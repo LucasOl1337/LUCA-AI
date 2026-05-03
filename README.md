@@ -13,6 +13,8 @@ npm run preview
 
 Rode `npm run server` para iniciar o backend em `http://127.0.0.1:4141`. Rode `npm run dev` para iniciar a UI em `http://127.0.0.1:5173`.
 
+Em producao local, rode `npm run build` e depois `npm run server`. O backend Express serve a UI compilada em `http://127.0.0.1:4141` junto com API e WebSocket na mesma origem.
+
 ## Baseline
 
 Antes de alterar o projeto, rode:
@@ -51,6 +53,16 @@ O backend mantem o estado real do sistema:
 - `riscos-campo`: executa os jobs derivados da pesquisa e grava status na database local.
 - Heartbeat: persistido em `.luca/heartbeat.jsonl` e exibido no card `heartbeat`.
 - Jobs: persistidos em `.luca/database-state.json`, mantendo configuracao minima e local.
+
+## Publicacao local
+
+- GitHub publico: `https://github.com/LucasOl1337/LUCA-AI`.
+- Tunnel Cloudflare nomeado: `LUCA-AI`.
+- Hostname publico: `https://luca-ai.fiapflow.com.br`.
+- Origem local do tunnel: `http://127.0.0.1:4141`.
+- Scripts de inicializacao local: `ops/run-backend.cmd` e `ops/run-tunnel.cmd`.
+
+O site continua rodando nesta maquina. Se o computador desligar, dormir, perder internet, ou se o backend parar, o hostname publico tambem para de responder corretamente.
 
 Variaveis opcionais:
 
