@@ -135,17 +135,25 @@ export class AgentRuntime {
       .join('\n');
 
     if (target) {
-      await this.store.updateJob(target.id, {
-        status: 'done',
-        lastRunAt: new Date().toISOString(),
-        lastSignal: `Job ${target.title}: ${target.focus}`,
-      });
+      const result = this.buildRiskResult({ database, target });
+      await this.store.completeJob(target.id, result);
       await this.store.appendHeartbeat({
         agentId: 'riscos-campo',
         jobId: target.id,
         status: 'done',
-        note: target.focus,
+        note: result.summary,
       });
+      return {
+        success: true,
+        output: [
+          `Job: ${target.title}`,
+          `Tipo: ${target.type}`,
+          `Resumo: ${result.summary}`,
+          `Base: ${database.source.name}`,
+          'Top riscos acionaveis:',
+          topRisks,
+        ].filter(Boolean).join('\n'),
+      };
     }
 
     return {
@@ -157,6 +165,78 @@ export class AgentRuntime {
         'Top riscos acionaveis:',
         topRisks,
       ].filter(Boolean).join('\n'),
+    };
+  }
+
+  buildRiskResult({ database, target }) {
+    const risk = database.painPoints.find((item) => item.id === target.riskId) ?? database.painPoints[0];
+    const createdAt = new Date().toISOString();
+    const base = {
+      id: `${target.id}-${Date.now()}`,
+      jobId: target.id,
+      missionId: target.missionId,
+      riskId: risk.id,
+      createdAt,
+    };
+
+    if (target.type === 'simulation') {
+      const simulatedLoss = Math.round(risk.score * 1.8);
+      const optimizedLoss = Math.round(simulatedLoss * 0.58);
+      const avoided = simulatedLoss - optimizedLoss;
+      return {
+        summary: `simulacao ${risk.name}: reduzir perda proxy de ${simulatedLoss} para ${optimizedLoss}`,
+        simulation: {
+          ...base,
+          title: `Simulacao: ${risk.name}`,
+          scenario: risk.signal,
+          before: `Resposta reativa: vistoria e decisao apos consolidacao do dano; perda proxy ${simulatedLoss}.`,
+          optimization: [
+            risk.agentAction,
+            'Classificar municipio/cultura por score antes da janela critica.',
+            'Priorizar fila de vistoria remota antes de deslocar equipe.',
+          ],
+          after: `Resposta otimizada: alerta, triagem e acao por severidade; perda proxy ${optimizedLoss}.`,
+          avoidedLossProxy: avoided,
+          severity: risk.score,
+        },
+      };
+    }
+
+    if (target.type === 'report') {
+      return {
+        summary: `relatorio ${risk.name}: acao preventiva consolidada`,
+        report: {
+          ...base,
+          title: `Relatorio preventivo: ${risk.name}`,
+          thesis: risk.impact,
+          findings: [
+            risk.signal,
+            `Criticidade ${risk.criticality} com score ${risk.score}.`,
+            `Dependencia operacional: ${target.focus}.`,
+          ],
+          nextActions: [
+            risk.agentAction,
+            'Converter sinal em regra de fila no dashboard.',
+            'Reavaliar resultado no proximo heartbeat.',
+          ],
+        },
+      };
+    }
+
+    return {
+      summary: `inteligencia ${risk.name}: ${risk.agentAction}`,
+      contribution: {
+        ...base,
+        title: `Contribuicao: ${risk.name}`,
+        insight: risk.impact,
+        evidence: risk.signal,
+        recommendation: risk.agentAction,
+        chart: {
+          label: risk.name,
+          value: risk.score,
+          kind: risk.criticality,
+        },
+      },
     };
   }
 

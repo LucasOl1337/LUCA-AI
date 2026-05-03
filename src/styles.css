@@ -415,6 +415,108 @@ button {
   font-family: inherit;
 }
 
+.operations-grid {
+  display: grid;
+  grid-template-columns: 0.9fr 1.2fr 0.9fr;
+  gap: 1px;
+  border-top: 1px solid var(--line);
+  background: var(--line);
+}
+
+.visual-panel,
+.scenario-panel,
+.job-panel {
+  min-height: 220px;
+  background: var(--panel);
+  padding: 16px;
+}
+
+.visual-panel {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.visual-panel img {
+  width: 96px;
+  height: 128px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.visual-panel h3,
+.scenario-panel h3,
+.job-panel h3,
+.report-box h3 {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: lowercase;
+}
+
+.visual-panel p,
+.scenario-panel p,
+.report-box p {
+  margin: 0 0 10px;
+  color: var(--soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.visual-panel strong {
+  color: var(--code);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scenario-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.scenario-compare span {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px;
+  color: var(--soft);
+  background: rgba(250, 249, 246, 0.02);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.job-panel {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.job-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  border-bottom: 1px solid rgba(250, 249, 246, 0.08);
+  padding-bottom: 7px;
+}
+
+.job-row span {
+  color: var(--soft);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.job-row mark {
+  border-radius: 3px;
+  padding: 2px 6px;
+  color: var(--code);
+  background: rgba(137, 216, 162, 0.08);
+  font-size: 9px;
+}
+
 .database-detail {
   display: grid;
   grid-template-columns: 0.85fr 1.15fr;
@@ -444,6 +546,12 @@ button {
   color: var(--soft);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.report-box {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
 }
 
 .risk-list {
@@ -506,6 +614,10 @@ button {
   }
 
   .dashboard-reports {
+    grid-template-columns: 1fr;
+  }
+
+  .operations-grid {
     grid-template-columns: 1fr;
   }
 

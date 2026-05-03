@@ -145,4 +145,9 @@ app.get(/.*/, (request, response) => {
 server.listen(config.port, '127.0.0.1', () => {
   console.log(`LUCA backend listening on http://127.0.0.1:${config.port}`);
   bus.emit('system.ready', { port: config.port });
+  supervisor.start().then(() => {
+    bus.emit('supervisor.autostarted', { reason: 'server boot' });
+  }).catch((error) => {
+    bus.emit('error', { scope: 'supervisor.autostart', message: error.message });
+  });
 });

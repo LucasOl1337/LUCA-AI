@@ -1,6 +1,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function slugify(value) {
   return value
     .toLowerCase()
@@ -21,6 +25,7 @@ export class MissionStore {
     this.databaseStateFile = path.join(lucaDir, 'database-state.json');
     this.heartbeatFile = path.join(lucaDir, 'heartbeat.jsonl');
     this.activeMissionId = null;
+    this.databaseMutation = Promise.resolve();
   }
 
   async init() {
@@ -142,25 +147,67 @@ export class MissionStore {
   }
 
   async ensureDatabaseState() {
+    const database = await this.readResearchDatabase();
     try {
       await fs.access(this.databaseStateFile);
-    } catch {
-      const database = await this.readResearchDatabase();
+    } catch (error) {
       await fs.writeFile(
         this.databaseStateFile,
         JSON.stringify({
           updatedAt: new Date().toISOString(),
+          cycle: 0,
           jobs: database.jobs,
+          autonomousMissions: [],
+          contributions: [],
+          simulations: [],
+          reports: [],
           lastCompletedJobId: null,
         }, null, 2),
         'utf8',
       );
+      return;
     }
+
+    let current = null;
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      try {
+        current = JSON.parse(await fs.readFile(this.databaseStateFile, 'utf8'));
+        break;
+      } catch {
+        await sleep(25);
+      }
+    }
+    if (!current) throw new Error('database state unreadable');
+
+    const migrated = {
+      cycle: current.cycle ?? 0,
+      jobs: current.jobs ?? database.jobs,
+      autonomousMissions: current.autonomousMissions ?? [],
+      contributions: current.contributions ?? [],
+      simulations: current.simulations ?? [],
+      reports: current.reports ?? [],
+      lastCompletedJobId: current.lastCompletedJobId ?? null,
+      updatedAt: current.updatedAt ?? new Date().toISOString(),
+    };
+    const needsMigration = ['cycle', 'jobs', 'autonomousMissions', 'contributions', 'simulations', 'reports', 'lastCompletedJobId']
+      .some((key) => current[key] === undefined);
+    if (needsMigration) await this.writeDatabaseState(migrated);
   }
 
   async readDatabaseState() {
     await this.ensureDatabaseState();
-    return JSON.parse(await fs.readFile(this.databaseStateFile, 'utf8'));
+    let lastError = null;
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      try {
+        const text = await fs.readFile(this.databaseStateFile, 'utf8');
+        if (!text.trim()) throw new Error('empty database state');
+        return JSON.parse(text);
+      } catch (error) {
+        lastError = error;
+        await sleep(25);
+      }
+    }
+    throw lastError;
   }
 
   async writeDatabaseState(state) {
@@ -173,24 +220,157 @@ export class MissionStore {
 
   async databaseSnapshot() {
     const database = await this.readResearchDatabase();
+    await this.ensureContinuousBacklog();
+    const nextState = await this.readDatabaseState();
+    const stateById = new Map((nextState.jobs ?? []).map((job) => [job.id, job]));
+    const liveJobs = (nextState.jobs ?? database.jobs).map((job) => ({ ...job, ...(stateById.get(job.id) ?? {}) }));
     const state = await this.readDatabaseState();
-    const stateById = new Map((state.jobs ?? []).map((job) => [job.id, job]));
     return {
       ...database,
-      jobs: database.jobs.map((job) => ({ ...job, ...(stateById.get(job.id) ?? {}) })),
+      metrics: {
+        ...database.metrics,
+        activeJobs: liveJobs.filter((job) => job.status === 'queued' || job.status === 'running').length,
+        completedJobs: liveJobs.filter((job) => job.status === 'done').length,
+        autonomousMissions: (state.autonomousMissions ?? []).length,
+        contributions: (state.contributions ?? []).length,
+        simulations: (state.simulations ?? []).length,
+        reports: (state.reports ?? []).length,
+      },
+      jobs: liveJobs,
+      autonomousMissions: state.autonomousMissions ?? [],
+      contributions: state.contributions ?? [],
+      simulations: state.simulations ?? [],
+      reports: state.reports ?? [],
       heartbeat: await this.tailHeartbeat(),
     };
   }
 
   async nextQueuedJob() {
+    await this.ensureContinuousBacklog();
     const state = await this.readDatabaseState();
     return (state.jobs ?? []).find((job) => job.status === 'queued' || job.status === 'watching') ?? null;
   }
 
   async updateJob(jobId, patch) {
-    const state = await this.readDatabaseState();
-    const jobs = (state.jobs ?? []).map((job) => (job.id === jobId ? { ...job, ...patch } : job));
-    await this.writeDatabaseState({ ...state, jobs, lastCompletedJobId: patch.status === 'done' ? jobId : state.lastCompletedJobId });
+    return this.mutateDatabaseState(async (state) => {
+      const jobs = (state.jobs ?? []).map((job) => (job.id === jobId ? { ...job, ...patch } : job));
+      return { ...state, jobs, lastCompletedJobId: patch.status === 'done' ? jobId : state.lastCompletedJobId };
+    });
+  }
+
+  async completeJob(jobId, result) {
+    return this.mutateDatabaseState(async (state) => {
+      const job = (state.jobs ?? []).find((item) => item.id === jobId);
+      const jobs = (state.jobs ?? []).map((item) => (
+        item.id === jobId
+          ? { ...item, status: 'done', lastRunAt: new Date().toISOString(), lastSignal: result.summary }
+          : item
+      ));
+      const missionId = job?.missionId ?? null;
+      const autonomousMissions = (state.autonomousMissions ?? []).map((mission) => {
+        if (mission.id !== missionId) return mission;
+        const missionJobs = jobs.filter((item) => item.missionId === missionId);
+        const done = missionJobs.length > 0 && missionJobs.every((item) => item.status === 'done');
+        return {
+          ...mission,
+          status: done ? 'done' : 'running',
+          completedAt: done ? new Date().toISOString() : mission.completedAt,
+        };
+      });
+
+      return {
+        ...state,
+        jobs,
+        autonomousMissions,
+        contributions: result.contribution ? [result.contribution, ...(state.contributions ?? [])].slice(0, 40) : (state.contributions ?? []),
+        simulations: result.simulation ? [result.simulation, ...(state.simulations ?? [])].slice(0, 24) : (state.simulations ?? []),
+        reports: result.report ? [result.report, ...(state.reports ?? [])].slice(0, 24) : (state.reports ?? []),
+        lastCompletedJobId: jobId,
+      };
+    });
+  }
+
+  async ensureContinuousBacklog() {
+    let createdMission = null;
+    await this.mutateDatabaseState(async (state) => {
+      const hasOpenJob = (state.jobs ?? []).some((job) => job.status === 'queued' || job.status === 'watching' || job.status === 'running');
+      if (hasOpenJob) return state;
+
+      const database = await this.readResearchDatabase();
+      const cycle = (state.cycle ?? 0) + 1;
+      const topRisk = database.painPoints[(cycle - 1) % database.painPoints.length];
+      const secondaryRisk = database.painPoints[cycle % database.painPoints.length];
+      const missionId = `auto-${String(cycle).padStart(4, '0')}-${topRisk.id}`;
+      createdMission = {
+        id: missionId,
+        title: `prevenir ${topRisk.name.toLowerCase()}`,
+        status: 'queued',
+        createdAt: new Date().toISOString(),
+        scope: topRisk.impact,
+        success: 'gerar contribuicao, simulacao e relatorio acionavel para prevencao de risco Sompo',
+      };
+      const jobs = [
+        {
+          id: `${missionId}-intel`,
+          missionId,
+          title: `conteudo util: ${topRisk.name}`,
+          type: 'intelligence',
+          cadence: 'heartbeat',
+          owner: 'riscos-campo',
+          status: 'queued',
+          focus: topRisk.agentAction,
+          riskId: topRisk.id,
+        },
+        {
+          id: `${missionId}-sim`,
+          missionId,
+          title: `simulacao real: ${topRisk.name}`,
+          type: 'simulation',
+          cadence: 'heartbeat',
+          owner: 'riscos-campo',
+          status: 'queued',
+          focus: `simular ${topRisk.signal} e otimizar resposta operacional`,
+          riskId: topRisk.id,
+        },
+        {
+          id: `${missionId}-report`,
+          missionId,
+          title: `relatorio preventivo: ${topRisk.name}`,
+          type: 'report',
+          cadence: 'heartbeat',
+          owner: 'riscos-campo',
+          status: 'queued',
+          focus: `consolidar ${topRisk.name} com dependencia cruzada: ${secondaryRisk.name}`,
+          riskId: topRisk.id,
+        },
+      ];
+
+      return {
+        ...state,
+        cycle,
+        jobs: [...(state.jobs ?? []), ...jobs].slice(-60),
+        autonomousMissions: [createdMission, ...(state.autonomousMissions ?? [])].slice(0, 30),
+      };
+    });
+    if (createdMission) {
+      await this.appendHeartbeat({
+        agentId: 'supervisor',
+        status: 'mission.setup',
+        missionId: createdMission.id,
+        note: createdMission.title,
+      });
+    }
+  }
+
+  async mutateDatabaseState(mutator) {
+    const run = this.databaseMutation.then(async () => {
+      const state = await this.readDatabaseState();
+      const nextState = await mutator(state);
+      await this.writeDatabaseState(nextState);
+      return nextState;
+    });
+    this.databaseMutation = run.catch(() => {});
+    return run;
   }
 
   async appendHeartbeat(entry) {

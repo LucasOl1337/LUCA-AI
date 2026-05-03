@@ -23,6 +23,10 @@ const fallbackDatabase = {
   },
   painPoints: [],
   jobs: [],
+  autonomousMissions: [],
+  contributions: [],
+  simulations: [],
+  reports: [],
   heartbeat: [],
   charts: {
     criticality: [],
@@ -57,6 +61,10 @@ function App() {
     sompo: database.charts.capital,
   };
   const completedJobs = database.jobs.filter((job) => job.status === 'done').length;
+  const latestMission = database.autonomousMissions[0];
+  const latestSimulation = database.simulations[0];
+  const latestReport = database.reports[0];
+  const latestContributions = database.contributions.slice(0, 3);
 
   useEffect(() => {
     let socket = null;
@@ -277,16 +285,16 @@ function App() {
         </div>
         <div className="dashboard-stats">
           <div className="stat-card">
-            <h3>pesquisa</h3>
-            <p>{database.metrics.painPoints} dores mapeadas · {database.metrics.veryHigh} criticas</p>
+            <h3>missoes autonomas</h3>
+            <p>{database.metrics.autonomousMissions} ciclos · {latestMission?.status ?? 'preparando'}</p>
           </div>
           <div className="stat-card">
             <h3>agentes</h3>
             <p>{supervisorMode} · {terminals.length} executor · {completedJobs}/{database.jobs.length} jobs</p>
           </div>
           <div className="stat-card">
-            <h3>heartbeat</h3>
-            <p>{database.heartbeat.length} eventos · {activeMission ? activeMission.title : database.source.topic}</p>
+            <h3>database viva</h3>
+            <p>{database.metrics.contributions} insights · {database.metrics.simulations} simulacoes · {database.metrics.reports} relatorios</p>
           </div>
         </div>
         <div className="dashboard-reports">
@@ -334,19 +342,56 @@ function App() {
             </div>
           </div>
         </div>
+        <div className="operations-grid">
+          <section className="visual-panel">
+            <img src="/agents/agent-riscos-campo.jpg" alt="riscos campo" />
+            <div>
+              <h3>simulacao ativa</h3>
+              <p>{latestSimulation?.title ?? 'aguardando simulacao do heartbeat'}</p>
+              <strong>{latestSimulation ? `${latestSimulation.avoidedLossProxy} pontos de perda proxy evitada` : 'sem cenario processado'}</strong>
+            </div>
+          </section>
+          <section className="scenario-panel">
+            <h3>otimizacao da situacao</h3>
+            {latestSimulation ? (
+              <>
+                <p>{latestSimulation.scenario}</p>
+                <div className="scenario-compare">
+                  <span>{latestSimulation.before}</span>
+                  <span>{latestSimulation.after}</span>
+                </div>
+              </>
+            ) : (
+              <p>o proximo ciclo do supervisor cria uma simulacao operacional.</p>
+            )}
+          </section>
+          <section className="job-panel">
+            <h3>fila incessante</h3>
+            {database.jobs.slice(-6).reverse().map((job) => (
+              <div className="job-row" key={job.id}>
+                <span>{job.title}</span>
+                <mark>{job.status}</mark>
+              </div>
+            ))}
+          </section>
+        </div>
         <div className="database-detail">
           <div className="database-summary">
             <h3>diagnostico</h3>
             <p>{database.summary}</p>
+            <div className="report-box">
+              <h3>{latestReport?.title ?? 'relatorio em construcao'}</h3>
+              <p>{latestReport?.thesis ?? 'o agente riscos-campo ainda esta consolidando o proximo relatorio.'}</p>
+            </div>
           </div>
           <div className="risk-list">
-            {database.painPoints.slice(0, 4).map((risk) => (
-              <article className="risk-item" key={risk.id}>
+            {(latestContributions.length ? latestContributions : database.painPoints.slice(0, 3)).map((item) => (
+              <article className="risk-item" key={item.id}>
                 <div>
-                  <h3>{risk.name}</h3>
-                  <p>{risk.impact}</p>
+                  <h3>{item.title ?? item.name}</h3>
+                  <p>{item.recommendation ?? item.impact}</p>
                 </div>
-                <mark>{risk.score}</mark>
+                <mark>{item.chart?.value ?? item.score}</mark>
               </article>
             ))}
           </div>

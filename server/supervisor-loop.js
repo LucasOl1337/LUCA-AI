@@ -89,6 +89,7 @@ export class SupervisorLoop {
           {
             type: 'send_to_executor',
             target: 'riscos-campo',
+            jobId: nextJob.id,
             message: `Execute job ${nextJob.id}: ${nextJob.title}. Escopo: ${nextJob.focus}. Contexto: ${missionLabel}`,
           },
         ],
@@ -110,6 +111,9 @@ export class SupervisorLoop {
     for (const action of decision.actions) {
       if (action.type === 'send_to_executor') {
         await this.agents.write('supervisor', `[send] ${action.target} <- ${action.message}`);
+        if (action.jobId) {
+          await this.store.updateJob(action.jobId, { status: 'running', startedAt: new Date().toISOString() });
+        }
         await this.agents.sendToExecutor(action.target, action.message);
       }
     }
