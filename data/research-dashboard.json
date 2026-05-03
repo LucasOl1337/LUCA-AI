@@ -1,0 +1,133 @@
+{
+  "source": {
+    "name": "deep-research-report.md",
+    "path": "C:/Users/user/Downloads/deep-research-report.md",
+    "topic": "Sompo agro 2025-2026",
+    "updatedAt": "2026-05-03"
+  },
+  "summary": "O agro da Sompo combina exposicao climatica recorrente, dependencia do PSR, pressao de resseguro, canal corretor caro, gap de dados/modelagem, sinistro pesado e janela regulatoria comprimida.",
+  "metrics": {
+    "painPoints": 7,
+    "veryHigh": 3,
+    "high": 4,
+    "psrBlockedMillions": 445,
+    "psrBudgetMillions": 1000,
+    "ruralLossRatioPct": 69.89,
+    "reinsurerPremium2025Millions": 85,
+    "reinsurerTarget2026Millions": 200,
+    "brokerCampaignCount": 3000,
+    "campaignAgriculturalGrowthPct": 110
+  },
+  "painPoints": [
+    {
+      "id": "clima",
+      "name": "Clima acima do apetite tecnico",
+      "criticality": "muito alta",
+      "score": 95,
+      "impact": "Sinistralidade rural perto ou acima de 70%, com consumo maior de resseguro e margem tecnica comprimida.",
+      "signal": "Seca e restricao hidrica afetando soja no RS e milho no PR em 2026.",
+      "agentAction": "Priorizar alerta climatico, microclima, safra, cultura e janela de contratacao."
+    },
+    {
+      "id": "psr",
+      "name": "Dependencia estrutural do PSR",
+      "criticality": "muito alta",
+      "score": 92,
+      "impact": "Mercado subvencionado reduzido por bloqueio de R$ 445 mi de um orcamento de R$ 1 bi.",
+      "signal": "Cronograma do PSR cobriu apenas parte de 2025 e 17 seguradoras disputam a mesma verba.",
+      "agentAction": "Monitorar verba, calendario, cultura elegivel e risco de pipeline travado."
+    },
+    {
+      "id": "resseguro",
+      "name": "Pressao de resseguro e capital",
+      "criticality": "muito alta",
+      "score": 90,
+      "impact": "Retencao local maior exige disciplina tecnica antes de crescer volume agro.",
+      "signal": "Sompo Resseguradora saiu de R$ 85 mi em premios em 2025 para meta de R$ 200 mi em 2026.",
+      "agentAction": "Sinalizar crescimento sem preco adequado como risco de capital."
+    },
+    {
+      "id": "canal",
+      "name": "Crescimento dependente de canal",
+      "criticality": "alta",
+      "score": 82,
+      "impact": "Volume cresce com incentivo comercial, mas fica caro e menos previsivel.",
+      "signal": "Campanha com mais de 3 mil corretores e 110% de crescimento entre vencedores.",
+      "agentAction": "Separar crescimento organico de crescimento empurrado por campanha."
+    },
+    {
+      "id": "modelagem",
+      "name": "Gap de dados e modelagem",
+      "criticality": "alta",
+      "score": 80,
+      "impact": "Risco de subprecificacao, selecao adversa e resposta lenta a mudancas microclimaticas.",
+      "signal": "IA aparece publicamente em outras linhas, mas nao com a mesma clareza no agro.",
+      "agentAction": "Criar tarefas de enriquecimento por solo, manejo, clima e historico regional."
+    },
+    {
+      "id": "sinistro",
+      "name": "Sinistro agricola pesado",
+      "criticality": "alta",
+      "score": 78,
+      "impact": "OPEX maior, TAT maior e mais atrito com produtor/corretor em picos climaticos.",
+      "signal": "Produtos de produtividade e multirrisco exigem regulacao e pericia em campo.",
+      "agentAction": "Priorizar triagem, sensoriamento remoto e filas por severidade."
+    },
+    {
+      "id": "regulatorio",
+      "name": "Janela regulatoria comprimida",
+      "criticality": "alta",
+      "score": 75,
+      "impact": "Custo maior de produto, compliance, tecnologia e reprecificacao.",
+      "signal": "SUSEP, CNSP e Zarc NM mudaram referencias em 2025-2026.",
+      "agentAction": "Criar checklist de refresh de produto, governanca e underwriting."
+    }
+  ],
+  "charts": {
+    "criticality": [
+      { "name": "Muito alta", "value": 3 },
+      { "name": "Alta", "value": 4 }
+    ],
+    "pressure": [
+      { "name": "Clima", "value": 95 },
+      { "name": "PSR", "value": 92 },
+      { "name": "Resseguro", "value": 90 },
+      { "name": "Canal", "value": 82 },
+      { "name": "Modelagem", "value": 80 },
+      { "name": "Sinistro", "value": 78 },
+      { "name": "Regulatorio", "value": 75 }
+    ],
+    "capital": [
+      { "name": "PSR bloqueado", "value": 445 },
+      { "name": "PSR disponivel", "value": 555 },
+      { "name": "Resseg 2025", "value": 85 },
+      { "name": "Meta resseg 2026", "value": 200 }
+    ]
+  },
+  "jobs": [
+    {
+      "id": "climate-watch",
+      "title": "vigiar clima e produtividade",
+      "cadence": "heartbeat",
+      "owner": "riscos-campo",
+      "status": "queued",
+      "focus": "secar, excesso de chuva, cultura, UF e janela de safra"
+    },
+    {
+      "id": "psr-watch",
+      "title": "vigiar PSR e calendario",
+      "cadence": "heartbeat",
+      "owner": "riscos-campo",
+      "status": "queued",
+      "focus": "verba, bloqueio, culturas elegiveis e competicao por subsidio"
+    },
+    {
+      "id": "claims-triage",
+      "title": "triagem de sinistro agricola",
+      "cadence": "heartbeat",
+      "owner": "riscos-campo",
+      "status": "queued",
+      "focus": "prioridade operacional, TAT e evidencias de campo"
+    }
+  ]
+}
