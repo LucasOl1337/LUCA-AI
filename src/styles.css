@@ -517,6 +517,53 @@ button {
   font-size: 9px;
 }
 
+.ops-knowledge-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  border-top: 1px solid var(--line);
+  background: var(--line);
+}
+
+.knowledge-panel {
+  min-height: 210px;
+  background: var(--panel);
+  padding: 16px;
+}
+
+.knowledge-panel h3 {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: lowercase;
+}
+
+.knowledge-panel p {
+  margin: 0 0 12px;
+  color: var(--soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.knowledge-panel ul {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.knowledge-panel li {
+  border: 1px solid rgba(250, 249, 246, 0.1);
+  border-radius: 5px;
+  padding: 7px 8px;
+  color: var(--soft);
+  background: rgba(250, 249, 246, 0.02);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .database-detail {
   display: grid;
   grid-template-columns: 0.85fr 1.15fr;
@@ -618,6 +665,10 @@ button {
   }
 
   .operations-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ops-knowledge-grid {
     grid-template-columns: 1fr;
   }
 

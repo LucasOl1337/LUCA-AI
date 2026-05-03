@@ -161,6 +161,9 @@ export class MissionStore {
           contributions: [],
           simulations: [],
           reports: [],
+          truthSources: [],
+          methods: [],
+          procedures: [],
           lastCompletedJobId: null,
         }, null, 2),
         'utf8',
@@ -186,10 +189,13 @@ export class MissionStore {
       contributions: current.contributions ?? [],
       simulations: current.simulations ?? [],
       reports: current.reports ?? [],
+      truthSources: current.truthSources ?? [],
+      methods: current.methods ?? [],
+      procedures: current.procedures ?? [],
       lastCompletedJobId: current.lastCompletedJobId ?? null,
       updatedAt: current.updatedAt ?? new Date().toISOString(),
     };
-    const needsMigration = ['cycle', 'jobs', 'autonomousMissions', 'contributions', 'simulations', 'reports', 'lastCompletedJobId']
+    const needsMigration = ['cycle', 'jobs', 'autonomousMissions', 'contributions', 'simulations', 'reports', 'truthSources', 'methods', 'procedures', 'lastCompletedJobId']
       .some((key) => current[key] === undefined);
     if (needsMigration) await this.writeDatabaseState(migrated);
   }
@@ -235,12 +241,18 @@ export class MissionStore {
         contributions: (state.contributions ?? []).length,
         simulations: (state.simulations ?? []).length,
         reports: (state.reports ?? []).length,
+        truthSources: (state.truthSources ?? []).length,
+        methods: (state.methods ?? []).length,
+        procedures: (state.procedures ?? []).length,
       },
       jobs: liveJobs,
       autonomousMissions: state.autonomousMissions ?? [],
       contributions: state.contributions ?? [],
       simulations: state.simulations ?? [],
       reports: state.reports ?? [],
+      truthSources: state.truthSources ?? [],
+      methods: state.methods ?? [],
+      procedures: state.procedures ?? [],
       heartbeat: await this.tailHeartbeat(),
     };
   }
@@ -285,6 +297,9 @@ export class MissionStore {
         contributions: result.contribution ? [result.contribution, ...(state.contributions ?? [])].slice(0, 40) : (state.contributions ?? []),
         simulations: result.simulation ? [result.simulation, ...(state.simulations ?? [])].slice(0, 24) : (state.simulations ?? []),
         reports: result.report ? [result.report, ...(state.reports ?? [])].slice(0, 24) : (state.reports ?? []),
+        truthSources: result.truthSource ? [result.truthSource, ...(state.truthSources ?? [])].slice(0, 40) : (state.truthSources ?? []),
+        methods: result.method ? [result.method, ...(state.methods ?? [])].slice(0, 40) : (state.methods ?? []),
+        procedures: result.procedure ? [result.procedure, ...(state.procedures ?? [])].slice(0, 40) : (state.procedures ?? []),
         lastCompletedJobId: jobId,
       };
     });
@@ -341,6 +356,39 @@ export class MissionStore {
           owner: 'riscos-campo',
           status: 'queued',
           focus: `consolidar ${topRisk.name} com dependencia cruzada: ${secondaryRisk.name}`,
+          riskId: topRisk.id,
+        },
+        {
+          id: `${missionId}-source`,
+          missionId,
+          title: `fonte da verdade: ${topRisk.name}`,
+          type: 'source',
+          cadence: 'heartbeat',
+          owner: 'riscos-campo',
+          status: 'queued',
+          focus: `definir indicadores, evidencias e campos mestres para ${topRisk.name}`,
+          riskId: topRisk.id,
+        },
+        {
+          id: `${missionId}-method`,
+          missionId,
+          title: `metodo de lucro e qualidade: ${topRisk.name}`,
+          type: 'method',
+          cadence: 'heartbeat',
+          owner: 'riscos-campo',
+          status: 'queued',
+          focus: `otimizar margem tecnica, TAT e qualidade de servico em ${topRisk.name}`,
+          riskId: topRisk.id,
+        },
+        {
+          id: `${missionId}-procedure`,
+          missionId,
+          title: `procedimento operacional: ${topRisk.name}`,
+          type: 'procedure',
+          cadence: 'heartbeat',
+          owner: 'riscos-campo',
+          status: 'queued',
+          focus: `criar rotina executavel para equipe/corretor/produtor em ${topRisk.name}`,
           riskId: topRisk.id,
         },
       ];

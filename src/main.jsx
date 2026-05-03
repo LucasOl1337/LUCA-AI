@@ -27,6 +27,9 @@ const fallbackDatabase = {
   contributions: [],
   simulations: [],
   reports: [],
+  truthSources: [],
+  methods: [],
+  procedures: [],
   heartbeat: [],
   charts: {
     criticality: [],
@@ -65,6 +68,9 @@ function App() {
   const latestSimulation = database.simulations[0];
   const latestReport = database.reports[0];
   const latestContributions = database.contributions.slice(0, 3);
+  const latestTruthSource = database.truthSources[0];
+  const latestMethod = database.methods[0];
+  const latestProcedure = database.procedures[0];
 
   useEffect(() => {
     let socket = null;
@@ -294,7 +300,7 @@ function App() {
           </div>
           <div className="stat-card">
             <h3>database viva</h3>
-            <p>{database.metrics.contributions} insights · {database.metrics.simulations} simulacoes · {database.metrics.reports} relatorios</p>
+            <p>{database.metrics.truthSources ?? 0} fontes · {database.metrics.methods ?? 0} metodos · {database.metrics.procedures ?? 0} procedimentos</p>
           </div>
         </div>
         <div className="dashboard-reports">
@@ -373,6 +379,35 @@ function App() {
                 <mark>{job.status}</mark>
               </div>
             ))}
+          </section>
+        </div>
+        <div className="ops-knowledge-grid">
+          <section className="knowledge-panel">
+            <h3>fonte da verdade</h3>
+            <p>{latestTruthSource?.title ?? 'aguardando fonte da verdade'}</p>
+            <ul>
+              {(latestTruthSource?.masterFields ?? ['risco_id', 'score_criticidade', 'acao_recomendada']).slice(0, 5).map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </section>
+          <section className="knowledge-panel">
+            <h3>metodo de lucro e qualidade</h3>
+            <p>{latestMethod?.title ?? 'aguardando metodo operacional'}</p>
+            <ul>
+              {(latestMethod?.profitLevers ?? ['reprecificar risco critico', 'reduzir TAT', 'preservar margem']).slice(0, 3).map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </section>
+          <section className="knowledge-panel">
+            <h3>procedimento de trabalho</h3>
+            <p>{latestProcedure?.title ?? 'aguardando procedimento'}</p>
+            <ul>
+              {(latestProcedure?.steps ?? ['abrir alerta', 'coletar evidencia', 'registrar proximo passo']).slice(0, 4).map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
           </section>
         </div>
         <div className="database-detail">

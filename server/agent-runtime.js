@@ -223,6 +223,85 @@ export class AgentRuntime {
       };
     }
 
+    if (target.type === 'source') {
+      return {
+        summary: `fonte da verdade ${risk.name}: indicadores mestres definidos`,
+        truthSource: {
+          ...base,
+          title: `Fonte da verdade: ${risk.name}`,
+          owner: 'riscos-campo',
+          purpose: 'Separar fato operacional de opiniao para decisao de precificacao, vistoria e atendimento.',
+          masterFields: [
+            'risco_id',
+            'cultura',
+            'uf_municipio',
+            'janela_safra',
+            'score_criticidade',
+            'sinal_climatico_ou_regulatorio',
+            'impacto_margem',
+            'impacto_tat',
+            'acao_recomendada',
+          ],
+          acceptanceRules: [
+            'Todo alerta precisa apontar risco, localidade/cultura ou regra afetada.',
+            'Toda decisao precisa ter score e acao recomendada.',
+            'Toda excecao comercial precisa declarar impacto em margem e qualidade.',
+          ],
+          sourceSignal: risk.signal,
+          profitUse: 'Evitar aceitar risco sem preco, franquia ou resseguro coerente.',
+          qualityUse: 'Reduzir espera e retrabalho ao padronizar a evidencia minima antes da vistoria.',
+        },
+      };
+    }
+
+    if (target.type === 'method') {
+      return {
+        summary: `metodo ${risk.name}: margem e qualidade com score operacional`,
+        method: {
+          ...base,
+          title: `Metodo: ${risk.name}`,
+          objective: 'Otimizar lucro tecnico sem degradar a qualidade percebida pelo corretor/produtor.',
+          formula: 'prioridade = score_criticidade + impacto_margem + impacto_tat - confianca_baixa',
+          profitLevers: [
+            'Reprecificar ou limitar aceitacao quando score >= 85.',
+            'Usar franquia, sublimite ou resseguro quando o impacto de capital subir.',
+            'Separar crescimento organico de campanha comercial para nao comprar volume ruim.',
+          ],
+          qualityLevers: [
+            'Antecipar comunicacao ao corretor antes do pico de sinistro.',
+            'Triar documentos e imagem remota antes de acionar campo.',
+            'Usar checklist unico para reduzir ida e volta entre produtor, corretor e regulacao.',
+          ],
+          decisionGate: `Aplicar metodo quando ${risk.name.toLowerCase()} estiver com score ${risk.score} ou maior.`,
+        },
+      };
+    }
+
+    if (target.type === 'procedure') {
+      return {
+        summary: `procedimento ${risk.name}: rotina executavel criada`,
+        procedure: {
+          ...base,
+          title: `Procedimento: ${risk.name}`,
+          trigger: risk.signal,
+          steps: [
+            'Abrir alerta no heartbeat e vincular ao risco mestre.',
+            'Coletar campos minimos da fonte da verdade.',
+            'Calcular prioridade operacional e impacto de margem.',
+            'Escolher resposta: aceitar, reprecificar, limitar, vistoriar remoto, vistoriar campo ou pausar venda.',
+            'Registrar resultado e relatorio no proximo ciclo.',
+          ],
+          roles: [
+            'supervisor: decide fila e criterio de sucesso',
+            'riscos-campo: coleta evidencia, simula resposta e gera procedimento',
+            'database: guarda fonte da verdade, metodo, procedimento e historico',
+          ],
+          serviceQualityCheck: 'Nenhum caso critico fica sem proximo passo, dono e evidencia minima.',
+          profitCheck: 'Nenhuma expansao comercial entra sem registrar impacto esperado em margem tecnica.',
+        },
+      };
+    }
+
     return {
       summary: `inteligencia ${risk.name}: ${risk.agentAction}`,
       contribution: {
