@@ -17,8 +17,13 @@ const bus = new EventBus({ store });
 const agents = new AgentRuntime({ store, bus, config });
 const supervisor = new SupervisorLoop({ store, bus, agents, heartbeatMs: config.heartbeatMs });
 
+const allowedOrigins = [`http://127.0.0.1:${config.port}`, `http://localhost:${config.port}`];
+
 app.use((request, response, next) => {
-  response.header('Access-Control-Allow-Origin', '*');
+  const origin = request.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    response.header('Access-Control-Allow-Origin', origin);
+  }
   response.header('Access-Control-Allow-Headers', 'Content-Type');
   response.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (request.method === 'OPTIONS') return response.sendStatus(200);
@@ -72,45 +77,58 @@ app.get('/api/database', async (request, response) => {
 app.post('/api/mission/activate', async (request, response) => {
   const mission = request.body;
   if (!mission?.title?.trim()) {
-    response.status(400).json({ error: 'mission.title required' });
-    return;
+    return response.status(400).json({ error: 'mission.title required' });
   }
-
-  await supervisor.reset();
-  await agents.resetEnvironment();
-  store.clearActiveMission();
-  currentMissionSnapshot = null;
-
-  const savedMission = await store.createMission(mission);
-  currentMissionSnapshot = savedMission;
-  bus.emit('mission.activated', { mission: savedMission });
-  await agents.write('supervisor', `[mission] active: ${savedMission.title}`);
-  await supervisor.start();
-  bus.emit('supervisor.started', { reason: 'mission activated' });
-  await broadcastState();
-  response.json({ mission: savedMission });
+  try {
+    await supervisor.reset();
+    await agents.resetEnvironment();
+    store.clearActiveMission();
+    currentMissionSnapshot = null;
+    const savedMission = await store.createMission(mission);
+    currentMissionSnapshot = savedMission;
+    bus.emit('mission.activated', { mission: savedMission });
+    await agents.write('supervisor', `[mission] active: ${savedMission.title}`);
+    await supervisor.start();
+    bus.emit('supervisor.started', { reason: 'mission activated' });
+    await broadcastState();
+    response.json({ mission: savedMission });
+  } catch (error) {
+    console.error('[api] mission activate failed:', error);
+    try { await supervisor.reset(); } catch {}
+    response.status(500).json({ error: error.message });
+  }
 });
 
 app.post('/api/mission/reset', async (request, response) => {
-  await supervisor.reset();
-  await agents.resetEnvironment();
-  store.clearActiveMission();
-  currentMissionSnapshot = null;
-  bus.emit('mission.reset');
-  await broadcastState();
-  response.json({ ok: true });
+  try {
+    await supervisor.reset();
+    await agents.resetEnvironment();
+    store.clearActiveMission();
+    currentMissionSnapshot = null;
+    bus.emit('mission.reset');
+    await broadcastState();
+    response.json({ ok: true });
+  } catch (error) {
+    console.error('[api] mission reset failed:', error);
+    response.status(500).json({ error: error.message });
+  }
 });
 
 app.post('/api/database/reset-field-prevention', async (request, response) => {
-  await supervisor.pause();
-  await supervisor.reset();
-  agents.resetAll();
-  store.clearActiveMission();
-  currentMissionSnapshot = null;
-  const result = await store.resetRuntimeDatabase();
-  bus.emit('database.reset', { backupDir: result.backupDir });
-  await broadcastState();
-  response.json({ ok: true, backupDir: result.backupDir });
+  try {
+    await supervisor.pause();
+    await supervisor.reset();
+    agents.resetAll();
+    store.clearActiveMission();
+    currentMissionSnapshot = null;
+    const result = await store.resetRuntimeDatabase();
+    bus.emit('database.reset', { backupDir: result.backupDir });
+    await broadcastState();
+    response.json({ ok: true, backupDir: result.backupDir });
+  } catch (error) {
+    console.error('[api] database reset failed:', error);
+    response.status(500).json({ error: error.message });
+  }
 });
 
 app.post('/api/supervisor/start', async (request, response) => {

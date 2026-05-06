@@ -410,7 +410,9 @@ export class MissionStore {
       await this.writeDatabaseState(nextState);
       return nextState;
     });
-    this.databaseMutation = run.catch(() => {});
+    this.databaseMutation = run.catch((error) => {
+      console.error('[mission-store] mutation failed:', error);
+    });
     return run;
   }
 

@@ -1,4 +1,12 @@
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
+import fs from 'node:fs';
+import nodePath from 'node:path';
 import { runCodexTask } from './codex-session.js';
+
+const execPromise = promisify(exec);
+
+const SAFE_COMMAND_PREFIXES = ['dir ', 'ls ', 'echo ', 'get-content ', 'get-childitem '];
 
 const baseAgents = [
   {
@@ -46,9 +54,9 @@ function normalizeStringArray(value) {
 
 function extractJson(raw) {
   const lines = String(raw).split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  for (const line of lines.reverse()) {
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
     try {
-      const event = JSON.parse(line);
+      const event = JSON.parse(lines[i]);
       const text = event.item?.text ?? event.text ?? event.message;
       if (typeof text === 'string') return JSON.parse(text);
       if (event.summary || event.executiveValue) return event;
@@ -490,26 +498,17 @@ export class AgentRuntime {
   }
 
   async executeCommand(task) {
-    const { exec } = await import('node:child_process');
-    const util = await import('node:util');
-    const execPromise = util.promisify(exec);
-    const fs = await import('node:fs');
-    const path = await import('node:path');
-
+    const desktop = nodePath.join(process.env.USERPROFILE || process.env.HOME || '.', 'Desktop');
     let command = task.trim();
     const missionMatch = command.match(/missao:\s*(.+?)\.\s*Criterio:/i);
-    if (missionMatch) {
-      command = missionMatch[1].trim();
-    }
-
+    if (missionMatch) command = missionMatch[1].trim();
     const lowerCommand = command.toLowerCase();
-    const desktop = path.join(process.env.USERPROFILE || process.env.HOME || '.', 'Desktop');
 
     if (lowerCommand.includes('cria') && lowerCommand.includes('arquivo') && lowerCommand.includes('.md')) {
       const fileMatch = command.match(/chamado\s+(\S+)/i);
       if (fileMatch) {
         const fileName = fileMatch[1].replace(/\.md$/i, '') + '.md';
-        const filePath = path.join(desktop, fileName);
+        const filePath = nodePath.join(desktop, fileName);
         const content = command.includes('preencha') ? `# ${fileName}\n\nGerado por LUCA-AI em ${new Date().toLocaleString('pt-BR')}\n\nMissao executada com sucesso.` : '';
         fs.writeFileSync(filePath, content, 'utf8');
         return { success: true, output: `Arquivo criado: ${filePath}` };
@@ -518,18 +517,17 @@ export class AgentRuntime {
 
     if (lowerCommand.includes('novo arquivo') || lowerCommand.includes('new file') || lowerCommand.includes('criar arquivo')) {
       const fileName = `luca_task_${Date.now()}.md`;
-      const filePath = path.join(desktop, fileName);
+      const filePath = nodePath.join(desktop, fileName);
       const content = `# ${fileName}\n\nGerado por LUCA-AI em ${new Date().toLocaleString('pt-BR')}\n\nMissao executada com sucesso.`;
       fs.writeFileSync(filePath, content, 'utf8');
       return { success: true, output: `Arquivo criado: ${filePath}` };
     }
 
-    if (lowerCommand.startsWith('powershell') || lowerCommand.startsWith('cmd') || lowerCommand.startsWith('node') || lowerCommand.startsWith('dir') || lowerCommand.startsWith('ls') || lowerCommand.startsWith('echo') || lowerCommand.startsWith('new-item') || lowerCommand.startsWith('set-content') || lowerCommand.startsWith('add-content') || lowerCommand.startsWith('get-content') || lowerCommand.startsWith('remove-item') || lowerCommand.startsWith('copy-item') || lowerCommand.startsWith('move-item')) {
+    if (SAFE_COMMAND_PREFIXES.some((prefix) => lowerCommand.startsWith(prefix))) {
       try {
         const { stdout, stderr } = await execPromise(command, {
-          timeout: 30000,
-          maxBuffer: 1024 * 1024,
-          env: { ...process.env, LUCA_TASK: 'true' },
+          timeout: 15000,
+          maxBuffer: 256 * 1024,
         });
         return { success: !stderr, output: stdout || stderr };
       } catch (error) {
@@ -537,16 +535,6 @@ export class AgentRuntime {
       }
     }
 
-    const psCommand = `powershell -NoProfile -Command "${command.replace(/"/g, '`"')}"`;
-    try {
-      const { stdout, stderr } = await execPromise(psCommand, {
-        timeout: 30000,
-        maxBuffer: 1024 * 1024,
-        env: { ...process.env, LUCA_TASK: 'true' },
-      });
-      return { success: !stderr, output: stdout || stderr };
-    } catch (error) {
-      return { success: false, output: error.message };
-    }
+    return { success: false, output: `Comando nao permitido: ${command.slice(0, 80)}` };
   }
 }
