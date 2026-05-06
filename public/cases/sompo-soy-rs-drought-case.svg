@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">Caso 001: soja RS com restricao hidrica</title>
+  <desc id="desc">Visual operacional de lavoura, talhoes priorizados e vistoria preventiva em campo.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#26322d"/>
+      <stop offset="1" stop-color="#10140f"/>
+    </linearGradient>
+    <linearGradient id="field" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#7a7446"/>
+      <stop offset="0.55" stop-color="#3e5c38"/>
+      <stop offset="1" stop-color="#1f3323"/>
+    </linearGradient>
+    <filter id="soft">
+      <feGaussianBlur stdDeviation="10"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="760" fill="#090b08"/>
+  <rect width="1200" height="360" fill="url(#sky)"/>
+  <circle cx="1030" cy="104" r="74" fill="#d7b36e" opacity="0.72" filter="url(#soft)"/>
+  <path d="M0 335 C180 292 315 310 470 278 C640 244 822 265 1200 220 L1200 760 L0 760 Z" fill="url(#field)"/>
+  <g opacity="0.35" stroke="#d8c477" stroke-width="2">
+    <path d="M-20 720 C220 580 390 460 540 300"/>
+    <path d="M130 760 C325 595 510 430 680 276"/>
+    <path d="M356 760 C520 602 680 448 840 258"/>
+    <path d="M610 760 C720 594 870 410 1040 238"/>
+    <path d="M870 760 C930 610 1020 450 1200 296"/>
+  </g>
+  <g opacity="0.18" stroke="#0b0d0a" stroke-width="8">
+    <path d="M-20 645 C260 520 455 420 605 290"/>
+    <path d="M210 745 C405 588 590 430 746 274"/>
+    <path d="M500 746 C630 590 770 430 970 242"/>
+  </g>
+  <g>
+    <rect x="68" y="64" width="372" height="166" rx="8" fill="#10120f" opacity="0.94" stroke="#f4f0df" stroke-opacity="0.18"/>
+    <text x="92" y="105" fill="#8ee4a8" font-family="Inter, Arial" font-size="18" font-weight="700">CASO 001</text>
+    <text x="92" y="145" fill="#faf9f6" font-family="Inter, Arial" font-size="30" font-weight="700">Soja RS</text>
+    <text x="92" y="184" fill="#c4c2bd" font-family="Inter, Arial" font-size="20">restricao hidrica + triagem preventiva</text>
+  </g>
+  <g transform="translate(714 104)">
+    <rect width="386" height="252" rx="8" fill="#10120f" opacity="0.94" stroke="#f4f0df" stroke-opacity="0.18"/>
+    <text x="24" y="42" fill="#8ee4a8" font-family="Inter, Arial" font-size="15" font-weight="700">FILA DE CAMPO</text>
+    <g font-family="Inter, Arial" font-size="17" fill="#faf9f6">
+      <text x="24" y="86">1. mapear apolice + talhao</text>
+      <text x="24" y="126">2. coletar foto georreferenciada</text>
+      <text x="24" y="166">3. classificar severidade</text>
+      <text x="24" y="206">4. acionar vistoria preventiva</text>
+    </g>
+  </g>
+  <g transform="translate(650 462)">
+    <rect x="0" y="0" width="420" height="176" rx="8" fill="#10120f" opacity="0.92" stroke="#8ee4a8" stroke-opacity="0.32"/>
+    <text x="26" y="44" fill="#8ee4a8" font-family="Inter, Arial" font-size="15" font-weight="700">DECISAO</text>
+    <text x="26" y="84" fill="#faf9f6" font-family="Inter, Arial" font-size="24" font-weight="700">contato tecnico, evidencia,</text>
+    <text x="26" y="118" fill="#faf9f6" font-family="Inter, Arial" font-size="24" font-weight="700">vistoria ou bloqueio tecnico</text>
+    <text x="26" y="150" fill="#c4c2bd" font-family="Inter, Arial" font-size="16">sem inventar perda evitada sem carteira real</text>
+  </g>
+  <g>
+    <circle cx="530" cy="404" r="15" fill="#d09a9a"/>
+    <circle cx="612" cy="466" r="11" fill="#d09a9a"/>
+    <circle cx="470" cy="510" r="12" fill="#d09a9a"/>
+    <path d="M530 404 L714 356" stroke="#d09a9a" stroke-width="3" stroke-dasharray="8 8"/>
+    <path d="M612 466 L650 548" stroke="#d09a9a" stroke-width="3" stroke-dasharray="8 8"/>
+    <path d="M470 510 L650 548" stroke="#d09a9a" stroke-width="3" stroke-dasharray="8 8"/>
+  </g>
+</svg>

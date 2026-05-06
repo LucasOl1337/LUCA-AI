@@ -1,133 +1,901 @@
 {
+  "schemaVersion": 2,
   "source": {
-    "name": "deep-research-report.md",
-    "path": "C:/Users/user/Downloads/deep-research-report.md",
-    "topic": "Sompo agro 2025-2026",
-    "updatedAt": "2026-05-03"
+    "name": "luca-operational-database",
+    "topic": "LUCA-AI Sompo field-risk simulation",
+    "updatedAt": "2026-05-04T00:00:00-03:00"
   },
-  "summary": "O agro da Sompo combina exposicao climatica recorrente, dependencia do PSR, pressao de resseguro, canal corretor caro, gap de dados/modelagem, sinistro pesado e janela regulatoria comprimida.",
+  "layers": {
+    "rawResearch": {
+      "id": "layer-1-raw-research",
+      "title": "Camada 1 - pesquisa bruta",
+      "status": "archived",
+      "dashboardVisibility": "blocked",
+      "rule": "Material bruto serve apenas como base interna de consulta. Nao pode ser exibido diretamente no dashboard.",
+      "items": [
+        {
+          "id": "legacy-sompo-research-archive",
+          "label": "Arquivo bruto Sompo agro anterior",
+          "type": "legacy-research-snapshot",
+          "importedAt": "2026-05-04T06:53:20",
+          "payload": {
+            "source": {
+              "name": "deep-research-report.md",
+              "path": "C:/Users/user/Downloads/deep-research-report.md",
+              "topic": "Sompo agro 2025-2026",
+              "updatedAt": "2026-05-03"
+            },
+            "summary": "O agro da Sompo combina exposicao climatica recorrente, dependencia do PSR, pressao de resseguro, canal corretor caro, gap de dados/modelagem, sinistro pesado e janela regulatoria comprimida.",
+            "metrics": {
+              "painPoints": 7,
+              "veryHigh": 3,
+              "high": 4,
+              "psrBlockedMillions": 445,
+              "psrBudgetMillions": 1000,
+              "ruralLossRatioPct": 69.89,
+              "reinsurerPremium2025Millions": 85,
+              "reinsurerTarget2026Millions": 200,
+              "brokerCampaignCount": 3000,
+              "campaignAgriculturalGrowthPct": 110
+            },
+            "painPoints": [
+              {
+                "id": "clima",
+                "name": "Clima acima do apetite tecnico",
+                "criticality": "muito alta",
+                "score": 95,
+                "impact": "Sinistralidade rural perto ou acima de 70%, com consumo maior de resseguro e margem tecnica comprimida.",
+                "signal": "Seca e restricao hidrica afetando soja no RS e milho no PR em 2026.",
+                "agentAction": "Priorizar alerta climatico, microclima, safra, cultura e janela de contratacao."
+              },
+              {
+                "id": "psr",
+                "name": "Dependencia estrutural do PSR",
+                "criticality": "muito alta",
+                "score": 92,
+                "impact": "Mercado subvencionado reduzido por bloqueio de R$ 445 mi de um orcamento de R$ 1 bi.",
+                "signal": "Cronograma do PSR cobriu apenas parte de 2025 e 17 seguradoras disputam a mesma verba.",
+                "agentAction": "Monitorar verba, calendario, cultura elegivel e risco de pipeline travado."
+              },
+              {
+                "id": "resseguro",
+                "name": "Pressao de resseguro e capital",
+                "criticality": "muito alta",
+                "score": 90,
+                "impact": "Retencao local maior exige disciplina tecnica antes de crescer volume agro.",
+                "signal": "Sompo Resseguradora saiu de R$ 85 mi em premios em 2025 para meta de R$ 200 mi em 2026.",
+                "agentAction": "Sinalizar crescimento sem preco adequado como risco de capital."
+              },
+              {
+                "id": "canal",
+                "name": "Crescimento dependente de canal",
+                "criticality": "alta",
+                "score": 82,
+                "impact": "Volume cresce com incentivo comercial, mas fica caro e menos previsivel.",
+                "signal": "Campanha com mais de 3 mil corretores e 110% de crescimento entre vencedores.",
+                "agentAction": "Separar crescimento organico de crescimento empurrado por campanha."
+              },
+              {
+                "id": "modelagem",
+                "name": "Gap de dados e modelagem",
+                "criticality": "alta",
+                "score": 80,
+                "impact": "Risco de subprecificacao, selecao adversa e resposta lenta a mudancas microclimaticas.",
+                "signal": "IA aparece publicamente em outras linhas, mas nao com a mesma clareza no agro.",
+                "agentAction": "Criar tarefas de enriquecimento por solo, manejo, clima e historico regional."
+              },
+              {
+                "id": "sinistro",
+                "name": "Sinistro agricola pesado",
+                "criticality": "alta",
+                "score": 78,
+                "impact": "OPEX maior, TAT maior e mais atrito com produtor/corretor em picos climaticos.",
+                "signal": "Produtos de produtividade e multirrisco exigem regulacao e pericia em campo.",
+                "agentAction": "Priorizar triagem, sensoriamento remoto e filas por severidade."
+              },
+              {
+                "id": "regulatorio",
+                "name": "Janela regulatoria comprimida",
+                "criticality": "alta",
+                "score": 75,
+                "impact": "Custo maior de produto, compliance, tecnologia e reprecificacao.",
+                "signal": "SUSEP, CNSP e Zarc NM mudaram referencias em 2025-2026.",
+                "agentAction": "Criar checklist de refresh de produto, governanca e underwriting."
+              }
+            ],
+            "charts": {
+              "criticality": [
+                {
+                  "name": "Muito alta",
+                  "value": 3
+                },
+                {
+                  "name": "Alta",
+                  "value": 4
+                }
+              ],
+              "pressure": [
+                {
+                  "name": "Clima",
+                  "value": 95
+                },
+                {
+                  "name": "PSR",
+                  "value": 92
+                },
+                {
+                  "name": "Resseguro",
+                  "value": 90
+                },
+                {
+                  "name": "Canal",
+                  "value": 82
+                },
+                {
+                  "name": "Modelagem",
+                  "value": 80
+                },
+                {
+                  "name": "Sinistro",
+                  "value": 78
+                },
+                {
+                  "name": "Regulatorio",
+                  "value": 75
+                }
+              ],
+              "capital": [
+                {
+                  "name": "PSR bloqueado",
+                  "value": 445
+                },
+                {
+                  "name": "PSR disponivel",
+                  "value": 555
+                },
+                {
+                  "name": "Resseg 2025",
+                  "value": 85
+                },
+                {
+                  "name": "Meta resseg 2026",
+                  "value": 200
+                }
+              ]
+            },
+            "jobs": [
+              {
+                "id": "climate-watch",
+                "title": "vigiar clima e produtividade",
+                "cadence": "heartbeat",
+                "owner": "riscos-campo",
+                "status": "queued",
+                "focus": "secar, excesso de chuva, cultura, UF e janela de safra"
+              },
+              {
+                "id": "psr-watch",
+                "title": "vigiar PSR e calendario",
+                "cadence": "heartbeat",
+                "owner": "riscos-campo",
+                "status": "queued",
+                "focus": "verba, bloqueio, culturas elegiveis e competicao por subsidio"
+              },
+              {
+                "id": "claims-triage",
+                "title": "triagem de sinistro agricola",
+                "cadence": "heartbeat",
+                "owner": "riscos-campo",
+                "status": "queued",
+                "focus": "prioridade operacional, TAT e evidencias de campo"
+              }
+            ],
+            "firstCase": {
+              "id": "case-001-soy-rs-water-restriction",
+              "title": "Triagem preventiva de soja no RS sob restricao hidrica",
+              "decision": "Comecar pela soja no Rio Grande do Sul porque ha cobertura Sompo Agricola, sinal publico de restricao hidrica e uma rotina operacional clara de campo.",
+              "region": "Rio Grande do Sul",
+              "crop": "soja",
+              "event": "restricao hidrica / seca",
+              "productFit": "Sompo Agricola Produtividade e Multirrisco, com foco em produtividade, evidencia de campo e vistoria preventiva.",
+              "simulationRule": "Sem carteira real, avoidedLossProxy fica 0; simular fila operacional, completude de evidencia, severidade e acao preventiva.",
+              "assets": {
+                "caseImage": "/cases/sompo-soy-rs-drought-case.svg",
+                "pipelineImage": "/cases/sompo-soy-rs-pipeline.svg"
+              },
+              "pipeline": [
+                {
+                  "stage": "Fonte confiavel",
+                  "detail": "Sompo Agricola, condicoes do produto, Conab e Secretaria da Agricultura do RS."
+                },
+                {
+                  "stage": "Caso selecionado",
+                  "detail": "Soja RS com restricao hidrica e risco de perda de produtividade."
+                },
+                {
+                  "stage": "Sinal de campo",
+                  "detail": "Municipio, talhao, fase da lavoura, chuva local, solo, manejo e foto georreferenciada."
+                },
+                {
+                  "stage": "Score operacional",
+                  "detail": "Severidade climatica, potencial de perda, lacuna de evidencia e impacto em vistoria/TAT."
+                },
+                {
+                  "stage": "Acao preventiva",
+                  "detail": "Contato tecnico, coleta de evidencia, visita de campo ou bloqueio tecnico ate revisao."
+                },
+                {
+                  "stage": "Saida executiva",
+                  "detail": "Relatorio, grafico/fluxo, fonte da verdade, metodo e procedimento."
+                }
+              ]
+            },
+            "reliableSources": [
+              {
+                "label": "Sompo Agricola",
+                "url": "https://sompo.com.br/produto/sompo-agricola",
+                "use": "Produto e culturas cobertas."
+              },
+              {
+                "label": "Sompo Condicoes Produtividade",
+                "url": "https://sompo.com.br/documents/d/global/vi-cg-susep-22082024",
+                "use": "Cobertura de seca/estiagem e regra de indenizacao de produtividade."
+              },
+              {
+                "label": "Conab 2026-03-02",
+                "url": "https://www.gov.br/conab/pt-br/assuntos/noticias/chuvas-concentram-se-no-centro-norte-e-favorecem-lavouras-enquanto-sul-registra-menor-volume-e-restricao-a-soja",
+                "use": "Restricao a soja no Sul/RS."
+              },
+              {
+                "label": "Secretaria Agricultura RS 2026-04",
+                "url": "https://www.agricultura.rs.gov.br/colheita-da-soja-alcanca-10-da-area-cultivada-no-rs",
+                "use": "Restricao hidrica, impacto na soja e produtividade revista."
+              },
+              {
+                "label": "Sompo Resseguradora 2026-04-06",
+                "url": "https://sompo.com.br/conteudo/sompo-resseguradora-lucra-em-primeiro-ano-de-opera%C3%A7%C3%A3o-e-mira-dobrar-volume-de-pr%C3%AAmios-em-2026",
+                "use": "Pressao de capital/resseguro como impacto executivo."
+              },
+              {
+                "label": "Sompo Confraria Safra 2025",
+                "url": "https://sompo.com.br/conteudo/campanha-confraria-sompo-it%C3%A1lia-safra-2025-impulsiona-neg%C3%B3cios-e-premia-corretores-com-viagem-internacional",
+                "use": "Canal corretor e crescimento comercial como contexto."
+              },
+              {
+                "label": "CNN/MAPA PSR 2025-06-24",
+                "url": "https://www.cnnbrasil.com.br/economia/macroeconomia/governo-confirma-corte-de-quase-metade-do-orcamento-do-seguro-rural/",
+                "use": "Restricao de PSR como contexto, nao como primeiro caso operacional."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "processing": {
+      "id": "layer-2-processing",
+      "title": "Camada 2 - processamento",
+      "status": "ready",
+      "dashboardVisibility": "blocked-until-filtered",
+      "rule": "Recebe apenas informacao julgada relevante, filtrada e preparada para agentes.",
+      "items": [
+        {
+          "id": "sompo-001-claims-prevention-extension",
+          "label": "Extensao de sinistros e prevencao Sompo 001",
+          "type": "simulation-extension",
+          "importedAt": "2026-05-04T11:06:06.515Z",
+          "status": "ready",
+          "payload": {
+            "claimScenarios": 3,
+            "preventionLayers": 3,
+            "stopRules": 4
+          }
+        },
+        {
+          "id": "sompo-001-structured-simulation",
+          "label": "Triagem preventiva de soja no RS sob restricao hidrica",
+          "type": "simulation-contract",
+          "importedAt": "2026-05-04T00:00:00-03:00",
+          "status": "ready",
+          "payload": {
+            "scenarioPath": "Simulations/sompo-field-risk-001/scenario.json",
+            "validationPath": "Simulations/sompo-field-risk-001/validation.md",
+            "parameterCount": 49,
+            "assets": 6
+          }
+        }
+      ]
+    },
+    "dashboardIntegration": {
+      "id": "layer-3-dashboard-integration",
+      "title": "Camada 3 - pos-processamento e integracao no dashboard",
+      "status": "ready",
+      "dashboardVisibility": "allowed-after-approval",
+      "rule": "Recebe somente funcoes, boxes e saidas aprovadas manualmente para aparecer no dashboard.",
+      "items": [
+        {
+          "id": "sompo-001-dashboard-panel",
+          "label": "Painel Sompo 001 no canvas LUCA-AI",
+          "type": "dashboard-panel",
+          "importedAt": "2026-05-04T00:00:00-03:00",
+          "status": "ready",
+          "payload": {
+            "component": "DashboardCanvas",
+            "heroImage": "/cases/sompo-field-risk-001/01-field-inspection-drought-soy-rs.png",
+            "publicAssets": {
+              "caseImage": "/cases/sompo-field-risk-001/01-field-inspection-drought-soy-rs.png",
+              "evidenceImage": "/cases/sompo-field-risk-001/02-geotagged-evidence-kit.png",
+              "dashboardImage": "/cases/sompo-field-risk-001/03-risk-command-dashboard.png",
+              "workflowImage": "/cases/sompo-field-risk-001/04-agent-workflow-map.png",
+              "fieldCallImage": "/cases/sompo-field-risk-001/05-producer-broker-call.png",
+              "droneImage": "/cases/sompo-field-risk-001/06-soy-parcel-drone-overview.png",
+              "imageManifest": "/cases/sompo-field-risk-001/image-manifest.json"
+            }
+          }
+        }
+      ]
+    }
+  },
   "metrics": {
-    "painPoints": 7,
-    "veryHigh": 3,
-    "high": 4,
-    "psrBlockedMillions": 445,
-    "psrBudgetMillions": 1000,
-    "ruralLossRatioPct": 69.89,
-    "reinsurerPremium2025Millions": 85,
-    "reinsurerTarget2026Millions": 200,
-    "brokerCampaignCount": 3000,
-    "campaignAgriculturalGrowthPct": 110
+    "painPoints": 3,
+    "veryHigh": 1,
+    "high": 2,
+    "activeJobs": 5,
+    "completedJobs": 0,
+    "autonomousMissions": 0,
+    "contributions": 0,
+    "simulations": 2,
+    "reports": 2,
+    "truthSources": 1,
+    "methods": 1,
+    "procedures": 2
   },
   "painPoints": [
     {
       "id": "clima",
-      "name": "Clima acima do apetite tecnico",
-      "criticality": "muito alta",
-      "score": 95,
-      "impact": "Sinistralidade rural perto ou acima de 70%, com consumo maior de resseguro e margem tecnica comprimida.",
-      "signal": "Seca e restricao hidrica afetando soja no RS e milho no PR em 2026.",
-      "agentAction": "Priorizar alerta climatico, microclima, safra, cultura e janela de contratacao."
-    },
-    {
-      "id": "psr",
-      "name": "Dependencia estrutural do PSR",
+      "name": "Restricao hidrica em soja RS",
       "criticality": "muito alta",
       "score": 92,
-      "impact": "Mercado subvencionado reduzido por bloqueio de R$ 445 mi de um orcamento de R$ 1 bi.",
-      "signal": "Cronograma do PSR cobriu apenas parte de 2025 e 17 seguradoras disputam a mesma verba.",
-      "agentAction": "Monitorar verba, calendario, cultura elegivel e risco de pipeline travado."
-    },
-    {
-      "id": "resseguro",
-      "name": "Pressao de resseguro e capital",
-      "criticality": "muito alta",
-      "score": 90,
-      "impact": "Retencao local maior exige disciplina tecnica antes de crescer volume agro.",
-      "signal": "Sompo Resseguradora saiu de R$ 85 mi em premios em 2025 para meta de R$ 200 mi em 2026.",
-      "agentAction": "Sinalizar crescimento sem preco adequado como risco de capital."
-    },
-    {
-      "id": "canal",
-      "name": "Crescimento dependente de canal",
-      "criticality": "alta",
-      "score": 82,
-      "impact": "Volume cresce com incentivo comercial, mas fica caro e menos previsivel.",
-      "signal": "Campanha com mais de 3 mil corretores e 110% de crescimento entre vencedores.",
-      "agentAction": "Separar crescimento organico de crescimento empurrado por campanha."
+      "impact": "Aumenta chance de perda de produtividade e pico de aviso de sinistro.",
+      "signal": "Baixa chuva e desenvolvimento limitado em regioes do RS.",
+      "agentAction": "Priorizar talhoes com baixa chuva, fase critica e evidencia incompleta."
     },
     {
       "id": "modelagem",
-      "name": "Gap de dados e modelagem",
+      "name": "Lacuna de evidencia de campo",
       "criticality": "alta",
-      "score": 80,
-      "impact": "Risco de subprecificacao, selecao adversa e resposta lenta a mudancas microclimaticas.",
-      "signal": "IA aparece publicamente em outras linhas, mas nao com a mesma clareza no agro.",
-      "agentAction": "Criar tarefas de enriquecimento por solo, manejo, clima e historico regional."
+      "score": 84,
+      "impact": "Sem evidencia, a operacao perde velocidade e aumenta retrabalho em vistoria.",
+      "signal": "Fotos georreferenciadas, chuva local, manejo e solo ausentes ou parciais.",
+      "agentAction": "Criar checklist minimo e bloquear decisao automatica quando campos essenciais faltarem."
     },
     {
       "id": "sinistro",
-      "name": "Sinistro agricola pesado",
+      "name": "TAT e atrito em pico climatico",
       "criticality": "alta",
-      "score": 78,
-      "impact": "OPEX maior, TAT maior e mais atrito com produtor/corretor em picos climaticos.",
-      "signal": "Produtos de produtividade e multirrisco exigem regulacao e pericia em campo.",
-      "agentAction": "Priorizar triagem, sensoriamento remoto e filas por severidade."
+      "score": 80,
+      "impact": "Fila sem priorizacao aumenta tempo de resposta para produtor e corretor.",
+      "signal": "Muitos talhoes com severidade alta e prova incompleta ao mesmo tempo.",
+      "agentAction": "Gerar fila por severidade, area, lacuna de evidencia e prazo de contato."
+    }
+  ],
+  "jobs": [
+    {
+      "id": "sompo-001-map-exposure",
+      "title": "Mapear exposicao soja RS por talhao",
+      "cadence": "heartbeat",
+      "owner": "riscos-campo",
+      "status": "queued",
+      "focus": "Cruzar cultura, municipio, area segurada, chuva local e fase da lavoura para priorizar campo.",
+      "riskId": "clima"
     },
     {
-      "id": "regulatorio",
-      "name": "Janela regulatoria comprimida",
-      "criticality": "alta",
-      "score": 75,
-      "impact": "Custo maior de produto, compliance, tecnologia e reprecificacao.",
-      "signal": "SUSEP, CNSP e Zarc NM mudaram referencias em 2025-2026.",
-      "agentAction": "Criar checklist de refresh de produto, governanca e underwriting."
+      "id": "sompo-001-evidence-gap",
+      "title": "Saneamento de evidencia georreferenciada",
+      "cadence": "heartbeat",
+      "owner": "riscos-campo",
+      "status": "queued",
+      "focus": "Cobrar foto, chuva local, solo, manejo e metadados antes de qualquer decisao automatica.",
+      "riskId": "modelagem"
+    },
+    {
+      "id": "sompo-001-field-brief",
+      "title": "Briefing preventivo para vistoria e corretor",
+      "cadence": "heartbeat",
+      "owner": "riscos-campo",
+      "status": "queued",
+      "focus": "Gerar proximo passo por prioridade: contato tecnico, vistoria remota, visita presencial ou bloqueio tecnico.",
+      "riskId": "sinistro"
+    },
+    {
+      "id": "sompo-001-claim-triage",
+      "title": "Triar casos de sinistro provavel",
+      "cadence": "heartbeat",
+      "owner": "riscos-campo",
+      "status": "queued",
+      "focus": "Separar pre-aviso critico, evidencia insuficiente e confirmacao de colheita usando os claimScenarios.",
+      "riskId": "sinistro"
+    },
+    {
+      "id": "sompo-001-loss-prevention",
+      "title": "Executar programa de prevencao de sinistro",
+      "cadence": "heartbeat",
+      "owner": "riscos-campo",
+      "status": "queued",
+      "focus": "Aplicar alerta antecipado, checklist de evidencia e roteamento de vistoria por prioridade.",
+      "riskId": "sinistro"
+    }
+  ],
+  "autonomousMissions": [],
+  "contributions": [],
+  "simulations": [
+    {
+      "id": "sompo-field-risk-001-claims-and-prevention",
+      "title": "Casos de sinistro e prevencao: soja RS",
+      "scenario": "Tres casos de sinistro provavel conectados a tres camadas preventivas.",
+      "before": "Fila reativa: aviso chega incompleto, regulacao atrasa e vistoria perde prioridade tecnica.",
+      "after": "Fila preventiva: pre-aviso, saneamento de evidencia e confirmacao de colheita seguem regras separadas.",
+      "avoidedLossProxy": 0,
+      "severity": 92,
+      "claimScenarioCount": 3,
+      "preventionLayerCount": 3,
+      "path": "Simulations/sompo-field-risk-001/scenario.json",
+      "createdAt": "2026-05-04T11:06:06.515Z"
+    },
+    {
+      "id": "sompo-field-risk-001",
+      "title": "Triagem preventiva de soja no RS sob restricao hidrica",
+      "scenario": "restricao hidrica / seca / estiagem",
+      "before": "Sem triagem preventiva, casos chegam como fila reativa de sinistro com evidencia incompleta.",
+      "after": "Com LUCA-AI, casos entram em fila por severidade, evidencia minima e acao preventiva definida.",
+      "avoidedLossProxy": 0,
+      "severity": 92,
+      "path": "Simulations/sompo-field-risk-001/scenario.json"
+    }
+  ],
+  "reports": [
+    {
+      "id": "sompo-001-claims-prevention-brief",
+      "title": "Brief: sinistros provaveis e prevencao Sompo 001",
+      "thesis": "O caso agora cobre tanto sinistro provavel quanto prevencao, com decisoes diferentes para pre-aviso, evidencia insuficiente e confirmacao de colheita.",
+      "findings": [
+        "claim-risk-001-critical-drought-yield-loss: abrir pre-aviso, bloquear conclusao automatica e acionar vistoria presencial ou remota prioritaria",
+        "claim-risk-002-incomplete-evidence: devolver para coleta guiada com prazo de 48h e manter status em observacao",
+        "claim-risk-003-harvest-confirmation: acompanhar colheita, preparar laudo preventivo e nao calcular indenizacao sem produtividade obtida"
+      ],
+      "nextActions": [
+        "Qual talhao tem maior severidade e menor evidencia?",
+        "Qual caso precisa virar pre-aviso e qual deve ficar em watchlist?",
+        "Qual evidencia falta para reduzir retrabalho de regulacao?",
+        "Qual acao preventiva deve ocorrer em 24h, 48h e 72h?",
+        "Qual decisao esta bloqueada por falta de dado real?"
+      ],
+      "path": "Simulations/sompo-field-risk-001/scenario.json",
+      "createdAt": "2026-05-04T11:06:06.515Z"
+    },
+    {
+      "id": "sompo-001-validation",
+      "title": "Validacao: caso plausivel para prevencao de sinistro agricola",
+      "thesis": "O caso e plausivel e util para agentes porque cruza produto, cobertura, evento publico, evidencia e rotina de campo.",
+      "findings": [
+        "Produto e cobertura aderentes.",
+        "Evento agricola publico e recente.",
+        "Parametros suficientes para fila e decisao preventiva.",
+        "Calculo financeiro real bloqueado sem carteira."
+      ],
+      "nextActions": [
+        "Rodar planejador no caso 001.",
+        "Executar job de evidencia.",
+        "Revisar filas antes de criar novos casos."
+      ],
+      "path": "Simulations/sompo-field-risk-001/validation.md"
+    }
+  ],
+  "truthSources": [
+    {
+      "id": "sompo-001-truth-source",
+      "title": "Fonte da verdade: Sompo 001 soja RS",
+      "owner": "database",
+      "purpose": "Controlar parametros minimos para agentes operarem o caso sem inventar dados reais.",
+      "masterFields": [
+        "policyId",
+        "producerAlias",
+        "municipality",
+        "fieldId",
+        "insuredAreaHa",
+        "guaranteedYieldKgHa",
+        "expectedRegionalYieldKgHa",
+        "phenologicalStage",
+        "recentRainfallMm14d",
+        "soilStatus",
+        "geoPhotoStatus",
+        "evidenceCompletenessPct",
+        "climateSeverityScore",
+        "inspectionPriority",
+        "preventiveAction"
+      ],
+      "acceptanceRules": [
+        "Sem valor financeiro real.",
+        "Sem produtor real.",
+        "Sem coordenada real.",
+        "Toda acao deve ter motivo.",
+        "Toda prioridade deve citar evidencia e severidade."
+      ]
+    }
+  ],
+  "methods": [
+    {
+      "id": "sompo-001-scoring-method",
+      "title": "Metodo: score preventivo de risco de campo",
+      "objective": "Priorizar talhoes com maior risco operacional antes do pico de sinistro.",
+      "profitLevers": [
+        "reduzir retrabalho de vistoria",
+        "evitar contato tardio",
+        "melhorar selecao de campo"
+      ],
+      "qualityLevers": [
+        "evidencia georreferenciada",
+        "motivo auditavel",
+        "SLA por prioridade"
+      ],
+      "decisionGate": "Se severidade >= 85 e evidencia < 50%, bloquear decisao automatica e abrir acao de campo."
+    }
+  ],
+  "procedures": [
+    {
+      "id": "sompo-001-claims-prevention-procedure",
+      "title": "Procedimento: sinistro provavel e prevencao",
+      "trigger": "Talhao de soja RS com restricao hidrica, evidencia incompleta ou fase de colheita pendente.",
+      "steps": [
+        "Classificar se e pre-aviso, evidencia insuficiente ou confirmacao de colheita.",
+        "Aplicar SLA de 24h, 48h ou 72h conforme o caso.",
+        "Cobrar evidencia obrigatoria antes de calculo ou encerramento.",
+        "Roteirizar vistoria por severidade e lacuna de dados.",
+        "Registrar motivo auditavel e regra de parada."
+      ],
+      "serviceQualityCheck": "Nenhum caso fica sem pergunta de triagem, evidencia faltante, decisao e SLA.",
+      "profitCheck": "Perda evitada e indenizacao continuam bloqueadas sem carteira/produtividade real.",
+      "createdAt": "2026-05-04T11:06:06.515Z"
+    },
+    {
+      "id": "sompo-001-field-procedure",
+      "title": "Procedimento: triagem preventiva soja RS",
+      "trigger": "Restricao hidrica publica em municipio com soja segurada e fase critica.",
+      "steps": [
+        "Mapear apolice e talhao.",
+        "Checar fase da lavoura e chuva local.",
+        "Cobrar foto georreferenciada.",
+        "Calcular severidade e lacuna de evidencia.",
+        "Definir contato, vistoria remota, visita presencial ou bloqueio tecnico.",
+        "Registrar briefing executivo."
+      ],
+      "serviceQualityCheck": "Todo item critico tem responsavel, prazo e proximo passo.",
+      "profitCheck": "Nao calcular perda evitada; registrar apenas proxy 0 ate haver carteira real."
+    }
+  ],
+  "reliableSources": [
+    {
+      "label": "Sompo Agricola",
+      "url": "https://sompo.com.br/produto/sompo-agricola",
+      "use": "Produto publico cobre Custeio, Produtividade e Granizo; Produtividade trata queda de produtividade causada por adversidades climaticas."
+    },
+    {
+      "label": "Sompo Produtividade - Condicoes Contratuais 2024",
+      "url": "https://sompo.com.br/documents/d/global/vi-cg-susep-22082024",
+      "use": "Cobertura de seca/estiagem cobre diferenca entre produtividade garantida e produtividade obtida quando o evento causa danos a cultura segurada."
+    },
+    {
+      "label": "Conab - Monitoramento Agricola",
+      "url": "https://www.gov.br/conab/pt-br/assuntos/noticias/chuvas-concentram-se-no-centro-norte-e-favorecem-lavouras-enquanto-sul-registra-menor-volume-e-restricao-a-soja",
+      "use": "No RS, precipitacoes irregulares e baixos volumes reduziram produtividades estimadas em grande parte do estado."
+    },
+    {
+      "label": "Secretaria da Agricultura RS / Emater-RS-Ascar",
+      "url": "https://www.agricultura.rs.gov.br/colheita-da-soja-alcanca-10-da-area-cultivada-no-rs",
+      "use": "Restricao hidrica persistente no Oeste e Noroeste reduziu porte, abortou estruturas reprodutivas e levou produtividade media revista a 2.871 kg/ha."
     }
   ],
   "charts": {
     "criticality": [
-      { "name": "Muito alta", "value": 3 },
-      { "name": "Alta", "value": 4 }
+      {
+        "name": "Muito alta",
+        "value": 1
+      },
+      {
+        "name": "Alta",
+        "value": 2
+      }
     ],
     "pressure": [
-      { "name": "Clima", "value": 95 },
-      { "name": "PSR", "value": 92 },
-      { "name": "Resseguro", "value": 90 },
-      { "name": "Canal", "value": 82 },
-      { "name": "Modelagem", "value": 80 },
-      { "name": "Sinistro", "value": 78 },
-      { "name": "Regulatorio", "value": 75 }
+      {
+        "name": "Restricao hidrica em soja RS",
+        "value": 92
+      },
+      {
+        "name": "Lacuna de evidencia de campo",
+        "value": 84
+      },
+      {
+        "name": "TAT e atrito em pico climatico",
+        "value": 80
+      }
     ],
     "capital": [
-      { "name": "PSR bloqueado", "value": 445 },
-      { "name": "PSR disponivel", "value": 555 },
-      { "name": "Resseg 2025", "value": 85 },
-      { "name": "Meta resseg 2026", "value": 200 }
+      {
+        "name": "Perda evitada proxy",
+        "value": 0
+      },
+      {
+        "name": "Talhoes simulados",
+        "value": 3
+      }
     ]
   },
-  "jobs": [
-    {
-      "id": "climate-watch",
-      "title": "vigiar clima e produtividade",
-      "cadence": "heartbeat",
-      "owner": "riscos-campo",
-      "status": "queued",
-      "focus": "secar, excesso de chuva, cultura, UF e janela de safra"
+  "firstCase": {
+    "id": "sompo-field-risk-001",
+    "title": "Triagem preventiva de soja no RS sob restricao hidrica",
+    "decision": "Ha sinal publico de campo, cobertura aderente e rotina operacional clara para agentes: mapear exposicao, cobrar evidencia, priorizar vistoria e emitir briefing.",
+    "region": "Rio Grande do Sul",
+    "crop": "soja",
+    "event": "restricao hidrica / seca / estiagem",
+    "productFit": "Sompo Agricola Produtividade, com risco coberto de seca/estiagem e apuracao por produtividade garantida versus obtida.",
+    "simulationRule": "Sem carteira real, avoidedLossProxy fica 0; simular fila operacional, evidencia, severidade e acao preventiva.",
+    "scenarioPath": "Simulations/sompo-field-risk-001/scenario.json",
+    "validationPath": "Simulations/sompo-field-risk-001/validation.md",
+    "assets": {
+      "caseImage": "/cases/sompo-field-risk-001/01-field-inspection-drought-soy-rs.png",
+      "evidenceImage": "/cases/sompo-field-risk-001/02-geotagged-evidence-kit.png",
+      "dashboardImage": "/cases/sompo-field-risk-001/03-risk-command-dashboard.png",
+      "workflowImage": "/cases/sompo-field-risk-001/04-agent-workflow-map.png",
+      "fieldCallImage": "/cases/sompo-field-risk-001/05-producer-broker-call.png",
+      "droneImage": "/cases/sompo-field-risk-001/06-soy-parcel-drone-overview.png",
+      "imageManifest": "/cases/sompo-field-risk-001/image-manifest.json"
     },
-    {
-      "id": "psr-watch",
-      "title": "vigiar PSR e calendario",
-      "cadence": "heartbeat",
-      "owner": "riscos-campo",
-      "status": "queued",
-      "focus": "verba, bloqueio, culturas elegiveis e competicao por subsidio"
-    },
-    {
-      "id": "claims-triage",
-      "title": "triagem de sinistro agricola",
-      "cadence": "heartbeat",
-      "owner": "riscos-campo",
-      "status": "queued",
-      "focus": "prioridade operacional, TAT e evidencias de campo"
+    "primaryMetrics": [
+      {
+        "label": "talhoes simulados",
+        "value": 3
+      },
+      {
+        "label": "casos de sinistro",
+        "value": 3
+      },
+      {
+        "label": "camadas preventivas",
+        "value": 3
+      },
+      {
+        "label": "perda evitada proxy",
+        "value": 0
+      }
+    ],
+    "portfolioSample": [
+      {
+        "policyId": "SIM-SOMPO-AGRO-2026-0001",
+        "producerAlias": "Produtor A",
+        "municipality": "Santa Rosa",
+        "region": "Noroeste RS",
+        "crop": "soja",
+        "fieldId": "talhao-07",
+        "insuredAreaHa": 186.4,
+        "guaranteedYieldKgHa": 3360,
+        "observedYieldKgHa": null,
+        "expectedRegionalYieldKgHa": 2871,
+        "phenologicalStage": "enchimento de graos / maturacao inicial",
+        "plantingDate": "2025-11-18",
+        "recentRainfallMm14d": 18,
+        "soilStatus": "umidade baixa, rachaduras superficiais",
+        "managementStatus": "plantio direto, sem irrigacao",
+        "geoPhotoStatus": "missing",
+        "evidenceCompletenessPct": 42,
+        "climateSeverityScore": 88,
+        "lossPotentialScore": 79,
+        "inspectionPriority": "alta",
+        "preventiveAction": "solicitar foto georreferenciada, historico de chuva local e vistoria remota em ate 48h",
+        "decisionReason": "alta severidade climatica com evidencia incompleta em regiao publicamente afetada"
+      },
+      {
+        "policyId": "SIM-SOMPO-AGRO-2026-0002",
+        "producerAlias": "Produtor B",
+        "municipality": "Ijuí",
+        "region": "Noroeste RS",
+        "crop": "soja",
+        "fieldId": "talhao-03",
+        "insuredAreaHa": 94.8,
+        "guaranteedYieldKgHa": 3180,
+        "observedYieldKgHa": null,
+        "expectedRegionalYieldKgHa": 2871,
+        "phenologicalStage": "maturacao",
+        "plantingDate": "2025-11-05",
+        "recentRainfallMm14d": 31,
+        "soilStatus": "umidade irregular",
+        "managementStatus": "boas praticas declaradas, evidencias parciais",
+        "geoPhotoStatus": "received_unverified",
+        "evidenceCompletenessPct": 67,
+        "climateSeverityScore": 74,
+        "lossPotentialScore": 61,
+        "inspectionPriority": "media",
+        "preventiveAction": "validar metadados das fotos e acompanhar colheita para laudo preventivo",
+        "decisionReason": "sinal moderado com evidencia parcialmente suficiente"
+      },
+      {
+        "policyId": "SIM-SOMPO-AGRO-2026-0003",
+        "producerAlias": "Produtor C",
+        "municipality": "Uruguaiana",
+        "region": "Oeste RS",
+        "crop": "soja",
+        "fieldId": "talhao-11",
+        "insuredAreaHa": 221.7,
+        "guaranteedYieldKgHa": 3300,
+        "observedYieldKgHa": null,
+        "expectedRegionalYieldKgHa": 2871,
+        "phenologicalStage": "enchimento de graos",
+        "plantingDate": "2025-12-02",
+        "recentRainfallMm14d": 9,
+        "soilStatus": "restricao hidrica persistente",
+        "managementStatus": "sem irrigacao, cobertura de solo parcial",
+        "geoPhotoStatus": "missing",
+        "evidenceCompletenessPct": 35,
+        "climateSeverityScore": 92,
+        "lossPotentialScore": 84,
+        "inspectionPriority": "critica",
+        "preventiveAction": "abrir tarefa de campo, bloquear decisao automatica e acionar corretor para pacote de evidencia",
+        "decisionReason": "maior area segurada, baixa chuva recente e evidencia insuficiente"
+      }
+    ],
+    "pipeline": [
+      {
+        "stage": "Fonte confiavel",
+        "detail": "Sompo Agricola, condicoes do produto, Conab e Secretaria da Agricultura do RS."
+      },
+      {
+        "stage": "Caso selecionado",
+        "detail": "Soja RS com restricao hidrica e risco de perda de produtividade."
+      },
+      {
+        "stage": "Sinal de campo",
+        "detail": "Municipio, talhao, fase da lavoura, chuva local, solo, manejo e foto georreferenciada."
+      },
+      {
+        "stage": "Score operacional",
+        "detail": "Severidade climatica, potencial de perda, lacuna de evidencia e impacto em vistoria/TAT."
+      },
+      {
+        "stage": "Acao preventiva",
+        "detail": "Contato tecnico, coleta de evidencia, visita de campo ou bloqueio tecnico ate revisao."
+      },
+      {
+        "stage": "Saida executiva",
+        "detail": "Relatorio, grafico/fluxo, fonte da verdade, metodo e procedimento."
+      }
+    ],
+    "claimScenarios": [
+      {
+        "id": "claim-risk-001-critical-drought-yield-loss",
+        "type": "aviso provavel de sinistro de produtividade",
+        "linkedPolicyId": "SIM-SOMPO-AGRO-2026-0003",
+        "trigger": "Produtor relata perda visual severa apos 14 dias com 9 mm de chuva e restricao hidrica persistente.",
+        "claimQuestion": "Ha perda de produtividade comprovavel abaixo da produtividade garantida ou ainda e apenas agravamento de risco?",
+        "requiredEvidence": [
+          "data do aviso",
+          "fotos georreferenciadas atuais",
+          "historico de chuva local",
+          "fase fenologica",
+          "estimativa de produtividade antes da colheita",
+          "comprovantes de manejo"
+        ],
+        "missingEvidence": [
+          "fotos georreferenciadas",
+          "chuva local validada",
+          "estimativa tecnica de produtividade"
+        ],
+        "triageDecision": "abrir pre-aviso, bloquear conclusao automatica e acionar vistoria presencial ou remota prioritaria",
+        "slaHours": 24,
+        "fraudOrNoiseRisk": "medio: evento publico existe, mas extensao do dano precisa ser comprovada no talhao",
+        "agentTasks": [
+          "validar completude do pacote",
+          "comparar severidade com outros talhoes",
+          "montar briefing para regulador",
+          "marcar proxima evidencia obrigatoria"
+        ]
+      },
+      {
+        "id": "claim-risk-002-incomplete-evidence",
+        "type": "sinistro com evidencia insuficiente",
+        "linkedPolicyId": "SIM-SOMPO-AGRO-2026-0001",
+        "trigger": "Corretor informa estresse hidrico, mas sem foto, coordenada, chuva local ou estimativa de produtividade.",
+        "claimQuestion": "O caso pode seguir para regulacao ou deve voltar para saneamento de evidencia?",
+        "requiredEvidence": [
+          "foto do talhao",
+          "coordenada ou identificador do talhao",
+          "chuva dos ultimos 14 e 30 dias",
+          "data de plantio",
+          "estado do solo",
+          "relato tecnico padronizado"
+        ],
+        "missingEvidence": [
+          "foto do talhao",
+          "coordenada",
+          "relato tecnico padronizado"
+        ],
+        "triageDecision": "devolver para coleta guiada com prazo de 48h e manter status em observacao",
+        "slaHours": 48,
+        "fraudOrNoiseRisk": "alto operacional: nao por suspeita, mas por baixa auditabilidade",
+        "agentTasks": [
+          "gerar checklist para corretor",
+          "separar campos obrigatorios",
+          "registrar motivo de pendencia",
+          "reavaliar apos nova evidencia"
+        ]
+      },
+      {
+        "id": "claim-risk-003-harvest-confirmation",
+        "type": "confirmacao de produtividade na colheita",
+        "linkedPolicyId": "SIM-SOMPO-AGRO-2026-0002",
+        "trigger": "Area em maturacao tem evidencia parcial e precisa confirmar produtividade obtida na colheita.",
+        "claimQuestion": "A produtividade obtida confirma dano indenizavel ou apenas variacao regional sem sinistro?",
+        "requiredEvidence": [
+          "data de colheita",
+          "notas ou romaneios simulados",
+          "area efetivamente colhida",
+          "produtividade obtida kg/ha",
+          "fotos de bordadura e interior do talhao"
+        ],
+        "missingEvidence": [
+          "produtividade obtida",
+          "area efetivamente colhida"
+        ],
+        "triageDecision": "acompanhar colheita, preparar laudo preventivo e nao calcular indenizacao sem produtividade obtida",
+        "slaHours": 72,
+        "fraudOrNoiseRisk": "baixo a medio: evidencia parcial existe, mas falta dado de fechamento",
+        "agentTasks": [
+          "agendar checkpoint de colheita",
+          "comparar produtividade obtida com garantida",
+          "gerar resumo executivo sem valor financeiro"
+        ]
+      }
+    ],
+    "lossPreventionProgram": {
+      "id": "prevention-program-001-soy-rs-drought",
+      "objective": "Reduzir atraso, retrabalho e agravamento operacional antes que eventos de seca/estiagem virem fila massiva de sinistro.",
+      "preventionLayers": [
+        {
+          "id": "prevention-01-early-warning",
+          "name": "alerta antecipado por municipio e fase da lavoura",
+          "trigger": "chuva baixa em 14/30 dias + fase critica + cultura soja",
+          "action": "marcar talhoes em watchlist e exigir evidencia minima antes de aceite de conclusao",
+          "ownerAgent": "riscos-campo",
+          "successMetric": "100% dos casos criticos com proximo passo e SLA"
+        },
+        {
+          "id": "prevention-02-evidence-first",
+          "name": "coleta de evidencia antes do pico de aviso",
+          "trigger": "evidenceCompletenessPct abaixo de 60 em area de severidade alta",
+          "action": "enviar checklist para corretor/produtor e bloquear decisao automatica ate completar campos minimos",
+          "ownerAgent": "planejador",
+          "successMetric": "reduzir casos sem foto, chuva local e fase fenologica"
+        },
+        {
+          "id": "prevention-03-field-routing",
+          "name": "roteamento de vistoria por prioridade",
+          "trigger": "climateSeverityScore >= 85 ou insuredAreaHa acima de 150 ha com evidencia incompleta",
+          "action": "priorizar vistoria presencial/remota, com briefing tecnico do talhao",
+          "ownerAgent": "supervisor",
+          "successMetric": "fila critica atendida antes da fila media"
+        }
+      ],
+      "preventiveQuestions": [
+        "Qual talhao tem maior severidade e menor evidencia?",
+        "Qual caso precisa virar pre-aviso e qual deve ficar em watchlist?",
+        "Qual evidencia falta para reduzir retrabalho de regulacao?",
+        "Qual acao preventiva deve ocorrer em 24h, 48h e 72h?",
+        "Qual decisao esta bloqueada por falta de dado real?"
+      ],
+      "stopRules": [
+        "nao calcular indenizacao sem produtividade obtida",
+        "nao usar nome ou coordenada real",
+        "nao tratar proxy como economia financeira",
+        "nao encerrar caso sem motivo auditavel"
+      ]
     }
-  ]
+  },
+  "summary": "Simulacao Sompo 001: triagem preventiva de soja no RS sob restricao hidrica, com parametros de apolice, campo, evidencia, severidade, operacao e governanca para agentes."
 }

@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 520" role="img" aria-labelledby="title desc">
+  <title id="title">Pipeline do caso Sompo soja RS</title>
+  <desc id="desc">Fluxo de fontes, caso, sinal de campo, scoring, acao preventiva e saida executiva.</desc>
+  <rect width="1400" height="520" fill="#090b08"/>
+  <g transform="translate(54 74)" font-family="Inter, Arial">
+    <text x="0" y="0" fill="#faf9f6" font-size="34" font-weight="700">Pipeline operacional: prevencao de sinistro no campo</text>
+    <text x="0" y="38" fill="#92918d" font-size="18">Caso 001 - soja RS sob restricao hidrica</text>
+  </g>
+  <g transform="translate(54 158)" font-family="Inter, Arial">
+    <g>
+      <rect width="184" height="196" rx="8" fill="#10100e" stroke="#f4f0df" stroke-opacity="0.16"/>
+      <text x="18" y="36" fill="#8ee4a8" font-size="13" font-weight="700">01 FONTE</text>
+      <text x="18" y="78" fill="#faf9f6" font-size="20" font-weight="700">Sompo + Conab</text>
+      <text x="18" y="114" fill="#c4c2bd" font-size="15">produto, cobertura,</text>
+      <text x="18" y="138" fill="#c4c2bd" font-size="15">boletim de safra</text>
+    </g>
+    <g transform="translate(214 0)">
+      <rect width="184" height="196" rx="8" fill="#10100e" stroke="#f4f0df" stroke-opacity="0.16"/>
+      <text x="18" y="36" fill="#8ee4a8" font-size="13" font-weight="700">02 CASO</text>
+      <text x="18" y="78" fill="#faf9f6" font-size="20" font-weight="700">soja RS</text>
+      <text x="18" y="114" fill="#c4c2bd" font-size="15">restricao hidrica</text>
+      <text x="18" y="138" fill="#c4c2bd" font-size="15">produtividade</text>
+    </g>
+    <g transform="translate(428 0)">
+      <rect width="184" height="196" rx="8" fill="#10100e" stroke="#f4f0df" stroke-opacity="0.16"/>
+      <text x="18" y="36" fill="#8ee4a8" font-size="13" font-weight="700">03 SINAL</text>
+      <text x="18" y="78" fill="#faf9f6" font-size="20" font-weight="700">talhao</text>
+      <text x="18" y="114" fill="#c4c2bd" font-size="15">chuva, solo, fase,</text>
+      <text x="18" y="138" fill="#c4c2bd" font-size="15">foto georrefer.</text>
+    </g>
+    <g transform="translate(642 0)">
+      <rect width="184" height="196" rx="8" fill="#10100e" stroke="#f4f0df" stroke-opacity="0.16"/>
+      <text x="18" y="36" fill="#8ee4a8" font-size="13" font-weight="700">04 SCORE</text>
+      <text x="18" y="78" fill="#faf9f6" font-size="20" font-weight="700">severidade</text>
+      <text x="18" y="114" fill="#c4c2bd" font-size="15">risco climatico +</text>
+      <text x="18" y="138" fill="#c4c2bd" font-size="15">lacuna de evidencia</text>
+    </g>
+    <g transform="translate(856 0)">
+      <rect width="184" height="196" rx="8" fill="#10100e" stroke="#f4f0df" stroke-opacity="0.16"/>
+      <text x="18" y="36" fill="#8ee4a8" font-size="13" font-weight="700">05 ACAO</text>
+      <text x="18" y="78" fill="#faf9f6" font-size="20" font-weight="700">campo</text>
+      <text x="18" y="114" fill="#c4c2bd" font-size="15">contato, vistoria,</text>
+      <text x="18" y="138" fill="#c4c2bd" font-size="15">bloqueio tecnico</text>
+    </g>
+    <g transform="translate(1070 0)">
+      <rect width="248" height="196" rx="8" fill="#10100e" stroke="#8ee4a8" stroke-opacity="0.36"/>
+      <text x="18" y="36" fill="#8ee4a8" font-size="13" font-weight="700">06 SAIDA</text>
+      <text x="18" y="78" fill="#faf9f6" font-size="20" font-weight="700">relatorio + grafico</text>
+      <text x="18" y="114" fill="#c4c2bd" font-size="15">fonte da verdade,</text>
+      <text x="18" y="138" fill="#c4c2bd" font-size="15">metodo e procedimento</text>
+    </g>
+  </g>
+  <g stroke="#8ee4a8" stroke-width="3" opacity="0.55">
+    <path d="M238 256 H264"/>
+    <path d="M452 256 H478"/>
+    <path d="M666 256 H692"/>
+    <path d="M880 256 H906"/>
+    <path d="M1094 256 H1124"/>
+  </g>
+  <g transform="translate(54 406)" font-family="Inter, Arial">
+    <rect width="1292" height="62" rx="8" fill="#10100e" stroke="#f4f0df" stroke-opacity="0.16"/>
+    <text x="22" y="39" fill="#c4c2bd" font-size="18">Regra: sem perda evitada em dinheiro sem carteira real; enquanto faltarem dados internos, simular fila, evidencia, severidade e decisao preventiva.</text>
+  </g>
+</svg>

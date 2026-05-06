@@ -1,0 +1,319 @@
+{
+  "schemaVersion": 1,
+  "id": "sompo-field-risk-001",
+  "title": "Triagem preventiva de soja no RS sob restricao hidrica",
+  "createdAt": "2026-05-04T00:00:00-03:00",
+  "company": {
+    "name": "Sompo Seguros",
+    "domain": "seguro agricola",
+    "operationalArea": "campo, prevencao de riscos e sinistro agricola"
+  },
+  "objective": "Simular um caso realista para agentes LUCA-AI priorizarem prevencao de sinistro agricola no campo sem inventar carteira real.",
+  "caseSummary": {
+    "region": "Rio Grande do Sul",
+    "crop": "soja",
+    "season": "safra 2025/2026",
+    "event": "restricao hidrica / seca / estiagem",
+    "productFit": "Sompo Agricola Produtividade, com risco coberto de seca/estiagem e apuracao por produtividade garantida versus obtida.",
+    "whyThisCase": "Ha sinal publico de campo, cobertura aderente e rotina operacional clara para agentes: mapear exposicao, cobrar evidencia, priorizar vistoria e emitir briefing."
+  },
+  "sourceBackedFacts": [
+    {
+      "id": "sompo-product",
+      "source": "Sompo Agricola",
+      "url": "https://sompo.com.br/produto/sompo-agricola",
+      "fact": "Produto publico cobre Custeio, Produtividade e Granizo; Produtividade trata queda de produtividade causada por adversidades climaticas."
+    },
+    {
+      "id": "sompo-drought-coverage",
+      "source": "Sompo Produtividade - Condicoes Contratuais 2024",
+      "url": "https://sompo.com.br/documents/d/global/vi-cg-susep-22082024",
+      "fact": "Cobertura de seca/estiagem cobre diferenca entre produtividade garantida e produtividade obtida quando o evento causa danos a cultura segurada."
+    },
+    {
+      "id": "conab-rs-soy",
+      "source": "Conab - Monitoramento Agricola",
+      "url": "https://www.gov.br/conab/pt-br/assuntos/noticias/chuvas-concentram-se-no-centro-norte-e-favorecem-lavouras-enquanto-sul-registra-menor-volume-e-restricao-a-soja",
+      "fact": "No RS, precipitacoes irregulares e baixos volumes reduziram produtividades estimadas em grande parte do estado."
+    },
+    {
+      "id": "rs-emater-soy",
+      "source": "Secretaria da Agricultura RS / Emater-RS-Ascar",
+      "url": "https://www.agricultura.rs.gov.br/colheita-da-soja-alcanca-10-da-area-cultivada-no-rs",
+      "fact": "Restricao hidrica persistente no Oeste e Noroeste reduziu porte, abortou estruturas reprodutivas e levou produtividade media revista a 2.871 kg/ha."
+    }
+  ],
+  "simulationRules": {
+    "avoidedLossProxy": 0,
+    "financialClaimCalculation": "blocked_without_real_portfolio",
+    "mustNotInvent": [
+      "valor real de premio",
+      "indenizacao real",
+      "nome real de produtor",
+      "numero real de apolice",
+      "coordenada real de fazenda",
+      "decisao real de sinistro"
+    ],
+    "allowedSimulation": [
+      "fila operacional",
+      "qualidade de evidencia",
+      "severidade",
+      "acao preventiva",
+      "briefing executivo",
+      "tarefas para agentes"
+    ]
+  },
+  "portfolioSample": [
+    {
+      "policyId": "SIM-SOMPO-AGRO-2026-0001",
+      "producerAlias": "Produtor A",
+      "municipality": "Santa Rosa",
+      "region": "Noroeste RS",
+      "crop": "soja",
+      "fieldId": "talhao-07",
+      "insuredAreaHa": 186.4,
+      "guaranteedYieldKgHa": 3360,
+      "observedYieldKgHa": null,
+      "expectedRegionalYieldKgHa": 2871,
+      "phenologicalStage": "enchimento de graos / maturacao inicial",
+      "plantingDate": "2025-11-18",
+      "recentRainfallMm14d": 18,
+      "soilStatus": "umidade baixa, rachaduras superficiais",
+      "managementStatus": "plantio direto, sem irrigacao",
+      "geoPhotoStatus": "missing",
+      "evidenceCompletenessPct": 42,
+      "climateSeverityScore": 88,
+      "lossPotentialScore": 79,
+      "inspectionPriority": "alta",
+      "preventiveAction": "solicitar foto georreferenciada, historico de chuva local e vistoria remota em ate 48h",
+      "decisionReason": "alta severidade climatica com evidencia incompleta em regiao publicamente afetada"
+    },
+    {
+      "policyId": "SIM-SOMPO-AGRO-2026-0002",
+      "producerAlias": "Produtor B",
+      "municipality": "Ijuí",
+      "region": "Noroeste RS",
+      "crop": "soja",
+      "fieldId": "talhao-03",
+      "insuredAreaHa": 94.8,
+      "guaranteedYieldKgHa": 3180,
+      "observedYieldKgHa": null,
+      "expectedRegionalYieldKgHa": 2871,
+      "phenologicalStage": "maturacao",
+      "plantingDate": "2025-11-05",
+      "recentRainfallMm14d": 31,
+      "soilStatus": "umidade irregular",
+      "managementStatus": "boas praticas declaradas, evidencias parciais",
+      "geoPhotoStatus": "received_unverified",
+      "evidenceCompletenessPct": 67,
+      "climateSeverityScore": 74,
+      "lossPotentialScore": 61,
+      "inspectionPriority": "media",
+      "preventiveAction": "validar metadados das fotos e acompanhar colheita para laudo preventivo",
+      "decisionReason": "sinal moderado com evidencia parcialmente suficiente"
+    },
+    {
+      "policyId": "SIM-SOMPO-AGRO-2026-0003",
+      "producerAlias": "Produtor C",
+      "municipality": "Uruguaiana",
+      "region": "Oeste RS",
+      "crop": "soja",
+      "fieldId": "talhao-11",
+      "insuredAreaHa": 221.7,
+      "guaranteedYieldKgHa": 3300,
+      "observedYieldKgHa": null,
+      "expectedRegionalYieldKgHa": 2871,
+      "phenologicalStage": "enchimento de graos",
+      "plantingDate": "2025-12-02",
+      "recentRainfallMm14d": 9,
+      "soilStatus": "restricao hidrica persistente",
+      "managementStatus": "sem irrigacao, cobertura de solo parcial",
+      "geoPhotoStatus": "missing",
+      "evidenceCompletenessPct": 35,
+      "climateSeverityScore": 92,
+      "lossPotentialScore": 84,
+      "inspectionPriority": "critica",
+      "preventiveAction": "abrir tarefa de campo, bloquear decisao automatica e acionar corretor para pacote de evidencia",
+      "decisionReason": "maior area segurada, baixa chuva recente e evidencia insuficiente"
+    }
+  ],
+  "agentWorkPlan": [
+    {
+      "agent": "planejador",
+      "task": "Converter o caso em tres missoes: mapeamento de exposicao, saneamento de evidencia e briefing de campo.",
+      "output": "missoes com jobs acionaveis e criterios de sucesso"
+    },
+    {
+      "agent": "riscos-campo",
+      "task": "Classificar talhoes por severidade, lacuna de evidencia e prioridade de vistoria.",
+      "output": "fila priorizada com acao preventiva e motivo"
+    },
+    {
+      "agent": "database",
+      "task": "Persistir fonte da verdade, parametros do caso, evidencias e status de cada tarefa.",
+      "output": "snapshot auditavel para dashboard"
+    },
+    {
+      "agent": "supervisor",
+      "task": "Impedir que agentes calculem economia real sem carteira e validar se cada job fica dentro do caso 001.",
+      "output": "gates de governanca e bloqueios anti-ficcao"
+    }
+  ],
+  "dashboardPanel": {
+    "heroImage": "/cases/sompo-field-risk-001/01-field-inspection-drought-soy-rs.png",
+    "supportImages": [
+      "/cases/sompo-field-risk-001/02-geotagged-evidence-kit.png",
+      "/cases/sompo-field-risk-001/03-risk-command-dashboard.png",
+      "/cases/sompo-field-risk-001/04-agent-workflow-map.png",
+      "/cases/sompo-field-risk-001/05-producer-broker-call.png",
+      "/cases/sompo-field-risk-001/06-soy-parcel-drone-overview.png"
+    ],
+    "primaryMetrics": [
+      {
+        "label": "talhoes simulados",
+        "value": 3
+      },
+      {
+        "label": "casos de sinistro",
+        "value": 3
+      },
+      {
+        "label": "camadas preventivas",
+        "value": 3
+      },
+      {
+        "label": "perda evitada proxy",
+        "value": 0
+      }
+    ]
+  },
+  "claimScenarios": [
+    {
+      "id": "claim-risk-001-critical-drought-yield-loss",
+      "type": "aviso provavel de sinistro de produtividade",
+      "linkedPolicyId": "SIM-SOMPO-AGRO-2026-0003",
+      "trigger": "Produtor relata perda visual severa apos 14 dias com 9 mm de chuva e restricao hidrica persistente.",
+      "claimQuestion": "Ha perda de produtividade comprovavel abaixo da produtividade garantida ou ainda e apenas agravamento de risco?",
+      "requiredEvidence": [
+        "data do aviso",
+        "fotos georreferenciadas atuais",
+        "historico de chuva local",
+        "fase fenologica",
+        "estimativa de produtividade antes da colheita",
+        "comprovantes de manejo"
+      ],
+      "missingEvidence": [
+        "fotos georreferenciadas",
+        "chuva local validada",
+        "estimativa tecnica de produtividade"
+      ],
+      "triageDecision": "abrir pre-aviso, bloquear conclusao automatica e acionar vistoria presencial ou remota prioritaria",
+      "slaHours": 24,
+      "fraudOrNoiseRisk": "medio: evento publico existe, mas extensao do dano precisa ser comprovada no talhao",
+      "agentTasks": [
+        "validar completude do pacote",
+        "comparar severidade com outros talhoes",
+        "montar briefing para regulador",
+        "marcar proxima evidencia obrigatoria"
+      ]
+    },
+    {
+      "id": "claim-risk-002-incomplete-evidence",
+      "type": "sinistro com evidencia insuficiente",
+      "linkedPolicyId": "SIM-SOMPO-AGRO-2026-0001",
+      "trigger": "Corretor informa estresse hidrico, mas sem foto, coordenada, chuva local ou estimativa de produtividade.",
+      "claimQuestion": "O caso pode seguir para regulacao ou deve voltar para saneamento de evidencia?",
+      "requiredEvidence": [
+        "foto do talhao",
+        "coordenada ou identificador do talhao",
+        "chuva dos ultimos 14 e 30 dias",
+        "data de plantio",
+        "estado do solo",
+        "relato tecnico padronizado"
+      ],
+      "missingEvidence": [
+        "foto do talhao",
+        "coordenada",
+        "relato tecnico padronizado"
+      ],
+      "triageDecision": "devolver para coleta guiada com prazo de 48h e manter status em observacao",
+      "slaHours": 48,
+      "fraudOrNoiseRisk": "alto operacional: nao por suspeita, mas por baixa auditabilidade",
+      "agentTasks": [
+        "gerar checklist para corretor",
+        "separar campos obrigatorios",
+        "registrar motivo de pendencia",
+        "reavaliar apos nova evidencia"
+      ]
+    },
+    {
+      "id": "claim-risk-003-harvest-confirmation",
+      "type": "confirmacao de produtividade na colheita",
+      "linkedPolicyId": "SIM-SOMPO-AGRO-2026-0002",
+      "trigger": "Area em maturacao tem evidencia parcial e precisa confirmar produtividade obtida na colheita.",
+      "claimQuestion": "A produtividade obtida confirma dano indenizavel ou apenas variacao regional sem sinistro?",
+      "requiredEvidence": [
+        "data de colheita",
+        "notas ou romaneios simulados",
+        "area efetivamente colhida",
+        "produtividade obtida kg/ha",
+        "fotos de bordadura e interior do talhao"
+      ],
+      "missingEvidence": [
+        "produtividade obtida",
+        "area efetivamente colhida"
+      ],
+      "triageDecision": "acompanhar colheita, preparar laudo preventivo e nao calcular indenizacao sem produtividade obtida",
+      "slaHours": 72,
+      "fraudOrNoiseRisk": "baixo a medio: evidencia parcial existe, mas falta dado de fechamento",
+      "agentTasks": [
+        "agendar checkpoint de colheita",
+        "comparar produtividade obtida com garantida",
+        "gerar resumo executivo sem valor financeiro"
+      ]
+    }
+  ],
+  "lossPreventionProgram": {
+    "id": "prevention-program-001-soy-rs-drought",
+    "objective": "Reduzir atraso, retrabalho e agravamento operacional antes que eventos de seca/estiagem virem fila massiva de sinistro.",
+    "preventionLayers": [
+      {
+        "id": "prevention-01-early-warning",
+        "name": "alerta antecipado por municipio e fase da lavoura",
+        "trigger": "chuva baixa em 14/30 dias + fase critica + cultura soja",
+        "action": "marcar talhoes em watchlist e exigir evidencia minima antes de aceite de conclusao",
+        "ownerAgent": "riscos-campo",
+        "successMetric": "100% dos casos criticos com proximo passo e SLA"
+      },
+      {
+        "id": "prevention-02-evidence-first",
+        "name": "coleta de evidencia antes do pico de aviso",
+        "trigger": "evidenceCompletenessPct abaixo de 60 em area de severidade alta",
+        "action": "enviar checklist para corretor/produtor e bloquear decisao automatica ate completar campos minimos",
+        "ownerAgent": "planejador",
+        "successMetric": "reduzir casos sem foto, chuva local e fase fenologica"
+      },
+      {
+        "id": "prevention-03-field-routing",
+        "name": "roteamento de vistoria por prioridade",
+        "trigger": "climateSeverityScore >= 85 ou insuredAreaHa acima de 150 ha com evidencia incompleta",
+        "action": "priorizar vistoria presencial/remota, com briefing tecnico do talhao",
+        "ownerAgent": "supervisor",
+        "successMetric": "fila critica atendida antes da fila media"
+      }
+    ],
+    "preventiveQuestions": [
+      "Qual talhao tem maior severidade e menor evidencia?",
+      "Qual caso precisa virar pre-aviso e qual deve ficar em watchlist?",
+      "Qual evidencia falta para reduzir retrabalho de regulacao?",
+      "Qual acao preventiva deve ocorrer em 24h, 48h e 72h?",
+      "Qual decisao esta bloqueada por falta de dado real?"
+    ],
+    "stopRules": [
+      "nao calcular indenizacao sem produtividade obtida",
+      "nao usar nome ou coordenada real",
+      "nao tratar proxy como economia financeira",
+      "nao encerrar caso sem motivo auditavel"
+    ]
+  }
+}

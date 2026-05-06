@@ -30,10 +30,25 @@ Resultado esperado: Vite compila `index.html`, CSS e JS para `dist/` sem erro.
 - `src/main.jsx`: estado, eventos e componentes React.
 - `src/styles.css`: layout, tema e responsividade.
 - `data/research-dashboard.json`: dados derivados do deep research report usado pelo dashboard.
+- `server/publication-engine.js`: motor do agente `database` para transformar pos-processamento em conteudo claro para diferentes publicos.
+- `docs/database-obsidian-plan.md`: pre-planejamento e prompt step-by-step da ligacao database + Obsidian.
+- `docs/obsidian-vault/LUCA-AI/`: notas Markdown para abrir como vault Obsidian `LUCA-AI`.
 - `server/`: backend local, WebSocket, store de missoes e heartbeat do supervisor.
 - `.luca/`: memoria local gerada em runtime, ignorada pelo Git.
 - `index.html`: entrada Vite.
 - `AGENTS.md`: regras de trabalho para agentes neste projeto.
+
+## Database + Obsidian
+
+O quadrado `database` abre as tres camadas reais de `data/research-dashboard.json`:
+
+- `01 pesquisa bruta`: snapshot e fontes confiaveis.
+- `02 processamento`: simulacoes, metodos e procedimentos filtrados para agentes.
+- `03 pos-processamento`: relatorios, assets e painel aprovado para dashboard.
+
+Cada camada tem link para uma nota Obsidian. Para o protocolo `obsidian://` abrir direto na pagina correta, registre a pasta `docs/obsidian-vault/LUCA-AI` no Obsidian como vault chamado `LUCA-AI`.
+
+A camada `03` passa pelo motor `public-friendly-post-processing`, incorporado ao agente `database`. A regra dessa skill e esconder chaves tecnicas, assets brutos e informacao indefinida, exibindo apenas resumo claro, importancia, informacoes confirmadas, perguntas que ajuda a responder e links aprovados.
 
 ## Backend
 
@@ -50,6 +65,7 @@ O backend mantem o estado real do sistema:
 ## Escopo agentico atual
 
 - `supervisor`: controla o heartbeat, le a database e despacha jobs.
+- `database`: aplica a skill local `public-friendly-post-processing` na camada 03 antes de ela aparecer no frontend.
 - `riscos-campo`: executa os jobs derivados da pesquisa e grava status na database local.
 - Heartbeat: persistido em `.luca/heartbeat.jsonl` e exibido no card `heartbeat`.
 - Jobs: persistidos em `.luca/database-state.json`, mantendo configuracao minima e local.

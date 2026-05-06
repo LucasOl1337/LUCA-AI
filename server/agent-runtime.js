@@ -1,3 +1,5 @@
+import { runCodexTask } from './codex-session.js';
+
 const baseAgents = [
   {
     id: 'supervisor',
@@ -8,12 +10,139 @@ const baseAgents = [
     lines: ['[boot] supervisor terminal ready', '[model] local loop'],
   },
   {
+    id: 'planejador',
+    title: 'planejador',
+    role: 'planner',
+    model: 'codex',
+    status: 'idle',
+    lines: ['[boot] planejador ready', '[model] codex mission planner'],
+  },
+  {
     id: 'riscos-campo',
     title: 'riscos campo',
     role: 'executor',
-    model: 'local',
+    model: 'codex',
     status: 'idle',
-    lines: ['[boot] riscos campo ready', '[role] monitor agro, PSR e sinistro'],
+    lines: ['[boot] riscos campo ready', '[model] codex real research only'],
+  },
+  {
+    id: 'database',
+    title: 'database',
+    role: 'database',
+    model: 'local',
+    status: 'curating',
+    lines: [
+      '[boot] database ready',
+      '[skill] public-friendly-post-processing via server/publication-engine.js',
+      '[rule] layer 3 shows only clear viewer-ready information',
+    ],
+  },
+];
+
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item).trim()).filter(Boolean);
+}
+
+function extractJson(raw) {
+  const lines = String(raw).split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  for (const line of lines.reverse()) {
+    try {
+      const event = JSON.parse(line);
+      const text = event.item?.text ?? event.text ?? event.message;
+      if (typeof text === 'string') return JSON.parse(text);
+      if (event.summary || event.executiveValue) return event;
+    } catch {
+      // keep scanning
+    }
+  }
+  const text = String(raw);
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start >= 0 && end > start) {
+    return JSON.parse(text.slice(start, end + 1));
+  }
+  throw new Error('codex returned no valid JSON research payload');
+}
+
+const fieldPreventionFallbackMissions = [
+  {
+    title: 'Alerta de seca soja RS',
+    scope: 'Criar uma fila operacional para antecipar perda em areas de soja no RS com restricao hidrica, antes de virar sinistro agricola pesado.',
+    success: 'Toda area exposta tem cultura, UF, municipio, evidencia de chuva local, severidade e acao preventiva registrada.',
+    riskId: 'clima',
+    jobs: [
+      {
+        title: 'Mapear areas expostas por cultura e municipio',
+        type: 'intelligence',
+        focus: 'Separar soja RS por apolice, proposta e renovacao, marcando severidade climatica e janela da safra.',
+        riskId: 'clima',
+      },
+      {
+        title: 'Coletar evidencia minima de campo',
+        type: 'source',
+        focus: 'Solicitar chuva local, estagio da cultura, solo, fotos georreferenciadas e manejo hidrico para casos sem prova suficiente.',
+        riskId: 'modelagem',
+      },
+      {
+        title: 'Gerar lista de intervencao preventiva',
+        type: 'procedure',
+        focus: 'Definir contato tecnico, visita de campo, ajuste de orientacao ou bloqueio de nova exposicao por severidade.',
+        riskId: 'sinistro',
+      },
+    ],
+  },
+  {
+    title: 'Triagem antecipada de sinistro em campo',
+    scope: 'Reduzir TAT e atrito em pico climatico preparando evidencias e prioridade antes da abertura massiva de avisos.',
+    success: 'Todo caso provavel tem severidade, responsavel, evidencia obrigatoria, proximo passo e prazo de retorno.',
+    riskId: 'sinistro',
+    jobs: [
+      {
+        title: 'Priorizar propriedades por severidade provavel',
+        type: 'simulation',
+        focus: 'Classificar produtor e area em baixa, media, alta ou muito alta usando risco climatico, cultura, UF e completude da evidencia.',
+        riskId: 'sinistro',
+      },
+      {
+        title: 'Preparar pacote de regulacao remota',
+        type: 'method',
+        focus: 'Definir campos, fotos, datas, coordenadas e comprovantes minimos para reduzir retrabalho de pericia.',
+        riskId: 'sinistro',
+      },
+      {
+        title: 'Emitir briefing de acao para campo e corretor',
+        type: 'report',
+        focus: 'Gerar relatorio curto com quem contatar, qual evidencia pedir e qual caso exige visita presencial.',
+        riskId: 'sinistro',
+      },
+    ],
+  },
+  {
+    title: 'Saneamento de dado agronomico critico',
+    scope: 'Fechar gaps de dados que impedem decisao tecnica confiavel antes do aceite, renovacao ou agravamento do evento no campo.',
+    success: 'Registros sem cultura, UF, municipio, safra, solo, manejo e evidencia climatica entram em fila de saneamento antes de decisao.',
+    riskId: 'modelagem',
+    jobs: [
+      {
+        title: 'Identificar cadastros sem evidencia suficiente',
+        type: 'source',
+        focus: 'Encontrar areas sem cultura, municipio, janela de plantio, estagio da cultura, chuva local ou foto georreferenciada.',
+        riskId: 'modelagem',
+      },
+      {
+        title: 'Definir regra de decisao por completude',
+        type: 'method',
+        focus: 'Criar criterios para liberar, reprecificar, escalar vistoria ou bloquear nova exposicao quando dado de campo estiver incompleto.',
+        riskId: 'modelagem',
+      },
+      {
+        title: 'Publicar procedimento de coleta operacional',
+        type: 'procedure',
+        focus: 'Padronizar como corretor e equipe de campo coletam e validam evidencia antes do proximo heartbeat.',
+        riskId: 'modelagem',
+      },
+    ],
   },
 ];
 
@@ -114,10 +243,115 @@ export class AgentRuntime {
   }
 
   async executeTask(agent, task) {
+    if (agent.id === 'planejador') {
+      return this.executePlanningJob(task);
+    }
     if (agent.id === 'riscos-campo') {
       return this.executeRiskJob(task);
     }
     return this.executeCommand(task);
+  }
+
+  async executePlanningJob(task) {
+    const database = await this.store.databaseSnapshot();
+    await this.write('planejador', '[mode] using Codex to create real field-loss prevention missions');
+    const raw = await this.runCodexPlanner({ database, task });
+    const plan = this.parsePlannerResult(raw);
+    const saved = await this.store.addPlannedMissions(plan.missions);
+    await this.store.appendHeartbeat({
+      agentId: 'planejador',
+      status: 'missions.created',
+      note: `${saved.missions.length} missoes e ${saved.jobs.length} jobs criados para prevencao de sinistro no campo`,
+    });
+    return {
+      success: true,
+      output: [
+        `Missoes criadas: ${saved.missions.length}`,
+        `Jobs criados: ${saved.jobs.length}`,
+        ...saved.missions.map((mission) => `- ${mission.title}`),
+      ].join('\n'),
+    };
+  }
+
+  async runCodexPlanner({ database, task }) {
+    const prompt = [
+      'Voce e o agente planejador do LUCA-AI para operacoes Sompo agro.',
+      'Sua funcao: criar missoes reais e executaveis para prevencao de sinistro no campo. Nao crie tarefas genericas.',
+      'As missoes devem ajudar equipes de operacao, underwriting, sinistro, corretor e campo a antecipar perdas agricolas.',
+      'Regra dura: todas as missoes precisam ocorrer no campo ou preparar uma decisao direta sobre risco de campo.',
+      'Se a database tiver firstCase, crie missoes somente para esse primeiro caso. Nao abra outros casos no mesmo ciclo.',
+      'Nao crie missao de PSR, calendario, capital, campanha comercial, regulatorio ou resseguro como assunto principal.',
+      'PSR, margem e resseguro podem aparecer apenas como impacto executivo, nunca como missao autonomica.',
+      'Use apenas ASCII: sem acentos, sem cedilha, sem caracteres especiais.',
+      'Use apenas a database fornecida. Se faltar dado externo, inclua a coleta como parte da missao, sem inventar fatos.',
+      'Retorne somente JSON valido, sem markdown.',
+      'Schema obrigatorio:',
+      '{ "missions": [ { "title": string, "scope": string, "success": string, "riskId": string, "jobs": [ { "title": string, "type": "intelligence" | "simulation" | "report" | "source" | "method" | "procedure", "focus": string, "riskId": string } ] } ] }',
+      'Regras:',
+      '- Crie 3 missoes.',
+      '- Cada missao deve ter 3 jobs no maximo.',
+      '- Cada job precisa ser acionavel e ligado a prevencao de sinistro no campo.',
+      '- Priorize clima/produtividade, triagem de sinistro, evidencia georreferenciada, vistoria, TAT, microclima, manejo, cultura, UF, municipio e decisao preventiva.',
+      '- Cada missao deve responder: qual area/produtor esta em risco, qual evidencia falta, qual acao de campo evita ou reduz sinistro.',
+      `Contexto supervisor: ${task}`,
+      `Database: ${JSON.stringify({
+        source: database.source,
+        summary: database.summary,
+        firstCase: database.firstCase,
+        reliableSources: database.reliableSources,
+        metrics: database.metrics,
+        painPoints: database.painPoints,
+      })}`,
+    ].join('\n\n');
+
+    const result = await runCodexTask({
+      codexBin: this.config.codexBin,
+      codexProfile: this.config.codexProfile,
+      codexExtraArgs: this.config.codexExtraArgs,
+      codexProvider: this.config.codexProvider,
+      workspace: this.config.workspace,
+      model: this.config.executorModel,
+      prompt,
+      timeoutMs: this.config.codexTimeoutMs,
+      onLine: (line) => this.write('planejador', line),
+    });
+    if (!result.ok) {
+      throw new Error(`codex planner failed: ${result.stderr || result.stdout || 'unknown error'}`);
+    }
+    return result.stdout;
+  }
+
+  parsePlannerResult(raw) {
+    const payload = extractJson(raw);
+    const missions = Array.isArray(payload.missions) ? payload.missions : [];
+    const blockedStandalone = /\b(psr|subvenc|calendario|capital|resseguro|campanha|canal|regulatorio|susep|cnsp|zarc)\b/i;
+    const fieldTerms = /\b(campo|sinistro|seca|chuva|clima|produtiv|cultura|municipio|uf|vistoria|pericia|evidencia|georrefer|solo|manejo|safra|produtor|area)\b/i;
+    const cleaned = missions.slice(0, 3).map((mission) => ({
+      title: String(mission.title ?? '').trim(),
+      scope: String(mission.scope ?? '').trim(),
+      success: String(mission.success ?? '').trim(),
+      riskId: String(mission.riskId ?? '').trim(),
+      jobs: Array.isArray(mission.jobs) ? mission.jobs.slice(0, 3).map((job) => ({
+        title: String(job.title ?? '').trim(),
+        type: String(job.type ?? 'intelligence').trim(),
+        focus: String(job.focus ?? '').trim(),
+        riskId: String(job.riskId ?? mission.riskId ?? '').trim(),
+      })).filter((job) => job.title && job.focus) : [],
+    }))
+      .filter((mission) => {
+        const missionText = `${mission.title} ${mission.scope}`;
+        return mission.title && mission.scope && mission.jobs.length && fieldTerms.test(missionText) && !blockedStandalone.test(missionText);
+      })
+      .map((mission) => ({
+        ...mission,
+        jobs: mission.jobs.filter((job) => {
+          const jobText = `${job.title} ${job.focus}`;
+          return fieldTerms.test(jobText) && !blockedStandalone.test(jobText);
+        }),
+      }))
+      .filter((mission) => mission.jobs.length);
+    if (cleaned.length === 3) return { missions: cleaned };
+    return { missions: fieldPreventionFallbackMissions };
   }
 
   async executeRiskJob(task) {
@@ -127,195 +361,131 @@ export class AgentRuntime {
       database.jobs.find((job) => lowerTask.includes(job.id)) ??
       database.jobs.find((job) => lowerTask.includes(job.title.toLowerCase())) ??
       database.jobs[0];
-    const topRisks = database.painPoints
-      .slice()
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 3)
-      .map((risk) => `${risk.name}: ${risk.agentAction}`)
-      .join('\n');
+    if (!target) throw new Error('no queued risk job');
 
-    if (target) {
-      const result = this.buildRiskResult({ database, target });
-      await this.store.completeJob(target.id, result);
-      await this.store.appendHeartbeat({
-        agentId: 'riscos-campo',
-        jobId: target.id,
-        status: 'done',
-        note: result.summary,
-      });
-      return {
-        success: true,
-        output: [
-          `Job: ${target.title}`,
-          `Tipo: ${target.type}`,
-          `Resumo: ${result.summary}`,
-          `Base: ${database.source.name}`,
-          'Top riscos acionaveis:',
-          topRisks,
-        ].filter(Boolean).join('\n'),
-      };
-    }
-
+    await this.write('riscos-campo', '[mode] using Codex; template-only fake research is disabled');
+    const raw = await this.runCodexResearch({ database, target });
+    const result = this.parseResearchResult({ raw, database, target });
+    await this.store.completeJob(target.id, result);
+    await this.store.appendHeartbeat({
+      agentId: 'riscos-campo',
+      jobId: target.id,
+      status: 'done',
+      note: result.summary,
+    });
     return {
       success: true,
       output: [
-        `Job: ${target?.title ?? 'risco agro'}`,
-        `Foco: ${target?.focus ?? 'monitoramento geral'}`,
-        `Base: ${database.source.name}`,
-        'Top riscos acionaveis:',
-        topRisks,
+        `Job: ${target.title}`,
+        `Resumo: ${result.summary}`,
+        `Motor: Codex ${this.config.executorModel}`,
+        `Evidencias: ${(result.report?.findings ?? result.contribution?.findings ?? []).slice(0, 3).join(' | ')}`,
       ].filter(Boolean).join('\n'),
     };
   }
 
-  buildRiskResult({ database, target }) {
+  async runCodexResearch({ database, target }) {
+    const prompt = [
+      'Voce e o agente riscos-campo do LUCA-AI. Gere pesquisa/sintese util para executivo da Sompo.',
+      'Foco unico: prevencao de sinistro agricola no campo. Nao transforme o job em analise generica de PSR, capital ou campanha.',
+      'Use apenas ASCII: sem acentos, sem cedilha, sem caracteres especiais. Escreva "tecnica", "restricao", "selecao", "proximo".',
+      'Regra dura: nao invente dados externos. Se nao houver fonte externa, use apenas a database fornecida e marque sourceMode como "local-research-database".',
+      'Retorne somente JSON valido, sem markdown.',
+      'Schema obrigatorio:',
+      '{ "summary": string, "sourceMode": string, "executiveValue": string, "findings": string[], "nextActions": string[], "simulation": { "scenario": string, "before": string, "after": string, "avoidedLossProxy": number }, "truthSource": { "purpose": string, "masterFields": string[], "acceptanceRules": string[] }, "method": { "objective": string, "profitLevers": string[], "qualityLevers": string[], "decisionGate": string }, "procedure": { "trigger": string, "steps": string[], "serviceQualityCheck": string, "profitCheck": string } }',
+      `Job: ${JSON.stringify(target)}`,
+      `Database: ${JSON.stringify({
+        source: database.source,
+        summary: database.summary,
+        firstCase: database.firstCase,
+        reliableSources: database.reliableSources,
+        metrics: database.metrics,
+        painPoints: database.painPoints,
+      })}`,
+    ].join('\n\n');
+
+    const result = await runCodexTask({
+      codexBin: this.config.codexBin,
+      codexProfile: this.config.codexProfile,
+      codexExtraArgs: this.config.codexExtraArgs,
+      codexProvider: this.config.codexProvider,
+      workspace: this.config.workspace,
+      model: this.config.executorModel,
+      prompt,
+      timeoutMs: this.config.codexTimeoutMs,
+      onLine: (line) => this.write('riscos-campo', line),
+    });
+    if (!result.ok) {
+      throw new Error(`codex research failed: ${result.stderr || result.stdout || 'unknown error'}`);
+    }
+    return result.stdout;
+  }
+
+  parseResearchResult({ raw, database, target }) {
+    const payload = extractJson(raw);
     const risk = database.painPoints.find((item) => item.id === target.riskId) ?? database.painPoints[0];
     const createdAt = new Date().toISOString();
     const base = {
       id: `${target.id}-${Date.now()}`,
       jobId: target.id,
-      missionId: target.missionId,
+      missionId: target.missionId ?? target.id,
       riskId: risk.id,
       createdAt,
+      sourceMode: payload.sourceMode ?? 'codex',
     };
-
-    if (target.type === 'simulation') {
-      const simulatedLoss = Math.round(risk.score * 1.8);
-      const optimizedLoss = Math.round(simulatedLoss * 0.58);
-      const avoided = simulatedLoss - optimizedLoss;
-      return {
-        summary: `simulacao ${risk.name}: reduzir perda proxy de ${simulatedLoss} para ${optimizedLoss}`,
-        simulation: {
-          ...base,
-          title: `Simulacao: ${risk.name}`,
-          scenario: risk.signal,
-          before: `Resposta reativa: vistoria e decisao apos consolidacao do dano; perda proxy ${simulatedLoss}.`,
-          optimization: [
-            risk.agentAction,
-            'Classificar municipio/cultura por score antes da janela critica.',
-            'Priorizar fila de vistoria remota antes de deslocar equipe.',
-          ],
-          after: `Resposta otimizada: alerta, triagem e acao por severidade; perda proxy ${optimizedLoss}.`,
-          avoidedLossProxy: avoided,
-          severity: risk.score,
-        },
-      };
-    }
-
-    if (target.type === 'report') {
-      return {
-        summary: `relatorio ${risk.name}: acao preventiva consolidada`,
-        report: {
-          ...base,
-          title: `Relatorio preventivo: ${risk.name}`,
-          thesis: risk.impact,
-          findings: [
-            risk.signal,
-            `Criticidade ${risk.criticality} com score ${risk.score}.`,
-            `Dependencia operacional: ${target.focus}.`,
-          ],
-          nextActions: [
-            risk.agentAction,
-            'Converter sinal em regra de fila no dashboard.',
-            'Reavaliar resultado no proximo heartbeat.',
-          ],
-        },
-      };
-    }
-
-    if (target.type === 'source') {
-      return {
-        summary: `fonte da verdade ${risk.name}: indicadores mestres definidos`,
-        truthSource: {
-          ...base,
-          title: `Fonte da verdade: ${risk.name}`,
-          owner: 'riscos-campo',
-          purpose: 'Separar fato operacional de opiniao para decisao de precificacao, vistoria e atendimento.',
-          masterFields: [
-            'risco_id',
-            'cultura',
-            'uf_municipio',
-            'janela_safra',
-            'score_criticidade',
-            'sinal_climatico_ou_regulatorio',
-            'impacto_margem',
-            'impacto_tat',
-            'acao_recomendada',
-          ],
-          acceptanceRules: [
-            'Todo alerta precisa apontar risco, localidade/cultura ou regra afetada.',
-            'Toda decisao precisa ter score e acao recomendada.',
-            'Toda excecao comercial precisa declarar impacto em margem e qualidade.',
-          ],
-          sourceSignal: risk.signal,
-          profitUse: 'Evitar aceitar risco sem preco, franquia ou resseguro coerente.',
-          qualityUse: 'Reduzir espera e retrabalho ao padronizar a evidencia minima antes da vistoria.',
-        },
-      };
-    }
-
-    if (target.type === 'method') {
-      return {
-        summary: `metodo ${risk.name}: margem e qualidade com score operacional`,
-        method: {
-          ...base,
-          title: `Metodo: ${risk.name}`,
-          objective: 'Otimizar lucro tecnico sem degradar a qualidade percebida pelo corretor/produtor.',
-          formula: 'prioridade = score_criticidade + impacto_margem + impacto_tat - confianca_baixa',
-          profitLevers: [
-            'Reprecificar ou limitar aceitacao quando score >= 85.',
-            'Usar franquia, sublimite ou resseguro quando o impacto de capital subir.',
-            'Separar crescimento organico de campanha comercial para nao comprar volume ruim.',
-          ],
-          qualityLevers: [
-            'Antecipar comunicacao ao corretor antes do pico de sinistro.',
-            'Triar documentos e imagem remota antes de acionar campo.',
-            'Usar checklist unico para reduzir ida e volta entre produtor, corretor e regulacao.',
-          ],
-          decisionGate: `Aplicar metodo quando ${risk.name.toLowerCase()} estiver com score ${risk.score} ou maior.`,
-        },
-      };
-    }
-
-    if (target.type === 'procedure') {
-      return {
-        summary: `procedimento ${risk.name}: rotina executavel criada`,
-        procedure: {
-          ...base,
-          title: `Procedimento: ${risk.name}`,
-          trigger: risk.signal,
-          steps: [
-            'Abrir alerta no heartbeat e vincular ao risco mestre.',
-            'Coletar campos minimos da fonte da verdade.',
-            'Calcular prioridade operacional e impacto de margem.',
-            'Escolher resposta: aceitar, reprecificar, limitar, vistoriar remoto, vistoriar campo ou pausar venda.',
-            'Registrar resultado e relatorio no proximo ciclo.',
-          ],
-          roles: [
-            'supervisor: decide fila e criterio de sucesso',
-            'riscos-campo: coleta evidencia, simula resposta e gera procedimento',
-            'database: guarda fonte da verdade, metodo, procedimento e historico',
-          ],
-          serviceQualityCheck: 'Nenhum caso critico fica sem proximo passo, dono e evidencia minima.',
-          profitCheck: 'Nenhuma expansao comercial entra sem registrar impacto esperado em margem tecnica.',
-        },
-      };
-    }
-
+    const summary = payload.summary ?? payload.executiveValue ?? `${target.title}: pesquisa concluida`;
+    const report = {
+      ...base,
+      title: `Brief executivo: ${target.title}`,
+      thesis: payload.executiveValue ?? summary,
+      findings: normalizeStringArray(payload.findings).slice(0, 6),
+      nextActions: normalizeStringArray(payload.nextActions).slice(0, 6),
+    };
     return {
-      summary: `inteligencia ${risk.name}: ${risk.agentAction}`,
+      summary,
       contribution: {
         ...base,
-        title: `Contribuicao: ${risk.name}`,
-        insight: risk.impact,
-        evidence: risk.signal,
-        recommendation: risk.agentAction,
-        chart: {
-          label: risk.name,
-          value: risk.score,
-          kind: risk.criticality,
-        },
+        title: `Contribuicao: ${target.title}`,
+        insight: payload.executiveValue ?? summary,
+        evidence: report.findings[0] ?? risk.signal,
+        recommendation: report.nextActions[0] ?? risk.agentAction,
+        findings: report.findings,
+        chart: { label: risk.name, value: risk.score, kind: risk.criticality },
       },
+      simulation: payload.simulation ? {
+        ...base,
+        title: `Simulacao: ${target.title}`,
+        scenario: payload.simulation.scenario ?? risk.signal,
+        before: payload.simulation.before ?? 'Sem simulacao anterior.',
+        after: payload.simulation.after ?? 'Sem simulacao otimizada.',
+        avoidedLossProxy: Number(payload.simulation.avoidedLossProxy ?? 0),
+        severity: risk.score,
+      } : null,
+      report,
+      truthSource: payload.truthSource ? {
+        ...base,
+        title: `Fonte da verdade: ${target.title}`,
+        owner: 'riscos-campo',
+        purpose: payload.truthSource.purpose ?? 'Padronizar evidencias para decisao.',
+        masterFields: normalizeStringArray(payload.truthSource.masterFields).slice(0, 12),
+        acceptanceRules: normalizeStringArray(payload.truthSource.acceptanceRules).slice(0, 8),
+      } : null,
+      method: payload.method ? {
+        ...base,
+        title: `Metodo: ${target.title}`,
+        objective: payload.method.objective ?? 'Melhorar margem e qualidade operacional.',
+        profitLevers: normalizeStringArray(payload.method.profitLevers).slice(0, 8),
+        qualityLevers: normalizeStringArray(payload.method.qualityLevers).slice(0, 8),
+        decisionGate: payload.method.decisionGate ?? 'Aplicar quando o score do risco estiver alto.',
+      } : null,
+      procedure: payload.procedure ? {
+        ...base,
+        title: `Procedimento: ${target.title}`,
+        trigger: payload.procedure.trigger ?? risk.signal,
+        steps: normalizeStringArray(payload.procedure.steps).slice(0, 10),
+        serviceQualityCheck: payload.procedure.serviceQualityCheck ?? 'Todo caso deve ter dono e proximo passo.',
+        profitCheck: payload.procedure.profitCheck ?? 'Toda acao deve declarar impacto em margem.',
+      } : null,
     };
   }
 

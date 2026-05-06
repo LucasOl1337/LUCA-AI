@@ -3,4 +3,10 @@ dist/
 *.log
 qa-*.png
 .env
+.env.*
+!.env.example
 .luca/
+config.local.json
+*.pem
+*.key
+credentials.json

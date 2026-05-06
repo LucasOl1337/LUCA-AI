@@ -101,6 +101,18 @@ app.post('/api/mission/reset', async (request, response) => {
   response.json({ ok: true });
 });
 
+app.post('/api/database/reset-field-prevention', async (request, response) => {
+  await supervisor.pause();
+  await supervisor.reset();
+  agents.resetAll();
+  store.clearActiveMission();
+  currentMissionSnapshot = null;
+  const result = await store.resetRuntimeDatabase();
+  bus.emit('database.reset', { backupDir: result.backupDir });
+  await broadcastState();
+  response.json({ ok: true, backupDir: result.backupDir });
+});
+
 app.post('/api/supervisor/start', async (request, response) => {
   await supervisor.start();
   bus.emit('supervisor.started');
@@ -145,9 +157,4 @@ app.get(/.*/, (request, response) => {
 server.listen(config.port, '127.0.0.1', () => {
   console.log(`LUCA backend listening on http://127.0.0.1:${config.port}`);
   bus.emit('system.ready', { port: config.port });
-  supervisor.start().then(() => {
-    bus.emit('supervisor.autostarted', { reason: 'server boot' });
-  }).catch((error) => {
-    bus.emit('error', { scope: 'supervisor.autostart', message: error.message });
-  });
 });
