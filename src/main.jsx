@@ -2,9 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 
-const apiBase = import.meta.env.DEV ? 'http://127.0.0.1:4141' : window.location.origin;
+const apiBase = import.meta.env.DEV ? 'http://127.0.0.1:4242' : window.location.origin;
 const wsBase = import.meta.env.DEV
-  ? 'ws://127.0.0.1:4141'
+  ? 'ws://127.0.0.1:4242'
   : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
 
 const fallbackDatabase = {
@@ -21,151 +21,30 @@ const agentDefs = [
   { id: 'heartbeat', title: 'heartbeat', icon: '/icons/heartbeat.mp4', fallbackIcon: '/icons/heart.jpg', role: 'system', isHeartbeat: true },
   { id: 'supervisor', title: 'supervisor', icon: '/icons/supervisor.jpg', role: 'supervisor' },
   { id: 'planejador', title: 'planejador', icon: '/icons/planejador.png', role: 'planner' },
-  { id: 'riscos-campo', title: 'riscos campo', icon: '/icons/riscos.jpg', role: 'executor' },
+  { id: 'pesquisador', title: 'pesquisador', icon: '/icons/riscos.jpg', role: 'researcher' },
   { id: 'database', title: 'database', icon: '/icons/database.png', role: 'database', isDatabase: true },
 ];
-
-const sompoSimulationCase = {
-  title: 'Sompo 001: soja RS',
-  subtitle: 'triagem preventiva por restricao hidrica',
-  image: '/cases/sompo-field-risk-001/01-field-inspection-drought-soy-rs.png',
-  metrics: [
-    ['talhoes', '3'],
-    ['sinistros', '3'],
-    ['prevencoes', '3'],
-    ['perda real calculada', '0'],
-  ],
-  priority: 'Uruguaiana / talhao-11: severidade 92, evidencia 35%, acionar campo e corretor.',
-  claimCases: [
-    'pre-aviso critico por seca e possivel perda de produtividade',
-    'sinistro com evidencia insuficiente devolvido para saneamento',
-    'confirmacao na colheita antes de calcular produtividade obtida',
-  ],
-  preventionCases: [
-    'alerta antecipado por municipio, cultura e fase da lavoura',
-    'checklist de evidencia antes do pico de aviso',
-    'roteamento de vistoria por severidade e lacuna de dados',
-  ],
-  details: [
-    'Produto aderente: Sompo Agricola Produtividade com seca/estiagem.',
-    'Evento plausivel: soja RS com restricao hidrica em boletins publicos 2026.',
-    'Agentes trabalham em exposicao, evidencia, score, vistoria e briefing.',
-    'Bloqueio: sem calculo financeiro real enquanto nao houver carteira interna.',
-  ],
-};
 
 function timestamp() {
   return new Date().toLocaleTimeString('pt-BR', { hour12: false });
 }
 
+function heartbeatFresh(updatedAt) {
+  if (!updatedAt) return false;
+  const ms = Date.parse(updatedAt);
+  if (!Number.isFinite(ms)) return false;
+  return (Date.now() - ms) < 12000;
+}
+
+function stateTone(state) {
+  if (state === 'running' || state === 'online' || state === 'ready') return '#55d26a';
+  if (state === 'error' || state === 'offline') return '#ff6b6b';
+  return '#f0c969';
+}
+
 function getRawResearch(database) {
   return database?.layers?.rawResearch?.items?.[0]?.payload ?? null;
 }
-
-function formatMoneyMillions(value) {
-  return `R$ ${Math.round(value).toLocaleString('pt-BR')} mi`;
-}
-
-function buildExecutiveIntel(database) {
-  const raw = getRawResearch(database);
-  const metrics = database?.metrics ?? raw?.metrics ?? {};
-  const firstCase = database?.firstCase ?? {};
-  const painPoints = database?.painPoints ?? raw?.painPoints ?? [];
-  const topRisks = painPoints.slice(0, 5).map((risk) => ({
-    name: risk.name
-      .replace('Clima acima do apetite tecnico', 'Clima')
-      .replace('Dependencia estrutural do PSR', 'PSR')
-      .replace('Pressao de resseguro e capital', 'Resseguro'),
-    score: risk.score ?? 0,
-    criticality: risk.criticality ?? 'n/a',
-    action: risk.agentAction ?? 'definir acao',
-  }));
-  const portfolioSignals = [
-    { label: 'PSR bloqueado', value: metrics.psrBlockedMillions ?? 0 },
-    { label: 'PSR orcado', value: metrics.psrBudgetMillions ?? 0 },
-    { label: 'Resseguro 2025', value: metrics.reinsurerPremium2025Millions ?? 0 },
-    { label: 'Meta resseguro', value: metrics.reinsurerTarget2026Millions ?? 0 },
-  ];
-  return {
-    metrics,
-    firstCase,
-    topRisks,
-    portfolioSignals,
-    decisionBrief: [
-      {
-        label: 'dor da Sompo',
-        title: 'seca pode virar fila de sinistro sem evidencia suficiente',
-        detail: `${firstCase.crop ?? 'soja'} no ${firstCase.region ?? 'Rio Grande do Sul'} precisa de triagem antes da decisao de campo.`,
-      },
-      {
-        label: 'o que os agentes fizeram',
-        title: 'separaram risco, evidencia e acao preventiva',
-        detail: 'Planejador organiza missoes; riscos-campo executa jobs; database entrega apenas informacao clara para decisao.',
-      },
-      {
-        label: 'decisao agora',
-        title: 'priorizar talhoes criticos e bloquear conclusao sem prova',
-        detail: 'Acionar corretor/campo, pedir fotos georreferenciadas, chuva local e fase da lavoura antes de qualquer calculo real.',
-      },
-    ],
-    kpis: [
-      { label: 'riscos claros', value: metrics.painPoints ?? painPoints.length },
-      { label: 'jobs ativos', value: metrics.activeJobs ?? database?.jobs?.length ?? 0 },
-      { label: 'simulacoes', value: metrics.simulations ?? database?.simulations?.length ?? 0 },
-      { label: 'fontes verificadas', value: database?.reliableSources?.length ?? raw?.reliableSources?.length ?? 0 },
-    ],
-    executiveTable: topRisks.map((risk) => ({
-      prioridade: risk.name,
-      score: risk.score,
-      decisao: risk.action,
-    })),
-  };
-}
-
-const initialDashboardBoxes = [
-  {
-    id: 'global-dashboard',
-    title: 'dashboards globais',
-    kind: 'blue',
-    x: 56,
-    y: 16,
-    width: 650,
-    height: 310,
-    content: 'DASHBOARDS COM INFORMACOES POS PROCESSADAS QUE PODEM SER UTEIS NUM ESCOPO GLOBAL DA SOMPO.',
-  },
-  {
-    id: 'savings-estimator',
-    title: 'estimador financeiro',
-    kind: 'blue greenText',
-    x: 730,
-    y: 16,
-    width: 220,
-    height: 255,
-    content: 'PAINEL QUE ESTIMA O CUSTO EM DINHEIRO QUE PODE SER ECONOMIZADO COM BASE NA SIMULACAO\n\nEM PORCENTAGEM E TBM VALOR ESTIMADO',
-  },
-  {
-    id: 'mission-definition',
-    title: 'definir missao',
-    kind: 'red',
-    x: 972,
-    y: 16,
-    width: 260,
-    height: 516,
-    content: 'MIGRAR ABA DE DEFINIR MISSAO AQUI.\n\nA MISSAO DEVE SER DEFINIDA PELO USUARIO\n\nDENTRO DA ABA DE MISSAO VAI ESTAR CONECTADO UM AGENTE LLM LIGADO ATRAVES DO ENDPOINT DO 9router. modelo gpt 5.4.\n\nEle devera fazer perguntas sobre o que precisa ser feito para o usuario e levantar requisitos e quando termina de levantar os requisitos vai converter isso em um plano ativo\n\nE pensar o que cada um dos agentes deve fazer, e ai passar a missao para eles.',
-  },
-  {
-    id: 'sompo-simulation-case',
-    title: 'caso sompo 001',
-    kind: 'sompoCase',
-    x: 56,
-    y: 342,
-    width: 894,
-    height: 190,
-    case: sompoSimulationCase,
-  },
-];
-
-const dashboardStage = { width: 1288, height: 548 };
 
 function getDatabaseLayers(database) {
   const layers = database?.layers ?? {};
@@ -291,22 +170,17 @@ function App() {
   const [supervisorMode, setSupervisorMode] = useState('standby');
   const [terminals, setTerminals] = useState([]);
   const [database, setDatabase] = useState(fallbackDatabase);
+  const [heartbeatMonitor, setHeartbeatMonitor] = useState(null);
+  const [heartbeatLogs, setHeartbeatLogs] = useState([]);
   const [lines, setLines] = useState([]);
   const [activeAgent, setActiveAgent] = useState(null);
   const [activeDatabaseLayer, setActiveDatabaseLayer] = useState('dashboardIntegration');
-  const [dashboardBoxes, setDashboardBoxes] = useState(initialDashboardBoxes);
-  const [savingsInputs, setSavingsInputs] = useState({ exposedMillions: 120, preventablePct: 18, confidencePct: 62 });
-  const [missionBuilder, setMissionBuilder] = useState({
-    objective: '',
-    area: 'sinistro agro',
-    horizon: '30 dias',
-    constraints: '',
-  });
   const agentLinesRef = useRef({});
 
   useEffect(() => {
     let socket = null;
     let reconnectTimer = null;
+    let pollTimer = null;
 
     function connect() {
       fetchState();
@@ -335,9 +209,11 @@ function App() {
     }
 
     connect();
+    pollTimer = setInterval(fetchState, 5000);
     return () => {
       if (socket) socket.close();
       if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (pollTimer) clearInterval(pollTimer);
     };
   }, []);
 
@@ -365,17 +241,19 @@ function App() {
   function syncBackendState(state) {
     const agents = state.agents ?? [];
     const supervisor = agents.find((agent) => agent.id === 'supervisor');
-    const executors = agents.filter((agent) => agent.role === 'executor' || agent.role === 'planner');
+    const workingAgents = agents.filter((agent) => agent.role === 'researcher' || agent.role === 'planner');
     setDatabase(state.database ?? fallbackDatabase);
+    setHeartbeatMonitor(state.heartbeatMonitor ?? null);
+    setHeartbeatLogs(state.heartbeatLogs ?? []);
 
     if (supervisor) {
       setSupervisorMode(supervisor.status);
       agentLinesRef.current = { ...agentLinesRef.current, supervisor: supervisor.lines };
     }
     setActiveMission(state.activeMission ? { ...state.activeMission, activatedAt: state.activeMission.activatedAt ?? '' } : null);
-    if (executors.length) {
-      setTerminals(executors);
-      executors.forEach((agent) => {
+    if (workingAgents.length) {
+      setTerminals(workingAgents);
+      workingAgents.forEach((agent) => {
         agentLinesRef.current = { ...agentLinesRef.current, [agent.id]: agent.lines };
       });
     }
@@ -394,7 +272,7 @@ function App() {
   }
 
   function getAgentLines(agentId) {
-    if (agentId === 'heartbeat') return lines.map((line) => line.text);
+    if (agentId === 'heartbeat') return heartbeatLogs;
     return agentLinesRef.current[agentId] ?? [];
   }
 
@@ -427,6 +305,26 @@ function App() {
     fetchState();
   }
 
+  async function runAgent(agentId) {
+    await apiPost('/api/agent/run', { agentId });
+    fetchState();
+  }
+
+  async function startHeartbeat() {
+    await apiPost('/api/heartbeat/start');
+    fetchState();
+  }
+
+  async function pauseHeartbeat() {
+    await apiPost('/api/heartbeat/pause');
+    fetchState();
+  }
+
+  async function clearAgents() {
+    await apiPost('/api/agents/clear');
+    fetchState();
+  }
+
   return (
     <main className="screen">
       <div className="strip">
@@ -438,7 +336,17 @@ function App() {
             isActive={activeAgent === agent.id}
             isOnline={backendReady}
             isSystemRunning={supervisorMode === 'running'}
-            onClick={() => setActiveAgent((current) => (current === agent.id ? null : agent.id))}
+            onClick={async () => {
+              const nextActive = activeAgent === agent.id ? null : agent.id;
+              setActiveAgent(nextActive);
+              if (nextActive && !agent.isHeartbeat && !agent.isDatabase) {
+                try {
+                  await runAgent(agent.id);
+                } catch {
+                  // terminal will reflect backend status/error on next state sync
+                }
+              }
+            }}
             onToggleSystem={supervisorMode === 'running' ? pauseSupervisor : startSupervisor}
           />
         ))}
@@ -459,339 +367,21 @@ function App() {
             missionDraft={missionDraft}
             supervisorMode={supervisorMode}
             terminals={terminals}
+            heartbeatMonitor={heartbeatMonitor}
             agentDefs={agentDefs}
             getAgentLines={getAgentLines}
             getAgentStatus={getAgentStatus}
             setActiveAgent={setActiveAgent}
-            setMissionDraft={setMissionDraft}
-            setupMission={setupMission}
-            resetMission={resetMission}
-            startSupervisor={startSupervisor}
-            pauseSupervisor={pauseSupervisor}
+            startHeartbeat={startHeartbeat}
+            pauseHeartbeat={pauseHeartbeat}
+            clearAgents={clearAgents}
+            backendReady={backendReady}
           />
         )
       )}
 
-      <DashboardCanvas
-        boxes={dashboardBoxes}
-        setBoxes={setDashboardBoxes}
-        database={database}
-        savingsInputs={savingsInputs}
-        setSavingsInputs={setSavingsInputs}
-        missionBuilder={missionBuilder}
-        setMissionBuilder={setMissionBuilder}
-        setMissionDraft={setMissionDraft}
-      />
-
+      <div className="empty-stage" aria-hidden="true" />
     </main>
-  );
-}
-
-function DashboardCanvas({ boxes, setBoxes, database, savingsInputs, setSavingsInputs, missionBuilder, setMissionBuilder, setMissionDraft }) {
-  const dragRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [stageScale, setStageScale] = useState(1);
-  const intel = buildExecutiveIntel(database);
-
-  useEffect(() => {
-    function updateScale() {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const nextScale = Math.min(rect.width / dashboardStage.width, rect.height / dashboardStage.height, 0.88);
-      setStageScale(Math.max(0.58, Number(nextScale.toFixed(3))));
-    }
-    updateScale();
-    const observer = new ResizeObserver(updateScale);
-    if (canvasRef.current) observer.observe(canvasRef.current);
-    window.addEventListener('resize', updateScale);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', updateScale);
-    };
-  }, []);
-
-  function startBoxAction(event, boxId, mode) {
-    event.preventDefault();
-    event.stopPropagation();
-    const box = boxes.find((item) => item.id === boxId);
-    if (!box) return;
-    dragRef.current = {
-      boxId,
-      mode,
-      startX: event.clientX,
-      startY: event.clientY,
-      box,
-      scale: stageScale,
-    };
-    window.addEventListener('pointermove', moveBox);
-    window.addEventListener('pointerup', stopBoxAction, { once: true });
-  }
-
-  function moveBox(event) {
-    const action = dragRef.current;
-    if (!action) return;
-    const dx = (event.clientX - action.startX) / action.scale;
-    const dy = (event.clientY - action.startY) / action.scale;
-    setBoxes((current) => current.map((box) => {
-      if (box.id !== action.boxId) return box;
-      if (action.mode === 'resize') {
-        return {
-          ...box,
-            width: Math.max(150, action.box.width + dx),
-            height: Math.max(90, action.box.height + dy),
-        };
-      }
-      return {
-        ...box,
-        x: Math.max(0, action.box.x + dx),
-        y: Math.max(0, action.box.y + dy),
-      };
-    }));
-  }
-
-  function stopBoxAction() {
-    dragRef.current = null;
-    window.removeEventListener('pointermove', moveBox);
-  }
-
-  return (
-    <section className="dashboard-canvas" ref={canvasRef} aria-label="dashboard operacional">
-      <div
-        className="dashboard-stage"
-        style={{
-          width: dashboardStage.width,
-          height: dashboardStage.height,
-          '--stage-scale': stageScale,
-        }}
-      >
-        {boxes.map((box) => (
-          <article
-            key={box.id}
-            className={`canvas-box ${box.kind}`}
-            style={{
-              left: box.x,
-              top: box.y,
-              width: box.width,
-              height: box.height,
-            }}
-          >
-            <button
-              className="box-drag-zone"
-              type="button"
-              aria-label={`mover ${box.title}`}
-              onPointerDown={(event) => startBoxAction(event, box.id, 'move')}
-            />
-            <CanvasBoxContent
-              box={box}
-              intel={intel}
-              savingsInputs={savingsInputs}
-              setSavingsInputs={setSavingsInputs}
-              missionBuilder={missionBuilder}
-              setMissionBuilder={setMissionBuilder}
-              setMissionDraft={setMissionDraft}
-            />
-            <button
-              className="box-resize-handle"
-              type="button"
-              aria-label={`redimensionar ${box.title}`}
-              onPointerDown={(event) => startBoxAction(event, box.id, 'resize')}
-            />
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function CanvasBoxContent({ box, intel, savingsInputs, setSavingsInputs, missionBuilder, setMissionBuilder, setMissionDraft }) {
-  if (box.id === 'global-dashboard') return <ExecutiveDashboard intel={intel} />;
-  if (box.id === 'savings-estimator') return <SavingsEstimator inputs={savingsInputs} setInputs={setSavingsInputs} />;
-  if (box.id === 'sompo-simulation-case') return <SompoSimulationPanel simulation={box.case} />;
-  if (box.id === 'mission-definition') {
-    return (
-      <MissionDefinitionPanel
-        missionBuilder={missionBuilder}
-        setMissionBuilder={setMissionBuilder}
-        setMissionDraft={setMissionDraft}
-      />
-    );
-  }
-  return <p>{box.content}</p>;
-}
-
-function SompoSimulationPanel({ simulation }) {
-  return (
-    <div className="sompo-simulation-panel">
-      <img src={simulation.image} alt="vistoria simulada em soja no Rio Grande do Sul" />
-      <div className="sompo-case-body">
-        <span>simulacao validada com fontes publicas</span>
-        <h2>{simulation.title}</h2>
-        <strong>{simulation.subtitle}</strong>
-        <div className="sompo-metrics">
-          {simulation.metrics.map(([label, value]) => (
-            <div key={label}>
-              <b>{value}</b>
-              <small>{label}</small>
-            </div>
-          ))}
-        </div>
-        <p>{simulation.priority}</p>
-        <div className="sompo-case-columns">
-          <section>
-            <h3>casos de sinistro</h3>
-            {simulation.claimCases.map((item) => (
-              <small key={item}>{item}</small>
-            ))}
-          </section>
-          <section>
-            <h3>prevencao</h3>
-            {simulation.preventionCases.map((item) => (
-              <small key={item}>{item}</small>
-            ))}
-          </section>
-        </div>
-        <ul>
-          {simulation.details.map((detail) => (
-            <li key={detail}>{detail}</li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-function ExecutiveDashboard({ intel }) {
-  return (
-    <div className="executive-dashboard">
-      <header>
-        <span>briefing humano para decisao</span>
-        <h2>Sompo 001: evitar atraso e retrabalho no sinistro agro</h2>
-        <p>O LUCA-AI transforma sinais de seca em prioridade de campo, evidencia minima e proximo passo claro.</p>
-      </header>
-      <div className="decision-brief-grid">
-        {intel.decisionBrief.map((item) => (
-          <section key={item.label}>
-            <span>{item.label}</span>
-            <strong>{item.title}</strong>
-            <p>{item.detail}</p>
-          </section>
-        ))}
-      </div>
-      <div className="kpi-row">
-        {intel.kpis.map((item) => (
-          <div key={item.label}>
-            <strong>{item.value}</strong>
-            <span>{item.label}</span>
-          </div>
-        ))}
-      </div>
-      <table className="exec-table">
-        <thead>
-          <tr>
-            <th>risco que precisa de atencao</th>
-            <th>score</th>
-            <th>acao sugerida pelos agentes</th>
-          </tr>
-        </thead>
-        <tbody>
-          {intel.executiveTable.slice(0, 3).map((row) => (
-            <tr key={row.prioridade}>
-              <td>{row.prioridade}</td>
-              <td>{row.score}</td>
-              <td>{row.decisao}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function SavingsEstimator({ inputs, setInputs }) {
-  const estimated = inputs.exposedMillions * (inputs.preventablePct / 100) * (inputs.confidencePct / 100);
-  function update(key, value) {
-    setInputs((current) => ({ ...current, [key]: Number(value) }));
-  }
-  return (
-    <div className="savings-estimator">
-      <h2>cenario hipotetico</h2>
-      <strong>{formatMoneyMillions(estimated)}</strong>
-      <span>nao e indenizacao real | {inputs.preventablePct}% evitavel</span>
-      <label>
-        carteira simulada
-        <input type="range" min="20" max="500" value={inputs.exposedMillions} onChange={(event) => update('exposedMillions', event.target.value)} />
-      </label>
-      <label>
-        perda evitavel simulada
-        <input type="range" min="1" max="40" value={inputs.preventablePct} onChange={(event) => update('preventablePct', event.target.value)} />
-      </label>
-      <label>
-        confianca
-        <input type="range" min="20" max="90" value={inputs.confidencePct} onChange={(event) => update('confidencePct', event.target.value)} />
-      </label>
-    </div>
-  );
-}
-
-function MissionDefinitionPanel({ missionBuilder, setMissionBuilder, setMissionDraft }) {
-  const plan = [
-    `1. levantar requisitos para ${missionBuilder.area}`,
-    `2. converter objetivo em missao com horizonte de ${missionBuilder.horizon}`,
-    '3. supervisor separa tarefas entre planejador e riscos-campo',
-    '4. camada 2 recebe informacao processada antes do dashboard',
-  ];
-  function update(key, value) {
-    setMissionBuilder((current) => ({ ...current, [key]: value }));
-  }
-  function promoteMission() {
-    setMissionDraft({
-      title: missionBuilder.objective || `Missao ${missionBuilder.area}`,
-      description: plan.join('\n'),
-      context: `area=${missionBuilder.area}; horizonte=${missionBuilder.horizon}`,
-      success: 'requisitos levantados, plano ativo criado e agentes acionados',
-      constraints: missionBuilder.constraints,
-    });
-  }
-  return (
-    <div className="mission-panel">
-      <header>
-        <span>agente de definicao</span>
-        <h2>definir missao</h2>
-      </header>
-      <label>
-        o que precisa ser feito?
-        <textarea value={missionBuilder.objective} onChange={(event) => update('objective', event.target.value)} placeholder="ex: reduzir atraso de vistoria em soja no RS" />
-      </label>
-      <div className="mission-row">
-        <label>
-          area
-          <select value={missionBuilder.area} onChange={(event) => update('area', event.target.value)}>
-            <option>sinistro agro</option>
-            <option>underwriting</option>
-            <option>canal corretor</option>
-            <option>resseguro</option>
-          </select>
-        </label>
-        <label>
-          horizonte
-          <select value={missionBuilder.horizon} onChange={(event) => update('horizon', event.target.value)}>
-            <option>7 dias</option>
-            <option>30 dias</option>
-            <option>90 dias</option>
-          </select>
-        </label>
-      </div>
-      <label>
-        restricoes
-        <input value={missionBuilder.constraints} onChange={(event) => update('constraints', event.target.value)} placeholder="ex: sem dados pessoais, sem dado bruto no dashboard" />
-      </label>
-      <section>
-        <h3>plano ativo sugerido</h3>
-        <p>{plan[0]}</p>
-      </section>
-      <button type="button" onClick={promoteMission}>enviar para setup da missao</button>
-    </div>
   );
 }
 
@@ -927,20 +517,25 @@ function DatabaseEnvironment({ database, activeLayerId, setActiveLayerId, onClos
 
 function AgentTerminal({
   activeAgent,
-  activeMission,
-  missionDraft,
-  supervisorMode,
   terminals,
+  heartbeatMonitor,
   agentDefs,
   getAgentLines,
   getAgentStatus,
   setActiveAgent,
-  setMissionDraft,
-  setupMission,
-  resetMission,
-  startSupervisor,
-  pauseSupervisor,
+  startHeartbeat,
+  pauseHeartbeat,
+  clearAgents,
+  backendReady,
 }) {
+  const heartbeatRows = [
+    { label: 'Supervisor', state: getAgentStatus('supervisor'), online: backendReady ? 'ready' : 'offline' },
+    { label: 'Planejador', state: getAgentStatus('planejador'), online: backendReady ? 'ready' : 'offline' },
+    { label: 'Pesquisador', state: getAgentStatus('pesquisador'), online: backendReady ? 'ready' : 'offline' },
+  ];
+  const monitorFresh = heartbeatFresh(heartbeatMonitor?.updatedAt);
+  const monitorStatus = monitorFresh ? (heartbeatMonitor?.status ?? 'online') : 'stale';
+
   return (
     <div className="agent-terminal-overlay" onClick={() => setActiveAgent(null)}>
       <div className="agent-terminal" onClick={(event) => event.stopPropagation()}>
@@ -951,45 +546,23 @@ function AgentTerminal({
         </div>
         <div className="agent-terminal-body">
           {activeAgent === 'heartbeat' ? (
-            <div className="heartbeat-workspace">
-              <div className="workspace-col">
-                <h3>missoes</h3>
-                <input
-                  placeholder="titulo"
-                  value={missionDraft.title}
-                  onChange={(event) => setMissionDraft((current) => ({ ...current, title: event.target.value }))}
-                />
-                <textarea
-                  placeholder="descricao"
-                  value={missionDraft.description}
-                  onChange={(event) => setMissionDraft((current) => ({ ...current, description: event.target.value }))}
-                />
-                <div className="row-btns">
-                  <button onClick={setupMission}>setup missao</button>
-                  <button onClick={resetMission}>resetar</button>
-                </div>
-                <p className="muted">ativa: {activeMission?.title ?? 'nenhuma'}</p>
+            <div className="heartbeat-workspace" style={{ display: 'block' }}>
+              <div className="row-btns" style={{ marginBottom: 12 }}>
+                <button onClick={startHeartbeat}>play</button>
+                <button onClick={pauseHeartbeat}>pause</button>
+                <button onClick={clearAgents}>limpar</button>
               </div>
-              <div className="workspace-col">
-                <h3>supervisor</h3>
-                <p>status: {supervisorMode}</p>
-                <div className="row-btns">
-                  <button onClick={startSupervisor}>rodar</button>
-                  <button onClick={pauseSupervisor}>pausar</button>
-                </div>
-                <div className="terminal-mini">
-                  {getAgentLines('supervisor').slice(-12).map((line, index) => (
-                    <p key={`${line}-${index}`}>{line}</p>
-                  ))}
-                </div>
-              </div>
-              <div className="workspace-col">
-                <h3>terminais</h3>
-                <div className="terminal-mini">
-                  {terminals.flatMap((terminal) => (terminal.lines || []).slice(-4)).slice(-12).map((line, index) => (
-                    <p key={`${line}-${index}`}>{line}</p>
-                  ))}
-                </div>
+              <div className="terminal-mini" style={{ minHeight: 320 }}>
+                <p>$ heartbeat monitor {monitorStatus}</p>
+                <p>last tick: {heartbeatMonitor?.updatedAt ?? 'n/a'}</p>
+                {heartbeatRows.map((row) => (
+                  <p key={row.label}>
+                    <span>{row.label} - </span>
+                    <span style={{ color: stateTone(row.state) }}>{row.state}</span>
+                    <span> / </span>
+                    <span style={{ color: stateTone(row.online) }}>{row.online}</span>
+                  </p>
+                ))}
               </div>
             </div>
           ) : (
@@ -1020,10 +593,7 @@ function AgentTile({ agent, status, isActive, isOnline, isSystemRunning, onClick
   );
 
   const tileFooter = (
-      <div className="tile-footer">
-        <span>{agent.title}</span>
-        {status && <mark>{status}</mark>}
-      </div>
+      <span className="tile-label">{agent.title}</span>
   );
 
   if (!agent.isHeartbeat) {
@@ -1058,7 +628,6 @@ function AgentTile({ agent, status, isActive, isOnline, isSystemRunning, onClick
             onToggleSystem();
           }}
         >
-          <span />
         </button>
       </div>
       {tileFooter}

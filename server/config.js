@@ -1,17 +1,14 @@
-import path from 'node:path';
+export const PORT = Number(process.env.PORT ?? 4242);
+export const ROUTER_API_KEY = process.env.ROUTER_API_KEY ?? process.env.NINE_ROUTER_API_KEY ?? '';
+export const ROUTER_BASE_URL = process.env.ROUTER_BASE_URL ?? 'http://127.0.0.1:20128/v1';
+export const ROUTER_MODEL = process.env.ROUTER_MODEL ?? 'cx/gpt-5.4-mini-xhigh';
 
-const rootDir = path.resolve(process.cwd());
+export const AGENTS = [
+  { id: 'supervisor', role: 'supervisor', name: 'Supervisor' },
+  { id: 'planejador', role: 'planner', name: 'Planejador' },
+  { id: 'pesquisador', role: 'researcher', name: 'Pesquisador' },
+];
 
-export const config = {
-  port: Number(process.env.LUCA_PORT ?? 4141),
-  workspace: process.env.LUCA_WORKSPACE ?? rootDir,
-  lucaDir: path.join(rootDir, '.luca'),
-  heartbeatMs: Number(process.env.LUCA_HEARTBEAT_MS ?? 2000),
-  codexBin: process.env.LUCA_CODEX_BIN ?? 'codex.cmd',
-  codexProfile: process.env.LUCA_CODEX_PROFILE ?? '',
-  codexExtraArgs: process.env.LUCA_CODEX_EXTRA_ARGS ?? '',
-  codexProvider: process.env.LUCA_CODEX_PROVIDER ?? '9router',
-  supervisorModel: process.env.LUCA_SUPERVISOR_MODEL ?? 'cx/gpt-5.5',
-  executorModel: process.env.LUCA_EXECUTOR_MODEL ?? 'cx/gpt-5.5',
-  codexTimeoutMs: Number(process.env.LUCA_CODEX_TIMEOUT_MS ?? 180000),
+export const AGENT_ALIASES = {
+  'riscos-campo': 'pesquisador',
 };

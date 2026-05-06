@@ -10,3 +10,4 @@ config.local.json
 *.pem
 *.key
 credentials.json
+heartbeat-report.json
