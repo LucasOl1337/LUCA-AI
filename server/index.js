@@ -22,6 +22,7 @@ import {
   setAgentStatus,
   setMission,
   setRunBriefing,
+  setSupervisorFinalReport,
   setSupervisorMode,
   setTemporaryDashboard,
   startNewMissionScope,
@@ -48,6 +49,10 @@ const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 let supervisorTimer = null;
 let heartbeatProcess = null;
 const heartbeatReportPath = path.resolve(process.cwd(), 'heartbeat-report.json');
+const distPath = path.resolve(process.cwd(), 'dist');
+const indexPath = path.join(distPath, 'index.html');
+const v2DesignPath = path.resolve(process.cwd(), 'public', 'v2-design');
+const v2IndexPath = path.join(v2DesignPath, 'index.html');
 const repoIgnoreDirs = new Set(['.git', 'node_modules', 'dist', '.luca']);
 const DELIVERY_PRINCIPLE = `Principio global LUCA-AI: trabalhe com o que existe e entregue o melhor resultado possivel. Falta de dados nao e motivo para travar, recusar ou ficar excessivamente criterioso. Quando algo estiver ausente, declare uma premissa razoavel, marque como estimativa/proxy quando necessario e siga pelo caminho mais util para cumprir a missao. Priorize decisao, solucao e output final satisfatorio.`;
 
@@ -249,6 +254,14 @@ function workerAgents() {
   return AGENTS.filter((agent) => agent.role === 'planner' || agent.role === 'researcher' || agent.role === 'designer');
 }
 
+function contributorAgents() {
+  return AGENTS.filter((agent) => agent.role === 'planner' || agent.role === 'researcher');
+}
+
+function designerAgent() {
+  return AGENTS.find((agent) => agent.role === 'designer');
+}
+
 function taskInstructionForAgent(agent) {
   if (agent.role === 'planner') {
     return `Atue como arquiteto da solucao. Leia o briefing e transforme a dor em um plano pratico de otimizacao.
@@ -306,6 +319,10 @@ function hasRunningWorker() {
   return workerAgents().some((agent) => ['running', 'queued'].includes(getState().activeRun?.agents?.[agent.id]?.status));
 }
 
+function hasCompletedTask(agentId) {
+  return completedTasksFor(agentId).length > 0;
+}
+
 function repoAnalysisSatisfied() {
   const text = (getState().globalChatMessages ?? []).map((message) => message.content).join('\n').toLowerCase();
   const hasStrength = /ponto forte|pontos fortes|forte:|fortes:/i.test(text);
@@ -360,6 +377,28 @@ function designerDataSnapshot(mission) {
       content: String(message.content ?? '').slice(0, 900),
       timestamp: message.timestamp,
     })),
+    supervisorFinalReport: state.activeRun?.finalReport ?? null,
+  };
+}
+
+function supervisorFinalReportSnapshot(mission) {
+  const state = getState();
+  return {
+    mission: {
+      title: mission?.title ?? '',
+      description: mission?.description ?? '',
+      success: mission?.success ?? '',
+    },
+    briefing: state.activeRun?.briefing ?? missionInstruction(mission),
+    contributions: (state.globalChatMessages ?? [])
+      .filter((message) => message.agentId !== 'supervisor' && message.agentId !== 'designer')
+      .slice(-12)
+      .map((message) => ({
+        agentId: message.agentId,
+        type: message.type,
+        content: String(message.content ?? '').slice(0, 1200),
+        timestamp: message.timestamp,
+      })),
   };
 }
 
@@ -367,6 +406,162 @@ function compactText(value, maxChars = 4000) {
   return String(value ?? '')
     .replace(/\r?\n{3,}/g, '\n\n')
     .slice(0, maxChars);
+}
+
+function fallbackSupervisorFinalReport(mission, reason = 'fallback local') {
+  const snapshot = supervisorFinalReportSnapshot(mission);
+  const contributions = snapshot.contributions ?? [];
+  const usefulItems = contributions
+    .map((message) => String(message.content ?? '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .slice(-5);
+  const missionText = [mission?.description, mission?.success, snapshot.briefing].filter(Boolean).join(' ');
+  const lower = missionText.toLowerCase();
+  const inferredFocus = lower.includes('sinistro') || lower.includes('financeiro') || lower.includes('preven')
+    ? 'otimizar prevencao de sinistros com foco financeiro'
+    : 'organizar a decisao principal da missao em um canvas executivo';
+  const findings = usefulItems.length
+    ? usefulItems.map((item, index) => ({
+      title: `Prioridade ${index + 1}`,
+      importance: index < 2 ? 'alta' : 'media',
+      basis: 'premissa',
+      detail: item.slice(0, 260),
+    }))
+    : [
+      {
+        title: 'Foco executivo',
+        importance: 'alta',
+        basis: 'premissa',
+        detail: inferredFocus,
+      },
+      {
+        title: 'Proxima decisao',
+        importance: 'media',
+        basis: 'premissa',
+        detail: 'Priorizar causas, impacto estimado, acoes preventivas e metrica de acompanhamento.',
+      },
+    ];
+  return {
+    summary: `Consolidacao local: ${inferredFocus}.`,
+    findings,
+    designerBrief: {
+      mustShow: ['dor central', 'prioridades', 'impacto ou proxy', 'acoes recomendadas', 'criterios de sucesso'],
+      recommendedBlocks: ['metric', 'tower', 'topics', 'note'],
+      chartGuidance: 'Use ranking simples para priorizar acoes e topicos curtos para criterios de sucesso.',
+      avoid: ['detalhes operacionais', 'logs', 'agentes', 'modelo', 'erros tecnicos'],
+    },
+    successCriteria: missionBulletItems(mission?.success).length
+      ? missionBulletItems(mission?.success)
+      : ['canvas publicado', 'prioridades claras', 'acoes praticas definidas'],
+    sourceAgentId: 'supervisor',
+    fallback: true,
+    fallbackReason: reason,
+  };
+}
+
+function fallbackDesignerDashboard(mission) {
+  const report = getState().activeRun?.finalReport ?? fallbackSupervisorFinalReport(mission);
+  const findings = Array.isArray(report.findings) ? report.findings.slice(0, 5) : [];
+  const towerItems = findings.map((finding, index) => ({
+    label: String(finding.title ?? `Prioridade ${index + 1}`).slice(0, 28),
+    value: Math.max(1, 5 - index),
+  }));
+  return {
+    title: 'Canvas Executivo',
+    subtitle: report.summary ?? mission?.description ?? 'Sintese da missao atual para decisao.',
+    status: 'concluido',
+    layout: 'result-board',
+    blocks: [
+      {
+        type: 'metric',
+        title: 'Foco',
+        value: 'prevenção',
+        body: 'Priorizar perdas evitaveis e acoes de maior impacto pratico.',
+      },
+      {
+        type: 'tower',
+        title: 'Prioridades',
+        items: towerItems.length ? towerItems : [
+          { label: 'Mapear causas', value: 5 },
+          { label: 'Quantificar impacto', value: 4 },
+          { label: 'Atacar recorrencia', value: 3 },
+        ],
+      },
+      {
+        type: 'topics',
+        title: 'Acoes recomendadas',
+        items: ['segmentar sinistros', 'comparar frequencia', 'priorizar severidade', 'monitorar economia'],
+      },
+      {
+        type: 'note',
+        title: 'Critério de sucesso',
+        body: (report.successCriteria ?? []).join('; ') || mission?.success || 'Canvas revisavel publicado.',
+      },
+    ],
+    fallback: true,
+  };
+}
+
+async function buildSupervisorFinalReport(mission) {
+  const model = ROUTER_MODEL;
+  const snapshot = supervisorFinalReportSnapshot(mission);
+  const prompt = `Missao global ativa
+Descricao: ${mission?.description ?? 'Sem descricao'}
+Criterios de conclusao: ${mission?.success ?? 'Sem criterios de conclusao'}
+
+${DELIVERY_PRINCIPLE}
+
+Dados para consolidacao:
+${JSON.stringify(snapshot, null, 2)}
+
+Sua tarefa como supervisor:
+Consolide o relatorio final que sera entregue ao Designer para assumir o canvas central da missao. O relatorio deve separar o que e importante para entendimento humano do trabalho feito.
+
+Inclua obrigatoriamente:
+1. Sintese executiva em uma frase.
+2. Findings principais, priorizados.
+3. Top 5 itens quando a missao pedir top 5.
+4. Evidencia, premissa ou proxy usado em cada finding quando aplicavel.
+5. Recomendacoes de visualizacao para o Designer: blocos, graficos, rankings, metricas e textos que devem aparecer.
+6. Itens que nao devem aparecer no canvas: detalhes de agentes, status operacional, logs, fila, modelo ou chat.
+7. Criterios de sucesso que o canvas final precisa cobrir.
+
+Responda somente com JSON valido neste formato:
+{
+  "summary": "frase executiva",
+  "findings": [
+    { "title": "finding", "importance": "alta|media|baixa", "basis": "evidencia|premissa|proxy", "detail": "explicacao curta" }
+  ],
+  "designerBrief": {
+    "mustShow": ["item"],
+    "recommendedBlocks": ["tower", "topics", "metric", "note"],
+    "chartGuidance": "orientacao curta",
+    "avoid": ["item"]
+  },
+  "successCriteria": ["criterio"]
+}`;
+  const system = 'Voce e o supervisor do LUCA-AI. Sua funcao e consolidar findings finais para o Designer montar um canvas executivo. Responda apenas JSON valido, sem expor funcionamento interno.';
+
+  setAgentStatus('supervisor', 'running');
+  appendLine('supervisor', `[orquestrador:${model}] consolidando relatorio final`);
+  const output = await call9Router({ system, user: prompt, agentId: scopedAgentId('supervisor'), model, maxTokens: 900 });
+  appendLine('supervisor', output);
+  const parsed = extractJsonObject(output);
+  if (!parsed) throw new Error('supervisor_final_report_invalid_json');
+  const report = {
+    ...parsed,
+    sourceAgentId: 'supervisor',
+    raw: output,
+  };
+  setSupervisorFinalReport(report);
+  publishChatMessage({
+    agentId: 'supervisor',
+    type: 'resultado',
+    content: `Relatorio final consolidado: ${parsed.summary ?? 'findings priorizados para o canvas.'}`,
+  });
+  addHeartbeat('supervisor', 'ready', 'relatorio final consolidado');
+  setAgentStatus('supervisor', 'ready');
+  return report;
 }
 
 async function runMissionTransformer(agent, mission) {
@@ -518,7 +713,7 @@ ${JSON.stringify(dataSnapshot, null, 2)}
 ${repoContext}
 
 Tarefa do designer:
-Preencha o canvas com uma visualizacao executiva de RESULTADOS e SOLUCOES da missao atual. Mostre conteudo util para uma equipe executiva, nao o funcionamento interno do sistema.
+Use o supervisorFinalReport como fonte principal quando ele existir. Preencha o canvas com uma visualizacao executiva de RESULTADOS e SOLUCOES da missao atual. Mostre conteudo util para uma equipe executiva, nao o funcionamento interno do sistema.
 Mesmo que a missao seja simples ou os insumos estejam incompletos, gere um canvas final util usando o melhor caminho possivel. Nao deixe o canvas vazio por falta de dados. Use premissas claras e componentes simples quando necessario.
 
 O canvas deve responder em ate 30 segundos:
@@ -540,6 +735,7 @@ Regras obrigatorias:
 8. Separe evidencia de inferencia quando houver risco de parecer dado inventado.
 9. Nao use termos fixos de um setor especifico se eles nao aparecerem na missao atual.
 10. Se o pedido for simples, entregue diretamente o resultado pedido com ranking/lista/topicos e pelo menos um bloco visual tower ou topics.
+11. Se o supervisorFinalReport trouxer designerBrief.mustShow, esses itens devem aparecer no canvas final.
 
 Componentes permitidos em blocks:
 - metric: valor curto com label relacionado ao resultado
@@ -575,7 +771,7 @@ Responda somente com JSON valido neste formato:
       throw new Error(`9router indisponivel em ${health.url}${health.error ? `: ${health.error}` : health.status ? `: HTTP ${health.status}` : ''}`);
     }
 
-    const output = await call9Router({ system: resultOnlySystem, user: resultOnlyPrompt, agentId: scopedAgentId(agent.id), model });
+    const output = await call9Router({ system: resultOnlySystem, user: resultOnlyPrompt, agentId: scopedAgentId(agent.id), model, maxTokens: 900 });
     appendLine(agent.id, output);
     const parsedDashboard = extractJsonObject(output);
     if (!parsedDashboard) {
@@ -601,6 +797,18 @@ Responda somente com JSON valido neste formato:
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const routerDown = isRouterUnavailable(error);
+    if (routerDown) {
+      const dashboard = fallbackDesignerDashboard(mission);
+      setTemporaryDashboard({ ...dashboard, sourceAgentId: agent.id });
+      publishChatMessage({ agentId: agent.id, type: 'resultado', content: `Canvas atualizado com fallback local: ${dashboard.title}` });
+      setAgentStatus(agent.id, 'ready');
+      if (task) updateAgentTask(task.id, { status: 'completed', completedAt: new Date().toISOString() });
+      markAgentChatSeen(agent.id, latestChatMessageId());
+      addHeartbeat(agent.id, 'ready', 'canvas fallback atualizado');
+      appendAgentHeartbeatEvent(agent.id, 'done', 'canvas fallback atualizado');
+      emitEvent({ type: 'agent.output', agentId: agent.id, text: JSON.stringify(dashboard), time: new Date().toISOString() });
+      return { ok: true, output: JSON.stringify(dashboard), fallback: true };
+    }
     appendLine(agent.id, `erro: ${message}`);
     publishChatMessage({ agentId: agent.id, type: 'alerta', content: `Canvas executivo nao foi gerado: ${message}` });
     setAgentStatus(agent.id, 'error');
@@ -645,8 +853,9 @@ async function supervisorTick(mission) {
   appendLine('supervisor', `[orquestrador] observando chat tick ${tick}`);
   markAgentChatSeen('supervisor', latestChatMessageId());
 
-  const workers = workerAgents();
-  const nextWorker = workers.find((agent) => !run.tasks.some((task) => task.agentId === agent.id));
+  const contributors = contributorAgents();
+  const designer = designerAgent();
+  const nextWorker = contributors.find((agent) => !run.tasks.some((task) => task.agentId === agent.id));
   if (nextWorker) {
     const instruction = taskInstructionForAgent(nextWorker);
     const task = createAgentTask(nextWorker.id, instruction);
@@ -678,8 +887,8 @@ async function supervisorTick(mission) {
     return;
   }
 
-  const allWorkersCompleted = workers.every((agent) => completedTasksFor(agent.id).length > 0);
-  if (allWorkersCompleted) {
+  const allContributorsCompleted = contributors.every((agent) => hasCompletedTask(agent.id));
+  if (allContributorsCompleted) {
     if (!missionCompletionSatisfied(mission)) {
       publishChatMessage({
         agentId: 'supervisor',
@@ -692,12 +901,75 @@ async function supervisorTick(mission) {
       emitState();
       return;
     }
+
+    if (!getState().activeRun?.finalReport) {
+      try {
+        publishChatMessage({
+          agentId: 'supervisor',
+          type: 'decisao',
+          content: 'Consolidando relatorio final para o Designer montar o canvas da missao.',
+        });
+        await buildSupervisorFinalReport(mission);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!isRouterUnavailable(error)) {
+          publishChatMessage({
+            agentId: 'supervisor',
+            type: 'alerta',
+            content: `Pausando a missao: relatorio final do supervisor nao foi gerado (${message}).`,
+          });
+          setSupervisorMode('standby');
+          stopSupervisorTimer();
+          setAgentStatus('supervisor', 'error');
+          addHeartbeat('supervisor', 'error', message);
+          emitState();
+          return;
+        }
+        const fallbackReport = fallbackSupervisorFinalReport(mission, message);
+        setSupervisorFinalReport(fallbackReport);
+        publishChatMessage({
+          agentId: 'supervisor',
+          type: 'resultado',
+          content: `Relatorio final consolidado com fallback local: ${fallbackReport.summary}`,
+        });
+        setAgentStatus('supervisor', 'ready');
+        addHeartbeat('supervisor', 'ready', 'relatorio fallback consolidado');
+        emitState();
+        return;
+      }
+      emitState();
+      return;
+    }
+
+    if (designer && !hasCompletedTask(designer.id)) {
+      const task = createAgentTask(designer.id, taskInstructionForAgent(designer));
+      publishChatMessage({
+        agentId: 'supervisor',
+        type: 'decisao',
+        content: 'Entregando o relatorio final ao Designer para assumir o canvas central.',
+      });
+      setAgentStatus('supervisor', 'ready');
+      emitState();
+      const result = await runAgent(designer, mission, task);
+      if (result?.ok === false) {
+        const reason = result.routerDown
+          ? 'o 9router local nao respondeu dentro do limite. Verifique se o roteador/modelo esta ativo e retome o supervisor depois.'
+          : `o Designer falhou ao gerar o canvas final: ${result.error ?? 'erro desconhecido'}`;
+        publishChatMessage({ agentId: 'supervisor', type: 'alerta', content: `Pausando a missao: ${reason}` });
+        setSupervisorMode('standby');
+        stopSupervisorTimer();
+        addHeartbeat('supervisor', 'paused', result.routerDown ? '9router indisponivel' : 'designer falhou');
+      }
+      emitState();
+      return;
+    }
+
     publishChatMessage({
       agentId: 'supervisor',
       type: 'resultado',
-      content: `Concluido: ${workers.map((agent) => agentDisplayName(agent.id)).join(', ')} publicaram suas contribuicoes. Criterios revisados: ${mission.success || 'sem criterios explicitos'}`,
+      content: `Concluido: relatorio final consolidado, Designer publicou o canvas e criterios foram revisados: ${mission.success || 'sem criterios explicitos'}`,
     });
-    completeRun('todos os agentes trabalhadores publicaram contribuicoes iniciais');
+    completeRun('relatorio final do supervisor entregue e canvas final publicado pelo designer');
     setSupervisorMode('standby');
     if (supervisorTimer) {
       clearInterval(supervisorTimer);
@@ -843,11 +1115,25 @@ app.post('/api/agents/clear', (_req, res) => {
   res.json({ ok: true });
 });
 
+app.use('/icons', express.static(path.resolve(process.cwd(), 'public', 'icons')));
+
+if (fs.existsSync(indexPath)) {
+  app.use(express.static(distPath));
+  app.get('*splat', (_req, res) => {
+    res.sendFile(indexPath);
+  });
+} else if (fs.existsSync(v2IndexPath)) {
+  app.use(express.static(v2DesignPath));
+  app.get('*splat', (_req, res) => {
+    res.sendFile(v2IndexPath);
+  });
+}
+
 wss.on('connection', (socket) => {
   socket.send(JSON.stringify({ kind: 'state', state: getState() }));
 });
 
-httpServer.listen(PORT, '127.0.0.1', () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   startHeartbeatMonitor();
   console.log(`LUCA backend em http://127.0.0.1:${PORT}`);
 });

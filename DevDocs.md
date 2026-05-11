@@ -2,7 +2,7 @@
 
 ## Estado atual
 
-- Frontend minimalista preservado e rodando em `http://localhost:4141`.
+- Frontend minimalista preservado e rodando em `http://localhost:5173`.
 - Backend novo recriado do zero e rodando em `http://127.0.0.1:4242`.
 - Heartbeat em Python funcional, com atualizacao real a cada 5 segundos.
 - Integracao com 9router local funcional via `http://127.0.0.1:20128/v1`.
@@ -65,7 +65,7 @@ Observacao:
 
 ## Configuracao de runtime
 
-- Frontend: `4141`
+- Frontend: `5173`
 - Backend: `4242`
 - 9router local: `http://127.0.0.1:20128/v1`
 - Modelo atual: `cx/gpt-5.4-mini-xhigh`
@@ -73,8 +73,8 @@ Observacao:
 ## Problemas ja resolvidos
 
 - Repo reduzida ao frontend essencial mais backend novo.
-- Porta do frontend estabilizada em `4141`.
-- Conflito frontend/backend resolvido com backend em `4242`.
+- Porta do frontend estabilizada em `5173`.
+- Conflito frontend/backend resolvido com Vite proxy para backend em `4242`.
 - CORS adicionado para comunicacao frontend-backend.
 - Heartbeat saiu de mock para processo Python real.
 - Cliente local do 9router deixou de exigir API key.

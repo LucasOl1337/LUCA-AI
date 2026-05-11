@@ -195,6 +195,7 @@ export function createRun(mission) {
     missionTitle: mission?.title ?? 'missao sem titulo',
     status: 'running',
     briefing: '',
+    finalReport: null,
     createdAt: new Date().toISOString(),
     completedAt: null,
     agents: makeRunAgentState(),
@@ -209,6 +210,15 @@ export function createRun(mission) {
 export function setRunBriefing(briefing) {
   if (!state.activeRun) return;
   state.activeRun.briefing = String(briefing ?? '');
+  persistState();
+}
+
+export function setSupervisorFinalReport(report) {
+  if (!state.activeRun) return;
+  state.activeRun.finalReport = report ? {
+    ...report,
+    createdAt: report.createdAt ?? new Date().toISOString(),
+  } : null;
   persistState();
 }
 

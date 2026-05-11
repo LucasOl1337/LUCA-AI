@@ -1,6 +1,6 @@
 import { ROUTER_API_KEY, ROUTER_BASE_URL, ROUTER_MODEL, ROUTER_TIMEOUT_MS } from './config.js';
 
-export async function call9Router({ system, user, agentId, model = ROUTER_MODEL }) {
+export async function call9Router({ system, user, agentId, model = ROUTER_MODEL, maxTokens = 1200 }) {
   const headers = {
     'Content-Type': 'application/json',
   };
@@ -22,6 +22,7 @@ export async function call9Router({ system, user, agentId, model = ROUTER_MODEL 
           { role: 'user', content: user },
         ],
         temperature: 0.3,
+        max_tokens: maxTokens,
       }),
     });
   } catch (error) {

@@ -2,10 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 
-const apiBase = import.meta.env.DEV ? 'http://127.0.0.1:4242' : window.location.origin;
-const wsBase = import.meta.env.DEV
-  ? 'ws://127.0.0.1:4242'
-  : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
+const apiBase = window.location.origin;
+const wsBase = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
 
 const fallbackDatabase = {
   source: { name: 'database offline', topic: 'LUCA-AI' },
@@ -27,26 +25,26 @@ const agentDefs = [
   { id: 'designer', title: 'designer', icon: '/icons/designer.png', role: 'designer' },
 ];
 
-const layoutStorageKey = 'luca.grid.layout.v2';
+const layoutStorageKey = 'luca.grid.layout.light.v1';
 const defaultGridLayout = {
-  mission: { x: 1100, y: 32, width: 560, height: 205 },
-  designer: { x: 170, y: 126, width: 890, height: 716 },
-  chat: { x: 1100, y: 260, width: 560, height: 582 },
+  mission: { x: 1430, y: 30, width: 500, height: 202 },
+  designer: { x: 170, y: 30, width: 1200, height: 815 },
+  chat: { x: 1430, y: 258, width: 500, height: 586 },
 };
 
 function getDefaultGridLayout() {
   if (typeof window === 'undefined') return defaultGridLayout;
   const width = window.innerWidth;
-  const leftDock = width >= 1200 ? 150 : 24;
-  const gap = 28;
-  const rightWidth = Math.min(Math.max(width * 0.32, 430), 590);
-  const rightX = Math.max(leftDock + 620, width - rightWidth - 36);
-  const designerWidth = Math.max(560, rightX - leftDock - gap);
-  const designerHeight = Math.max(520, window.innerHeight - 176);
-  const chatTop = 260;
+  const leftDock = width >= 1200 ? 172 : 24;
+  const gap = 26;
+  const rightWidth = Math.min(Math.max(width * 0.285, 430), 540);
+  const rightX = Math.max(leftDock + 650, width - rightWidth - 36);
+  const designerWidth = Math.max(600, rightX - leftDock - gap);
+  const designerHeight = Math.max(540, window.innerHeight - 60);
+  const chatTop = 258;
   return {
-    mission: { x: Math.round(rightX), y: 32, width: Math.round(rightWidth), height: 205 },
-    designer: { x: leftDock, y: 126, width: Math.round(designerWidth), height: designerHeight },
+    mission: { x: Math.round(rightX), y: 30, width: Math.round(rightWidth), height: 202 },
+    designer: { x: leftDock, y: 30, width: Math.round(designerWidth), height: designerHeight },
     chat: { x: Math.round(rightX), y: chatTop, width: Math.round(rightWidth), height: Math.max(420, window.innerHeight - chatTop - 52) },
   };
 }
