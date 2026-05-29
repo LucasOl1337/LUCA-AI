@@ -1,0 +1,153 @@
+// Tipos do contrato do backend LUCA-AI (server/state.js getState()).
+// Mantidos propositalmente permissivos: o backend evolui e o front degrada com
+// segurança via defaults.
+
+export interface AgentEntry {
+  id: string;
+  role: string;
+  name: string;
+  status: string;
+  enabled?: boolean;
+  model?: string;
+  lines: string[];
+}
+
+export interface Mission {
+  title?: string;
+  description?: string;
+  success?: string;
+  activatedAt?: string;
+  context?: unknown;
+  realtimeFeed?: unknown[];
+  [key: string]: unknown;
+}
+
+export interface ChatMessage {
+  id: string;
+  agentId?: string;
+  agentName: string;
+  type: string;
+  content: string;
+  timestamp: string;
+}
+
+export interface DatabaseLayerRaw {
+  status?: string;
+  dashboardVisibility?: string;
+  rule?: string;
+  title?: string;
+  items?: DatabaseItem[];
+}
+
+export interface DatabaseItem {
+  id?: string;
+  label?: string;
+  title?: string;
+  type?: string;
+  status?: string;
+  importedAt?: string;
+  payload?: Record<string, unknown>;
+  publicView?: {
+    plainSummary?: string;
+    whyItMatters?: string;
+    clearInformation?: string | string[];
+    viewerQuestions?: string | string[];
+    approvedLinks?: { label: string; target: string }[];
+  };
+  [key: string]: unknown;
+}
+
+export interface DatabaseState {
+  source?: { name?: string; topic?: string };
+  layers?: {
+    rawResearch?: DatabaseLayerRaw;
+    processing?: DatabaseLayerRaw;
+    dashboardIntegration?: DatabaseLayerRaw;
+  };
+  heartbeat?: { agentId: string; status?: string; state?: string; note?: string; time?: string }[];
+  reliableSources?: { label: string; url: string; use?: string }[];
+  simulations?: { title: string; path: string; scenario?: string; thesis?: string }[];
+  methods?: { title: string; id: string; objective?: string }[];
+  procedures?: { title: string; id: string; trigger?: string }[];
+  reports?: { title: string; path: string; thesis?: string }[];
+  [key: string]: unknown;
+}
+
+export interface HeartbeatMonitor {
+  service?: string;
+  status?: string;
+  updatedAt?: string | null;
+  intervalSeconds?: number;
+  summary?: string;
+  [key: string]: unknown;
+}
+
+export interface TemporaryDashboard {
+  title?: string;
+  subtitle?: string;
+  layout?: string;
+  fallback?: boolean;
+  sourceAgentId?: string;
+  updatedAt?: string;
+  metrics?: { label: string; value: string | number }[];
+  panels?: { title: string; body: string }[];
+  blocks?: DashboardBlockData[];
+  [key: string]: unknown;
+}
+
+export interface DashboardBlockData {
+  type?: string;
+  title?: string;
+  value?: string | number;
+  body?: string;
+  items?: unknown[];
+}
+
+export interface ScheduledMission {
+  id: string;
+  title?: string;
+  description?: string;
+  success?: string;
+  status?: string;
+  cron?: string;
+  nextRun?: string;
+  [key: string]: unknown;
+}
+
+export interface ArchivedMission {
+  id: string;
+  reason?: string;
+  archivedAt?: string;
+  mission?: Mission | null;
+  run?: { id?: string; status?: string } | null;
+  dashboard?: TemporaryDashboard | null;
+  chatMessages?: ChatMessage[];
+  agents?: AgentEntry[];
+}
+
+export interface LucaState {
+  supervisorMode: string;
+  activeMission: Mission | null;
+  activeRun: { id?: string; status?: string } | null;
+  missionHistory: ArchivedMission[];
+  temporaryDashboard: TemporaryDashboard | null;
+  database: DatabaseState;
+  heartbeatLogs: string[];
+  globalChatMessages: ChatMessage[];
+  scheduledMissions: ScheduledMission[];
+  missionQueue: unknown[];
+  personaAgents: unknown[];
+  agents: AgentEntry[];
+  heartbeatMonitor?: HeartbeatMonitor | null;
+}
+
+export type BackendEvent =
+  | { type: 'mission.activated'; mission: Mission; time: string }
+  | { type: 'chat.message'; message: ChatMessage }
+  | { type: 'agent.output'; [key: string]: unknown }
+  | { type: 'agent.status'; [key: string]: unknown }
+  | { type: string; [key: string]: unknown };
+
+export type WsPayload =
+  | { kind: 'state'; state: LucaState }
+  | { kind: 'event'; event: BackendEvent };

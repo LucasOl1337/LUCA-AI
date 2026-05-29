@@ -1,0 +1,294 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.75rem;
+
+    /* LUC.AI — porcelana Wild Lotus (marfim + navy + ouro) */
+    --l-void:        #F5F1E8;       /* porcelana: fundo absoluto */
+    --l-void-2:      #efe9db;       /* sidebar — creme um tom abaixo */
+    --l-surface:     rgba(255, 253, 247, 0.66);   /* painéis de vidro claro */
+    --l-surface-hi:  rgba(255, 255, 252, 0.85);
+    --l-input:       rgba(255, 255, 253, 0.9);
+
+    /* Navy lacado — estrutura, texto forte, console */
+    --l-navy:        #1E3A6C;
+    --l-navy-deep:   #0F2849;
+    --l-navy-soft:   rgba(30, 58, 108, 0.06);
+    --l-navy-glow:   rgba(30, 58, 108, 0.16);
+
+    /* Ouro filigrana — marca e estado ativo (tons profundos p/ legibilidade no claro) */
+    --l-gold:        #A8801A;       /* ouro de texto/borda sobre porcelana */
+    --l-gold-bright: #D4AF37;       /* ouro de preenchimento/brilho */
+    --l-gold-deep:   #836311;
+    --l-gold-soft:   rgba(168, 128, 26, 0.08);
+    --l-gold-glow:   rgba(212, 175, 55, 0.28);
+    --l-gold-haze:   rgba(168, 128, 26, 0.05);
+
+    /* Azul royal — acento secundário */
+    --l-fleet:       #2E5AA0;
+    --l-fleet-soft:  rgba(46, 90, 160, 0.08);
+    --l-fleet-glow:  rgba(46, 90, 160, 0.20);
+
+    /* Verde heartbeat — RESERVADO ao sinal de vida (online / pulso) */
+    --l-alive:       #2f9e6a;       /* verde mais escuro: legível no claro */
+    --l-alive-soft:  rgba(47, 158, 106, 0.10);
+    --l-alive-glow:  rgba(47, 158, 106, 0.22);
+
+    /* Textos — tinta sobre porcelana */
+    --l-text:        #0F2849;       /* navy quase-preto */
+    --l-text-soft:   #3a527a;
+    --l-text-mute:   #6c7c96;
+    --l-text-ghost:  #a7b0c0;
+
+    /* Bordas — filigrana sutil */
+    --l-border:        rgba(30, 58, 108, 0.10);
+    --l-border-hover:  rgba(168, 128, 26, 0.35);
+    --l-border-active: rgba(168, 128, 26, 0.55);
+
+    /* Estados */
+    --l-ok:        #2f9e6a;
+    --l-ok-bg:     rgba(47, 158, 106, 0.12);
+    --l-error:     #c0392b;
+    --l-error-bg:  rgba(192, 57, 43, 0.10);
+    --l-warning:   #b8860b;
+    --l-warning-bg: rgba(184, 134, 11, 0.12);
+
+    /* Console navy (terminais permanecem escuros — contraste com a porcelana) */
+    --l-console:     #0d1f3a;
+    --l-console-2:   #0a1830;
+    --l-console-text: #cfe0f4;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--l-void);
+    color: var(--l-text);
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  #root { min-height: 100vh; }
+
+  ::selection {
+    background: var(--l-gold-soft);
+    color: var(--l-text);
+  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--l-border);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: var(--l-border-hover); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* ─── Painel de vidro porcelana ─── */
+  .void-panel {
+    background: var(--l-surface);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid var(--l-border);
+    box-shadow:
+      0 6px 22px rgba(15, 40, 73, 0.07),
+      inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .void-panel:hover {
+    border-color: var(--l-border-hover);
+    box-shadow:
+      0 10px 28px rgba(15, 40, 73, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  }
+
+  /* ─── Item de navegação (sidebar) ─── */
+  .rift-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 cursor-pointer;
+    color: var(--l-text-mute);
+    position: relative;
+    border: 1px solid transparent;
+  }
+  .rift-item:hover {
+    background: var(--l-gold-soft);
+    color: var(--l-text);
+  }
+  .rift-item.active {
+    background: var(--l-gold-soft);
+    color: var(--l-gold-deep);
+    border-color: var(--l-border-hover);
+  }
+  .rift-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 50%;
+    transform: translateY(-50%);
+    width: 2px; height: 60%;
+    background: var(--l-gold);
+    border-radius: 2px;
+    opacity: 0.9;
+  }
+
+  /* ─── Badge de estado ─── */
+  .state-badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wide uppercase;
+  }
+  .state-badge.ok {
+    background: var(--l-ok-bg);
+    color: var(--l-ok);
+    border: 1px solid var(--l-ok);
+  }
+  .state-badge.error {
+    background: var(--l-error-bg);
+    color: var(--l-error);
+    border: 1px solid var(--l-error);
+  }
+  .state-badge.warning {
+    background: var(--l-warning-bg);
+    color: var(--l-warning);
+    border: 1px solid var(--l-warning);
+  }
+  .state-badge.dormant {
+    background: rgba(108, 124, 150, 0.10);
+    color: var(--l-text-mute);
+    border: 1px solid var(--l-text-ghost);
+  }
+
+  /* ─── Texto com glow de marca ─── */
+  .gold-text {
+    color: var(--l-gold-deep);
+  }
+  .void-text {
+    background: linear-gradient(135deg, var(--l-navy-deep) 0%, var(--l-navy) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .kanji {
+    font-family: 'Noto Serif JP', serif;
+    letter-spacing: 0.08em;
+  }
+
+  /* ─── Título de seção ─── */
+  .void-title {
+    @apply font-display font-bold tracking-tight;
+    background: linear-gradient(135deg, var(--l-navy-deep) 0%, var(--l-navy) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ─── Botões ─── */
+  .btn-fleet {
+    @apply px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 cursor-pointer;
+    background: var(--l-input);
+    color: var(--l-text-soft);
+    border: 1px solid var(--l-border);
+  }
+  .btn-fleet:hover {
+    background: var(--l-gold-soft);
+    border-color: var(--l-border-hover);
+    color: var(--l-gold-deep);
+    box-shadow: 0 0 16px var(--l-gold-haze);
+  }
+  .btn-fleet:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    @apply px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 cursor-pointer;
+    background: linear-gradient(135deg, var(--l-gold-bright) 0%, var(--l-gold-deep) 100%);
+    color: #2a2008;
+    border: 1px solid var(--l-gold);
+    box-shadow: 0 4px 14px var(--l-gold-glow);
+  }
+  .btn-primary:hover { filter: brightness(1.06); box-shadow: 0 6px 20px var(--l-gold-glow); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; filter: none; box-shadow: none; }
+
+  /* ─── Tab pill ─── */
+  .tab-pill {
+    @apply px-5 py-2 rounded-lg text-xs font-semibold tracking-[0.18em] uppercase transition-all duration-200 cursor-pointer;
+    color: var(--l-text-mute);
+    background: transparent;
+    border: 1px solid transparent;
+  }
+  .tab-pill:hover {
+    color: var(--l-text-soft);
+    background: var(--l-gold-haze);
+  }
+  .tab-pill.active {
+    color: var(--l-gold-deep);
+    background: var(--l-gold-soft);
+    border-color: var(--l-border-hover);
+  }
+
+  /* ─── Terminal / console vintage (navy escuro sobre porcelana) ─── */
+  .term {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    background: var(--l-console);
+    border: 1px solid rgba(46, 90, 160, 0.25);
+    border-radius: var(--radius);
+    color: var(--l-console-text);
+    font-size: 12px;
+    line-height: 1.7;
+    box-shadow: inset 0 2px 12px rgba(0,0,0,0.35);
+  }
+  .term-line-start { color: #8fb4e8; }
+  .term-line-done  { color: #5fd6a0; }
+  .term-line-fail  { color: #ec7c6e; }
+
+  /* ─── Card de agente (placa de porcelana) ─── */
+  .agent-card {
+    background: linear-gradient(160deg, var(--l-surface-hi) 0%, var(--l-surface) 100%);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--l-border);
+    box-shadow: 0 6px 18px rgba(15, 40, 73, 0.06), inset 0 1px 0 rgba(255,255,255,0.7);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .agent-card:hover {
+    border-color: var(--l-border-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 26px rgba(15, 40, 73, 0.1), inset 0 1px 0 rgba(255,255,255,0.8);
+  }
+  .agent-card.active {
+    border-color: var(--l-border-active);
+    box-shadow: 0 0 0 1px var(--l-gold-glow), 0 12px 26px rgba(15,40,73,0.1);
+  }
+  .agent-card.active::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 0%, var(--l-gold-haze), transparent 60%);
+    pointer-events: none;
+  }
+
+  /* ─── Filigrana decorativa (cantos ornamentais dourados) ─── */
+  .filigree-corner {
+    position: absolute;
+    width: 48px; height: 48px;
+    pointer-events: none;
+    opacity: 0.5;
+  }
+}

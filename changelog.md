@@ -1,201 +1,92 @@
-# Changelog
+﻿# Changelog - LUCA-AI
 
-<!-- safe-commit:generated:start -->
-Generated: 2026-05-29T11:23:31.323Z
-Repository: LUCA-AI
-Path: C:\projetos\LUCA-AI
-Branch: main
-Remote: https://github.com/LucasOl1337/LUCA-AI.git
-GitHub baseline: origin/main
-State before safe commit: dirty
-Ahead/behind before safe commit: ahead 0, behind 0
-Recent local file changes detected: 19
-Recent local commit detected: no
-Last commit: 2026-05-19T14:16:05-03:00 - Backup nested PraisonAI reference 2026-05-19
+All notable changes to this project will be documented in this file.
 
-## 2026-05-29 - dirty safe commit preparation
+## [Unreleased] - 2026-05-29
 
-### Summary
+### Changed
+- **BREAKING:** Complete frontend migration from JavaScript to TypeScript/React
+- Replaced src/main.jsx with src/main.tsx
+- Replaced src/styles.css with src/index.css (Tailwind integration)
+- Replaced vite.config.js with vite.config.ts
+- Updated package.json with TypeScript dependencies
+- Added comprehensive TypeScript configuration (tsconfig.json, tsconfig.node.json)
+- Restructured source into proper directories: components/, hooks/, pages/, lib/
 
-- Prepared this repository for a safe commit after checking the local PC version against origin/main.
-- Recorded branch state: ahead 0, behind 0, dirty yes.
-- Added or refreshed patchnotes.md and changelog.md with the current comparison and local status evidence.
-- No Git conflict entries detected before staging the safe commit.
+### Added
+- TypeScript support with strict configuration
+- Tailwind CSS integration (tailwind.config.js, postcss.config.js)
+- Modern React component architecture
+- Custom hooks library
+- Page-based routing structure
+- Vite environment declarations
 
-### Recent Local Commits And History
-```text
-b359e59 (HEAD -> main, origin/main, origin/HEAD) Backup nested PraisonAI reference 2026-05-19
-b3faeeb Backup snapshot 2026-05-19
-2ed5e4d Update LUCA AI: v2 design, new agent assets, server config
-3cff6af Update LUCA interface assets and chat layout
-2cb9154 Rebuild minimal LUCA runtime
-1455a92 (origin/master) fix: RCE executeCommand allowlist, CORS localhost-only, error handling, mutateDatabaseState logging
-90b8af8 backup 5/05 — estado atual antes de correções de bugs
-ce643ef Add truth sources methods and procedures
-```
+### Removed
+- Legacy JavaScript entry point (main.jsx)
+- Legacy CSS (styles.css)
+- Legacy Vite config (vite.config.js)
 
-### Commits Seen In Last 24 Hours
-None.
+### Technical Notes
+- Branch: main
+- Migration scope: Full frontend rewrite
+- Pre-commit: 19 uncommitted files (3M, 3D, 13??)
+## [6c10413] - 2026-05-29
+### 2026-05-29 dirty safe commit
 
-### Local-Only Commits Versus GitHub
-- None.
+---
 
-### GitHub-Only Commits Versus PC
-- None.
+## [b359e59] - 2026-05-19
+### Backup nested PraisonAI reference 2026-05-19
 
-### Working Tree Changes To Carry Into Commit
-```text
- M index.html
- M package.json
- M server/config.js
- M server/index.js
- M server/state.js
- M src/main.jsx
-?? brand/
-?? changelog.md
-?? patchnotes.md
-?? public/apple-touch-icon.png
-?? public/favicon-32.png
-?? public/favicon.svg
-?? public/icon-512.png
-?? server/closure.js
-?? server/intent.js
-?? server/kamui-bridge.test.js
-?? server/kamui-client.js
-?? server/luca-ai.test.js
-?? server/problem-context.js
-?? server/problem-context.test.js
-?? server/scheduler.js
-```
+---
 
-### File Delta Against GitHub Baseline
-```text
-M	index.html
-M	package.json
-M	server/config.js
-M	server/index.js
-M	server/state.js
-M	src/main.jsx
-```
+## [b3faeeb] - 2026-05-19
+### Backup snapshot 2026-05-19
 
-### Recent Files Detected On This PC
-- index.html (2026-05-29T11:02:58.678Z)
-- package.json (2026-05-29T02:48:48.590Z)
-- server/config.js (2026-05-29T02:35:26.545Z)
-- server/index.js (2026-05-29T03:14:34.760Z)
-- server/state.js (2026-05-29T03:01:14.283Z)
-- src/main.jsx (2026-05-29T02:49:45.151Z)
-- brand (2026-05-29T03:14:51.369Z, dir)
-- public/apple-touch-icon.png (2026-05-29T03:14:50.588Z)
-- public/favicon-32.png (2026-05-29T03:14:51.369Z)
-- public/favicon.svg (2026-05-29T03:13:14.161Z)
-- public/icon-512.png (2026-05-29T03:14:49.784Z)
-- server/closure.js (2026-05-29T02:37:51.335Z)
-- server/intent.js (2026-05-29T02:37:11.955Z)
-- server/kamui-bridge.test.js (2026-05-29T03:04:33.705Z)
-- server/kamui-client.js (2026-05-29T03:00:21.430Z)
-- server/luca-ai.test.js (2026-05-29T02:47:27.747Z)
-- server/problem-context.js (2026-05-29T03:10:27.874Z)
-- server/problem-context.test.js (2026-05-29T03:10:46.456Z)
-- server/scheduler.js (2026-05-29T02:38:18.085Z)
-<!-- safe-commit:generated:end -->
+---
 
-## Previous Local Notes Preserved
+## [2ed5e4d] - 2026-05-11
+### Update LUCA AI: v2 design, new agent assets, server config
 
-<!-- safe-commit:generated:start -->
-Generated: 2026-05-29T11:22:14.915Z
-Repository: LUCA-AI
-Path: C:\projetos\LUCA-AI
-Branch: main
-Remote: https://github.com/LucasOl1337/LUCA-AI.git
-GitHub baseline: origin/main
-State before safe commit: dirty
-Ahead/behind before safe commit: ahead 0, behind 0
-Recent local file changes detected: 19
-Recent local commit detected: no
-Last commit: 2026-05-19T14:16:05-03:00 - Backup nested PraisonAI reference 2026-05-19
-<!-- safe-commit:generated:end -->
+---
 
-## 2026-05-29 - dirty safe commit preparation
+## [3cff6af] - 2026-05-06
+### Update LUCA interface assets and chat layout
 
-### Summary
+---
 
-- Prepared this repository for a safe commit after checking the local PC version against origin/main.
-- Recorded branch state: ahead 0, behind 0, dirty yes.
-- Added or refreshed patchnotes.md and changelog.md with the current comparison and local status evidence.
-- No Git conflict entries detected before staging the safe commit.
+## [2cb9154] - 2026-05-06
+### Rebuild minimal LUCA runtime
 
-### Recent Local Commits And History
-```text
-b359e59 (HEAD -> main, origin/main, origin/HEAD) Backup nested PraisonAI reference 2026-05-19
-b3faeeb Backup snapshot 2026-05-19
-2ed5e4d Update LUCA AI: v2 design, new agent assets, server config
-3cff6af Update LUCA interface assets and chat layout
-2cb9154 Rebuild minimal LUCA runtime
-1455a92 (origin/master) fix: RCE executeCommand allowlist, CORS localhost-only, error handling, mutateDatabaseState logging
-90b8af8 backup 5/05 — estado atual antes de correções de bugs
-ce643ef Add truth sources methods and procedures
-```
+---
 
-### Commits Seen In Last 24 Hours
-None.
+## [1455a92] - 2026-05-06
+### fix: RCE executeCommand allowlist, CORS localhost-only, error handling, mutateDatabaseState logging
 
-### Local-Only Commits Versus GitHub
-- None.
+---
 
-### GitHub-Only Commits Versus PC
-- None.
+## [90b8af8] - 2026-05-06
+### backup 5/05 — estado atual antes de correções de bugs
 
-### Working Tree Changes To Carry Into Commit
-```text
- M index.html
- M package.json
- M server/config.js
- M server/index.js
- M server/state.js
- M src/main.jsx
-?? brand/
-?? public/apple-touch-icon.png
-?? public/favicon-32.png
-?? public/favicon.svg
-?? public/icon-512.png
-?? server/closure.js
-?? server/intent.js
-?? server/kamui-bridge.test.js
-?? server/kamui-client.js
-?? server/luca-ai.test.js
-?? server/problem-context.js
-?? server/problem-context.test.js
-?? server/scheduler.js
-```
+---
 
-### File Delta Against GitHub Baseline
-```text
-M	index.html
-M	package.json
-M	server/config.js
-M	server/index.js
-M	server/state.js
-M	src/main.jsx
-```
+## [ce643ef] - 2026-05-03
+### Add truth sources methods and procedures
 
-### Recent Files Detected On This PC
-- index.html (2026-05-29T11:02:58.678Z)
-- package.json (2026-05-29T02:48:48.590Z)
-- server/config.js (2026-05-29T02:35:26.545Z)
-- server/index.js (2026-05-29T03:14:34.760Z)
-- server/state.js (2026-05-29T03:01:14.283Z)
-- src/main.jsx (2026-05-29T02:49:45.151Z)
-- brand (2026-05-29T03:14:51.369Z, dir)
-- public/apple-touch-icon.png (2026-05-29T03:14:50.588Z)
-- public/favicon-32.png (2026-05-29T03:14:51.369Z)
-- public/favicon.svg (2026-05-29T03:13:14.161Z)
-- public/icon-512.png (2026-05-29T03:14:49.784Z)
-- server/closure.js (2026-05-29T02:37:51.335Z)
-- server/intent.js (2026-05-29T02:37:11.955Z)
-- server/kamui-bridge.test.js (2026-05-29T03:04:33.705Z)
-- server/kamui-client.js (2026-05-29T03:00:21.430Z)
-- server/luca-ai.test.js (2026-05-29T02:47:27.747Z)
-- server/problem-context.js (2026-05-29T03:10:27.874Z)
-- server/problem-context.test.js (2026-05-29T03:10:46.456Z)
-- server/scheduler.js (2026-05-29T02:38:18.085Z)
+---
+
+## [a6c0b56] - 2026-05-03
+### Add autonomous risk prevention heartbeat
+
+---
+
+## [24ab410] - 2026-05-03
+### Add production tunnel startup scripts
+
+---
+
+## [767341a] - 2026-05-03
+### Initial LUCA-AI dashboard
+
+---
+
