@@ -1,4 +1,9 @@
-import { AGENTS } from './config.js';
+import {
+  AGENTS,
+  defaultAgentEnabled,
+  normalizeAgentEnabled,
+  sanitizeAgentModel,
+} from './config.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -23,6 +28,18 @@ function makeDatabase() {
   };
 }
 
+function makeAgentEntry(agent) {
+  return {
+    id: agent.id,
+    role: agent.role,
+    name: agent.name,
+    status: 'idle',
+    enabled: defaultAgentEnabled(agent.id),
+    model: sanitizeAgentModel(agent.model, agent.model),
+    lines: [`${agent.name} pronto.`],
+  };
+}
+
 function makeInitialState() {
   return {
     supervisorMode: 'standby',
@@ -33,8 +50,28 @@ function makeInitialState() {
     database: makeDatabase(),
     heartbeatLogs: [],
     globalChatMessages: [],
-    agents: AGENTS.map((a) => ({ id: a.id, role: a.role, status: 'idle', lines: [`${a.name} pronto.`] })),
+    scheduledMissions: [],
+    missionQueue: [],
+    personaAgents: [],
+    agents: AGENTS.map(makeAgentEntry),
   };
+}
+
+function normalizeAgentList(savedAgents) {
+  const saved = Array.isArray(savedAgents) ? savedAgents : [];
+  return AGENTS.map((agent) => {
+    const previous = saved.find((item) => item.id === agent.id);
+    const enabled = normalizeAgentEnabled(agent.id, previous?.enabled);
+    return {
+      id: agent.id,
+      role: agent.role,
+      name: agent.name,
+      status: previous?.status ?? 'idle',
+      enabled,
+      model: sanitizeAgentModel(previous?.model, agent.model),
+      lines: Array.isArray(previous?.lines) && previous.lines.length ? previous.lines.slice(-80) : [`${agent.name} pronto.`],
+    };
+  });
 }
 
 function loadPersistedState() {
@@ -53,9 +90,12 @@ function loadPersistedState() {
         },
         heartbeat: parsed.database?.heartbeat ?? initial.database.heartbeat,
       },
-      agents: Array.isArray(parsed.agents) ? parsed.agents : initial.agents,
+      agents: normalizeAgentList(parsed.agents),
       heartbeatLogs: Array.isArray(parsed.heartbeatLogs) ? parsed.heartbeatLogs : initial.heartbeatLogs,
       globalChatMessages: Array.isArray(parsed.globalChatMessages) ? parsed.globalChatMessages : initial.globalChatMessages,
+      scheduledMissions: Array.isArray(parsed.scheduledMissions) ? parsed.scheduledMissions : initial.scheduledMissions,
+      missionQueue: Array.isArray(parsed.missionQueue) ? parsed.missionQueue : initial.missionQueue,
+      personaAgents: Array.isArray(parsed.personaAgents) ? parsed.personaAgents : initial.personaAgents,
     };
   } catch {
     return makeInitialState();
@@ -75,11 +115,18 @@ function persistState() {
       database: state.database,
       heartbeatLogs: state.heartbeatLogs,
       globalChatMessages: state.globalChatMessages,
+      scheduledMissions: state.scheduledMissions,
+      missionQueue: state.missionQueue,
+      personaAgents: state.personaAgents,
       agents: state.agents,
     }, null, 2));
   } catch {
     // Runtime persistence must not break the live system.
   }
+}
+
+export function persist() {
+  persistState();
 }
 
 function defaultAgentLine(agent) {
@@ -90,28 +137,56 @@ function ensureConfiguredAgents() {
   let changed = false;
   for (const agent of AGENTS) {
     if (!state.agents.some((item) => item.id === agent.id)) {
-      state.agents.push({
-        id: agent.id,
-        role: agent.role,
-        status: 'idle',
-        lines: [defaultAgentLine(agent)],
-      });
+      state.agents.push(makeAgentEntry(agent));
+      changed = true;
+    }
+  }
+  for (const item of state.agents) {
+    if (typeof item.enabled !== 'boolean') {
+      item.enabled = defaultAgentEnabled(item.id);
+      changed = true;
+    } else {
+      const normalized = normalizeAgentEnabled(item.id, item.enabled);
+      if (normalized !== item.enabled) {
+        item.enabled = normalized;
+        changed = true;
+      }
+    }
+    if (!item.model) {
+      item.model = sanitizeAgentModel(undefined, AGENTS.find((a) => a.id === item.id)?.model);
       changed = true;
     }
   }
   if (changed) persistState();
 }
 
+function rebuildAgentsPreservingConfig() {
+  const config = new Map(state.agents.map((agent) => [agent.id, { enabled: agent.enabled, model: agent.model }]));
+  return AGENTS.map((agent) => ({
+    id: agent.id,
+    role: agent.role,
+    name: agent.name,
+    status: 'idle',
+    enabled: normalizeAgentEnabled(agent.id, config.get(agent.id)?.enabled),
+    model: sanitizeAgentModel(config.get(agent.id)?.model, agent.model),
+    lines: [defaultAgentLine(agent)],
+  }));
+}
+
 export function getState() {
   ensureConfiguredAgents();
   return {
-      activeMission: state.activeMission,
-      activeRun: state.activeRun,
-      missionHistory: state.missionHistory,
-      temporaryDashboard: state.temporaryDashboard,
-      database: state.database,
+    supervisorMode: state.supervisorMode,
+    activeMission: state.activeMission,
+    activeRun: state.activeRun,
+    missionHistory: state.missionHistory,
+    temporaryDashboard: state.temporaryDashboard,
+    database: state.database,
     heartbeatLogs: state.heartbeatLogs,
     globalChatMessages: state.globalChatMessages,
+    scheduledMissions: state.scheduledMissions,
+    missionQueue: state.missionQueue,
+    personaAgents: state.personaAgents,
     agents: state.agents,
   };
 }
@@ -158,12 +233,7 @@ function resetActiveScope() {
   state.globalChatMessages = [];
   state.database.layers.dashboardIntegration.items = [];
   state.database.heartbeat = [];
-  state.agents = AGENTS.map((agent) => ({
-    id: agent.id,
-    role: agent.role,
-    status: 'idle',
-    lines: [defaultAgentLine(agent)],
-  }));
+  state.agents = rebuildAgentsPreservingConfig();
 }
 
 export function startNewMissionScope(mission) {
@@ -298,6 +368,7 @@ export function addGlobalChatMessage(message) {
     agentName: message.agentName ?? message.agentId ?? 'system',
     type: message.type ?? 'info',
     content: String(message.content ?? '').trim(),
+    meta: message.meta ?? null,
     timestamp: message.timestamp ?? new Date().toLocaleTimeString('pt-BR', { hour12: false }),
     createdAt: message.createdAt ?? new Date().toISOString(),
   };
@@ -328,6 +399,33 @@ export function setAgentStatus(agentId, status) {
   if (!agent) return;
   agent.status = status;
   persistState();
+}
+
+export function setAgentConfig(agentId, patch = {}) {
+  ensureConfiguredAgents();
+  const agent = state.agents.find((a) => a.id === agentId);
+  if (!agent) return null;
+  if (typeof patch.model === 'string') {
+    agent.model = sanitizeAgentModel(patch.model, agent.model);
+  }
+  if (typeof patch.enabled === 'boolean') {
+    const nextEnabled = normalizeAgentEnabled(agentId, patch.enabled);
+    if (agent.enabled !== nextEnabled) {
+      agent.enabled = nextEnabled;
+      agent.status = nextEnabled ? 'idle' : 'disabled';
+      agent.lines = [...agent.lines, `[config] agente ${nextEnabled ? 'ativado' : 'desativado'}`].slice(-80);
+    }
+  } else {
+    agent.enabled = normalizeAgentEnabled(agentId, agent.enabled);
+  }
+  agent.lines = [...agent.lines, `[config] modelo=${agent.model}`].slice(-80);
+  persistState();
+  return agent;
+}
+
+export function getAgentConfig(agentId) {
+  ensureConfiguredAgents();
+  return state.agents.find((a) => a.id === agentId) ?? null;
 }
 
 export function setMission(mission) {
@@ -362,11 +460,84 @@ export function clearAgentContexts() {
   state.heartbeatLogs = [];
   state.database.heartbeat = [];
   state.globalChatMessages = [];
-  state.agents = AGENTS.map((agent) => ({
-    id: agent.id,
-    role: agent.role,
-    status: 'idle',
-    lines: [defaultAgentLine(agent)],
-  }));
+  state.agents = rebuildAgentsPreservingConfig();
   persistState();
+}
+
+export function archiveActiveMission({ status = 'completed', reason = '', evidence = [] } = {}) {
+  const mission = state.activeMission;
+  if (!mission && !state.activeRun) return false;
+  const completedAt = new Date().toISOString();
+  state.missionHistory = [{
+    id: state.activeRun?.id ?? mission?.id ?? `mission-${Date.now()}`,
+    archivedAt: completedAt,
+    completedAt,
+    status,
+    reason,
+    mission: mission ? { ...mission, completedAt } : null,
+    run: state.activeRun,
+    dashboard: state.temporaryDashboard,
+    evidence,
+    chatMessages: state.globalChatMessages,
+    agents: state.agents,
+  }, ...(state.missionHistory ?? [])].slice(0, 20);
+  resetActiveScope();
+  persistState();
+  return true;
+}
+
+export function setScheduledMissions(list) {
+  state.scheduledMissions = Array.isArray(list) ? list.slice(0, 30) : [];
+  persistState();
+}
+
+export function setMissionQueue(list) {
+  state.missionQueue = Array.isArray(list) ? list.slice(-80) : [];
+  persistState();
+}
+
+export function getPersonaAgents() {
+  if (!Array.isArray(state.personaAgents)) state.personaAgents = [];
+  return state.personaAgents;
+}
+
+export function addPersonaAgent(entry = {}) {
+  const slug = String(entry.slug || '').trim();
+  if (!slug) return null;
+  if (!Array.isArray(state.personaAgents)) state.personaAgents = [];
+  const existing = state.personaAgents.find((p) => p.slug === slug);
+  const record = {
+    id: `yume:${slug}`,
+    slug,
+    source: 'yume',
+    name: entry.name || existing?.name || slug,
+    model: entry.model ?? existing?.model ?? '',
+    enabled: entry.enabled !== undefined ? Boolean(entry.enabled) : (existing?.enabled !== false),
+    cachedVersion: entry.cachedVersion ?? existing?.cachedVersion ?? null,
+    cachedSystemPrompt: entry.cachedSystemPrompt ?? existing?.cachedSystemPrompt ?? null,
+    cachedAt: entry.cachedAt ?? existing?.cachedAt ?? null,
+    lastError: null,
+    addedAt: existing?.addedAt || new Date().toISOString(),
+  };
+  state.personaAgents = [record, ...state.personaAgents.filter((p) => p.slug !== slug)].slice(0, 50);
+  persistState();
+  return record;
+}
+
+export function updatePersonaAgent(slug, patch = {}) {
+  if (!Array.isArray(state.personaAgents)) state.personaAgents = [];
+  const record = state.personaAgents.find((p) => p.slug === slug);
+  if (!record) return null;
+  Object.assign(record, patch);
+  persistState();
+  return record;
+}
+
+export function removePersonaAgent(slug) {
+  if (!Array.isArray(state.personaAgents)) state.personaAgents = [];
+  const before = state.personaAgents.length;
+  state.personaAgents = state.personaAgents.filter((p) => p.slug !== slug);
+  const changed = state.personaAgents.length !== before;
+  if (changed) persistState();
+  return changed;
 }

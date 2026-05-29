@@ -18,6 +18,7 @@ const fallbackDatabase = {
 const agentDefs = [
   { id: 'heartbeat', title: 'heartbeat', icon: '/icons/heartbeat.mp4', fallbackIcon: null, role: 'system', isHeartbeat: true },
   { id: 'database', title: 'database', icon: '/icons/database.png', role: 'database', isDatabase: true },
+  { id: 'maestro', title: 'maestro', icon: '/icons/quest.png', role: 'router' },
   { id: 'transformador-missao', title: 'transformador de missão', icon: '/icons/quest.png', role: 'mission-transformer' },
   { id: 'supervisor', title: 'supervisor', icon: '/icons/supervisor.png', role: 'supervisor' },
   { id: 'planejador', title: 'planejador', icon: '/icons/planejador.png', role: 'planner' },
