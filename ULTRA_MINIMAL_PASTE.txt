@@ -1,0 +1,118 @@
+﻿// =====================================================
+// ULTRA SIMPLES - Cole isso na NOVA conversa e rode
+// =====================================================
+
+const p = String.raw`C:\Users\user\.codex\plugins\cache\openai-bundled\computer-use\26.527.30818`;
+
+if (!globalThis.sky) {
+  const { setupComputerUseRuntime } = await import(`${p}/scripts/computer-use-client.mjs`);
+  await setupComputerUseRuntime({ globals: globalThis });
+}
+globalThis.apps = await sky.list_apps();
+
+async function go() {
+  let paint = apps.find(a => /paint|mspaint/i.test(a.id) || /paint/i.test(a.displayName || ""));
+  if (!paint?.windows?.length) {
+    await sky.launch_app({ app: String.raw`C:\Windows\System32\mspaint.exe` });
+    for (let i = 0; i < 10; i++) {
+      await new Promise(r => setTimeout(r, 700));
+      globalThis.apps = await sky.list_apps();
+      paint = apps.find(a => /paint|mspaint/i.test(a.id) || /paint/i.test(a.displayName || ""));
+      if (paint?.windows?.length) break;
+    }
+  }
+  if (!paint?.windows?.length) throw new Error("Abra o Paint manualmente e rode novamente.");
+
+  globalThis.w = await sky.get_window(paint.windows[0]);
+  await sky.activate_window({ window: w });
+  globalThis.w = await sky.get_window({ id: w.id, app: w.app });
+  globalThis.st = await sky.get_window_state({ window: w, include_screenshot: true });
+
+  const cx = 430, cy = 340;
+  const sX = n => Math.round(cx + n);
+  const sY = n => Math.round(cy + n);
+
+  const d = async (x1, y1, x2, y2, t = 2) => {
+    const id = st.screenshots?.[0]?.id;
+    for (let i = 0; i < t; i++) {
+      const o = (i % 2 ? -i : i);
+      await sky.drag({ window: w, from_x: x1 + o, from_y: y1 + (i % 3), to_x: x2 + o, to_y: y2 + (i % 3), screenshotId: id });
+      await new Promise(r => setTimeout(r, 10));
+    }
+  };
+
+  console.log("Desenhando teste rápido...");
+  await d(cx - 90, cy - 60, cx + 90, cy - 60, 2);
+  await d(cx + 90, cy - 60, cx + 90, cy + 60, 2);
+  await d(cx + 90, cy + 60, cx - 90, cy + 60, 2);
+  await d(cx - 90, cy + 60, cx - 90, cy - 60, 2);
+
+  console.log("Desenhando goblin...");
+  await d(sX(-40), sY(-62), sX(40), sY(-62), 2);
+  await d(sX(40), sY(-62), sX(56), sY(-24), 2);
+  await d(sX(56), sY(-24), sX(44), sY(22), 2);
+  await d(sX(44), sY(22), sX(-44), sY(22), 2);
+  await d(sX(-44), sY(22), sX(-56), sY(-24), 2);
+  await d(sX(-56), sY(-24), sX(-40), sY(-62), 2);
+
+  await d(sX(-40), sY(-48), sX(-72), sY(-84), 2);
+  await d(sX(-72), sY(-84), sX(-52), sY(-40), 2);
+  await d(sX(40), sY(-48), sX(72), sY(-84), 2);
+  await d(sX(72), sY(-84), sX(52), sY(-40), 2);
+
+  await d(sX(-26), sY(-16), sX(-8), sY(-16), 2);
+  await d(sX(-8), sY(-16), sX(-8), sY(-2), 2);
+  await d(sX(-8), sY(-2), sX(-26), sY(-2), 2);
+  await d(sX(-26), sY(-2), sX(-26), sY(-16), 2);
+  await d(sX(-20), sY(-10), sX(-14), sY(-10), 2);
+
+  await d(sX(8), sY(-16), sX(26), sY(-16), 2);
+  await d(sX(26), sY(-16), sX(26), sY(-2), 2);
+  await d(sX(26), sY(-2), sX(8), sY(-2), 2);
+  await d(sX(8), sY(-2), sX(8), sY(-16), 2);
+  await d(sX(14), sY(-10), sX(20), sY(-10), 2);
+
+  await d(sX(-30), sY(-26), sX(-6), sY(-32), 2);
+  await d(sX(6), sY(-32), sX(30), sY(-26), 2);
+
+  await d(sX(-22), sY(6), sX(22), sY(6), 2);
+  await d(sX(-22), sY(6), sX(-12), sY(22), 2);
+  await d(sX(-12), sY(22), sX(12), sY(22), 2);
+  await d(sX(12), sY(22), sX(22), sY(6), 2);
+
+  await d(sX(-12), sY(24), sX(-12), sY(82), 2);
+  await d(sX(12), sY(24), sX(12), sY(82), 2);
+  await d(sX(-12), sY(82), sX(12), sY(82), 2);
+
+  await d(sX(-12), sY(40), sX(-56), sY(16), 2);
+  await d(sX(-56), sY(16), sX(-70), sY(42), 2);
+  await d(sX(-70), sY(42), sX(-82), sY(30), 2);
+  await d(sX(-70), sY(42), sX(-60), sY(54), 2);
+
+  await d(sX(12), sY(40), sX(52), sY(18), 2);
+  await d(sX(52), sY(18), sX(66), sY(50), 2);
+  await d(sX(66), sY(50), sX(78), sY(38), 2);
+  await d(sX(66), sY(50), sX(56), sY(62), 2);
+
+  await d(sX(60), sY(38), sX(60), sY(90), 2);
+  await d(sX(50), sY(90), sX(70), sY(90), 2);
+
+  await d(sX(-8), sY(82), sX(-12), sY(124), 2);
+  await d(sX(8), sY(82), sX(12), sY(124), 2);
+  await d(sX(-12), sY(124), sX(-34), sY(122), 2);
+  await d(sX(12), sY(124), sX(34), sY(122), 2);
+
+  console.log("✅ Goblin desenhado com sucesso!");
+  console.log("");
+  console.log("Se ficou bom → objetivo cumprido!");
+  console.log("");
+  console.log("Se ficou torto ou fora do lugar, use um destes comandos para ajustar:");
+  console.log("  await drawGoblin(380, 320)      // mais para esquerda e cima");
+  console.log("  await drawGoblin(480, 360)      // mais para direita e baixo");
+  console.log("  await drawGoblin(430, 340, 0.85) // menor");
+  console.log("  await drawGoblin(430, 340, 1.15) // maior");
+  console.log("");
+  console.log("Me fala o que aconteceu que eu te dou o comando exato.");
+}
+
+await go();

@@ -1,0 +1,20 @@
+﻿FAÇA ISSO AGORA (o mais simples possível):
+
+1. Feche esta conversa.
+
+2. Abra uma **conversa completamente NOVA**.
+
+3. Cole o conteúdo **inteiro** deste arquivo na nova conversa:
+   C:\Projetos\LUCA-AI\ULTRA_MINIMAL_PASTE.txt
+
+4. Aperte Enter / rode.
+
+Pronto. O script vai:
+- Carregar o Computer Use
+- Abrir o Paint
+- Desenhar um retângulo de teste
+- Desenhar o goblin automaticamente na melhor posição padrão
+
+Depois me fala o que aconteceu (se apareceu bem, se ficou torto, erro, etc.) que eu ajusto na hora.
+
+Esse é o menor e mais direto possível que conseguimos deixar.

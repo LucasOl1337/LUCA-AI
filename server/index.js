@@ -50,6 +50,8 @@ import {
   listYumePersonas,
   fetchYumePersonaSystemPrompt,
   getYumePersonaVersion,
+  isKamuiReachable,
+  KAMUI_BASE,
 } from './kamui-client.js';
 import {
   normalizeMissionContext,

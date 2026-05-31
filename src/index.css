@@ -6,47 +6,47 @@
   :root {
     --radius: 0.75rem;
 
-    /* LUC.AI — porcelana Wild Lotus (marfim + navy + ouro) */
-    --l-void:        #F5F1E8;       /* porcelana: fundo absoluto */
-    --l-void-2:      #efe9db;       /* sidebar — creme um tom abaixo */
-    --l-surface:     rgba(255, 253, 247, 0.66);   /* painéis de vidro claro */
-    --l-surface-hi:  rgba(255, 255, 252, 0.85);
-    --l-input:       rgba(255, 255, 253, 0.9);
+    /* LUC.AI — Cerrado: pergaminho + verde floresta + sienna */
+    --l-void:        #f2e8d8;
+    --l-void-2:      #e9ddc8;
+    --l-surface:     rgba(245, 235, 215, 0.70);
+    --l-surface-hi:  rgba(252, 246, 238, 0.88);
+    --l-input:       rgba(250, 244, 234, 0.92);
 
-    /* Navy lacado — estrutura, texto forte, console */
-    --l-navy:        #1E3A6C;
-    --l-navy-deep:   #0F2849;
-    --l-navy-soft:   rgba(30, 58, 108, 0.06);
-    --l-navy-glow:   rgba(30, 58, 108, 0.16);
+    /* Verde floresta — estrutura (era navy) */
+    --l-navy:        #1a5c3a;
+    --l-navy-deep:   #0f3d24;
+    --l-navy-soft:   rgba(26, 92, 58, 0.06);
+    --l-navy-glow:   rgba(26, 92, 58, 0.16);
 
-    /* Ouro filigrana — marca e estado ativo (tons profundos p/ legibilidade no claro) */
-    --l-gold:        #A8801A;       /* ouro de texto/borda sobre porcelana */
-    --l-gold-bright: #D4AF37;       /* ouro de preenchimento/brilho */
-    --l-gold-deep:   #836311;
-    --l-gold-soft:   rgba(168, 128, 26, 0.08);
-    --l-gold-glow:   rgba(212, 175, 55, 0.28);
-    --l-gold-haze:   rgba(168, 128, 26, 0.05);
+    /* Sienna marrom — acento primário (era gold) */
+    --l-gold:        #8b5a2b;
+    --l-gold-bright: #b07840;
+    --l-gold-deep:   #6b3d1a;
+    --l-gold-soft:   rgba(139, 90, 43, 0.08);
+    --l-gold-glow:   rgba(176, 120, 64, 0.28);
+    --l-gold-haze:   rgba(139, 90, 43, 0.05);
 
-    /* Azul royal — acento secundário */
-    --l-fleet:       #2E5AA0;
-    --l-fleet-soft:  rgba(46, 90, 160, 0.08);
-    --l-fleet-glow:  rgba(46, 90, 160, 0.20);
+    /* Verde médio — acento secundário (era fleet) */
+    --l-fleet:       #2d6a4f;
+    --l-fleet-soft:  rgba(45, 106, 79, 0.08);
+    --l-fleet-glow:  rgba(45, 106, 79, 0.20);
 
-    /* Verde heartbeat — RESERVADO ao sinal de vida (online / pulso) */
-    --l-alive:       #2f9e6a;       /* verde mais escuro: legível no claro */
+    /* Verde heartbeat — sinal de vida */
+    --l-alive:       #2f9e6a;
     --l-alive-soft:  rgba(47, 158, 106, 0.10);
     --l-alive-glow:  rgba(47, 158, 106, 0.22);
 
-    /* Textos — tinta sobre porcelana */
-    --l-text:        #0F2849;       /* navy quase-preto */
-    --l-text-soft:   #3a527a;
-    --l-text-mute:   #6c7c96;
-    --l-text-ghost:  #a7b0c0;
+    /* Textos — tinta sobre pergaminho */
+    --l-text:        #1e1209;
+    --l-text-soft:   #4a3020;
+    --l-text-mute:   #7a5c46;
+    --l-text-ghost:  #b8a090;
 
-    /* Bordas — filigrana sutil */
-    --l-border:        rgba(30, 58, 108, 0.10);
-    --l-border-hover:  rgba(168, 128, 26, 0.35);
-    --l-border-active: rgba(168, 128, 26, 0.55);
+    /* Bordas */
+    --l-border:        rgba(26, 92, 58, 0.10);
+    --l-border-hover:  rgba(139, 90, 43, 0.35);
+    --l-border-active: rgba(139, 90, 43, 0.55);
 
     /* Estados */
     --l-ok:        #2f9e6a;
@@ -56,15 +56,13 @@
     --l-warning:   #b8860b;
     --l-warning-bg: rgba(184, 134, 11, 0.12);
 
-    /* Console navy (terminais permanecem escuros — contraste com a porcelana) */
-    --l-console:     #0d1f3a;
-    --l-console-2:   #0a1830;
-    --l-console-text: #cfe0f4;
+    /* Console — verde musgo escuro */
+    --l-console:     #0d1a0f;
+    --l-console-2:   #0a1509;
+    --l-console-text: #b8d8b0;
   }
 
-  * {
-    box-sizing: border-box;
-  }
+  * { box-sizing: border-box; }
 
   html, body {
     margin: 0;
@@ -102,22 +100,22 @@
 }
 
 @layer components {
-  /* ─── Painel de vidro porcelana ─── */
+  /* ─── Painel de vidro pergaminho ─── */
   .void-panel {
     background: var(--l-surface);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     border: 1px solid var(--l-border);
     box-shadow:
-      0 6px 22px rgba(15, 40, 73, 0.07),
-      inset 0 1px 0 rgba(255, 255, 255, 0.6);
+      0 6px 22px rgba(30, 18, 9, 0.07),
+      inset 0 1px 0 rgba(255, 255, 255, 0.55);
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .void-panel:hover {
     border-color: var(--l-border-hover);
     box-shadow:
-      0 10px 28px rgba(15, 40, 73, 0.1),
-      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      0 10px 28px rgba(30, 18, 9, 0.10),
+      inset 0 1px 0 rgba(255, 255, 255, 0.65);
   }
 
   /* ─── Item de navegação (sidebar) ─── */
@@ -167,12 +165,12 @@
     border: 1px solid var(--l-warning);
   }
   .state-badge.dormant {
-    background: rgba(108, 124, 150, 0.10);
+    background: rgba(122, 92, 70, 0.10);
     color: var(--l-text-mute);
     border: 1px solid var(--l-text-ghost);
   }
 
-  /* ─── Texto com glow de marca ─── */
+  /* ─── Texto de marca ─── */
   .gold-text {
     color: var(--l-gold-deep);
   }
@@ -209,14 +207,12 @@
     color: var(--l-gold-deep);
     box-shadow: 0 0 16px var(--l-gold-haze);
   }
-  .btn-fleet:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
+  .btn-fleet:disabled { opacity: 0.4; cursor: not-allowed; }
+
   .btn-primary {
     @apply px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 cursor-pointer;
     background: linear-gradient(135deg, var(--l-gold-bright) 0%, var(--l-gold-deep) 100%);
-    color: #2a2008;
+    color: #fdf6ec;
     border: 1px solid var(--l-gold);
     box-shadow: 0 4px 14px var(--l-gold-glow);
   }
@@ -240,28 +236,28 @@
     border-color: var(--l-border-hover);
   }
 
-  /* ─── Terminal / console vintage (navy escuro sobre porcelana) ─── */
+  /* ─── Terminal / console verde musgo ─── */
   .term {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     background: var(--l-console);
-    border: 1px solid rgba(46, 90, 160, 0.25);
+    border: 1px solid rgba(45, 106, 79, 0.25);
     border-radius: var(--radius);
     color: var(--l-console-text);
     font-size: 12px;
     line-height: 1.7;
     box-shadow: inset 0 2px 12px rgba(0,0,0,0.35);
   }
-  .term-line-start { color: #8fb4e8; }
-  .term-line-done  { color: #5fd6a0; }
-  .term-line-fail  { color: #ec7c6e; }
+  .term-line-start { color: #7dc4a0; }
+  .term-line-done  { color: #4dbb8a; }
+  .term-line-fail  { color: #e07070; }
 
-  /* ─── Card de agente (placa de porcelana) ─── */
+  /* ─── Card de agente ─── */
   .agent-card {
     background: linear-gradient(160deg, var(--l-surface-hi) 0%, var(--l-surface) 100%);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     border: 1px solid var(--l-border);
-    box-shadow: 0 6px 18px rgba(15, 40, 73, 0.06), inset 0 1px 0 rgba(255,255,255,0.7);
+    box-shadow: 0 6px 18px rgba(30, 18, 9, 0.06), inset 0 1px 0 rgba(255,255,255,0.65);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
     position: relative;
@@ -270,11 +266,11 @@
   .agent-card:hover {
     border-color: var(--l-border-hover);
     transform: translateY(-2px);
-    box-shadow: 0 12px 26px rgba(15, 40, 73, 0.1), inset 0 1px 0 rgba(255,255,255,0.8);
+    box-shadow: 0 12px 26px rgba(30, 18, 9, 0.10), inset 0 1px 0 rgba(255,255,255,0.75);
   }
   .agent-card.active {
     border-color: var(--l-border-active);
-    box-shadow: 0 0 0 1px var(--l-gold-glow), 0 12px 26px rgba(15,40,73,0.1);
+    box-shadow: 0 0 0 1px var(--l-gold-glow), 0 12px 26px rgba(30,18,9,0.10);
   }
   .agent-card.active::after {
     content: '';
@@ -284,7 +280,7 @@
     pointer-events: none;
   }
 
-  /* ─── Filigrana decorativa (cantos ornamentais dourados) ─── */
+  /* ─── Ornamento de canto ─── */
   .filigree-corner {
     position: absolute;
     width: 48px; height: 48px;

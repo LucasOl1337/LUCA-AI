@@ -1,0 +1,30 @@
+﻿# QUICK START - Computer Use + Goblin no Paint
+
+**Passo 1:** Feche esta conversa e abra uma **conversa completamente NOVA** no Codex.
+
+**Passo 2:** Cole o conteúdo **inteiro** deste arquivo na nova conversa:
+`C:\Projetos\LUCA-AI\COMPUTER_USE_TUDO_EM_UM.js`
+
+**Passo 3:** Rode apenas este comando:
+
+```js
+await runGoblin()
+```
+
+Ele vai:
+- Abrir o Paint
+- Desenhar uma grade de calibração
+- Te dar instruções claras do que fazer em seguida
+
+Depois é só escolher a melhor posição da grade e rodar o `drawBetterGoblin` com os números certos.
+
+---
+
+Se quiser o fluxo manual mais controlado:
+```js
+await openAndPreparePaint()
+await drawCalibrationGrid()
+await drawBetterGoblin({ cx: 430, cy: 340, scale: 1.0 })
+```
+
+Boa sorte! Quando rodar, me conta o resultado.

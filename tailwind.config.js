@@ -7,16 +7,16 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Porcelana Wild Lotus — paleta LUC.AI
-        void:    '#F5F1E8',
-        void2:   '#efe9db',
-        navy:    '#1E3A6C',
-        'navy-deep': '#0F2849',
-        gold:    '#A8801A',
-        'gold-bright': '#D4AF37',
-        fleet:   '#2E5AA0',
+        // LUC.AI — Cerrado: pergaminho + verde floresta + sienna
+        void:    '#f2e8d8',
+        void2:   '#e9ddc8',
+        navy:    '#1a5c3a',
+        'navy-deep': '#0f3d24',
+        gold:    '#8b5a2b',
+        'gold-bright': '#b07840',
+        fleet:   '#2d6a4f',
         alive:   '#2f9e6a',
-        cream:   '#F5F1E8',
+        cream:   '#f2e8d8',
       },
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
@@ -27,6 +27,7 @@ export default {
       animation: {
         'spiral-slow': 'spiral 90s linear infinite',
         'spiral-reverse': 'spiral-reverse 120s linear infinite',
+        'tomoe-spin': 'spiral 24s linear infinite',
         'drift': 'drift 30s ease-in-out infinite',
         'pulse-void': 'pulse-void 9s ease-in-out infinite',
         'breathe': 'breathe 8s ease-in-out infinite',
@@ -55,7 +56,6 @@ export default {
           '0%, 100%': { transform: 'scale(1)', opacity: '0.55' },
           '50%': { transform: 'scale(1.03)', opacity: '0.78' },
         },
-        // Pulso ECG varrendo a linha — o sinal de vida da LUC.AI
         'ecg-sweep': {
           '0%': { strokeDashoffset: '1000' },
           '100%': { strokeDashoffset: '0' },
