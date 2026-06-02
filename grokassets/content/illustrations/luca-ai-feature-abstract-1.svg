@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" fill="none">
+  <rect width="1920" height="1080" fill="#0A0C14"/>
+  <g opacity="0.9">
+    <!-- Abstract representation of the project's metaphor -->
+    <circle cx="600" cy="500" r="180" fill="#C5A46E" opacity="0.15"/>
+    <circle cx="720" cy="420" r="90" fill="#E8D5A3" opacity="0.25"/>
+  </g>
+  <text x="960" y="920" font-family="system-ui, sans-serif" font-size="32" fill="#F5F0E6" opacity="0.4" text-anchor="middle">LUCA-AI — Feature 1</text>
+</svg>

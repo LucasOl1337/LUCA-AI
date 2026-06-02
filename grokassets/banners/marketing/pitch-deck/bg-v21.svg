@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" fill="none">
+  <defs>
+    <pattern id="g21" width="181" height="181" patternUnits="userSpaceOnUse">
+      <path d="M 80 0 L 0 0 0 80" fill="none" stroke="#C5A46E" stroke-width="1" opacity="0.235"/>
+    </pattern>
+  </defs>
+  <rect width="1920" height="1080" fill="#0A0C14"/>
+  <rect width="1920" height="1080" fill="url(#g21)"/>
+</svg>

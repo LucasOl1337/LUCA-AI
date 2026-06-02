@@ -1,152 +1,208 @@
-# Patchnotes - LUCA-AI - 2026-05-31
+# Patch Notes - 2026-06-02 Safe Sync (PC vs GitHub Research)
+
+**Project:** LUCA-AI (LUCA AI agent system, PraisonAI, computer-use, goblin helpers, heartbeat, vite frontend)
+**Path:** C:\Projetos\LUCA-AI
+**Branch:** main (push: origin)
+**Generated:** 2026-06-02 11:42:57
+**State:** docs | Pre-rebase state: docs | Ahead/Behind post: +0 / -0
 
 ## Executive Summary
+Batch safe commit for projects with 24h activity (file mods, commits, dirty tree, or agent-driven patch/changelog touches). Research performed locally via git (fetch, rev-list, diff, status, stash/rebase) comparing current PC working tree + HEAD against GitHub remote (origin/main).
 
-Part of 18-project safe sync batch (highest change + interesting parallel work: dashboards, backends, multi-file refactors). LUCA-AI (https://github.com/LucasOl1337/LUCA-AI.git on **main**) had 18 uncommitted files.
+This snapshot captures all local mutations since last synced safe commit (typically 05-31). Includes work from parallel agent sessions (Grok, Claude, sub-agents, /loop etc.). Conflicts (if any during rebase to integrate latest GitHub) were resolved preferring **--ours (PC/local version)** to preserve the authoritative state on this machine.
 
-Prior: "dirty safe commit" + grokassets/. Current: new Cerrado natural Brazilian biome theme hook, cyber LucaOwl component with animations/ECG, new LandingPage, server/index.js updates, tailwind config, .claude/ artifact, COMPUTER_USE_SETUP.md + related goblin helpers.
+Key stats: 24h commits present=no, dirty=yes, stashed=True, rebased=False, conflicts-resolved=False, rebase-aborted=False.
 
-**Key accomplishments by parallel agents:**
-- New `hooks/useTheme.tsx` (LucaTheme "Cerrado" palette: pergaminho/cream + verde floresta + sienna/gold + navy + fleet/alive accents; full tokens for void/surface/text/ok/error).
-- New `src/components/LucaOwl.tsx`: Real cyber-owl.jpg image in circular frame with ciano halo, rotating ice rings (SVG animate-spiral), ECG pulse overlay, breathe anim — alive/dead states.
-- New `src/pages/LandingPage.tsx`: Framer motion landing with theme, owl, mission/supervisor/agents/db/heartbeat status, navigation cards.
-- `server/index.js` + related (config, router-client, heartbeat): updates for agentic runtime, 9router/GLM, Maestro model, WS, global chat, PraisonAI integration.
-- Tailwind + postcss/vite configs aligned to new theme.
-- `.claude/launch.json` + COMPUTER_USE_SETUP.md + goblin helpers (ULTRA_MINIMAL_PASTE.txt, PASTE_ME..., computer-use scripts) for "Goblin no Paint" computer-use skill.
-- grokassets/ full (consistent batch).
-- Existing: heartbeat-report.json, PraisonAI/, Agentes/ docs.
+## Local PC vs GitHub Comparison (Post-Reconciliation Research)
 
-Synthesized: "new theme hook + owl component + landing in LUCA" + computer-use goblin tooling + agentic server polish. Fits "Has .claude artifact".
+| Aspect | PC (Local) | GitHub (origin) | Notes |
+|--------|------------|---------------------|-------|
+| HEAD | c07c331 | c07c331 | Post-rebase if applied |
+| Branch tracking | main | origin/main | |
+| Ahead / Behind | +0 | -0 | 0/0 ideal after rebase |
+| Working tree | dirty (24 lines) | (remote clean by definition) | Uncommitted on PC |
+| Unique commits (24h) | 0 listed | See div below | |
+| Divergence PC-only commits | 0 | - | These + uncommitted = what we commit |
+| Divergence GH-only | - | 0 | Integrated via rebase (or ignored if aborted) |
 
-## Local vs Remote Comparison
+### Commits unique to PC (will be part of this safe commit or already in HEAD)
+(none - all local work is uncommitted or already matched)
 
-| Item                  | Value |
-|-----------------------|-------|
-| Branch                | main |
-| Local HEAD            | b6f80072438d2618c7a0defdc02feaf4ac6cbe8e ("2026-05-29+dirty safe commit") |
-| Remote HEAD           | b6f8007... (primary) + other branches in FETCH (master, v2-cyberpunk-rural) |
-| Working Tree          | DIRTY (18 uncommitted per prompt: server/index.js, src/components/LucaOwl.tsx, hooks/useTheme.tsx [src/hooks], pages/LandingPage.tsx, tailwind*, .claude/, COMPUTER_USE_SETUP.md + migration remnants + more) |
-| Ahead / Behind        | 0/0 at HEAD; dirty WD |
-| Sync Status           | IN SYNC at last dirty safe commit. FETCH shows multiple remote branches. .git/logs short (clone + 2 dirty safes). |
-| Notes                 | .git/config standard origin. No custom branch (contrast Sennin). |
+### Commits only on GitHub (fetched, integrated where possible)
+(none - PC was at or ahead of remote at research time)
 
-## Uncommitted Changes Summary
+### Recent 24h local commits (full subjects + relative time)
+  (no new commits in last 24h; changes are uncommitted or from prior)
 
-**Modified:**
-- server/index.js (and server/ dir)
-- src/components/LucaOwl.tsx (new but tracked as mod in count)
-- src/hooks/useTheme.tsx (Cerrado theme)
-- src/pages/LandingPage.tsx (new landing)
-- tailwind.config.js + postcss/vite (theme tokens)
-- .claude/launch.json
-- COMPUTER_USE_SETUP.md + helper .txt/.js files
-- package.json (TS/React deps from prior migration)
-- index.html / public assets
+### Pending uncommitted changes on PC (porcelain post-rebase/pop)
+```
+M changelog.md
+ M grokassets/manifest.json
+ M patchnotes.md
+?? .codegraph/graph-data.json
+?? grokassets/BRAND-USAGE-GUIDELINES.md
+?? grokassets/ONE-PAGE-VISUAL-IDENTITY-SNAPSHOT.md
+?? grokassets/banners/
+?? grokassets/content/
+?? grokassets/icons/
+?? grokassets/logos/primary/horizontal/dark/luca-ai-logo-h-dark.svg
+?? grokassets/motion/
+?? grokassets/prompts/2026-05-31-loop-round10.md
+?? grokassets/prompts/2026-05-31-loop-round11.md
+?? grokassets/prompts/2026-05-31-loop-round4.md
+?? grokassets/prompts/2026-05-31-loop-round6.md
+?? grokassets/prompts/2026-05-31-loop-round8.md
+?? grokassets/prompts/2026-05-31-loop-round9.md
+?? grokassets/prompts/2026-05-31-luca-ai-additional-diorama-cards.md
+?? grokassets/prompts/2026-05-31-luca-ai-agent-performance-diorama.md
+?? grokassets/prompts/2026-05-31-luca-ai-symmetrical-agent-canvas-nav.md
+?? grokassets/prompts/2026-05-31-luca-ai-wes-anderson-diorama-command.md
+?? grokassets/prompts/2026-05-31-luca-ai-youtube-channel-art.md
+?? grokimaginevideos/
+?? luca-codegraph.html
+```
 
-**New/Untracked (artifacts + components):**
-- .claude/ (launch config)
-- Expanded grokassets/
-- tmp-shots/, dist/ updates, PraisonAI tests etc (per count)
+### Diff stat (unstaged work to be snapshotted)
+```
+changelog.md             |  68 +++++++++-----
+ grokassets/manifest.json | 157 ++++++++++++++++++++++++++++++--
+ patchnotes.md            | 232 +++++++++++++++++++++++++++++------------------
+ 3 files changed, 337 insertions(+), 120 deletions(-)
+```
 
-Matches prompt + prior patchnotes (which captured JS->TS migration; this session adds theme/owl/landing/computer-use).
+### Untracked files
+```
+.codegraph/graph-data.json
+grokassets/BRAND-USAGE-GUIDELINES.md
+grokassets/ONE-PAGE-VISUAL-IDENTITY-SNAPSHOT.md
+grokassets/banners/marketing/og-image/luca-ai-og-1200x630.jpg
+grokassets/banners/marketing/pitch-deck/bg-v1.svg
+grokassets/banners/marketing/pitch-deck/bg-v10.svg
+grokassets/banners/marketing/pitch-deck/bg-v11.svg
+grokassets/banners/marketing/pitch-deck/bg-v12.svg
+grokassets/banners/marketing/pitch-deck/bg-v13.svg
+grokassets/banners/marketing/pitch-deck/bg-v14.svg
+grokassets/banners/marketing/pitch-deck/bg-v15.svg
+grokassets/banners/marketing/pitch-deck/bg-v16.svg
+grokassets/banners/marketing/pitch-deck/bg-v17.svg
+grokassets/banners/marketing/pitch-deck/bg-v18.svg
+grokassets/banners/marketing/pitch-deck/bg-v19.svg
+grokassets/banners/marketing/pitch-deck/bg-v2.svg
+grokassets/banners/marketing/pitch-deck/bg-v20.svg
+grokassets/banners/marketing/pitch-deck/bg-v21.svg
+grokassets/banners/marketing/pitch-deck/bg-v22.svg
+grokassets/banners/marketing/pitch-deck/bg-v23.svg
+grokassets/banners/marketing/pitch-deck/bg-v24.svg
+grokassets/banners/marketing/pitch-deck/bg-v25.svg
+grokassets/banners/marketing/pitch-deck/bg-v26.svg
+grokassets/banners/marketing/pitch-deck/bg-v27.svg
+grokassets/banners/marketing/pitch-deck/bg-v28.svg
+grokassets/banners/marketing/pitch-deck/bg-v3.svg
+grokassets/banners/marketing/pitch-deck/bg-v4.svg
+grokassets/banners/marketing/pitch-deck/bg-v5.svg
+grokassets/banners/marketing/pitch-deck/bg-v6.svg
+grokassets/banners/marketing/pitch-deck/bg-v7.svg
+... (truncated)
+```
 
-## File Change Matrix
+### Change categorization (inferred from paths)
+docs: patchnotes.md (1) | untracked-root: .codegraph/graph-data.json, grokassets/BRAND-USAGE-GUIDELINES.md, grokassets/ONE-PAGE-VISUAL-IDENTITY-SNAPSHOT.md... (305) | assets: grokassets/manifest.json, grokassets/BRAND-USAGE-GUIDELINES.md, grokassets/ONE-PAGE-VISUAL-IDENTITY-SNAPSHOT.md... (19) | root: .codegraph/graph-data.json, grokimaginevideos/, luca-codegraph.html (3)
 
-| Category | Files | Tech | Impact |
-|----------|-------|------|--------|
-| Server/Backend | server/index.js + config/router/heartbeat | JS + WS + express | Agentic runtime, 9router/Maestro, heartbeat |
-| Theme Hook | src/hooks/useTheme.tsx | TSX | Cerrado Brazilian biome palette (pergaminho/verde/sienna) |
-| Owl Component | src/components/LucaOwl.tsx | TSX + framer + SVG | Cyber owl with ECG/spirals/halo (real image + anims) |
-| Landing Page | src/pages/LandingPage.tsx | TSX + motion + lucide | New entry with status (mission, agents, db, heartbeat, owl) |
-| Config/Styles | tailwind.config.js + vite/postcss | JS/CSS | Theme colors + fonts + anims (spiral etc) |
-| Computer Use | COMPUTER_USE_SETUP.md + *.js + *.txt | MD/JS | Goblin helpers, ultra minimal paste, setup for Paint skill |
-| Agent Artifact | .claude/launch.json | JSON | VSCode launch for luca-ai (node server.js :4242) |
-| Assets/Docs | grokassets/ + others | Multi | Batch branding + Agentes/ DevDocs |
+### Remotes (full)
+```
+origin	https://github.com/LucasOl1337/LUCA-AI.git (fetch)
+origin	https://github.com/LucasOl1337/LUCA-AI.git (push)
+```
 
-**Total ~18 uncommitted (source + tooling + artifacts).**
+### git fetch output (abridged)
+```
 
-## Categorized Changes
+```
 
-**New Theme + Visual Identity (Cerrado Brazilian):**
-- useTheme: Full LucaTheme interface + context/provider with void/cream, navy/forest greens, gold/sienna, fleet/alive, text variants, borders, ok/error/warning.
-- Tailwind extend: exact matching colors + spiral animations + fonts (Jost display, JP serif).
-- Used in LandingPage + Owl + Layout for consistent natural/light tech aesthetic (vs prior cyber?).
+## Multi-Agent Parallel Work & Conflict Handling
+Many agents (Grok 4.3, Claude, specialized sub-agents, background loops, best-of-n, implement/review loops) operated in parallel across the 23 active projects.
+Observed artifacts: simultaneous edits to patchnotes.md/changelog.md (timestamp ~10:05), .codegraph/ db updates (indexing), source in Kamui/Yume/Terminal/Sennin/simple-ai/VideoGen/LUCA, heavy data/job writes (OmniVoiceDash), recent feature commits (nexarq ~40 commits with detailed feat/fix messages), .bak experiment files, agent handoff mds, heartbeat/state json.
 
-**LucaOwl Component:**
-- Real /public/cyber-owl.jpg in clipped circle with border/glow.
-- Layered SVG: ciano halo blur, dual rotating dashed rings (slow + reverse), ECG pulse line (linearGradient animated? via alive prop).
-- Stars, breathe anim class. Props size/alive.
+Reconciliation strategy used here:
+- git fetch --all to pull latest GitHub (other agents or CI may have pushed).
+- Stash uncommitted PC work.
+- Rebase onto origin/main (preferring GitHub base).
+- On CONFLICT: checkout --ours + add (PC local wins for the snapshot of 'what is on this machine now').
+- Pop stash. This ensures the safe commit represents the authoritative PC reality on top of (or reconciled with) GitHub.
+- If rebase aborted: still proceed with commit of current PC tree (safe, no data loss).
+- Uniform detailed patchnotes + changelog written before the git add -A + commit.
 
-**LandingPage:**
-- Motion fade/stagger entrance.
-- Integrates useLuca state (activeMission, supervisorMode, agents, database count, backendReady, heartbeatMonitor).
-- Owl + status pills (backend, monitor).
-- Mission cards, agent grid, db/heartbeat indicators, gold accents.
-- Nav to other pages.
+No hard unresolvable conflicts left; state includes 'conflict-resolved' or 'rebase-aborted' flags where applicable. Cross-project overlaps (grokassets, AGENTS.md, brand, docs) handled by consistent formatting.
 
-**Server + Agentic Runtime:**
-- Express + WS + 9router calls (GLM), Maestro model, PraisonAI, heartbeat monitor, global chat, conversation partners, closure handling.
-- Config exports for ports/models/agents.
-
-**Computer Use Goblin:**
-- COMPUTER_USE_SETUP.md: Instructions to use ULTRA_MINIMAL_PASTE.txt in fresh convo for "goblin no Paint" skill (computer-use drawing).
-- Helpers: computer-use-goblin-helper*.js, PASTE_ME..., DO_THIS_NOW.txt, QUICKSTART_GOBLIN.
-- Ties to tmp-shots/ for screenshots.
-
-**Artifacts:**
-- .claude/launch.json for debug.
-- grokassets/ (full: visual-bible, icons, logos tailored to LUCA agents/owls/cerrado).
-
-## Multi-Agent Parallel Work Reconciliation
-
-**Batch context:** Highest change count (18 files) alongside ChessCam (10), Kamui (17), simple-ai (30 lines + dashboard), Sennin (7 + json). "dashboards, backends, multi-file refactors". Prior dirty safe + grokassets/ pattern. No hard conflicts.
-
-**Specific files edited by parallel agents this session (LUCA slice):**
-- **hooks/useTheme.tsx + tailwind.config.js + LandingPage.tsx + LucaOwl.tsx:** New Cerrado natural theme (pergaminho + verde floresta + sienna Brazilian biome) + cyber owl visual masterpiece (real photo + layered SVG ECG/spirals/halo/animations) + full motion landing page consuming theme + useLuca state (missions, agents, heartbeat, db). "new theme hook + owl component + landing in LUCA".
-- **server/index.js + server/**: Agent runtime hardening (9router/GLM routing, Maestro model, PraisonAI, WS global chat, heartbeat, config for agents/aliases/models).
-- **COMPUTER_USE_SETUP.md + goblin helpers (multiple .js/.txt):** Complete computer-use "Goblin no Paint" tooling + ultra-minimal paste flow for fresh-convo skill loading (addresses "só carrega em uma conversa nova").
-- **.claude/launch.json:** VSCode debug launch config (node server on 4242).
-- **grokassets/ + public/dist updates:** Batch visual assets (owl/cerrado themed icons/logos/banners in visual-bible).
-
-**Cross-project grokassets pattern:** Identical top-level structure rolled out by agents across all 18 (incl. this, ChessCam chess-green, Kamui Mangekyo red, Sennin Maestro, simple-ai NOVOFLUXO/fluxo, + others). Personalized per project DNA (LUCA = cerrado pergaminho + cyber owl + agentic goblin). See root GROKASSETS-PLAN.md + each project's visual-bible.md. Unifies ecosystem branding.
-
-**Reconciliation notes:**
-- Builds on prior JS->TS migration (captured in old patchnotes) + "2026-05-29 dirty safe commits".
-- Parallel agents added natural Brazilian theme + iconic owl + landing + computer-use goblin layer on top of existing PraisonAI/heartbeat/agent swarm.
-- Synergies in batch: LUCA computer-use goblins + Kamui tethers (for persona/voice) + simple-ai NOVOFLUXO dashboard orchestration + Sennin Maestro whatsapp (via Kamui/Yume) + ChessCam realtime vision. All now grokassets-branded.
-- .claude artifact + COMPUTER_USE_* files are session-specific agent tooling (matches Claude.md instructions in workspace).
-- No conflicts; additive polish to "advanced agentic AI system (PraisonAI, computer-use, goblin helpers)".
-
-**Overall batch synthesis for LUCA:** Agents delivered beautiful Cerrado-themed landing + owl mascot, full theme system, computer-use goblin automation, and server refinements — making LUCA the most visually cohesive + actionable agent platform in the set.
-
-## Special Notes for Branch/Remote
-
-- Branch: main (standard).
-- Remote: https://github.com/LucasOl1337/LUCA-AI.git . FETCH shows extra branches (master, v2-cyberpunk-rural) — note for future.
-- Aligned to last dirty safe (b6f8007). No ahead commits.
-- .claude/ and computer-use docs are local dev artifacts.
-- No push performed.
-
-## Risk Assessment
-
-- **LOW RISK:** Source (JS/TSX/MD/JSON/config), images, no secrets. Theme is additive.
-- **Computer-use:** Relies on fresh convo paste (documented); goblin scripts are helpers.
-- **Visuals:** Real owl.jpg + SVGs — production ready.
-- **Server:** Long-running agentic (heartbeat, 9router) — tested in prior.
-
-## Conclusion for Safe Commit
-
-Complete capture of theme/owl/landing + computer-use + server work by parallel agents.
-
-**Recommended:**
-1. patchnotes.md + changelog.md (this) written + verified.
-2. Stage (include .claude, helpers, grokassets — exclude node_modules/tmp).
-3. Commit: "2026-05-31+dirty safe commit — LUCA Cerrado theme + LucaOwl + Landing + computer-use goblin + server polish + grokassets"
-4. (NO push.)
-
-Delivers polished, ready agent platform result. Batch-safe.
+## Conclusion & Next
+PC version researched and documented vs GitHub. All qualifying mutations (code, docs, data from agent runs, experiments) staged for the **2026-06-02+docs safe commit**.
+Push target: origin (may be backup/safe for non-primary forks or to avoid affecting public upstreams like sub2api).
+See changelog.md for the concise entry. Prior history preserved below the --- marker.
 
 ---
-*Generated 2026-05-31 — deep subagent analysis*
-*References: full reads of owl/theme/landing/server/tailwind/COMPUTER_*/.claude + .git metadata + batch patterns*
-*Part of 18-project (ChessCam realtime, Kamui backend tether, this, Sennin Maestro json/server, simple-ai NOVOFLUXO massive dashboard)*
+Prior patch history (preserved from file before overwrite of top section):
+
+# Patch Notes - 2026-06-02 Safe Sync (PC vs GitHub Research)
+
+**Project:** LUCA-AI (LUCA AI agent system, PraisonAI, computer-use, goblin helpers, heartbeat, vite frontend)
+**Path:** C:\Projetos\LUCA-AI
+**Branch:** main (push: origin)
+**Generated:** 2026-06-02 11:39:05
+**State:** clean | Pre-rebase state: clean | Ahead/Behind post: +0 / -0
+
+## Executive Summary
+Batch safe commit for projects with 24h activity (file mods, commits, dirty tree, or agent-driven patch/changelog touches). Research performed locally via git (fetch, rev-list, diff, status, stash/rebase) comparing current PC working tree + HEAD against GitHub remote (origin/main).
+
+This snapshot captures all local mutations since last synced safe commit (typically 05-31). Includes work from parallel agent sessions (Grok, Claude, sub-agents, /loop etc.). Conflicts (if any during rebase to integrate latest GitHub) were resolved preferring **--ours (PC/local version)** to preserve the authoritative state on this machine.
+
+Key stats: 24h commits present=no, dirty=yes, stashed=True, rebased=False, conflicts-resolved=False, rebase-aborted=False.
+
+## Local PC vs GitHub Comparison (Post-Reconciliation Research)
+
+| Aspect | PC (Local) | GitHub (origin) | Notes |
+|--------|------------|---------------------|-------|
+| HEAD | c07c331 | c07c331 | Post-rebase if applied |
+| Branch tracking | main | origin/main | |
+| Ahead / Behind | +0 | -0 | 0/0 ideal after rebase |
+| Working tree | dirty (22 lines) | (remote clean by definition) | Uncommitted on PC |
+| Unique commits (24h) | 0 listed | See div below | |
+| Divergence PC-only commits | 0 | - | These + uncommitted = what we commit |
+| Divergence GH-only | - | 0 | Integrated via rebase (or ignored if aborted) |
+
+### Commits unique to PC (will be part of this safe commit or already in HEAD)
+(none - all local work is uncommitted or already matched)
+
+### Commits only on GitHub (fetched, integrated where possible)
+(none - PC was at or ahead of remote at research time)
+
+### Recent 24h local commits (full subjects + relative time)
+  (no new commits in last 24h; changes are uncommitted or from prior)
+
+### Pending uncommitted changes on PC (porcelain post-rebase/pop)
+```
+M grokassets/manifest.json
+?? .codegraph/graph-data.json
+?? grokassets/BRAND-USAGE-GUIDELINES.md
+?? grokassets/ONE-PAGE-VISUAL-IDENTITY-SNAPSHOT.md
+?? grokassets/banners/
+?? grokassets/content/
+?? grokassets/icons/
+?? grokassets/logos/primary/horizontal/dark/luca-ai-logo-h-dark.svg
+?? grokassets/motion/
+?? grokassets/prompts/2026-05-31-loop-round10.md
+?? grokassets/prompts/2026-05-31-loop-round11.md
+?? grokassets/prompts/2026-05-31-loop-round4.md
+?? grokassets/prompts/2026-05-31-loop-round6.md
+?? grokassets/prompts/2026-05-31-loop-round8.md
+?? grokassets/prompts/2026-05-31-loop-round9.md
+?? grokassets/prompts/2026-05-31-luca-ai-additional-diorama-cards.md
+?? grokassets/prompts/2026-05-31-luca-ai-agent-performance-diorama.md
+?? grokassets/prompts/2026-05-31-luca-ai-symmetrical-agent-canvas-nav.md
+?? grokassets/prompts/2026-05-31-luca-ai-wes-anderson-diorama-command.md
+?? grokassets/prompts/2026-05-31-luca-ai-youtube-channel-art.md
+?? grokimaginevideos/
+?? luca-codegraph.html
+
+... (older history in git + truncated for readability; use git log -S patchnotes or open full file in editor)
+
+(End of 2026-06-02 augmentation. Full git history has complete trail.)

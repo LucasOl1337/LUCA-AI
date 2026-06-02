@@ -1,8 +1,153 @@
 ﻿{
-  "project": "LUCA-AI",
-  "campaign": "grokassets",
-  "generatedAt": "2026-05-31",
-  "status": "structure-created",
-  "visualTheme": "",
-  "assets": []
+    "project":  "LUCA-AI",
+    "campaign":  "grokassets",
+    "generatedAt":  "2026-05-31 (marketing surface registration batch)",
+    "status":  "structure-created",
+    "visualTheme":  "",
+    "assets":  [
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-card-03.jpg"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-card-04.jpg"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-card-05.jpg"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-additional-06.jpg",
+                       "notes":  "Recovered + organized session asset"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-additional-07.jpg",
+                       "notes":  "Recovered + organized session asset"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-additional-08.jpg",
+                       "notes":  "Recovered + organized session asset"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-additional-09.jpg",
+                       "notes":  "Recovered + organized session asset"
+                   },
+                   {
+                       "promptFile":  "prompts/2026-05-31-luca-ai-wes-anderson-diorama-command.md",
+                       "resolution":  "720p",
+                       "path":  "motion/hero-loops/luca-ai-wes-anderson-diorama-command-16x9-10s-720p.mp4",
+                       "type":  "motion-hero-diorama",
+                       "duration":  "10s",
+                       "notes":  "Wes Anderson symmetrical miniature command theater hero — delightful agent orchestration for presentations"
+                   },
+                   {
+                       "promptFile":  "prompts/2026-05-31-luca-ai-symmetrical-agent-canvas-nav.md",
+                       "resolution":  "720p",
+                       "path":  "motion/navigation-transitions/luca-ai-symmetrical-agent-canvas-nav-16x9-8s-720p.mp4",
+                       "type":  "motion-navigation-canvas",
+                       "duration":  "8s",
+                       "notes":  "Symmetrical agent canvas navigation transition with precise diorama reconfigurations"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-additional-10.jpg",
+                       "notes":  "Recovered + organized session asset"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-additional-11.jpg",
+                       "notes":  "Recovered + organized session asset"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-additional-12.jpg",
+                       "notes":  "Recovered + organized session asset"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-additional-13.jpg",
+                       "notes":  "Recovered + organized session asset"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-additional-14.jpg",
+                       "notes":  "Recovered + organized session asset"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-additional-15.jpg",
+                       "notes":  "Recovered + organized session asset"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-additional-16.jpg",
+                       "notes":  "Recovered + organized session asset"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-additional-17.jpg",
+                       "notes":  "Recovered + organized session asset"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-additional-18.jpg",
+                       "notes":  "Recovered + organized session asset"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-additional-19.jpg",
+                       "notes":  "Recovered + organized session asset"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-additional-20.jpg",
+                       "notes":  "Recovered + organized session asset"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-additional-21.jpg",
+                       "notes":  "Recovered + organized session asset"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-additional-22.jpg",
+                       "notes":  "Recovered + organized session asset"
+                   },
+                   {
+                       "type":  "agent-diorama",
+                       "path":  "content/characters/luca-agent-diorama-additional-23.jpg",
+                       "notes":  "Recovered + organized session asset"
+                   },
+                   {
+                       "promptFile":  "prompts/2026-05-31-luca-ai-agent-performance-diorama.md",
+                       "resolution":  "720p",
+                       "path":  "motion/feature-demos/luca-ai-agent-performance-diorama-16x9-8s-720p.mp4",
+                       "type":  "motion-agent-performance",
+                       "duration":  "8s",
+                       "notes":  "Symmetrical Wes Anderson miniature stage with agent orbs performing precise synchronized missions — agent performance feature demo"
+                   },
+                   {
+                       "type":  "youtube-hero",
+                       "path":  "banners/youtube-channel/luca-ai-youtube-hero-20260531.jpg",
+                       "notes":  "Fresh 16:9 hero-poster migrated from grokimaginevideos - primary YouTube channel art surface"
+                   },
+                   {
+                       "type":  "vertical-reel-thumb",
+                       "path":  "content/thumbnails/luca-ai-reels-thumb-20260531.jpg",
+                       "notes":  "9:16 vertical reel thumbnail - social/Shorts marketing surface"
+                   }
+               ],
+    "recommended_next_assets":  [
+                                    "YouTube-channel-art (2560x1440) — Wes Anderson symmetrical diorama command theater with multiple agent miniatures on a beautiful miniature set — highest priority",
+                                    "Instagram + LinkedIn + more X variants (complete social surfaces in navy/pastel palette)",
+                                    "Additional agent diorama cards (more characters, different missions, symmetrical compositions)",
+                                    "Light-mode / presentation-safe variants of existing dioramas and pitch assets",
+                                    "Hero-desktop (1920x1080) in the full Wes Anderson miniature lab style",
+                                    "More UI mockups of the symmetrical agent canvas in use"
+                                ]
 }

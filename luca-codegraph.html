@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>LUCA-AI • CodeGraph</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<style>
+  :root {
+    --navy: #0B1F3A;
+    --fleet: #1E4E8C;
+    --gold: #C9A227;
+    --cream: #EDE7D9;
+    --void: #061426;
+    --text: #F8FAFC;
+    --muted: #94A3B8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--void);
+    color: var(--text);
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    overflow: hidden;
+  }
+  #header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    background: linear-gradient(180deg, var(--navy), var(--void));
+    border-bottom: 1px solid rgba(201,162,39,.2);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    z-index: 100;
+    gap: 16px;
+  }
+  #header h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: .5px;
+    color: var(--gold);
+  }
+  #header .stats {
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: 8px;
+  }
+  #controls {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  input, button, select {
+    background: #0F2A4A;
+    border: 1px solid rgba(201,162,39,.25);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    outline: none;
+  }
+  input { width: 260px; }
+  button {
+    cursor: pointer;
+    transition: all .1s ease;
+  }
+  button:hover { background: var(--fleet); border-color: var(--gold); }
+  .legend {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  #graph {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 280px;
+    bottom: 0;
+    background: #050D1A;
+  }
+  #sidebar {
+    position: fixed;
+    top: 56px;
+    right: 0;
+    width: 280px;
+    bottom: 0;
+    background: var(--navy);
+    border-left: 1px solid rgba(201,162,39,.15);
+    padding: 16px;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  #sidebar h3 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    color: var(--gold);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .detail {
+    background: #0A1F36;
+    border: 1px solid rgba(201,162,39,.15);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .detail-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .detail-value { margin-top: 3px; word-break: break-word; }
+  .kind-badge {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    margin-right: 6px;
+  }
+  .empty { color: var(--muted); font-style: italic; padding: 20px 0; text-align: center; }
+  #status {
+    position: fixed;
+    bottom: 12px;
+    left: 20px;
+    font-size: 11px;
+    color: var(--muted);
+    background: rgba(6,20,38,.8);
+    padding: 4px 10px;
+    border-radius: 4px;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="header">
+  <h1>LUCA-AI</h1>
+  <div style="font-size:13px; color:#C9A227; font-weight:500;">CodeGraph</div>
+  <div class="stats" id="stats"></div>
+
+  <div id="controls">
+    <input id="search" type="text" placeholder="Buscar função, rota ou arquivo...">
+    <select id="kindFilter">
+      <option value="">Todos os tipos</option>
+      <option value="function">function</option>
+      <option value="route">route</option>
+      <option value="file">file</option>
+      <option value="interface">interface</option>
+      <option value="class">class</option>
+      <option value="method">method</option>
+    </select>
+    <button onclick="resetView()">Reset View</button>
+    <button onclick="togglePhysics()">Toggle Physics</button>
+    <button onclick="exportPNG()">PNG</button>
+  </div>
+</div>
+
+<div id="graph"></div>
+
+<div id="sidebar">
+  <h3>Detalhes do Nó</h3>
+  <div id="details">
+    <div class="empty">Clique em um nó no grafo para ver informações detalhadas.</div>
+  </div>
+
+  <h3 style="margin-top:24px">Legenda</h3>
+  <div class="legend" id="legend"></div>
+
+  <h3 style="margin-top:24px">Estatísticas</h3>
+  <div id="sidebarStats" style="font-size:12px; color:#94A3B8; line-height:1.6"></div>
+</div>
+
+<div id="status">Carregando grafo do CodeGraph...</div>
+
+<script>
+// Data will be loaded from graph-data.json
+let network = null;
+let allNodes = [];
+let allEdges = [];
+let physicsEnabled = true;
+
+const KIND_COLORS = {
+  'function': '#7FB3D5',
+  'route': '#C9A227',
+  'file': '#4A5A6A',
+  'interface': '#43d18a',
+  'class': '#b58cff',
+  'method': '#E07A5F',
+  'default': '#6B7280'
+};
+
+async function loadData() {
+  const res = await fetch('./.codegraph/graph-data.json');
+  const data = await res.json();
+  
+  allNodes = data.nodes;
+  allEdges = data.edges;
+
+  document.getElementById('stats').innerHTML = 
+    `${data.stats.exportedNodes} nós • ${data.stats.exportedEdges} arestas <span style="opacity:.5">(${data.stats.totalNodesInDB} total no DB)</span>`;
+
+  document.getElementById('sidebarStats').innerHTML = `
+    Nós exportados: <strong>${data.stats.exportedNodes}</strong><br>
+    Arestas exportadas: <strong>${data.stats.exportedEdges}</strong><br>
+    Nós no banco: ${data.stats.totalNodesInDB}<br>
+    Arestas no banco: ${data.stats.totalEdgesInDB}<br>
+    Gerado: ${new Date(data.stats.generatedAt).toLocaleString('pt-BR')}
+  `;
+
+  buildLegend();
+  renderGraph();
+  document.getElementById('status').textContent = 'Grafo interativo pronto • 670 nós / 1.689 arestas no índice completo';
+}
+
+function buildLegend() {
+  const container = document.getElementById('legend');
+  container.innerHTML = '';
+  Object.entries(KIND_COLORS).forEach(([kind, color]) => {
+    if (kind === 'default') return;
+    const div = document.createElement('div');
+    div.className = 'legend-item';
+    div.innerHTML = `<span class="legend-dot" style="background:${color}"></span> ${kind}`;
+    container.appendChild(div);
+  });
+}
+
+function renderGraph(filteredNodes = null, filteredEdges = null) {
+  const container = document.getElementById('graph');
+  container.innerHTML = '';
+
+  const nodesData = (filteredNodes || allNodes).map(n => ({
+    id: n.id,
+    label: n.label.length > 28 ? n.label.slice(0,26) + '…' : n.label,
+    title: `${n.kind}: ${n.label}\n${n.file || ''}:${n.line || ''}`,
+    color: {
+      background: KIND_COLORS[n.kind] || KIND_COLORS.default,
+      border: '#fff',
+      highlight: { background: '#fff', border: KIND_COLORS[n.kind] || KIND_COLORS.default }
+    },
+    font: { color: '#0B1F3A', size: 12, face: 'Inter, system-ui' },
+    shape: n.kind === 'route' ? 'diamond' : (n.kind === 'file' ? 'box' : 'dot'),
+    size: n.kind === 'route' ? 22 : (n.kind === 'file' ? 16 : 14),
+    kind: n.kind,
+    file: n.file,
+    line: n.line,
+    signature: n.signature,
+    docstring: n.docstring
+  }));
+
+  const edgesData = (filteredEdges || allEdges).map(e => ({
+    from: e.from,
+    to: e.to,
+    arrows: { to: { enabled: true, scaleFactor: 0.6 } },
+    color: { color: 'rgba(201,162,39,0.25)', highlight: 'rgba(201,162,39,0.7)' },
+    width: 1.2,
+    smooth: { type: 'continuous' }
+  }));
+
+  const data = { nodes: nodesData, edges: edgesData };
+
+  const options = {
+    layout: { improvedLayout: true },
+    physics: {
+      enabled: physicsEnabled,
+      barnesHut: { gravitationalConstant: -18000, centralGravity: 0.3, springLength: 95, springConstant: 0.04, damping: 0.75 },
+      stabilization: { iterations: 180 }
+    },
+    nodes: { borderWidth: 1.5, borderWidthSelected: 3 },
+    edges: { selectionWidth: 2.5 },
+    interaction: { hover: true, tooltipDelay: 80, hideEdgesOnDrag: true, keyboard: true }
+  };
+
+  network = new vis.Network(container, data, options);
+
+  network.on('click', params => {
+    if (params.nodes.length === 1) {
+      const nodeId = params.nodes[0];
+      const node = nodesData.find(n => n.id === nodeId);
+      if (node) showDetails(node);
+    } else {
+      document.getElementById('details').innerHTML = '<div class="empty">Clique em um nó para ver detalhes.</div>';
+    }
+  });
+
+  // Search + filter wiring
+  setupFilters(nodesData);
+}
+
+function setupFilters(nodesData) {
+  const search = document.getElementById('search');
+  const kindFilter = document.getElementById('kindFilter');
+
+  const apply = () => {
+    const term = search.value.toLowerCase().trim();
+    const kind = kindFilter.value;
+
+    const visibleNodes = allNodes.filter(n => {
+      const matchesTerm = !term || 
+        (n.label && n.label.toLowerCase().includes(term)) ||
+        (n.file && n.file.toLowerCase().includes(term)) ||
+        (n.signature && n.signature.toLowerCase().includes(term));
+      const matchesKind = !kind || n.kind === kind;
+      return matchesTerm && matchesKind;
+    });
+
+    const visibleIds = new Set(visibleNodes.map(n => n.id));
+    const visibleEdges = allEdges.filter(e => visibleIds.has(e.from) && visibleIds.has(e.to));
+
+    renderGraph(visibleNodes, visibleEdges);
+  };
+
+  search.oninput = apply;
+  kindFilter.onchange = apply;
+}
+
+function showDetails(node) {
+  const el = document.getElementById('details');
+  const kindColor = KIND_COLORS[node.kind] || KIND_COLORS.default;
+
+  el.innerHTML = `
+    <div class="detail">
+      <div style="margin-bottom:8px">
+        <span class="kind-badge" style="background:${kindColor}22; color:${kindColor}; border:1px solid ${kindColor}44">${node.kind}</span>
+        <strong style="font-size:15px">${node.label}</strong>
+      </div>
+      ${node.signature ? `<div class="detail-label">Assinatura</div><div class="detail-value" style="font-family:ui-monospace, monospace; font-size:12px; color:#C9A227">${node.signature}</div>` : ''}
+      ${node.file ? `<div class="detail-label" style="margin-top:10px">Arquivo</div><div class="detail-value">${node.file}${node.line ? `:${node.line}` : ''}</div>` : ''}
+      ${node.docstring ? `<div class="detail-label" style="margin-top:10px">Descrição</div><div class="detail-value" style="color:#CBD5E1">${node.docstring}</div>` : ''}
+    </div>
+  `;
+}
+
+function resetView() {
+  if (network) {
+    network.fit({ animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+    document.getElementById('search').value = '';
+    document.getElementById('kindFilter').value = '';
+    renderGraph();
+  }
+}
+
+function togglePhysics() {
+  physicsEnabled = !physicsEnabled;
+  if (network) {
+    network.setOptions({ physics: { enabled: physicsEnabled } });
+  }
+}
+
+function exportPNG() {
+  if (!network) return;
+  const canvas = network.canvas.frame.canvas;
+  const link = document.createElement('a');
+  link.download = 'luca-ai-codegraph.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+function init() {
+  loadData().catch(err => {
+    document.getElementById('status').textContent = 'Erro ao carregar .codegraph/graph-data.json — rode o export primeiro.';
+    console.error(err);
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    if (e.key === '/' && document.activeElement.tagName === 'BODY') {
+      e.preventDefault();
+      document.getElementById('search').focus();
+    }
+    if (e.key.toLowerCase() === 'r' && e.metaKey) {
+      e.preventDefault();
+      resetView();
+    }
+  });
+
+  // Initial empty details hint
+  setTimeout(() => {
+    const s = document.getElementById('status');
+    if (s.textContent.includes('Carregando')) s.textContent = 'Pressione / para focar na busca • Clique nos nós';
+  }, 4200);
+}
+
+init();
+</script>
+</body>
+</html>
