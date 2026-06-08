@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" fill="none">
-  <defs>
-    <pattern id="g16" width="151" height="151" patternUnits="userSpaceOnUse">
-      <path d="M 80 0 L 0 0 0 80" fill="none" stroke="#C5A46E" stroke-width="1" opacity="0.185"/>
-    </pattern>
-  </defs>
-  <rect width="1920" height="1080" fill="#0A0C14"/>
-  <rect width="1920" height="1080" fill="url(#g16)"/>
-</svg>

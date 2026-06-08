@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="500" viewBox="0 0 1500 500" fill="none">
-  <rect width="1500" height="500" fill="#0A0C14"/>
-  <g opacity="0.65">
-    <circle cx="550" cy="240" r="142" fill="#C5A46E" opacity="0.12"/>
-  </g>
-  <text x="750" y="310" font-family="system-ui, sans-serif" font-size="38" fill="#F5F0E6" opacity="0.55" text-anchor="middle">LUCA-AI</text>
-</svg>

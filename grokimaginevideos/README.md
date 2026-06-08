@@ -41,7 +41,6 @@ Auto-generated high-quality marketing videos and motion assets for the LUCA-AI e
 - All assets adhere strictly to the LUCA-AI visual bible: Wes Anderson symmetry and meticulous composition, miniature diorama command theater, deep Admiralty Navy (#0B1F3A) + Royal Fleet Blue (#1E4E8C) + Officer White (#F8FAFC) + sophisticated pastels, delightful precision and elegant control.
 - Typography: clean, slightly playful but professional sans with excellent symmetry and spacing. Portuguese text feels refined and cinematic.
 - These marketing videos and stills are designed for sophisticated external positioning: pitch decks, website hero sections, social campaigns, Obsidian/agent community showcases, and any context where "beautiful, precise agent orchestration" needs to be communicated with delight rather than raw power.
-- Existing motion assets in `grokassets/motion/` (wes-anderson-diorama-command hero loop and symmetrical-agent-canvas navigation) complement this library for UI and presentation use cases.
 
 Next execution of the loop will process the next project in the queue (MoneyPrinterTurbo).
 
