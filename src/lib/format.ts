@@ -1,7 +1,8 @@
 import type { ChatMessage } from './types';
+import { formatBrazilTime } from '../../shared/time.js';
 
 export function timestamp(): string {
-  return new Date().toLocaleTimeString('pt-BR', { hour12: false });
+  return formatBrazilTime();
 }
 
 export function formatMissionRuntime(activatedAt?: string): string {

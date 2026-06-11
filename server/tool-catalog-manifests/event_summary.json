@@ -1,0 +1,29 @@
+{
+  "id": "event_summary",
+  "name": "Resumo de Eventos",
+  "description": "Consolida o feed persistido de eventos em um resumo operacional com latest, contagens por tipo e origem.",
+  "category": "runtime",
+  "kind": "catalog",
+  "provider": "luca",
+  "capabilities": ["observability", "events", "reporting"],
+  "tags": ["events", "summary", "trace"],
+  "prompt_instruction": "Use para validar rapidamente o estado operacional recente ou inspecionar um missionId/traceId sem percorrer o feed bruto inteiro.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "type": { "type": "string", "description": "filtro opcional por tipo de evento" },
+      "missionId": { "type": "string", "description": "filtro opcional por missao" },
+      "goalId": { "type": "string", "description": "filtro opcional por goal" },
+      "traceId": { "type": "string", "description": "filtro opcional por trilha correlacionada" },
+      "limit": { "type": "integer", "description": "janela amostral maxima usada no resumo" }
+    }
+  },
+  "invoke": {
+    "type": "http",
+    "method": "GET",
+    "endpoint": "/api/events/summary"
+  },
+  "executable": true,
+  "availability": "both",
+  "source": "tars-event-summary-pattern"
+}

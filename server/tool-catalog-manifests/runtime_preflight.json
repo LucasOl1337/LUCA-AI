@@ -1,0 +1,23 @@
+{
+  "id": "runtime_preflight",
+  "name": "Preflight Operacional",
+  "description": "Executa uma checagem rápida de readiness antes de missão live, validando endpoints críticos e lock de concorrência.",
+  "category": "runtime",
+  "kind": "catalog",
+  "provider": "luca",
+  "capabilities": ["preflight", "health", "readiness"],
+  "tags": ["preflight", "health", "mission"],
+  "prompt_instruction": "Use antes de abrir missão viva ou acionar GLM quando precisar confirmar que health, state, events e governança estão coerentes.",
+  "parameters": {
+    "type": "object",
+    "properties": {}
+  },
+  "invoke": {
+    "type": "http",
+    "method": "GET",
+    "endpoint": "/api/preflight"
+  },
+  "executable": true,
+  "availability": "local",
+  "source": "kamui-service-health-pattern"
+}

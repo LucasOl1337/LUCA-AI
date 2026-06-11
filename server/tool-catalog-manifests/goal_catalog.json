@@ -1,0 +1,25 @@
+{
+  "id": "goal_catalog",
+  "name": "Consultar Goals",
+  "description": "Consulta a fila de goals persistidos no runtime cloud e seus budgets/status.",
+  "category": "goals",
+  "kind": "catalog",
+  "provider": "luca",
+  "capabilities": ["goal", "status", "discovery"],
+  "tags": ["goal", "catalog", "runtime"],
+  "prompt_instruction": "Use para revisar objetivos abertos, executando ou concluídos sem abrir o estado bruto.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "status": { "type": "string", "description": "filtro opcional por status do goal" }
+    }
+  },
+  "invoke": {
+    "type": "http",
+    "method": "GET",
+    "endpoint": "/api/goals"
+  },
+  "executable": true,
+  "availability": "cloud",
+  "source": "tars-goals-pattern"
+}

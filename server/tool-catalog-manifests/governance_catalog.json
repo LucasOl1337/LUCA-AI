@@ -1,0 +1,23 @@
+{
+  "id": "governance_catalog",
+  "name": "Consultar Governanca",
+  "description": "Lê a politica operacional do runtime cloud, incluindo budgets padrao e alerta de missao concorrente.",
+  "category": "runtime",
+  "kind": "catalog",
+  "provider": "luca",
+  "capabilities": ["governance", "policy", "runtime"],
+  "tags": ["governance", "policy", "tars"],
+  "prompt_instruction": "Use antes de mutar producao ou abrir missao live para checar budgets, bloqueios e concorrencia recente.",
+  "parameters": {
+    "type": "object",
+    "properties": {}
+  },
+  "invoke": {
+    "type": "http",
+    "method": "GET",
+    "endpoint": "/api/governance"
+  },
+  "executable": true,
+  "availability": "cloud",
+  "source": "tars-governance-pattern"
+}

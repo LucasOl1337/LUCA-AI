@@ -1,0 +1,28 @@
+{
+  "id": "yume_memory_event_preview",
+  "name": "Preview Memoria Yume",
+  "description": "Gera um payload MemoryEventIn a partir do relatorio e evidencias da missao atual ou arquivada.",
+  "category": "pontes",
+  "kind": "bridge",
+  "provider": "luca+yume",
+  "capabilities": ["memory", "evidence", "reporting", "bridge"],
+  "tags": ["yume", "memory", "evidence"],
+  "prompt_instruction": "Use antes de sincronizar conhecimento de uma missao LUCA no Yume; revise o payload e evite enviar transcript bruto.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "missionId": {
+        "type": "string",
+        "description": "id opcional da missao arquivada; vazio usa a missao ativa quando existir"
+      }
+    }
+  },
+  "invoke": {
+    "type": "http",
+    "method": "GET",
+    "endpoint": "/api/integrations/yume/memory-event"
+  },
+  "executable": true,
+  "availability": "local",
+  "source": "yume-hybrid-memory-contract"
+}

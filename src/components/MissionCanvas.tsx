@@ -4,13 +4,18 @@ import { useLuca } from '@/hooks/useLucaState';
 import { isOperationalCanvas, resolveBlocks } from '@/lib/canvas';
 import LucaOwl from './LucaOwl';
 import DashboardBlock from './DashboardBlock';
+import ReportModal from './ReportModal';
 
 export default function MissionCanvas() {
   const theme = useTheme();
-  const { temporaryDashboard, activeMission, backendReady } = useLuca();
+  const { temporaryDashboard, activeMission, backendReady, state } = useLuca();
+  const run = state?.activeRun as { status?: string; verifier?: { approved?: boolean; reason?: string } } | null;
+  const rejected = run?.status === 'needs_revision' || run?.status === 'failed' || run?.verifier?.approved === false;
+  const chatOnly = run?.status === 'chat_completed';
 
-  // Só exibe canvas de resultado se for conteúdo "público" (não operacional).
-  const display = temporaryDashboard && !isOperationalCanvas(temporaryDashboard) ? temporaryDashboard : null;
+  // Mantém o relatório visível mesmo quando há necessidade de revisão.
+  const reportDashboard = temporaryDashboard && !isOperationalCanvas(temporaryDashboard) ? temporaryDashboard : null;
+  const display = reportDashboard;
 
   return (
     <div className="void-panel rounded-2xl flex flex-col h-full overflow-hidden">
@@ -21,6 +26,21 @@ export default function MissionCanvas() {
         <span className="text-[10px]" style={{ color: theme.textMute }}>
           {activeMission ? (activeMission.title ?? 'missão ativa') : 'aguardando missão'}
         </span>
+        {reportDashboard && (
+          <div className="flex items-center gap-2">
+            <ReportModal
+              dashboard={reportDashboard}
+              mission={activeMission}
+              reportContext={{
+                finalReport: state?.activeRun?.finalReport ?? null,
+                chatMessages: state?.globalChatMessages ?? [],
+                runStatus: state?.activeRun?.status ?? null,
+                governance: state?.heartbeatMonitor?.governance ?? state?.governance ?? null,
+                heartbeatMonitor: state?.heartbeatMonitor ?? null,
+              }}
+            />
+          </div>
+        )}
       </header>
 
       <div className="flex-1 overflow-y-auto">
@@ -32,6 +52,28 @@ export default function MissionCanvas() {
               {display.subtitle && (
                 <p className="text-sm mt-1" style={{ color: theme.textMute }}>{display.subtitle}</p>
               )}
+              {rejected && (
+                <div
+                  className="mt-3 rounded-xl px-3 py-2 text-xs"
+                  style={{ color: theme.error, background: theme.errorBg, border: `1px solid ${theme.error}` }}
+                >
+                  {run?.verifier?.reason || 'O verificador pediu revisão, mas o canvas foi preservado para auditoria.'}
+                </div>
+              )}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <ReportModal
+                  dashboard={display}
+                  mission={activeMission}
+                  reportContext={{
+                    finalReport: state?.activeRun?.finalReport ?? null,
+                    chatMessages: state?.globalChatMessages ?? [],
+                    runStatus: state?.activeRun?.status ?? null,
+                    governance: state?.heartbeatMonitor?.governance ?? state?.governance ?? null,
+                    heartbeatMonitor: state?.heartbeatMonitor ?? null,
+                  }}
+                  buttonClassName="btn-fleet !px-4 !py-2 text-[11px] flex items-center gap-2"
+                />
+              </div>
             </div>
             <motion.div
               initial="hidden"
@@ -48,6 +90,39 @@ export default function MissionCanvas() {
                 </motion.div>
               ))}
             </motion.div>
+          </div>
+        ) : rejected ? (
+          <div className="h-full flex flex-col items-center justify-center text-center px-6 py-8">
+            <div className="void-panel rounded-xl p-5 max-w-lg" style={{ borderColor: theme.error }}>
+              <span className="state-badge error">revisão necessária</span>
+              <h2 className="void-title text-lg mt-3">Canvas não aprovado</h2>
+              <p className="text-sm mt-2 leading-relaxed" style={{ color: theme.textMute }}>
+                {run?.verifier?.reason || 'O verificador bloqueou esta saída. Ajuste o briefing ou use um pedido de chat quando não houver necessidade de canvas.'}
+              </p>
+              {reportDashboard && (
+                <div className="mt-4 flex justify-center">
+                  <ReportModal
+                    dashboard={reportDashboard}
+                    mission={activeMission}
+                    reportContext={{
+                      finalReport: state?.activeRun?.finalReport ?? null,
+                      chatMessages: state?.globalChatMessages ?? [],
+                      runStatus: state?.activeRun?.status ?? null,
+                      governance: state?.heartbeatMonitor?.governance ?? state?.governance ?? null,
+                      heartbeatMonitor: state?.heartbeatMonitor ?? null,
+                    }}
+                    buttonClassName="btn-fleet !px-4 !py-2 text-[11px] flex items-center gap-2"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        ) : chatOnly ? (
+          <div className="h-full flex flex-col items-center justify-center text-center px-6 py-8">
+            <LucaOwl size={120} alive={backendReady} />
+            <p className="text-sm mt-4 max-w-sm leading-relaxed" style={{ color: theme.textMute }}>
+              Pedido tratado como chat. A resposta está no painel de comunicação.
+            </p>
           </div>
         ) : (
           // Estado ocioso — medalhão compacto (o herói grande está no topo da página).

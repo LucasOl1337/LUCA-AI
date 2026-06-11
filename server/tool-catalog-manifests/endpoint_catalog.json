@@ -1,0 +1,23 @@
+{
+  "id": "endpoint_catalog",
+  "name": "Catalogo de Endpoints",
+  "description": "Entrega o contrato navegavel das rotas operacionais do LUCA, espelhando o estilo de mapeamento do TARS.",
+  "category": "docs",
+  "kind": "catalog",
+  "provider": "luca",
+  "capabilities": ["docs", "contract", "discovery"],
+  "tags": ["catalog", "endpoints"],
+  "prompt_instruction": "Use para consultar rapidamente o que o runtime expõe e o que ele aceita receber.",
+  "parameters": {
+    "type": "object",
+    "properties": {}
+  },
+  "invoke": {
+    "type": "http",
+    "method": "GET",
+    "endpoint": "/api/catalog/endpoints"
+  },
+  "executable": true,
+  "availability": "both",
+  "source": "tars-tool-catalog-pattern"
+}

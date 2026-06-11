@@ -55,6 +55,7 @@ test('classifyMissionIntent: dashboard_build por padrao', () => {
 test('missionRequestsAllAgents e julgamento', () => {
   assert.equal(missionRequestsAllAgents({ description: 'todos os agentes devem contar uma piada' }), true);
   assert.equal(missionNeedsSupervisorJudgment({ description: 'escolha a melhor piada', success: 'eleger vencedor' }), true);
+  assert.equal(missionNeedsSupervisorJudgment({ description: 'gerar ranking de apolices por valor segurado' }), false);
   assert.equal(missionNeedsSupervisorJudgment({ description: 'apenas conversem' }), false);
 });
 
@@ -129,6 +130,20 @@ test('buildDeterministicClosureReview exige veredito do supervisor em missao de 
     ],
   });
   assert.equal(approved.verdict, 'approved');
+});
+
+test('buildDeterministicClosureReview aceita veredito rotulado do supervisor em caso Sompo', () => {
+  const review = buildDeterministicClosureReview({
+    mission: { description: 'pesquisador, planejador e supervisor devem decidir a primeira acao', success: 'fechar com veredito, proxima acao e pendencia critica' },
+    agents: enabledRoster,
+    chatMessages: [
+      { agentId: 'planejador', type: 'acao', content: 'Prioridade: alta. Acao imediata: vistoria. Dono sugerido: underwriting.' },
+      { agentId: 'pesquisador', type: 'resultado', content: 'Evidencia: telemetria e CSV. Lacuna critica: sem dado financeiro. Risco principal: subprecificacao.' },
+      { agentId: 'supervisor', type: 'decisao', content: 'Veredito: Avancar com analise tecnica e segurar emissao. Proxima acao: cobrar dados financeiros. Pendencia critica: importancia segurada.' },
+    ],
+    closureContext: { type: 'chat_only', proposedStatus: 'completed' },
+  });
+  assert.equal(review.verdict, 'approved');
 });
 
 test('mergeClosureReviews aplica precedencia correta', () => {

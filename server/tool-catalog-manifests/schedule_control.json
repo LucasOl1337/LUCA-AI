@@ -1,0 +1,34 @@
+{
+  "id": "schedule_control",
+  "name": "Controle de Agenda",
+  "description": "Cria ou altera agendamentos recorrentes de missao sem acessar o estado bruto manualmente.",
+  "category": "agenda",
+  "kind": "action",
+  "provider": "luca",
+  "capabilities": ["schedule", "queue", "recorrencia"],
+  "tags": ["schedule", "queue"],
+  "prompt_instruction": "Use para operar a fila recorrente de missoes e ajustar cadencia.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "mode": { "type": "string", "enum": ["create", "pause", "resume", "cancel"], "description": "operacao de agenda" },
+      "scheduleId": { "type": "string", "description": "id do agendamento quando aplicavel" },
+      "description": { "type": "string", "description": "descricao da missao quando mode=create" },
+      "intervalValue": { "type": "integer", "description": "valor do intervalo quando mode=create" },
+      "intervalUnit": { "type": "string", "enum": ["minutes", "hours", "days"], "description": "unidade do intervalo" }
+    },
+    "required": ["mode"]
+  },
+  "invoke": {
+    "type": "http-multi",
+    "endpoints": {
+      "create": "/api/mission/schedule",
+      "pause": "/api/schedule/pause",
+      "resume": "/api/schedule/resume",
+      "cancel": "/api/schedule/cancel"
+    }
+  },
+  "executable": true,
+  "availability": "local",
+  "source": "tars-tool-catalog-pattern"
+}

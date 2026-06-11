@@ -1,0 +1,29 @@
+{
+  "id": "agent_run",
+  "name": "Executar Agente",
+  "description": "Dispara um agente ou persona importada para contribuir com a missao ativa.",
+  "category": "agentes",
+  "kind": "action",
+  "provider": "luca",
+  "capabilities": ["agent", "persona", "execucao-manual"],
+  "tags": ["agent", "persona", "manual"],
+  "prompt_instruction": "Use para forcar uma contribuicao de um agente especifico sem esperar o proximo ciclo automatico.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "agentId": {
+        "type": "string",
+        "description": "id do agente builtin ou persona importada"
+      }
+    },
+    "required": ["agentId"]
+  },
+  "invoke": {
+    "type": "http",
+    "method": "POST",
+    "endpoint": "/api/agent/run"
+  },
+  "executable": true,
+  "availability": "local",
+  "source": "tars-tool-catalog-pattern"
+}

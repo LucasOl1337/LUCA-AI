@@ -1,0 +1,32 @@
+{
+  "id": "goal_create",
+  "name": "Criar Goal",
+  "description": "Registra um objetivo persistido no runtime cloud com definition of done e limites operacionais.",
+  "category": "goals",
+  "kind": "action",
+  "provider": "luca",
+  "capabilities": ["goal", "budget", "planning"],
+  "tags": ["goal", "runtime", "tars"],
+  "prompt_instruction": "Use para abrir uma trilha de trabalho persistida e rastreavel sem disparar uma missao viva.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "title": { "type": "string", "description": "nome curto do objetivo" },
+      "description": { "type": "string", "description": "contexto operacional do objetivo" },
+      "definitionOfDone": { "type": "string", "description": "critério de saída objetivo" },
+      "priority": { "type": "integer", "description": "prioridade de 1 a 9" },
+      "maxIterations": { "type": "integer", "description": "limite de iterações" },
+      "maxSeconds": { "type": "integer", "description": "limite de tempo em segundos" },
+      "maxToolCalls": { "type": "integer", "description": "limite de chamadas operacionais" }
+    },
+    "required": ["title"]
+  },
+  "invoke": {
+    "type": "http",
+    "method": "POST",
+    "endpoint": "/api/goals"
+  },
+  "executable": true,
+  "availability": "cloud",
+  "source": "tars-goals-pattern"
+}

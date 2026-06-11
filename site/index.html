@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="LUC.AI e um centro operacional para coordenar agentes de IA, transformar missoes em canvas executivos e manter supervisor, heartbeat, database e personas em sincronia."
+    />
+    <meta property="og:title" content="LUC.AI - Operations Command" />
+    <meta
+      property="og:description"
+      content="Um command theater para missoes com agentes: Supervisor, Maestro, Planejador, Pesquisador, Designer, Database, Heartbeat e personas do Yume via Kamui."
+    />
+    <meta property="og:image" content="/screenshot.jpeg" />
+    <link rel="icon" href="/assets/brand-icon.svg" />
+    <title>LUC.AI - Operations Command</title>
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="topbar" aria-label="Navegacao principal">
+        <a class="brand-lockup" href="#top" aria-label="LUC.AI inicio">
+          <img src="/assets/luca-ai-logo.svg" alt="LUC.AI" />
+        </a>
+        <nav class="nav-links" aria-label="Secoes">
+          <a href="#como-funciona">Como funciona</a>
+          <a href="#recursos">Recursos</a>
+          <a href="#workflow">Workflow</a>
+        </nav>
+        <a class="topbar-cta" href="#cta">Entrar no comando</a>
+      </header>
+
+      <main id="top">
+        <section class="hero" aria-labelledby="hero-title">
+          <div class="hero-copy">
+            <p class="eyebrow">Operations Command para agentes de IA</p>
+            <h1 id="hero-title">LUC.AI transforma missões em execução coordenada.</h1>
+            <p class="hero-lede">
+              Um centro operacional onde Supervisor, Maestro, Planejador, Pesquisador, Designer, Database e Heartbeat trabalham como uma frota: recebem uma missão, conversam no chat global, produzem evidência e montam um canvas executivo em tempo real.
+            </p>
+            <div class="hero-actions" aria-label="Acoes principais">
+              <a class="button primary" href="#workflow">Ver o fluxo</a>
+              <a class="button secondary" href="#recursos">Explorar recursos</a>
+            </div>
+          </div>
+          <div class="hero-visual" aria-label="Command theater LUC.AI">
+            <img class="hero-video" src="/assets/agent-command-theater.jpg" alt="Diorama command theater dos agentes LUC.AI" />
+            <canvas id="hero-canvas" aria-hidden="true"></canvas>
+            <div class="hero-visual-label">
+              <span>Mission deck live</span>
+              <strong>Supervisor + agentes em sincronia</strong>
+            </div>
+            <aside class="hero-status" aria-label="Resumo operacional">
+              <div>
+                <span>Contrato backend</span>
+                <strong>127.0.0.1:4242</strong>
+              </div>
+              <div>
+                <span>Agentes nativos</span>
+                <strong>6 + sistemas</strong>
+              </div>
+              <div>
+                <span>Integração</span>
+                <strong>Kamui / Yume</strong>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="section intro-ribbon" aria-label="Sinal da proxima secao">
+          <div class="ribbon-track">
+            <span>Supervisor interpreta</span>
+            <span>Maestro roteia</span>
+            <span>Agentes contribuem</span>
+            <span>Designer publica canvas</span>
+          </div>
+        </section>
+
+        <section class="section split" id="como-funciona" aria-labelledby="how-title">
+          <div class="section-copy">
+            <p class="eyebrow">Como funciona</p>
+            <h2 id="how-title">Uma missão entra. O sistema cria uma sala de operação.</h2>
+            <p>
+              O LUCA-AI não é só um chat com vários nomes. O backend cria uma missão, abre um run, distribui tarefas, injeta contexto do repositório quando necessário e só fecha quando a entrega passa por revisão de encerramento.
+            </p>
+          </div>
+          <div class="mechanism" aria-label="Fluxo de funcionamento">
+            <div class="mechanism-step">
+              <span>01</span>
+              <h3>Briefing</h3>
+              <p>Uma caixa de missão define objetivo, critério de sucesso e contexto estruturado.</p>
+            </div>
+            <div class="mechanism-step">
+              <span>02</span>
+              <h3>Orquestração</h3>
+              <p>Supervisor liga o ciclo, Maestro roteia e agentes publicam decisões no Chat Global.</p>
+            </div>
+            <div class="mechanism-step">
+              <span>03</span>
+              <h3>Canvas</h3>
+              <p>O Designer transforma contribuições em output executivo, filtrado para não expor ruído operacional.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="section product-stage" aria-labelledby="product-title">
+          <div class="stage-copy">
+            <p class="eyebrow">Produto real</p>
+            <h2 id="product-title">A interface já nasce conectada ao runtime.</h2>
+            <p>
+              A aplicação principal conversa com <code>/api/state</code>, <code>/ws</code>, <code>/api/mission/activate</code>, <code>/api/agent/run</code>, scheduler, heartbeat monitor e importação de personas. A landing usa o mesmo vocabulário visual do dashboard.
+            </p>
+          </div>
+          <figure class="product-frame">
+            <img src="/assets/product-screen.png" alt="Screenshot real do painel operacional LUC.AI" />
+            <figcaption>Screenshot real do painel operacional preservado no repositório.</figcaption>
+          </figure>
+        </section>
+
+        <section class="section features" id="recursos" aria-labelledby="features-title">
+          <div class="section-heading">
+            <p class="eyebrow">Recursos principais</p>
+            <h2 id="features-title">Peças de operação, não promessas vagas.</h2>
+          </div>
+          <div class="feature-grid">
+            <article class="feature-panel wide">
+              <img src="/assets/owl-supervisor.png" alt="" />
+              <div>
+                <h3>Supervisor com fechamento verificável</h3>
+                <p>Ativa ciclos, registra heartbeat, avalia encerramento e evita concluir missões sem contribuição útil dos agentes esperados.</p>
+              </div>
+            </article>
+            <article class="feature-panel">
+              <img src="/assets/mission.png" alt="" />
+              <h3>Missão como unidade de trabalho</h3>
+              <p>Briefing, critérios, contexto do problema, sinais em tempo real e histórico caminham juntos.</p>
+            </article>
+            <article class="feature-panel">
+              <video src="/assets/heartbeat.mp4" autoplay muted loop playsinline></video>
+              <h3>Heartbeat operacional</h3>
+              <p>Monitor local com status fresco, logs próprios e comandos para iniciar, pausar e limpar agentes.</p>
+            </article>
+            <article class="feature-panel">
+              <img src="/assets/database.png" alt="" />
+              <h3>Database e memória de missão</h3>
+              <p>Estado persistido, registros de canvas, chat global, tarefas por agente e fila de missões agendadas.</p>
+            </article>
+            <article class="feature-panel wide image-panel">
+              <img src="/assets/agent-command-theater.jpg" alt="Diorama visual dos agentes LUC.AI em operação" />
+              <div>
+                <h3>Identidade de command theater</h3>
+                <p>O produto trata agentes como pequenas estações de trabalho coordenadas, com visual simétrico e leitura operacional.</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="section differentiators" aria-labelledby="diff-title">
+          <div class="section-heading">
+            <p class="eyebrow">Diferenciais</p>
+            <h2 id="diff-title">Autonomia com trilha de decisão.</h2>
+          </div>
+          <div class="diff-list">
+            <article>
+              <span>Roteamento</span>
+              <h3>Maestro e Transformador de Missão</h3>
+              <p>O sistema pode transformar um pedido em direção operacional antes de acionar Planejador, Pesquisador e Designer.</p>
+            </article>
+            <article>
+              <span>Integração</span>
+              <h3>Personas do Yume via Kamui</h3>
+              <p>LUCA lê personas e system prompts em modo read-only, importa especialistas e mantém cache por versão.</p>
+            </article>
+            <article>
+              <span>Governança</span>
+              <h3>Chat Global e revisão de encerramento</h3>
+              <p>Contribuições ficam visíveis por agente; o Supervisor consolida o resultado e registra por que a missão foi concluída.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="section workflow" id="workflow" aria-labelledby="workflow-title">
+          <div class="workflow-copy">
+            <p class="eyebrow">Workflow</p>
+            <h2 id="workflow-title">Da intenção ao canvas executivo.</h2>
+          </div>
+          <div class="workflow-board" aria-label="Fluxo de uso do LUC.AI">
+            <div class="workflow-item">
+              <span>1</span>
+              <strong>Defina a missão</strong>
+              <p>Ex.: analisar uma dor de negócio, gerar dashboard executivo ou publicar uma decisão.</p>
+            </div>
+            <div class="workflow-item">
+              <span>2</span>
+              <strong>Agentes trabalham</strong>
+              <p>Planejador estrutura, Pesquisador valida premissas, Designer monta o canvas.</p>
+            </div>
+            <div class="workflow-item">
+              <span>3</span>
+              <strong>Supervisor fecha</strong>
+              <p>O run é concluído quando evidência, contribuição e critério de sucesso estão coerentes.</p>
+            </div>
+          </div>
+          <figure class="workflow-visual">
+            <img src="/assets/missions-in-progress.jpg" alt="Diorama de missões de agentes em progresso" />
+          </figure>
+        </section>
+
+        <section class="section use-cases" aria-labelledby="cases-title">
+          <div class="section-heading">
+            <p class="eyebrow">Casos de uso</p>
+            <h2 id="cases-title">Onde o LUC.AI encaixa melhor.</h2>
+          </div>
+          <div class="case-rail">
+            <article>
+              <h3>Diagnóstico executivo</h3>
+              <p>Transformar sintomas de negócio em prioridades, métricas, riscos e próximos passos.</p>
+            </article>
+            <article>
+              <h3>Pesquisa com decisão</h3>
+              <p>Separar evidência, premissa e proxy para que a saída seja defensável.</p>
+            </article>
+            <article>
+              <h3>Operação recorrente</h3>
+              <p>Agendar missões, manter fila e reativar ciclos sem perder contexto.</p>
+            </article>
+            <article>
+              <h3>Especialistas plugáveis</h3>
+              <p>Adicionar personas do Yume como agentes especialistas sem escrever de volta no sistema de origem.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="final-cta" id="cta" aria-labelledby="cta-title">
+          <img src="/assets/ui-mockup-loading.jpg" alt="Mockup visual do core LUC.AI inicializando" />
+          <div>
+            <p class="eyebrow">Pronto para operar localmente</p>
+            <h2 id="cta-title">Abra o centro operacional e dê uma missão real ao esquadrão.</h2>
+            <p>
+              Rode o backend principal com <code>npm run dev:full</code> e use esta landing como porta de entrada premium para apresentar o produto, sua arquitetura e seu visual de comando.
+            </p>
+            <a class="button primary" href="#top">Voltar ao topo</a>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

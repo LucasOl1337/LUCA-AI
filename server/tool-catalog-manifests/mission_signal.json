@@ -1,0 +1,29 @@
+{
+  "id": "mission_signal",
+  "name": "Injetar Sinal",
+  "description": "Empurra um sinal em tempo real para a missao ativa, influenciando a proxima rodada do supervisor.",
+  "category": "missao",
+  "kind": "action",
+  "provider": "luca",
+  "capabilities": ["telemetria", "tempo-real", "contexto"],
+  "tags": ["signal", "realtime", "mission"],
+  "prompt_instruction": "Use para anexar fatos novos ou alertas durante uma missao em curso.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "title": { "type": "string", "description": "nome curto do sinal" },
+      "detail": { "type": "string", "description": "conteudo operacional do sinal" },
+      "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"], "description": "grau de severidade" },
+      "source": { "type": "string", "description": "origem do sinal" }
+    },
+    "required": ["title", "detail"]
+  },
+  "invoke": {
+    "type": "http",
+    "method": "POST",
+    "endpoint": "/api/mission/signal"
+  },
+  "executable": true,
+  "availability": "local",
+  "source": "tars-tool-catalog-pattern"
+}

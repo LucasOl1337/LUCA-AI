@@ -4,6 +4,7 @@ import {
   normalizeAgentEnabled,
   sanitizeAgentModel,
 } from './config.js';
+import { formatBrazilTime } from '../shared/time.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -369,7 +370,7 @@ export function addGlobalChatMessage(message) {
     type: message.type ?? 'info',
     content: String(message.content ?? '').trim(),
     meta: message.meta ?? null,
-    timestamp: message.timestamp ?? new Date().toLocaleTimeString('pt-BR', { hour12: false }),
+    timestamp: message.timestamp ?? formatBrazilTime(),
     createdAt: message.createdAt ?? new Date().toISOString(),
   };
   if (!next.content) return null;

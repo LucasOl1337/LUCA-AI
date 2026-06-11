@@ -7,13 +7,15 @@ import {
   Database,
   Activity,
   History,
+  Plug2,
+  Wrench,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import { useLuca } from '@/hooks/useLucaState';
 
-export type PageId = 'inicio' | 'operacional' | 'agentes' | 'database' | 'heartbeat' | 'historico';
+export type PageId = 'inicio' | 'operacional' | 'agentes' | 'database' | 'ferramentas' | 'endpoints' | 'heartbeat' | 'historico';
 
 interface LayoutProps {
   activePage: PageId;
@@ -33,6 +35,8 @@ const navItems: NavItem[] = [
   { id: 'operacional', label: 'Operacional', icon: LayoutGrid, hint: 'centro operacional da missão' },
   { id: 'agentes', label: 'Agentes', icon: Boxes, hint: 'esquadrão de corujas e seus terminais' },
   { id: 'database', label: 'Database', icon: Database, hint: 'as três camadas do conhecimento' },
+  { id: 'ferramentas', label: 'Ferramentas', icon: Wrench, hint: 'catálogo operacional adaptado do TARS' },
+  { id: 'endpoints', label: 'Endpoints', icon: Plug2, hint: 'catálogo operacional de rotas e contratos' },
   { id: 'heartbeat', label: 'Heartbeat', icon: Activity, hint: 'o pulso vital do sistema' },
   { id: 'historico', label: 'Histórico', icon: History, hint: 'missões passadas e agendadas' },
 ];
@@ -40,7 +44,22 @@ const navItems: NavItem[] = [
 export default function Layout({ activePage, onPageChange, children }: LayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
   const theme = useTheme();
-  const { backendReady } = useLuca();
+  const { backendReady, connectionState, runtimeMode } = useLuca();
+  const cloudRuntime = runtimeMode === 'cloud';
+  const statusTone = connectionState === 'checking'
+    ? theme.gold
+    : backendReady
+      ? theme.alive
+      : theme.error;
+  const runtimeLabel = cloudRuntime
+    ? connectionState === 'checking'
+      ? 'conectando cloud'
+      : 'glm 5.1 cloud'
+    : connectionState === 'checking'
+      ? 'checando sistema'
+      : backendReady
+        ? 'sistema online'
+        : 'sistema offline';
 
   return (
     <div className="flex h-screen w-screen overflow-hidden relative" style={{ background: theme.void }}>
@@ -140,7 +159,7 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
           })}
         </nav>
 
-        {/* Footer — status do backend */}
+        {/* Footer — status do runtime */}
         <div className="px-3 py-3 border-t" style={{ borderColor: theme.border }}>
           <div
             className={`flex items-center gap-2 px-3 py-2 rounded-lg ${collapsed ? 'justify-center' : ''}`}
@@ -148,7 +167,7 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
           >
             <div
               className="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse-void"
-              style={{ background: backendReady ? theme.alive : theme.error }}
+              style={{ background: statusTone }}
             />
             <AnimatePresence>
               {!collapsed && (
@@ -156,10 +175,10 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="text-[10px] font-medium tracking-wider uppercase"
-                  style={{ color: theme.textMute }}
-                >
-                  {backendReady ? 'sistema online' : 'sistema offline'}
+                className="text-[10px] font-medium tracking-wider uppercase"
+                style={{ color: theme.textMute }}
+              >
+                  {runtimeLabel}
                 </motion.span>
               )}
             </AnimatePresence>
@@ -187,7 +206,7 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
             {navItems.find((n) => n.id === activePage)?.hint}
           </span>
           <div className="flex items-center gap-3 text-[10px] font-mono" style={{ color: theme.textGhost }}>
-            <span>127.0.0.1 : 4242</span>
+            <span>{cloudRuntime ? 'glm 5.1 cloud' : '127.0.0.1 : 4242'}</span>
           </div>
         </div>
 

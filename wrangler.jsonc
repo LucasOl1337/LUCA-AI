@@ -1,0 +1,36 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "luca-ai",
+  "account_id": "f838f7d26348a09f88fb38ea03272857",
+  "main": "worker/src/index.js",
+  "compatibility_date": "2026-06-10",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "vars": {
+    "GLM_BASE": "https://api.z.ai/api/coding/paas/v4",
+    "GLM_MODEL": "glm-5.1"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "LUCA_RUNTIME",
+        "class_name": "LucaRuntime"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1_luca_runtime",
+      "new_sqlite_classes": ["LucaRuntime"]
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "app.luca-ai.com.br",
+      "custom_domain": true
+    }
+  ]
+}

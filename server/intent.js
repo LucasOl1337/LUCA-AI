@@ -44,7 +44,7 @@ export function missionRequestsChatOnlyAction(mission = {}) {
 
 export function missionNeedsSupervisorJudgment(mission = {}) {
   const text = missionFullText(mission).toLowerCase();
-  return /\b(escolh(er|a|am|em)|avali(ar|e|em)|julgar|decid(ir|e|a)|melhor|vencedor|vencedora|nota|ranking)\b/i.test(text);
+  return /\b(escolh(er|a|am|em)|avali(ar|e|em)|julgar|decid(ir|e|a)|melhor|vencedor|vencedora|nota)\b/i.test(text);
 }
 
 export function classifyMissionIntent(mission = {}) {

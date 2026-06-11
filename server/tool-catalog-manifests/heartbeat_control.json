@@ -1,0 +1,28 @@
+{
+  "id": "heartbeat_control",
+  "name": "Controle de Heartbeat",
+  "description": "Liga ou pausa o monitor de heartbeat do runtime atual.",
+  "category": "runtime",
+  "kind": "action",
+  "provider": "luca",
+  "capabilities": ["heartbeat", "monitoramento", "runtime"],
+  "tags": ["heartbeat", "monitor"],
+  "prompt_instruction": "Use para controlar a observabilidade de pulso do sistema.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "action": { "type": "string", "enum": ["start", "pause"], "description": "acao desejada sobre o heartbeat" }
+    },
+    "required": ["action"]
+  },
+  "invoke": {
+    "type": "http-multi",
+    "endpoints": {
+      "start": "/api/heartbeat/start",
+      "pause": "/api/heartbeat/pause"
+    }
+  },
+  "executable": true,
+  "availability": "both",
+  "source": "tars-tool-catalog-pattern"
+}

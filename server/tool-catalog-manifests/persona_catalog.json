@@ -1,0 +1,23 @@
+{
+  "id": "persona_catalog",
+  "name": "Catalogo de Personas",
+  "description": "Consulta o catalogo de personas disponiveis no Yume para importacao segura no LUCA.",
+  "category": "pontes",
+  "kind": "bridge",
+  "provider": "kamui+yume",
+  "capabilities": ["persona", "bridge", "discovery"],
+  "tags": ["yume", "personas", "catalog"],
+  "prompt_instruction": "Use antes de importar especialistas do Yume para confirmar disponibilidade e metadados.",
+  "parameters": {
+    "type": "object",
+    "properties": {}
+  },
+  "invoke": {
+    "type": "http",
+    "method": "GET",
+    "endpoint": "/api/personas/available"
+  },
+  "executable": true,
+  "availability": "local",
+  "source": "tars-tool-catalog-pattern"
+}

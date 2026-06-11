@@ -72,11 +72,34 @@ import {
 } from './intent.js';
 import {
   parseClosureReviewOutput,
-  buildDeterministicClosureReview,
   mergeClosureReviews,
   expectedChatPerformers,
 } from './closure.js';
+import { buildDeterministicClosureReview, executiveCanvasCoverageGaps } from '../shared/closure-review.js';
 import { buildSchedule, missionScheduleIsInfinite, tickSchedules } from './scheduler.js';
+import {
+  buildAgentPlaybook,
+  businessWorkflowHint,
+  agentCollaborationContract,
+} from '../shared/agent-playbooks.js';
+import {
+  missionBulletItems,
+  normalizeSupervisorFinalReport,
+  parseSupervisorFinalReportOutput,
+} from '../shared/supervisor-final-report.js';
+import { buildPublicStateSnapshot } from '../shared/state-payload.js';
+import { runOperationalPreflight } from '../shared/preflight.js';
+import { reviewResearcherContribution } from './agent-quality.js';
+import { buildEndpointCatalog } from './endpoint-catalog.js';
+import { buildToolCatalog } from './tool-catalog.js';
+import { buildCatalogAudit } from './catalog-audit.js';
+import { appendEvent, eventFlows, eventSummary, listEvents } from './event-log.js';
+import { buildDeterministicExecutiveDashboard } from '../shared/executive-dashboard.js';
+import { createSingleFlightLoop } from './run-cycle-gate.js';
+import { buildOkStateResponse } from './state-response.js';
+import { buildMissionReport } from './mission-report.js';
+import { buildYumeMemoryEvent } from './yume-memory-event.js';
+import { runRuntimeReadinessChecks } from './runtime-readiness.js';
 
 const app = express();
 app.use((req, res, next) => {
@@ -96,6 +119,7 @@ const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
 let supervisorTimer = null;
 let heartbeatProcess = null;
+let runCycleGate = null;
 const heartbeatReportPath = path.resolve(process.cwd(), 'heartbeat-report.json');
 const distPath = path.resolve(process.cwd(), 'dist');
 const indexPath = path.join(distPath, 'index.html');
@@ -103,12 +127,17 @@ const v2DesignPath = path.resolve(process.cwd(), 'public', 'v2-design');
 const v2IndexPath = path.join(v2DesignPath, 'index.html');
 const repoIgnoreDirs = new Set(['.git', 'node_modules', 'dist', '.luca']);
 const DELIVERY_PRINCIPLE = `Principio global LUCA-AI: trabalhe com o que existe e entregue o melhor resultado possivel. Falta de dados nao e motivo para travar, recusar ou ficar excessivamente criterioso. Quando algo estiver ausente, declare uma premissa razoavel, marque como estimativa/proxy quando necessario e siga pelo caminho mais util para cumprir a missao. Priorize decisao, solucao e output final satisfatorio.`;
+const SETTLED_RUN_STATUSES = new Set(['completed', 'chat_completed', 'needs_revision', 'failed', 'cancelled']);
 
 function stopSupervisorTimer() {
   if (supervisorTimer) {
     clearInterval(supervisorTimer);
     supervisorTimer = null;
   }
+}
+
+function missionRunIsSettled(status) {
+  return SETTLED_RUN_STATUSES.has(String(status ?? ''));
 }
 
 function readTextFile(relativePath, maxChars = 5000) {
@@ -236,6 +265,17 @@ function missionContextBlock(mission) {
 }
 
 function emitEvent(event) {
+  try {
+    const normalizedEvent = {
+      ...event,
+      missionId: event?.missionId ?? event?.mission?.id ?? null,
+      goalId: event?.goalId ?? event?.goal?.id ?? null,
+      traceId: event?.traceId ?? event?.missionId ?? event?.mission?.id ?? event?.goal?.traceId ?? event?.goalId ?? event?.goal?.id ?? null,
+    };
+    appendEvent(normalizedEvent);
+  } catch {
+    // Observability must not break the runtime event path.
+  }
   const payload = JSON.stringify({ kind: 'event', event });
   for (const client of wss.clients) {
     if (client.readyState === 1) client.send(payload);
@@ -243,10 +283,172 @@ function emitEvent(event) {
 }
 
 function emitState() {
-  const payload = JSON.stringify({ kind: 'state', state: { ...getState(), heartbeatMonitor: readHeartbeatReport() } });
+  const state = publicStateSnapshot();
+  const payload = JSON.stringify({
+    kind: 'state',
+    state,
+  });
   for (const client of wss.clients) {
     if (client.readyState === 1) client.send(payload);
   }
+}
+
+function publicStateSnapshot() {
+  return buildPublicStateSnapshot(getState(), {
+    heartbeatMonitor: readHeartbeatReport(),
+    events: listEvents({ limit: 120 }),
+  });
+}
+
+function missionActivationBlocker() {
+  const current = getState();
+  const runStatus = current.activeRun?.status ?? null;
+  if (runStatus && !missionRunIsSettled(runStatus)) {
+    return {
+      error: 'mission_already_running',
+      detail: `execucao ativa com status ${runStatus}`,
+      state: publicStateSnapshot(),
+    };
+  }
+  if (current.activeMission && !missionRunIsSettled(runStatus)) {
+    return {
+      error: 'mission_already_active',
+      detail: `missao ativa: ${current.activeMission.title || current.activeMission.id || 'sem titulo'}`,
+      state: publicStateSnapshot(),
+    };
+  }
+  const governance = publicStateSnapshot()?.governance;
+  if (governance?.missionConcurrency?.blocked) {
+    return {
+      error: 'mission_concurrency_locked',
+      detail: 'event stream possui missao recente sem fechamento',
+      lock: governance.missionConcurrency,
+      state: publicStateSnapshot(),
+    };
+  }
+  return null;
+}
+
+function findMissionReportTarget(missionId = '') {
+  const snapshot = publicStateSnapshot();
+  const normalizedId = String(missionId ?? '').trim();
+  const activeMission = getState().activeMission;
+  if (!normalizedId && activeMission) {
+    return {
+      scope: 'active',
+      mission: activeMission,
+      run: getState().activeRun,
+      dashboard: getState().temporaryDashboard,
+      chatMessages: getState().globalChatMessages ?? [],
+      archivedAt: '',
+      status: getState().activeRun?.status ?? '',
+      evidence: [],
+      snapshot,
+    };
+  }
+
+  const history = getState().missionHistory ?? [];
+  const archived = history.find((item) => (
+    !normalizedId
+      ? false
+      : item?.id === normalizedId
+        || item?.mission?.id === normalizedId
+        || item?.run?.id === normalizedId
+  )) ?? (!normalizedId ? history[0] : null);
+
+  if (!archived) return null;
+  return {
+    scope: 'history',
+    mission: archived.mission ?? {},
+    run: archived.run ?? {},
+    dashboard: archived.dashboard ?? null,
+    chatMessages: archived.chatMessages ?? [],
+    archivedAt: archived.archivedAt ?? '',
+    status: archived.status ?? archived.run?.status ?? archived.reason ?? '',
+    evidence: archived.evidence ?? [],
+    snapshot,
+  };
+}
+
+async function runLocalPreflight() {
+  const state = publicStateSnapshot();
+  const governance = state?.heartbeatMonitor?.governance ?? state?.governance ?? null;
+  const baseUrl = `http://127.0.0.1:${PORT}`;
+  const operational = await runOperationalPreflight({
+    mode: 'local',
+    governance,
+    state,
+    probeEndpoint: async (endpointPath) => {
+      try {
+        const response = await fetch(`${baseUrl}${endpointPath}`, {
+          headers: { Accept: 'application/json' },
+        });
+        const body = await response.json().catch(() => null);
+        const ok = response.ok && (
+          endpointPath === '/api/state'
+            ? Boolean(body && typeof body === 'object' && Array.isArray(body.agents))
+            : endpointPath === '/api/events'
+              ? Boolean(body?.ok && Array.isArray(body?.events))
+              : Boolean(body?.ok)
+        );
+        return {
+          ok,
+          body,
+          detail: response.ok ? '' : `HTTP ${response.status}`,
+          status: response.status,
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+  });
+  const readiness = await runRuntimeReadinessChecks({
+    rootDir: process.cwd(),
+    heartbeatScriptPath: path.resolve(process.cwd(), 'heartbeat_monitor.py'),
+  });
+  const checks = [...operational.checks, ...readiness.checks];
+  const ok = checks.every((check) => check.ok);
+  return {
+    ...operational,
+    ok,
+    status: ok ? 'passed' : 'failed',
+    readyForLiveMission: ok,
+    checks,
+    runtimeReadiness: readiness,
+    source: [...new Set([...(operational.source || []), ...(readiness.source || [])])],
+  };
+}
+
+async function runLocalHarnessSmoke() {
+  const preflight = await runLocalPreflight();
+  const state = publicStateSnapshot();
+  const summary = eventSummary();
+  const checks = [
+    ...preflight.checks,
+    {
+      id: 'event-store-summary',
+      label: 'Event store summary',
+      ok: summary.total >= 0,
+      detail: `${summary.total} evento(s) persistidos`,
+    },
+    {
+      id: 'heartbeat-monitor',
+      label: 'Heartbeat monitor',
+      ok: Boolean(state?.heartbeatMonitor?.updatedAt || state?.heartbeatMonitor?.service),
+      detail: state?.heartbeatMonitor?.summary || state?.heartbeatMonitor?.updatedAt || state?.heartbeatMonitor?.service || 'monitor sem sinal',
+    },
+  ];
+  return {
+    ok: checks.every((check) => check.ok),
+    status: checks.every((check) => check.ok) ? 'passed' : 'failed',
+    timestamp: new Date().toISOString(),
+    readyForLiveMission: preflight.readyForLiveMission,
+    checks,
+    source: ['tars-governance-pattern', 'kamui-service-health-pattern'],
+  };
 }
 
 function agentDisplayName(agentId) {
@@ -348,6 +550,7 @@ Se faltar contexto, escolha a premissa mais razoavel e avance. Nao transforme la
   if (agent.role === 'researcher') {
     return `Atue como validador pragmatico de evidencias e realismo. Leia o briefing, use o que estiver disponivel e complete lacunas com premissas claras quando isso ajudar a cumprir a missao.
 Entregue no Chat Global uma contribuicao curta com: evidencias aproveitaveis, premissas adotadas, proxies quando necessarios, riscos principais e como tornar a solucao defensavel para uma equipe executiva.
+Se a missao usar RepoContext, publique obrigatoriamente: um ponto forte com evidencia concreta de arquivo/caminho, um ponto fraco com evidencia concreta de arquivo/caminho e uma leitura de risco/lacuna ou premissa. Use rotulos explicitos como "Ponto forte:", "Ponto fraco:" e "Risco:" ou "Premissa:".
 Nao pare na falta de informacao. Nao invente fato como se fosse evidencia; quando precisar inferir, rotule como premissa/proxy e entregue resultado.`;
   }
   if (agent.role === 'designer') {
@@ -412,6 +615,41 @@ function repoAnalysisSatisfied() {
 function missionCompletionSatisfied(mission) {
   if (missionRequiresRepoContext(mission)) return repoAnalysisSatisfied();
   return true;
+}
+
+function buildBuiltinAgentSystemPrompt(agent, mission, { mode = 'task' } = {}) {
+  const collaboration = mode === 'chat'
+    ? 'Use o Chat Global apenas para contribuicoes novas e uteis a outros agentes.'
+    : 'Entregue contribuicoes acionaveis e orientadas ao resultado final da missao.';
+  return [
+    `Voce e o agente ${agent.id} (${agent.role}) do projeto LUCA-AI. Responda em pt-BR, objetivo, pragmatico e orientado a entrega.`,
+    buildAgentPlaybook([agent.id]),
+    businessWorkflowHint(mission),
+    agentCollaborationContract(mission),
+    collaboration,
+    'Quando precisar compartilhar algo no Chat Global, use uma linha [chat:tipo] mensagem.',
+  ].filter(Boolean).join('\n\n');
+}
+
+async function repairResearcherRepoContribution(agent, mission, originalOutput, review, model) {
+  const system = buildBuiltinAgentSystemPrompt(agent, mission, { mode: 'task' });
+  const user = `Sua saida anterior do Pesquisador foi rejeitada pelo verificador interno porque nao ficou suficientemente rastreavel para analise de repo.
+
+Lacunas encontradas:
+${review.gaps.map((gap) => `- ${gap}`).join('\n')}
+
+Saida anterior:
+${String(originalOutput || '').slice(0, 2500)}
+
+Reescreva a contribuicao agora em 2 a 4 linhas [chat:resultado], sem falar do verificador.
+Obrigatorio:
+- incluir pelo menos um "Ponto forte:" com evidencia concreta de arquivo/caminho;
+- incluir pelo menos um "Ponto fraco:" com evidencia concreta de arquivo/caminho;
+- incluir "Risco:" ou "Premissa:" quando houver inferencia ou lacuna.
+- nao alegar falta de acesso se RepoContext foi fornecido.
+
+Responda somente com linhas [chat:resultado] ou [chat:alerta].`;
+  return call9Router({ system, user, agentId: `${scopedAgentId(agent.id)}:repair`, model, maxTokens: 700 });
 }
 
 function extractJsonObject(output) {
@@ -518,7 +756,10 @@ function fallbackSupervisorFinalReport(mission, reason = 'fallback local') {
         detail: 'Priorizar causas, impacto estimado, acoes preventivas e metrica de acompanhamento.',
       },
     ];
-  return {
+  return normalizeSupervisorFinalReport({
+    mission,
+    snapshot,
+    report: {
     summary: `Consolidacao local: ${inferredFocus}.`,
     findings,
     designerBrief: {
@@ -532,51 +773,18 @@ function fallbackSupervisorFinalReport(mission, reason = 'fallback local') {
       : ['canvas publicado', 'prioridades claras', 'acoes praticas definidas'],
     sourceAgentId: 'supervisor',
     fallback: true,
+    },
     fallbackReason: reason,
-  };
+  });
 }
 
 function fallbackDesignerDashboard(mission) {
   const report = getState().activeRun?.finalReport ?? fallbackSupervisorFinalReport(mission);
-  const findings = Array.isArray(report.findings) ? report.findings.slice(0, 5) : [];
-  const towerItems = findings.map((finding, index) => ({
-    label: String(finding.title ?? `Prioridade ${index + 1}`).slice(0, 28),
-    value: Math.max(1, 5 - index),
-  }));
-  return {
-    title: 'Canvas Executivo',
-    subtitle: report.summary ?? mission?.description ?? 'Sintese da missao atual para decisao.',
-    status: 'concluido',
-    layout: 'result-board',
-    blocks: [
-      {
-        type: 'metric',
-        title: 'Foco',
-        value: 'prevenção',
-        body: 'Priorizar perdas evitaveis e acoes de maior impacto pratico.',
-      },
-      {
-        type: 'tower',
-        title: 'Prioridades',
-        items: towerItems.length ? towerItems : [
-          { label: 'Mapear causas', value: 5 },
-          { label: 'Quantificar impacto', value: 4 },
-          { label: 'Atacar recorrencia', value: 3 },
-        ],
-      },
-      {
-        type: 'topics',
-        title: 'Acoes recomendadas',
-        items: ['segmentar sinistros', 'comparar frequencia', 'priorizar severidade', 'monitorar economia'],
-      },
-      {
-        type: 'note',
-        title: 'Critério de sucesso',
-        body: (report.successCriteria ?? []).join('; ') || mission?.success || 'Canvas revisavel publicado.',
-      },
-    ],
-    fallback: true,
-  };
+  return buildDeterministicExecutiveDashboard({
+    mission,
+    finalReport: report,
+    snapshot: supervisorFinalReportSnapshot(mission),
+  });
 }
 
 async function buildSupervisorFinalReport(mission) {
@@ -602,6 +810,7 @@ Inclua obrigatoriamente:
 5. Recomendacoes de visualizacao para o Designer: blocos, graficos, rankings, metricas e textos que devem aparecer.
 6. Itens que nao devem aparecer no canvas: detalhes de agentes, status operacional, logs, fila, modelo ou chat.
 7. Criterios de sucesso que o canvas final precisa cobrir.
+8. Se a missao pedir entregaveis especificos de seguro agro ou Sompo, carregue isso para o JSON final sem perder o pedido: ZARC, microrregioes, mapa de risco, ranking de apolices, sinistralidade, projecao de indenizacoes, cronograma de monitoramento e alertas operacionais.
 
 Responda somente com JSON valido neste formato:
 {
@@ -623,22 +832,40 @@ Responda somente com JSON valido neste formato:
   appendLine('supervisor', `[orquestrador:${model}] consolidando relatorio final`);
   const output = await call9Router({ system, user: prompt, agentId: scopedAgentId('supervisor'), model, maxTokens: 900 });
   appendLine('supervisor', output);
-  const parsed = extractJsonObject(output);
-  if (!parsed) throw new Error('supervisor_final_report_invalid_json');
-  const report = {
-    ...parsed,
+  const parsed = parseSupervisorFinalReportOutput(output);
+  const fallbackReason = parsed
+    ? ''
+    : 'supervisor retornou JSON invalido; usando consolidacao deterministica';
+  const report = normalizeSupervisorFinalReport({
+    mission,
+    snapshot,
+    report: parsed
+      ? {
+        ...parsed,
+        sourceAgentId: 'supervisor',
+        raw: output,
+      }
+      : {
+        sourceAgentId: 'supervisor',
+        raw: output,
+        fallback: true,
+      },
+    fallbackReason,
+  });
+  const storedReport = {
     sourceAgentId: 'supervisor',
     raw: output,
+    ...report,
   };
-  setSupervisorFinalReport(report);
+  setSupervisorFinalReport(storedReport);
   publishChatMessage({
     agentId: 'supervisor',
     type: 'resultado',
-    content: `Relatorio final consolidado: ${parsed.summary ?? 'findings priorizados para o canvas.'}`,
+    content: `Relatorio final consolidado${report.fallback ? ' com fallback deterministico' : ''}: ${report.summary ?? 'findings priorizados para o canvas.'}`,
   });
-  addHeartbeat('supervisor', 'ready', 'relatorio final consolidado');
+  addHeartbeat('supervisor', 'ready', report.fallback ? fallbackReason : 'relatorio final consolidado');
   setAgentStatus('supervisor', 'ready');
-  return report;
+  return storedReport;
 }
 
 async function runMissionTransformer(agent, mission) {
@@ -721,7 +948,7 @@ async function runAgent(agent, mission, task = null) {
   const chatContext = `\nChat Global recente:\n${recentChatContext()}\n\nMensagens novas para voce:\n${unreadChatContext(agent.id)}\n`;
   const repoContext = missionRequiresRepoContext(mission) ? `\nFerramenta RepoContext disponivel. Use estas evidencias observaveis da repo; cite arquivos quando fizer achados:\n${repoContextForPrompt()}\n` : '';
   const prompt = `Missao global ativa\nDescricao: ${mission?.description ?? 'Sem descricao'}\nCriterios de conclusao: ${mission?.success ?? 'Sem criterios de conclusao'}\n\n${DELIVERY_PRINCIPLE}\n${directionPrompt ? `\nDirecionamento transformado pelo agente transformador-missao:\n${directionPrompt}\n` : ''}${taskInstruction}${chatContext}${repoContext}${contextBlock ? `\n${contextBlock}\n` : ''}\nFerramenta disponivel: Chat Global.\nPara publicar no chat visivel aos agentes, escreva uma linha exatamente neste formato:\n[chat:tipo] mensagem\nTipos permitidos: info, resultado, decisao, pergunta, alerta.\nUse o chat apenas para informacoes uteis a outros agentes. Nao use para status trivial.\n${chatRequired ? '\nEsta missao exige mensagem no chat. Inclua obrigatoriamente uma linha [chat:info] com a mensagem solicitada.\n' : ''}\nQualidade obrigatoria da contribuicao:\n1. Entregue uma contribuicao final util, mesmo com informacao incompleta.\n2. Se faltar dado, declare premissa/proxy e siga. Nao use lacuna como conclusao principal.\n3. Escolha uma direcao, priorize e recomende a proxima acao.\n4. Produza material que ajude o Designer a montar um dashboard executivo: itens, ranking, metricas, acoes ou criterios de sucesso.\n5. Nao repita informacoes que ja estao no chat; entregue contribuicao nova.\nSe a tarefa pede analise da repo, publique pontos fortes e fracos com evidencia de arquivo/diretorio. Nao diga que nao tem acesso a arvore se RepoContext foi fornecido. Trabalhe apenas dentro desse escopo. Use os criterios de conclusao e o direcionamento transformado para decidir se sua resposta esta suficiente.`;
-  const system = `Voce e o agente ${agent.id} (${agent.role}) do projeto LUCA-AI. Responda em pt-BR, objetivo, pragmatico e orientado a entrega. Trabalhe com o que tem, use premissas claras quando faltar dado e entregue resultado acionavel. Quando precisar compartilhar algo no Chat Global, use uma linha [chat:tipo] mensagem.`;
+  const system = buildBuiltinAgentSystemPrompt(agent, mission, { mode: 'task' });
   const model = runtime.model;
 
   try {
@@ -731,12 +958,29 @@ async function runAgent(agent, mission, task = null) {
     appendAgentHeartbeatEvent(agent.id, 'start', model);
     emitEvent({ type: 'agent.status', agentId: agent.id, status: 'running', time: new Date().toISOString() });
 
-    const output = await call9Router({ system, user: prompt, agentId: scopedAgentId(agent.id), model });
+    let output = await call9Router({ system, user: prompt, agentId: scopedAgentId(agent.id), model });
     appendLine(agent.id, output);
-    const chatMessages = extractChatMessages(agent.id, output);
+    let chatMessages = extractChatMessages(agent.id, output);
     if (!chatMessages.length) {
       const fallback = fallbackChatMessage(agent.id, output);
       if (fallback) chatMessages.push(fallback);
+    }
+    if (agent.role === 'researcher' && missionRequiresRepoContext(mission)) {
+      const review = reviewResearcherContribution({ mission, output, messages: chatMessages });
+      if (!review.ok) {
+        appendLine(agent.id, `[quality] pesquisador_repair ${review.gaps.join(' | ')}`);
+        output = await repairResearcherRepoContribution(agent, mission, output, review, model);
+        appendLine(agent.id, output);
+        chatMessages = extractChatMessages(agent.id, output);
+        if (!chatMessages.length) {
+          const fallback = fallbackChatMessage(agent.id, output);
+          if (fallback) chatMessages.push(fallback);
+        }
+        const repaired = reviewResearcherContribution({ mission, output, messages: chatMessages });
+        if (!repaired.ok) {
+          throw new Error(`researcher_quality_repo_evidence_failed: ${repaired.gaps.join(' | ')}`);
+        }
+      }
     }
     for (const chatMessage of chatMessages) publishChatMessage(chatMessage);
     setAgentStatus(agent.id, 'ready');
@@ -869,12 +1113,22 @@ Responda somente com JSON valido neste formato:
     if (isOperationalDashboard(parsedDashboard)) {
       throw new Error('designer_quality_operational_content: modelo tentou expor processo interno no canvas executivo');
     }
-    const dashboard = parsedDashboard;
+    const coverageGaps = executiveCanvasCoverageGaps({
+      mission,
+      dashboard: parsedDashboard,
+      finalReport: getState().activeRun?.finalReport ?? null,
+    });
+    const dashboard = coverageGaps.length
+      ? fallbackDesignerDashboard(mission)
+      : parsedDashboard;
+    if (coverageGaps.length) {
+      appendLine(agent.id, `designer_quality_fallback: ${coverageGaps.join(' | ')}`);
+    }
     setTemporaryDashboard({ ...dashboard, sourceAgentId: agent.id });
     publishChatMessage({
       agentId: agent.id,
       type: 'resultado',
-      content: `Canvas atualizado: ${dashboard.title ?? 'sem titulo'}`,
+      content: `Canvas atualizado${coverageGaps.length ? ' com reforco deterministico de cobertura' : ''}: ${dashboard.title ?? 'sem titulo'}`,
     });
     setAgentStatus(agent.id, 'ready');
     if (task) updateAgentTask(task.id, { status: 'completed', completedAt: new Date().toISOString() });
@@ -939,6 +1193,15 @@ async function runCycle() {
   if (!missionReadyForAgents(currentMission)) return;
 
   await supervisorTick(currentMission);
+}
+
+function triggerRunCycle() {
+  if (!runCycleGate) {
+    runCycleGate = createSingleFlightLoop(async () => {
+      await runCycle();
+    });
+  }
+  return runCycleGate.trigger();
 }
 
 async function supervisorTick(mission) {
@@ -1093,7 +1356,7 @@ async function supervisorTick(mission) {
 
 function startSupervisorTimer() {
   if (supervisorTimer) return;
-  supervisorTimer = setInterval(() => { runCycle().catch(() => {}); }, 8000);
+  supervisorTimer = setInterval(() => { void triggerRunCycle().catch(() => {}); }, 8000);
 }
 
 // ---------------------------------------------------------------------------
@@ -1151,19 +1414,22 @@ async function reviewMissionClosure(closureContext = {}) {
   const chatMessages = chatMessagesSinceMissionStart(mission);
   const agents = getState().agents;
   const requiresRepo = missionRequiresRepoContext(mission);
-  const deterministic = buildDeterministicClosureReview({
-    mission,
-    chatMessages,
-    agents,
-    closureContext: {
-      ...closureContext,
-      requiresAllAgents: missionRequestsAllAgents(mission),
-      needsSupervisorJudgment: missionNeedsSupervisorJudgment(mission),
-      expectedPerformerIds: expectedChatPerformers(mission, agents).map((a) => a.id),
-      repoAnalysisSatisfied: requiresRepo ? repoAnalysisSatisfied() : undefined,
-      hasDashboard: Boolean(getState().temporaryDashboard),
-    },
-  });
+    const deterministic = buildDeterministicClosureReview({
+      mission,
+      chatMessages,
+      agents,
+      closureContext: {
+        ...closureContext,
+        requiresAllAgents: missionRequestsAllAgents(mission),
+        needsSupervisorJudgment: missionNeedsSupervisorJudgment(mission),
+        expectedPerformerIds: expectedChatPerformers(mission, agents).map((a) => a.id),
+        repoAnalysisSatisfied: requiresRepo ? repoAnalysisSatisfied() : undefined,
+        hasFinalReport: Boolean(getState().activeRun?.finalReport),
+        hasDashboard: Boolean(getState().temporaryDashboard),
+        finalReport: getState().activeRun?.finalReport ?? null,
+        dashboard: getState().temporaryDashboard ?? null,
+      },
+    });
   const maestro = await runMaestroClosureReview(mission, closureContext);
   return mergeClosureReviews(deterministic, maestro);
 }
@@ -1486,9 +1752,17 @@ async function runChatOnlyMission(mission) {
 // ---------------------------------------------------------------------------
 
 async function activateMissionInternal(payload = {}, extra = {}) {
+  const blocker = missionActivationBlocker();
+  if (blocker) {
+    const error = new Error(blocker.error);
+    error.statusCode = 409;
+    error.payload = { ok: false, ...blocker };
+    throw error;
+  }
   stopSupervisorTimer();
   const description = String(payload?.description ?? '').trim();
   const success = String(payload?.success ?? '').trim();
+  const previous = getState();
   const mission = {
     id: `mission-${Date.now()}`,
     title: String(payload?.title ?? description.slice(0, 80)).trim(),
@@ -1499,26 +1773,40 @@ async function activateMissionInternal(payload = {}, extra = {}) {
     activatedAt: new Date().toISOString(),
     ...(extra.scheduledRun ? { scheduledRun: extra.scheduledRun } : {}),
   };
+  if (previous.activeMission || previous.activeRun) {
+    emitEvent({
+      type: 'mission.archived',
+      source: 'runtime',
+      missionId: previous.activeMission?.id ?? previous.activeRun?.id ?? null,
+      traceId: previous.activeMission?.id ?? previous.activeRun?.id ?? null,
+      time: new Date().toISOString(),
+      payload: {
+        title: previous.activeMission?.title || previous.activeRun?.missionTitle || 'missao anterior',
+        reason: 'new_mission_started',
+        status: previous.activeRun?.status ?? 'archived',
+      },
+    });
+  }
   startNewMissionScope(mission);
   createRun(mission);
   addHeartbeat('supervisor', 'ready', `missao ativada: ${mission.title || 'sem titulo'}`);
+  emitEvent({
+    type: 'mission.started',
+    source: extra.scheduledRun ? 'scheduler' : 'ui',
+    missionId: mission.id,
+    traceId: mission.id,
+    time: mission.activatedAt,
+    payload: {
+      title: mission.title,
+      intent: classifyMissionIntent(mission),
+      description: mission.description.slice(0, 1200),
+    },
+  });
   emitEvent({ type: 'mission.activated', mission, time: mission.activatedAt });
   emitState();
-  if (classifyMissionIntent(mission) === 'dashboard_build') {
-    const transformer = AGENTS.find((agent) => agent.role === 'mission-transformer');
-    if (transformer && agentRuntime(transformer.id).enabled) {
-      publishChatMessage({
-        agentId: transformer.id,
-        type: 'info',
-        content: 'Recebi a missao. Vou transformar os criterios em um direcionamento operacional para os agentes.',
-      });
-      await runMissionTransformer(transformer, mission);
-      emitState();
-    }
-  }
   setSupervisorMode('running');
   startSupervisorTimer();
-  await runCycle();
+  void triggerRunCycle().catch(() => {});
   return mission;
 }
 
@@ -1565,17 +1853,153 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.get('/api/state', (_req, res) => {
-  res.json({ ...getState(), heartbeatMonitor: readHeartbeatReport() });
+  res.json(publicStateSnapshot());
+});
+
+app.get('/api/events', (req, res) => {
+  const limit = req.query?.limit;
+  const type = req.query?.type;
+  const missionId = req.query?.missionId;
+  const goalId = req.query?.goalId;
+  const traceId = req.query?.traceId;
+  res.json({
+    ok: true,
+    filters: { limit, type, missionId, goalId, traceId },
+    events: listEvents({ limit, type, missionId, goalId, traceId }),
+  });
+});
+
+app.get('/api/events/summary', (req, res) => {
+  const limit = req.query?.limit;
+  const type = req.query?.type;
+  const missionId = req.query?.missionId;
+  const goalId = req.query?.goalId;
+  const traceId = req.query?.traceId;
+  res.json({
+    ok: true,
+    summary: eventSummary({ limit, type, missionId, goalId, traceId }),
+  });
+});
+
+app.get('/api/events/flows', (req, res) => {
+  const limit = req.query?.limit;
+  const type = req.query?.type;
+  const missionId = req.query?.missionId;
+  const goalId = req.query?.goalId;
+  const traceId = req.query?.traceId;
+  res.json({
+    ok: true,
+    report: eventFlows({ limit, type, missionId, goalId, traceId }),
+  });
+});
+
+app.get('/api/governance', (_req, res) => {
+  res.json({ ok: true, governance: publicStateSnapshot()?.governance ?? null });
+});
+
+app.get('/api/preflight', async (_req, res) => {
+  res.json(await runLocalPreflight());
+});
+
+app.get('/api/catalog/endpoints', (_req, res) => {
+  res.json(buildEndpointCatalog());
+});
+
+app.get('/api/catalog/tools', (_req, res) => {
+  res.json(buildToolCatalog());
+});
+
+app.get('/api/catalog/audit', (_req, res) => {
+  res.json(buildCatalogAudit({
+    endpointCatalog: buildEndpointCatalog(),
+    toolCatalog: buildToolCatalog(),
+  }));
+});
+
+app.get('/api/report/mission', (req, res) => {
+  const target = findMissionReportTarget(req.query?.missionId);
+  if (!target) {
+    res.status(404).json({ ok: false, error: 'mission_report_target_not_found' });
+    return;
+  }
+  const missionId = target.mission?.id ?? req.query?.missionId ?? '';
+  const flows = eventFlows({ missionId, limit: 4 }).flows ?? [];
+  const report = buildMissionReport({
+    mission: target.mission,
+    dashboard: target.dashboard,
+    run: target.run,
+    finalReport: target.run?.finalReport ?? null,
+    chatMessages: target.chatMessages,
+    governance: target.snapshot?.heartbeatMonitor?.governance ?? target.snapshot?.governance ?? null,
+    heartbeatMonitor: target.snapshot?.heartbeatMonitor ?? null,
+    flows,
+    evidence: target.evidence,
+    archivedAt: target.archivedAt,
+    status: target.status,
+  });
+  res.json({
+    ok: true,
+    scope: target.scope,
+    missionId: missionId || null,
+    report,
+    markdown: report.markdown,
+  });
+});
+
+app.get('/api/integrations/yume/memory-event', (req, res) => {
+  const target = findMissionReportTarget(req.query?.missionId);
+  if (!target) {
+    res.status(404).json({ ok: false, error: 'mission_report_target_not_found' });
+    return;
+  }
+  const missionId = target.mission?.id ?? req.query?.missionId ?? '';
+  const flows = eventFlows({ missionId, limit: 4 }).flows ?? [];
+  const report = buildMissionReport({
+    mission: target.mission,
+    dashboard: target.dashboard,
+    run: target.run,
+    finalReport: target.run?.finalReport ?? null,
+    chatMessages: target.chatMessages,
+    governance: target.snapshot?.heartbeatMonitor?.governance ?? target.snapshot?.governance ?? null,
+    heartbeatMonitor: target.snapshot?.heartbeatMonitor ?? null,
+    flows,
+    evidence: target.evidence,
+    archivedAt: target.archivedAt,
+    status: target.status,
+  });
+  res.json({
+    ok: true,
+    scope: target.scope,
+    missionId: missionId || null,
+    memoryEvent: buildYumeMemoryEvent({
+      mission: target.mission,
+      report,
+      flows,
+      archivedAt: target.archivedAt,
+      status: target.status,
+    }),
+    source: ['yume-hybrid-memory-contract', ...report.source],
+  });
+});
+
+app.post('/api/harness/smoke', async (_req, res) => {
+  res.json(await runLocalHarnessSmoke());
 });
 
 app.post('/api/mission/activate', async (req, res) => {
-  const mission = await activateMissionInternal({
-    title: req.body?.title,
-    description: req.body?.description,
-    success: req.body?.success,
-    context: req.body?.context,
-  });
-  res.json({ ok: true, mission });
+  try {
+    const mission = await activateMissionInternal({
+      title: req.body?.title,
+      description: req.body?.description,
+      success: req.body?.success,
+      context: req.body?.context,
+    });
+    res.json(buildOkStateResponse(publicStateSnapshot(), { mission }));
+  } catch (error) {
+    const statusCode = Number(error?.statusCode) || 500;
+    const payload = error?.payload || { ok: false, error: error instanceof Error ? error.message : String(error) };
+    res.status(statusCode).json(payload);
+  }
 });
 
 app.post('/api/mission/context', (req, res) => {
@@ -1806,10 +2230,26 @@ app.post('/api/tools/global-chat/message', (req, res) => {
 
 app.post('/api/mission/reset', (_req, res) => {
   stopSupervisorTimer();
+  const current = getState();
+  if (current.activeMission?.id && !missionRunIsSettled(current.activeRun?.status)) {
+    emitEvent({
+      type: 'mission.archived',
+      source: 'ui',
+      missionId: current.activeMission.id,
+      traceId: current.activeMission.id,
+      time: new Date().toISOString(),
+      payload: {
+        title: current.activeMission.title || 'missao',
+        reason: 'manual_reset',
+        status: current.activeRun?.status || 'reset',
+      },
+    });
+  }
   resetMissionScope();
   addHeartbeat('supervisor', 'ready', 'missao resetada');
+  emitEvent({ type: 'state.reset', source: 'ui', time: new Date().toISOString(), payload: {} });
   emitState();
-  res.json({ ok: true });
+  res.json(buildOkStateResponse(publicStateSnapshot()));
 });
 
 app.post('/api/supervisor/start', async (_req, res) => {
@@ -1817,12 +2257,12 @@ app.post('/api/supervisor/start', async (_req, res) => {
   addHeartbeat('supervisor', 'running', 'supervisor ligado');
   if (!supervisorTimer) {
     supervisorTimer = setInterval(() => {
-      runCycle();
+      void triggerRunCycle().catch(() => {});
     }, 8000);
   }
-  await runCycle();
+  void triggerRunCycle().catch(() => {});
   emitState();
-  res.json({ ok: true });
+  res.json(buildOkStateResponse(publicStateSnapshot()));
 });
 
 app.post('/api/supervisor/pause', (_req, res) => {
@@ -1833,7 +2273,7 @@ app.post('/api/supervisor/pause', (_req, res) => {
     supervisorTimer = null;
   }
   emitState();
-  res.json({ ok: true });
+  res.json(buildOkStateResponse(publicStateSnapshot()));
 });
 
 app.post('/api/agent/run', async (req, res) => {
@@ -1881,20 +2321,20 @@ app.post('/api/agent/run', async (req, res) => {
 app.post('/api/heartbeat/start', (_req, res) => {
   startHeartbeatMonitor();
   emitState();
-  res.json({ ok: true });
+  res.json(buildOkStateResponse(publicStateSnapshot()));
 });
 
 app.post('/api/heartbeat/pause', (_req, res) => {
   stopHeartbeatMonitor();
   emitState();
-  res.json({ ok: true });
+  res.json(buildOkStateResponse(publicStateSnapshot()));
 });
 
 app.post('/api/agents/clear', (_req, res) => {
   clearAgentContexts();
   appendHeartbeatLog('[heartbeat] terminais e contexto dos agentes limpos');
   emitState();
-  res.json({ ok: true });
+  res.json(buildOkStateResponse(publicStateSnapshot()));
 });
 
 app.use('/icons', express.static(path.resolve(process.cwd(), 'public', 'icons')));
@@ -1912,7 +2352,7 @@ if (fs.existsSync(indexPath)) {
 }
 
 wss.on('connection', (socket) => {
-  socket.send(JSON.stringify({ kind: 'state', state: getState() }));
+  socket.send(JSON.stringify({ kind: 'state', state: publicStateSnapshot() }));
 });
 
 httpServer.listen(PORT, '0.0.0.0', () => {

@@ -1,0 +1,23 @@
+{
+  "id": "catalog_audit",
+  "name": "Auditar Catalogos",
+  "description": "Valida o contrato entre catalogo de endpoints e catalogo de ferramentas, incluindo metodos, payloads e invokes.",
+  "category": "docs",
+  "kind": "catalog",
+  "provider": "luca",
+  "capabilities": ["catalog", "contract", "quality-gate"],
+  "tags": ["catalog", "audit", "endpoints", "tools"],
+  "prompt_instruction": "Use antes de expor novas ferramentas ou rotas para confirmar que o catalogo esta coerente e navegavel.",
+  "parameters": {
+    "type": "object",
+    "properties": {}
+  },
+  "invoke": {
+    "type": "http",
+    "method": "GET",
+    "endpoint": "/api/catalog/audit"
+  },
+  "executable": true,
+  "availability": "both",
+  "source": "kamui-catalog-audit-pattern"
+}

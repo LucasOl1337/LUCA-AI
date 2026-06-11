@@ -5,6 +5,7 @@ import { useLuca } from '@/hooks/useLucaState';
 import { countDatabaseItems } from '@/lib/database';
 import LucaOwl from '@/components/LucaOwl';
 import type { PageId } from '@/components/Layout';
+import { SOMPO_CASE_PROMPT } from '@/lib/sompo-case';
 
 interface LandingPageProps {
   onNavigate: (page: PageId) => void;
@@ -21,11 +22,79 @@ const stagger = {
 
 export default function LandingPage({ onNavigate }: LandingPageProps) {
   const theme = useTheme();
-  const { activeMission, supervisorMode, agents, database, backendReady, heartbeatMonitor } = useLuca();
+  const {
+    activeMission,
+    supervisorMode,
+    agents,
+    database,
+    backendReady,
+    connectionState,
+    heartbeatMonitor,
+    runtimeMode,
+    activateMission,
+    missionActionBusy,
+    operationError,
+    canActivateMission,
+    missionLockReason,
+    missionPhase,
+  } = useLuca();
 
   const dbItems = countDatabaseItems(database);
   const running = supervisorMode === 'running';
-  const monitorStatus = heartbeatMonitor?.status ?? (backendReady ? 'online' : 'offline');
+  const cloudRuntime = runtimeMode === 'cloud';
+  const runtimeOnline = cloudRuntime ? connectionState !== 'offline' : backendReady;
+  const monitorStatus = heartbeatMonitor?.status ?? (connectionState === 'checking' ? 'checking' : runtimeOnline ? 'online' : 'offline');
+  const systemBadge = missionPhase === 'running'
+    ? 'em operação'
+    : missionPhase === 'completed' || missionPhase === 'chat_completed'
+      ? 'concluída'
+      : missionPhase === 'needs_revision' || missionPhase === 'failed' || missionPhase === 'cancelled' || missionPhase === 'blocked'
+        ? 'atenção'
+        : connectionState === 'checking'
+          ? 'conectando'
+          : runtimeOnline
+            ? 'em espera'
+            : 'offline';
+  const systemBadgeClass = missionPhase === 'running'
+    ? 'ok'
+    : missionPhase === 'completed' || missionPhase === 'chat_completed'
+      ? 'warning'
+      : missionPhase === 'needs_revision' || missionPhase === 'failed' || missionPhase === 'cancelled' || missionPhase === 'blocked'
+        ? 'error'
+        : connectionState === 'checking'
+          ? 'warning'
+          : runtimeOnline
+            ? 'warning'
+            : 'error';
+  const missionCardValue = missionPhase === 'running'
+    ? 'ativa'
+    : missionPhase === 'completed' || missionPhase === 'chat_completed'
+      ? 'concluída'
+      : missionPhase === 'needs_revision'
+        ? 'revisão'
+        : missionPhase === 'failed' || missionPhase === 'cancelled' || missionPhase === 'blocked'
+          ? 'lock'
+          : 'livre';
+  const missionCardDesc = missionActionBusy
+    ? 'envio em andamento'
+    : missionLockReason
+      ? missionLockReason
+      : running
+        ? 'supervisor rodando'
+        : activeMission
+          ? 'acompanhe o canvas operacional'
+          : 'pronta para novo briefing';
+
+  async function launchSompoCase() {
+    if (!canActivateMission) return;
+    const activated = await activateMission({
+      title: 'Caso Sompo rural',
+      description: SOMPO_CASE_PROMPT,
+      success: 'Canvas executivo Sompo aprovado pelo verificador, com premissas e lacunas sinalizadas.',
+    });
+    if (!activated) return;
+    onNavigate('operacional');
+  }
 
   return (
     <div className="h-full overflow-y-auto">
@@ -68,7 +137,7 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                 filter: 'blur(32px)',
               }}
             />
-            <LucaOwl size={340} alive={backendReady} />
+            <LucaOwl size={340} alive={runtimeOnline} />
           </div>
 
           {/* Título */}
@@ -80,30 +149,52 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
           >
             <h1 className="void-title text-6xl tracking-[0.32em] font-display font-bold">LUC.AI</h1>
             <p
-              className="text-[11px] tracking-[0.6em] uppercase mt-3 kanji"
+              className="text-[11px] tracking-[0.5em] uppercase mt-3 kanji"
               style={{ color: theme.textGhost }}
             >
-              centro operacional
+              sompo sprint 2
             </p>
             <p
               className="text-sm mt-5 max-w-sm mx-auto leading-relaxed text-center"
               style={{ color: theme.textMute }}
             >
-              Um esquadrão de agentes coordenados — operando missões e desenhando resultados em tempo real.
+              Centro operacional para transformar CSV, telemetria rural e risco de sinistro em um canvas executivo apresentável.
             </p>
           </motion.div>
 
           {/* CTA */}
-          <motion.button
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.5, duration: 0.4 }}
-            whileTap={{ scale: 0.96 }}
-            onClick={() => onNavigate('operacional')}
-            className="btn-primary mt-7 flex items-center gap-2 !px-8 !py-3 text-sm tracking-widest uppercase"
-          >
-            Entrar no Centro Operacional
-          </motion.button>
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+            <motion.button
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.5, duration: 0.4 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={() => onNavigate('operacional')}
+              className="btn-primary flex items-center gap-2 !px-8 !py-3 text-sm tracking-widest uppercase"
+            >
+              Centro Operacional
+            </motion.button>
+            <motion.button
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.58, duration: 0.4 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={launchSompoCase}
+              className="btn-fleet flex items-center gap-2 !px-6 !py-3 text-sm tracking-widest uppercase"
+              disabled={!runtimeOnline || !canActivateMission}
+              title={
+                missionActionBusy
+                  ? 'aguarde a missão atual ser enviada'
+                  : missionLockReason
+                    ? missionLockReason
+                    : !runtimeOnline
+                      ? 'runtime offline'
+                      : 'rodar caso Sompo'
+              }
+            >
+              {missionActionBusy ? 'Enviando missão' : 'Rodar Caso Sompo'}
+            </motion.button>
+          </div>
         </motion.div>
 
         {/* ─── Stat cards ─── */}
@@ -124,9 +215,13 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
             {
               icon: Crosshair,
               label: 'Missão',
-              value: activeMission ? 'ativa' : '—',
-              desc: running ? 'supervisor rodando' : 'aguardando comando',
-              tone: activeMission ? theme.alive : theme.textMute,
+              value: missionCardValue,
+              desc: missionCardDesc,
+              tone: missionPhase === 'running'
+                ? theme.alive
+                : canActivateMission
+                  ? theme.textMute
+                  : theme.error,
             },
             {
               icon: Database,
@@ -137,10 +232,10 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
             },
             {
               icon: Activity,
-              label: 'Heartbeat',
-              value: backendReady ? 'vivo' : 'off',
-              desc: `monitor ${monitorStatus}`,
-              tone: backendReady ? theme.alive : theme.error,
+              label: 'Runtime',
+              value: cloudRuntime ? 'cloud' : backendReady ? 'vivo' : 'off',
+              desc: cloudRuntime ? 'glm 5.1 real' : `monitor ${monitorStatus}`,
+              tone: runtimeOnline ? theme.alive : connectionState === 'checking' ? theme.gold : theme.error,
             },
           ].map((s) => {
             const Icon = s.icon;
@@ -185,17 +280,29 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
         >
           <div
             className="w-2 h-2 rounded-full shrink-0 animate-pulse-void"
-            style={{ background: backendReady ? theme.alive : theme.error }}
+            style={{ background: connectionState === 'checking' ? theme.gold : runtimeOnline ? theme.alive : theme.error }}
           />
           <p className="text-sm leading-relaxed flex-1" style={{ color: theme.textMute }}>
-            {activeMission
-              ? 'Missão ativa. Abra o Centro Operacional para acompanhar o canvas e o log do supervisor.'
+            {operationError
+              ? operationError
+              : missionLockReason
+              ? `Novo disparo bloqueado. ${missionLockReason}.`
+              : missionPhase === 'running'
+                ? 'Missão ativa. Abra o Centro Operacional para acompanhar o canvas e o log do supervisor.'
+              : missionPhase === 'completed' || missionPhase === 'chat_completed'
+                ? 'Missão concluída. Revise o canvas e resete o estado antes de iniciar uma nova rodada.'
+              : missionPhase === 'needs_revision' || missionPhase === 'failed' || missionPhase === 'cancelled'
+                ? 'A última missão precisa de atenção. Abra o Centro Operacional, revise o resultado e resete o estado.'
+              : connectionState === 'checking'
+                ? 'Conectando ao runtime cloud para sincronizar estado, agentes e heartbeat.'
+              : cloudRuntime
+                ? 'Modo público online. As missões são processadas no backend cloud com GLM 5.1.'
               : backendReady
                 ? 'Sistema online. Pronto para receber missão.'
                 : 'Sem conexão com o backend. Verifique se o servidor está em 127.0.0.1:4242.'}
           </p>
-          <div className={`state-badge ${activeMission ? 'ok' : backendReady ? 'warning' : 'error'} shrink-0`}>
-            {activeMission ? 'em operação' : backendReady ? 'em espera' : 'offline'}
+          <div className={`state-badge ${systemBadgeClass} shrink-0`}>
+            {systemBadge}
           </div>
         </motion.div>
 

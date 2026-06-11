@@ -1,6 +1,9 @@
 import type { LucaState } from './types';
+import { buildApiErrorMessage, requestJson } from './requestTimeout';
 
 const apiBase = typeof window !== 'undefined' ? window.location.origin : '';
+const STATE_REQUEST_TIMEOUT_MS = 8000;
+const ACTION_REQUEST_TIMEOUT_MS = 20000;
 
 export function wsUrl(): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -9,23 +12,24 @@ export function wsUrl(): string {
 
 export async function fetchState(): Promise<LucaState | null> {
   try {
-    const response = await fetch(`${apiBase}/api/state`);
-    if (!response.ok) return null;
-    return (await response.json()) as LucaState;
+    return await requestJson(`${apiBase}/api/state`, {
+      timeoutMs: STATE_REQUEST_TIMEOUT_MS,
+    }) as LucaState;
   } catch {
     return null;
   }
 }
 
 export async function apiPost<T = unknown>(path: string, body: Record<string, unknown> = {}): Promise<T> {
-  const response = await fetch(`${apiBase}${path}`, {
+  return requestJson(`${apiBase}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    timeoutMs: ACTION_REQUEST_TIMEOUT_MS,
   });
-  if (!response.ok) throw new Error(await response.text());
-  return (await response.json()) as T;
 }
+
+export { buildApiErrorMessage };
 
 // ─── Ações do contrato (server/index.js) ───
 export const lucaApi = {
@@ -39,7 +43,8 @@ export const lucaApi = {
   pauseHeartbeat: () => apiPost('/api/heartbeat/pause'),
   clearAgents: () => apiPost('/api/agents/clear'),
   sendChatMessage: (content: string) => apiPost('/api/tools/global-chat/message', { content }),
-  cancelSchedule: (id: string) => apiPost('/api/schedule/cancel', { id }),
-  pauseSchedule: (id: string) => apiPost('/api/schedule/pause', { id }),
-  resumeSchedule: (id: string) => apiPost('/api/schedule/resume', { id }),
+  runHarnessSmoke: () => apiPost('/api/harness/smoke'),
+  cancelSchedule: (scheduleId: string) => apiPost('/api/schedule/cancel', { scheduleId }),
+  pauseSchedule: (scheduleId: string) => apiPost('/api/schedule/pause', { scheduleId }),
+  resumeSchedule: (scheduleId: string) => apiPost('/api/schedule/resume', { scheduleId }),
 };

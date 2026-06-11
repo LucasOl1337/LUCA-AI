@@ -21,15 +21,18 @@ export function parseClosureReviewOutput(output = '') {
 
 export function supervisorReportedJudgmentBlocker(message = {}) {
   if (message.agentId !== 'supervisor') return false;
-  if (!['alerta', 'decisao', 'resultado', 'info'].includes(message.type)) return false;
-  return /\b(n[aã]o posso|nao posso|n[aã]o consigo|sem inventar|ainda n[aã]o|ainda nao|faltou|faltam|sem (piada|mensagem|contribui|evidencia)|bloque)\b/i.test(String(message.content || ''));
+  if (!['alerta', 'decisao', 'resultado', 'info', 'verificacao'].includes(message.type)) return false;
+  const content = String(message.content || '');
+  if (/\bveredito\b/i.test(content)) return false;
+  if (/Canvas executivo gerado por contingencia deterministica|Motivo tecnico tratado/i.test(content)) return false;
+  return /\b(n[aã]o posso|nao posso|n[aã]o consigo|sem inventar|ainda n[aã]o|ainda nao|faltou|faltam|sem (piada|mensagem|contribui|evidencia)|bloque)\b/i.test(content);
 }
 
 export function supervisorIssuedJudgmentVerdict(message = {}) {
   if (message.agentId !== 'supervisor') return false;
-  if (!['decisao', 'resultado', 'acao'].includes(message.type)) return false;
+  if (!['decisao', 'resultado', 'acao', 'verificacao'].includes(message.type)) return false;
   if (supervisorReportedJudgmentBlocker(message)) return false;
-  return /\b(venceu|vencedor|vencedora|nota|melhor|escolh|escolhi|decidi|ranking)\b/i.test(String(message.content || ''));
+  return /\b(veredito|venceu|vencedor|vencedora|nota|melhor|escolh|escolhi|decidi|ranking|aprovar|aprovo|aprovaria|reprovar|reprovo|avan[cç]ar|seguir|condicion|bloquear|segurar)\b/i.test(String(message.content || ''));
 }
 
 export function expectedChatPerformers(mission = {}, agents = []) {

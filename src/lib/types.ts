@@ -31,6 +31,19 @@ export interface ChatMessage {
   timestamp: string;
 }
 
+export interface MissionFinding {
+  title?: string;
+  detail?: string;
+  basis?: string;
+  importance?: string;
+}
+
+export interface MissionFinalReport {
+  summary?: string;
+  findings?: MissionFinding[];
+  [key: string]: unknown;
+}
+
 export interface DatabaseLayerRaw {
   status?: string;
   dashboardVisibility?: string;
@@ -79,6 +92,38 @@ export interface HeartbeatMonitor {
   updatedAt?: string | null;
   intervalSeconds?: number;
   summary?: string;
+  governance?: GovernanceSummary;
+  [key: string]: unknown;
+}
+
+export interface GovernanceSummary {
+  source?: string;
+  runtime?: string;
+  provider?: string;
+  liveMissionConcurrency?: string;
+  irreversibleActions?: string;
+  missionConcurrency?: {
+    blocked?: boolean;
+    unmatchedCount?: number;
+    latestUnmatched?: {
+      missionId?: string | null;
+      title?: string | null;
+      timestamp?: string | null;
+    } | null;
+  };
+  destructiveGuards?: string[];
+  irreversibleActionList?: string[];
+  shellAccess?: boolean;
+  filesystemWriteAccess?: boolean;
+  requiredPreflightEndpoints?: string[];
+  defaultBudget?: {
+    maxIterations?: number;
+    maxSeconds?: number;
+    maxToolCalls?: number;
+  };
+  rules?: string[];
+  summaryLines?: string[];
+  summaryText?: string;
   [key: string]: unknown;
 }
 
@@ -114,21 +159,58 @@ export interface ScheduledMission {
   [key: string]: unknown;
 }
 
+export interface GoalEntry {
+  id: string;
+  title: string;
+  description?: string;
+  definitionOfDone?: string;
+  status: string;
+  origin?: string;
+  priority?: number;
+  maxIterations?: number;
+  maxSeconds?: number;
+  maxToolCalls?: number;
+  iterations?: number;
+  toolCalls?: number;
+  tokensUsed?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  error?: string | null;
+}
+
 export interface ArchivedMission {
   id: string;
+  status?: string;
   reason?: string;
   archivedAt?: string;
   mission?: Mission | null;
-  run?: { id?: string; status?: string } | null;
+  run?: MissionRun | null;
   dashboard?: TemporaryDashboard | null;
+  evidence?: unknown[];
   chatMessages?: ChatMessage[];
   agents?: AgentEntry[];
+}
+
+export interface MissionRun {
+  id?: string;
+  status?: string;
+  intent?: string;
+  phase?: string;
+  progressLabel?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  completedAt?: string;
+  attempts?: number | null;
+  finalReport?: MissionFinalReport | null;
+  [key: string]: unknown;
 }
 
 export interface LucaState {
   supervisorMode: string;
   activeMission: Mission | null;
-  activeRun: { id?: string; status?: string } | null;
+  activeRun: MissionRun | null;
   missionHistory: ArchivedMission[];
   temporaryDashboard: TemporaryDashboard | null;
   database: DatabaseState;
@@ -136,9 +218,21 @@ export interface LucaState {
   globalChatMessages: ChatMessage[];
   scheduledMissions: ScheduledMission[];
   missionQueue: unknown[];
+  goals?: GoalEntry[];
+  governance?: GovernanceSummary;
   personaAgents: unknown[];
   agents: AgentEntry[];
   heartbeatMonitor?: HeartbeatMonitor | null;
+}
+
+export interface MissionConcurrencyLock {
+  blocked: boolean;
+  unmatchedCount?: number;
+  latestUnmatched?: {
+    missionId?: string | null;
+    title?: string | null;
+    timestamp?: string | null;
+  } | null;
 }
 
 export type BackendEvent =

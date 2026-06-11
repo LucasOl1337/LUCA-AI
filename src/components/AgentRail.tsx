@@ -14,8 +14,9 @@ interface AgentRailProps {
 
 export default function AgentRail({ activeAgent, onOpenAgent, onNavigate }: AgentRailProps) {
   const theme = useTheme();
-  const { getAgentStatus, backendReady, supervisorMode, startSupervisor, pauseSupervisor } = useLuca();
+  const { getAgentStatus, backendReady, runtimeMode, supervisorMode, startSupervisor, pauseSupervisor } = useLuca();
   const running = supervisorMode === 'running';
+  const online = backendReady || runtimeMode === 'cloud';
 
   return (
     <div className="void-panel rounded-2xl px-4 py-3 flex items-center gap-3 overflow-x-auto">
@@ -45,7 +46,7 @@ export default function AgentRail({ activeAgent, onOpenAgent, onNavigate }: Agen
             agent={agent}
             status={getAgentStatus(agent.id)}
             active={activeAgent === agent.id}
-            online={backendReady}
+            online={online}
             compact
             onClick={() => {
               if (agent.isDatabase) onNavigate('database');

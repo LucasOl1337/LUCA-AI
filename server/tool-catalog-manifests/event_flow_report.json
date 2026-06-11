@@ -1,0 +1,29 @@
+{
+  "id": "event_flow_report",
+  "name": "Fluxos de Eventos",
+  "description": "Agrupa eventos operacionais por traceId ou janela temporal para revisar a trilha completa de uma missão, goal ou incidente.",
+  "category": "runtime",
+  "kind": "catalog",
+  "provider": "luca",
+  "capabilities": ["observability", "events", "trace", "reporting"],
+  "tags": ["events", "flows", "trace", "tars"],
+  "prompt_instruction": "Use quando precisar reconstruir a sequencia operacional correlacionada de uma missao, goal ou falha sem percorrer o feed bruto evento por evento.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "type": { "type": "string", "description": "filtro opcional por tipo de evento" },
+      "missionId": { "type": "string", "description": "filtro opcional por missao" },
+      "goalId": { "type": "string", "description": "filtro opcional por goal" },
+      "traceId": { "type": "string", "description": "filtro opcional por trilha correlacionada" },
+      "limit": { "type": "integer", "description": "quantidade maxima de fluxos retornados" }
+    }
+  },
+  "invoke": {
+    "type": "http",
+    "method": "GET",
+    "endpoint": "/api/events/flows"
+  },
+  "executable": true,
+  "availability": "both",
+  "source": "tars-event-flow-pattern"
+}

@@ -9,7 +9,8 @@ import CopyLogButton from './CopyLogButton';
 
 export default function GlobalChat() {
   const theme = useTheme();
-  const { globalChatMessages, backendReady } = useLuca();
+  const { globalChatMessages, backendReady, runtimeMode } = useLuca();
+  const cloudRuntime = runtimeMode === 'cloud';
   const streamRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -25,9 +26,9 @@ export default function GlobalChat() {
         </h3>
         <span
           className="text-[9px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full"
-          style={{ color: backendReady ? theme.alive : theme.error, border: `1px solid ${theme.border}` }}
+          style={{ color: backendReady || cloudRuntime ? theme.alive : theme.error, border: `1px solid ${theme.border}` }}
         >
-          {backendReady ? 'ao vivo' : 'offline'}
+          {cloudRuntime ? 'glm' : backendReady ? 'ao vivo' : 'offline'}
         </span>
         <CopyLogButton text={formatGlobalChatLog(globalChatMessages)} label="copiar log do chat" />
       </header>

@@ -6,6 +6,8 @@ import AgentesPage from '@/pages/AgentesPage';
 import DatabasePage from '@/pages/DatabasePage';
 import HeartbeatPage from '@/pages/HeartbeatPage';
 import HistoricoPage from '@/pages/HistoricoPage';
+import EndpointsPage from '@/pages/EndpointsPage';
+import ToolsPage from '@/pages/ToolsPage';
 import AgentTerminal from '@/components/AgentTerminal';
 import { usePersistentState } from '@/hooks/usePersistentState';
 
@@ -20,6 +22,8 @@ export default function App() {
       case 'operacional': return <OperacionalPage onOpenAgent={setActiveAgent} activeAgent={activeAgent} onNavigate={setActivePage} />;
       case 'agentes':     return <AgentesPage onOpenAgent={setActiveAgent} activeAgent={activeAgent} onNavigate={setActivePage} />;
       case 'database':    return <DatabasePage />;
+      case 'ferramentas': return <ToolsPage />;
+      case 'endpoints':   return <EndpointsPage />;
       case 'heartbeat':   return <HeartbeatPage />;
       case 'historico':   return <HistoricoPage />;
       default:            return <LandingPage onNavigate={setActivePage} />;

@@ -1,0 +1,28 @@
+{
+  "id": "mission_activate",
+  "name": "Ativar Missao",
+  "description": "Abre uma missao nova no runtime LUCA com briefing e criterio de sucesso.",
+  "category": "missao",
+  "kind": "action",
+  "provider": "luca",
+  "capabilities": ["orquestracao", "briefing", "run"],
+  "tags": ["mission", "supervisor", "runtime"],
+  "prompt_instruction": "Use para iniciar uma nova rodada operacional quando houver objetivo claro e criterio de entrega.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "title": { "type": "string", "description": "titulo curto da missao" },
+      "description": { "type": "string", "description": "briefing operacional" },
+      "success": { "type": "string", "description": "definicao de sucesso esperada" }
+    },
+    "required": ["description"]
+  },
+  "invoke": {
+    "type": "http",
+    "method": "POST",
+    "endpoint": "/api/mission/activate"
+  },
+  "executable": true,
+  "availability": "both",
+  "source": "tars-tool-catalog-pattern"
+}

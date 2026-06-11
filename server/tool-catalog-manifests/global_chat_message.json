@@ -1,0 +1,28 @@
+{
+  "id": "global_chat_message",
+  "name": "Mensagem no Chat Global",
+  "description": "Publica uma mensagem manual no chat global do LUCA para orientar operadores e agentes.",
+  "category": "comms",
+  "kind": "action",
+  "provider": "luca",
+  "capabilities": ["chat", "coordenação", "operacao"],
+  "tags": ["chat", "broadcast"],
+  "prompt_instruction": "Use para registrar uma orientacao curta ou observacao operacional no chat global.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "content": { "type": "string", "description": "mensagem a publicar" },
+      "type": { "type": "string", "enum": ["info", "resultado", "decisao", "pergunta", "alerta", "acao", "sistema"], "description": "classificacao da mensagem" },
+      "agentId": { "type": "string", "description": "autor logico da mensagem" }
+    },
+    "required": ["content"]
+  },
+  "invoke": {
+    "type": "http",
+    "method": "POST",
+    "endpoint": "/api/tools/global-chat/message"
+  },
+  "executable": true,
+  "availability": "local",
+  "source": "tars-tool-catalog-pattern"
+}
