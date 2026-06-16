@@ -14,17 +14,23 @@ export default function MissionCanvas() {
   const chatOnly = run?.status === 'chat_completed';
 
   // Mantém o relatório visível mesmo quando há necessidade de revisão.
-  const reportDashboard = temporaryDashboard && !isOperationalCanvas(temporaryDashboard) ? temporaryDashboard : null;
+  const dashboardCandidate = temporaryDashboard ?? state?.temporaryDashboard ?? null;
+  const reportDashboard = dashboardCandidate && !isOperationalCanvas(dashboardCandidate) ? dashboardCandidate : null;
   const display = reportDashboard;
+  const headerStatus = activeMission
+    ? (activeMission.title ?? 'missão ativa')
+    : display
+      ? 'missão concluída'
+      : 'aguardando missão';
 
   return (
     <div className="void-panel rounded-2xl flex flex-col h-full overflow-hidden">
-      <header className="flex items-center gap-2 px-5 h-12 border-b shrink-0" style={{ borderColor: theme.border }}>
-        <h3 className="text-[11px] font-semibold tracking-[0.2em] uppercase flex-1" style={{ color: theme.textSoft }}>
+      <header className="flex items-center gap-2 px-5 h-12 border-b shrink-0 min-w-0" style={{ borderColor: theme.border }}>
+        <h3 className="text-[11px] font-semibold tracking-[0.2em] uppercase flex-1 min-w-0 luca-wrap" style={{ color: theme.textSoft }}>
           Canvas da Missão
         </h3>
-        <span className="text-[10px]" style={{ color: theme.textMute }}>
-          {activeMission ? (activeMission.title ?? 'missão ativa') : 'aguardando missão'}
+        <span className="text-[10px] max-w-[42%] shrink-0 text-right luca-wrap" style={{ color: theme.textMute }}>
+          {headerStatus}
         </span>
         {reportDashboard && (
           <div className="flex items-center gap-2">
@@ -48,9 +54,9 @@ export default function MissionCanvas() {
           <div className="p-5">
             <div className="mb-4">
               <span className="text-[10px] uppercase tracking-[0.2em]" style={{ color: theme.gold }}>canvas</span>
-              <h2 className="void-title text-xl mt-1">{display.title ?? 'Canvas temporário'}</h2>
+              <h2 className="void-title text-xl mt-1 luca-wrap">{display.title ?? 'Canvas temporário'}</h2>
               {display.subtitle && (
-                <p className="text-sm mt-1" style={{ color: theme.textMute }}>{display.subtitle}</p>
+                <p className="text-sm mt-1 luca-wrap" style={{ color: theme.textMute }}>{display.subtitle}</p>
               )}
               {rejected && (
                 <div
@@ -85,6 +91,7 @@ export default function MissionCanvas() {
                 <motion.div
                   key={`${block.type}-${block.title}-${i}`}
                   variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
+                  className="min-w-0"
                 >
                   <DashboardBlock block={block} />
                 </motion.div>

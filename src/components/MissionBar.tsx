@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ClipboardList, SendHorizontal, RotateCcw } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
@@ -55,6 +55,7 @@ export default function MissionBar() {
   const [draft, setDraft] = useState('');
   const [briefingOpen, setBriefingOpen] = useState(false);
   const [sompoFields, setSompoFields] = useState<SompoBriefingFields>(SOMPO_BRIEFING_TEMPLATE);
+  const lastDirectActionAt = useRef<Record<string, number>>({});
   useRuntimeTick(); // re-render do runtime a cada 1s
 
   const canActivate = draft.trim().length > 0 && canActivateMission;
@@ -92,6 +93,41 @@ export default function MissionBar() {
     }
   }
 
+  function runDirectButtonAction(event: React.SyntheticEvent<HTMLButtonElement>, key: string, action: () => void | Promise<void>) {
+    event.preventDefault();
+    event.stopPropagation();
+    const now = Date.now();
+    if (now - (lastDirectActionAt.current[key] ?? 0) < 250) return;
+    lastDirectActionAt.current[key] = now;
+    void action();
+  }
+
+  function runClickButtonAction(event: React.MouseEvent<HTMLButtonElement>, key: string, action: () => void | Promise<void>) {
+    event.stopPropagation();
+    if (Date.now() - (lastDirectActionAt.current[key] ?? 0) < 500) return;
+    void action();
+  }
+
+  function buttonActionHandlers(key: string, action: () => void | Promise<void>) {
+    const direct = (event: React.SyntheticEvent<HTMLButtonElement>) => runDirectButtonAction(event, key, action);
+    const click = (event: React.MouseEvent<HTMLButtonElement>) => runClickButtonAction(event, key, action);
+    return {
+      onPointerDownCapture: direct,
+      onPointerUpCapture: direct,
+      onMouseDownCapture: direct,
+      onMouseUpCapture: direct,
+      onTouchStartCapture: direct,
+      onTouchEndCapture: direct,
+      onPointerDown: direct,
+      onPointerUp: direct,
+      onMouseDown: direct,
+      onMouseUp: direct,
+      onTouchStart: direct,
+      onTouchEnd: direct,
+      onClick: click,
+    };
+  }
+
   const dbItems = countDatabaseItems(database);
   const runStatus = state?.activeRun?.status;
   const runSettled = ['completed', 'chat_completed', 'needs_revision', 'failed', 'cancelled'].includes(String(runStatus ?? ''));
@@ -99,6 +135,8 @@ export default function MissionBar() {
     || ['running', 'pending', 'verifying'].includes(String(runStatus ?? ''))
     || Boolean(activeMission && !runSettled);
   const hasMissionSurface = Boolean(activeMission || state?.activeRun || state?.temporaryDashboard);
+  const heartbeatModelSelector = state?.heartbeatMonitor?.modelSelector as { model?: string } | undefined;
+  const activeCloudModel = heartbeatModelSelector?.model || state?.governance?.provider || 'modelo';
   const missionConcurrency = state?.governance?.missionConcurrency ?? state?.heartbeatMonitor?.governance?.missionConcurrency ?? null;
   const concurrencyMissionId = String(missionConcurrency?.latestUnmatched?.missionId || '').trim();
   const activeMissionId = String(activeMission?.id || state?.activeMission?.id || '').trim();
@@ -112,7 +150,7 @@ export default function MissionBar() {
   const governanceBlocked = Boolean(missionConcurrency?.blocked && !currentMissionLocked);
   const latestBlockedTitle = String(missionConcurrency?.latestUnmatched?.title || '').trim();
   const missionStatusText = missionActionBusy
-    ? 'processando missão no GLM 5.1'
+    ? `processando missão no ${activeCloudModel}`
     : runStatus === 'pending'
       ? 'missão aceita pelo runtime'
     : runStatus === 'running'
@@ -135,18 +173,22 @@ export default function MissionBar() {
     <div className="void-panel rounded-2xl p-3 flex flex-col gap-2">
       {briefingOpen && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
-          <label className="lg:col-span-3 text-[10px] uppercase tracking-[0.16em] font-semibold" style={{ color: theme.textSoft }}>
+          <label htmlFor="sompo-case-name" className="lg:col-span-3 text-[10px] uppercase tracking-[0.16em] font-semibold" style={{ color: theme.textSoft }}>
             Caso
             <input
+              id="sompo-case-name"
+              aria-label="Caso"
               value={sompoFields.caseName}
               onChange={(e) => updateSompoField('caseName', e.target.value)}
               className="mt-1 w-full rounded-lg px-3 py-2 text-xs outline-none"
               style={{ color: theme.text, background: theme.input, border: `1px solid ${theme.border}` }}
             />
           </label>
-          <label className="lg:col-span-3 text-[10px] uppercase tracking-[0.16em] font-semibold" style={{ color: theme.textSoft }}>
+          <label htmlFor="sompo-claims-csv" className="lg:col-span-3 text-[10px] uppercase tracking-[0.16em] font-semibold" style={{ color: theme.textSoft }}>
             Sinistros CSV
             <textarea
+              id="sompo-claims-csv"
+              aria-label="Sinistros CSV"
               value={sompoFields.claimsCsv}
               onChange={(e) => updateSompoField('claimsCsv', e.target.value)}
               rows={3}
@@ -154,9 +196,11 @@ export default function MissionBar() {
               style={{ color: theme.text, background: theme.input, border: `1px solid ${theme.border}` }}
             />
           </label>
-          <label className="lg:col-span-3 text-[10px] uppercase tracking-[0.16em] font-semibold" style={{ color: theme.textSoft }}>
+          <label htmlFor="sompo-telemetry" className="lg:col-span-3 text-[10px] uppercase tracking-[0.16em] font-semibold" style={{ color: theme.textSoft }}>
             Telemetria
             <textarea
+              id="sompo-telemetry"
+              aria-label="Telemetria"
               value={sompoFields.telemetry}
               onChange={(e) => updateSompoField('telemetry', e.target.value)}
               rows={3}
@@ -164,9 +208,11 @@ export default function MissionBar() {
               style={{ color: theme.text, background: theme.input, border: `1px solid ${theme.border}` }}
             />
           </label>
-          <label className="lg:col-span-3 text-[10px] uppercase tracking-[0.16em] font-semibold" style={{ color: theme.textSoft }}>
+          <label htmlFor="sompo-finance" className="lg:col-span-3 text-[10px] uppercase tracking-[0.16em] font-semibold" style={{ color: theme.textSoft }}>
             Financeiro
             <textarea
+              id="sompo-finance"
+              aria-label="Financeiro"
               value={sompoFields.finance}
               onChange={(e) => updateSompoField('finance', e.target.value)}
               rows={3}
@@ -174,9 +220,11 @@ export default function MissionBar() {
               style={{ color: theme.text, background: theme.input, border: `1px solid ${theme.border}` }}
             />
           </label>
-          <label className="lg:col-span-12 text-[10px] uppercase tracking-[0.16em] font-semibold" style={{ color: theme.textSoft }}>
+          <label htmlFor="sompo-decision-goal" className="lg:col-span-12 text-[10px] uppercase tracking-[0.16em] font-semibold" style={{ color: theme.textSoft }}>
             Objetivo de decisao
             <input
+              id="sompo-decision-goal"
+              aria-label="Objetivo de decisao"
               value={sompoFields.decisionGoal}
               onChange={(e) => updateSompoField('decisionGoal', e.target.value)}
               className="mt-1 w-full rounded-lg px-3 py-2 text-xs outline-none"
@@ -186,8 +234,8 @@ export default function MissionBar() {
         </div>
       )}
 
-      <div className="flex items-end gap-2">
-        <div className="flex-1 relative">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <div className="flex-1 relative min-w-0">
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -201,7 +249,7 @@ export default function MissionBar() {
         </div>
 
         {hasMissionSurface && (
-          <button className="btn-fleet flex items-center gap-2" onClick={resetMission} title="resetar missão" disabled={missionActionBusy}>
+          <button className="btn-fleet flex items-center justify-center gap-2 whitespace-nowrap" {...buttonActionHandlers('reset', resetMission)} title="resetar missão" disabled={missionActionBusy}>
             <RotateCcw className="w-4 h-4" />
             Resetar
           </button>
@@ -209,8 +257,8 @@ export default function MissionBar() {
 
         <motion.button
           whileTap={{ scale: 0.95 }}
-          className="btn-primary flex items-center gap-2"
-          onClick={submit}
+          className="btn-primary flex items-center justify-center gap-2 whitespace-nowrap"
+          {...buttonActionHandlers('submit', submit)}
           disabled={!canActivate}
           title={!canActivate ? (missionLockReason ?? 'descreva a missão para ativar') : 'ativar missão'}
         >
@@ -220,17 +268,17 @@ export default function MissionBar() {
       </div>
 
       {/* status row */}
-      <div className="flex items-center justify-between px-1">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-[11px]" style={{ color: theme.textMute }}>
+      <div className="flex flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
+          <span className="text-[11px] min-w-0 luca-wrap" style={{ color: theme.textMute }}>
             {missionStatusText}
           </span>
           {!activeMission && (
             <button
               type="button"
-              className="text-[11px] underline-offset-2 hover:underline inline-flex items-center gap-1 disabled:no-underline disabled:opacity-45"
+              className="inline-flex h-10 items-center gap-1 rounded-md px-2 text-[11px] underline-offset-2 hover:underline disabled:no-underline disabled:opacity-45"
               style={{ color: theme.gold }}
-              onClick={launchSompoCase}
+              {...buttonActionHandlers('briefing', launchSompoCase)}
               disabled={!canActivateMission}
               title={canActivateMission ? 'preencher briefing Sompo' : (missionLockReason ?? 'missão bloqueada')}
             >
@@ -239,12 +287,12 @@ export default function MissionBar() {
             </button>
           )}
           {briefingOpen && !activeMission && (
-            <button type="button" className="text-[11px] underline-offset-2 hover:underline" style={{ color: theme.textMute }} onClick={() => setBriefingOpen(false)}>
+            <button type="button" className="inline-flex h-10 items-center rounded-md px-2 text-[11px] underline-offset-2 hover:underline" style={{ color: theme.textMute }} {...buttonActionHandlers('hide-briefing', () => setBriefingOpen(false))}>
               ocultar campos
             </button>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <StatePill label="online" on={backendReady} />
           <StatePill label={`db ${dbItems}`} on={dbItems > 0} color={theme.fleet} />
           <StatePill label={missionConcurrency?.blocked ? 'lock' : 'clear'} on={!governanceBlocked} color={governanceBlocked ? theme.error : currentMissionLocked ? theme.gold : theme.alive} />
@@ -272,7 +320,7 @@ export default function MissionBar() {
           <button
             type="button"
             className="underline-offset-2 hover:underline shrink-0"
-            onClick={clearOperationError}
+            {...buttonActionHandlers('clear-operation-error', clearOperationError)}
             style={{ color: theme.error }}
           >
             dispensar

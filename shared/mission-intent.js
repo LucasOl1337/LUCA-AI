@@ -87,7 +87,12 @@ export function textMentionsMissionQuantitativeEvidence(text = '', mission = {})
 
 function clipEvidence(value = '', max = 140) {
   const text = String(value || '').replace(/\s+/g, ' ').trim();
-  return text.length <= max ? text : `${text.slice(0, max - 3)}...`;
+  if (text.length <= max) return text;
+  const candidate = text.slice(0, max).trimEnd();
+  const sentenceCut = Math.max(candidate.lastIndexOf('. '), candidate.lastIndexOf('; '), candidate.lastIndexOf(': '));
+  if (sentenceCut > Math.floor(max * 0.55)) return candidate.slice(0, sentenceCut + 1).trim();
+  const wordCut = candidate.lastIndexOf(' ');
+  return (wordCut > Math.floor(max * 0.55) ? candidate.slice(0, wordCut) : candidate).trim();
 }
 
 function firstRawMatch(rawText = '', patterns = []) {

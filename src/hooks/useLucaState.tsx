@@ -26,10 +26,10 @@ const fallbackDatabase: DatabaseState = {
 };
 
 const LOCAL_POLL_MS = 5000;
-const CLOUD_IDLE_POLL_MS = 30000;
-const CLOUD_ACTIVE_POLL_MS = 2500;
-const CLOUD_SETTLED_POLL_MS = 12000;
-const CLOUD_BLOCKED_POLL_MS = 15000;
+const CLOUD_IDLE_POLL_MS = 120000;
+const CLOUD_ACTIVE_POLL_MS = 7000;
+const CLOUD_SETTLED_POLL_MS = 45000;
+const CLOUD_BLOCKED_POLL_MS = 60000;
 const RECENT_MISSION_BLOCK_WINDOW_MS = 20 * 60 * 1000;
 
 export type MissionUiPhase =
@@ -238,9 +238,32 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
     const pending = (async () => {
       const next = await fetchState();
       if (!next) {
+        if (runtimeMode === 'cloud' && cloudResultRef.current) {
+          syncState(cloudResultRef.current);
+          setBackendReady(true);
+          setConnectionState('online');
+          return true;
+        }
         setBackendReady(false);
         setConnectionState('offline');
         return false;
+      }
+      if (
+        runtimeMode === 'cloud'
+        && cloudResultRef.current
+        && !next.activeRun
+        && !next.temporaryDashboard
+        && (next.heartbeatMonitor?.storageDegraded || next.heartbeatMonitor?.status === 'degraded')
+      ) {
+        syncState({
+          ...cloudResultRef.current,
+          heartbeatMonitor: next.heartbeatMonitor ?? cloudResultRef.current.heartbeatMonitor,
+          governance: next.governance ?? cloudResultRef.current.governance,
+          heartbeatLogs: next.heartbeatLogs?.length ? next.heartbeatLogs : cloudResultRef.current.heartbeatLogs,
+        });
+        setBackendReady(true);
+        setConnectionState('online');
+        return true;
       }
       syncState(next);
       setBackendReady(true);
@@ -259,7 +282,7 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
   const scheduleCloudRefreshBurst = useCallback(() => {
     if (runtimeMode !== 'cloud') return;
     clearCloudRefreshTimers();
-    [500, 1500, 3000, 6000, 10000, 16000].forEach((delay) => {
+    [1000, 4000, 9000, 16000, 30000].forEach((delay) => {
       const timer = setTimeout(() => {
         void refresh();
       }, delay);
@@ -271,10 +294,9 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
     if (eventRefreshTimerRef.current) clearTimeout(eventRefreshTimerRef.current);
     eventRefreshTimerRef.current = setTimeout(() => {
       eventRefreshTimerRef.current = null;
-      if (runtimeMode === 'cloud' && !pageVisibleRef.current) return;
       void refresh();
     }, delay);
-  }, [refresh, runtimeMode]);
+  }, [refresh]);
 
   const applyBackendEvent = useCallback((event: BackendEvent) => {
     if (event.type === 'mission.activated') {
@@ -338,10 +360,6 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
       if (pollTimer) clearTimeout(pollTimer);
       pollTimer = setTimeout(async () => {
         if (closed) return;
-        if (runtimeMode === 'cloud' && !pageVisibleRef.current) {
-          schedulePoll();
-          return;
-        }
         await refresh();
         schedulePoll();
       }, delay);
@@ -394,12 +412,21 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
           schedulePoll(1000);
         }
       };
+      const onAttention = () => {
+        pageVisibleRef.current = document.visibilityState !== 'hidden';
+        void refresh();
+        schedulePoll(1000);
+      };
       document.addEventListener('visibilitychange', onVisibilityChange);
+      window.addEventListener('focus', onAttention);
+      window.addEventListener('pageshow', onAttention);
       schedulePoll();
 
       return () => {
         closed = true;
         document.removeEventListener('visibilitychange', onVisibilityChange);
+        window.removeEventListener('focus', onAttention);
+        window.removeEventListener('pageshow', onAttention);
         if (socket) socket.close();
         if (reconnectTimer) clearTimeout(reconnectTimer);
         if (pollTimer) clearTimeout(pollTimer);

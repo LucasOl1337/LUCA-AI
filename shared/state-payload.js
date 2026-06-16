@@ -56,7 +56,7 @@ function formatLegacyUtcTimeAsBrazil(timestamp) {
 
 function stateUsesCloudRuntime(state) {
   return state?.heartbeatMonitor?.service === 'luca-ai-cloud'
-    || state?.database?.source?.name === 'GLM 5.1 runtime';
+    || / runtime$/i.test(String(state?.database?.source?.name || ''));
 }
 
 function normalizeChatMessage(message, { convertLegacyUtcTime = false } = {}) {

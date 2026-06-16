@@ -34,6 +34,7 @@ export async function requestJson(url, options = {}) {
     method = 'GET',
     headers,
     body,
+    cache = 'no-store',
     timeoutMs = 15000,
     fetchImpl = globalThis.fetch,
   } = options;
@@ -51,6 +52,7 @@ export async function requestJson(url, options = {}) {
       method,
       headers,
       body,
+      cache,
       signal: controller.signal,
     });
   } catch (error) {

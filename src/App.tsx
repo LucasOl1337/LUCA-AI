@@ -2,7 +2,9 @@ import { useState } from 'react';
 import Layout, { type PageId } from '@/components/Layout';
 import LandingPage from '@/pages/LandingPage';
 import OperacionalPage from '@/pages/OperacionalPage';
+import LucaAiPage from '@/pages/LucaAiPage';
 import AgentesPage from '@/pages/AgentesPage';
+import PersonasPage from '@/pages/PersonasPage';
 import DatabasePage from '@/pages/DatabasePage';
 import HeartbeatPage from '@/pages/HeartbeatPage';
 import HistoricoPage from '@/pages/HistoricoPage';
@@ -20,7 +22,9 @@ export default function App() {
     switch (activePage) {
       case 'inicio':      return <LandingPage onNavigate={setActivePage} />;
       case 'operacional': return <OperacionalPage onOpenAgent={setActiveAgent} activeAgent={activeAgent} onNavigate={setActivePage} />;
+      case 'luca-ai':     return <LucaAiPage />;
       case 'agentes':     return <AgentesPage onOpenAgent={setActiveAgent} activeAgent={activeAgent} onNavigate={setActivePage} />;
+      case 'personas':    return <PersonasPage />;
       case 'database':    return <DatabasePage />;
       case 'ferramentas': return <ToolsPage />;
       case 'endpoints':   return <EndpointsPage />;

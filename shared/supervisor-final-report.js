@@ -157,7 +157,12 @@ function normalizeText(value = '') {
 
 function compactText(value = '', max = 260) {
   const text = String(value || '').replace(/\s+/g, ' ').trim();
-  return text.length <= max ? text : `${text.slice(0, max - 3)}...`;
+  if (text.length <= max) return text;
+  const candidate = text.slice(0, max).trimEnd();
+  const sentenceCut = Math.max(candidate.lastIndexOf('. '), candidate.lastIndexOf('; '), candidate.lastIndexOf(': '));
+  if (sentenceCut > Math.floor(max * 0.55)) return candidate.slice(0, sentenceCut + 1).trim();
+  const wordCut = candidate.lastIndexOf(' ');
+  return (wordCut > Math.floor(max * 0.55) ? candidate.slice(0, wordCut) : candidate).trim();
 }
 
 function escapeRegExp(value = '') {
@@ -269,14 +274,14 @@ function injectInsuranceContractFindings(findings = [], mission = {}, coverage =
   const appendIfMissing = ({ pattern, title, detail, importance = 'alta', basis = 'premissa' }) => {
     if (result.length >= 8) return;
     if (pattern.test(findingsText(result))) return;
-    result.push({ title, detail: compactText(detail, 420), importance, basis });
+    result.push({ title, detail: compactText(detail, 1200), importance, basis });
   };
 
   if (agroClimateEvidence.length) {
     appendIfMissing({
       pattern: /\b(inmet|conab|deficit hidrico|chuva abaixo|produtividade|zarc|francisco beltrao|safra|climatic)\b/,
       title: 'Evidencias agroclimaticas',
-      detail: compactText(`Sinais do briefing para sustentar underwriting agricola: ${agroClimateEvidence.map((item) => item.value).join('; ')}.`, 420),
+      detail: compactText(`Sinais do briefing para sustentar underwriting agricola: ${agroClimateEvidence.map((item) => item.value).join('; ')}.`, 1200),
       importance: 'alta',
       basis: 'evidencia',
     });
@@ -334,8 +339,8 @@ function normalizeFindings(findings = [], contributions = []) {
   const parsed = Array.isArray(findings) ? findings : [];
   const normalized = parsed
     .map((finding, index) => {
-      const title = compactText(finding?.title || `Prioridade ${index + 1}`, 80);
-      const detail = compactText(finding?.detail || finding?.summary || finding?.description || title, 260);
+      const title = compactText(finding?.title || `Prioridade ${index + 1}`, 120);
+      const detail = compactText(finding?.detail || finding?.summary || finding?.description || title, 1200);
       return {
         title,
         importance: IMPORTANCE_VALUES.has(String(finding?.importance || '').trim()) ? String(finding.importance).trim() : (index < 2 ? 'alta' : 'media'),
@@ -347,9 +352,9 @@ function normalizeFindings(findings = [], contributions = []) {
   if (normalized.length) return normalized.slice(0, 6);
 
   return contributions.slice(0, 4).map((message, index) => {
-    const detail = compactText(message?.content || `Prioridade ${index + 1}`, 260);
+    const detail = compactText(message?.content || `Prioridade ${index + 1}`, 1200);
     return {
-      title: compactText(message?.agentId ? `${message.agentId} ${index + 1}` : `Prioridade ${index + 1}`, 80),
+      title: compactText(message?.agentId ? `${message.agentId} ${index + 1}` : `Prioridade ${index + 1}`, 120),
       importance: index < 2 ? 'alta' : 'media',
       basis: inferBasis(detail),
       detail,
@@ -392,7 +397,7 @@ export function normalizeSupervisorFinalReport({ mission = {}, snapshot = {}, re
       || findings[0]?.detail
       || fallbackReason
       || 'Consolidacao executiva pronta para canvas.',
-    360,
+    1200,
   );
   const chartGuidance = compactText(
     [
@@ -402,7 +407,7 @@ export function normalizeSupervisorFinalReport({ mission = {}, snapshot = {}, re
         ? 'Use ranking de risco, bloco de evidencia/premissa e nota curta sobre lacuna financeira ou proxy quando houver.'
         : 'Use ranking simples e blocos curtos para explicar prioridades e criterio de sucesso.',
     ].filter(Boolean).join(' '),
-    520,
+    1200,
   );
 
   return {

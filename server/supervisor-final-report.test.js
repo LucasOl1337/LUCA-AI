@@ -233,6 +233,36 @@ test('normalizeSupervisorFinalReport preserva evidencias agroclimaticas do brief
   assert.match(text, /4 a 8 semanas/);
 });
 
+test('normalizeSupervisorFinalReport nao injeta reticencias em evidencias longas', () => {
+  const longDetail = [
+    'Evidencia: Caso Sompo Sprint 2 - Fazenda Santa Aurora Entrada de sinistros em CSV fornecida pelo briefing: tipo_evento,quantidade alagamento,12 falha_irrigacao,7 pragas,5.',
+    'Telemetria atual: Talhao norte com umidade acima do limite operacional; previsao de chuva 42mm nas proximas 24h; sensor de vazao da irrigacao leste oscilando.',
+    'Dados financeiros: Valor de apolice, custo de reparo e produtividade financeira ainda nao enviados; marcar valores financeiros como pendentes.',
+  ].join(' ');
+
+  const report = normalizeSupervisorFinalReport({
+    mission: {
+      title: 'Caso Sompo Sprint 2',
+      description: 'Gerar canvas executivo Sompo com evidencias, telemetria e lacuna financeira.',
+      success: 'Exibir evidencias sem cortes de texto.',
+    },
+    snapshot: {
+      contributions: [
+        { agentId: 'pesquisador', content: longDetail },
+      ],
+    },
+    report: {
+      summary: longDetail,
+      findings: [{ title: 'Evidencia principal', detail: longDetail, importance: 'alta', basis: 'evidencia' }],
+    },
+  });
+
+  const text = JSON.stringify(report);
+  assert.doesNotMatch(text, /\.\.\./);
+  assert.match(text, /sensor de vazao da irrigacao leste oscilando/);
+  assert.match(text, /Valor de apolice, custo de reparo e produtividade financeira ainda nao enviados/);
+});
+
 test('normalizeSupervisorFinalReport deriva evidencias, fila e gatilhos para prevencao operacional', () => {
   const mission = {
     title: 'Sompo claims prevention',

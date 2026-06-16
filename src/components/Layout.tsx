@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home,
   LayoutGrid,
+  BrainCircuit,
   Boxes,
+  StickyNote,
   Database,
   Activity,
   History,
@@ -15,7 +17,7 @@ import {
 import { useTheme } from '@/hooks/useTheme';
 import { useLuca } from '@/hooks/useLucaState';
 
-export type PageId = 'inicio' | 'operacional' | 'agentes' | 'database' | 'ferramentas' | 'endpoints' | 'heartbeat' | 'historico';
+export type PageId = 'inicio' | 'operacional' | 'luca-ai' | 'agentes' | 'personas' | 'database' | 'ferramentas' | 'endpoints' | 'heartbeat' | 'historico';
 
 interface LayoutProps {
   activePage: PageId;
@@ -33,7 +35,9 @@ interface NavItem {
 const navItems: NavItem[] = [
   { id: 'inicio', label: 'Início', icon: Home, hint: 'apresentação do centro' },
   { id: 'operacional', label: 'Operacional', icon: LayoutGrid, hint: 'centro operacional da missão' },
+  { id: 'luca-ai', label: 'LUCA-AI', icon: BrainCircuit, hint: 'bancada isolada com equipe de personas' },
   { id: 'agentes', label: 'Agentes', icon: Boxes, hint: 'esquadrão de corujas e seus terminais' },
+  { id: 'personas', label: 'Personas', icon: StickyNote, hint: 'cards do Yume embutidos no LUCA' },
   { id: 'database', label: 'Database', icon: Database, hint: 'as três camadas do conhecimento' },
   { id: 'ferramentas', label: 'Ferramentas', icon: Wrench, hint: 'catálogo operacional adaptado do TARS' },
   { id: 'endpoints', label: 'Endpoints', icon: Plug2, hint: 'catálogo operacional de rotas e contratos' },
@@ -43,9 +47,21 @@ const navItems: NavItem[] = [
 
 export default function Layout({ activePage, onPageChange, children }: LayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [isNarrow, setIsNarrow] = useState(false);
   const theme = useTheme();
-  const { backendReady, connectionState, runtimeMode } = useLuca();
+  const { backendReady, connectionState, runtimeMode, state } = useLuca();
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)');
+    const sync = () => setIsNarrow(media.matches);
+    sync();
+    media.addEventListener('change', sync);
+    return () => media.removeEventListener('change', sync);
+  }, []);
+
+  const shellCollapsed = collapsed || isNarrow;
   const cloudRuntime = runtimeMode === 'cloud';
+  const heartbeatModelSelector = state?.heartbeatMonitor?.modelSelector as { model?: string } | undefined;
+  const activeCloudModel = heartbeatModelSelector?.model || state?.governance?.provider || 'modelo cloud';
   const statusTone = connectionState === 'checking'
     ? theme.gold
     : backendReady
@@ -54,7 +70,7 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
   const runtimeLabel = cloudRuntime
     ? connectionState === 'checking'
       ? 'conectando cloud'
-      : 'glm 5.1 cloud'
+      : `${activeCloudModel} cloud`
     : connectionState === 'checking'
       ? 'checando sistema'
       : backendReady
@@ -89,7 +105,7 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
       {/* ─── Sidebar ─── */}
       <motion.aside
         initial={false}
-        animate={{ width: collapsed ? 76 : 240 }}
+        animate={{ width: shellCollapsed ? 76 : 240 }}
         transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
         className="relative flex flex-col h-full shrink-0 z-20 border-r"
         style={{
@@ -111,7 +127,7 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
             </div>
           </div>
           <AnimatePresence>
-            {!collapsed && (
+            {!shellCollapsed && (
               <motion.div
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -138,11 +154,11 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
                 key={item.id}
                 onClick={() => onPageChange(item.id)}
                 className={`rift-item w-full ${isActive ? 'active' : ''}`}
-                title={collapsed ? item.label : undefined}
+                title={shellCollapsed ? item.label : undefined}
               >
                 <Icon className="w-[18px] h-[18px] shrink-0" />
                 <AnimatePresence>
-                  {!collapsed && (
+                  {!shellCollapsed && (
                     <motion.span
                       initial={{ opacity: 0, x: -6 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -162,7 +178,7 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
         {/* Footer — status do runtime */}
         <div className="px-3 py-3 border-t" style={{ borderColor: theme.border }}>
           <div
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg ${collapsed ? 'justify-center' : ''}`}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg ${shellCollapsed ? 'justify-center' : ''}`}
             style={{ background: theme.goldSoft, border: `1px solid ${theme.border}` }}
           >
             <div
@@ -170,7 +186,7 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
               style={{ background: statusTone }}
             />
             <AnimatePresence>
-              {!collapsed && (
+              {!shellCollapsed && (
                 <motion.span
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -188,7 +204,7 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
         {/* Collapse toggle */}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="absolute -right-3 top-20 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer border z-30 transition-all hover:scale-110"
+          className={`absolute -right-3 top-20 w-6 h-6 rounded-full items-center justify-center cursor-pointer border z-30 transition-all hover:scale-110 ${isNarrow ? 'hidden' : 'flex'}`}
           style={{ background: theme.void2, borderColor: theme.border }}
         >
           {collapsed ? (
@@ -201,12 +217,12 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
 
       {/* ─── Main ─── */}
       <main className="flex-1 overflow-hidden relative z-10 flex flex-col">
-        <div className="flex items-center justify-between gap-3 px-6 h-14 shrink-0 border-b" style={{ borderColor: theme.border }}>
-          <span className="text-[11px] font-medium tracking-[0.25em] uppercase" style={{ color: theme.textMute }}>
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 h-14 shrink-0 border-b" style={{ borderColor: theme.border }}>
+          <span className="text-[11px] font-medium tracking-[0.25em] uppercase truncate" style={{ color: theme.textMute }}>
             {navItems.find((n) => n.id === activePage)?.hint}
           </span>
-          <div className="flex items-center gap-3 text-[10px] font-mono" style={{ color: theme.textGhost }}>
-            <span>{cloudRuntime ? 'glm 5.1 cloud' : '127.0.0.1 : 4242'}</span>
+          <div className="hidden sm:flex items-center gap-3 text-[10px] font-mono" style={{ color: theme.textGhost }}>
+            <span>{cloudRuntime ? `${activeCloudModel} cloud` : '127.0.0.1 : 4242'}</span>
           </div>
         </div>
 

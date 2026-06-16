@@ -20,6 +20,7 @@ declare module '../../shared/request-timeout.js' {
       method?: string;
       headers?: Record<string, string>;
       body?: string;
+      cache?: RequestCache;
       timeoutMs?: number;
       fetchImpl?: typeof fetch;
     },

@@ -100,12 +100,23 @@ import { buildOkStateResponse } from './state-response.js';
 import { buildMissionReport } from './mission-report.js';
 import { buildYumeMemoryEvent } from './yume-memory-event.js';
 import { runRuntimeReadinessChecks } from './runtime-readiness.js';
+import { buildKamuiYumeAvatarUrl, normalizeYumeAvatarPath, normalizeYumePersonasForLuca } from './persona-cards.js';
+import {
+  buildPersonaTeamPrompt,
+  cleanPersonaTeamOutput,
+  normalizePersonaTeamRunInput,
+  PERSONA_WORKFLOW_ROLES,
+} from './persona-team.js';
 
 const app = express();
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  if (req.path.startsWith('/api/')) {
+    res.setHeader('Cache-Control', 'no-store');
+  }
   if (req.method === 'OPTIONS') {
     res.sendStatus(204);
     return;
@@ -668,6 +679,11 @@ function isRouterUnavailable(error) {
   return /9router_unreachable|fetch failed|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|timeout/i.test(message);
 }
 
+function isTechnicalRuntimeMessage(value) {
+  return /\b(9router|fetch failed|unreachable|timeout|econnrefused|enotfound|etimedout|indisponivel|falhei ao transformar|erro:)\b/i
+    .test(String(value || ''));
+}
+
 function isOperationalDashboard(dashboard) {
   const { sourceAgentId, updatedAt, ...publicDashboard } = dashboard ?? {};
   const text = JSON.stringify(publicDashboard).toLowerCase();
@@ -729,6 +745,7 @@ function fallbackSupervisorFinalReport(mission, reason = 'fallback local') {
   const usefulItems = contributions
     .map((message) => String(message.content ?? '').replace(/\s+/g, ' ').trim())
     .filter(Boolean)
+    .filter((item) => !isTechnicalRuntimeMessage(item))
     .slice(-5);
   const missionText = [mission?.description, mission?.success, snapshot.briefing].filter(Boolean).join(' ');
   const lower = missionText.toLowerCase();
@@ -816,7 +833,7 @@ Responda somente com JSON valido neste formato:
 {
   "summary": "frase executiva",
   "findings": [
-    { "title": "finding", "importance": "alta|media|baixa", "basis": "evidencia|premissa|proxy", "detail": "explicacao curta" }
+    { "title": "finding", "importance": "alta|media|baixa", "basis": "evidencia|premissa|proxy", "detail": "frase executiva completa, sem reticencias e sem cortar palavras" }
   ],
   "designerBrief": {
     "mustShow": ["item"],
@@ -830,7 +847,7 @@ Responda somente com JSON valido neste formato:
 
   setAgentStatus('supervisor', 'running');
   appendLine('supervisor', `[orquestrador:${model}] consolidando relatorio final`);
-  const output = await call9Router({ system, user: prompt, agentId: scopedAgentId('supervisor'), model, maxTokens: 900 });
+  const output = await call9Router({ system, user: prompt, agentId: scopedAgentId('supervisor'), model, maxTokens: 1800 });
   appendLine('supervisor', output);
   const parsed = parseSupervisorFinalReportOutput(output);
   const fallbackReason = parsed
@@ -1031,7 +1048,7 @@ async function runDesignerAgent(agent, mission, task = null) {
   const repoContext = missionRequiresRepoContext(mission) ? `\nEvidencias da repo, se forem relevantes:\n${compactText(repoContextForPrompt(), 2500)}\n` : '';
   const prompt = `Missao global ativa\nDescricao: ${mission?.description ?? 'Sem descricao'}\nCriterios de conclusao: ${mission?.success ?? 'Sem criterios de conclusao'}\n\nBriefing operacional:\n${directionPrompt || 'sem briefing'}\n\nDados estruturados da run:\n${JSON.stringify(dataSnapshot, null, 2)}\n${repoContext}\n\nTarefa do designer:\nVoce recebeu um canvas temporario vazio na area principal esquerda. Preencha com resultados uteis da RUN atual, de forma limpa, minimalista e facil de ler. O objetivo nao e decorar: e transformar progresso, agentes, riscos, achados e proximas decisoes em uma visualizacao sintetica.\n\nLogica de design obrigatoria:\n1. Se houver contagens ou proporcoes claras, prefira grafico simples: pie para distribuicao, tower para comparacao/ranking.\n2. Se a run tiver muitos achados textuais, prefira topics com topicos curtos e modernos.\n3. Se envolver varios agentes, mostre status por agente e progresso da run.\n4. Se houver risco/ambiguidades, inclua um bloco de alerta curto.\n5. Se houver sequencia temporal, use timeline.\n6. Se a missao for simples, use 2 a 4 blocos e muito espaco vazio.\n7. Nao invente dados: derive contagens apenas dos dados estruturados, briefing, chat e RepoContext quando fornecido.\n\nComponentes permitidos em blocks:\n- metric: valor curto com label\n- status: estado de agente ou run\n- list: lista curta\n- timeline: eventos recentes\n- note: texto curto\n- alert: risco ou pendencia\n- progress: progresso textual tipo 2/4\n- pie: grafico de pizza simples; items devem ser objetos { "label": "nome", "value": numero }\n- tower: grafico de barras horizontais/torre; items devem ser objetos { "label": "nome", "value": numero }\n- topics: lista visual de topicos curtos; items devem ser strings de 2 a 5 palavras\n\nResponda somente com JSON valido neste formato:\n{\n  "title": "titulo curto",\n  "subtitle": "frase de contexto",\n  "status": "rascunho|ativo|concluido|alerta",\n  "layout": "empty|minimal|status-board|timeline|mission-control|insight-board",\n  "blocks": [\n    { "type": "metric|status|list|timeline|note|alert|progress|pie|tower|topics", "title": "titulo", "value": "valor opcional", "body": "texto opcional", "items": ["item 1"] }\n  ]\n}\n\nUse no maximo 6 blocos. Se usar pie ou tower, mantenha ate 5 itens. Se a missao for simples, use 2 ou 3 blocos. Nao inclua markdown fora do JSON.`;
   const system = `Voce e o agente ${agent.id} (${agent.role}) do projeto LUCA-AI. Sua funcao e desenhar canvas temporarios claros, minimalistas e acionaveis para a missao ativa. Priorize resultados uteis da run, visualizacoes simples e topicos modernos. Voce escolhe o layout conforme a natureza da missao e responde em JSON valido.`;
-  const resultOnlySystem = `Voce e o agente ${agent.id} (${agent.role}) do projeto LUCA-AI. Sua funcao e desenhar canvas temporarios de resultados para a missao atual. Nunca inclua detalhes operacionais, agentes, progresso, eventos ou status internos. Responda em JSON valido.`;
+  const resultOnlySystem = `Voce e o agente ${agent.id} (${agent.role}) do projeto LUCA-AI. Sua funcao e desenhar canvas temporarios de resultados para a missao atual. Nunca inclua detalhes operacionais, agentes, progresso, eventos ou status internos. Nunca corte palavras nem use reticencias (...). Responda em JSON valido.`;
   const resultOnlyPrompt = `Missao global ativa
 Descricao: ${mission?.description ?? 'Sem descricao'}
 Criterios de conclusao: ${mission?.success ?? 'Sem criterios de conclusao'}
@@ -1073,7 +1090,7 @@ Regras obrigatorias:
 Componentes permitidos em blocks:
 - metric: valor curto com label relacionado ao resultado
 - list: lista de resultados finais
-- note: explicacao curta sobre o tema
+- note: texto executivo objetivo em frase completa
 - pie: grafico de distribuicao do conteudo final; items devem ser objetos { "label": "nome", "value": numero }
 - tower: ranking/comparacao de resultados; items devem ser objetos { "label": "nome", "value": numero }
 - topics: topicos curtos de resultado; items devem ser strings de 2 a 5 palavras
@@ -1089,7 +1106,9 @@ Responda somente com JSON valido neste formato:
   "blocks": [
     { "type": "list|note|metric|pie|tower|topics", "title": "titulo", "body": "texto opcional", "value": "valor opcional", "items": [] }
   ]
-}`;
+}
+
+Nao use reticencias (...), nao abrevie body no meio da palavra e nao deixe frases incompletas. Se o texto ficar grande, resuma reescrevendo a frase, sem cortar evidencias, telemetria ou lacunas financeiras.`;
   const model = resolveAgentModel(agent);
 
   try {
@@ -1104,7 +1123,7 @@ Responda somente com JSON valido neste formato:
       throw new Error(`9router indisponivel em ${health.url}${health.error ? `: ${health.error}` : health.status ? `: HTTP ${health.status}` : ''}`);
     }
 
-    const output = await call9Router({ system: resultOnlySystem, user: resultOnlyPrompt, agentId: scopedAgentId(agent.id), model, maxTokens: 900 });
+    const output = await call9Router({ system: resultOnlySystem, user: resultOnlyPrompt, agentId: scopedAgentId(agent.id), model, maxTokens: 1800 });
     appendLine(agent.id, output);
     const parsedDashboard = extractJsonObject(output);
     if (!parsedDashboard) {
@@ -1614,6 +1633,247 @@ Responda como ${persona.name}, em 1 a 5 linhas. Use [chat:tipo] para o que deve 
   }
 }
 
+async function loadPersonaTeamPrompt(slug) {
+  const persona = getPersonaAgents().find((p) => p.slug === slug);
+  try {
+    const data = await fetchYumePersonaSystemPrompt(slug);
+    let version = null;
+    try {
+      const versionInfo = await getYumePersonaVersion(slug);
+      version = versionInfo?.version ?? null;
+    } catch {
+      version = data?.version ?? null;
+    }
+    return {
+      name: data?.name || persona?.name || slug,
+      model: data?.model || persona?.model || '',
+      systemPrompt: data?.system_prompt || '',
+      version,
+      cached: false,
+    };
+  } catch (error) {
+    if (persona?.cachedSystemPrompt) {
+      return {
+        name: persona.name || slug,
+        model: persona.model || '',
+        systemPrompt: persona.cachedSystemPrompt,
+        version: persona.cachedVersion ?? null,
+        cached: true,
+        stale: true,
+        warning: error?.message || String(error),
+      };
+    }
+    throw error;
+  }
+}
+
+function summarizeLucaAiTraceText(value, maxLength = 320) {
+  const compact = String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!compact) return '';
+  return compact.length > maxLength ? `${compact.slice(0, maxLength - 1)}...` : compact;
+}
+
+function appendLucaAiTraceEvent(traceId, type, payload = {}) {
+  if (!traceId) return null;
+  try {
+    return appendEvent({
+      type,
+      traceId,
+      source: 'luca-ai',
+      payload,
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, workflowRole = null, accumulatedContext = '', traceId = null }) {
+  const name = loaded.name || slug;
+  const model = loaded.model || ROUTER_MODEL;
+  const prompt = buildPersonaTeamPrompt({
+    mission,
+    personaName: name,
+    personaSlug: slug,
+    systemPrompt: loaded.systemPrompt,
+    teamNames,
+    workflowRole,
+    accumulatedContext,
+  });
+  const startedAt = new Date().toISOString();
+  const startedMs = Date.now();
+  const roleLabel = workflowRole?.roleLabel || '';
+
+  appendLucaAiTraceEvent(traceId, 'luca_ai.llm.requested', {
+    slug,
+    name: prompt.name,
+    model,
+    roleId: workflowRole?.roleId || null,
+    roleLabel,
+    inputSummary: summarizeLucaAiTraceText(prompt.user),
+    systemSummary: summarizeLucaAiTraceText(prompt.system, 180),
+    inputChars: prompt.user.length,
+    systemChars: prompt.system.length,
+  });
+
+  try {
+    const output = await call9Router({
+      system: prompt.system,
+      user: prompt.user,
+      agentId: `luca-ai-team-${slug}`,
+      model,
+      maxTokens: 900,
+    });
+    const completedAt = new Date().toISOString();
+    const durationMs = Date.now() - startedMs;
+    const content = cleanPersonaTeamOutput(output);
+    appendLucaAiTraceEvent(traceId, 'luca_ai.llm.completed', {
+      slug,
+      name: prompt.name,
+      model,
+      roleId: workflowRole?.roleId || null,
+      roleLabel,
+      durationMs,
+      outputSummary: summarizeLucaAiTraceText(content, 420),
+      outputChars: content.length,
+    });
+    return {
+      ok: true,
+      slug,
+      name: prompt.name,
+      model,
+      version: loaded.version ?? null,
+      cached: Boolean(loaded.cached),
+      stale: Boolean(loaded.stale),
+      content,
+      startedAt,
+      completedAt,
+      durationMs,
+    };
+  } catch (error) {
+    const completedAt = new Date().toISOString();
+    const durationMs = Date.now() - startedMs;
+    appendLucaAiTraceEvent(traceId, 'luca_ai.llm.failed', {
+      slug,
+      name,
+      model,
+      roleId: workflowRole?.roleId || null,
+      roleLabel,
+      durationMs,
+      error: summarizeLucaAiTraceText(error?.message || String(error), 240),
+    });
+    return {
+      ok: false,
+      slug,
+      name,
+      model,
+      version: loaded.version ?? null,
+      cached: Boolean(loaded.cached),
+      stale: Boolean(loaded.stale),
+      error: error?.message || String(error),
+      startedAt,
+      completedAt,
+      durationMs,
+    };
+  }
+}
+
+async function runLucaAiPersonaWorkflow({ mission, workflow, teamNames, loadedBySlug, traceId = null }) {
+  const steps = [];
+  const contextSections = [];
+
+  for (const roleConfig of PERSONA_WORKFLOW_ROLES) {
+    const stepStartedAt = new Date().toISOString();
+    const stepStartedMs = Date.now();
+    const assignment = workflow.find((item) => item.roleId === roleConfig.id);
+    const role = assignment || {
+      roleId: roleConfig.id,
+      roleLabel: roleConfig.label,
+      instruction: roleConfig.instruction,
+      slugs: [],
+    };
+    appendLucaAiTraceEvent(traceId, 'luca_ai.workflow.step_started', {
+      roleId: role.roleId,
+      roleLabel: role.roleLabel || roleConfig.label,
+      participantCount: (role.slugs || []).length,
+      participants: (role.slugs || []).map((slug) => ({ slug })),
+    });
+    const accumulatedContext = contextSections.join('\n\n');
+    const replies = await Promise.all((role.slugs || []).map((slug) => {
+      const entry = loadedBySlug.get(slug);
+      if (!entry || entry.error) {
+        appendLucaAiTraceEvent(traceId, 'luca_ai.llm.failed', {
+          slug,
+          name: slug,
+          model: '',
+          roleId: role.roleId,
+          roleLabel: role.roleLabel || roleConfig.label,
+          error: entry?.error || 'persona_not_loaded',
+        });
+        return Promise.resolve({
+          ok: false,
+          slug,
+          name: slug,
+          model: '',
+          version: null,
+          cached: false,
+          stale: false,
+          error: entry?.error || 'persona_not_loaded',
+        });
+      }
+
+      return runLucaAiPersonaTeamMember({
+        slug,
+        mission,
+        teamNames,
+        loaded: entry.loaded,
+        workflowRole: role,
+        accumulatedContext,
+        traceId,
+      });
+    }));
+    const stepCompletedAt = new Date().toISOString();
+    const stepDurationMs = Date.now() - stepStartedMs;
+    const step = {
+      id: role.roleId,
+      roleId: role.roleId,
+      roleLabel: role.roleLabel || roleConfig.label,
+      participants: (role.slugs || []).map((slug) => {
+        const entry = loadedBySlug.get(slug);
+        return {
+          slug,
+          name: entry?.loaded?.name || slug,
+          model: entry?.loaded?.model || '',
+        };
+      }),
+      replies,
+      startedAt: stepStartedAt,
+      completedAt: stepCompletedAt,
+      durationMs: stepDurationMs,
+    };
+    steps.push(step);
+    appendLucaAiTraceEvent(traceId, 'luca_ai.workflow.step_completed', {
+      roleId: step.roleId,
+      roleLabel: step.roleLabel,
+      durationMs: stepDurationMs,
+      okCount: replies.filter((reply) => reply.ok).length,
+      errorCount: replies.filter((reply) => !reply.ok).length,
+      outputSummary: summarizeLucaAiTraceText(
+        replies.map((reply) => `${reply.name || reply.slug}: ${reply.ok ? reply.content : `FALHA: ${reply.error || 'erro desconhecido'}`}`).join(' | '),
+        520,
+      ),
+    });
+
+    const stepContext = replies
+      .map((reply) => `${reply.name || reply.slug}: ${reply.ok ? reply.content : `FALHA: ${reply.error || 'erro desconhecido'}`}`)
+      .join('\n');
+    contextSections.push(`## ${step.roleLabel}\n${stepContext || 'Sem resposta nesta etapa.'}`);
+  }
+
+  return steps;
+}
+
 // ---------------------------------------------------------------------------
 // Missao de conversa entre agentes (turnos com evidencia temporal).
 // ---------------------------------------------------------------------------
@@ -2073,25 +2333,162 @@ app.post('/api/agent/config', (req, res) => {
   res.json({ ok: true, agent });
 });
 
+app.get('/api/personas/avatar', async (req, res) => {
+  const avatarPath = normalizeYumeAvatarPath(req.query?.src);
+  if (!avatarPath) {
+    res.status(400).json({ ok: false, error: 'invalid_avatar_src' });
+    return;
+  }
+
+  try {
+    const upstream = await fetch(buildKamuiYumeAvatarUrl(avatarPath), {
+      method: 'GET',
+      headers: {
+        Accept: 'image/*',
+        'X-Kamui-Caller': 'luca',
+        'User-Agent': 'luca-ai-service (persona-avatar-proxy)',
+      },
+    });
+    const contentType = upstream.headers.get('content-type') || '';
+    if (!upstream.ok) {
+      res.status(upstream.status).json({ ok: false, error: `avatar_upstream_${upstream.status}` });
+      return;
+    }
+    if (!contentType.toLowerCase().startsWith('image/')) {
+      res.status(502).json({ ok: false, error: 'avatar_upstream_not_image' });
+      return;
+    }
+    const bytes = Buffer.from(await upstream.arrayBuffer());
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(bytes);
+  } catch (error) {
+    res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
+  }
+});
+
 app.get('/api/personas/available', async (_req, res) => {
   try {
     const personas = await listYumePersonas();
-    const imported = new Set(getPersonaAgents().map((p) => p.slug));
     res.json({
       ok: true,
-      personas: personas.map((p) => ({
-        slug: p.slug,
-        name: p.name,
-        model: p.model,
-        description: p.description,
-        avatar_url: p.avatar_url,
-        version: p.version,
-        imported: imported.has(p.slug),
-      })),
+      personas: normalizeYumePersonasForLuca(personas, getPersonaAgents()),
     });
   } catch (error) {
     res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
   }
+});
+
+app.post('/api/luca-ai/persona-team/run', async (req, res) => {
+  const input = normalizePersonaTeamRunInput(req.body);
+  if (!input.ok) {
+    res.status(400).json(input);
+    return;
+  }
+  const runStartedAt = new Date().toISOString();
+  const runStartedMs = Date.now();
+
+  appendLucaAiTraceEvent(input.traceId, 'luca_ai.workflow.started', {
+    mode: input.mode,
+    missionSummary: summarizeLucaAiTraceText(input.mission, 360),
+    teamSize: input.slugs.length,
+    workflow: input.workflow?.map((role) => ({
+      roleId: role.roleId,
+      roleLabel: role.roleLabel,
+      slugs: role.slugs,
+    })) ?? [],
+  });
+
+  const loaded = await Promise.all(input.slugs.map(async (slug) => {
+    try {
+      return { slug, loaded: await loadPersonaTeamPrompt(slug) };
+    } catch (error) {
+      return { slug, error: error?.message || String(error) };
+    }
+  }));
+  const teamNames = loaded.map((entry) => entry.loaded?.name || entry.slug);
+  const loadedBySlug = new Map(loaded.map((entry) => [entry.slug, entry]));
+  let steps = [];
+  let replies = [];
+
+  if (input.mode === 'workflow') {
+    steps = await runLucaAiPersonaWorkflow({
+      mission: input.mission,
+      workflow: input.workflow,
+      teamNames,
+      loadedBySlug,
+      traceId: input.traceId,
+    });
+    replies = steps.flatMap((step) => step.replies.map((reply) => ({
+      ...reply,
+      workflowRoleId: step.roleId,
+      workflowRoleLabel: step.roleLabel,
+    })));
+  } else {
+    replies = await Promise.all(loaded.map((entry) => {
+      if (entry.error) {
+        return Promise.resolve({
+          ok: false,
+          slug: entry.slug,
+          name: entry.slug,
+          model: '',
+          version: null,
+          cached: false,
+          stale: false,
+          error: entry.error,
+        });
+      }
+      return runLucaAiPersonaTeamMember({
+        slug: entry.slug,
+        mission: input.mission,
+        teamNames,
+        loaded: entry.loaded,
+        traceId: input.traceId,
+      });
+    }));
+  }
+  const finalDisplayStep = steps.find((step) => step.roleId === 'display') || null;
+  const finalDisplayReply = finalDisplayStep?.replies.find((reply) => reply.ok) || null;
+  const generatedAt = new Date().toISOString();
+  const durationMs = Date.now() - runStartedMs;
+
+  appendLucaAiTraceEvent(input.traceId, 'luca_ai.workflow.completed', {
+    mode: input.mode,
+    durationMs,
+    ok: replies.some((reply) => reply.ok),
+    okCount: replies.filter((reply) => reply.ok).length,
+    errorCount: replies.filter((reply) => !reply.ok).length,
+    finalDisplaySlug: finalDisplayReply?.slug || null,
+  });
+
+  res.json({
+    ok: replies.some((reply) => reply.ok),
+    traceId: input.traceId,
+    mission: input.mission,
+    mode: input.mode,
+    team: loaded.map((entry) => ({
+      slug: entry.slug,
+      name: entry.loaded?.name || entry.slug,
+      model: entry.loaded?.model || '',
+      version: entry.loaded?.version ?? null,
+      cached: Boolean(entry.loaded?.cached),
+      stale: Boolean(entry.loaded?.stale),
+      error: entry.error || null,
+    })),
+    replies,
+    steps,
+    finalDisplay: finalDisplayReply ? {
+      roleId: finalDisplayStep.roleId,
+      roleLabel: finalDisplayStep.roleLabel,
+      slug: finalDisplayReply.slug,
+      name: finalDisplayReply.name,
+      model: finalDisplayReply.model,
+      content: finalDisplayReply.content,
+    } : null,
+    startedAt: runStartedAt,
+    durationMs,
+    generatedAt,
+  });
 });
 
 app.post('/api/agent/persona/add', async (req, res) => {

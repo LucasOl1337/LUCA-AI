@@ -1,4 +1,5 @@
-import { Power } from 'lucide-react';
+import { Loader2, Power } from 'lucide-react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import AgentCard from './AgentCard';
 import { AGENT_DEFS } from '@/lib/agents';
@@ -15,26 +16,53 @@ interface AgentRailProps {
 export default function AgentRail({ activeAgent, onOpenAgent, onNavigate }: AgentRailProps) {
   const theme = useTheme();
   const { getAgentStatus, backendReady, runtimeMode, supervisorMode, startSupervisor, pauseSupervisor } = useLuca();
+  const [supervisorAction, setSupervisorAction] = useState<'start' | 'pause' | null>(null);
   const running = supervisorMode === 'running';
   const online = backendReady || runtimeMode === 'cloud';
+  const supervisorBusy = supervisorAction !== null;
+  const supervisorLabel = supervisorAction === 'start'
+    ? 'ligando'
+    : supervisorAction === 'pause'
+      ? 'pausando'
+      : running
+        ? 'ligado'
+        : 'desligado';
+  const supervisorTone = supervisorBusy ? theme.gold : running ? theme.alive : theme.textMute;
+
+  async function toggleSupervisor() {
+    if (supervisorBusy) return;
+    const nextAction = running ? 'pause' : 'start';
+    setSupervisorAction(nextAction);
+    try {
+      await (running ? pauseSupervisor() : startSupervisor());
+    } finally {
+      setSupervisorAction(null);
+    }
+  }
 
   return (
-    <div className="void-panel rounded-2xl px-4 py-3 flex items-center gap-3 overflow-x-auto">
+    <div className="void-panel rounded-2xl px-4 py-3 flex items-center gap-3 overflow-x-auto overflow-y-hidden shrink-0 min-h-[132px]">
       {/* botão liga/desliga do sistema (supervisor) */}
       <motion.button
         type="button"
         whileTap={{ scale: 0.94 }}
-        onClick={() => (running ? pauseSupervisor() : startSupervisor())}
-        title={running ? 'desligar sistema' : 'ligar sistema'}
+        onClick={toggleSupervisor}
+        title={supervisorBusy ? supervisorLabel : running ? 'desligar sistema' : 'ligar sistema'}
+        disabled={supervisorBusy}
+        aria-busy={supervisorBusy}
         className="shrink-0 flex flex-col items-center justify-center gap-1 w-[88px] h-[104px] rounded-2xl transition-all"
         style={{
-          background: running ? 'rgba(67,209,138,0.08)' : theme.input,
-          border: `1px solid ${running ? theme.alive : theme.border}`,
+          background: running || supervisorBusy ? 'rgba(67,209,138,0.08)' : theme.input,
+          border: `1px solid ${running ? theme.alive : supervisorBusy ? theme.gold : theme.border}`,
         }}
       >
-        <Power className="w-7 h-7" style={{ color: running ? theme.alive : theme.textMute }} />
-        <span className="text-[10px] font-semibold tracking-[0.15em] uppercase" style={{ color: running ? theme.alive : theme.textMute }}>
-          {running ? 'ligado' : 'desligado'}
+        {supervisorBusy ? (
+          <Loader2 className="w-7 h-7 animate-spin" style={{ color: supervisorTone }} />
+        ) : (
+          <Power className="w-7 h-7" style={{ color: supervisorTone }} />
+        )}
+        <span className="text-[10px] font-semibold tracking-[0.15em] uppercase" style={{ color: supervisorTone }}>
+          {supervisorLabel}
         </span>
       </motion.button>
 

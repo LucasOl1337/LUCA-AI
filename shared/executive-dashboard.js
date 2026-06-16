@@ -24,11 +24,24 @@ function uniqueStrings(values = [], { max = 12 } = {}) {
 
 function clip(value = '', max = 220) {
   const text = String(value || '').replace(/\s+/g, ' ').trim();
-  return text.length <= max ? text : `${text.slice(0, max - 3)}...`;
+  if (text.length <= max) return text;
+  const candidate = text.slice(0, max).trimEnd();
+  const sentenceCut = Math.max(candidate.lastIndexOf('. '), candidate.lastIndexOf('; '), candidate.lastIndexOf(': '));
+  if (sentenceCut > Math.floor(max * 0.55)) return candidate.slice(0, sentenceCut + 1).trim();
+  const wordCut = candidate.lastIndexOf(' ');
+  return (wordCut > Math.floor(max * 0.55) ? candidate.slice(0, wordCut) : candidate).trim();
+}
+
+function fullBodyText(value = '') {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+\./g, '.')
+    .replace(/\.{2,}/g, '.')
+    .trim();
 }
 
 function looksLikeTechnicalFallback(value = '') {
-  return /\b(glm|contrato incompleto|revisao deterministica|contingencia deterministica|fallback|erro|tecnico|metricas executivas|blocos obrigatorios)\b/.test(normalizeText(value));
+  return /\b(glm|9router|fetch failed|unreachable|timeout|econnrefused|enotfound|etimedout|indisponivel|falhei|falha|erro|contrato incompleto|revisao deterministica|contingencia deterministica|fallback|tecnico|metricas executivas|blocos obrigatorios)\b/.test(normalizeText(value));
 }
 
 function dashboardSummaryText(finalReport = {}, mission = {}, findings = []) {
@@ -82,9 +95,8 @@ function buildSinistralityProxyText(mission = {}, findings = []) {
   const regions = extractRegionalAnchors(mission, findings);
   const anchorsText = anchors.length ? ` Evidencias quantitativas reaproveitadas: ${anchors.join(', ')}.` : '';
   const regionText = regions.length ? ` Faixa prioritaria: ${regions.join(', ')}.` : '';
-  return clip(
+  return fullBodyText(
     `Proxy qualitativo: sinistralidade esperada em faixa alta para a carteira priorizada, com calibracao final dependente de apolices, valor segurado e premio consolidados.${regionText}${anchorsText}`,
-    260,
   );
 }
 
@@ -159,29 +171,33 @@ function extractEvidenceBody(researchText = '', findings = [], quantitativeAncho
     : '';
   const basisSummary = findings
     .slice(0, 3)
+    .filter((finding) => !looksLikeTechnicalFallback(`${finding?.title || ''} ${finding?.detail || ''}`))
     .map((finding) => `${finding?.basis || 'premissa'}: ${finding?.detail || finding?.title || ''}`)
     .filter(Boolean)
     .join(' ');
-  return clip([
+  return fullBodyText([
     evidence ? `Evidencia: ${evidence}.` : '',
     quantitativeText,
     gap ? `Premissa/proxy: ${gap}.` : '',
     risk ? `Risco principal: ${risk}.` : '',
     basisSummary,
-  ].filter(Boolean).join(' '), 360);
+  ].filter(Boolean).join(' '));
 }
 
 function buildCentralPainBody(mission = {}, researchText = '', findings = [], regionalAnchors = []) {
   const risk = extractLabeledValue(researchText, ['Risco principal']);
   const evidence = extractLabeledValue(researchText, ['Evidencia']);
-  const mainFinding = findings.find((finding) => finding?.detail || finding?.title);
-  return clip([
+  const mainFinding = findings.find((finding) => {
+    if (!finding?.detail && !finding?.title) return false;
+    return !looksLikeTechnicalFallback(`${finding?.title || ''} ${finding?.detail || ''}`);
+  });
+  return fullBodyText([
     risk ? `Risco principal: ${risk}.` : '',
     evidence ? `Evidencia central: ${evidence}.` : '',
     regionalAnchors.length ? `Regioes priorizadas: ${regionalAnchors.join(', ')}.` : '',
     mainFinding ? `Foco executivo: ${mainFinding.detail || mainFinding.title}.` : '',
     !risk && !evidence && !mainFinding ? `Dor central: ${mission?.description || mission?.title || 'priorizar risco e proxima acao defensavel'}.` : '',
-  ].filter(Boolean).join(' '), 300);
+  ].filter(Boolean).join(' '));
 }
 
 function padRankingItems(items = [], labelPrefix = 'Prioridade') {
@@ -199,7 +215,7 @@ function rankingItemTitle(finding = {}, index = 0, rankingTitle = 'Prioridades')
   const fallback = rankingTitle === 'Ranking de apolices'
     ? `Apolice critica ${index + 1}`
     : `Prioridade ${index + 1}`;
-  const title = clip(finding?.title || fallback, 40);
+  const title = fullBodyText(finding?.title || fallback);
   if (rankingTitle !== 'Ranking de apolices') return title;
   if (/\b(apolice|carteira|talhao|fazenda|produtor|lote)\b/i.test(title)) return title;
   return `${fallback} - ${title}`;
@@ -263,12 +279,11 @@ export function buildDeterministicExecutiveDashboard({ mission = {}, finalReport
       type: 'metric',
       title: 'Impacto ou proxy',
       value: hasMustShow(normalizedMustShow, /\bprojecao de indenizacoes\b/) ? 'proxy ativo' : 'pendente',
-      body: clip(
+      body: fullBodyText(
         summaryText
           || (needsFinancialBlock
             ? 'Decisao executiva deve seguir com impacto financeiro em proxy explicito ate consolidar premio, valor segurado ou base economica completa.'
             : 'Decisao executiva deve seguir com proxy explicito ate consolidar base financeira completa.'),
-        180,
       ),
     });
   }
@@ -277,11 +292,10 @@ export function buildDeterministicExecutiveDashboard({ mission = {}, finalReport
     blocks.push({
       type: 'note',
       title: 'Evidencias agroclimaticas',
-      body: clip(
+      body: fullBodyText(
         agroClimateEvidence.length
           ? `Fonte e sinais do briefing: ${agroClimateEvidence.map((item) => item.value).join('; ')}. Usar esses sinais como lastro e manter sinistralidade/indenizacao como proxy quando faltar carteira consolidada.`
           : 'Separar fonte climatica, metrica, regiao e janela antes de fechar underwriting agricola.',
-        260,
       ),
     });
   }
@@ -290,9 +304,8 @@ export function buildDeterministicExecutiveDashboard({ mission = {}, finalReport
     type: 'tower',
     title: rankingTitle,
     body: rankingTitle === 'Ranking de apolices'
-      ? clip(
+      ? fullBodyText(
         `Top 5 executivo para underwriting. Quando o caso nao trouxer IDs e valor segurado por apolice, manter identificacao pendente e priorizar o cruzamento da carteira critica.${regionalAnchors.length ? ` Faixa regional sob maior pressao: ${regionalAnchors.join(', ')}.` : ''}`,
-        220,
       )
       : undefined,
     items: rankingItems,
@@ -302,7 +315,7 @@ export function buildDeterministicExecutiveDashboard({ mission = {}, finalReport
     blocks.push({
       type: 'note',
       title: hasMustShow(normalizedMustShow, /\bmapa de risco\b/) ? 'Mapa de risco' : 'Microrregioes prioritarias',
-      body: clip(
+      body: fullBodyText(
         (
           hasMustShow(normalizedMustShow, /\bmicrorregioes prioritarias\b/)
             ? 'Microrregioes prioritarias devem aparecer com faixa regional clara para underwriting, corretor e vistoria.'
@@ -310,7 +323,6 @@ export function buildDeterministicExecutiveDashboard({ mission = {}, finalReport
         )
         + (regionalAnchors.length ? ` Regioes ancoradas no briefing: ${regionalAnchors.join(', ')}.` : '')
         + (findings[0]?.detail ? ` ${findings[0].detail}` : ''),
-        220,
       ),
     });
   }
@@ -327,9 +339,8 @@ export function buildDeterministicExecutiveDashboard({ mission = {}, finalReport
     blocks.push({
       type: 'note',
       title: 'Projecao de indenizacoes',
-      body: clip(
+      body: fullBodyText(
         `Proxy: projetar a provisao em faixa defensavel, sem numero inventado, ate consolidar valor segurado, premio e exposicao final da carteira.${quantitativeAnchors.length ? ` Reaproveitar sinais do briefing: ${quantitativeAnchors.join(', ')}.` : ''}`,
-        220,
       ),
     });
   }
@@ -346,7 +357,7 @@ export function buildDeterministicExecutiveDashboard({ mission = {}, finalReport
   blocks.push({
     type: 'note',
     title: 'Plano preventivo',
-    body: clip(planBody, 220),
+    body: fullBodyText(planBody),
   });
 
   if (hasMustShow(normalizedMustShow, /\bcronograma de monitoramento\b/)) {
@@ -363,9 +374,8 @@ export function buildDeterministicExecutiveDashboard({ mission = {}, finalReport
     blocks.push({
       type: 'note',
       title: 'Alertas operacionais',
-      body: clip(
+      body: fullBodyText(
         `Disparar alertas preventivos para corretores e operacao com gatilho claro, orientacao de vistoria/documentacao e escalonamento para underwriting quando houver risco de negativa ou sinistro relevante.${regionalAnchors.length ? ` Priorizar comunicados para ${regionalAnchors.join(', ')}.` : ''}`,
-        220,
       ),
     });
   }
@@ -374,9 +384,8 @@ export function buildDeterministicExecutiveDashboard({ mission = {}, finalReport
     blocks.push({
       type: 'note',
       title: 'Pacote de evidencias',
-      body: clip(
+      body: fullBodyText(
         `Checklist documental: consolidar fotos, laudos, anexos, telemetria e comprovantes de vistoria com status de coleta e lacunas explicitas para sustentar a decisao.${quantitativeAnchors.length ? ` Reaproveitar sinais do briefing: ${quantitativeAnchors.join(', ')}.` : ''}`,
-        220,
       ),
     });
   }
@@ -385,9 +394,8 @@ export function buildDeterministicExecutiveDashboard({ mission = {}, finalReport
     blocks.push({
       type: 'note',
       title: 'Fila operacional',
-      body: clip(
+      body: fullBodyText(
         `Priorizar a fila por severidade, aging e impacto esperado, com dono claro para triagem e checkpoint de SLA antes do fechamento executivo.${regionalAnchors.length ? ` Foco inicial: ${regionalAnchors.join(', ')}.` : ''}`,
-        220,
       ),
     });
   }
@@ -396,9 +404,8 @@ export function buildDeterministicExecutiveDashboard({ mission = {}, finalReport
     blocks.push({
       type: 'note',
       title: 'Gatilhos preventivos',
-      body: clip(
+      body: fullBodyText(
         `Definir gatilhos de acionamento preventivo com condicao objetiva, responsavel e prazo de resposta para conter o risco antes do sinistro.${quantitativeAnchors.length ? ` Gatilhos podem usar: ${quantitativeAnchors.join(', ')}.` : ''}`,
-        220,
       ),
     });
   }
@@ -419,7 +426,7 @@ export function buildDeterministicExecutiveDashboard({ mission = {}, finalReport
 
   return {
     title: String(mission?.title || 'Canvas Executivo').trim() || 'Canvas Executivo',
-    subtitle: clip(summaryText || mission?.description || 'Sintese executiva pronta para decisao.', 140),
+    subtitle: clip(summaryText || mission?.description || 'Sintese executiva pronta para decisao.', 360),
     status: 'concluido',
     layout: 'result-board',
     metrics: buildExecutiveMetrics({

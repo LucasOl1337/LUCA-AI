@@ -19,9 +19,9 @@ export default function GlobalChat() {
 
   return (
     <div className="void-panel rounded-2xl flex flex-col h-full overflow-hidden">
-      <header className="flex items-center gap-2 px-4 h-12 border-b shrink-0" style={{ borderColor: theme.border }}>
+      <header className="flex items-center gap-2 px-4 h-12 border-b shrink-0 min-w-0" style={{ borderColor: theme.border }}>
         <MessageSquare className="w-4 h-4" style={{ color: theme.gold, opacity: 0.8 }} />
-        <h3 className="text-[11px] font-semibold tracking-[0.2em] uppercase flex-1" style={{ color: theme.textSoft }}>
+        <h3 className="text-[11px] font-semibold tracking-[0.2em] uppercase flex-1 min-w-0 luca-wrap" style={{ color: theme.textSoft }}>
           Comunicação
         </h3>
         <span
@@ -51,27 +51,27 @@ export default function GlobalChat() {
                 initial={{ opacity: 0, x: fromRight ? 10 : -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.25 }}
-                className="rounded-xl p-3"
+                className="rounded-xl p-3 min-w-0"
                 style={{
                   background: theme.input,
                   border: `1px solid ${theme.border}`,
                   borderLeft: `2px solid ${accent}`,
                 }}
               >
-                <div className="flex items-center gap-2 mb-1">
-                  <strong className="text-[11px] font-semibold" style={{ color: accent }}>
+                <div className="flex items-start gap-2 mb-1 min-w-0">
+                  <strong className="text-[11px] font-semibold min-w-0 luca-wrap" style={{ color: accent }}>
                     {message.agentName}
                   </strong>
-                  <span className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ color: theme.textMute, background: 'rgba(127,179,213,0.06)' }}>
+                  <span className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0" style={{ color: theme.textMute, background: 'rgba(127,179,213,0.06)' }}>
                     {message.type}
                   </span>
-                  <time className="text-[9px] ml-auto font-mono" style={{ color: theme.textGhost }}>
+                  <time className="text-[9px] ml-auto font-mono shrink-0" style={{ color: theme.textGhost }}>
                     {message.timestamp}
                   </time>
                 </div>
                 <div className="space-y-1">
                   {formatChatParagraphs(message.content).map((p, i) => (
-                    <p key={`${p}-${i}`} className="text-xs leading-relaxed" style={{ color: theme.textSoft }}>
+                    <p key={`${p}-${i}`} className="text-xs leading-relaxed luca-wrap" style={{ color: theme.textSoft }}>
                       {p}
                     </p>
                   ))}

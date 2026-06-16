@@ -10,8 +10,8 @@ export default function DashboardBlock({ block }: { block: DashboardBlockData })
 
   if (block.type === 'pie') {
     return (
-      <article className="void-panel rounded-xl p-4">
-        <h3 className="text-xs font-semibold tracking-wide uppercase mb-3" style={{ color: theme.textSoft }}>
+      <article className="void-panel rounded-xl p-4 min-w-0">
+        <h3 className="text-xs font-semibold tracking-wide uppercase mb-3 luca-wrap" style={{ color: theme.textSoft }}>
           {block.title ?? 'distribuição'}
         </h3>
         <div
@@ -21,7 +21,7 @@ export default function DashboardBlock({ block }: { block: DashboardBlockData })
         />
         <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 justify-center">
           {chartItems.map((item) => (
-            <span key={item.label} className="text-[10px]" style={{ color: theme.textMute }}>
+            <span key={item.label} className="text-[10px] max-w-full luca-wrap" style={{ color: theme.textMute }}>
               {item.label} <b style={{ color: theme.text }}>{item.value}</b>
             </span>
           ))}
@@ -33,15 +33,15 @@ export default function DashboardBlock({ block }: { block: DashboardBlockData })
   if (block.type === 'tower') {
     const maxValue = Math.max(...chartItems.map((i) => i.value), 1);
     return (
-      <article className="void-panel rounded-xl p-4">
-        <h3 className="text-xs font-semibold tracking-wide uppercase mb-3" style={{ color: theme.textSoft }}>
+      <article className="void-panel rounded-xl p-4 min-w-0">
+        <h3 className="text-xs font-semibold tracking-wide uppercase mb-3 luca-wrap" style={{ color: theme.textSoft }}>
           {block.title ?? 'torre'}
         </h3>
         <div className="space-y-2">
           {chartItems.map((item) => (
-            <div key={item.label} className="flex items-center gap-2">
-              <span className="text-[10px] w-20 truncate" style={{ color: theme.textMute }}>{item.label}</span>
-              <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: theme.input }}>
+            <div key={item.label} className="grid grid-cols-[minmax(5.5rem,8rem)_minmax(0,1fr)_2rem] items-center gap-2">
+              <span className="text-[10px] leading-tight luca-wrap" style={{ color: theme.textMute }}>{item.label}</span>
+              <div className="h-2 rounded-full overflow-hidden min-w-0" style={{ background: theme.input }}>
                 <div
                   className="h-full rounded-full"
                   style={{ width: `${Math.max(8, (item.value / maxValue) * 100)}%`, background: `linear-gradient(90deg, ${theme.fleet}, ${theme.gold})` }}
@@ -57,15 +57,15 @@ export default function DashboardBlock({ block }: { block: DashboardBlockData })
 
   if (block.type === 'topics') {
     return (
-      <article className="void-panel rounded-xl p-4">
-        <h3 className="text-xs font-semibold tracking-wide uppercase mb-3" style={{ color: theme.textSoft }}>
+      <article className="void-panel rounded-xl p-4 min-w-0">
+        <h3 className="text-xs font-semibold tracking-wide uppercase mb-3 luca-wrap" style={{ color: theme.textSoft }}>
           {block.title ?? 'tópicos'}
         </h3>
         <div className="flex flex-wrap gap-1.5">
           {items.map((item, i) => (
             <span
               key={i}
-              className="text-[10px] px-2 py-1 rounded-full"
+              className="max-w-full rounded-lg px-2 py-1 text-[10px] leading-snug luca-wrap"
               style={{ background: theme.goldSoft, color: theme.gold, border: `1px solid ${theme.border}` }}
             >
               {formatTopicLabel(item)}
@@ -78,22 +78,22 @@ export default function DashboardBlock({ block }: { block: DashboardBlockData })
 
   // metric / note / default
   return (
-    <article className="void-panel rounded-xl p-4">
-      <h3 className="text-xs font-semibold tracking-wide uppercase mb-2" style={{ color: theme.textSoft }}>
+    <article className="void-panel rounded-xl p-4 min-w-0">
+      <h3 className="text-xs font-semibold tracking-wide uppercase mb-2 luca-wrap" style={{ color: theme.textSoft }}>
         {block.title ?? block.type ?? 'bloco'}
       </h3>
       {block.value !== undefined && (
-        <strong className="block text-2xl font-display font-bold mb-1" style={{ color: theme.text }}>
+        <strong className="block text-2xl font-display font-bold mb-1 luca-wrap" style={{ color: theme.text }}>
           {block.value}
         </strong>
       )}
-      {block.body && <p className="text-xs leading-relaxed" style={{ color: theme.textMute }}>{block.body}</p>}
+      {block.body && <p className="text-xs leading-relaxed luca-wrap" style={{ color: theme.textMute }}>{block.body}</p>}
       {items.length > 0 && (
         <ul className="mt-2 space-y-1">
           {items.map((item, i) => (
-            <li key={i} className="text-xs flex gap-2" style={{ color: theme.textSoft }}>
+            <li key={i} className="text-xs flex gap-2 min-w-0" style={{ color: theme.textSoft }}>
               <span style={{ color: theme.gold }}>•</span>
-              {formatTopicLabel(item)}
+              <span className="min-w-0 flex-1 luca-wrap">{formatTopicLabel(item)}</span>
             </li>
           ))}
         </ul>

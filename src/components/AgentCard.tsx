@@ -55,7 +55,7 @@ export default function AgentCard({ agent, status, active, online, onClick, comp
       </div>
 
       <span
-        className={`font-display font-semibold tracking-wide ${compact ? 'text-[11px]' : 'text-sm'}`}
+        className={`font-display font-semibold tracking-wide leading-tight luca-wrap ${compact ? 'min-h-[2.2em] text-[11px]' : 'text-sm'}`}
         style={{ color: active ? theme.gold : theme.text }}
       >
         {agent.title}

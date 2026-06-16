@@ -17,6 +17,27 @@ function blockText(block = {}) {
   ].join(' '));
 }
 
+function hasTruncatedDisplayText(dashboard = {}) {
+  const text = [
+    dashboard?.title,
+    dashboard?.subtitle,
+    ...(Array.isArray(dashboard?.metrics)
+      ? dashboard.metrics.flatMap((metric) => [metric?.label, metric?.value])
+      : []),
+    ...(Array.isArray(dashboard?.blocks)
+      ? dashboard.blocks.flatMap((block) => [
+        block?.title,
+        block?.value,
+        block?.body,
+        ...(Array.isArray(block?.items)
+          ? block.items.map((item) => (typeof item === 'string' ? item : `${item?.label || ''} ${item?.value || ''}`))
+          : []),
+      ])
+      : []),
+  ].filter(Boolean).join(' ');
+  return /\S\.\.\.(?=\s|$)|\.\.\.\S/.test(text);
+}
+
 const REQUIRED_EXECUTIVE_DASHBOARD_CONCEPTS = [
   {
     title: 'Dor e evidencias',
@@ -56,6 +77,9 @@ export function executiveDashboardContractIssues(dashboard = {}) {
   }
   if (blocks.length < REQUIRED_EXECUTIVE_DASHBOARD_CONCEPTS.length) {
     issues.push('faltam os 5 blocos obrigatorios do canvas');
+  }
+  if (hasTruncatedDisplayText(dashboard)) {
+    issues.push('dashboard contem texto truncado com reticencias');
   }
 
   for (const concept of REQUIRED_EXECUTIVE_DASHBOARD_CONCEPTS) {

@@ -23,6 +23,7 @@ import { buildToolCatalog } from '../../shared/tool-catalog.js';
 import { buildCatalogAudit } from '../../shared/catalog-audit.js';
 import { normalizeGoalInput, publicGoal, summarizeGoals } from '../../shared/goals.js';
 import { buildGovernanceSummary } from '../../shared/governance.js';
+import { resolveModelSelector, modelSelectorSummary } from '../../shared/model-selector.js';
 import { serializePublicState } from '../../shared/state-payload.js';
 import { normalizeSupervisorFinalReport } from '../../shared/supervisor-final-report.js';
 import { runOperationalPreflight } from '../../shared/preflight.js';
@@ -31,7 +32,7 @@ import { formatBrazilTime } from '../../shared/time.js';
 const AGENTS = [
   { id: 'maestro', role: 'router', name: 'Maestro', status: 'ready', lines: ['cloud: pronto para rotear missao real'] },
   { id: 'transformador-missao', role: 'mission-transformer', name: 'Transformador de Missao', status: 'ready', lines: ['cloud: aguardando missao'] },
-  { id: 'supervisor', role: 'supervisor', name: 'Supervisor', status: 'ready', lines: ['cloud: supervisor conectado ao GLM 5.1'] },
+  { id: 'supervisor', role: 'supervisor', name: 'Supervisor', status: 'ready', lines: ['cloud: supervisor conectado ao modelo do runtime'] },
   { id: 'planejador', role: 'planner', name: 'Planejador', status: 'ready', lines: ['cloud: planejador pronto'] },
   { id: 'pesquisador', role: 'researcher', name: 'Pesquisador', status: 'ready', lines: ['cloud: pesquisador pronto'] },
   { id: 'designer', role: 'designer', name: 'Designer', status: 'ready', lines: ['cloud: designer pronto'] },
@@ -52,11 +53,34 @@ const GLM_REQUEST_TIMEOUT_MS = 120 * 1000;
 const FORBIDDEN_PRESENTATION_LANGUAGE = /mock|demo|simulad/i;
 const REQUIRED_BLOCK_TITLES = executiveDashboardContractTitles();
 const FINAL_MISSION_EVENT_TYPES = ['mission.completed', 'mission.failed', 'mission.chat_completed', 'mission.archived'];
+const RUNTIME_STATE_READ_EVENT_LIMIT = 24;
+const RUNTIME_STATE_HEAVY_READ_EVENT_LIMIT = 80;
+const RUNTIME_MEMORY_EVENT_LIMIT = 120;
+
+let runtimeMemoryState = null;
+let runtimeMemoryEvents = [];
+let runtimeLastStorageError = '';
+
+function runtimeModelSelector(env = {}) {
+  return resolveModelSelector(env || {});
+}
+
+function runtimeModel(env = {}) {
+  return runtimeModelSelector(env).model;
+}
+
+function runtimeAgents(model = runtimeModel()) {
+  return AGENTS.map((agent) => (
+    agent.id === 'supervisor'
+      ? { ...agent, lines: [`cloud: supervisor conectado ao ${model}`] }
+      : { ...agent }
+  ));
+}
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...CORS, 'Content-Type': 'application/json; charset=utf-8' },
+    headers: { ...CORS, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
   });
 }
 
@@ -75,8 +99,10 @@ function eventTimestampMs(event) {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-function baseState(extra = {}) {
-  const governance = buildGovernanceSummary();
+function baseState(extra = {}, env = {}) {
+  const modelSelector = runtimeModelSelector(env);
+  const model = modelSelector.model;
+  const governance = buildGovernanceSummary({ provider: model });
   return {
     supervisorMode: 'ready',
     activeMission: null,
@@ -84,32 +110,152 @@ function baseState(extra = {}) {
     missionHistory: [],
     temporaryDashboard: null,
     database: {
-      source: { name: 'GLM 5.1 runtime', topic: 'missao real em nuvem' },
+      source: { name: `${model} runtime`, topic: 'missao real em nuvem' },
       layers: {
         rawResearch: { status: 'empty', items: [], dashboardVisibility: 'internal' },
         processing: { status: 'empty', items: [], dashboardVisibility: 'technical' },
         dashboardIntegration: { status: 'empty', items: [], dashboardVisibility: 'public' },
       },
-      heartbeat: [{ agentId: 'supervisor', status: 'ready', note: 'GLM 5.1 configurado em runtime cloud', time: nowTime() }],
+      heartbeat: [{ agentId: 'supervisor', status: 'ready', note: `${model} configurado em runtime cloud`, time: nowTime() }],
     },
-    heartbeatLogs: [`[${nowTime()}] cloud: aguardando missao real via GLM 5.1`],
+    heartbeatLogs: [`[${nowTime()}] cloud: aguardando missao real via ${model}`],
     globalChatMessages: [],
     scheduledMissions: [],
     missionQueue: [],
     goals: [],
     personaAgents: [],
-    agents: AGENTS,
+    agents: runtimeAgents(model),
     heartbeatMonitor: {
       service: 'luca-ai-cloud',
       status: 'online',
       updatedAt: nowIso(),
       intervalSeconds: 0,
-      summary: 'Runtime serverless real. Missoes chamam GLM 5.1.',
+      summary: `Runtime serverless real. Missoes chamam ${model}.`,
+      provider: model,
+      modelSelector,
       governance,
     },
     governance,
     ...extra,
   };
+}
+
+function normalizeRuntimeEvent(event = {}) {
+  const timestamp = event.timestamp || event.time || nowIso();
+  const ts = eventTimestampMs({ ...event, timestamp }) || Date.now();
+  return {
+    id: event.id || `mem_${crypto.randomUUID()}`,
+    type: String(event.type || 'event'),
+    ts,
+    time: timestamp,
+    timestamp,
+    source: event.source || 'runtime',
+    missionId: event.missionId ?? event.mission_id ?? null,
+    goalId: event.goalId ?? event.goal_id ?? null,
+    traceId: event.traceId ?? event.trace_id ?? null,
+    payload: event.payload || {},
+  };
+}
+
+function rememberRuntimeEvent(event = {}) {
+  const normalized = normalizeRuntimeEvent(event);
+  runtimeMemoryEvents = [normalized, ...runtimeMemoryEvents].slice(0, RUNTIME_MEMORY_EVENT_LIMIT);
+  return normalized;
+}
+
+function summarizeRuntimeEvents(events = [], filters = {}) {
+  const byType = new Map();
+  const bySource = new Map();
+  for (const event of events) {
+    byType.set(event.type, (byType.get(event.type) || 0) + 1);
+    const source = event.source || 'unknown';
+    bySource.set(source, (bySource.get(source) || 0) + 1);
+  }
+  return {
+    total: events.length,
+    latest: events[0] || null,
+    oldest: events[events.length - 1] || null,
+    filters: {
+      type: String(filters.type || '').trim() || null,
+      missionId: String(filters.missionId || '').trim() || null,
+      goalId: String(filters.goalId || '').trim() || null,
+      traceId: String(filters.traceId || '').trim() || null,
+      sampledLimit: Math.max(1, Number(filters.limit) || events.length || RUNTIME_STATE_READ_EVENT_LIMIT),
+    },
+    byType: Array.from(byType.entries()).map(([type, total]) => ({ type, total })),
+    bySource: Array.from(bySource.entries()).map(([source, total]) => ({ source, total })),
+  };
+}
+
+function filterRuntimeMemoryEvents(filters = {}) {
+  const limit = Math.max(1, Math.min(250, Number(filters.limit) || RUNTIME_STATE_READ_EVENT_LIMIT));
+  const wantedType = String(filters.type || '').trim();
+  const wantedMissionId = String(filters.missionId || '').trim();
+  const wantedGoalId = String(filters.goalId || '').trim();
+  const wantedTraceId = String(filters.traceId || '').trim();
+  return runtimeMemoryEvents.filter((event) => {
+    if (wantedType && event.type !== wantedType) return false;
+    if (wantedMissionId && event.missionId !== wantedMissionId) return false;
+    if (wantedGoalId && event.goalId !== wantedGoalId) return false;
+    if (wantedTraceId && event.traceId !== wantedTraceId) return false;
+    return true;
+  }).slice(0, limit);
+}
+
+function rememberRuntimeState(state, env = {}) {
+  const serialized = serializePublicState(state || baseState({}, env));
+  runtimeMemoryState = serialized;
+  return serialized;
+}
+
+function storageErrorMessage(error) {
+  return error instanceof Error ? error.message : String(error || 'storage_unavailable');
+}
+
+function isDurableObjectStorageLimitError(error) {
+  const message = storageErrorMessage(error).toLowerCase();
+  return /rows?_read|daily usage limit|free tier|limit exceeded|storage|durable object|sqlite/.test(message);
+}
+
+function runtimeDegradedState(env = {}, error = 'storage_unavailable', overlay = {}) {
+  const message = compactText(storageErrorMessage(error), 360);
+  runtimeLastStorageError = message;
+  const modelSelector = runtimeModelSelector(env);
+  const cached = runtimeMemoryState || baseState({}, env);
+  const events = runtimeMemoryEvents.slice(0, RUNTIME_STATE_READ_EVENT_LIMIT);
+  const summary = summarizeRuntimeEvents(events, { limit: RUNTIME_STATE_READ_EVENT_LIMIT });
+  const governance = buildGovernanceSummary({
+    provider: modelSelector.model,
+    events,
+    missionLockTimeoutMs: MISSION_LOCK_TIMEOUT_MS,
+  });
+  const heartbeatLogs = [
+    ...(Array.isArray(cached.heartbeatLogs) ? cached.heartbeatLogs : []),
+    `[${nowTime()}] cloud: Durable Objects em modo degradado; ${message || 'limite de leitura atingido'}`,
+  ].slice(-30);
+  return serializePublicState({
+    ...cached,
+    ...overlay,
+    heartbeatLogs,
+    governance,
+    heartbeatMonitor: {
+      ...(cached.heartbeatMonitor || {}),
+      service: 'luca-ai-cloud',
+      status: 'degraded',
+      updatedAt: nowIso(),
+      intervalSeconds: 0,
+      summary: 'Cloudflare Durable Objects com limite de leitura atingido; usando estado transitório em memória.',
+      beats: summary.total,
+      lastAction: events[0]?.type || 'storage.degraded',
+      eventTypes: summary.byType,
+      goalsSummary: summarizeGoals(cached.goals || []),
+      provider: modelSelector.model,
+      modelSelector,
+      governance,
+      storageDegraded: true,
+      storageError: message,
+    },
+  });
 }
 
 function runtimeStub(env) {
@@ -126,7 +272,12 @@ function safeJsonParse(value, fallback = null) {
 
 function compactText(value, max = 220) {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim();
-  return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 3))}...`;
+  if (text.length <= max) return text;
+  const candidate = text.slice(0, max).trimEnd();
+  const sentenceCut = Math.max(candidate.lastIndexOf('. '), candidate.lastIndexOf('; '), candidate.lastIndexOf(': '));
+  if (sentenceCut > Math.floor(max * 0.55)) return candidate.slice(0, sentenceCut + 1).trim();
+  const wordCut = candidate.lastIndexOf(' ');
+  return (wordCut > Math.floor(max * 0.55) ? candidate.slice(0, wordCut) : candidate).trim();
 }
 
 function eventFiltersFromSearchParams(searchParams) {
@@ -257,7 +408,7 @@ export class LucaRuntime extends DurableObject {
       traceId,
       JSON.stringify(payload || {}),
     );
-    return { id, type, ts, timestamp, source, missionId, goalId, traceId, payload };
+    return rememberRuntimeEvent({ id, type, ts, timestamp, source, missionId, goalId, traceId, payload });
   }
 
   listEvents(options = 80) {
@@ -304,27 +455,10 @@ export class LucaRuntime extends DurableObject {
   eventSummary(options = {}) {
     const filters = typeof options === 'number' ? { limit: options } : (options || {});
     const events = this.listEvents({ limit: filters.limit || 250, ...filters });
-    const byType = new Map();
-    const bySource = new Map();
-    for (const event of events) {
-      byType.set(event.type, (byType.get(event.type) || 0) + 1);
-      const source = event.source || 'unknown';
-      bySource.set(source, (bySource.get(source) || 0) + 1);
-    }
-    return {
-      total: events.length,
-      latest: events[0] || null,
-      oldest: events[events.length - 1] || null,
-      filters: {
-        type: String(filters.type || '').trim() || null,
-        missionId: String(filters.missionId || '').trim() || null,
-        goalId: String(filters.goalId || '').trim() || null,
-        traceId: String(filters.traceId || '').trim() || null,
-        sampledLimit: Math.max(1, Math.min(250, Number(filters.limit) || 250)),
-      },
-      byType: Array.from(byType.entries()).map(([type, total]) => ({ type, total })),
-      bySource: Array.from(bySource.entries()).map(([source, total]) => ({ source, total })),
-    };
+    return summarizeRuntimeEvents(events, {
+      ...filters,
+      limit: Math.max(1, Math.min(250, Number(filters.limit) || 250)),
+    });
   }
 
   eventFlows(options = {}) {
@@ -553,7 +687,7 @@ export class LucaRuntime extends DurableObject {
     }
     this.snapshotState(state);
     const traceId = metadata.traceId ?? missionId ?? null;
-    this.appendEvent(eventType, eventPayload, metadata.source || 'glm-5.1', missionId, { traceId, goalId: metadata.goalId || null });
+    this.appendEvent(eventType, eventPayload, metadata.source || runtimeModel(this.env), missionId, { traceId, goalId: metadata.goalId || null });
     return this.getState();
   }
 
@@ -615,7 +749,7 @@ export class LucaRuntime extends DurableObject {
     if (this.missionHasFinalEvent(mission?.id)) {
       return this.getState();
     }
-    const state = stateFromMissionProgress(mission, intent, phase, payload);
+    const state = stateFromMissionProgress(mission, intent, phase, payload, this.env);
     return this.saveState(
       state,
       {
@@ -631,7 +765,7 @@ export class LucaRuntime extends DurableObject {
   }
 
   saveMissionFailure(mission, error, payload = {}) {
-    const state = stateFromMissionFailure(mission, error, payload);
+    const state = stateFromMissionFailure(mission, error, payload, this.env);
     return this.saveState(
       state,
       {
@@ -640,7 +774,7 @@ export class LucaRuntime extends DurableObject {
         ...payload,
       },
       'mission.failed',
-      { traceId: mission.id, missionId: mission.id, source: payload.source || 'glm-5.1' },
+      { traceId: mission.id, missionId: mission.id, source: payload.source || runtimeModel(this.env) },
     );
   }
 
@@ -680,6 +814,7 @@ export class LucaRuntime extends DurableObject {
         },
         'mission_timeout_auto_closed',
         { reason, startedAt: event.timestamp },
+        this.env,
       ));
       this.appendEvent(
         'mission.failed',
@@ -834,7 +969,7 @@ export class LucaRuntime extends DurableObject {
         await this.scheduleMissionAlarm(MISSION_JOB_RETRY_DELAY_MS * job.attempts);
         return { ok: false, retrying: true, error: message };
       }
-      this.saveMissionFailure(job.mission, message, { attempts: job.attempts, source: 'glm-5.1' });
+      this.saveMissionFailure(job.mission, message, { attempts: job.attempts, source: runtimeModel(this.env) });
       this.setMissionJobStatus(job.id, 'failed', message);
     }
 
@@ -853,7 +988,7 @@ export class LucaRuntime extends DurableObject {
   async beginMission(mission, intent = 'dashboard_build') {
     this.expireStaleMissionStarts();
     const governance = buildGovernanceSummary({
-      provider: this.env.GLM_MODEL || 'glm-5.1',
+      provider: runtimeModel(this.env),
       events: this.listEvents(250),
       missionLockTimeoutMs: MISSION_LOCK_TIMEOUT_MS,
     });
@@ -879,7 +1014,7 @@ export class LucaRuntime extends DurableObject {
   }
 
   async resetState() {
-    const current = this.latestSnapshot() || baseState();
+    const current = this.latestSnapshot() || baseState({}, this.env);
     const activeMission = current?.activeMission || null;
     if (activeMission?.id && !this.missionHasFinalEvent(activeMission.id)) {
       this.appendEvent(
@@ -895,7 +1030,7 @@ export class LucaRuntime extends DurableObject {
       );
     }
     this.processingMissionJob = null;
-    const blank = baseState();
+    const blank = baseState({}, this.env);
     this.ctx.storage.sql.exec("DELETE FROM mission_jobs WHERE status IN ('queued', 'running')");
     await this.ctx.storage.deleteAlarm();
     this.ctx.storage.sql.exec(
@@ -915,21 +1050,23 @@ export class LucaRuntime extends DurableObject {
   }
 
   getState(options = {}) {
-    this.expireStaleMissionStarts();
-    const events = this.listEvents(80);
-    const summary = this.eventSummary();
+    if (options.expireStale === true) this.expireStaleMissionStarts();
+    const eventLimit = options.heavyRead === true ? RUNTIME_STATE_HEAVY_READ_EVENT_LIMIT : RUNTIME_STATE_READ_EVENT_LIMIT;
+    const events = this.listEvents(eventLimit);
+    const summary = summarizeRuntimeEvents(events, { limit: eventLimit });
     const latest = options.includeLatestSnapshot === false ? null : this.latestSnapshot();
-    const history = this.missionHistory(12);
-    const goals = this.listGoals(12);
+    const history = options.includeHistory === true ? this.missionHistory(12) : (latest?.missionHistory || []);
+    const goals = options.includeGoals === true ? this.listGoals(12) : (latest?.goals || []);
     const goalsSummary = summarizeGoals(goals);
     const heartbeatLogs = events.slice(0, 30).reverse().map(eventLine);
-    const base = latest || baseState();
+    const modelSelector = runtimeModelSelector(this.env);
+    const base = latest || baseState({}, this.env);
     const governance = buildGovernanceSummary({
-      provider: this.env.GLM_MODEL || 'glm-5.1',
+      provider: modelSelector.model,
       events,
       missionLockTimeoutMs: MISSION_LOCK_TIMEOUT_MS,
     });
-    return serializePublicState({
+    return rememberRuntimeState({
       ...base,
       goals,
       governance,
@@ -946,6 +1083,8 @@ export class LucaRuntime extends DurableObject {
         lastAction: events[0]?.type || 'idle',
         eventTypes: summary.byType,
         goalsSummary,
+        provider: modelSelector.model,
+        modelSelector,
         governance,
       },
     });
@@ -963,7 +1102,7 @@ async function callGlm(env, messages, { temperature = 0.25, maxTokens = 2600 } =
   const apiKey = env.GLM_API_KEY;
   if (!apiKey) throw new Error('GLM_API_KEY ausente no Worker');
   const base = (env.GLM_BASE || 'https://api.z.ai/api/coding/paas/v4').replace(/\/+$/, '');
-  const model = env.GLM_MODEL || 'glm-5.1';
+  const model = runtimeModel(env);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), GLM_REQUEST_TIMEOUT_MS);
   let response;
@@ -1312,7 +1451,7 @@ function runIdForMission(mission = {}) {
 function missionProgressLabel(phase = 'accepted') {
   const labels = {
     accepted: 'missao aceita pelo runtime',
-    glm_started: 'GLM 5.1 analisando briefing',
+    glm_started: 'modelo analisando briefing',
     analysis_generated: 'analise GLM recebida',
     repairing: 'normalizando contrato executivo',
     verifying: 'verificando fechamento',
@@ -1354,8 +1493,8 @@ function missionProgressMessages(mission, intent, phase = 'accepted', payload = 
   return messages;
 }
 
-function agentsFromProgressMessages(messages = []) {
-  return AGENTS.map((agent) => {
+function agentsFromProgressMessages(messages = [], model = runtimeModel()) {
+  return runtimeAgents(model).map((agent) => {
     const agentMsgs = messages.filter((message) => message.agentId === agent.id);
     const active = agentMsgs.length > 0;
     return {
@@ -1369,7 +1508,8 @@ function agentsFromProgressMessages(messages = []) {
   });
 }
 
-function stateFromMissionProgress(mission, intent, phase = 'accepted', payload = {}) {
+function stateFromMissionProgress(mission, intent, phase = 'accepted', payload = {}, env = {}) {
+  const model = runtimeModel(env);
   const messages = missionProgressMessages(mission, intent, phase, payload);
   return baseState({
     supervisorMode: 'running',
@@ -1386,7 +1526,7 @@ function stateFromMissionProgress(mission, intent, phase = 'accepted', payload =
     },
     temporaryDashboard: null,
     database: {
-      source: { name: 'GLM 5.1 runtime', topic: mission?.title || 'missao real' },
+      source: { name: `${model} runtime`, topic: mission?.title || 'missao real' },
       layers: {
         rawResearch: { status: phase === 'accepted' ? 'queued' : 'loading', items: [], dashboardVisibility: 'internal' },
         processing: { status: phase === 'accepted' ? 'queued' : 'running', items: [], dashboardVisibility: 'technical' },
@@ -1398,20 +1538,21 @@ function stateFromMissionProgress(mission, intent, phase = 'accepted', payload =
     },
     heartbeatLogs: [
       `[${nowTime()}] mission: ${missionProgressLabel(phase)}`,
-      `[${nowTime()}] glm-5.1: ${phase === 'accepted' ? 'job aguardando alarm' : 'execucao em andamento'}`,
+      `[${nowTime()}] ${model}: ${phase === 'accepted' ? 'job aguardando alarm' : 'execucao em andamento'}`,
     ],
     globalChatMessages: messages,
-    agents: agentsFromProgressMessages(messages),
-  });
+    agents: agentsFromProgressMessages(messages, model),
+  }, env);
 }
 
-function stateFromMissionFailure(mission, error, payload = {}) {
+function stateFromMissionFailure(mission, error, payload = {}, env = {}) {
+  const model = runtimeModel(env);
   const reason = payload.reason || compactText(error, 700);
   const messages = [
     chatMessage('maestro', 'Maestro', 'sistema', `Missao encerrada com falha operacional: ${compactText(mission?.title || mission?.id || 'missao', 120)}.`),
     chatMessage('supervisor', 'Supervisor', 'alerta', `Falha: ${compactText(reason, 700)}`),
   ];
-  const agents = AGENTS.map((agent) => {
+  const agents = runtimeAgents(model).map((agent) => {
     const agentMsgs = messages.filter((message) => message.agentId === agent.id);
     return {
       ...agent,
@@ -1439,14 +1580,15 @@ function stateFromMissionFailure(mission, error, payload = {}) {
     ],
     globalChatMessages: messages,
     agents,
-  });
+  }, env);
 }
 
-function stateFromChatOnly(mission, analysis, meta, verifier = { approved: true, reason: '', missing: [] }) {
+function stateFromChatOnly(mission, analysis, meta, verifier = { approved: true, reason: '', missing: [] }, env = {}) {
+  const model = meta.model || runtimeModel(env);
   const agentMessages = Array.isArray(analysis.agentMessages) ? analysis.agentMessages.slice(0, 6) : [];
   const content = String(analysis.finalMessage || analysis.message || analysis.response || 'Pedido atendido no chat.').slice(0, 1800);
   const messages = [
-    chatMessage('maestro', 'Maestro', 'sistema', `Missao de chat processada por ${meta.model || 'glm-5.1'} em runtime cloud real.`),
+    chatMessage('maestro', 'Maestro', 'sistema', `Missao de chat processada por ${model} em runtime cloud real.`),
     ...(analysis.briefing ? [chatMessage('supervisor', 'Supervisor', 'decisao', analysis.briefing)] : []),
     ...agentMessages.map((message) => (
       chatMessage(message.agentId || 'supervisor', message.agentName || message.agentId || 'Agente', message.type || 'info', message.content || '')
@@ -1454,7 +1596,7 @@ function stateFromChatOnly(mission, analysis, meta, verifier = { approved: true,
     chatMessage('supervisor', 'Supervisor', 'resultado', content),
     ...(!verifier.approved ? [chatMessage('supervisor', 'Supervisor', 'alerta', verifier.reason || 'Verificador bloqueou o fechamento do chat.')] : []),
   ];
-  const agents = AGENTS.map((agent) => ({
+  const agents = runtimeAgents(model).map((agent) => ({
     ...agent,
     status: 'ready',
     lines: [
@@ -1473,12 +1615,12 @@ function stateFromChatOnly(mission, analysis, meta, verifier = { approved: true,
     },
     temporaryDashboard: null,
     heartbeatLogs: [
-      `[${nowTime()}] glm-5.1: chat gerado`,
+      `[${nowTime()}] ${model}: chat gerado`,
       `[${nowTime()}] chat: ${verifier.approved ? 'concluido sem canvas' : 'bloqueado por verificador'}`,
     ],
     globalChatMessages: messages,
     agents,
-  });
+  }, env);
 }
 
 function buildChatOnlyPrompt(mission) {
@@ -1529,7 +1671,7 @@ ${insuranceRoleOutputContract(mission, { mode: 'dashboard' })}
 
 Proibido inventar dados como se fossem reais. Se faltar dado real, rotule como "premissa", "estimativa" ou "necessita CSV/telemetria".
 Proibido usar linguagem de mock, demo, simulado ou simulada em qualquer campo. Dados citados na missao do usuario sao dados fornecidos pelo briefing e devem ser tratados como entrada real do caso.
-Seja compacto. Gere textos curtos, no maximo 4 metricas, 5 blocos e 5 mensagens de agentes.
+Seja objetivo, mas sempre com frases completas. Nao use reticencias (...), nao corte palavras e nao abrevie evidencias, telemetria ou lacunas financeiras no meio da frase. Gere no maximo 4 metricas, 5 blocos e 5 mensagens de agentes.
 Use portugues executivo claro. Nao use palavras inventadas, jargoes estranhos ou verbos incomuns quando uma acao operacional simples resolver.
 Obrigatorio: gere exatamente 5 blocos de dashboard com estes titles exatos: "Dor e evidencias", "Ranking de risco", "Plano preventivo", "Valor para seguradora", "Criterio de sucesso".
 No bloco "Plano preventivo", sempre escreva pelo menos uma acao concreta e um dono/responsavel claro.
@@ -1543,21 +1685,21 @@ Schema obrigatorio:
   "briefing": "resumo da missao interpretada",
   "assumptions": ["premissas adotadas"],
   "agentMessages": [
-    {"agentId":"transformador-missao|pesquisador|planejador|designer","agentName":"...","type":"info|resultado|acao|decisao","content":"..."}
+    {"agentId":"transformador-missao|pesquisador|planejador|designer","agentName":"nome","type":"info|resultado|acao|decisao","content":"frase completa sem reticencias"}
   ],
   "dashboard": {
-    "title": "...",
-    "subtitle": "...",
-    "metrics": [{"label":"...","value":"..."}],
+    "title": "titulo",
+    "subtitle": "frase executiva",
+    "metrics": [{"label":"metrica","value":"valor"}],
     "blocks": [
-      {"type":"note|tower|pie|topics|metric","title":"...","body":"...","items":[{"label":"...","value":1}]}
+      {"type":"note|tower|pie|topics|metric","title":"titulo","body":"frase completa sem reticencias","items":[{"label":"item","value":1}]}
     ]
   },
   "database": {
-    "sourceName": "...",
-    "rawItems": [{"label":"...","type":"...","status":"...","detail":"..."}],
-    "processingItems": [{"label":"...","type":"...","status":"...","detail":"..."}],
-    "publicItems": [{"label":"...","type":"...","status":"...","summary":"...","whyItMatters":"..."}]
+    "sourceName": "fonte",
+    "rawItems": [{"label":"entrada","type":"tipo","status":"status","detail":"detalhe completo"}],
+    "processingItems": [{"label":"processamento","type":"tipo","status":"status","detail":"detalhe completo"}],
+    "publicItems": [{"label":"resultado","type":"tipo","status":"status","summary":"resumo completo","whyItMatters":"por que importa"}]
   },
   "finalReport": "veredito executivo curto"
 }`,
@@ -1587,7 +1729,8 @@ async function repairPresentationLanguage(env, mission, analysis) {
 Remova linguagem proibida de material ficticio. Preserve os dados fornecidos pelo briefing: sinistros, telemetria, fazenda, lacunas e premissas. Nao invente dados financeiros.
 ${insuranceRoleOutputContract(mission, { mode: 'dashboard' })}
 O dashboard deve ter exatamente estes 5 blocos com titles exatos: "Dor e evidencias", "Ranking de risco", "Plano preventivo", "Valor para seguradora", "Criterio de sucesso".
-No bloco "Plano preventivo", explicite acao concreta e dono/responsavel.`,
+No bloco "Plano preventivo", explicite acao concreta e dono/responsavel.
+Nao use reticencias (...), nao corte palavras e nao deixe body com frase incompleta.`,
         },
         {
           role: 'user',
@@ -1789,14 +1932,15 @@ ${JSON.stringify(analysis).slice(0, 14000)}`,
   ];
 }
 
-function stateFromAnalysis(mission, analysis, verifier, meta) {
+function stateFromAnalysis(mission, analysis, verifier, meta, env = {}) {
+  const model = meta.model || runtimeModel(env);
   const dashboard = analysis.dashboard || {};
   const database = analysis.database || {};
   const rawItems = Array.isArray(database.rawItems) ? database.rawItems : [];
   const processingItems = Array.isArray(database.processingItems) ? database.processingItems : [];
   const publicItems = Array.isArray(database.publicItems) ? database.publicItems : [];
   const messages = [
-    chatMessage('maestro', 'Maestro', 'sistema', `Missao processada por ${meta.model || 'glm-5.1'} em runtime cloud real.`),
+    chatMessage('maestro', 'Maestro', 'sistema', `Missao processada por ${model} em runtime cloud real.`),
     chatMessage('supervisor', 'Supervisor', 'decisao', analysis.briefing || mission.description),
     ...(Array.isArray(analysis.agentMessages) ? analysis.agentMessages.slice(0, 8).map((m) => (
       chatMessage(m.agentId || 'supervisor', m.agentName || m.agentId || 'Agente', m.type || 'info', m.content || '')
@@ -1805,7 +1949,7 @@ function stateFromAnalysis(mission, analysis, verifier, meta) {
     chatMessage('supervisor', verifier.approved ? 'Supervisor' : 'Supervisor', verifier.approved ? 'resultado' : 'alerta', `${verifier.approved ? 'Verificacao aprovada' : 'Verificacao reprovada'}: ${verifier.reason || 'sem justificativa'}`),
   ];
 
-  const agents = AGENTS.map((agent) => {
+  const agents = runtimeAgents(model).map((agent) => {
     const agentMsgs = messages.filter((m) => m.agentId === agent.id);
     return {
       ...agent,
@@ -1829,15 +1973,15 @@ function stateFromAnalysis(mission, analysis, verifier, meta) {
       completedAt: nowIso(),
     },
     temporaryDashboard: {
-      title: dashboard.title || 'Canvas gerado pelo GLM 5.1',
+      title: dashboard.title || `Canvas gerado pelo ${model}`,
       subtitle: dashboard.subtitle || analysis.finalReport || '',
       metrics: Array.isArray(dashboard.metrics) ? dashboard.metrics.slice(0, 4) : [],
       blocks: normalizeBlocks(dashboard.blocks),
-      sourceAgentId: meta.model || 'glm-5.1',
+      sourceAgentId: model,
       updatedAt: nowIso(),
     },
     database: {
-      source: { name: database.sourceName || 'GLM 5.1 analysis', topic: mission.title || 'missao real' },
+      source: { name: database.sourceName || `${model} analysis`, topic: mission.title || 'missao real' },
       layers: {
         rawResearch: {
           status: rawItems.length ? 'loaded' : 'empty',
@@ -1854,7 +1998,7 @@ function stateFromAnalysis(mission, analysis, verifier, meta) {
         processing: {
           status: processingItems.length ? 'ready' : 'empty',
           dashboardVisibility: 'technical',
-          rule: 'Inferencias e transformacoes geradas pelo GLM 5.1.',
+          rule: `Inferencias e transformacoes geradas pelo ${model}.`,
           items: processingItems.map((item, index) => ({
             id: `processing-${index}`,
             label: item.label,
@@ -1884,13 +2028,13 @@ function stateFromAnalysis(mission, analysis, verifier, meta) {
       ],
     },
     heartbeatLogs: [
-      `[${nowTime()}] glm-5.1: analise gerada`,
+      `[${nowTime()}] ${model}: analise gerada`,
       `[${nowTime()}] verifier: ${verifier.approved ? 'aprovado' : 'reprovado'}`,
       ...(Array.isArray(verifier.missing) ? verifier.missing.map((m) => `[${nowTime()}] missing: ${m}`) : []),
     ],
     globalChatMessages: messages,
     agents,
-  });
+  }, env);
 }
 
 async function processMissionLifecycle(env, runtime, mission, intent) {
@@ -1901,7 +2045,7 @@ async function processMissionLifecycle(env, runtime, mission, intent) {
     const analysis = cleanPublicValue(await repairChatOnlyInsuranceMessages(env, mission, generated.parsed));
     const deterministicReview = buildDeterministicWorkerReview({ mission, analysis, mode: 'chat_only' });
     const verifier = closureReviewToVerifier(deterministicReview);
-    const state = stateFromChatOnly(mission, analysis, { model: generated.meta.model, usage: generated.meta.usage }, verifier);
+    const state = stateFromChatOnly(mission, analysis, { model: generated.meta.model, usage: generated.meta.usage }, verifier, env);
     const persistedState = runtime
       ? await runtime.saveState(state, { title: mission.title, mode: 'chat_only' }, 'mission.chat_completed', { traceId: mission.id, missionId: mission.id })
       : state;
@@ -1910,7 +2054,7 @@ async function processMissionLifecycle(env, runtime, mission, intent) {
 
   let generated = null;
   let analysis = null;
-  let modelMeta = { model: env.GLM_MODEL || 'glm-5.1', usage: null };
+  let modelMeta = { model: runtimeModel(env), usage: null };
   try {
     generated = await callGlmJson(env, buildPrompt(mission), { temperature: 0.18, maxTokens: 2600 });
     modelMeta = { model: generated.meta.model, usage: generated.meta.usage };
@@ -1934,7 +2078,7 @@ async function processMissionLifecycle(env, runtime, mission, intent) {
   const prepared = prepareAnalysisForClosure(mission, analysis, 'dashboard_build');
   analysis = prepared.analysis;
   const verifier = closureReviewToVerifier(prepared.review);
-  const state = stateFromAnalysis(mission, analysis, verifier, modelMeta);
+  const state = stateFromAnalysis(mission, analysis, verifier, modelMeta, env);
   const persistedState = runtime
     ? await runtime.saveState(
       state,
@@ -1944,6 +2088,45 @@ async function processMissionLifecycle(env, runtime, mission, intent) {
     )
     : state;
   return { ok: true, mission, verifier, state: persistedState };
+}
+
+async function processTransientMissionLifecycle(env, mission, intent) {
+  try {
+    const result = await processMissionLifecycle(env, null, mission, intent);
+    if (result?.state) {
+      rememberRuntimeEvent({
+        type: intent === 'chat_only' ? 'mission.chat_completed' : 'mission.completed',
+        source: result?.state?.activeRun?.sourceAgentId || runtimeModel(env),
+        missionId: mission.id,
+        traceId: mission.id,
+        payload: {
+          title: mission.title,
+          transient: true,
+          approved: result?.verifier?.approved ?? true,
+        },
+      });
+      rememberRuntimeState(result.state, env);
+    }
+    return result;
+  } catch (error) {
+    const failedState = stateFromMissionFailure(mission, error, {
+      reason: 'Execucao transitoria falhou durante modo degradado do Durable Object.',
+      source: runtimeModel(env),
+    }, env);
+    rememberRuntimeEvent({
+      type: 'mission.failed',
+      source: runtimeModel(env),
+      missionId: mission.id,
+      traceId: mission.id,
+      payload: {
+        title: mission.title,
+        transient: true,
+        error: storageErrorMessage(error),
+      },
+    });
+    rememberRuntimeState(failedState, env);
+    return { ok: false, mission, error: storageErrorMessage(error), state: failedState };
+  }
 }
 
 async function activateMission(request, env, ctx) {
@@ -1962,32 +2145,78 @@ async function activateMission(request, env, ctx) {
   const intent = classifyMissionIntent(mission);
   const runtime = runtimeStub(env);
   if (runtime) {
-    const begin = await runtime.beginMission(mission, intent);
-    if (!begin.ok) {
+    try {
+      const begin = await runtime.beginMission(mission, intent);
+      if (!begin.ok) {
+        return json({
+          ok: false,
+          error: begin.error || 'mission_concurrency_locked',
+          lock: begin.lock || null,
+          state: begin.state || await runtime.getState(),
+        }, 409);
+      }
+      if (ctx?.waitUntil) {
+        ctx.waitUntil(runtime.processNextMissionJob().catch(() => {}));
+      }
+      return json({ ok: true, accepted: true, mission, state: begin.state || await runtime.getState() }, 202);
+    } catch (error) {
+      const progressState = rememberRuntimeState(stateFromMissionProgress(
+        mission,
+        intent,
+        'accepted',
+        { warning: 'durable_object_storage_degraded' },
+        env,
+      ), env);
+      rememberRuntimeEvent({
+        type: 'mission.started',
+        source: 'ui',
+        missionId: mission.id,
+        traceId: mission.id,
+        payload: {
+          title: mission.title,
+          intent,
+          transient: true,
+          storageDegraded: isDurableObjectStorageLimitError(error),
+        },
+      });
+      const transientRun = processTransientMissionLifecycle(env, mission, intent);
+      if (ctx?.waitUntil) {
+        ctx.waitUntil(transientRun.catch(() => {}));
+      } else {
+        transientRun.catch(() => {});
+      }
       return json({
-        ok: false,
-        error: begin.error || 'mission_concurrency_locked',
-        lock: begin.lock || null,
-        state: begin.state || await runtime.getState(),
-      }, 409);
+        ok: true,
+        accepted: true,
+        degraded: true,
+        mission,
+        state: runtimeDegradedState(env, error, progressState),
+      }, 202);
     }
-    if (ctx?.waitUntil) {
-      ctx.waitUntil(runtime.processNextMissionJob().catch(() => {}));
-    }
-    return json({ ok: true, accepted: true, mission, state: begin.state || await runtime.getState() }, 202);
   }
 
-  return json(await processMissionLifecycle(env, null, mission, intent));
+  const result = await processTransientMissionLifecycle(env, mission, intent);
+  return json(result);
 }
 
 async function runHarnessSmoke(env) {
   const runtime = runtimeStub(env);
-  const state = runtime ? await runtime.getState() : baseState();
+  const modelSelector = runtimeModelSelector(env);
+  let state = baseState({}, env);
+  let degraded = false;
+  if (runtime) {
+    try {
+      state = await runtime.getState();
+    } catch (error) {
+      degraded = true;
+      state = runtimeDegradedState(env, error);
+    }
+  }
   const checks = [
     { id: 'glm-key', label: 'GLM secret', ok: Boolean(env.GLM_API_KEY), detail: env.GLM_API_KEY ? 'secret configurado' : 'GLM_API_KEY ausente' },
-    { id: 'glm-model', label: 'GLM model', ok: (env.GLM_MODEL || '') === 'glm-5.1', detail: env.GLM_MODEL || 'n/a' },
+    { id: 'model-selector', label: 'Model selector', ok: Boolean(modelSelector.model), detail: modelSelectorSummary(modelSelector) },
     { id: 'runtime-state', label: 'Runtime state', ok: Boolean(state?.heartbeatMonitor), detail: state?.heartbeatMonitor?.summary || 'sem monitor' },
-    { id: 'event-store', label: 'Event store', ok: runtime ? true : false, detail: `${state?.heartbeatMonitor?.beats ?? 0} eventos` },
+    { id: 'event-store', label: 'Event store', ok: runtime ? !degraded : false, detail: degraded ? 'Durable Objects em modo degradado' : `${state?.heartbeatMonitor?.beats ?? 0} eventos` },
     { id: 'agents', label: 'Agent roster', ok: Array.isArray(state?.agents) && state.agents.length >= 5, detail: `${state?.agents?.length || 0} agentes` },
     { id: 'governance-summary', label: 'Governance summary', ok: Array.isArray(state?.heartbeatMonitor?.governance?.summaryLines) && state.heartbeatMonitor.governance.summaryLines.length >= 4, detail: state?.heartbeatMonitor?.governance?.summaryText || 'governanca ausente' },
     { id: 'canvas-contract', label: 'Canvas contract', ok: true, detail: REQUIRED_BLOCK_TITLES.join(', ') },
@@ -1998,14 +2227,30 @@ async function runHarnessSmoke(env) {
     timestamp: nowIso(),
     checks,
   };
-  if (runtime) await runtime.appendEvent('harness.smoke', result, 'harness');
+  if (runtime) {
+    try {
+      await runtime.appendEvent('harness.smoke', result, 'harness');
+    } catch {
+      rememberRuntimeEvent({ type: 'harness.smoke', source: 'harness', payload: result });
+    }
+  }
   return result;
 }
 
 async function runCloudPreflight(env) {
   const runtime = runtimeStub(env);
-  const state = runtime ? await runtime.getState() : baseState();
-  const governance = state?.governance || state?.heartbeatMonitor?.governance || buildGovernanceSummary();
+  const modelSelector = runtimeModelSelector(env);
+  let state = baseState({}, env);
+  let degradedError = null;
+  if (runtime) {
+    try {
+      state = await runtime.getState();
+    } catch (error) {
+      degradedError = error;
+      state = runtimeDegradedState(env, error);
+    }
+  }
+  const governance = state?.governance || state?.heartbeatMonitor?.governance || buildGovernanceSummary({ provider: modelSelector.model });
   return runOperationalPreflight({
     mode: 'cloud',
     governance,
@@ -2014,7 +2259,7 @@ async function runCloudPreflight(env) {
       if (path === '/api/health') {
         return {
           ok: true,
-          body: { ok: true, service: 'luca-ai-cloud', model: env.GLM_MODEL || 'glm-5.1' },
+          body: { ok: true, service: 'luca-ai-cloud', model: modelSelector.model, modelSelector },
           detail: env.GLM_API_KEY ? 'GLM secret configurado' : 'GLM_API_KEY ausente',
         };
       }
@@ -2026,11 +2271,21 @@ async function runCloudPreflight(env) {
         };
       }
       if (path === '/api/events') {
-        const events = runtime ? await runtime.listEvents({ limit: 100 }) : [];
+        let events = [];
+        if (runtime && !degradedError) {
+          try {
+            events = await runtime.listEvents({ limit: RUNTIME_STATE_READ_EVENT_LIMIT });
+          } catch (error) {
+            degradedError = error;
+            events = runtimeMemoryEvents.slice(0, RUNTIME_STATE_READ_EVENT_LIMIT);
+          }
+        } else {
+          events = runtimeMemoryEvents.slice(0, RUNTIME_STATE_READ_EVENT_LIMIT);
+        }
         return {
           ok: Array.isArray(events),
           body: { ok: true, events },
-          detail: `${events.length} evento(s) recentes`,
+          detail: degradedError ? 'eventos em cache transitorio' : `${events.length} evento(s) recentes`,
         };
       }
       return { ok: false, error: 'endpoint_not_supported' };
@@ -2041,16 +2296,27 @@ async function runCloudPreflight(env) {
 async function handleApi(request, env, pathname, ctx) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   if (pathname === '/api/health') {
-    return json({ ok: true, service: 'luca-ai-cloud', model: env.GLM_MODEL || 'glm-5.1', hasGlmKey: Boolean(env.GLM_API_KEY) });
+    const modelSelector = runtimeModelSelector(env);
+    return json({ ok: true, service: 'luca-ai-cloud', model: modelSelector.model, modelSelector, hasGlmKey: Boolean(env.GLM_API_KEY) });
   }
   if (pathname === '/api/state' && request.method === 'GET') {
     const runtime = runtimeStub(env);
-    return json(runtime ? await runtime.getState() : baseState());
+    try {
+      return json(runtime ? await runtime.getState() : rememberRuntimeState(baseState({}, env), env));
+    } catch (error) {
+      return json(runtimeDegradedState(env, error));
+    }
   }
   if (pathname === '/api/governance' && request.method === 'GET') {
+    const modelSelector = runtimeModelSelector(env);
     const runtime = runtimeStub(env);
-    const state = runtime ? await runtime.getState() : baseState();
-    return json({ ok: true, governance: state?.governance || buildGovernanceSummary() });
+    let state = baseState({}, env);
+    try {
+      state = runtime ? await runtime.getState() : rememberRuntimeState(baseState({}, env), env);
+    } catch (error) {
+      state = runtimeDegradedState(env, error);
+    }
+    return json({ ok: true, governance: state?.governance || buildGovernanceSummary({ provider: modelSelector.model }) });
   }
   if (pathname === '/api/preflight' && request.method === 'GET') {
     return json(await runCloudPreflight(env));
@@ -2070,64 +2336,122 @@ async function handleApi(request, env, pathname, ctx) {
   }
   if (pathname === '/api/goals' && request.method === 'GET') {
     const runtime = runtimeStub(env);
-    const goals = runtime ? await runtime.listGoals(100, new URL(request.url).searchParams.get('status') || '') : [];
+    let goals = [];
+    try {
+      goals = runtime ? await runtime.listGoals(100, new URL(request.url).searchParams.get('status') || '') : [];
+    } catch {
+      goals = runtimeMemoryState?.goals || [];
+    }
     return json({ ok: true, goals, summary: summarizeGoals(goals) });
   }
   if (pathname === '/api/goals' && request.method === 'POST') {
     const runtime = runtimeStub(env);
     if (!runtime) return json({ ok: false, error: 'runtime_unavailable' }, 503);
-    const body = await request.json();
-    const goal = await runtime.createGoal(body, 'ui');
-    return json({ ok: true, goal, summary: summarizeGoals(await runtime.listGoals(100)) }, 201);
+    try {
+      const body = await request.json();
+      const goal = await runtime.createGoal(body, 'ui');
+      return json({ ok: true, goal, summary: summarizeGoals(await runtime.listGoals(100)) }, 201);
+    } catch (error) {
+      return json({
+        ok: false,
+        error: 'durable_object_storage_degraded',
+        detail: storageErrorMessage(error),
+      }, isDurableObjectStorageLimitError(error) ? 503 : 500);
+    }
   }
   if (pathname === '/api/mission/activate' && request.method === 'POST') {
     try {
       return await activateMission(request, env, ctx);
     } catch (error) {
-      return json({ ok: false, error: error instanceof Error ? error.message : String(error), source: 'glm-5.1' }, 502);
+      return json({ ok: false, error: error instanceof Error ? error.message : String(error), source: runtimeModel(env) }, 502);
     }
   }
   if (pathname === '/api/mission/reset' && request.method === 'POST') {
     const runtime = runtimeStub(env);
-    const state = runtime ? await runtime.resetState() : baseState();
+    let state = null;
+    try {
+      state = runtime ? await runtime.resetState() : baseState({}, env);
+      rememberRuntimeState(state, env);
+    } catch (error) {
+      rememberRuntimeEvent({ type: 'state.reset', source: 'ui', payload: { transient: true } });
+      state = rememberRuntimeState(baseState({}, env), env);
+      state = runtimeDegradedState(env, error, state);
+    }
     return json({ ok: true, state });
   }
   if (pathname === '/api/heartbeat/start' && request.method === 'POST') {
     const runtime = runtimeStub(env);
-    const state = runtime ? await runtime.heartbeat('play') : baseState();
+    let state = null;
+    try {
+      state = runtime ? await runtime.heartbeat('play') : baseState({}, env);
+      rememberRuntimeState(state, env);
+    } catch (error) {
+      rememberRuntimeEvent({ type: 'heartbeat.play', source: 'heartbeat', payload: { transient: true } });
+      state = runtimeDegradedState(env, error);
+    }
     return json({ ok: true, state });
   }
   if (pathname === '/api/heartbeat/pause' && request.method === 'POST') {
     const runtime = runtimeStub(env);
-    const state = runtime ? await runtime.heartbeat('pause') : baseState();
+    let state = null;
+    try {
+      state = runtime ? await runtime.heartbeat('pause') : baseState({}, env);
+      rememberRuntimeState(state, env);
+    } catch (error) {
+      rememberRuntimeEvent({ type: 'heartbeat.pause', source: 'heartbeat', payload: { transient: true } });
+      state = runtimeDegradedState(env, error);
+    }
     return json({ ok: true, state });
   }
   if (pathname === '/api/events' && request.method === 'GET') {
     const runtime = runtimeStub(env);
     const filters = eventFiltersFromSearchParams(new URL(request.url).searchParams);
-    return json({ ok: true, filters, events: runtime ? await runtime.listEvents(filters) : [] });
+    try {
+      return json({ ok: true, filters, events: runtime ? await runtime.listEvents(filters) : filterRuntimeMemoryEvents(filters) });
+    } catch (error) {
+      return json({ ok: true, degraded: true, detail: storageErrorMessage(error), filters, events: filterRuntimeMemoryEvents(filters) });
+    }
   }
   if (pathname === '/api/events/summary' && request.method === 'GET') {
     const runtime = runtimeStub(env);
     const filters = eventFiltersFromSearchParams(new URL(request.url).searchParams);
-    return json({
-      ok: true,
-      summary: runtime
-        ? await runtime.eventSummary(filters)
-        : { total: 0, latest: null, oldest: null, filters, byType: [], bySource: [] },
-    });
+    try {
+      return json({
+        ok: true,
+        summary: runtime
+          ? await runtime.eventSummary(filters)
+          : summarizeRuntimeEvents(filterRuntimeMemoryEvents(filters), filters),
+      });
+    } catch (error) {
+      return json({
+        ok: true,
+        degraded: true,
+        detail: storageErrorMessage(error),
+        summary: summarizeRuntimeEvents(filterRuntimeMemoryEvents(filters), filters),
+      });
+    }
   }
   if (pathname === '/api/events/flows' && request.method === 'GET') {
     const runtime = runtimeStub(env);
     const filters = eventFiltersFromSearchParams(new URL(request.url).searchParams);
-    return json({ ok: true, ...(runtime ? await runtime.eventFlows(filters) : { flows: [], filters }) });
+    try {
+      return json({ ok: true, ...(runtime ? await runtime.eventFlows(filters) : { flows: [], filters }) });
+    } catch (error) {
+      return json({ ok: true, degraded: true, detail: storageErrorMessage(error), flows: [], filters });
+    }
   }
   if (pathname === '/api/harness/smoke' && request.method === 'POST') {
     return json(await runHarnessSmoke(env));
   }
   if (request.method === 'POST') {
     const runtime = runtimeStub(env);
-    return json({ ok: true, state: runtime ? await runtime.heartbeat('tick') : baseState() });
+    try {
+      const state = runtime ? await runtime.heartbeat('tick') : baseState({}, env);
+      return json({ ok: true, state: rememberRuntimeState(state, env) });
+    } catch (error) {
+      rememberRuntimeEvent({ type: 'heartbeat.tick', source: 'heartbeat', payload: { transient: true } });
+      return json({ ok: true, degraded: true, state: runtimeDegradedState(env, error) });
+    }
   }
   return json({ ok: false, error: 'not_found' }, 404);
 }

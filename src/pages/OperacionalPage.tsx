@@ -25,17 +25,17 @@ interface OperacionalPageProps {
  */
 export default function OperacionalPage({ activeAgent, onOpenAgent, onNavigate }: OperacionalPageProps) {
   return (
-    <div className="h-full flex flex-col gap-3 p-4 min-h-0">
+    <div className="h-full overflow-y-auto lg:overflow-hidden flex flex-col gap-3 p-3 sm:p-4 min-h-0">
       <AgentRail activeAgent={activeAgent} onOpenAgent={onOpenAgent} onNavigate={onNavigate} />
 
-      <div className="flex-1 grid grid-cols-12 gap-3 min-h-0">
+      <div className="flex-none lg:flex-1 grid grid-cols-12 gap-3 min-h-0">
         <div className="col-span-3 min-h-0 hidden lg:block">
           <SupervisorLog />
         </div>
-        <div className="col-span-12 lg:col-span-6 min-h-0">
+        <div className="col-span-12 lg:col-span-6 min-h-[280px] lg:min-h-0">
           <MissionCanvas />
         </div>
-        <div className="col-span-12 lg:col-span-3 min-h-0">
+        <div className="col-span-12 lg:col-span-3 min-h-[260px] lg:min-h-0">
           <GlobalChat />
         </div>
       </div>

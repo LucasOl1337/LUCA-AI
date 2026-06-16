@@ -42,6 +42,8 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
   const dbItems = countDatabaseItems(database);
   const running = supervisorMode === 'running';
   const cloudRuntime = runtimeMode === 'cloud';
+  const heartbeatModelSelector = heartbeatMonitor?.modelSelector as { model?: string } | undefined;
+  const activeCloudModel = heartbeatModelSelector?.model || 'modelo cloud';
   const runtimeOnline = cloudRuntime ? connectionState !== 'offline' : backendReady;
   const monitorStatus = heartbeatMonitor?.status ?? (connectionState === 'checking' ? 'checking' : runtimeOnline ? 'online' : 'offline');
   const systemBadge = missionPhase === 'running'
@@ -296,7 +298,7 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
               : connectionState === 'checking'
                 ? 'Conectando ao runtime cloud para sincronizar estado, agentes e heartbeat.'
               : cloudRuntime
-                ? 'Modo público online. As missões são processadas no backend cloud com GLM 5.1.'
+                ? `Modo público online. As missões são processadas no backend cloud com ${activeCloudModel}.`
               : backendReady
                 ? 'Sistema online. Pronto para receber missão.'
                 : 'Sem conexão com o backend. Verifique se o servidor está em 127.0.0.1:4242.'}

@@ -11,7 +11,9 @@
   },
   "vars": {
     "GLM_BASE": "https://api.z.ai/api/coding/paas/v4",
-    "GLM_MODEL": "glm-5.1"
+    "GLM_MODEL": "glm-5.1",
+    "MODEL_SELECTOR_KEY": "principal",
+    "GLM_MODEL_OPTIONS": "{\"principal\":\"glm-5.1\"}"
   },
   "durable_objects": {
     "bindings": [

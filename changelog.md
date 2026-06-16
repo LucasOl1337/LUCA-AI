@@ -1,4 +1,70 @@
-# Changelog - LUCA-AI
+# Changelog
+## [2026-06-16] - Safe Commit Sync (Multi-Agent + PC vs GitHub Research)
+
+**Project:** LUCA-AI  |  **Branch:** main  |  **State:** active
+
+### PC vs GitHub at Research Time
+- Local HEAD: 38038d0 (C:\Projetos\LUCA-AI)
+- Remote (origin): b01beda
+- Ahead/Behind: +1 / -0
+- 24h commits: 0
+- Uncommitted entries (porcelain): 40
+
+### Summary of Changes Being Committed
+tests: erver/executive-dashboard.test.js, server/supervisor-final-report.test.js, server/model-selector.test.js ... (10 total) | docs: DocsDev/, DocsDev/qa-browser-loop.md (2) | root: shared/dashboard-contract.js, shared/executive-dashboard.js, shared/mission-intent.js ... (10 total) | source: server/index.js, server/router-client.js, src/App.tsx ... (27 total)
+
+### 24h Commit Subjects (local)
+- (none)
+
+### Files Changed (working tree preview)
+```text
+M server/executive-dashboard.test.js
+ M server/index.js
+ M server/router-client.js
+ M server/supervisor-final-report.test.js
+ M shared/dashboard-contract.js
+ M shared/executive-dashboard.js
+ M shared/mission-intent.js
+ M shared/request-timeout.js
+ M shared/state-payload.js
+ M shared/supervisor-final-report.js
+ M src/App.tsx
+ M src/components/AgentCard.tsx
+ M src/components/AgentRail.tsx
+ M src/components/AgentTerminal.tsx
+ M src/components/CopyLogButton.tsx
+ M src/components/DashboardBlock.tsx
+ M src/components/GlobalChat.tsx
+ M src/components/Layout.tsx
+ M src/components/MissionBar.tsx
+ M src/components/MissionCanvas.tsx
+ M src/components/ReportModal.tsx
+ M src/hooks/useLucaState.tsx
+ M src/index.css
+ M src/lib/api.ts
+ M src/lib/types.ts
+ M src/pages/LandingPage.tsx
+ M src/pages/OperacionalPage.tsx
+ M src/types/shared-request-timeout.d.ts
+ M worker/src/index.js
+ M wrangler.jsonc
+?? DocsDev/
+?? server/model-selector.test.js
+?? server/persona-cards.js
+?? server/persona-cards.test.js
+?? server/persona-team.js
+?? server/persona-team.test.js
+?? server/router-client.test.js
+?? shared/model-selector.js
+?? src/pages/LucaAiPage.tsx
+?? src/pages/PersonasPage.tsx
+```
+
+See patchnotes.md for full divergence tables, categorized research, remotes, fetch log, and multi-agent reconciliation details.
+
+---
+Prior changelog entries preserved:
+
 
 Generated: 2026-06-08 23:46:34 -03:00
 
@@ -93,3 +159,4 @@ No remote-only commits found or no upstream available.
 ``text
 No local-only commits found or no upstream available.
 ``
+

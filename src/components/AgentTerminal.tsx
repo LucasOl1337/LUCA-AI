@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { useRef } from 'react';
 import { X } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import { useLuca } from '@/hooks/useLucaState';
@@ -19,6 +20,7 @@ interface AgentTerminalProps {
 
 export default function AgentTerminal({ activeAgent, onClose }: AgentTerminalProps) {
   const theme = useTheme();
+  const lastDirectActionAt = useRef<Record<string, number>>({});
   const {
     getAgentLines,
     getAgentStatus,
@@ -60,6 +62,21 @@ export default function AgentTerminal({ activeAgent, onClose }: AgentTerminalPro
       })
     : formatAgentLog({ title, status, lines: plainLines });
 
+  function runDirectAction(event: React.SyntheticEvent, key: string, action: () => void | Promise<void>) {
+    event.preventDefault();
+    event.stopPropagation();
+    const now = Date.now();
+    if (now - (lastDirectActionAt.current[key] ?? 0) < 250) return;
+    lastDirectActionAt.current[key] = now;
+    void action();
+  }
+
+  function runClickAction(event: React.MouseEvent<HTMLButtonElement>, key: string, action: () => void | Promise<void>) {
+    event.stopPropagation();
+    if (Date.now() - (lastDirectActionAt.current[key] ?? 0) < 500) return;
+    void action();
+  }
+
   return (
     <AnimatePresence>
       {open && (
@@ -70,14 +87,23 @@ export default function AgentTerminal({ activeAgent, onClose }: AgentTerminalPro
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
+          onPointerDown={onClose}
+          onMouseDown={onClose}
+          onTouchStart={onClose}
         >
           <motion.div
             className="void-panel rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-label={isHeartbeat ? 'heartbeat monitor' : `${title} terminal`}
             initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 12 }}
             transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
             onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
           >
             {/* header */}
             <div className="flex items-center gap-3 px-5 h-14 border-b shrink-0" style={{ borderColor: theme.border }}>
@@ -90,8 +116,21 @@ export default function AgentTerminal({ activeAgent, onClose }: AgentTerminalPro
               </span>
               <CopyLogButton text={logText} label={`copiar log de ${title}`} />
               <button
-                onClick={onClose}
-                className="w-7 h-7 rounded-md flex items-center justify-center transition-colors"
+                type="button"
+                onClick={(e) => runClickAction(e, 'close', onClose)}
+                onPointerDownCapture={(e) => runDirectAction(e, 'close', onClose)}
+                onPointerUpCapture={(e) => runDirectAction(e, 'close', onClose)}
+                onMouseDownCapture={(e) => runDirectAction(e, 'close', onClose)}
+                onMouseUpCapture={(e) => runDirectAction(e, 'close', onClose)}
+                onTouchStartCapture={(e) => runDirectAction(e, 'close', onClose)}
+                onTouchEndCapture={(e) => runDirectAction(e, 'close', onClose)}
+                onPointerDown={(e) => runDirectAction(e, 'close', onClose)}
+                onPointerUp={(e) => runDirectAction(e, 'close', onClose)}
+                onMouseDown={(e) => runDirectAction(e, 'close', onClose)}
+                onMouseUp={(e) => runDirectAction(e, 'close', onClose)}
+                onTouchStart={(e) => runDirectAction(e, 'close', onClose)}
+                onTouchEnd={(e) => runDirectAction(e, 'close', onClose)}
+                className="w-10 h-10 -mr-2 rounded-md flex items-center justify-center transition-colors"
                 style={{ color: theme.textMute }}
                 aria-label="fechar"
               >
@@ -104,9 +143,63 @@ export default function AgentTerminal({ activeAgent, onClose }: AgentTerminalPro
               {isHeartbeat ? (
                 <div>
                   <div className="flex gap-2 mb-3">
-                    <button className="btn-fleet !py-1.5 !px-3 !text-xs" onClick={startHeartbeat}>play</button>
-                    <button className="btn-fleet !py-1.5 !px-3 !text-xs" onClick={pauseHeartbeat}>pause</button>
-                    <button className="btn-fleet !py-1.5 !px-3 !text-xs" onClick={clearAgents}>limpar</button>
+                    <button
+                      type="button"
+                      className="btn-fleet !py-1.5 !px-3 !text-xs"
+                      onPointerDownCapture={(e) => runDirectAction(e, 'heartbeat-play', startHeartbeat)}
+                      onPointerUpCapture={(e) => runDirectAction(e, 'heartbeat-play', startHeartbeat)}
+                      onMouseDownCapture={(e) => runDirectAction(e, 'heartbeat-play', startHeartbeat)}
+                      onMouseUpCapture={(e) => runDirectAction(e, 'heartbeat-play', startHeartbeat)}
+                      onTouchStartCapture={(e) => runDirectAction(e, 'heartbeat-play', startHeartbeat)}
+                      onTouchEndCapture={(e) => runDirectAction(e, 'heartbeat-play', startHeartbeat)}
+                      onPointerDown={(e) => runDirectAction(e, 'heartbeat-play', startHeartbeat)}
+                      onPointerUp={(e) => runDirectAction(e, 'heartbeat-play', startHeartbeat)}
+                      onMouseDown={(e) => runDirectAction(e, 'heartbeat-play', startHeartbeat)}
+                      onMouseUp={(e) => runDirectAction(e, 'heartbeat-play', startHeartbeat)}
+                      onTouchStart={(e) => runDirectAction(e, 'heartbeat-play', startHeartbeat)}
+                      onTouchEnd={(e) => runDirectAction(e, 'heartbeat-play', startHeartbeat)}
+                      onClick={(e) => runClickAction(e, 'heartbeat-play', startHeartbeat)}
+                    >
+                      play
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-fleet !py-1.5 !px-3 !text-xs"
+                      onPointerDownCapture={(e) => runDirectAction(e, 'heartbeat-pause', pauseHeartbeat)}
+                      onPointerUpCapture={(e) => runDirectAction(e, 'heartbeat-pause', pauseHeartbeat)}
+                      onMouseDownCapture={(e) => runDirectAction(e, 'heartbeat-pause', pauseHeartbeat)}
+                      onMouseUpCapture={(e) => runDirectAction(e, 'heartbeat-pause', pauseHeartbeat)}
+                      onTouchStartCapture={(e) => runDirectAction(e, 'heartbeat-pause', pauseHeartbeat)}
+                      onTouchEndCapture={(e) => runDirectAction(e, 'heartbeat-pause', pauseHeartbeat)}
+                      onPointerDown={(e) => runDirectAction(e, 'heartbeat-pause', pauseHeartbeat)}
+                      onPointerUp={(e) => runDirectAction(e, 'heartbeat-pause', pauseHeartbeat)}
+                      onMouseDown={(e) => runDirectAction(e, 'heartbeat-pause', pauseHeartbeat)}
+                      onMouseUp={(e) => runDirectAction(e, 'heartbeat-pause', pauseHeartbeat)}
+                      onTouchStart={(e) => runDirectAction(e, 'heartbeat-pause', pauseHeartbeat)}
+                      onTouchEnd={(e) => runDirectAction(e, 'heartbeat-pause', pauseHeartbeat)}
+                      onClick={(e) => runClickAction(e, 'heartbeat-pause', pauseHeartbeat)}
+                    >
+                      pause
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-fleet !py-1.5 !px-3 !text-xs"
+                      onPointerDownCapture={(e) => runDirectAction(e, 'heartbeat-clear', clearAgents)}
+                      onPointerUpCapture={(e) => runDirectAction(e, 'heartbeat-clear', clearAgents)}
+                      onMouseDownCapture={(e) => runDirectAction(e, 'heartbeat-clear', clearAgents)}
+                      onMouseUpCapture={(e) => runDirectAction(e, 'heartbeat-clear', clearAgents)}
+                      onTouchStartCapture={(e) => runDirectAction(e, 'heartbeat-clear', clearAgents)}
+                      onTouchEndCapture={(e) => runDirectAction(e, 'heartbeat-clear', clearAgents)}
+                      onPointerDown={(e) => runDirectAction(e, 'heartbeat-clear', clearAgents)}
+                      onPointerUp={(e) => runDirectAction(e, 'heartbeat-clear', clearAgents)}
+                      onMouseDown={(e) => runDirectAction(e, 'heartbeat-clear', clearAgents)}
+                      onMouseUp={(e) => runDirectAction(e, 'heartbeat-clear', clearAgents)}
+                      onTouchStart={(e) => runDirectAction(e, 'heartbeat-clear', clearAgents)}
+                      onTouchEnd={(e) => runDirectAction(e, 'heartbeat-clear', clearAgents)}
+                      onClick={(e) => runClickAction(e, 'heartbeat-clear', clearAgents)}
+                    >
+                      limpar
+                    </button>
                   </div>
                   <p>$ heartbeat monitor {monitorStatus}</p>
                   <p>last tick: {heartbeatMonitor?.updatedAt ?? 'n/a'}</p>
