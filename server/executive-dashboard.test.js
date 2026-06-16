@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { buildDeterministicExecutiveDashboard } from '../shared/executive-dashboard.js';
+import { executiveDashboardContractIssues } from '../shared/dashboard-contract.js';
 
 test('buildDeterministicExecutiveDashboard cobre entregaveis agro Sompo no fallback', () => {
   const dashboard = buildDeterministicExecutiveDashboard({
@@ -205,4 +206,102 @@ test('buildDeterministicExecutiveDashboard materializa evidencias, fila e gatilh
   assert.match(text, /gatilhos preventivos/);
   assert.match(text, /fotos|laudos|document/);
   assert.match(text, /sla|severidade|aging/);
+});
+
+test('buildDeterministicExecutiveDashboard remove mensagens tecnicas do fallback visual', () => {
+  const dashboard = buildDeterministicExecutiveDashboard({
+    mission: {
+      title: 'Sompo rural',
+      description: 'Gerar canvas executivo com ranking de apolices, plano preventivo e criterio de sucesso.',
+      success: 'Entregar resultado executivo sem expor logs tecnicos.',
+    },
+    finalReport: {
+      summary: 'Falhei ao transformar a missao: 9router_unreachable http://127.0.0.1:20128/v1/chat/completions: timeout de 45s',
+      findings: [
+        {
+          title: 'Falha tecnica',
+          detail: 'Falhei ao transformar a missao: fetch failed no roteador local.',
+          basis: 'premissa',
+        },
+        {
+          title: 'Risco rural',
+          detail: 'Carteira exige priorizacao por exposicao e prevencao antes do sinistro.',
+          basis: 'premissa',
+        },
+      ],
+      designerBrief: {
+        mustShow: ['ranking de apolices', 'plano preventivo', 'criterios de sucesso'],
+      },
+      successCriteria: ['publicar leitura executiva sem logs tecnicos'],
+    },
+    snapshot: {
+      contributions: [
+        { agentId: 'pesquisador', content: 'Falhei ao transformar a missao: 9router_unreachable timeout de 45s' },
+      ],
+    },
+  });
+
+  const text = JSON.stringify(dashboard).toLowerCase();
+  assert.doesNotMatch(text, /9router|fetch failed|unreachable|timeout/);
+  assert.match(text, /carteira exige priorizacao/);
+  assert.match(text, /ranking de apolices/);
+});
+
+test('buildDeterministicExecutiveDashboard nao corta evidencias executivas com reticencias', () => {
+  const researcherContent = [
+    'Evidencia: Caso Sompo Sprint 2 - Fazenda Santa Aurora Entrada de sinistros em CSV fornecida pelo briefing: tipo_evento,quantidade alagamento,12 falha_irrigacao,7 pragas,5 Telemetria atual: Talhao norte com umidade acima do limite operacional; previsao de chuva 42mm nas proximas 24h; sensor de vazao da irrigacao leste oscilando. Dados financeiros: Valor de apolice, custo de reparo e produtividade financeira ainda nao enviados; marcar valores financeiros como pendentes.',
+    'Lacuna critica: valor segurado e premio seguem pendentes para calcular impacto financeiro exato.',
+    'Risco principal: decisao sem priorizacao explicita atrasaria underwriting, prevencao ou acionamento operacional.',
+  ].join(' ');
+
+  const dashboard = buildDeterministicExecutiveDashboard({
+    mission: {
+      title: 'Caso Sompo Sprint 2',
+      description: 'Gerar canvas executivo Sompo com riscos priorizados, premissas explicitas, lacunas de dados, plano preventivo, valor para seguradora e criterio de sucesso.',
+      success: 'Canvas executivo sem cortes de texto.',
+    },
+    finalReport: {
+      summary: 'Leitura executiva de contingencia para underwriting rural.',
+      findings: [
+        { title: 'Dor central', detail: 'Risco operacional concentrado na Fazenda Santa Aurora exige priorizacao defensavel.', basis: 'evidencia' },
+        { title: 'Lacuna financeira', detail: 'Valor de apolice, custo de reparo e produtividade financeira ainda nao enviados; marcar valores financeiros como pendentes.', basis: 'proxy' },
+      ],
+      designerBrief: {
+        mustShow: ['dor central', 'ranking de apolices', 'evidencia e premissa', 'impacto ou proxy', 'criterios de sucesso'],
+      },
+      successCriteria: ['exibir telemetria e lacuna financeira sem truncar'],
+    },
+    snapshot: {
+      contributions: [
+        { agentId: 'pesquisador', content: researcherContent },
+      ],
+    },
+  });
+
+  const text = JSON.stringify(dashboard);
+  assert.doesNotMatch(text, /Tel\.\.\.|Valor d\.\.\.|\.\.\./);
+  assert.match(text, /sensor de vazao da irrigacao leste oscilando/);
+  assert.match(text, /Valor de apolice, custo de reparo e produtividade financeira ainda nao enviados/);
+});
+
+test('executiveDashboardContractIssues reprova texto visual truncado com reticencias', () => {
+  const issues = executiveDashboardContractIssues({
+    title: 'Caso Sompo',
+    subtitle: 'Leitura executiva completa',
+    metrics: [
+      { label: 'Evidencias usadas', value: '5 sinais' },
+      { label: 'Prioridade executiva', value: 'carteira critica' },
+      { label: 'Impacto financeiro', value: 'proxy/pendente' },
+      { label: 'Entregaveis cobertos', value: '5 itens' },
+    ],
+    blocks: [
+      { type: 'note', title: 'Dor e evidencias', body: 'Telemetria atual: Talhao norte com umidade acima do limite operacional; Tel...' },
+      { type: 'tower', title: 'Ranking de risco', items: [{ label: 'Apolice critica 1', value: 5 }] },
+      { type: 'note', title: 'Plano preventivo', body: 'Acao concreta com dono responsavel.' },
+      { type: 'metric', title: 'Valor para seguradora', body: 'Proxy financeiro pendente.' },
+      { type: 'note', title: 'Criterio de sucesso', body: 'Canvas aprovado sem cortes.' },
+    ],
+  });
+
+  assert.match(issues.join('\n'), /texto truncado com reticencias/);
 });

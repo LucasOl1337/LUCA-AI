@@ -242,3 +242,11 @@ Cross-project overlaps observed in this batch: shared `grokassets/` pruning (Ter
 
 **Excluded:** node_modules, venvs, __pycache__, .codegraph/, .playwright-mcp/, .wrangler/, .env*, NUL, .tmp-* scratch scripts, terminals/, browser session caches.
 
+
+## Follow-up safe commit (2026-06-16 09:10:04)
+
+Residual safe files staged after initial batch (regex guard fix / post-commit agent edits).
+
+Files:
+- server/executive-dashboard.test.js
+
