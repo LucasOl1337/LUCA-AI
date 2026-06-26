@@ -1,0 +1,33 @@
+[1m
+CodeGraph Status
+[0m
+[36mProject:[0m C:\Projetos\LUCA-AI
+
+[1mIndex Statistics:[0m
+  Files:     130
+  Nodes:     1.531
+  Edges:     4.046
+  DB Size:   3.77 MB
+  Backend:   [32mnode:sqlite - built-in (full WAL)[0m
+  Journal:   [32mwal[0m
+
+[1mNodes by Kind:[0m
+  function        648
+  import          378
+  constant        157
+  file            130
+  interface       60
+  variable        58
+  method          44
+  route           38
+  type_alias      10
+  class           8
+
+[1mFiles by Language:[0m
+  javascript      76
+  tsx             28
+  python          13
+  typescript      13
+
+[32m[OK][0m Index is up to date
+

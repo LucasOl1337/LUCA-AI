@@ -1,0 +1,782 @@
+[
+  {
+    "path": "COMPUTER_USE_TUDO_EM_UM.js",
+    "language": "javascript",
+    "nodeCount": 3,
+    "size": 7399
+  },
+  {
+    "path": "PASTE_ME_IN_NEW_CONVERSATION.js",
+    "language": "javascript",
+    "nodeCount": 6,
+    "size": 6008
+  },
+  {
+    "path": "computer-use-goblin-helper-v2.js",
+    "language": "javascript",
+    "nodeCount": 7,
+    "size": 8158
+  },
+  {
+    "path": "computer-use-goblin-helper.js",
+    "language": "javascript",
+    "nodeCount": 6,
+    "size": 4785
+  },
+  {
+    "path": "heartbeat_monitor.py",
+    "language": "python",
+    "nodeCount": 7,
+    "size": 865
+  },
+  {
+    "path": "postcss.config.js",
+    "language": "javascript",
+    "nodeCount": 1,
+    "size": 80
+  },
+  {
+    "path": "praisonai-tests/00_setup.py",
+    "language": "python",
+    "nodeCount": 9,
+    "size": 1338
+  },
+  {
+    "path": "praisonai-tests/01_single_agent.py",
+    "language": "python",
+    "nodeCount": 5,
+    "size": 468
+  },
+  {
+    "path": "praisonai-tests/02_multi_agents.py",
+    "language": "python",
+    "nodeCount": 7,
+    "size": 995
+  },
+  {
+    "path": "praisonai-tests/03_tools.py",
+    "language": "python",
+    "nodeCount": 7,
+    "size": 1550
+  },
+  {
+    "path": "praisonai-tests/04_multi_model.py",
+    "language": "python",
+    "nodeCount": 8,
+    "size": 1274
+  },
+  {
+    "path": "praisonai-tests/05_reflection.py",
+    "language": "python",
+    "nodeCount": 5,
+    "size": 640
+  },
+  {
+    "path": "praisonai-tests/06_workflow.py",
+    "language": "python",
+    "nodeCount": 8,
+    "size": 1295
+  },
+  {
+    "path": "praisonai-tests/07_memory.py",
+    "language": "python",
+    "nodeCount": 6,
+    "size": 894
+  },
+  {
+    "path": "praisonai-tests/08_providers.py",
+    "language": "python",
+    "nodeCount": 7,
+    "size": 870
+  },
+  {
+    "path": "praisonai-tests/09_luca_sim.py",
+    "language": "python",
+    "nodeCount": 12,
+    "size": 2889
+  },
+  {
+    "path": "scripts/preview_icons.py",
+    "language": "python",
+    "nodeCount": 10,
+    "size": 687
+  },
+  {
+    "path": "scripts/refine_white_icons.py",
+    "language": "python",
+    "nodeCount": 9,
+    "size": 2629
+  },
+  {
+    "path": "server/agent-playbooks.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 2272
+  },
+  {
+    "path": "server/agent-quality.js",
+    "language": "javascript",
+    "nodeCount": 9,
+    "size": 1968
+  },
+  {
+    "path": "server/agent-quality.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 1878
+  },
+  {
+    "path": "server/canvas-visibility.test.js",
+    "language": "javascript",
+    "nodeCount": 6,
+    "size": 2599
+  },
+  {
+    "path": "server/catalog-audit.js",
+    "language": "javascript",
+    "nodeCount": 1,
+    "size": 64
+  },
+  {
+    "path": "server/catalog-audit.test.js",
+    "language": "javascript",
+    "nodeCount": 6,
+    "size": 2008
+  },
+  {
+    "path": "server/closure.js",
+    "language": "javascript",
+    "nodeCount": 10,
+    "size": 7959
+  },
+  {
+    "path": "server/config.js",
+    "language": "javascript",
+    "nodeCount": 20,
+    "size": 2559
+  },
+  {
+    "path": "server/dashboard-contract.test.js",
+    "language": "javascript",
+    "nodeCount": 5,
+    "size": 2308
+  },
+  {
+    "path": "server/endpoint-catalog.js",
+    "language": "javascript",
+    "nodeCount": 1,
+    "size": 70
+  },
+  {
+    "path": "server/endpoint-catalog.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 2469
+  },
+  {
+    "path": "server/event-log.js",
+    "language": "javascript",
+    "nodeCount": 19,
+    "size": 8712
+  },
+  {
+    "path": "server/event-log.test.js",
+    "language": "javascript",
+    "nodeCount": 8,
+    "size": 9766
+  },
+  {
+    "path": "server/executive-dashboard.test.js",
+    "language": "javascript",
+    "nodeCount": 5,
+    "size": 15594
+  },
+  {
+    "path": "server/goals.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 1580
+  },
+  {
+    "path": "server/governance.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 3911
+  },
+  {
+    "path": "server/index.js",
+    "language": "javascript",
+    "nodeCount": 166,
+    "size": 117224
+  },
+  {
+    "path": "server/intent.js",
+    "language": "javascript",
+    "nodeCount": 9,
+    "size": 3336
+  },
+  {
+    "path": "server/kamui-bridge.test.js",
+    "language": "javascript",
+    "nodeCount": 6,
+    "size": 4045
+  },
+  {
+    "path": "server/kamui-client.js",
+    "language": "javascript",
+    "nodeCount": 13,
+    "size": 3797
+  },
+  {
+    "path": "server/luca-ai.test.js",
+    "language": "javascript",
+    "nodeCount": 8,
+    "size": 10069
+  },
+  {
+    "path": "server/mission-report.js",
+    "language": "javascript",
+    "nodeCount": 11,
+    "size": 5431
+  },
+  {
+    "path": "server/mission-report.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 1779
+  },
+  {
+    "path": "server/model-selector.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 1891
+  },
+  {
+    "path": "server/persona-cards.js",
+    "language": "javascript",
+    "nodeCount": 8,
+    "size": 2126
+  },
+  {
+    "path": "server/persona-cards.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 1529
+  },
+  {
+    "path": "server/persona-team.js",
+    "language": "javascript",
+    "nodeCount": 18,
+    "size": 9019
+  },
+  {
+    "path": "server/persona-team.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 4142
+  },
+  {
+    "path": "server/preflight.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 2309
+  },
+  {
+    "path": "server/problem-context.js",
+    "language": "javascript",
+    "nodeCount": 12,
+    "size": 4633
+  },
+  {
+    "path": "server/problem-context.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 2976
+  },
+  {
+    "path": "server/request-timeout.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 1626
+  },
+  {
+    "path": "server/router-client.js",
+    "language": "javascript",
+    "nodeCount": 8,
+    "size": 5688
+  },
+  {
+    "path": "server/router-client.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 1639
+  },
+  {
+    "path": "server/run-cycle-gate.js",
+    "language": "javascript",
+    "nodeCount": 3,
+    "size": 505
+  },
+  {
+    "path": "server/run-cycle-gate.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 1472
+  },
+  {
+    "path": "server/runtime-readiness.js",
+    "language": "javascript",
+    "nodeCount": 10,
+    "size": 3929
+  },
+  {
+    "path": "server/runtime-readiness.test.js",
+    "language": "javascript",
+    "nodeCount": 7,
+    "size": 1748
+  },
+  {
+    "path": "server/scheduler.js",
+    "language": "javascript",
+    "nodeCount": 9,
+    "size": 5023
+  },
+  {
+    "path": "server/state-payload.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 4719
+  },
+  {
+    "path": "server/state-response.js",
+    "language": "javascript",
+    "nodeCount": 2,
+    "size": 115
+  },
+  {
+    "path": "server/state-response.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 728
+  },
+  {
+    "path": "server/state.js",
+    "language": "javascript",
+    "nodeCount": 52,
+    "size": 17370
+  },
+  {
+    "path": "server/supervisor-final-report.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 14400
+  },
+  {
+    "path": "server/time.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 548
+  },
+  {
+    "path": "server/tool-catalog.js",
+    "language": "javascript",
+    "nodeCount": 10,
+    "size": 4558
+  },
+  {
+    "path": "server/tool-catalog.test.js",
+    "language": "javascript",
+    "nodeCount": 7,
+    "size": 4943
+  },
+  {
+    "path": "server/worker-closure.test.js",
+    "language": "javascript",
+    "nodeCount": 7,
+    "size": 65883
+  },
+  {
+    "path": "server/yume-memory-event.js",
+    "language": "javascript",
+    "nodeCount": 8,
+    "size": 5369
+  },
+  {
+    "path": "server/yume-memory-event.test.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 2797
+  },
+  {
+    "path": "shared/agent-playbooks.js",
+    "language": "javascript",
+    "nodeCount": 12,
+    "size": 11465
+  },
+  {
+    "path": "shared/catalog-audit.js",
+    "language": "javascript",
+    "nodeCount": 13,
+    "size": 9331
+  },
+  {
+    "path": "shared/closure-review.js",
+    "language": "javascript",
+    "nodeCount": 19,
+    "size": 24302
+  },
+  {
+    "path": "shared/dashboard-contract.js",
+    "language": "javascript",
+    "nodeCount": 7,
+    "size": 3323
+  },
+  {
+    "path": "shared/endpoint-catalog.js",
+    "language": "javascript",
+    "nodeCount": 3,
+    "size": 9658
+  },
+  {
+    "path": "shared/executive-dashboard.js",
+    "language": "javascript",
+    "nodeCount": 22,
+    "size": 20124
+  },
+  {
+    "path": "shared/goals.js",
+    "language": "javascript",
+    "nodeCount": 7,
+    "size": 3596
+  },
+  {
+    "path": "shared/governance.js",
+    "language": "javascript",
+    "nodeCount": 8,
+    "size": 5270
+  },
+  {
+    "path": "shared/mission-intent.js",
+    "language": "javascript",
+    "nodeCount": 17,
+    "size": 9448
+  },
+  {
+    "path": "shared/model-selector.js",
+    "language": "javascript",
+    "nodeCount": 9,
+    "size": 2350
+  },
+  {
+    "path": "shared/preflight.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 3382
+  },
+  {
+    "path": "shared/public-state.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 440
+  },
+  {
+    "path": "shared/request-timeout.js",
+    "language": "javascript",
+    "nodeCount": 10,
+    "size": 2742
+  },
+  {
+    "path": "shared/state-payload.js",
+    "language": "javascript",
+    "nodeCount": 13,
+    "size": 3441
+  },
+  {
+    "path": "shared/supervisor-final-report.js",
+    "language": "javascript",
+    "nodeCount": 22,
+    "size": 18078
+  },
+  {
+    "path": "shared/time.d.ts",
+    "language": "typescript",
+    "nodeCount": 3,
+    "size": 332
+  },
+  {
+    "path": "shared/time.js",
+    "language": "javascript",
+    "nodeCount": 7,
+    "size": 813
+  },
+  {
+    "path": "shared/tool-catalog.js",
+    "language": "javascript",
+    "nodeCount": 4,
+    "size": 14487
+  },
+  {
+    "path": "site/postcss.config.js",
+    "language": "javascript",
+    "nodeCount": 1,
+    "size": 19
+  },
+  {
+    "path": "site/src/main.js",
+    "language": "javascript",
+    "nodeCount": 27,
+    "size": 4121
+  },
+  {
+    "path": "src/App.tsx",
+    "language": "tsx",
+    "nodeCount": 16,
+    "size": 2037
+  },
+  {
+    "path": "src/components/AgentCard.tsx",
+    "language": "tsx",
+    "nodeCount": 7,
+    "size": 2422
+  },
+  {
+    "path": "src/components/AgentRail.tsx",
+    "language": "tsx",
+    "nodeCount": 12,
+    "size": 3361
+  },
+  {
+    "path": "src/components/AgentTerminal.tsx",
+    "language": "tsx",
+    "nodeCount": 13,
+    "size": 11941
+  },
+  {
+    "path": "src/components/CopyLogButton.tsx",
+    "language": "tsx",
+    "nodeCount": 9,
+    "size": 3050
+  },
+  {
+    "path": "src/components/DashboardBlock.tsx",
+    "language": "tsx",
+    "nodeCount": 5,
+    "size": 4395
+  },
+  {
+    "path": "src/components/GlobalChat.tsx",
+    "language": "tsx",
+    "nodeCount": 10,
+    "size": 3977
+  },
+  {
+    "path": "src/components/Layout.tsx",
+    "language": "tsx",
+    "nodeCount": 12,
+    "size": 10509
+  },
+  {
+    "path": "src/components/LucaOwl.tsx",
+    "language": "tsx",
+    "nodeCount": 3,
+    "size": 4502
+  },
+  {
+    "path": "src/components/MissionBar.tsx",
+    "language": "tsx",
+    "nodeCount": 21,
+    "size": 14914
+  },
+  {
+    "path": "src/components/MissionCanvas.tsx",
+    "language": "tsx",
+    "nodeCount": 9,
+    "size": 7352
+  },
+  {
+    "path": "src/components/ReportModal.tsx",
+    "language": "tsx",
+    "nodeCount": 11,
+    "size": 4109
+  },
+  {
+    "path": "src/components/StatCard.tsx",
+    "language": "tsx",
+    "nodeCount": 6,
+    "size": 1713
+  },
+  {
+    "path": "src/components/StatePill.tsx",
+    "language": "tsx",
+    "nodeCount": 4,
+    "size": 970
+  },
+  {
+    "path": "src/components/SupervisorLog.tsx",
+    "language": "tsx",
+    "nodeCount": 8,
+    "size": 2221
+  },
+  {
+    "path": "src/hooks/useLucaState.tsx",
+    "language": "tsx",
+    "nodeCount": 28,
+    "size": 22968
+  },
+  {
+    "path": "src/hooks/usePersistentState.ts",
+    "language": "typescript",
+    "nodeCount": 4,
+    "size": 1197
+  },
+  {
+    "path": "src/hooks/useTheme.tsx",
+    "language": "tsx",
+    "nodeCount": 7,
+    "size": 2750
+  },
+  {
+    "path": "src/lib/agents.ts",
+    "language": "typescript",
+    "nodeCount": 8,
+    "size": 2422
+  },
+  {
+    "path": "src/lib/api.ts",
+    "language": "typescript",
+    "nodeCount": 31,
+    "size": 3818
+  },
+  {
+    "path": "src/lib/canvas.ts",
+    "language": "typescript",
+    "nodeCount": 19,
+    "size": 9942
+  },
+  {
+    "path": "src/lib/database.ts",
+    "language": "typescript",
+    "nodeCount": 16,
+    "size": 6330
+  },
+  {
+    "path": "src/lib/format.ts",
+    "language": "typescript",
+    "nodeCount": 13,
+    "size": 2824
+  },
+  {
+    "path": "src/lib/requestTimeout.ts",
+    "language": "typescript",
+    "nodeCount": 2,
+    "size": 243
+  },
+  {
+    "path": "src/lib/sompo-case.ts",
+    "language": "typescript",
+    "nodeCount": 2,
+    "size": 624
+  },
+  {
+    "path": "src/lib/types.ts",
+    "language": "typescript",
+    "nodeCount": 28,
+    "size": 8118
+  },
+  {
+    "path": "src/main.tsx",
+    "language": "tsx",
+    "nodeCount": 7,
+    "size": 443
+  },
+  {
+    "path": "src/pages/AgentesPage.tsx",
+    "language": "tsx",
+    "nodeCount": 8,
+    "size": 1656
+  },
+  {
+    "path": "src/pages/DatabasePage.tsx",
+    "language": "tsx",
+    "nodeCount": 10,
+    "size": 10060
+  },
+  {
+    "path": "src/pages/EndpointsPage.tsx",
+    "language": "tsx",
+    "nodeCount": 12,
+    "size": 12531
+  },
+  {
+    "path": "src/pages/HeartbeatPage.tsx",
+    "language": "tsx",
+    "nodeCount": 10,
+    "size": 14267
+  },
+  {
+    "path": "src/pages/HistoricoPage.tsx",
+    "language": "tsx",
+    "nodeCount": 13,
+    "size": 8795
+  },
+  {
+    "path": "src/pages/LandingPage.tsx",
+    "language": "tsx",
+    "nodeCount": 14,
+    "size": 12455
+  },
+  {
+    "path": "src/pages/LucaAiPage.tsx",
+    "language": "tsx",
+    "nodeCount": 80,
+    "size": 68822
+  },
+  {
+    "path": "src/pages/OperacionalPage.tsx",
+    "language": "tsx",
+    "nodeCount": 9,
+    "size": 2111
+  },
+  {
+    "path": "src/pages/PersonasPage.tsx",
+    "language": "tsx",
+    "nodeCount": 21,
+    "size": 14398
+  },
+  {
+    "path": "src/pages/ToolsPage.tsx",
+    "language": "tsx",
+    "nodeCount": 14,
+    "size": 15504
+  },
+  {
+    "path": "src/types/shared-request-timeout.d.ts",
+    "language": "typescript",
+    "nodeCount": 10,
+    "size": 689
+  },
+  {
+    "path": "src/vite-env.d.ts",
+    "language": "typescript",
+    "nodeCount": 1,
+    "size": 38
+  },
+  {
+    "path": "tailwind.config.js",
+    "language": "javascript",
+    "nodeCount": 1,
+    "size": 2555
+  },
+  {
+    "path": "vite.config.ts",
+    "language": "typescript",
+    "nodeCount": 4,
+    "size": 385
+  },
+  {
+    "path": "worker/src/index.js",
+    "language": "javascript",
+    "nodeCount": 138,
+    "size": 97521
+  }
+]
