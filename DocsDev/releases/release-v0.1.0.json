@@ -1,0 +1,78 @@
+{
+  "brand": {
+    "name": "LUCA-AI",
+    "vendor": "YUME",
+    "footer": "LUCA-AI",
+    "masthead": "NOTAS DA ATUALIZACAO",
+    "footerLeft": "Lista completa das notas no GitHub Releases",
+    "bgGradient": ["#121826", "#162033", "#1F2A44"],
+    "pillGradient": ["#2563EB", "#14B8A6"]
+  },
+  "version": "v0.1.0",
+  "date": "22 de junho de 2026 · Release oficial",
+  "categories": [
+    {
+      "label": "Novidades",
+      "title": "NOVIDADES",
+      "color": "#FBBF24",
+      "items": [
+        {
+          "name": "Coordenador multiagente",
+          "desc": "Maestro delega missoes para personas configuraveis",
+          "tag": "AGENTES"
+        },
+        {
+          "name": "Painel operacional",
+          "desc": "frontend Vite exibe canvas, trilhos e chat global",
+          "tag": "WEB"
+        }
+      ]
+    },
+    {
+      "label": "Melhorias",
+      "title": "MELHORIAS",
+      "color": "#34D399",
+      "items": [
+        {
+          "name": "Contexto do repositorio",
+          "desc": "prompts incluem arvore resumida e arquivos principais",
+          "tag": "PROMPT"
+        },
+        {
+          "name": "Catalogos auditaveis",
+          "desc": "endpoints e ferramentas expostos pelo servidor",
+          "tag": "API"
+        }
+      ]
+    },
+    {
+      "label": "Correcoes",
+      "title": "CORRECOES",
+      "color": "#38BDF8",
+      "items": [
+        {
+          "name": "Loop de ciclo unico",
+          "desc": "single-flight evita runs concorrentes em missoes longas",
+          "tag": "RUNTIME"
+        }
+      ]
+    },
+    {
+      "label": "Sistemas",
+      "title": "SISTEMAS",
+      "color": "#A78BFA",
+      "items": [
+        {
+          "name": "Heartbeat real",
+          "desc": "processo separado alimenta status via report e WebSocket",
+          "tag": "OPS"
+        },
+        {
+          "name": "Gate de qualidade",
+          "desc": "testes bloqueiam respostas vagas sem evidencia concreta",
+          "tag": "TESTES"
+        }
+      ]
+    }
+  ]
+}
