@@ -4,6 +4,4 @@ credentials-file: C:\Users\user\.cloudflared\LUCA_AI_TUNNEL_ID.json
 ingress:
   - hostname: luca-ai.com.br
     service: http://127.0.0.1:4242
-  - hostname: www.luca-ai.com.br
-    service: http://127.0.0.1:4242
   - service: http_status:404
