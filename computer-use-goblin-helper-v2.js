@@ -3,7 +3,7 @@
  * Versão 2 - Mais robusto e com melhor desenho
  * 
  * Uso recomendado (nova conversa):
- *   1. Cole o bootstrap do COMPUTER_USE_SETUP.md
+ *   1. Cole o bootstrap do DocsDev/arquivados/computer-use/COMPUTER_USE_SETUP.md
  *   2. Cole este arquivo inteiro
  *   3. Rode: await initComputerUse()
  *   4. Rode: await openAndPreparePaint()
