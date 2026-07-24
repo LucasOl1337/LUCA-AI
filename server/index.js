@@ -2,15 +2,79 @@ import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { HOST, PORT } from './config.js';
+import {
+  API_RATE_LIMIT_MAX,
+  API_RATE_LIMIT_WINDOW_MS,
+  CLOUDFLARE_ACCESS_EMAILS,
+  HOST,
+  PORT,
+  REQUIRE_CLOUDFLARE_ACCESS,
+} from './config.js';
 import { buildKamuiYumeAvatarUrl, normalizeYumeAvatarPath } from './persona-cards.js';
 import { createPersonaWorkbench } from './persona-workbench.js';
+import { get9RouterProfiles } from './router-client.js';
 
 const app = express();
 const workbench = createPersonaWorkbench();
 
 app.disable('x-powered-by');
-app.use(express.json({ limit: '1mb' }));
+app.set('trust proxy', 'loopback');
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; base-uri 'self'; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'");
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
+  next();
+});
+app.use(express.json({ limit: '256kb' }));
+
+const rateBuckets = new Map();
+
+function requestIdentity(req) {
+  return String(req.headers['cf-connecting-ip'] || req.ip || req.socket.remoteAddress || 'unknown');
+}
+
+function isDirectLoopback(req) {
+  const address = String(req.socket.remoteAddress || '');
+  return !req.headers['cf-ray'] && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(address);
+}
+
+function requireCloudflareAccess(req, res, next) {
+  if (!REQUIRE_CLOUDFLARE_ACCESS || isDirectLoopback(req)) {
+    next();
+    return;
+  }
+  const email = String(req.headers['cf-access-authenticated-user-email'] || '').trim().toLowerCase();
+  const assertion = String(req.headers['cf-access-jwt-assertion'] || '').trim();
+  const emailAllowed = CLOUDFLARE_ACCESS_EMAILS.length === 0 || CLOUDFLARE_ACCESS_EMAILS.includes(email);
+  if (!email || !assertion || !emailAllowed) {
+    res.status(401).json({ ok: false, error: 'cloudflare_access_required' });
+    return;
+  }
+  next();
+}
+
+function rateLimitApi(req, res, next) {
+  const now = Date.now();
+  const key = requestIdentity(req);
+  const bucket = rateBuckets.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    rateBuckets.set(key, { count: 1, resetAt: now + API_RATE_LIMIT_WINDOW_MS });
+    next();
+    return;
+  }
+  bucket.count += 1;
+  if (bucket.count > API_RATE_LIMIT_MAX) {
+    res.setHeader('Retry-After', String(Math.max(1, Math.ceil((bucket.resetAt - now) / 1000))));
+    res.status(429).json({ ok: false, error: 'rate_limit_exceeded' });
+    return;
+  }
+  next();
+}
+
+app.use('/api', requireCloudflareAccess, rateLimitApi);
 
 function sendFailure(res, error, source = 'luca-ai', status = 502) {
   res.status(status).json({
@@ -22,6 +86,10 @@ function sendFailure(res, error, source = 'luca-ai', status = 502) {
 
 app.get('/api/health', async (_req, res) => {
   res.json(await workbench.health());
+});
+
+app.get('/api/models', (_req, res) => {
+  res.json({ ok: true, provider: '9router', profiles: get9RouterProfiles() });
 });
 
 app.get('/api/events', (req, res) => {

@@ -1,4 +1,5 @@
 import { ROUTER_API_KEY, ROUTER_BASE_URL, ROUTER_MODEL, ROUTER_TIMEOUT_MS } from './config.js';
+import { ROUTER_MODEL_IDS, ROUTER_PROFILES, resolveRouterModel } from './router-models.js';
 
 function extractChoiceContent(data) {
   return normalizeModelContent(
@@ -136,7 +137,7 @@ export async function call9Router({ system, user, agentId, model = ROUTER_MODEL,
       headers,
       signal: controller.signal,
       body: JSON.stringify({
-        model,
+        model: resolveRouterModel(model, ROUTER_MODEL),
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },
@@ -171,16 +172,28 @@ export async function check9RouterHealth(timeoutMs = 1500) {
       headers: ROUTER_API_KEY ? { Authorization: `Bearer ${ROUTER_API_KEY}` } : undefined,
       signal: controller.signal,
     });
-    return { ok: response.ok, status: response.status, url: ROUTER_BASE_URL };
+    const payload = response.ok ? await response.json().catch(() => ({})) : {};
+    const published = new Set(Array.isArray(payload?.data) ? payload.data.map((entry) => entry?.id).filter(Boolean) : []);
+    const uncatalogedRoutes = ROUTER_MODEL_IDS.filter((route) => !published.has(route));
+    return {
+      ok: response.ok,
+      status: response.status,
+      catalogedRoutes: ROUTER_MODEL_IDS.length - uncatalogedRoutes.length,
+      expectedRoutes: ROUTER_MODEL_IDS.length,
+      uncatalogedRoutes,
+    };
   } catch (error) {
     const aborted = error instanceof Error && error.name === 'AbortError';
     return {
       ok: false,
       status: 0,
-      url: ROUTER_BASE_URL,
       error: aborted ? `timeout de ${timeoutMs}ms` : (error instanceof Error ? error.message : String(error)),
     };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export function get9RouterProfiles() {
+  return ROUTER_PROFILES.map((profile) => ({ ...profile }));
 }

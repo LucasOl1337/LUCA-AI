@@ -16,6 +16,7 @@ import {
 } from './persona-team.js';
 import { createPersonaStore } from './persona-store.js';
 import { call9Router, check9RouterHealth } from './router-client.js';
+import { resolveRouterModel } from './router-models.js';
 
 const defaultKamui = {
   listPersonas: listYumePersonas,
@@ -102,7 +103,7 @@ export function createPersonaWorkbench({
 
   async function runMember({ slug, mission, teamNames, loaded, workflowRole = null, accumulatedContext = '', traceId = null }) {
     const name = loaded.name || slug;
-    const preferredModel = loaded.model || ROUTER_MODEL;
+    const preferredModel = resolveRouterModel(loaded.model, ROUTER_MODEL);
     let model = preferredModel;
     const prompt = buildPersonaTeamPrompt({
       mission,

@@ -114,7 +114,7 @@ test('persona do catalogo pode executar workflow sem importacao previa', async (
   assert.deepEqual(store.list(), []);
 });
 
-test('workflow repete com modelo padrao quando modelo da persona esta indisponivel', async () => {
+test('workflow troca modelo da persona fora da whitelist pela rota padrao', async () => {
   const routerModels = [];
   const workbench = createPersonaWorkbench({
     store: memoryStore(),
@@ -127,7 +127,6 @@ test('workflow repete com modelo padrao quando modelo da persona esta indisponiv
     router: {
       call: async ({ model }) => {
         routerModels.push(model);
-        if (model === 'glm-5.2') throw new Error('9router 404: No active credentials for provider: glm; model_not_found');
         return 'resposta pelo fallback';
       },
       health: async () => ({ ok: true }),
@@ -151,7 +150,7 @@ test('workflow repete com modelo padrao quando modelo da persona esta indisponiv
 
   assert.equal(result.ok, true);
   assert.equal(result.finalDisplay.model, ROUTER_MODEL);
-  assert.deepEqual(routerModels, Array.from({ length: 5 }, () => ['glm-5.2', ROUTER_MODEL]).flat());
+  assert.deepEqual(routerModels, Array.from({ length: 5 }, () => ROUTER_MODEL));
 });
 
 test('workflow limita executores para nao saturar o roteador local', async () => {
