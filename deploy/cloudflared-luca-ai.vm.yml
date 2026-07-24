@@ -1,0 +1,9 @@
+# Acrescente este bloco antes do fallback `http_status:404` no Tunnel da VM.
+# O Tunnel continua responsável apenas por transporte; autenticação é do LUCA.
+  - hostname: luca-ai.com.br
+    service: http://127.0.0.1:4242
+    originRequest:
+      connectTimeout: 10s
+      tcpKeepAlive: 30s
+      keepAliveTimeout: 90s
+      keepAliveConnections: 100

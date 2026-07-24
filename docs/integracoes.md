@@ -28,7 +28,7 @@ Ao importar uma persona, o LUCA preserva nome, prompt e versao lidos do Yume, ma
 
 O LUCA lista personas, le prompt e versao e guarda o cache no estado local. Nao adicione escrita no Yume a esse cliente.
 
-No domínio público, as telas de Personas e LUCA-AI usam `/api` na mesma origem. O Cloudflare Tunnel encaminha essas chamadas para o Express em `127.0.0.1:4242`; o navegador do visitante nunca tenta acessar o próprio loopback.
+No domínio público, as telas de Personas e LUCA-AI usam `/api` na mesma origem. O Cloudflare Tunnel executado na VM encaminha essas chamadas para o Express em `127.0.0.1:4242`; o navegador do visitante e o PC de desenvolvimento nunca participam do caminho interno.
 
 ## Publicação atual
 

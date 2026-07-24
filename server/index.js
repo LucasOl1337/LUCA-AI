@@ -193,7 +193,8 @@ const wss = new WebSocketServer({
 let supervisorTimer = null;
 let heartbeatProcess = null;
 let runCycleGate = null;
-const heartbeatReportPath = path.resolve(process.cwd(), 'heartbeat-report.json');
+const runtimeStateDir = path.resolve(process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'));
+const heartbeatReportPath = path.join(runtimeStateDir, 'heartbeat-report.json');
 const distPath = path.resolve(process.cwd(), 'dist');
 const indexPath = path.join(distPath, 'index.html');
 const v2DesignPath = path.resolve(process.cwd(), 'public', 'v2-design');
@@ -480,6 +481,7 @@ async function runLocalPreflight() {
   });
   const readiness = await runRuntimeReadinessChecks({
     rootDir: process.cwd(),
+    stateDir: runtimeStateDir,
     heartbeatScriptPath: path.resolve(process.cwd(), 'heartbeat_monitor.py'),
   });
   const checks = [...operational.checks, ...readiness.checks];

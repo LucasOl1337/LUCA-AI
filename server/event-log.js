@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-const stateDir = path.resolve(process.cwd(), '.luca');
+const stateDir = path.resolve(process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'));
 const eventLogPath = path.join(stateDir, 'runtime-events.jsonl');
 
 function ensureStateDir() {

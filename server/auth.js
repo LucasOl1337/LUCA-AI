@@ -47,7 +47,8 @@ function sendAuthError(res, error) {
 }
 
 export function createAuthService({ rootDir = process.cwd(), dataPath = '', adminEmails = [], internalToken = '' } = {}) {
-  const store = new AuthStore(dataPath || path.resolve(rootDir, '.luca', 'auth.json'), { adminEmails });
+  const stateDirectory = process.env.LUCA_DATA_DIR || path.resolve(rootDir, '.luca');
+  const store = new AuthStore(dataPath || path.resolve(stateDirectory, 'auth.json'), { adminEmails });
   const authAttempts = new Map();
 
   function protectAuthAttempt(req, res, next) {

@@ -8,7 +8,7 @@ import { formatBrazilTime } from '../shared/time.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const stateDir = path.resolve(process.cwd(), '.luca');
+const stateDir = path.resolve(process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'));
 const statePath = path.join(stateDir, 'system-state.json');
 
 function makeDatabase() {

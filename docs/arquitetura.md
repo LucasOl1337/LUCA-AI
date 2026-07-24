@@ -23,6 +23,8 @@ navegador -> cadastro/login LUCA -> cookie HttpOnly -> Cloudflare DNS/Tunnel -> 
 
 O Express é a única superfície ativa da produção. O Worker permanece legado e não deve ser tratado como provider ou origem do frontend publicado.
 
+Todos os processos de produção vivem na VM `sennin-core-01`. O PC Windows é somente ambiente de desenvolvimento e não participa do tráfego de `luca-ai.com.br`. Na VM, `luca-ai.service` serve o Express em loopback e `cloudflared-bombapvp-lab.service` publica o hostname.
+
 ## Autenticação
 
 - `server/auth-store.js` mantém usuários e sessões em `.luca/auth.json`; senhas são derivadas com `scrypt` e nunca persistidas em texto puro.
