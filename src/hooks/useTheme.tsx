@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
 
 /**
- * LUC.AI — tema operacional escuro.
+ * LUCA — tema operacional escuro.
  *
  * Os nomes das propriedades permanecem estáveis para preservar os componentes
  * existentes. A implementação usa um material de vidro escuro, azul para ações,

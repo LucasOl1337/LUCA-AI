@@ -41,7 +41,7 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
               <span className="h-1 w-1 rounded-full" style={{ background: theme.textGhost }} />
               <span className="text-[10px] uppercase tracking-[0.12em]" style={{ color: theme.textGhost }}>equipe de personas</span>
             </div>
-            <h1 className="void-title">LUC.AI</h1>
+            <h1 className="void-title">LUCA</h1>
             <p className="mt-2 max-w-[620px] text-[13px] leading-relaxed" style={{ color: theme.textMute }}>
               Monte uma equipe de personas, envie uma missão e acompanhe a entrega em uma conversa única.
             </p>

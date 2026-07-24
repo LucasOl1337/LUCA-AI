@@ -100,7 +100,7 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
                 transition={{ duration: 0.18 }}
                 className="min-w-0 flex-1"
               >
-                <strong className="block text-[15px] font-bold tracking-[0.12em]" style={{ color: theme.text }}>LUC.AI</strong>
+                <strong className="block text-[15px] font-bold tracking-[0.12em]" style={{ color: theme.text }}>LUCA</strong>
                 <span className="block text-[10px] tracking-[0.12em] uppercase truncate" style={{ color: theme.textGhost }}>
                   centro operacional
                 </span>
@@ -167,7 +167,7 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
         </button>
         <BrandMark />
         <div className="min-w-0 flex-1">
-          <strong className="block text-sm tracking-[0.08em]">LUC.AI</strong>
+          <strong className="block text-sm tracking-[0.08em]">LUCA</strong>
           <span className="block text-[10px] truncate" style={{ color: theme.textMute }}>{activeItem.label}</span>
         </div>
         <span className="state-badge shrink-0" style={{ color: statusTone, background: runtimeOnline ? theme.aliveSoft : theme.errorBg }}>
