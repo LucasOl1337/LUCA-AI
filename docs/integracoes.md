@@ -28,8 +28,8 @@ Ao importar uma persona, o LUCA preserva nome, prompt e versao lidos do Yume, ma
 
 O LUCA lista personas, le prompt e versao e guarda o cache no estado local. Nao adicione escrita no Yume a esse cliente.
 
-No domínio público, as telas de Personas e LUCA-AI usam `/api` na mesma origem. O Cloudflare Tunnel executado na VM encaminha essas chamadas para o Express em `127.0.0.1:4242`; o navegador do visitante e o PC de desenvolvimento nunca participam do caminho interno.
+No domínio público, as telas de Personas e LUCA-AI usam `/api` na mesma origem. O proxy de borda encaminha o tráfego para `luca-origin.bombapvp.com`; o Cloudflare Tunnel executado na VM entrega as chamadas ao Express em `127.0.0.1:4242`. O navegador do visitante e o PC de desenvolvimento nunca participam do caminho interno.
 
 ## Publicação atual
 
-O ambiente de produção usa somente o 9Router da VM. O Cloudflare fornece DNS e Tunnel, sem executar modelos e sem exigir conta Cloudflare do visitante. O runtime legado em `worker/` não participa da publicação de `luca-ai.com.br`.
+O ambiente de produção usa somente o 9Router da VM. A Cloudflare fornece DNS, um proxy reverso de borda e Tunnel, sem executar modelos e sem exigir conta Cloudflare do visitante. O runtime legado em `worker/` não participa da publicação de `luca-ai.com.br`; o único Worker ativo para o domínio é o proxy mínimo versionado em `deploy/luca-ai-vm-proxy.js`.

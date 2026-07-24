@@ -56,7 +56,8 @@ ln -s "$release" "$release_root/current.next"
 mv -Tf "$release_root/current.next" "$release_root/current"
 install -o root -g root -m 644 "$release/deploy/luca-ai.service" /etc/systemd/system/luca-ai.service
 systemctl daemon-reload
-systemctl enable --now luca-ai.service
+systemctl enable luca-ai.service
+systemctl restart luca-ai.service
 
 for _attempt in $(seq 1 30); do
   if curl -fsS --max-time 2 http://127.0.0.1:4242/api/auth/session >/dev/null; then
@@ -74,6 +75,25 @@ if ! grep -q 'hostname: luca-ai.com.br' "$tunnel_config"; then
   awk '
     /  - service: http_status:404/ {
       print "  - hostname: luca-ai.com.br"
+      print "    service: http://127.0.0.1:4242"
+      print "    originRequest:"
+      print "      connectTimeout: 10s"
+      print "      tcpKeepAlive: 30s"
+      print "      keepAliveTimeout: 90s"
+      print "      keepAliveConnections: 100"
+    }
+    { print }
+  ' "$tunnel_config" > "$config_tmp"
+  chmod --reference="$tunnel_config" "$config_tmp"
+  chown --reference="$tunnel_config" "$config_tmp"
+  mv "$config_tmp" "$tunnel_config"
+fi
+
+if ! grep -q 'hostname: luca-origin.bombapvp.com' "$tunnel_config"; then
+  config_tmp="$(mktemp /etc/cloudflared/bombapvp-lab.yml.XXXXXX)"
+  awk '
+    /  - service: http_status:404/ {
+      print "  - hostname: luca-origin.bombapvp.com"
       print "    service: http://127.0.0.1:4242"
       print "    originRequest:"
       print "      connectTimeout: 10s"

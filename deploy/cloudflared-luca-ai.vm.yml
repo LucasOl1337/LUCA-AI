@@ -7,3 +7,10 @@
       tcpKeepAlive: 30s
       keepAliveTimeout: 90s
       keepAliveConnections: 100
+  - hostname: luca-origin.bombapvp.com
+    service: http://127.0.0.1:4242
+    originRequest:
+      connectTimeout: 10s
+      tcpKeepAlive: 30s
+      keepAliveTimeout: 90s
+      keepAliveConnections: 100
