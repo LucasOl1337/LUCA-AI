@@ -1,34 +1,35 @@
-# Operacao
+# Operação
 
-Leia SOMENTE ao instalar, executar, testar, diagnosticar estado local ou preparar release.
+Leia ao instalar, executar, testar ou diagnosticar o runtime local.
 
-## Runtime local
+## Executar
 
-Use Node.js e Python 3. O servidor chama `heartbeat_monitor.py`; o restante do runtime roda em Node.js.
+Requer Node.js.
 
 ```powershell
 npm ci
 npm start
 ```
 
-`npm start` gera `dist/` e inicia o Express em `http://127.0.0.1:4242`. `npm run dev:full` inicia apenas o servidor e reutiliza o build existente.
+`npm start` gera `dist/` e inicia o Express em `http://127.0.0.1:4242`. Para desenvolver apenas a interface com hot reload, use `npm run dev`; para servir um build já existente, use `npm run server`.
 
-Confira a saude em `GET /api/health` e o preflight em `GET /api/preflight`.
+Confira a saúde em `GET /api/health`.
 
-## Verificacao
+## Verificar
 
 ```powershell
 npm test
 npm run typecheck
 npm run build
+npm audit --omit=dev --audit-level=high
 ```
-
-O teste do catalogo local le `../TARS/ferramentas` e `../Yume/ferramentas`. Mantenha esses checkouts como irmaos do LUCA-AI para executar a suite completa.
 
 ## Estado local
 
-O runtime grava estado em `.luca/system-state.json` e eventos em `.luca/runtime-events.jsonl`. A pasta esta ignorada pelo Git. Copie esses arquivos antes de limpar o estado quando precisar preservar missoes, personas importadas ou historico.
+O runtime grava as personas importadas e o cache de seus prompts em `.luca/personas.json`; os eventos ficam em `.luca/runtime-events.jsonl`. A pasta é ignorada pelo Git.
 
-## Release cloud
+Se existir `.luca/system-state.json` de uma versão anterior, as personas são migradas automaticamente no primeiro carregamento. O arquivo legado não é alterado e pode ser removido depois de conferir a nova lista.
 
-O repositorio nao possui workflow de CI nem script de deploy. `wrangler.jsonc` publica `dist/` no dominio de producao e declara a migration do Durable Object. O Wrangler nao esta fixado nas dependencias do projeto.
+## Segurança operacional
+
+O servidor escuta `127.0.0.1` por padrão e não possui autenticação. Não altere `HOST` para uma interface pública sem desenhar autenticação, autorização e política de origem.

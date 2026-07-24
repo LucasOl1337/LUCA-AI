@@ -1,9 +1,12 @@
 # LUCA-AI
 
-LUCA-AI e um painel para criar, acompanhar e revisar missoes executadas por agentes de IA. O repositorio contem uma interface React, um runtime Express local e um runtime Cloudflare com Durable Object.
+LUCA-AI é uma bancada local para executar missões com uma equipe de personas. O produto possui somente duas áreas:
 
-O fluxo local, o estado persistido, os catalogos, os relatorios e os testes Node estao implementados. O roteador LLM e o Kamui/Yume sao dependencias externas; a interface cloud usa uma ponte local para recursos de personas.
+- **LUCA-AI:** monta os papéis Supervisor, Decisor da missão, Executores, Aprovação e Exibição final, executa o fluxo e apresenta processo, canvas e comunicação.
+- **Personas:** consulta o catálogo Yume via Kamui e gerencia quais personas estão disponíveis na bancada.
 
-Stack: React, TypeScript, Vite, Tailwind CSS, Express, WebSocket, Node Test Runner e Cloudflare Workers.
+O backend Express concentra o caso de uso em `server/persona-workbench.js`, persiste apenas as personas importadas em `.luca/personas.json` e registra telemetria em `.luca/runtime-events.jsonl`. O 9Router e o Kamui/Yume são dependências locais externas.
 
-Consulte [`INDEX.md`](./INDEX.md) para localizar codigo e documentacao sem carregar material historico.
+Stack: React, TypeScript, Vite, Tailwind CSS, Express e Node Test Runner.
+
+Consulte [`INDEX.md`](./INDEX.md) para localizar código e documentação.

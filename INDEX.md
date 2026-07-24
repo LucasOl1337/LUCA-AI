@@ -1,27 +1,27 @@
-# Indice
+# Índice
 
-## Codigo
+## Código
 
 | Onde | Quando abrir |
 | --- | --- |
-| `src/` | SOMENTE ao alterar a interface React ou o cliente HTTP/WebSocket. |
-| `server/` | SOMENTE ao alterar o runtime Express, estado local, agentes ou APIs. |
-| `shared/` | SOMENTE ao alterar contratos usados por mais de um runtime. |
-| `worker/` e `wrangler.jsonc` | SOMENTE ao alterar o runtime Cloudflare, Durable Object ou deploy. |
-| `public/` | SOMENTE ao alterar assets servidos pelo app principal. |
-| `site/` | SOMENTE ao trabalhar no site visual separado do app principal. |
-| `praisonai-tests/` e `PraisonAI/` | SOMENTE ao executar os exemplos Python ou inspecionar o submodulo. |
-| CodeGraph CLI | SOMENTE ao mapear estrutura, chamadas ou impacto antes de abrir muitos arquivos. |
+| `src/pages/LucaAiPage.tsx` | Ao alterar a bancada, seus cinco papéis, canvas, comunicação ou execução de missão. |
+| `src/pages/PersonasPage.tsx` | Ao alterar o catálogo e a importação de personas do Yume. |
+| `src/components/Layout.tsx` | Ao alterar o shell, a navegação de duas telas ou o estado de saúde. |
+| `src/lib/` | Ao alterar o cliente HTTP ou os contratos usados pela interface. |
+| `server/persona-workbench.js` | Ao alterar o caso de uso principal; esta é a interface profunda do backend. |
+| `server/persona-store.js` | Ao alterar a persistência mínima das personas importadas. |
+| `server/kamui-client.js` | Ao alterar leituras do Yume; este adaptador nunca escreve. |
+| `server/router-client.js` | Ao alterar chamadas ao 9Router. |
+| `server/index.js` | Ao alterar a superfície HTTP ou a entrega do build. |
+| CodeGraph CLI | Ao mapear estrutura, chamadas ou impacto antes de abrir muitos arquivos. |
 
 ## Documentos
 
 | Documento | Quando ler |
 | --- | --- |
-| [`README.md`](./README.md) | SOMENTE ao chegar ao projeto sem contexto. |
-| [`docs/operacao.md`](./docs/operacao.md) | SOMENTE ao instalar, executar, testar, diagnosticar estado local ou preparar release. |
-| [`docs/arquitetura.md`](./docs/arquitetura.md) | SOMENTE ao mudar um fluxo que cruza frontend, Express, contratos compartilhados ou Worker. |
-| [`docs/integracoes.md`](./docs/integracoes.md) | SOMENTE ao mudar roteador LLM, Kamui, personas Yume ou a ponte local do modo cloud. |
-| `praisonai-tests/README.md` | SOMENTE ao executar os exemplos Python desse diretorio. |
-| `grokimaginevideos/README.md` | SOMENTE ao trabalhar nesse checkout co-locado. |
-| `DocsDev/` | SOMENTE ao buscar contexto historico que o codigo e os documentos oficiais nao resolvem; nao trate como fonte de verdade. |
-| `DocsDev/arquivados/` | NUNCA leia durante trabalho normal; use apenas por ordem explicita do dono. |
+| [`README.md`](./README.md) | Ao chegar ao projeto sem contexto. |
+| [`docs/operacao.md`](./docs/operacao.md) | Ao instalar, executar, testar ou diagnosticar o runtime local. |
+| [`docs/arquitetura.md`](./docs/arquitetura.md) | Ao mudar um fluxo que cruza frontend, Express ou integrações. |
+| [`docs/integracoes.md`](./docs/integracoes.md) | Ao mudar 9Router, Kamui ou personas Yume. |
+| `DocsDev/` | Apenas para contexto histórico que o código e os documentos oficiais não resolvem; não é fonte de verdade. |
+| `DocsDev/arquivados/` | Nunca durante o trabalho normal; use somente por ordem explícita do dono. |

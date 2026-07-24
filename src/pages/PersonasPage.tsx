@@ -3,57 +3,33 @@ import { motion } from 'framer-motion';
 import { AlertCircle, ExternalLink, Loader2, Plus, RefreshCw, Search, Sparkles, Trash2, UserPlus, UsersRound } from 'lucide-react';
 import { buildApiErrorMessage, lucaApi } from '@/lib/api';
 import type { YumePersonaSummary } from '@/lib/types';
-import { useLuca } from '@/hooks/useLucaState';
 import { useTheme } from '@/hooks/useTheme';
 
 type FilterMode = 'all' | 'imported' | 'available';
 
 const YUME_DASHBOARD_URL = 'http://127.0.0.1:2222';
-const LOCAL_LUCA_BRIDGE_URL = 'http://127.0.0.1:4242';
-
-function withBaseUrl(value: string | undefined, base: string | undefined): string | undefined {
-  const raw = String(value || '').trim();
-  if (!raw || !base || /^https?:\/\//i.test(raw)) return raw || undefined;
-  if (!raw.startsWith('/')) return raw;
-  return `${base.replace(/\/+$/, '')}${raw}`;
-}
-
-function normalizePersonaAssetUrls(personas: YumePersonaSummary[], base: string | undefined): YumePersonaSummary[] {
-  return personas.map((persona) => ({
-    ...persona,
-    avatarUrl: withBaseUrl(persona.avatarUrl, base),
-    avatar_url: withBaseUrl(persona.avatar_url, base),
-  }));
-}
 
 export default function PersonasPage() {
   const theme = useTheme();
-  const { runtimeMode, refresh, state } = useLuca();
   const [personas, setPersonas] = useState<YumePersonaSummary[]>([]);
-  const [loading, setLoading] = useState(runtimeMode === 'backend');
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busySlug, setBusySlug] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<FilterMode>('all');
 
-  const bridgeBase = runtimeMode === 'cloud' ? LOCAL_LUCA_BRIDGE_URL : undefined;
-  const importedInState = state?.personaAgents?.length ?? 0;
-
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined);
-      setPersonas(normalizePersonaAssetUrls(data.personas ?? [], bridgeBase));
+      const data = await lucaApi.listYumePersonas();
+      setPersonas(data.personas ?? []);
     } catch (err) {
-      const fallback = runtimeMode === 'cloud'
-        ? `Nao consegui acessar a ponte local do LUCA em ${LOCAL_LUCA_BRIDGE_URL}.`
-        : 'Falha ao carregar personas do Yume.';
-      setError(buildApiErrorMessage(err, fallback));
+      setError(buildApiErrorMessage(err, 'Falha ao carregar personas do Yume.'));
     } finally {
       setLoading(false);
     }
-  }, [bridgeBase, runtimeMode]);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -74,16 +50,15 @@ export default function PersonasPage() {
     });
   }, [filter, personas, query]);
 
-  const importedCount = personas.filter((persona) => persona.imported).length || importedInState;
+  const importedCount = personas.filter((persona) => persona.imported).length;
   const availableCount = Math.max(0, personas.length - personas.filter((persona) => persona.imported).length);
 
   async function importPersona(slug: string) {
     setBusySlug(slug);
-      setError(null);
+    setError(null);
     try {
-      await lucaApi.importYumePersona(slug, bridgeBase);
+      await lucaApi.importYumePersona(slug);
       await load();
-      if (runtimeMode === 'backend') await refresh();
     } catch (err) {
       setError(buildApiErrorMessage(err, `Falha ao importar ${slug}.`));
     } finally {
@@ -93,11 +68,10 @@ export default function PersonasPage() {
 
   async function removePersona(slug: string) {
     setBusySlug(slug);
-      setError(null);
+    setError(null);
     try {
-      await lucaApi.removeYumePersona(slug, bridgeBase);
+      await lucaApi.removeYumePersona(slug);
       await load();
-      if (runtimeMode === 'backend') await refresh();
     } catch (err) {
       setError(buildApiErrorMessage(err, `Falha ao remover ${slug}.`));
     } finally {

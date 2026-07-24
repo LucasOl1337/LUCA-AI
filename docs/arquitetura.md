@@ -1,26 +1,26 @@
 # Arquitetura
 
-Leia SOMENTE ao mudar um fluxo que cruza frontend, Express, contratos compartilhados ou Worker.
-
-| Area | Contrato atual |
-| --- | --- |
-| `src/` | Interface React, cliente REST/WebSocket e estado de tela. |
-| `server/` | Runtime local Express, WebSocket, orquestracao e persistencia em `.luca/`. |
-| `shared/` | Contratos de estado publico, catalogos, governanca, modelos e fechamento. |
-| `worker/` | Runtime Cloudflare, Durable Object, SQL interno, jobs e assets de `dist/`. |
-
-Fluxo local principal:
+Leia ao mudar um fluxo que cruza frontend, Express ou integrações.
 
 ```text
-src -> /api e /ws -> server -> shared -> .luca
+LucaAiPage / PersonasPage
+          |
+          v
+     src/lib/api.ts
+          |
+          v
+    server/index.js
+          |
+          v
+persona-workbench.js
+   |          |          |
+   v          v          v
+Kamui       9Router   persona-store
+(leitura)  (execução) (.luca/personas.json)
 ```
 
-Fluxo cloud principal:
+`server/persona-workbench.js` é a interface profunda do backend: lista e importa personas, executa o workflow fixo de cinco papéis e publica eventos. O servidor HTTP apenas valida o transporte e delega esse trabalho.
 
-```text
-src -> /api -> worker -> LucaRuntime Durable Object -> SQL
-```
+O frontend mantém somente estado de apresentação. Não existe estado global de missões, WebSocket, Worker cloud ou segunda implementação das regras. O Express serve `dist/` quando o build existe e expõe somente a superfície necessária da bancada sob `/api`.
 
-O Express e o Worker implementam superficies parecidas sem uma camada unica de rotas. Ao mudar payload publico, endpoint, evento, fechamento ou governanca, localize as duas implementacoes e os testes relacionados antes de editar.
-
-O servidor serve `dist/` quando o build existe. `site/` possui uma superficie visual separada e nao entra no build do app principal.
+Ao iniciar com um checkout antigo, `persona-store.js` migra uma única vez as personas encontradas em `.luca/system-state.json` para `.luca/personas.json`; o restante do estado legado não é carregado.

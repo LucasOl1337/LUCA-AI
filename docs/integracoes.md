@@ -1,27 +1,22 @@
-# Integracoes
+# Integrações
 
-Leia SOMENTE ao mudar roteador LLM, Kamui, personas Yume ou a ponte local do modo cloud.
+Leia ao mudar 9Router, Kamui ou personas Yume.
 
-## Roteador local
+## 9Router
 
-`server/router-client.js` usa uma API compativel com OpenAI. O padrao e `http://127.0.0.1:20128/v1`.
+`server/router-client.js` usa uma API compatível com OpenAI. O padrão é `http://127.0.0.1:20128/v1`.
 
-| Variavel | Uso |
+| Variável | Uso |
 | --- | --- |
 | `ROUTER_BASE_URL` | Base do roteador local. |
-| `ROUTER_API_KEY` ou `NINE_ROUTER_API_KEY` | Credencial enviada como Bearer quando definida. |
-| `ROUTER_MODEL` | Modelo dos agentes comuns. |
-| `MISSION_TRANSFORMER_MODEL`, `DESIGNER_MODEL`, `MAESTRO_MODEL` | Modelos dos papeis especializados. |
+| `ROUTER_API_KEY` ou `NINE_ROUTER_API_KEY` | Credencial Bearer opcional. |
+| `ROUTER_MODEL` | Modelo usado pelos cinco papéis. |
 | `ROUTER_TIMEOUT_MS` | Timeout das chamadas. |
+
+Quando o modelo preferido de uma persona retorna `model_not_found` ou informa ausência de credencial ativa, a bancada repete a chamada com `ROUTER_MODEL`. Falhas de rede e timeouts continuam visíveis e não disparam repetição automática.
 
 ## Kamui e Yume
 
-`server/kamui-client.js` acessa Yume somente por GET via `{KAMUI_BASE}/kamui/yume/...`. O padrao de `KAMUI_BASE` e `http://127.0.0.1:1338`; `KAMUI_TIMEOUT_MS` controla o timeout.
+`server/kamui-client.js` acessa o Yume somente por GET em `{KAMUI_BASE}/kamui/yume/...`. `KAMUI_BASE` usa `http://127.0.0.1:1338` por padrão e `KAMUI_TIMEOUT_MS` controla o timeout.
 
-O LUCA lista personas, le prompt e versao e guarda o cache no estado local. Nao adicione escrita no Yume a esse cliente.
-
-No modo cloud, as telas de personas e LUCA-AI tentam acessar `http://127.0.0.1:4242` como ponte local. Mantenha o runtime Express ativo para importar ou executar recursos Yume pela interface cloud.
-
-## Worker Cloudflare
-
-O Worker usa `GLM_API_KEY` como secret e le `GLM_BASE`, `GLM_MODEL`, `GLM_MODEL_OPTIONS` e `MODEL_SELECTOR_KEY` da configuracao. Valide `GET /api/health` e `GET /api/preflight` depois de mudar provider ou bindings.
+A bancada consulta catálogo, prompt de sistema e versão das personas. Os prompts podem ser mantidos em cache local para tolerar uma indisponibilidade temporária, mas nenhuma rota escreve no Yume.

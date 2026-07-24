@@ -1,10 +1,6 @@
 node_modules/
 dist/
-site/dist/
-site/node_modules/
-site/test-results/
 *.log
-site/*.log
 qa-*.png
 prod-*.png
 luca-mission-runtime-after-fix.png
@@ -22,6 +18,7 @@ luca-mission-runtime-after-fix.png
 output/
 test-results/
 tmp-shots/
+tmp-live-ui/
 .chrome-dom-tools.html
 *.cpuprofile
 config.local.json

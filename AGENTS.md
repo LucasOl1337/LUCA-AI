@@ -1,10 +1,10 @@
 # LUCA-AI
 
-Este checkout contem o painel React, o runtime Express local e o Worker Cloudflare publicado em `app.luca-ai.com.br`. `git push` nao deploya; o repositorio nao declara staging nem automacao de deploy.
+Este checkout contém uma bancada local para executar missões com equipes de personas. A interface React conversa apenas com o runtime Express; o Express lê personas do Yume via Kamui e executa os cinco papéis da bancada pelo roteador 9Router.
 
-1. Faca commit, push, release ou deploy somente com ordem explicita do dono.
-2. Nao use `git clean`, `git reset --hard`, `git checkout --` nem `git stash`; preserve alteracoes alheias na arvore compartilhada.
-3. Nao rode testes mutantes nem comandos de limpeza contra `app.luca-ai.com.br` ou o Durable Object de producao.
-4. Nunca escreva direto no Yume; leia personas pelo cliente GET do Kamui em `server/kamui-client.js`.
-5. Inclua a migration do Durable Object no mesmo commit do codigo que exige a mudanca de schema.
-6. Consulte INDEX.md para onde esta cada coisa e quando ler cada documento.
+1. Faça commit, push, release ou deploy somente com ordem explícita do dono.
+2. Preserve alterações alheias na árvore compartilhada e nunca apague `plans/` ou o histórico em `DocsDev/` sem ordem explícita.
+3. Nunca escreva direto no Yume; `server/kamui-client.js` deve permanecer somente leitura.
+4. Mantenha o servidor restrito ao loopback enquanto não existir autenticação desenhada para exposição externa.
+5. Use CodeGraph primeiro para mapear estrutura, chamadas e impacto; sincronize o índice se estiver inconsistente.
+6. Consulte `INDEX.md` para localizar o código e a documentação oficial.

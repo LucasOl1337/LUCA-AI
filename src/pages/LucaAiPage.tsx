@@ -33,11 +33,9 @@ import type {
   RuntimeEvent,
   YumePersonaSummary,
 } from '@/lib/types';
-import { useLuca } from '@/hooks/useLucaState';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useTheme } from '@/hooks/useTheme';
 
-const LOCAL_LUCA_BRIDGE_URL = 'http://127.0.0.1:4242';
 const MAX_EXECUTORS = 4;
 
 type TranscriptRole = 'operator' | 'persona' | 'system';
@@ -159,21 +157,6 @@ function roleLabelsForSlug(assignments: WorkflowAssignments, slug: string): stri
   return WORKFLOW_ROLES
     .filter((role) => assignments[role.id].includes(slug))
     .map((role) => role.label);
-}
-
-function withBaseUrl(value: string | undefined, base: string | undefined): string | undefined {
-  const raw = String(value || '').trim();
-  if (!raw || !base || /^https?:\/\//i.test(raw)) return raw || undefined;
-  if (!raw.startsWith('/')) return raw;
-  return `${base.replace(/\/+$/, '')}${raw}`;
-}
-
-function normalizePersonaAssetUrls(personas: YumePersonaSummary[], base: string | undefined): YumePersonaSummary[] {
-  return personas.map((persona) => ({
-    ...persona,
-    avatarUrl: withBaseUrl(persona.avatarUrl, base),
-    avatar_url: withBaseUrl(persona.avatar_url, base),
-  }));
 }
 
 function nowId(prefix: string): string {
@@ -445,7 +428,6 @@ function plannedRuntimeEvents(traceId: string, mission: string, assignments: Wor
 
 export default function LucaAiPage() {
   const theme = useTheme();
-  const { runtimeMode } = useLuca();
   const [personas, setPersonas] = useState<YumePersonaSummary[]>([]);
   const [legacyTeamSlugs] = usePersistentState<string[]>('lucaAi.teamSlugs', []);
   const [workflowState, setWorkflowState] = usePersistentState<WorkflowAssignments>('lucaAi.workflowAssignments', createEmptyWorkflowAssignments());
@@ -461,7 +443,6 @@ export default function LucaAiPage() {
   const [processEvents, setProcessEvents] = useState<RuntimeEvent[]>([]);
   const transcriptRef = useRef<HTMLDivElement>(null);
 
-  const bridgeBase = runtimeMode === 'cloud' ? LOCAL_LUCA_BRIDGE_URL : undefined;
   const assignments = useMemo(() => normalizeWorkflowAssignments(workflowState), [workflowState]);
   const assignedSlugs = useMemo(() => flattenWorkflowAssignments(assignments), [assignments]);
   const readyRoles = useMemo(() => WORKFLOW_ROLES.filter((role) => assignments[role.id].length > 0).length, [assignments]);
@@ -471,17 +452,14 @@ export default function LucaAiPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined);
-      setPersonas(normalizePersonaAssetUrls(data.personas ?? [], bridgeBase));
+      const data = await lucaApi.listYumePersonas();
+      setPersonas(data.personas ?? []);
     } catch (err) {
-      const fallback = runtimeMode === 'cloud'
-        ? `Nao consegui acessar a ponte local do LUCA em ${LOCAL_LUCA_BRIDGE_URL}.`
-        : 'Falha ao carregar personas do Yume.';
-      setError(buildApiErrorMessage(err, fallback));
+      setError(buildApiErrorMessage(err, 'Falha ao carregar personas do Yume.'));
     } finally {
       setLoading(false);
     }
-  }, [bridgeBase, runtimeMode]);
+  }, []);
 
   useEffect(() => {
     void loadPersonas();
@@ -491,10 +469,13 @@ export default function LucaAiPage() {
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight, behavior: 'smooth' });
   }, [transcript.length, running, finalResult?.id]);
 
-  const importedPersonas = useMemo(() => personas.filter((persona) => persona.imported), [personas]);
-  const importedSlugs = useMemo(() => importedPersonas.map((persona) => persona.slug), [importedPersonas]);
-  const importedSlugsKey = useMemo(() => importedSlugs.join('|'), [importedSlugs]);
-  const personaBySlug = useMemo(() => new Map(importedPersonas.map((persona) => [persona.slug, persona])), [importedPersonas]);
+  const workbenchPersonas = useMemo(() => [
+    ...personas.filter((persona) => persona.imported),
+    ...personas.filter((persona) => !persona.imported),
+  ], [personas]);
+  const workbenchSlugs = useMemo(() => workbenchPersonas.map((persona) => persona.slug), [workbenchPersonas]);
+  const workbenchSlugsKey = useMemo(() => workbenchSlugs.join('|'), [workbenchSlugs]);
+  const personaBySlug = useMemo(() => new Map(workbenchPersonas.map((persona) => [persona.slug, persona])), [workbenchPersonas]);
 
   useEffect(() => {
     if (!assignedSlugs.length) {
@@ -513,7 +494,7 @@ export default function LucaAiPage() {
 
     async function pollEvents() {
       try {
-        const data = await lucaApi.listEvents({ traceId, limit: 120 }, bridgeBase);
+        const data = await lucaApi.listEvents({ traceId, limit: 120 });
         if (cancelled || !data.ok || !data.events?.length) return;
         setProcessEvents(sortRuntimeEvents(data.events));
       } catch {
@@ -527,39 +508,39 @@ export default function LucaAiPage() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [activeTraceId, bridgeBase, running]);
+  }, [activeTraceId, running]);
 
   useEffect(() => {
     if (loading || !personas.length) return;
-    const importedSet = new Set(importedSlugs);
+    const availableSet = new Set(workbenchSlugs);
     setWorkflowState((prev) => {
       const normalized = normalizeWorkflowAssignments(prev);
       let next = createEmptyWorkflowAssignments();
       for (const role of WORKFLOW_ROLES) {
         next[role.id] = normalized[role.id]
-          .filter((slug) => importedSet.has(slug))
+          .filter((slug) => availableSet.has(slug))
           .slice(0, role.maxSlugs);
       }
 
       const hasAnyAssignment = WORKFLOW_ROLES.some((role) => next[role.id].length > 0);
       if (!hasAnyAssignment) {
-        const seedSource = legacyTeamSlugs.filter((slug) => importedSet.has(slug));
-        next = buildSeedWorkflow(seedSource.length ? seedSource : importedSlugs);
+        const seedSource = legacyTeamSlugs.filter((slug) => availableSet.has(slug));
+        next = buildSeedWorkflow(seedSource.length ? seedSource : workbenchSlugs);
       }
 
       return workflowAssignmentsEqual(normalized, next) ? prev : next;
     });
-  }, [importedSlugs, importedSlugsKey, legacyTeamSlugs, loading, personas.length, setWorkflowState]);
+  }, [legacyTeamSlugs, loading, personas.length, setWorkflowState, workbenchSlugs, workbenchSlugsKey]);
 
   const filteredPersonas = useMemo(() => {
     const term = query.trim().toLowerCase();
-    return importedPersonas.filter((persona) => {
+    return workbenchPersonas.filter((persona) => {
       if (!term) return true;
       return [persona.name, persona.slug, persona.description, persona.purpose, persona.model]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(term));
     });
-  }, [importedPersonas, query]);
+  }, [query, workbenchPersonas]);
 
   const canRun = mission.trim().length > 0 && isWorkflowReady && !running;
 
@@ -633,7 +614,6 @@ export default function LucaAiPage() {
         slugsToRun,
         workflowPayload(assignmentsToRun),
         traceId,
-        bridgeBase,
       );
       if (data.traceId) setActiveTraceId(data.traceId);
       const nextMessages = transcriptEntriesFromResponse(data);
@@ -666,7 +646,7 @@ export default function LucaAiPage() {
       setTranscript((prev) => [...prev, errorEntry].slice(-140));
     } finally {
       try {
-        const data = await lucaApi.listEvents({ traceId, limit: 120 }, bridgeBase);
+        const data = await lucaApi.listEvents({ traceId, limit: 120 });
         if (data.ok && data.events?.length) setProcessEvents(sortRuntimeEvents(data.events));
       } catch {
         // Evento em tempo real é auxiliar; mantemos os dados locais se o polling falhar.
@@ -695,7 +675,7 @@ export default function LucaAiPage() {
   return (
     <div className="h-full overflow-y-auto lg:overflow-hidden flex flex-col gap-3 p-3 sm:p-4 min-h-0">
       <LucaWorkflowRail
-        personas={importedPersonas}
+        personas={workbenchPersonas}
         personaBySlug={personaBySlug}
         assignments={assignments}
         activeSlug={activePersonaSlug}
