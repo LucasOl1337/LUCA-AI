@@ -1,8 +1,11 @@
 import { createContext, useContext } from 'react';
 
 /**
- * LUC.AI — paleta "Cerrado": pergaminho quente + verde floresta + sienna marrom.
- * Tema claro natural inspirado no bioma brasileiro.
+ * LUC.AI — tema operacional escuro.
+ *
+ * Os nomes das propriedades permanecem estáveis para preservar os componentes
+ * existentes. A implementação usa um material de vidro escuro, azul para ações,
+ * violeta para agentes e verde exclusivamente para estados positivos.
  */
 export interface LucaTheme {
   void: string;
@@ -52,59 +55,50 @@ export interface LucaTheme {
 }
 
 export const LUCA_THEME: LucaTheme = {
-  // Pergaminho quente — fundo
-  void: '#f2e8d8',
-  void2: '#e9ddc8',
-  surface: 'rgba(245, 235, 215, 0.70)',
-  surfaceHi: 'rgba(252, 246, 238, 0.88)',
-  input: 'rgba(250, 244, 234, 0.92)',
+  void: '#090c11',
+  void2: 'rgba(15, 19, 26, 0.88)',
+  surface: 'rgba(20, 24, 31, 0.58)',
+  surfaceHi: 'rgba(23, 28, 36, 0.72)',
+  input: 'rgba(255, 255, 255, 0.09)',
 
-  // Verde floresta — estrutura, texto forte (era navy)
-  navy: '#1a5c3a',
-  navyDeep: '#0f3d24',
-  navySoft: 'rgba(26, 92, 58, 0.06)',
-  navyGlow: 'rgba(26, 92, 58, 0.16)',
+  navy: '#0a84ff',
+  navyDeep: '#64d2ff',
+  navySoft: 'rgba(10, 132, 255, 0.12)',
+  navyGlow: 'rgba(10, 132, 255, 0.24)',
 
-  // Sienna marrom — marca e estado ativo (era gold)
-  gold: '#8b5a2b',
-  goldBright: '#b07840',
-  goldDeep: '#6b3d1a',
-  goldSoft: 'rgba(139, 90, 43, 0.08)',
-  goldGlow: 'rgba(176, 120, 64, 0.28)',
-  goldHaze: 'rgba(139, 90, 43, 0.05)',
+  gold: '#0a84ff',
+  goldBright: '#64d2ff',
+  goldDeep: '#82c7ff',
+  goldSoft: 'rgba(10, 132, 255, 0.18)',
+  goldGlow: 'rgba(10, 132, 255, 0.30)',
+  goldHaze: 'rgba(10, 132, 255, 0.10)',
 
-  // Verde médio — acento secundário (era fleet)
-  fleet: '#2d6a4f',
-  fleetSoft: 'rgba(45, 106, 79, 0.08)',
-  fleetGlow: 'rgba(45, 106, 79, 0.20)',
+  fleet: '#bf5af2',
+  fleetSoft: 'rgba(191, 90, 242, 0.14)',
+  fleetGlow: 'rgba(191, 90, 242, 0.24)',
 
-  // Verde heartbeat — sinal de vida
-  alive: '#2f9e6a',
-  aliveSoft: 'rgba(47, 158, 106, 0.10)',
-  aliveGlow: 'rgba(47, 158, 106, 0.22)',
+  alive: '#30d158',
+  aliveSoft: 'rgba(48, 209, 88, 0.15)',
+  aliveGlow: 'rgba(48, 209, 88, 0.24)',
 
-  // Textos — tinta sobre pergaminho
-  text: '#1e1209',
-  textSoft: '#4a3020',
-  textMute: '#7a5c46',
-  textGhost: '#b8a090',
+  text: 'rgba(255, 255, 255, 0.94)',
+  textSoft: 'rgba(255, 255, 255, 0.72)',
+  textMute: 'rgba(255, 255, 255, 0.60)',
+  textGhost: 'rgba(255, 255, 255, 0.38)',
 
-  // Bordas
-  border: 'rgba(26, 92, 58, 0.10)',
-  borderHover: 'rgba(139, 90, 43, 0.35)',
-  borderActive: 'rgba(139, 90, 43, 0.55)',
+  border: 'rgba(255, 255, 255, 0.10)',
+  borderHover: 'rgba(100, 210, 255, 0.34)',
+  borderActive: 'rgba(100, 210, 255, 0.62)',
 
-  // Estados
-  ok: '#2f9e6a',
-  okBg: 'rgba(47, 158, 106, 0.12)',
-  error: '#c0392b',
-  errorBg: 'rgba(192, 57, 43, 0.10)',
-  warning: '#b8860b',
-  warningBg: 'rgba(184, 134, 11, 0.12)',
+  ok: '#30d158',
+  okBg: 'rgba(48, 209, 88, 0.16)',
+  error: '#ff453a',
+  errorBg: 'rgba(255, 69, 58, 0.16)',
+  warning: '#ff9f0a',
+  warningBg: 'rgba(255, 159, 10, 0.16)',
 
-  // Console — mantém escuro (verde musgo)
-  console: '#0d1a0f',
-  consoleText: '#b8d8b0',
+  console: 'rgba(5, 8, 13, 0.88)',
+  consoleText: 'rgba(214, 233, 255, 0.82)',
 };
 
 const ThemeContext = createContext<LucaTheme>(LUCA_THEME);

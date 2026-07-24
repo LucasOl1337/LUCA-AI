@@ -1,6 +1,7 @@
 const DEFAULT_MAX_TEAM_SIZE = 10;
 const DEFAULT_MAX_MISSION_CHARS = 6000;
 const DEFAULT_MAX_EXECUTION_SLUGS = 4;
+const DEFAULT_MAX_INDIVIDUAL_PARTICIPANTS = 5;
 
 export const PERSONA_WORKFLOW_ROLES = [
   {
@@ -168,9 +169,18 @@ function flattenPersonaTeamWorkflowSlugs(workflow = [], maxTeamSize = DEFAULT_MA
 
 export function normalizePersonaTeamRunInput(body = {}, options = {}) {
   const maxTeamSize = Number.isInteger(options.maxTeamSize) ? options.maxTeamSize : DEFAULT_MAX_TEAM_SIZE;
+  const maxIndividualParticipants = Number.isInteger(options.maxIndividualParticipants)
+    ? options.maxIndividualParticipants
+    : DEFAULT_MAX_INDIVIDUAL_PARTICIPANTS;
   const maxMissionChars = Number.isInteger(options.maxMissionChars) ? options.maxMissionChars : DEFAULT_MAX_MISSION_CHARS;
   const mission = String(body?.mission || body?.description || '').trim().slice(0, maxMissionChars);
   const traceId = normalizeTraceId(body?.traceId);
+  const requestedMode = String(body?.mode || '').trim().toLowerCase();
+  const individualMode = requestedMode === 'individual';
+  const judgeSlug = individualMode
+    ? normalizePersonaTeamSlug(body?.judgeSlug || body?.judge || body?.judgePersona)
+    : '';
+  const participantLimit = individualMode ? maxIndividualParticipants : maxTeamSize;
   const sourceSlugs = Array.isArray(body?.slugs)
     ? body.slugs
     : Array.isArray(body?.teamSlugs)
@@ -184,10 +194,10 @@ export function normalizePersonaTeamRunInput(body = {}, options = {}) {
     if (!slug || seen.has(slug)) continue;
     seen.add(slug);
     baseSlugs.push(slug);
-    if (baseSlugs.length >= maxTeamSize) break;
+    if (baseSlugs.length >= participantLimit) break;
   }
-  const workflow = normalizePersonaTeamWorkflow(body, baseSlugs);
-  const explicitWorkflow = hasExplicitWorkflow(body);
+  const workflow = individualMode ? [] : normalizePersonaTeamWorkflow(body, baseSlugs);
+  const explicitWorkflow = !individualMode && hasExplicitWorkflow(body);
   const slugs = workflow.length
     ? flattenPersonaTeamWorkflowSlugs(workflow, maxTeamSize)
     : baseSlugs;
@@ -198,6 +208,9 @@ export function normalizePersonaTeamRunInput(body = {}, options = {}) {
   if (!slugs.length) {
     return { ok: false, error: 'team_required', mission, slugs: [] };
   }
+  if (individualMode && !judgeSlug) {
+    return { ok: false, error: 'judge_required', mission, slugs, workflow: [] };
+  }
   if (explicitWorkflow) {
     const missingRoles = workflow
       .filter((role) => !role.slugs.length)
@@ -207,7 +220,15 @@ export function normalizePersonaTeamRunInput(body = {}, options = {}) {
     }
   }
 
-  return { ok: true, mission, slugs, workflow, mode: workflow.length ? 'workflow' : 'parallel', traceId };
+  return {
+    ok: true,
+    mission,
+    slugs,
+    workflow,
+    mode: individualMode ? 'individual' : workflow.length ? 'workflow' : 'parallel',
+    judgeSlug: individualMode ? judgeSlug : undefined,
+    traceId,
+  };
 }
 
 export function buildPersonaTeamPrompt({
@@ -218,6 +239,7 @@ export function buildPersonaTeamPrompt({
   teamNames = [],
   workflowRole = null,
   accumulatedContext = '',
+  independent = false,
 }) {
   const name = String(personaName || personaSlug || 'Persona Yume').trim();
   const slug = String(personaSlug || '').trim();
@@ -229,6 +251,9 @@ export function buildPersonaTeamPrompt({
   const context = String(accumulatedContext || '').trim();
   const workflowSystem = roleLabel
     ? `\nPapel nesta rodada: ${roleLabel}.\nContrato do papel: ${roleInstruction}`
+    : '';
+  const individualSystem = independent
+    ? '\nEsta e uma resolucao com contexto limpo e individual. Voce nao recebeu nomes nem respostas dos demais participantes; responda sem presumir consenso ou complementar trabalho alheio.'
     : '';
   const workflowUser = roleLabel
     ? `
@@ -249,16 +274,72 @@ ${context || 'Ainda nao ha contexto acumulado; esta e a primeira etapa.'}
 ---
 Voce esta trabalhando dentro do modulo LUCA-AI, uma bancada isolada de personas do Yume.
 Nao publique no chat global, nao acione agentes fixos do Operacional e nao assuma que existe uma missao ativa fora desta tela.
-Responda em pt-BR, com postura de agente especialista e foco em acao concreta.${workflowSystem}`,
+Responda em pt-BR, com postura de agente especialista e foco em acao concreta.${workflowSystem}${individualSystem}`,
     user: `Missao desta bancada:
 ${mission}
 
-Equipe ativa: ${teammates}
+${independent ? '' : `Equipe ativa: ${teammates}\n`}
 Sua persona: ${name}${slug ? ` (${slug})` : ''}
 ${workflowUser}
 
 ${outputContract}`,
   };
+}
+
+export function buildIndividualJudgePrompt({
+  mission,
+  judgeName,
+  judgeSlug,
+  systemPrompt,
+  replies = [],
+}) {
+  const name = String(judgeName || judgeSlug || 'Juiz').trim();
+  const slug = String(judgeSlug || '').trim();
+  const basePrompt = String(systemPrompt || '').trim() || `Voce e a persona ${name}.`;
+  const contributions = replies.map((reply) => {
+    const author = `${reply?.name || reply?.slug || 'Participante'}${reply?.slug ? ` (${reply.slug})` : ''}`;
+    const content = reply?.ok
+      ? cleanPersonaTeamOutput(reply.content)
+      : `FALHA: ${String(reply?.error || 'sem resposta').trim()}`;
+    return `${author}: ${content}`;
+  }).join('\n\n');
+
+  return {
+    name,
+    system: `${basePrompt}
+
+---
+Voce e o juiz independente de uma resolucao individual no modulo LUCA-AI.
+Nao produza uma resposta isolada antes de examinar todas as contribuicoes recebidas.
+Avalie evidencias, utilidade, consistencia e cobertura. Nao favoreca uma persona por identidade, inclusive se voce tambem participou da primeira rodada.
+Responda em pt-BR e nao acione agentes, ferramentas ou contexto externo.`,
+    user: `Missao original:
+${mission}
+
+Persona juiza: ${name}${slug ? ` (${slug})` : ''}
+
+Contribuicoes individuais:
+${contributions || 'Nenhuma contribuicao utilizavel foi recebida.'}
+
+Produza obrigatoriamente estas secoes:
+1. Avaliacao dos participantes — diga o que foi util em cada resposta.
+2. Alertas de qualidade — identifique, por participante, qualquer trecho falso, nao sustentado ou incompleto. Se nao houver, diga explicitamente.
+3. Complementacao — combine o que for compativel e corrija as lacunas relevantes.
+4. Veredito final — apresente a melhor decisao final, sua justificativa e proximas acoes.`,
+  };
+}
+
+export async function runIndividualResolution({
+  participantSlugs = [],
+  judgeSlug,
+  runParticipant,
+  runJudge,
+}) {
+  const replies = await Promise.all(
+    participantSlugs.map((slug) => runParticipant({ slug })),
+  );
+  const judge = await runJudge({ slug: judgeSlug, replies });
+  return { replies, judge };
 }
 
 export function cleanPersonaTeamOutput(value) {

@@ -1,4 +1,10 @@
-import { ROUTER_API_KEY, ROUTER_BASE_URL, ROUTER_MODEL, ROUTER_TIMEOUT_MS } from './config.js';
+import {
+  ROUTER_API_KEY,
+  ROUTER_BASE_URL,
+  ROUTER_MODEL,
+  ROUTER_TIMEOUT_MS,
+  assertAllowed9RouterModel,
+} from './config.js';
 
 function extractChoiceContent(data) {
   return normalizeModelContent(
@@ -121,6 +127,7 @@ export function extractChatCompletionContent(payloadText) {
 }
 
 export async function call9Router({ system, user, agentId, model = ROUTER_MODEL, maxTokens = 1200 }) {
+  const route = assertAllowed9RouterModel(model);
   const headers = {
     'Content-Type': 'application/json',
   };
@@ -136,7 +143,7 @@ export async function call9Router({ system, user, agentId, model = ROUTER_MODEL,
       headers,
       signal: controller.signal,
       body: JSON.stringify({
-        model,
+        model: route,
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },

@@ -19,14 +19,14 @@ export default function GlobalChat() {
 
   return (
     <div className="void-panel rounded-2xl flex flex-col h-full overflow-hidden">
-      <header className="flex items-center gap-2 px-4 h-12 border-b shrink-0 min-w-0" style={{ borderColor: theme.border }}>
+      <header className="flex items-center gap-1.5 px-3 h-12 border-b shrink-0 min-w-0" style={{ borderColor: theme.border }}>
         <MessageSquare className="w-4 h-4" style={{ color: theme.gold, opacity: 0.8 }} />
-        <h3 className="text-[11px] font-semibold tracking-[0.2em] uppercase flex-1 min-w-0 luca-wrap" style={{ color: theme.textSoft }}>
+        <h3 className="text-[10px] font-semibold tracking-[0.12em] uppercase flex-1 min-w-0 truncate whitespace-nowrap" style={{ color: theme.textSoft }}>
           Comunicação
         </h3>
         <span
           className="text-[9px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full"
-          style={{ color: backendReady || cloudRuntime ? theme.alive : theme.error, border: `1px solid ${theme.border}` }}
+          style={{ color: backendReady || cloudRuntime ? theme.alive : theme.error, background: backendReady || cloudRuntime ? theme.aliveSoft : theme.errorBg }}
         >
           {cloudRuntime ? 'glm' : backendReady ? 'ao vivo' : 'offline'}
         </span>

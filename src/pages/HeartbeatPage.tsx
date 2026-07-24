@@ -64,7 +64,7 @@ export default function HeartbeatPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto px-8 py-8">
+    <div className="luca-page-shell h-full overflow-y-auto px-8 py-8">
       <div className="max-w-[1100px] mx-auto">
         <header className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">

@@ -5,11 +5,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { WebSocketServer } from 'ws';
 import {
+  API_RATE_LIMIT_MAX,
+  API_RATE_LIMIT_WINDOW_MS,
+  CLOUDFLARE_ACCESS_EMAILS,
+  HOST,
   PORT,
+  REQUIRE_CLOUDFLARE_ACCESS,
   AGENTS,
   AGENT_ALIASES,
+  ROUTER_BASE_URL,
   ROUTER_MODEL,
   MAESTRO_MODEL,
+  NINE_ROUTER_CAPABILITIES,
+  NINE_ROUTER_MODEL_PROFILES,
+  NINE_ROUTER_ROUTE_IDS,
   MAX_CLOSURE_ATTEMPTS,
   CONVERSATION_PARTNER_AGENT_ID,
 } from './config.js';
@@ -102,28 +111,75 @@ import { buildYumeMemoryEvent } from './yume-memory-event.js';
 import { runRuntimeReadinessChecks } from './runtime-readiness.js';
 import { buildKamuiYumeAvatarUrl, normalizeYumeAvatarPath, normalizeYumePersonasForLuca } from './persona-cards.js';
 import {
+  buildIndividualJudgePrompt,
   buildPersonaTeamPrompt,
   cleanPersonaTeamOutput,
   normalizePersonaTeamRunInput,
   PERSONA_WORKFLOW_ROLES,
+  runIndividualResolution,
 } from './persona-team.js';
 
 const app = express();
+app.disable('x-powered-by');
+app.set('trust proxy', 'loopback');
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  res.setHeader('Content-Security-Policy', "default-src 'self'; base-uri 'self'; connect-src 'self' ws: wss:; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; media-src 'self' blob:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'");
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   if (req.path.startsWith('/api/')) {
     res.setHeader('Cache-Control', 'no-store');
-  }
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(204);
-    return;
   }
   next();
 });
 app.use(express.json({ limit: '1mb' }));
+
+const rateBuckets = new Map();
+
+function requestIdentity(req) {
+  return String(req.headers['cf-connecting-ip'] || req.ip || req.socket.remoteAddress || 'unknown');
+}
+
+function isDirectLoopback(req) {
+  const address = String(req.socket.remoteAddress || '');
+  return !req.headers['cf-ray'] && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(address);
+}
+
+function requireCloudflareAccess(req, res, next) {
+  if (!REQUIRE_CLOUDFLARE_ACCESS || isDirectLoopback(req)) {
+    next();
+    return;
+  }
+  const email = String(req.headers['cf-access-authenticated-user-email'] || '').trim().toLowerCase();
+  const assertion = String(req.headers['cf-access-jwt-assertion'] || '').trim();
+  const emailAllowed = CLOUDFLARE_ACCESS_EMAILS.length === 0 || CLOUDFLARE_ACCESS_EMAILS.includes(email);
+  if (!email || !assertion || !emailAllowed) {
+    res.status(401).json({ ok: false, error: 'cloudflare_access_required' });
+    return;
+  }
+  next();
+}
+
+function rateLimitApi(req, res, next) {
+  const now = Date.now();
+  const key = requestIdentity(req);
+  const bucket = rateBuckets.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    rateBuckets.set(key, { count: 1, resetAt: now + API_RATE_LIMIT_WINDOW_MS });
+    next();
+    return;
+  }
+  bucket.count += 1;
+  if (bucket.count > API_RATE_LIMIT_MAX) {
+    res.setHeader('Retry-After', String(Math.max(1, Math.ceil((bucket.resetAt - now) / 1000))));
+    res.status(429).json({ ok: false, error: 'rate_limit_exceeded' });
+    return;
+  }
+  next();
+}
+
+app.use('/api', requireCloudflareAccess, rateLimitApi);
 
 const httpServer = createServer(app);
 const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
@@ -1646,7 +1702,7 @@ async function loadPersonaTeamPrompt(slug) {
     }
     return {
       name: data?.name || persona?.name || slug,
-      model: data?.model || persona?.model || '',
+      model: persona?.model || ROUTER_MODEL,
       systemPrompt: data?.system_prompt || '',
       version,
       cached: false,
@@ -1689,7 +1745,7 @@ function appendLucaAiTraceEvent(traceId, type, payload = {}) {
   }
 }
 
-async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, workflowRole = null, accumulatedContext = '', traceId = null }) {
+async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, workflowRole = null, accumulatedContext = '', independent = false, traceId = null }) {
   const name = loaded.name || slug;
   const model = loaded.model || ROUTER_MODEL;
   const prompt = buildPersonaTeamPrompt({
@@ -1700,6 +1756,7 @@ async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, wo
     teamNames,
     workflowRole,
     accumulatedContext,
+    independent,
   });
   const startedAt = new Date().toISOString();
   const startedMs = Date.now();
@@ -1760,6 +1817,93 @@ async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, wo
       model,
       roleId: workflowRole?.roleId || null,
       roleLabel,
+      durationMs,
+      error: summarizeLucaAiTraceText(error?.message || String(error), 240),
+    });
+    return {
+      ok: false,
+      slug,
+      name,
+      model,
+      version: loaded.version ?? null,
+      cached: Boolean(loaded.cached),
+      stale: Boolean(loaded.stale),
+      error: error?.message || String(error),
+      startedAt,
+      completedAt,
+      durationMs,
+    };
+  }
+}
+
+async function runLucaAiIndividualJudge({ slug, mission, replies, loaded, traceId = null }) {
+  const name = loaded.name || slug;
+  const model = loaded.model || ROUTER_MODEL;
+  const prompt = buildIndividualJudgePrompt({
+    mission,
+    judgeName: name,
+    judgeSlug: slug,
+    systemPrompt: loaded.systemPrompt,
+    replies,
+  });
+  const startedAt = new Date().toISOString();
+  const startedMs = Date.now();
+
+  appendLucaAiTraceEvent(traceId, 'luca_ai.llm.requested', {
+    slug,
+    name: prompt.name,
+    model,
+    roleId: 'judge',
+    roleLabel: 'Juiz',
+    inputSummary: summarizeLucaAiTraceText(prompt.user),
+    systemSummary: summarizeLucaAiTraceText(prompt.system, 180),
+    inputChars: prompt.user.length,
+    systemChars: prompt.system.length,
+  });
+
+  try {
+    const output = await call9Router({
+      system: prompt.system,
+      user: prompt.user,
+      agentId: `luca-ai-judge-${slug}`,
+      model,
+      maxTokens: 1400,
+    });
+    const completedAt = new Date().toISOString();
+    const durationMs = Date.now() - startedMs;
+    const content = cleanPersonaTeamOutput(output);
+    appendLucaAiTraceEvent(traceId, 'luca_ai.llm.completed', {
+      slug,
+      name: prompt.name,
+      model,
+      roleId: 'judge',
+      roleLabel: 'Juiz',
+      durationMs,
+      outputSummary: summarizeLucaAiTraceText(content, 520),
+      outputChars: content.length,
+    });
+    return {
+      ok: true,
+      slug,
+      name: prompt.name,
+      model,
+      version: loaded.version ?? null,
+      cached: Boolean(loaded.cached),
+      stale: Boolean(loaded.stale),
+      content,
+      startedAt,
+      completedAt,
+      durationMs,
+    };
+  } catch (error) {
+    const completedAt = new Date().toISOString();
+    const durationMs = Date.now() - startedMs;
+    appendLucaAiTraceEvent(traceId, 'luca_ai.llm.failed', {
+      slug,
+      name,
+      model,
+      roleId: 'judge',
+      roleLabel: 'Juiz',
       durationMs,
       error: summarizeLucaAiTraceText(error?.message || String(error), 240),
     });
@@ -2169,6 +2313,17 @@ app.get('/api/catalog/tools', (_req, res) => {
   res.json(buildToolCatalog());
 });
 
+app.get('/api/router/models', (_req, res) => {
+  res.json({
+    ok: true,
+    provider: '9router',
+    baseUrl: ROUTER_BASE_URL,
+    profiles: NINE_ROUTER_MODEL_PROFILES,
+    routeIds: NINE_ROUTER_ROUTE_IDS,
+    capabilities: NINE_ROUTER_CAPABILITIES,
+  });
+});
+
 app.get('/api/catalog/audit', (_req, res) => {
   res.json(buildCatalogAudit({
     endpointCatalog: buildEndpointCatalog(),
@@ -2399,7 +2554,10 @@ app.post('/api/luca-ai/persona-team/run', async (req, res) => {
     })) ?? [],
   });
 
-  const loaded = await Promise.all(input.slugs.map(async (slug) => {
+  const slugsToLoad = input.mode === 'individual'
+    ? [...new Set([...input.slugs, input.judgeSlug])]
+    : input.slugs;
+  const loaded = await Promise.all(slugsToLoad.map(async (slug) => {
     try {
       return { slug, loaded: await loadPersonaTeamPrompt(slug) };
     } catch (error) {
@@ -2410,6 +2568,7 @@ app.post('/api/luca-ai/persona-team/run', async (req, res) => {
   const loadedBySlug = new Map(loaded.map((entry) => [entry.slug, entry]));
   let steps = [];
   let replies = [];
+  let judgeReply = null;
 
   if (input.mode === 'workflow') {
     steps = await runLucaAiPersonaWorkflow({
@@ -2424,6 +2583,92 @@ app.post('/api/luca-ai/persona-team/run', async (req, res) => {
       workflowRoleId: step.roleId,
       workflowRoleLabel: step.roleLabel,
     })));
+  } else if (input.mode === 'individual') {
+    const individualStartedAt = new Date().toISOString();
+    const individualStartedMs = Date.now();
+    const result = await runIndividualResolution({
+      participantSlugs: input.slugs,
+      judgeSlug: input.judgeSlug,
+      runParticipant: ({ slug }) => {
+        const entry = loadedBySlug.get(slug);
+        if (!entry || entry.error) {
+          return Promise.resolve({
+            ok: false,
+            slug,
+            name: entry?.loaded?.name || slug,
+            model: entry?.loaded?.model || '',
+            version: null,
+            cached: false,
+            stale: false,
+            error: entry?.error || 'persona_not_loaded',
+          });
+        }
+        return runLucaAiPersonaTeamMember({
+          slug,
+          mission: input.mission,
+          teamNames,
+          loaded: entry.loaded,
+          independent: true,
+          traceId: input.traceId,
+        });
+      },
+      runJudge: ({ slug, replies: participantReplies }) => {
+        const entry = loadedBySlug.get(slug);
+        if (!entry || entry.error) {
+          return Promise.resolve({
+            ok: false,
+            slug,
+            name: entry?.loaded?.name || slug,
+            model: entry?.loaded?.model || '',
+            version: null,
+            cached: false,
+            stale: false,
+            error: entry?.error || 'judge_not_loaded',
+          });
+        }
+        return runLucaAiIndividualJudge({
+          slug,
+          mission: input.mission,
+          replies: participantReplies,
+          loaded: entry.loaded,
+          traceId: input.traceId,
+        });
+      },
+    });
+    replies = result.replies;
+    judgeReply = result.judge;
+    const participantsCompletedAt = replies.reduce((latest, reply) => (
+      String(reply.completedAt || '') > latest ? String(reply.completedAt) : latest
+    ), individualStartedAt);
+    steps = [
+      {
+        id: 'individual-responses',
+        roleId: 'participants',
+        roleLabel: 'Respostas individuais',
+        participants: input.slugs.map((slug) => {
+          const entry = loadedBySlug.get(slug);
+          return { slug, name: entry?.loaded?.name || slug, model: entry?.loaded?.model || '' };
+        }),
+        replies,
+        startedAt: individualStartedAt,
+        completedAt: participantsCompletedAt,
+        durationMs: Math.max(0, new Date(participantsCompletedAt).getTime() - individualStartedMs),
+      },
+      {
+        id: 'judge',
+        roleId: 'judge',
+        roleLabel: 'Juiz',
+        participants: [{
+          slug: input.judgeSlug,
+          name: loadedBySlug.get(input.judgeSlug)?.loaded?.name || input.judgeSlug,
+          model: loadedBySlug.get(input.judgeSlug)?.loaded?.model || '',
+        }],
+        replies: [judgeReply],
+        startedAt: judgeReply?.startedAt || participantsCompletedAt,
+        completedAt: judgeReply?.completedAt || new Date().toISOString(),
+        durationMs: judgeReply?.durationMs || 0,
+      },
+    ];
   } else {
     replies = await Promise.all(loaded.map((entry) => {
       if (entry.error) {
@@ -2447,22 +2692,27 @@ app.post('/api/luca-ai/persona-team/run', async (req, res) => {
       });
     }));
   }
-  const finalDisplayStep = steps.find((step) => step.roleId === 'display') || null;
-  const finalDisplayReply = finalDisplayStep?.replies.find((reply) => reply.ok) || null;
+  const finalDisplayStep = steps.find((step) => step.roleId === 'display' || step.roleId === 'judge') || null;
+  const finalDisplayReply = input.mode === 'individual'
+    ? judgeReply?.ok ? judgeReply : null
+    : finalDisplayStep?.replies.find((reply) => reply.ok) || null;
   const generatedAt = new Date().toISOString();
   const durationMs = Date.now() - runStartedMs;
+  const runOk = input.mode === 'individual'
+    ? Boolean(judgeReply?.ok && replies.some((reply) => reply.ok))
+    : replies.some((reply) => reply.ok);
 
   appendLucaAiTraceEvent(input.traceId, 'luca_ai.workflow.completed', {
     mode: input.mode,
     durationMs,
-    ok: replies.some((reply) => reply.ok),
+    ok: runOk,
     okCount: replies.filter((reply) => reply.ok).length,
     errorCount: replies.filter((reply) => !reply.ok).length,
     finalDisplaySlug: finalDisplayReply?.slug || null,
   });
 
   res.json({
-    ok: replies.some((reply) => reply.ok),
+    ok: runOk,
     traceId: input.traceId,
     mission: input.mission,
     mode: input.mode,
@@ -2476,6 +2726,7 @@ app.post('/api/luca-ai/persona-team/run', async (req, res) => {
       error: entry.error || null,
     })),
     replies,
+    judge: judgeReply,
     steps,
     finalDisplay: finalDisplayReply ? {
       roleId: finalDisplayStep.roleId,
@@ -2752,8 +3003,8 @@ wss.on('connection', (socket) => {
   socket.send(JSON.stringify({ kind: 'state', state: publicStateSnapshot() }));
 });
 
-httpServer.listen(PORT, '0.0.0.0', () => {
+httpServer.listen(PORT, HOST, () => {
   startHeartbeatMonitor();
   startScheduler();
-  console.log(`LUCA backend em http://127.0.0.1:${PORT}`);
+  console.log(`LUCA backend em http://${HOST}:${PORT}`);
 });

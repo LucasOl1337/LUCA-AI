@@ -34,14 +34,14 @@ export default function ReportModal({ dashboard, mission, reportContext, buttonC
 
   const modal = open ? (
     <div
-      className="fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto px-3 py-4 sm:items-center sm:p-6"
-      style={{ background: 'rgba(9, 18, 14, 0.55)' }}
+      className="luca-modal-layer fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto px-3 py-4 sm:items-center sm:p-6"
+      style={{ background: 'rgba(2, 5, 9, 0.72)', backdropFilter: 'blur(8px)' }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="mission-report-title"
     >
       <div
-        className="void-panel w-full max-w-4xl max-h-[calc(100dvh-2rem)] rounded-xl flex flex-col overflow-hidden sm:max-h-[calc(100dvh-3rem)]"
+        className="luca-sheet void-panel w-full max-w-4xl max-h-[calc(100dvh-2rem)] rounded-xl flex flex-col overflow-hidden sm:max-h-[calc(100dvh-3rem)]"
         style={{ borderColor: theme.borderHover }}
       >
         <header className="flex flex-col gap-3 px-4 py-3 border-b shrink-0 sm:flex-row sm:items-center sm:px-5" style={{ borderColor: theme.border }}>
@@ -71,7 +71,7 @@ export default function ReportModal({ dashboard, mission, reportContext, buttonC
         <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5">
           <pre
             className="luca-pre m-0 max-w-full overflow-x-hidden text-sm leading-relaxed font-sans"
-            style={{ color: theme.text, background: theme.input, border: `1px solid ${theme.border}`, borderRadius: 8, padding: 16 }}
+            style={{ color: theme.text, background: theme.input, borderRadius: 12, padding: 16 }}
           >
             {markdown}
           </pre>

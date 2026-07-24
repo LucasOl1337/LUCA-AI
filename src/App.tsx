@@ -1,43 +1,39 @@
-import { useState } from 'react';
+import { useEffect } from 'react';
 import Layout, { type PageId } from '@/components/Layout';
 import LandingPage from '@/pages/LandingPage';
-import OperacionalPage from '@/pages/OperacionalPage';
 import LucaAiPage from '@/pages/LucaAiPage';
-import AgentesPage from '@/pages/AgentesPage';
 import PersonasPage from '@/pages/PersonasPage';
-import DatabasePage from '@/pages/DatabasePage';
-import HeartbeatPage from '@/pages/HeartbeatPage';
-import HistoricoPage from '@/pages/HistoricoPage';
-import EndpointsPage from '@/pages/EndpointsPage';
-import ToolsPage from '@/pages/ToolsPage';
-import AgentTerminal from '@/components/AgentTerminal';
 import { usePersistentState } from '@/hooks/usePersistentState';
 
+const ACTIVE_PAGES: readonly PageId[] = ['inicio', 'luca-ai', 'personas'];
+
+function isPageId(value: string): value is PageId {
+  return ACTIVE_PAGES.includes(value as PageId);
+}
+
 export default function App() {
-  const [activePage, setActivePage] = usePersistentState<PageId>('activePage', 'inicio');
-  // Terminal de agente aberto — compartilhado entre as páginas Operacional e Agentes.
-  const [activeAgent, setActiveAgent] = useState<string | null>(null);
+  const [storedPage, setStoredPage] = usePersistentState<string>('activePage', 'inicio');
+  const activePage: PageId = isPageId(storedPage) ? storedPage : 'inicio';
+
+  useEffect(() => {
+    if (storedPage !== activePage) setStoredPage(activePage);
+  }, [activePage, setStoredPage, storedPage]);
+
+  function navigate(page: PageId) {
+    setStoredPage(page);
+  }
 
   const renderPage = () => {
     switch (activePage) {
-      case 'inicio':      return <LandingPage onNavigate={setActivePage} />;
-      case 'operacional': return <OperacionalPage onOpenAgent={setActiveAgent} activeAgent={activeAgent} onNavigate={setActivePage} />;
-      case 'luca-ai':     return <LucaAiPage />;
-      case 'agentes':     return <AgentesPage onOpenAgent={setActiveAgent} activeAgent={activeAgent} onNavigate={setActivePage} />;
+      case 'inicio':      return <LandingPage onNavigate={navigate} />;
+      case 'luca-ai':     return <LucaAiPage onNavigate={navigate} />;
       case 'personas':    return <PersonasPage />;
-      case 'database':    return <DatabasePage />;
-      case 'ferramentas': return <ToolsPage />;
-      case 'endpoints':   return <EndpointsPage />;
-      case 'heartbeat':   return <HeartbeatPage />;
-      case 'historico':   return <HistoricoPage />;
-      default:            return <LandingPage onNavigate={setActivePage} />;
     }
   };
 
   return (
-    <Layout activePage={activePage} onPageChange={setActivePage}>
+    <Layout activePage={activePage} onPageChange={navigate}>
       {renderPage()}
-      <AgentTerminal activeAgent={activeAgent} onClose={() => setActiveAgent(null)} />
     </Layout>
   );
 }

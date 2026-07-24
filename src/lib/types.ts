@@ -80,7 +80,7 @@ export interface LucaAiPersonaTeamRunResponse {
   ok: boolean;
   traceId?: string;
   mission: string;
-  mode?: 'parallel' | 'workflow' | string;
+  mode?: 'parallel' | 'workflow' | 'individual' | string;
   team: Array<{
     slug: string;
     name: string;
@@ -91,6 +91,7 @@ export interface LucaAiPersonaTeamRunResponse {
     error?: string | null;
   }>;
   replies: LucaAiPersonaTeamReply[];
+  judge?: LucaAiPersonaTeamReply | null;
   steps?: LucaAiPersonaTeamStep[];
   finalDisplay?: {
     roleId: string;

@@ -6,6 +6,8 @@ Leia SOMENTE ao mudar roteador LLM, Kamui, personas Yume ou a ponte local do mod
 
 `server/router-client.js` usa uma API compativel com OpenAI. O padrao e `http://127.0.0.1:20128/v1`.
 
+`server/config.js` mantem o catalogo fechado do 9Router: 14 perfis visuais resolvem para 12 IDs de rota. Perfis Ultra sao aliases das respectivas rotas `-xhigh`; o cliente nao envia campos de esforco ou raciocinio. `GET /api/router/models` expoe esse catalogo e as capacidades declaradas pelo runtime local, sem credenciais.
+
 | Variavel | Uso |
 | --- | --- |
 | `ROUTER_BASE_URL` | Base do roteador local. |
@@ -13,6 +15,12 @@ Leia SOMENTE ao mudar roteador LLM, Kamui, personas Yume ou a ponte local do mod
 | `ROUTER_MODEL` | Modelo dos agentes comuns. |
 | `MISSION_TRANSFORMER_MODEL`, `DESIGNER_MODEL`, `MAESTRO_MODEL` | Modelos dos papeis especializados. |
 | `ROUTER_TIMEOUT_MS` | Timeout das chamadas. |
+
+Valores de modelo vindos do ambiente, do estado local ou de personas Yume sao aceitos somente quando correspondem a um dos 12 IDs do catalogo 9Router. Uma rota externa nunca e encaminhada ao provider.
+
+Ao importar uma persona, o LUCA preserva nome, prompt e versao lidos do Yume, mas normaliza a rota somente no estado local. O modelo remoto do Yume nao substitui nem aparece como configuracao do provider 9Router.
+
+`POST /api/luca-ai/persona-team/run` oferece dois modos visiveis. `workflow` encadeia os papeis da equipe; `individual` executa de uma a cinco personas em contextos isolados e chama depois uma persona juiza com todas as respostas. O juiz pode repetir uma persona participante, mas sempre usa uma chamada separada.
 
 ## Kamui e Yume
 

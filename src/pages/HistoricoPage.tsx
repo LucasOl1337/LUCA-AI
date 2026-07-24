@@ -44,7 +44,7 @@ export default function HistoricoPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto px-8 py-8">
+    <div className="luca-page-shell h-full overflow-y-auto px-8 py-8">
       <div className="max-w-[1100px] mx-auto space-y-8">
         <header>
           <h1 className="void-title text-3xl">Histórico</h1>
@@ -149,7 +149,7 @@ export default function HistoricoPage() {
 
         {openReportFor && (
           <div
-            className="fixed inset-0 z-40 bg-black/65 flex items-center justify-center p-4"
+            className="luca-modal-layer fixed inset-0 z-40 bg-black/65 flex items-center justify-center p-4"
             onClick={() => setOpenReportFor(null)}
           >
             {(() => {
@@ -158,8 +158,7 @@ export default function HistoricoPage() {
               const reportText = reportFrom(selected);
               return (
                 <div
-                  className="w-full max-w-3xl max-h-[85vh] overflow-hidden rounded-2xl border p-4"
-                  style={{ background: theme.void, borderColor: theme.border }}
+                  className="luca-sheet void-panel w-full max-w-3xl max-h-[85vh] overflow-hidden rounded-2xl p-4"
                   onClick={(event) => event.stopPropagation()}
                   role="dialog"
                   aria-modal="true"

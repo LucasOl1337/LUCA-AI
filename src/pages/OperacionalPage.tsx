@@ -3,12 +3,11 @@ import SupervisorLog from '@/components/SupervisorLog';
 import MissionCanvas from '@/components/MissionCanvas';
 import GlobalChat from '@/components/GlobalChat';
 import MissionBar from '@/components/MissionBar';
-import type { PageId } from '@/components/Layout';
 
 interface OperacionalPageProps {
   activeAgent: string | null;
   onOpenAgent: (id: string | null) => void;
-  onNavigate: (page: PageId) => void;
+  onNavigate: (page: 'database') => void;
 }
 
 /**

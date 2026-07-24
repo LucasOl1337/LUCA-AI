@@ -139,7 +139,7 @@ export default function ToolsPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto px-8 py-8">
+    <div className="luca-page-shell h-full overflow-y-auto px-8 py-8">
       <div className="mx-auto max-w-[1240px] space-y-6">
         <header className="void-panel rounded-[28px] p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">

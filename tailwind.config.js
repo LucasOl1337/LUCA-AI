@@ -7,22 +7,22 @@ export default {
   theme: {
     extend: {
       colors: {
-        // LUC.AI — Cerrado: pergaminho + verde floresta + sienna
-        void:    '#f2e8d8',
-        void2:   '#e9ddc8',
-        navy:    '#1a5c3a',
-        'navy-deep': '#0f3d24',
-        gold:    '#8b5a2b',
-        'gold-bright': '#b07840',
-        fleet:   '#2d6a4f',
-        alive:   '#2f9e6a',
-        cream:   '#f2e8d8',
+        // LUC.AI — dark liquid glass + cores semânticas operacionais
+        void:    '#090c11',
+        void2:   '#0f131a',
+        navy:    '#0a84ff',
+        'navy-deep': '#64d2ff',
+        gold:    '#0a84ff',
+        'gold-bright': '#64d2ff',
+        fleet:   '#bf5af2',
+        alive:   '#30d158',
+        cream:   'rgba(255, 255, 255, 0.94)',
       },
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
-        display: ['Jost', 'Futura', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
-        jp: ['"Noto Serif JP"', 'serif'],
+        jp: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       animation: {
         'spiral-slow': 'spiral 90s linear infinite',

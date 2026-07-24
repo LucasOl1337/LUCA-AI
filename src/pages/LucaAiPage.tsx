@@ -1,27 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertCircle,
   BrainCircuit,
   CheckCircle2,
+  ChevronDown,
   ClipboardCheck,
   Eye,
   GitBranch,
   Loader2,
   MessageSquareText,
-  Network,
   Play,
   Plus,
-  Radio,
   RefreshCw,
   RotateCcw,
   Search,
+  Scale,
   ShieldCheck,
   Target,
   Terminal,
-  Trash2,
   UserRound,
-  UserPlus,
+  Users,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -39,17 +38,35 @@ import { useTheme } from '@/hooks/useTheme';
 
 const LOCAL_LUCA_BRIDGE_URL = 'http://127.0.0.1:4242';
 const MAX_EXECUTORS = 4;
+const LUCA_AI_CLEAN_UI_VERSION = '9router-clean-v1';
+const LUCA_AI_CLEAN_UI_STORAGE_KEY = 'luca.lucaAi.cleanUiVersion';
+
+interface LucaAiPageProps {
+  onNavigate: (page: 'personas') => void;
+}
 
 type TranscriptRole = 'operator' | 'persona' | 'system';
+type OperationMode = 'team' | 'individual';
 type WorkflowRoleId = 'supervisor' | 'mission' | 'execution' | 'approval' | 'display';
 type WorkflowAssignments = Record<WorkflowRoleId, string[]>;
+type IndividualPickerId = 'participants' | 'judge';
+type PickerTarget = { mode: 'team'; id: WorkflowRoleId } | { mode: 'individual'; id: IndividualPickerId };
 
-interface WorkflowRoleConfig {
-  id: WorkflowRoleId;
+interface IndividualAssignments {
+  participants: string[];
+  judge: string | null;
+}
+
+interface PersonaPickerConfig {
+  id: string;
   label: string;
   icon: LucideIcon;
   multiple: boolean;
   maxSlugs: number;
+}
+
+interface WorkflowRoleConfig extends PersonaPickerConfig {
+  id: WorkflowRoleId;
 }
 
 interface TeamTranscriptEntry {
@@ -65,9 +82,12 @@ interface TeamTranscriptEntry {
 }
 
 type MessageBlock =
-  | { kind: 'heading'; label: string }
+  | { kind: 'heading'; label: string; level: number }
   | { kind: 'bullet'; label?: string; body: string }
-  | { kind: 'paragraph'; label?: string; body: string };
+  | { kind: 'paragraph'; label?: string; body: string }
+  | { kind: 'table'; headers: string[]; rows: string[][] }
+  | { kind: 'code'; language?: string; body: string }
+  | { kind: 'image'; alt: string; src: string };
 
 interface InlineTextPart {
   text: string;
@@ -81,6 +101,11 @@ const WORKFLOW_ROLES: WorkflowRoleConfig[] = [
   { id: 'approval', label: 'Aprovacao', icon: ClipboardCheck, multiple: false, maxSlugs: 1 },
   { id: 'display', label: 'Exibicao final', icon: Eye, multiple: false, maxSlugs: 1 },
 ];
+
+const INDIVIDUAL_PICKER_CONFIGS: Record<IndividualPickerId, PersonaPickerConfig> = {
+  participants: { id: 'participants', label: 'Participantes', icon: Users, multiple: true, maxSlugs: 5 },
+  judge: { id: 'judge', label: 'Juiz', icon: Scale, multiple: false, maxSlugs: 1 },
+};
 
 const ROLE_LABEL_BY_ID = new Map(WORKFLOW_ROLES.map((role) => [role.id, role.label]));
 
@@ -117,21 +142,6 @@ function normalizeWorkflowAssignments(value: Partial<Record<WorkflowRoleId, unkn
   return next;
 }
 
-function buildSeedWorkflow(slugs: string[]): WorkflowAssignments {
-  const unique = uniqueSlugs(slugs);
-  const first = unique[0];
-  const second = unique[1] || first;
-  const third = unique[2] || first;
-  const last = unique[unique.length - 1] || first;
-  return {
-    supervisor: first ? [first] : [],
-    mission: second ? [second] : [],
-    execution: unique.slice(0, MAX_EXECUTORS),
-    approval: third ? [third] : [],
-    display: last ? [last] : [],
-  };
-}
-
 function workflowAssignmentsEqual(a: WorkflowAssignments, b: WorkflowAssignments): boolean {
   return WORKFLOW_ROLES.every((role) => {
     const left = a[role.id];
@@ -153,12 +163,6 @@ function workflowPayload(assignments: WorkflowAssignments): LucaAiWorkflowAssign
     roleId: role.id,
     slugs: assignments[role.id],
   }));
-}
-
-function roleLabelsForSlug(assignments: WorkflowAssignments, slug: string): string[] {
-  return WORKFLOW_ROLES
-    .filter((role) => assignments[role.id].includes(slug))
-    .map((role) => role.label);
 }
 
 function withBaseUrl(value: string | undefined, base: string | undefined): string | undefined {
@@ -239,65 +243,92 @@ function parseLabelledText(value: string): { label?: string; body: string } {
 }
 
 function parseMessageBlocks(value: string): MessageBlock[] {
-  const normalized = String(value || '')
-    .replace(/\r/g, '')
-    .replace(/\n{3,}/g, '\n\n');
-  const lines = normalized
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter((line) => Boolean(line) && !/^[-*_]{3,}$/.test(line));
+  const lines = String(value || '').replace(/\r/g, '').split('\n');
+  const blocks: MessageBlock[] = [];
+  const markdownCells = (line: string) => line
+    .replace(/^\s*\|/, '')
+    .replace(/\|\s*$/, '')
+    .split('|')
+    .map((cell) => stripOuterMarkdown(cell.trim()));
+  const isTableDivider = (line: string) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line);
 
-  if (!lines.length) return [{ kind: 'paragraph', body: 'Sem conteudo textual.' }];
-
-  const blocks = lines.map((line): MessageBlock | null => {
-    const heading = line.match(/^#{1,4}\s+(.+)$/);
-    if (heading) {
-      return { kind: 'heading', label: stripOuterMarkdown(heading[1]) };
+  for (let index = 0; index < lines.length;) {
+    const line = lines[index].trim();
+    if (!line || /^[-*_]{3,}$/.test(line)) {
+      index += 1;
+      continue;
     }
 
-    if (/^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?$/.test(line)) {
-      return null;
-    }
-
-    if (line.startsWith('|') && line.endsWith('|')) {
-      const cells = line
-        .split('|')
-        .map((cell) => stripOuterMarkdown(cell.trim()))
-        .filter(Boolean);
-      if (cells.length >= 2) {
-        return {
-          kind: 'bullet',
-          label: cells[0],
-          body: cells.slice(1).join(' - '),
-        };
+    const codeStart = line.match(/^```([\w-]+)?\s*$/);
+    if (codeStart) {
+      const code: string[] = [];
+      index += 1;
+      while (index < lines.length && !/^```\s*$/.test(lines[index].trim())) {
+        code.push(lines[index]);
+        index += 1;
       }
+      blocks.push({ kind: 'code', language: codeStart[1], body: code.join('\n') });
+      index += 1;
+      continue;
+    }
+
+    if (line.includes('|') && index + 1 < lines.length && isTableDivider(lines[index + 1])) {
+      const headers = markdownCells(line);
+      const rows: string[][] = [];
+      index += 2;
+      while (index < lines.length) {
+        const row = lines[index].trim();
+        if (!row || !row.includes('|')) break;
+        rows.push(markdownCells(row));
+        index += 1;
+      }
+      blocks.push({ kind: 'table', headers, rows });
+      continue;
+    }
+
+    const image = line.match(/^!\[([^\]]*)\]\((https?:\/\/[^\s)]+|\/[^\s)]+)\)$/i);
+    if (image) {
+      blocks.push({ kind: 'image', alt: image[1] || 'Imagem da entrega', src: image[2] });
+      index += 1;
+      continue;
+    }
+
+    const heading = line.match(/^(#{1,4})\s+(.+)$/);
+    if (heading) {
+      blocks.push({ kind: 'heading', label: stripOuterMarkdown(heading[2]), level: heading[1].length });
+      index += 1;
+      continue;
     }
 
     const bullet = line.match(/^(?:[-*]|•)\s+(.+)$/);
-    const source = bullet ? bullet[1].trim() : line;
+    const ordered = line.match(/^(\d+)[.)]\s+(.+)$/);
+    const source = bullet ? bullet[1].trim() : ordered ? ordered[2].trim() : line;
     const labelled = parseLabelledText(source);
     const body = stripOuterMarkdown(labelled.body);
 
-    if (bullet) {
-      return {
+    if (bullet || ordered) {
+      blocks.push({
         kind: 'bullet',
-        label: labelled.label,
+        label: ordered ? String(ordered[1]).padStart(2, '0') : labelled.label,
         body: body || labelled.label || source,
-      };
+      });
+      index += 1;
+      continue;
     }
 
     if (labelled.label && !body) {
-      return { kind: 'heading', label: labelled.label };
+      blocks.push({ kind: 'heading', label: labelled.label, level: 3 });
+    } else {
+      blocks.push({ kind: 'paragraph', label: labelled.label, body: body || source });
     }
+    index += 1;
+  }
 
-    return {
-      kind: 'paragraph',
-      label: labelled.label,
-      body: body || source,
-    };
-  });
+  return blocks.length ? blocks : [{ kind: 'paragraph', body: 'Sem conteúdo textual.' }];
+}
 
-  return blocks.filter((block): block is MessageBlock => Boolean(block));
+function createEmptyIndividualAssignments(): IndividualAssignments {
+  return { participants: [], judge: null };
 }
 
 function inlineTextParts(value: string): InlineTextPart[] {
@@ -333,17 +364,6 @@ function compactText(value: unknown, maxLength = 220): string {
     .trim();
   if (!text) return '';
   return text.length > maxLength ? `${text.slice(0, maxLength - 1)}...` : text;
-}
-
-function modelLabel(value: unknown): string {
-  return String(value || 'modelo n/d').trim();
-}
-
-function roleModelSummary(personas: YumePersonaSummary[]): string {
-  const models = Array.from(new Set(personas.map((persona) => modelLabel(persona.model)).filter(Boolean)));
-  if (!models.length) return 'modelo n/d';
-  if (models.length === 1) return models[0];
-  return `${models[0]} +${models.length - 1}`;
 }
 
 function runtimePayload(event: RuntimeEvent): Record<string, unknown> {
@@ -443,12 +463,12 @@ function plannedRuntimeEvents(traceId: string, mission: string, assignments: Wor
   return events;
 }
 
-export default function LucaAiPage() {
-  const theme = useTheme();
-  const { runtimeMode } = useLuca();
+export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
+  const { runtimeMode, refresh } = useLuca();
   const [personas, setPersonas] = useState<YumePersonaSummary[]>([]);
-  const [legacyTeamSlugs] = usePersistentState<string[]>('lucaAi.teamSlugs', []);
+  const [operationMode, setOperationMode] = usePersistentState<OperationMode>('lucaAi.operationMode', 'team');
   const [workflowState, setWorkflowState] = usePersistentState<WorkflowAssignments>('lucaAi.workflowAssignments', createEmptyWorkflowAssignments());
+  const [individualState, setIndividualState] = usePersistentState<IndividualAssignments>('lucaAi.individualAssignments', createEmptyIndividualAssignments());
   const [mission, setMission] = usePersistentState<string>('lucaAi.missionDraft', '');
   const [transcript, setTranscript] = usePersistentState<TeamTranscriptEntry[]>('lucaAi.transcript', []);
   const [finalResult, setFinalResult] = usePersistentState<TeamTranscriptEntry | null>('lucaAi.finalResult', null);
@@ -459,13 +479,27 @@ export default function LucaAiPage() {
   const [activePersonaSlug, setActivePersonaSlug] = usePersistentState<string | null>('lucaAi.activePersonaSlug', null);
   const [activeTraceId, setActiveTraceId] = useState<string | null>(null);
   const [processEvents, setProcessEvents] = useState<RuntimeEvent[]>([]);
+  const [activeWorkspaceView, setActiveWorkspaceView] = useState<'result' | 'activity'>('result');
+  const [teamPanelOpen, setTeamPanelOpen] = useState(true);
+  const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
+  const [busyPersonaSlug, setBusyPersonaSlug] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
 
   const bridgeBase = runtimeMode === 'cloud' ? LOCAL_LUCA_BRIDGE_URL : undefined;
   const assignments = useMemo(() => normalizeWorkflowAssignments(workflowState), [workflowState]);
   const assignedSlugs = useMemo(() => flattenWorkflowAssignments(assignments), [assignments]);
+  const individualAssignments = useMemo<IndividualAssignments>(() => ({
+    participants: uniqueSlugs(Array.isArray(individualState?.participants) ? individualState.participants : [], 5),
+    judge: String(individualState?.judge || '').trim() || null,
+  }), [individualState]);
+  const individualConfiguredSlugs = useMemo(() => uniqueSlugs([
+    ...individualAssignments.participants,
+    individualAssignments.judge,
+  ]), [individualAssignments]);
+  const configuredSlugs = operationMode === 'individual' ? individualConfiguredSlugs : assignedSlugs;
   const readyRoles = useMemo(() => WORKFLOW_ROLES.filter((role) => assignments[role.id].length > 0).length, [assignments]);
   const isWorkflowReady = useMemo(() => workflowReady(assignments), [assignments]);
+  const isIndividualReady = individualAssignments.participants.length > 0 && Boolean(individualAssignments.judge);
 
   const loadPersonas = useCallback(async () => {
     setLoading(true);
@@ -488,23 +522,29 @@ export default function LucaAiPage() {
   }, [loadPersonas]);
 
   useEffect(() => {
+    if (window.localStorage.getItem(LUCA_AI_CLEAN_UI_STORAGE_KEY) === LUCA_AI_CLEAN_UI_VERSION) return;
+    setTranscript([]);
+    setFinalResult(null);
+    setProcessEvents([]);
+    setActiveTraceId(null);
+    window.localStorage.setItem(LUCA_AI_CLEAN_UI_STORAGE_KEY, LUCA_AI_CLEAN_UI_VERSION);
+  }, [setFinalResult, setTranscript]);
+
+  useEffect(() => {
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight, behavior: 'smooth' });
   }, [transcript.length, running, finalResult?.id]);
 
-  const importedPersonas = useMemo(() => personas.filter((persona) => persona.imported), [personas]);
-  const importedSlugs = useMemo(() => importedPersonas.map((persona) => persona.slug), [importedPersonas]);
-  const importedSlugsKey = useMemo(() => importedSlugs.join('|'), [importedSlugs]);
-  const personaBySlug = useMemo(() => new Map(importedPersonas.map((persona) => [persona.slug, persona])), [importedPersonas]);
+  const personaBySlug = useMemo(() => new Map(personas.map((persona) => [persona.slug, persona])), [personas]);
 
   useEffect(() => {
-    if (!assignedSlugs.length) {
+    if (!configuredSlugs.length) {
       if (activePersonaSlug) setActivePersonaSlug(null);
       return;
     }
-    if (!activePersonaSlug || !assignedSlugs.includes(activePersonaSlug)) {
-      setActivePersonaSlug(assignedSlugs[0]);
+    if (!activePersonaSlug || !configuredSlugs.includes(activePersonaSlug)) {
+      setActivePersonaSlug(configuredSlugs[0]);
     }
-  }, [activePersonaSlug, assignedSlugs, setActivePersonaSlug]);
+  }, [activePersonaSlug, configuredSlugs, setActivePersonaSlug]);
 
   useEffect(() => {
     if (!activeTraceId || !running) return undefined;
@@ -531,54 +571,76 @@ export default function LucaAiPage() {
 
   useEffect(() => {
     if (loading || !personas.length) return;
-    const importedSet = new Set(importedSlugs);
+    const availableSet = new Set(personas.map((persona) => persona.slug));
     setWorkflowState((prev) => {
       const normalized = normalizeWorkflowAssignments(prev);
-      let next = createEmptyWorkflowAssignments();
+      const next = createEmptyWorkflowAssignments();
       for (const role of WORKFLOW_ROLES) {
         next[role.id] = normalized[role.id]
-          .filter((slug) => importedSet.has(slug))
+          .filter((slug) => availableSet.has(slug))
           .slice(0, role.maxSlugs);
       }
-
-      const hasAnyAssignment = WORKFLOW_ROLES.some((role) => next[role.id].length > 0);
-      if (!hasAnyAssignment) {
-        const seedSource = legacyTeamSlugs.filter((slug) => importedSet.has(slug));
-        next = buildSeedWorkflow(seedSource.length ? seedSource : importedSlugs);
-      }
-
       return workflowAssignmentsEqual(normalized, next) ? prev : next;
     });
-  }, [importedSlugs, importedSlugsKey, legacyTeamSlugs, loading, personas.length, setWorkflowState]);
+  }, [loading, personas, setWorkflowState]);
 
-  const filteredPersonas = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    return importedPersonas.filter((persona) => {
-      if (!term) return true;
-      return [persona.name, persona.slug, persona.description, persona.purpose, persona.model]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term));
+  useEffect(() => {
+    if (loading || !personas.length) return;
+    const availableSet = new Set(personas.map((persona) => persona.slug));
+    setIndividualState((prev) => {
+      const participants = uniqueSlugs(
+        (Array.isArray(prev?.participants) ? prev.participants : []).filter((slug) => availableSet.has(slug)),
+        5,
+      );
+      const judge = availableSet.has(String(prev?.judge || '')) ? String(prev.judge) : null;
+      if (participants.join('|') === (prev?.participants || []).join('|') && judge === (prev?.judge || null)) return prev;
+      return { participants, judge };
     });
-  }, [importedPersonas, query]);
+  }, [loading, personas, setIndividualState]);
 
-  const canRun = mission.trim().length > 0 && isWorkflowReady && !running;
+  const canRun = mission.trim().length > 0
+    && (operationMode === 'individual' ? isIndividualReady : isWorkflowReady)
+    && !running;
 
-  function setSingleRole(roleId: WorkflowRoleId, slug: string) {
+  async function ensurePersonaImported(slug: string): Promise<boolean> {
+    const persona = personaBySlug.get(slug);
+    if (!persona || persona.imported) return Boolean(persona);
+    setBusyPersonaSlug(slug);
+    setError(null);
+    try {
+      await lucaApi.importYumePersona(slug, bridgeBase);
+      const data = await lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined);
+      setPersonas(normalizePersonaAssetUrls(data.personas ?? [], bridgeBase));
+      if (runtimeMode === 'backend') await refresh();
+      return true;
+    } catch (err) {
+      setError(buildApiErrorMessage(err, `Falha ao conectar ${persona.name || slug} ao LUCA.`));
+      return false;
+    } finally {
+      setBusyPersonaSlug(null);
+    }
+  }
+
+  async function setSingleRole(roleId: WorkflowRoleId, slug: string) {
+    if (slug && !(await ensurePersonaImported(slug))) return;
     setWorkflowState((prev) => {
       const next = normalizeWorkflowAssignments(prev);
       next[roleId] = slug ? [slug] : [];
       return next;
     });
+    if (slug) setActivePersonaSlug(slug);
   }
 
-  function addRoleSlug(roleId: WorkflowRoleId, slug: string) {
+  async function addRoleSlug(roleId: WorkflowRoleId, slug: string) {
     const role = WORKFLOW_ROLES.find((item) => item.id === roleId);
     if (!role || !slug) return;
+    if (!(await ensurePersonaImported(slug))) return;
     setWorkflowState((prev) => {
       const next = normalizeWorkflowAssignments(prev);
       next[roleId] = uniqueSlugs([...next[roleId], slug], role.maxSlugs);
       return next;
     });
+    setActivePersonaSlug(slug);
   }
 
   function removeRoleSlug(roleId: WorkflowRoleId, slug: string) {
@@ -593,6 +655,35 @@ export default function LucaAiPage() {
     setWorkflowState(createEmptyWorkflowAssignments());
   }
 
+  async function addIndividualParticipant(slug: string) {
+    if (!slug || !(await ensurePersonaImported(slug))) return;
+    setIndividualState((prev) => ({
+      participants: uniqueSlugs([...(prev?.participants || []), slug], 5),
+      judge: prev?.judge || null,
+    }));
+    setActivePersonaSlug(slug);
+  }
+
+  async function setIndividualJudge(slug: string) {
+    if (slug && !(await ensurePersonaImported(slug))) return;
+    setIndividualState((prev) => ({
+      participants: uniqueSlugs(prev?.participants || [], 5),
+      judge: slug || null,
+    }));
+    if (slug) setActivePersonaSlug(slug);
+  }
+
+  function removeIndividualParticipant(slug: string) {
+    setIndividualState((prev) => ({
+      participants: uniqueSlugs(prev?.participants || [], 5).filter((item) => item !== slug),
+      judge: prev?.judge || null,
+    }));
+  }
+
+  function clearIndividualAssignments() {
+    setIndividualState(createEmptyIndividualAssignments());
+  }
+
   function clearTranscript() {
     setTranscript([]);
     setFinalResult(null);
@@ -600,11 +691,20 @@ export default function LucaAiPage() {
     setActiveTraceId(null);
   }
 
-  async function runTeam() {
+  async function runMission() {
     const trimmedMission = mission.trim();
     const assignmentsToRun = normalizeWorkflowAssignments(assignments);
-    const slugsToRun = flattenWorkflowAssignments(assignmentsToRun);
-    if (!trimmedMission || !slugsToRun.length || !workflowReady(assignmentsToRun) || running) return;
+    const individualToRun = {
+      participants: uniqueSlugs(individualAssignments.participants, 5),
+      judge: individualAssignments.judge,
+    };
+    const slugsToRun = operationMode === 'individual'
+      ? individualToRun.participants
+      : flattenWorkflowAssignments(assignmentsToRun);
+    const readyToRun = operationMode === 'individual'
+      ? slugsToRun.length > 0 && Boolean(individualToRun.judge)
+      : workflowReady(assignmentsToRun);
+    if (!trimmedMission || !slugsToRun.length || !readyToRun || running) return;
 
     const startedAt = new Date().toISOString();
     const traceId = createTraceId();
@@ -613,9 +713,14 @@ export default function LucaAiPage() {
     setFinalResult(null);
     setMission('');
     setActiveTraceId(traceId);
-    setProcessEvents(plannedRuntimeEvents(traceId, trimmedMission, assignmentsToRun, personaBySlug));
-    if (!activePersonaSlug || !slugsToRun.includes(activePersonaSlug)) {
-      setActivePersonaSlug(slugsToRun[0] ?? null);
+    setProcessEvents(operationMode === 'team'
+      ? plannedRuntimeEvents(traceId, trimmedMission, assignmentsToRun, personaBySlug)
+      : []);
+    const runPersonas = operationMode === 'individual'
+      ? uniqueSlugs([...slugsToRun, individualToRun.judge])
+      : slugsToRun;
+    if (!activePersonaSlug || !runPersonas.includes(activePersonaSlug)) {
+      setActivePersonaSlug(runPersonas[0] ?? null);
     }
     const operatorEntry: TeamTranscriptEntry = {
       id: nowId('operator'),
@@ -628,17 +733,40 @@ export default function LucaAiPage() {
     setTranscript((prev) => [...prev, operatorEntry].slice(-100));
 
     try {
-      const data = await lucaApi.runLucaAiPersonaTeam(
-        trimmedMission,
-        slugsToRun,
-        workflowPayload(assignmentsToRun),
-        traceId,
-        bridgeBase,
-      );
+      const data = operationMode === 'individual'
+        ? await lucaApi.runLucaAiIndividualResolution(
+          trimmedMission,
+          slugsToRun,
+          String(individualToRun.judge),
+          traceId,
+          bridgeBase,
+        )
+        : await lucaApi.runLucaAiPersonaTeam(
+          trimmedMission,
+          slugsToRun,
+          workflowPayload(assignmentsToRun),
+          traceId,
+          bridgeBase,
+        );
       if (data.traceId) setActiveTraceId(data.traceId);
-      const nextMessages = transcriptEntriesFromResponse(data);
+      const nextMessages = operationMode === 'individual'
+        ? (data.replies ?? []).map((reply) => transcriptEntryFromReply(reply, data.generatedAt || new Date().toISOString(), 'Resposta individual'))
+        : transcriptEntriesFromResponse(data);
       setTranscript((prev) => [...prev, ...nextMessages].slice(-140));
-      if (data.finalDisplay?.content) {
+      const finalReply = operationMode === 'individual' ? data.judge : null;
+      if (operationMode === 'individual' && finalReply?.content) {
+        setFinalResult({
+          id: nowId('judge-verdict'),
+          role: 'persona',
+          name: finalReply.name || finalReply.slug,
+          slug: finalReply.slug,
+          model: finalReply.model,
+          stage: 'Juiz',
+          content: finalReply.content,
+          status: finalReply.ok ? 'ok' : 'error',
+          timestamp: data.generatedAt || new Date().toISOString(),
+        });
+      } else if (data.finalDisplay?.content) {
         setFinalResult({
           id: nowId('final-display'),
           role: 'persona',
@@ -651,9 +779,13 @@ export default function LucaAiPage() {
           timestamp: data.generatedAt || new Date().toISOString(),
         });
       }
-      if (!data.ok) setError('A equipe foi acionada, mas nenhuma persona retornou resposta util.');
+      if (!data.ok) setError(operationMode === 'individual'
+        ? 'As respostas individuais foram acionadas, mas o juiz não concluiu um veredito útil.'
+        : 'A equipe foi acionada, mas nenhuma persona retornou resposta util.');
     } catch (err) {
-      const message = buildApiErrorMessage(err, 'Falha ao rodar fluxo de personas.');
+      const message = buildApiErrorMessage(err, operationMode === 'individual'
+        ? 'Falha ao rodar resolução individual.'
+        : 'Falha ao rodar fluxo de personas.');
       setError(message);
       const errorEntry: TeamTranscriptEntry = {
         id: nowId('system-error'),
@@ -692,88 +824,206 @@ export default function LucaAiPage() {
     return filtered.length ? filtered : processEvents;
   }, [activePersonaRoleIds, activePersonaSlug, processEvents]);
 
-  return (
-    <div className="h-full overflow-y-auto lg:overflow-hidden flex flex-col gap-3 p-3 sm:p-4 min-h-0">
-      <LucaWorkflowRail
-        personas={importedPersonas}
-        personaBySlug={personaBySlug}
-        assignments={assignments}
-        activeSlug={activePersonaSlug}
-        loading={loading}
-        running={running}
-        readyRoles={readyRoles}
-        rounds={transcript.filter((entry) => entry.role === 'operator').length}
+  if (loading && personas.length === 0) {
+    return (
+      <LucaAiStartState
+        state="loading"
         onReload={loadPersonas}
-        onClearWorkflow={clearWorkflow}
-        onSetSingle={setSingleRole}
-        onAdd={addRoleSlug}
-        onRemove={removeRoleSlug}
-        onInspect={setActivePersonaSlug}
+        onOpenPersonas={() => onNavigate('personas')}
       />
+    );
+  }
 
-      {error && <Notice title="Atencao" body={error} />}
+  if (error && personas.length === 0) {
+    return (
+      <LucaAiStartState
+        state="error"
+        message={error}
+        onReload={loadPersonas}
+        onOpenPersonas={() => onNavigate('personas')}
+      />
+    );
+  }
 
-      <div className="flex-none lg:flex-1 grid grid-cols-12 gap-3 min-h-0">
-        <div className="col-span-12 lg:col-span-3 min-h-[240px] lg:min-h-0">
-          <LucaProcessTerminal
-            persona={activePersona}
-            events={activeProcessEvents}
+  if (personas.length === 0) {
+    return (
+      <LucaAiStartState
+        state="empty"
+        onReload={loadPersonas}
+        onOpenPersonas={() => onNavigate('personas')}
+      />
+    );
+  }
+
+  const pickerConfig = pickerTarget
+    ? pickerTarget.mode === 'team'
+      ? WORKFLOW_ROLES.find((role) => role.id === pickerTarget.id) ?? null
+      : INDIVIDUAL_PICKER_CONFIGS[pickerTarget.id]
+    : null;
+  const pickerSelectedSlugs = pickerTarget
+    ? pickerTarget.mode === 'team'
+      ? assignments[pickerTarget.id]
+      : pickerTarget.id === 'participants'
+        ? individualAssignments.participants
+        : individualAssignments.judge ? [individualAssignments.judge] : []
+    : [];
+
+  return (
+    <div className="luca-ai-page luca-ai-chat-page relative h-full min-h-0">
+      <div className="luca-ai-chat-column">
+        <header className="luca-ai-chat-toolbar">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <div className="luca-ai-view-switch" role="group" aria-label="Modo de operação">
+              <button type="button" className={operationMode === 'team' ? 'active' : ''} disabled={running} aria-pressed={operationMode === 'team'} onClick={() => { setOperationMode('team'); setPickerTarget(null); clearTranscript(); }}>
+                <GitBranch className="h-4 w-4" /> Equipe
+              </button>
+              <button type="button" className={operationMode === 'individual' ? 'active' : ''} disabled={running} aria-pressed={operationMode === 'individual'} onClick={() => { setOperationMode('individual'); setPickerTarget(null); clearTranscript(); }}>
+                <UserRound className="h-4 w-4" /> Individual
+              </button>
+            </div>
+            <div className="luca-ai-view-switch" role="tablist" aria-label="Visualização da bancada">
+              <button type="button" role="tab" aria-selected={activeWorkspaceView === 'result'} className={activeWorkspaceView === 'result' ? 'active' : ''} onClick={() => setActiveWorkspaceView('result')}>
+                <Eye className="h-4 w-4" /> Chat
+              </button>
+              <button type="button" role="tab" aria-selected={activeWorkspaceView === 'activity'} className={activeWorkspaceView === 'activity' ? 'active' : ''} onClick={() => setActiveWorkspaceView('activity')}>
+                <Terminal className="h-4 w-4" /> Atividade
+              </button>
+            </div>
+          </div>
+          <button
+            type="button"
+            className={`luca-ai-team-trigger ${teamPanelOpen ? 'active' : ''}`}
+            onClick={() => setTeamPanelOpen((open) => !open)}
+            aria-expanded={teamPanelOpen}
+            aria-controls="luca-ai-team-side"
+          >
+            <BrainCircuit className="h-4 w-4" />
+            <span>{operationMode === 'individual' ? 'Seleção' : 'Equipe'}</span>
+            <span className="font-mono text-[10px]">{operationMode === 'individual' ? `${individualAssignments.participants.length}/5` : `${readyRoles}/${WORKFLOW_ROLES.length}`}</span>
+          </button>
+        </header>
+
+        {error && <div className="luca-ai-chat-notice"><Notice title="Atenção" body={error} /></div>}
+
+        <main className="luca-ai-chat-stage">
+          {activeWorkspaceView === 'result' ? (
+            <LucaMissionCanvas
+              transcript={transcript}
+              finalResult={finalResult}
+              personaBySlug={personaBySlug}
+              running={running}
+              transcriptRef={transcriptRef}
+              onInspect={setActivePersonaSlug}
+              operationMode={operationMode}
+            />
+          ) : (
+            <div className="h-full min-h-0 w-full overflow-y-auto px-4 py-4 sm:px-5">
+              <LucaProcessTerminal persona={activePersona} events={activeProcessEvents} running={running} traceId={activeTraceId} />
+            </div>
+          )}
+        </main>
+
+        <div className="luca-ai-composer-dock">
+          <LucaMissionBar
+            mission={mission}
             running={running}
-            traceId={activeTraceId}
-          />
-        </div>
-
-        <div className="col-span-12 lg:col-span-6 min-h-[360px] lg:min-h-0">
-          <LucaMissionCanvas
-            transcript={transcript}
-            finalResult={finalResult}
-            personaBySlug={personaBySlug}
-            running={running}
-            transcriptRef={transcriptRef}
-            onInspect={setActivePersonaSlug}
-          />
-        </div>
-
-        <div className="col-span-12 lg:col-span-3 min-h-[260px] lg:min-h-0">
-          <LucaCommunication
-            transcript={transcript}
-            personas={filteredPersonas}
-            assignments={assignments}
-            personaBySlug={personaBySlug}
-            query={query}
-            loading={loading}
-            running={running}
-            activeSlug={activePersonaSlug}
-            onQuery={setQuery}
-            onRefresh={loadPersonas}
-            onAddExecutor={(slug) => addRoleSlug('execution', slug)}
-            onInspect={setActivePersonaSlug}
+            canRun={canRun}
+            operationMode={operationMode}
+            readyRoles={readyRoles}
+            isWorkflowReady={isWorkflowReady}
+            isIndividualReady={isIndividualReady}
+            assignedCount={operationMode === 'individual' ? individualAssignments.participants.length : assignedSlugs.length}
+            onMissionChange={setMission}
+            onRun={runMission}
+            onClear={clearTranscript}
           />
         </div>
       </div>
 
-      <LucaMissionBar
-        mission={mission}
-        running={running}
-        canRun={canRun}
-        readyRoles={readyRoles}
-        isWorkflowReady={isWorkflowReady}
-        traceId={activeTraceId}
-        assignedCount={assignedSlugs.length}
-        onMissionChange={setMission}
-        onRun={runTeam}
-        onClear={clearTranscript}
-      />
-    </div>
-  );
-}
+      <AnimatePresence>
+        {teamPanelOpen && (
+          <motion.aside
+            id="luca-ai-team-side"
+            className="luca-ai-team-side"
+            initial={{ opacity: 0, x: 28 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 28 }}
+            transition={{ duration: 0.18 }}
+          >
+            {operationMode === 'individual' ? (
+              <LucaIndividualPanel
+                personas={personas}
+                personaBySlug={personaBySlug}
+                assignments={individualAssignments}
+                activeSlug={activePersonaSlug}
+                loading={loading}
+                running={running}
+                onReload={loadPersonas}
+                onClear={clearIndividualAssignments}
+                onRemoveParticipant={removeIndividualParticipant}
+                onClearJudge={() => void setIndividualJudge('')}
+                onInspect={setActivePersonaSlug}
+                onOpenPicker={(id) => setPickerTarget({ mode: 'individual', id })}
+                onOpenPersonas={() => onNavigate('personas')}
+                onClose={() => setTeamPanelOpen(false)}
+              />
+            ) : (
+              <LucaWorkflowPanel
+                personas={personas}
+                personaBySlug={personaBySlug}
+                assignments={assignments}
+                activeSlug={activePersonaSlug}
+                loading={loading}
+                running={running}
+                readyRoles={readyRoles}
+                onReload={loadPersonas}
+                onClearWorkflow={clearWorkflow}
+                onRemove={removeRoleSlug}
+                onInspect={setActivePersonaSlug}
+                onOpenPicker={(id) => setPickerTarget({ mode: 'team', id })}
+                onOpenPersonas={() => onNavigate('personas')}
+                onClose={() => setTeamPanelOpen(false)}
+              />
+            )}
+          </motion.aside>
+        )}
+      </AnimatePresence>
 
-function Metric({ label, value, suffix = '' }: { label: string; value: number; suffix?: string }) {
-  const theme = useTheme();
-  return (
-    <div className="rounded-lg px-3 py-2" style={{ background: theme.input, border: `1px solid ${theme.border}` }}>
-      <div className="text-[9px] font-semibold uppercase tracking-[0.18em]" style={{ color: theme.textGhost }}>{label}</div>
-      <div className="mt-0.5 text-sm font-mono font-semibold" style={{ color: theme.textSoft }}>{value}{suffix}</div>
+      <AnimatePresence>
+        {pickerConfig && pickerTarget && (
+          <PersonaPickerSheet
+            key={`${pickerTarget.mode}-${pickerConfig.id}`}
+            role={pickerConfig}
+            personas={personas}
+            selectedSlugs={pickerSelectedSlugs}
+            query={query}
+            busySlug={busyPersonaSlug}
+            onQuery={setQuery}
+            onClose={() => { setPickerTarget(null); setQuery(''); }}
+            onChoose={async (slug) => {
+              if (pickerTarget.mode === 'team') {
+                if (pickerConfig.multiple) await addRoleSlug(pickerTarget.id, slug);
+                else {
+                  await setSingleRole(pickerTarget.id, slug);
+                  setPickerTarget(null);
+                  setQuery('');
+                }
+              } else if (pickerTarget.id === 'participants') {
+                await addIndividualParticipant(slug);
+              } else {
+                await setIndividualJudge(slug);
+                setPickerTarget(null);
+                setQuery('');
+              }
+            }}
+            onRemove={(slug) => {
+              if (pickerTarget.mode === 'team') removeRoleSlug(pickerTarget.id, slug);
+              else if (pickerTarget.id === 'participants') removeIndividualParticipant(slug);
+              else void setIndividualJudge('');
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -791,7 +1041,158 @@ function Notice({ title, body }: { title: string; body: string }) {
   );
 }
 
-function LucaWorkflowRail({
+function LucaAiStartState({
+  state,
+  message,
+  onReload,
+  onOpenPersonas,
+}: {
+  state: 'loading' | 'empty' | 'error';
+  message?: string;
+  onReload: () => void | Promise<void>;
+  onOpenPersonas: () => void;
+}) {
+  const theme = useTheme();
+  const loading = state === 'loading';
+  const error = state === 'error';
+
+  return (
+    <div className="flex h-full min-h-0 items-center justify-center overflow-y-auto p-4 sm:p-8">
+      <section className="void-panel relative w-full max-w-[760px] overflow-hidden rounded-[26px] p-6 sm:p-10">
+        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full" style={{ background: `radial-gradient(circle, ${theme.goldSoft}, transparent 68%)` }} />
+        <div className="relative max-w-[560px]">
+          <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl" style={{ background: error ? theme.errorBg : theme.goldSoft, color: error ? theme.error : theme.goldDeep }}>
+            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : error ? <AlertCircle className="h-5 w-5" /> : <BrainCircuit className="h-5 w-5" />}
+          </div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: theme.textGhost }}>Bancada de personas</p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] sm:text-3xl" style={{ color: theme.text }}>
+            {loading ? 'Preparando a equipe' : error ? 'A equipe não pôde ser carregada' : 'Conecte a primeira persona'}
+          </h1>
+          <p className="mt-3 max-w-[58ch] text-sm leading-relaxed" style={{ color: theme.textMute }}>
+            {loading
+              ? 'Buscando as personas disponíveis no Yume e conferindo quais já estão conectadas ao LUCA.'
+              : error
+                ? message
+                : 'Escolha no catálogo as personas que poderão supervisionar, executar, aprovar e apresentar as missões desta bancada.'}
+          </p>
+          {!loading && (
+            <div className="mt-7 flex flex-wrap gap-2">
+              <button type="button" className="btn-primary" onClick={onOpenPersonas}>Abrir Personas</button>
+              <button type="button" className="btn-fleet" onClick={() => void onReload()}>Verificar novamente</button>
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function LucaIndividualPanel({
+  personas,
+  personaBySlug,
+  assignments,
+  activeSlug,
+  loading,
+  running,
+  onReload,
+  onClear,
+  onRemoveParticipant,
+  onClearJudge,
+  onInspect,
+  onOpenPicker,
+  onOpenPersonas,
+  onClose,
+}: {
+  personas: YumePersonaSummary[];
+  personaBySlug: Map<string, YumePersonaSummary>;
+  assignments: IndividualAssignments;
+  activeSlug: string | null;
+  loading: boolean;
+  running: boolean;
+  onReload: () => void | Promise<void>;
+  onClear: () => void;
+  onRemoveParticipant: (slug: string) => void;
+  onClearJudge: () => void;
+  onInspect: (slug: string | null) => void;
+  onOpenPicker: (id: IndividualPickerId) => void;
+  onOpenPersonas: () => void;
+  onClose: () => void;
+}) {
+  const theme = useTheme();
+  const readyCount = Number(assignments.participants.length > 0) + Number(Boolean(assignments.judge));
+  const ready = readyCount === 2;
+  const configuredCount = uniqueSlugs([...assignments.participants, assignments.judge]).length;
+
+  return (
+    <aside className="luca-ai-flow-panel min-h-0 overflow-hidden">
+      <header className="border-b px-4 py-4" style={{ borderColor: theme.border }}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: theme.textGhost }}>Modo individual</p>
+            <h2 className="mt-1 text-base font-semibold" style={{ color: theme.text }}>Resolução com juiz</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="rounded-lg px-2.5 py-1 font-mono text-[10px]" style={{ background: ready ? theme.aliveSoft : theme.goldSoft, color: ready ? theme.alive : theme.goldDeep }}>
+              {readyCount}/2
+            </span>
+            <button type="button" className="grid h-8 w-8 place-items-center rounded-lg transition" onClick={onClose} aria-label="Fechar seleção" style={{ color: theme.textMute }}>
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        <div className="mt-4 h-1.5 overflow-hidden rounded-full" style={{ background: theme.surfaceHi }}>
+          <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${(readyCount / 2) * 100}%`, background: ready ? theme.alive : theme.gold }} />
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed" style={{ color: theme.textMute }}>
+          {running
+            ? 'As personas respondem isoladamente; o juiz entra depois.'
+            : ready
+              ? `${assignments.participants.length} participante${assignments.participants.length === 1 ? '' : 's'} e um juiz prontos.`
+              : 'Escolha de 1 a 5 participantes e uma persona juíza. O juiz pode também estar entre os participantes.'}
+        </p>
+      </header>
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className="space-y-2">
+          <WorkflowRoleRow
+            role={INDIVIDUAL_PICKER_CONFIGS.participants}
+            personaBySlug={personaBySlug}
+            selectedSlugs={assignments.participants}
+            activeSlug={activeSlug}
+            disabled={running}
+            onOpen={() => onOpenPicker('participants')}
+            onRemove={onRemoveParticipant}
+            onInspect={onInspect}
+          />
+          <WorkflowRoleRow
+            role={INDIVIDUAL_PICKER_CONFIGS.judge}
+            personaBySlug={personaBySlug}
+            selectedSlugs={assignments.judge ? [assignments.judge] : []}
+            activeSlug={activeSlug}
+            disabled={running}
+            onOpen={() => onOpenPicker('judge')}
+            onRemove={onClearJudge}
+            onInspect={onInspect}
+          />
+          <div className="rounded-xl px-3 py-3 text-[11px] leading-relaxed" style={{ background: theme.surfaceHi, color: theme.textMute }}>
+            Cada participante recebe somente a missão original. Depois, a chamada separada do juiz recebe todas as respostas para comparar, corrigir e decidir.
+          </div>
+        </div>
+      </div>
+
+      <footer className="grid grid-cols-2 gap-2 border-t p-3" style={{ borderColor: theme.border }}>
+        <button type="button" className="btn-fleet !px-3 text-xs" onClick={onOpenPersonas} disabled={running}>Catálogo</button>
+        <button type="button" className="btn-fleet !px-3 text-xs" onClick={onClear} disabled={running || configuredCount === 0}>Limpar seleção</button>
+        <button type="button" className="col-span-2 inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] transition" onClick={() => void onReload()} disabled={loading || running} style={{ color: theme.textMute }}>
+          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+          Atualizar {personas.length} personas
+        </button>
+      </footer>
+    </aside>
+  );
+}
+
+function LucaWorkflowPanel({
   personas,
   personaBySlug,
   assignments,
@@ -799,13 +1200,13 @@ function LucaWorkflowRail({
   loading,
   running,
   readyRoles,
-  rounds,
   onReload,
   onClearWorkflow,
-  onSetSingle,
-  onAdd,
   onRemove,
   onInspect,
+  onOpenPicker,
+  onOpenPersonas,
+  onClose,
 }: {
   personas: YumePersonaSummary[];
   personaBySlug: Map<string, YumePersonaSummary>;
@@ -814,88 +1215,89 @@ function LucaWorkflowRail({
   loading: boolean;
   running: boolean;
   readyRoles: number;
-  rounds: number;
   onReload: () => void | Promise<void>;
   onClearWorkflow: () => void;
-  onSetSingle: (roleId: WorkflowRoleId, slug: string) => void;
-  onAdd: (roleId: WorkflowRoleId, slug: string) => void;
   onRemove: (roleId: WorkflowRoleId, slug: string) => void;
   onInspect: (slug: string | null) => void;
+  onOpenPicker: (roleId: WorkflowRoleId) => void;
+  onOpenPersonas: () => void;
+  onClose: () => void;
 }) {
   const theme = useTheme();
   const ready = readyRoles === WORKFLOW_ROLES.length;
+  const assignedCount = flattenWorkflowAssignments(assignments).length;
 
   return (
-    <div className="void-panel rounded-2xl px-3 py-3 flex items-stretch gap-3 overflow-x-auto overflow-y-hidden shrink-0 h-[118px] min-h-[118px]">
-      <button
-        type="button"
-        className="shrink-0 flex h-[94px] w-[104px] flex-col items-center justify-center gap-1.5 rounded-2xl border px-3 text-center transition"
-        style={{
-          background: running ? theme.aliveSoft : ready ? theme.fleetSoft : theme.input,
-          borderColor: running ? theme.alive : ready ? theme.borderActive : theme.border,
-          color: running ? theme.alive : ready ? theme.navyDeep : theme.textMute,
-        }}
-        onClick={() => onInspect(activeSlug)}
-      >
-        {running ? <Loader2 className="h-6 w-6 animate-spin" /> : <BrainCircuit className="h-6 w-6" />}
-        <span className="text-[10px] font-semibold uppercase tracking-[0.16em]">
-          {running ? 'rodando' : ready ? 'pronto' : 'setup'}
-        </span>
-        <span className="font-mono text-[10px] opacity-80">
-          {readyRoles}/{WORKFLOW_ROLES.length} · {rounds}
-        </span>
-      </button>
+    <aside className="luca-ai-flow-panel min-h-0 overflow-hidden">
+      <header className="border-b px-4 py-4" style={{ borderColor: theme.border }}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: theme.textGhost }}>Composição</p>
+            <h2 className="mt-1 text-base font-semibold" style={{ color: theme.text }}>Fluxo de personas</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="rounded-lg px-2.5 py-1 font-mono text-[10px]" style={{ background: ready ? theme.aliveSoft : theme.goldSoft, color: ready ? theme.alive : theme.goldDeep }}>
+              {readyRoles}/{WORKFLOW_ROLES.length}
+            </span>
+            <button type="button" className="grid h-8 w-8 place-items-center rounded-lg transition" onClick={onClose} aria-label="Fechar equipe" style={{ color: theme.textMute }}>
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        <div className="mt-4 h-1.5 overflow-hidden rounded-full" style={{ background: theme.surfaceHi }}>
+          <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${(readyRoles / WORKFLOW_ROLES.length) * 100}%`, background: ready ? theme.alive : theme.gold }} />
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed" style={{ color: theme.textMute }}>
+          {running ? 'A equipe está executando a missão.' : ready ? `${assignedCount} persona${assignedCount === 1 ? '' : 's'} pronta${assignedCount === 1 ? '' : 's'} para executar.` : 'Escolha uma persona para cada etapa. A conexão ao LUCA acontece automaticamente.'}
+        </p>
+      </header>
 
-      <div className="w-px h-16 self-center shrink-0" style={{ background: theme.border }} />
-
-      {WORKFLOW_ROLES.map((role) => (
-        <WorkflowRoleTile
-          key={role.id}
-          role={role}
-          personas={personas}
-          personaBySlug={personaBySlug}
-          selectedSlugs={assignments[role.id]}
-          activeSlug={activeSlug}
-          disabled={running}
-          onSetSingle={(slug) => onSetSingle(role.id, slug)}
-          onAdd={(slug) => onAdd(role.id, slug)}
-          onRemove={(slug) => onRemove(role.id, slug)}
-          onInspect={onInspect}
-        />
-      ))}
-
-      <div className="ml-auto flex shrink-0 flex-col gap-2">
-        <button type="button" className="btn-fleet !h-10 !px-3" onClick={onReload} disabled={loading || running} title="recarregar personas">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-        </button>
-        <button type="button" className="btn-fleet !h-10 !px-3" onClick={onClearWorkflow} disabled={running} title="limpar fluxo">
-          <X className="h-4 w-4" />
-        </button>
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className="space-y-2">
+          {WORKFLOW_ROLES.map((role) => (
+            <WorkflowRoleRow
+              key={role.id}
+              role={role}
+              personaBySlug={personaBySlug}
+              selectedSlugs={assignments[role.id]}
+              activeSlug={activeSlug}
+              disabled={running}
+              onOpen={() => onOpenPicker(role.id)}
+              onRemove={(slug) => onRemove(role.id, slug)}
+              onInspect={onInspect}
+            />
+          ))}
+        </div>
       </div>
-    </div>
+
+      <footer className="grid grid-cols-2 gap-2 border-t p-3" style={{ borderColor: theme.border }}>
+        <button type="button" className="btn-fleet !px-3 text-xs" onClick={onOpenPersonas} disabled={running}>Catálogo</button>
+        <button type="button" className="btn-fleet !px-3 text-xs" onClick={onClearWorkflow} disabled={running || assignedCount === 0}>Limpar fluxo</button>
+        <button type="button" className="col-span-2 inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] transition" onClick={() => void onReload()} disabled={loading || running} style={{ color: theme.textMute }}>
+          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+          Atualizar {personas.length} personas
+        </button>
+      </footer>
+    </aside>
   );
 }
 
-function WorkflowRoleTile({
+function WorkflowRoleRow({
   role,
-  personas,
   personaBySlug,
   selectedSlugs,
   activeSlug,
   disabled,
-  onSetSingle,
-  onAdd,
+  onOpen,
   onRemove,
   onInspect,
 }: {
-  role: WorkflowRoleConfig;
-  personas: YumePersonaSummary[];
+  role: PersonaPickerConfig;
   personaBySlug: Map<string, YumePersonaSummary>;
   selectedSlugs: string[];
   activeSlug: string | null;
   disabled: boolean;
-  onSetSingle: (slug: string) => void;
-  onAdd: (slug: string) => void;
+  onOpen: () => void;
   onRemove: (slug: string) => void;
   onInspect: (slug: string | null) => void;
 }) {
@@ -905,108 +1307,106 @@ function WorkflowRoleTile({
     slug,
     persona: personaBySlug.get(slug),
   }));
-  const selectedPersonas = selectedSlugs
-    .map((slug) => personaBySlug.get(slug))
-    .filter((persona): persona is YumePersonaSummary => Boolean(persona));
-  const availablePersonas = personas.filter((persona) => !selectedSlugs.includes(persona.slug));
   const active = selectedSlugs.includes(String(activeSlug || ''));
-  const selectId = `luca-ai-rail-role-${role.id}`;
-  const modelSummary = selectedPersonas.length ? roleModelSummary(selectedPersonas) : 'modelo n/d';
 
   return (
     <article
-      className="agent-card shrink-0 rounded-2xl p-2 w-[178px] h-[94px] flex flex-col gap-1.5"
+      className="rounded-xl border p-3 transition"
+      data-testid={`workflow-role-${role.id}`}
       style={{ borderColor: active ? theme.borderActive : selectedSlugs.length ? theme.borderHover : theme.border }}
     >
-      <button
-        type="button"
-        className="flex min-w-0 items-center gap-2 text-left"
-        onClick={() => onInspect(selectedSlugs[0] ?? null)}
-      >
+      <div className="flex min-w-0 items-center gap-2">
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border" style={{ background: theme.goldSoft, borderColor: theme.border, color: theme.goldDeep }}>
           <Icon className="h-3.5 w-3.5" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[11px] font-semibold" style={{ color: active ? theme.goldDeep : theme.textSoft }}>{role.label}</span>
-          <span className="block truncate font-mono text-[10px]" style={{ color: selectedPersonas.length ? theme.goldDeep : theme.textGhost }}>
-            {selectedSlugs.length}/{role.maxSlugs} · {modelSummary}
-          </span>
+          <span className="block truncate text-xs font-semibold" style={{ color: active ? theme.goldDeep : theme.textSoft }}>{role.label}</span>
+          <span className="block truncate text-[10px]" style={{ color: theme.textGhost }}>{role.multiple ? `até ${role.maxSlugs} personas` : 'uma persona'}</span>
         </span>
-      </button>
-
-      <div className="flex min-h-[28px] items-center gap-1.5 overflow-hidden">
-        {selectedItems.length ? selectedItems.slice(0, 4).map(({ slug, persona }) => (
-          <button
-            key={slug}
-            type="button"
-            className="group relative h-7 w-7 shrink-0 rounded-lg"
-            onClick={() => onInspect(slug)}
-            title={`${persona?.name || slug} · ${role.label} · ${modelLabel(persona?.model)}`}
-          >
-            {persona ? (
-              <PersonaAvatar persona={persona} size="xs" />
-            ) : (
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg border text-[10px] font-semibold uppercase" style={{ background: theme.surfaceHi, borderColor: theme.border, color: theme.textMute }}>
-                {slug.charAt(0) || '?'}
-              </span>
-            )}
-            {role.multiple && (
-              <span
-                className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full border group-hover:flex"
-                style={{ background: theme.input, borderColor: theme.border, color: theme.goldDeep }}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (!disabled) onRemove(slug);
-                }}
-              >
-                <X className="h-3 w-3" />
-              </span>
-            )}
-          </button>
-        )) : (
-          <span className="text-[11px]" style={{ color: theme.textGhost }}>sem persona</span>
-        )}
-        {selectedItems.length > 4 && (
-          <span className="rounded-full px-2 py-1 text-[10px] font-mono" style={{ background: theme.surfaceHi, color: theme.textMute }}>
-            +{selectedItems.length - 4}
-          </span>
-        )}
+        <button type="button" className="rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition" onClick={onOpen} disabled={disabled} style={{ background: theme.goldSoft, borderColor: theme.border, color: theme.goldDeep }}>
+          {selectedSlugs.length ? role.multiple ? 'Adicionar' : 'Trocar' : 'Escolher'}
+        </button>
       </div>
 
-      <label className="sr-only" htmlFor={selectId}>{role.label}</label>
-      {role.multiple ? (
-        <select
-          id={selectId}
-          value=""
-          onChange={(event) => {
-            onAdd(event.target.value);
-            event.currentTarget.value = '';
-          }}
-          className="mt-auto h-7 w-full rounded-lg border px-2 text-[11px] outline-none"
-          style={{ background: theme.surfaceHi, borderColor: theme.border, color: theme.textSoft }}
-          disabled={disabled || selectedSlugs.length >= role.maxSlugs || availablePersonas.length === 0}
-        >
-          <option value="">{selectedSlugs.length >= role.maxSlugs ? 'limite atingido' : 'adicionar'}</option>
-          {availablePersonas.map((persona) => (
-            <option key={persona.slug} value={persona.slug}>{persona.name}</option>
+      {selectedItems.length ? (
+        <div className="mt-2 space-y-1.5">
+          {selectedItems.map(({ slug, persona }) => (
+            <div key={slug} className="flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: theme.surfaceHi }}>
+              {persona ? <PersonaAvatar persona={persona} size="xs" /> : <span className="h-7 w-7 rounded-lg" style={{ background: theme.goldSoft }} />}
+              <button type="button" className="min-w-0 flex-1 truncate text-left text-[11px] font-medium" onClick={() => onInspect(slug)} style={{ color: theme.textSoft }}>{persona?.name || slug}</button>
+              <button type="button" className="grid h-7 w-7 place-items-center rounded-md transition" onClick={() => !disabled && onRemove(slug)} disabled={disabled} aria-label={`Remover ${persona?.name || slug} de ${role.label}`} style={{ color: theme.textGhost }}><X className="h-3.5 w-3.5" /></button>
+            </div>
           ))}
-        </select>
+        </div>
       ) : (
-        <select
-          id={selectId}
-          value={selectedSlugs[0] ?? ''}
-          onChange={(event) => onSetSingle(event.target.value)}
-          className="mt-auto h-7 w-full rounded-lg border px-2 text-[11px] outline-none"
-          style={{ background: theme.surfaceHi, borderColor: theme.border, color: theme.textSoft }}
-          disabled={disabled || personas.length === 0}
-        >
-          <option value="">selecionar</option>
-          {personas.map((persona) => (
-            <option key={persona.slug} value={persona.slug}>{persona.name}</option>
-          ))}
-        </select>
+        <button type="button" className="mt-2 flex w-full items-center gap-2 rounded-lg border border-dashed px-2.5 py-2 text-left text-[10px] transition" onClick={onOpen} disabled={disabled} style={{ borderColor: theme.border, color: theme.textGhost }}>
+          <Plus className="h-3.5 w-3.5" /> Nenhuma persona atribuída
+        </button>
       )}
     </article>
+  );
+}
+
+function PersonaPickerSheet({ role, personas, selectedSlugs, query, busySlug, onQuery, onClose, onChoose, onRemove }: {
+  role: PersonaPickerConfig;
+  personas: YumePersonaSummary[];
+  selectedSlugs: string[];
+  query: string;
+  busySlug: string | null;
+  onQuery: (value: string) => void;
+  onClose: () => void;
+  onChoose: (slug: string) => void | Promise<void>;
+  onRemove: (slug: string) => void;
+}) {
+  const theme = useTheme();
+  const RoleIcon = role.icon;
+  const term = query.trim().toLowerCase();
+  const visiblePersonas = personas.filter((persona) => !term || [persona.name, persona.description, persona.purpose, persona.slug].filter(Boolean).some((value) => String(value).toLowerCase().includes(term)));
+  const limitReached = role.multiple && selectedSlugs.length >= role.maxSlugs;
+
+  return (
+    <motion.div className="luca-ai-picker-layer" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <button type="button" className="absolute inset-0 cursor-default" aria-label="Fechar seleção de personas" onClick={onClose} />
+      <motion.aside className="luca-ai-picker" initial={{ x: 36, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 36, opacity: 0 }} transition={{ duration: 0.2 }} aria-label={`Selecionar persona para ${role.label}`}>
+        <header className="border-b p-5" style={{ borderColor: theme.border }}>
+          <div className="flex items-start gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: theme.goldSoft, color: theme.goldDeep }}><RoleIcon className="h-5 w-5" /></span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: theme.textGhost }}>Selecionar para</p>
+              <h2 className="mt-1 text-lg font-semibold" style={{ color: theme.text }}>{role.label}</h2>
+              <p className="mt-1 text-xs leading-relaxed" style={{ color: theme.textMute }}>{role.multiple ? `Escolha até ${role.maxSlugs} personas. Você pode combinar especialistas.` : 'Escolha a persona responsável por esta etapa.'}</p>
+            </div>
+            <button type="button" className="grid h-9 w-9 place-items-center rounded-lg" onClick={onClose} aria-label="Fechar"><X className="h-4 w-4" /></button>
+          </div>
+          <div className="relative mt-4">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: theme.textGhost }} />
+            <input autoFocus type="search" value={query} onChange={(event) => onQuery(event.target.value)} placeholder="Buscar por nome ou especialidade" className="w-full rounded-xl border py-3 pl-10 pr-3 text-sm outline-none" style={{ background: theme.input, borderColor: theme.border, color: theme.text }} />
+          </div>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <div className="space-y-2">
+            {visiblePersonas.map((persona) => {
+              const selected = selectedSlugs.includes(persona.slug);
+              const busy = busySlug === persona.slug;
+              return (
+                <button key={persona.slug} type="button" className="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition" data-testid={`persona-option-${persona.slug}`} onClick={() => selected ? onRemove(persona.slug) : void onChoose(persona.slug)} disabled={Boolean(busySlug) || (!selected && limitReached)} style={{ background: selected ? theme.goldSoft : theme.input, borderColor: selected ? theme.borderActive : theme.border, opacity: !selected && limitReached ? 0.5 : 1 }}>
+                  <PersonaAvatar persona={persona} size="sm" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold" style={{ color: theme.textSoft }}>{persona.name}</span>
+                    <span className="mt-0.5 block line-clamp-2 text-[11px] leading-relaxed" style={{ color: theme.textMute }}>{persona.description || persona.purpose || 'Especialista disponível no catálogo.'}</span>
+                  </span>
+                  <span className="flex shrink-0 flex-col items-end gap-1">
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin" style={{ color: theme.goldDeep }} /> : selected ? <CheckCircle2 className="h-4 w-4" style={{ color: theme.alive }} /> : <Plus className="h-4 w-4" style={{ color: theme.goldDeep }} />}
+                    <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: persona.imported ? theme.alive : theme.textGhost }}>{persona.imported ? 'no LUCA' : 'conectar'}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {!visiblePersonas.length && <p className="px-4 py-12 text-center text-sm" style={{ color: theme.textMute }}>Nenhuma persona corresponde à busca.</p>}
+        </div>
+      </motion.aside>
+    </motion.div>
   );
 }
 
@@ -1034,37 +1434,38 @@ function LucaProcessTerminal({
         : theme.textMute;
 
   return (
-    <div className="void-panel rounded-2xl flex flex-col h-full overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden rounded-2xl" style={{ background: theme.input }}>
       <header className="flex items-center gap-2 px-4 h-12 border-b shrink-0" style={{ borderColor: theme.border }}>
         <Terminal className="w-4 h-4" style={{ color: theme.gold, opacity: 0.85 }} />
-        <h3 className="text-[11px] font-semibold tracking-[0.2em] uppercase flex-1 min-w-0 luca-wrap" style={{ color: theme.textSoft }}>
-          Processos
+        <h3 className="text-xs font-semibold flex-1 min-w-0 luca-wrap" style={{ color: theme.textSoft }}>
+          Atividade
         </h3>
         <span className="text-[9px] font-semibold tracking-wider uppercase" style={{ color: stateColor }}>
           {latestState}
         </span>
       </header>
 
-      <div className="term flex-1 overflow-hidden p-3 m-2 rounded-xl border-0">
-        <p style={{ color: theme.textMute }}>feedback em tempo real</p>
-        <p style={{ color: theme.consoleText }}>
-          agente: {persona?.name || 'workflow'}
-        </p>
-        <p style={{ color: theme.consoleText }}>
-          modelo: {modelLabel(persona?.model)}
-        </p>
-        <p style={{ color: theme.textGhost }}>
-          trace: {traceId ? traceId.slice(-18) : 'aguardando'}
-        </p>
-
-        <div className="mt-3 space-y-2">
-          {visibleEvents.length ? visibleEvents.map((event) => (
+      <div className="term flex-1 overflow-y-auto p-3 m-2 rounded-xl border-0">
+        {visibleEvents.length ? (
+          <>
+            <div className="mb-3 flex items-center justify-between gap-2 text-[10px]" style={{ color: theme.textGhost }}>
+              <span className="truncate">{persona?.name || 'Fluxo completo'}</span>
+              {traceId && <span className="font-mono">sessão {traceId.slice(-6)}</span>}
+            </div>
+            <div className="space-y-2">
+              {visibleEvents.map((event) => (
             <ProcessEventLine key={event.id} event={event} />
-          )) : (
-            <p style={{ color: theme.textGhost }}>clique em um card de agente para ver chamadas e requests.</p>
-          )}
-        </div>
-        <p className="mt-3" style={{ color: theme.gold }}>$ _</p>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="flex h-full min-h-[180px] flex-col items-center justify-center px-5 text-center">
+            <Terminal className="mb-3 h-7 w-7" style={{ color: theme.textGhost }} />
+            <p className="max-w-[24ch] text-xs leading-relaxed" style={{ color: theme.textMute }}>
+              A atividade dos agentes aparece aqui durante a execução.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1123,6 +1524,7 @@ function LucaMissionCanvas({
   running,
   transcriptRef,
   onInspect,
+  operationMode,
 }: {
   transcript: TeamTranscriptEntry[];
   finalResult: TeamTranscriptEntry | null;
@@ -1130,219 +1532,71 @@ function LucaMissionCanvas({
   running: boolean;
   transcriptRef: React.RefObject<HTMLDivElement | null>;
   onInspect: (slug: string | null) => void;
+  operationMode: OperationMode;
 }) {
   const theme = useTheme();
-  const headerStatus = running ? 'workflow em andamento' : finalResult ? 'exibicao final pronta' : transcript.length ? 'rodada registrada' : 'aguardando missao';
+  const headerStatus = running
+    ? operationMode === 'individual' ? 'respostas individuais em andamento' : 'workflow em andamento'
+    : finalResult
+      ? operationMode === 'individual' ? 'veredito do juiz pronto' : 'exibicao final pronta'
+      : transcript.length ? 'rodada registrada' : 'aguardando missao';
+  const supportingTranscript = finalResult
+    ? transcript.filter((entry) => !(
+      entry.slug === finalResult.slug
+      && entry.stage === finalResult.stage
+      && compactText(entry.content) === compactText(finalResult.content)
+    ))
+    : transcript;
 
   return (
-    <div className="void-panel rounded-2xl flex flex-col h-full overflow-hidden">
-      <header className="flex items-center gap-2 px-5 h-12 border-b shrink-0 min-w-0" style={{ borderColor: theme.border }}>
-        <GitBranch className="h-4 w-4" style={{ color: theme.gold, opacity: 0.85 }} />
-        <h3 className="text-[11px] font-semibold tracking-[0.2em] uppercase flex-1 min-w-0 luca-wrap" style={{ color: theme.textSoft }}>
-          Canvas da Bancada
-        </h3>
-        <span className="text-[10px] max-w-[44%] shrink-0 text-right luca-wrap" style={{ color: theme.textMute }}>
-          {headerStatus}
-        </span>
-      </header>
-
-      <div ref={transcriptRef} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
-        {finalResult && (
-          <FinalDisplayCard entry={finalResult} persona={finalResult.slug ? personaBySlug.get(finalResult.slug) : undefined} />
+    <div ref={transcriptRef} className="luca-ai-chat-scroll">
+      <div className="luca-ai-chat-thread">
+        {(supportingTranscript.length > 0 || finalResult) && (
+          <div className="mb-5 flex items-center gap-2 text-[11px]" style={{ color: theme.textGhost }}>
+            <GitBranch className="h-3.5 w-3.5 shrink-0" />
+            <span className="luca-wrap">{headerStatus}</span>
+          </div>
         )}
 
-        {transcript.length ? (
-          transcript.map((entry) => (
-            <button
+        {supportingTranscript.length ? supportingTranscript.map((entry) => (
+          entry.stage === 'Resposta individual' ? (
+            <IndividualResponseCard
               key={entry.id}
-              type="button"
-              className="block w-full text-left"
-              onClick={() => onInspect(entry.slug || null)}
-            >
-              <TranscriptEntry
-                entry={entry}
-                persona={entry.slug ? personaBySlug.get(entry.slug) : undefined}
-              />
+              entry={entry}
+              persona={entry.slug ? personaBySlug.get(entry.slug) : undefined}
+              onInspect={onInspect}
+            />
+          ) : (
+            <button key={entry.id} type="button" className="block w-full min-w-0 text-left" onClick={() => onInspect(entry.slug || null)}>
+              <TranscriptEntry entry={entry} persona={entry.slug ? personaBySlug.get(entry.slug) : undefined} />
             </button>
-          ))
-        ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center px-6 py-8">
-            <BrainCircuit className="h-10 w-10 mb-3" style={{ color: theme.textGhost }} />
-            <p className="text-sm mt-1 max-w-xs leading-relaxed" style={{ color: theme.textMute }}>
-              O resultado da bancada aparece aqui, no mesmo padrao do canvas operacional.
+          )
+        )) : !finalResult && (
+          <div className="flex min-h-[48vh] flex-col items-center justify-center px-4 text-center sm:px-6">
+            <div className="mb-5 grid h-14 w-14 place-items-center overflow-hidden rounded-2xl border" style={{ borderColor: theme.border, background: theme.goldSoft }}>
+              <img src="/icon-512.png" alt="" className="h-full w-full object-cover object-[center_28%]" />
+            </div>
+            <h1 className="text-xl font-semibold tracking-[-0.025em]" style={{ color: theme.text }}>
+              {operationMode === 'individual' ? 'Qual problema deve ser julgado?' : 'O que a equipe deve entregar?'}
+            </h1>
+            <p className="mt-2 max-w-[46ch] text-sm leading-relaxed luca-wrap" style={{ color: theme.textMute }}>
+              {operationMode === 'individual'
+                ? 'Abra Seleção no topo, escolha até cinco participantes e um juiz. Cada resposta fica isolada e o veredito encerra a rodada.'
+                : 'Abra Equipe no topo, escolha as personas e envie a missão abaixo. As respostas aparecem aqui como uma conversa.'}
             </p>
           </div>
         )}
 
+        {finalResult && (
+          <FinalDisplayCard entry={finalResult} persona={finalResult.slug ? personaBySlug.get(finalResult.slug) : undefined} />
+        )}
+
         {running && (
-          <div className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs" style={{ background: theme.goldSoft, borderColor: theme.border, color: theme.goldDeep }}>
+          <div className="mt-6 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs" style={{ background: theme.goldSoft, color: theme.goldDeep }}>
             <Loader2 className="h-4 w-4 animate-spin" />
-            Workflow em andamento...
+            {operationMode === 'individual' ? 'As personas estão resolvendo individualmente...' : 'A equipe está trabalhando...'}
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-function LucaCommunication({
-  transcript,
-  personas,
-  assignments,
-  personaBySlug,
-  query,
-  loading,
-  running,
-  activeSlug,
-  onQuery,
-  onRefresh,
-  onAddExecutor,
-  onInspect,
-}: {
-  transcript: TeamTranscriptEntry[];
-  personas: YumePersonaSummary[];
-  assignments: WorkflowAssignments;
-  personaBySlug: Map<string, YumePersonaSummary>;
-  query: string;
-  loading: boolean;
-  running: boolean;
-  activeSlug: string | null;
-  onQuery: (value: string) => void;
-  onRefresh: () => void | Promise<void>;
-  onAddExecutor: (slug: string) => void;
-  onInspect: (slug: string | null) => void;
-}) {
-  const theme = useTheme();
-  const latestMessages = transcript.slice(-4).reverse();
-
-  return (
-    <div className="void-panel rounded-2xl flex flex-col h-full overflow-hidden">
-      <header className="flex items-center gap-2 px-4 h-12 border-b shrink-0 min-w-0" style={{ borderColor: theme.border }}>
-        <MessageSquareText className="w-4 h-4" style={{ color: theme.gold, opacity: 0.85 }} />
-        <h3 className="text-[11px] font-semibold tracking-[0.2em] uppercase flex-1 min-w-0 luca-wrap" style={{ color: theme.textSoft }}>
-          Comunicacao
-        </h3>
-        <span
-          className="text-[9px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full"
-          style={{ color: running ? theme.gold : theme.alive, border: `1px solid ${theme.border}` }}
-        >
-          {running ? 'ao vivo' : 'online'}
-        </span>
-      </header>
-
-      <div className="border-b p-3" style={{ borderColor: theme.border }}>
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: theme.textGhost }} />
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => onQuery(event.target.value)}
-            placeholder="buscar persona"
-            className="w-full rounded-lg border py-2 pl-9 pr-10 text-xs outline-none transition"
-            style={{ background: theme.input, borderColor: theme.border, color: theme.text }}
-          />
-          <button
-            type="button"
-            className="absolute right-1 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md"
-            onClick={() => void onRefresh()}
-            disabled={loading}
-            title="recarregar personas"
-            style={{ color: theme.goldDeep }}
-          >
-            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-          </button>
-        </div>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto p-3 space-y-2.5">
-        {latestMessages.map((entry) => (
-          <button
-            type="button"
-            key={entry.id}
-            className="w-full rounded-xl border p-2 text-left"
-            style={{ background: theme.input, borderColor: entry.slug === activeSlug ? theme.borderActive : theme.border }}
-            onClick={() => onInspect(entry.slug || null)}
-          >
-            <div className="flex items-center gap-2">
-              {entry.slug && personaBySlug.get(entry.slug) ? (
-                <PersonaAvatar persona={personaBySlug.get(entry.slug)!} size="sm" />
-              ) : (
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border" style={{ background: theme.fleetSoft, borderColor: theme.border, color: theme.navyDeep }}>
-                  <UserRound className="h-4 w-4" />
-                </span>
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <span className="truncate text-xs font-semibold" style={{ color: theme.textSoft }}>{entry.name}</span>
-                  {entry.model && (
-                    <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-mono" style={{ background: theme.goldSoft, color: theme.goldDeep }}>
-                      {entry.model}
-                    </span>
-                  )}
-                </div>
-                <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed" style={{ color: theme.textMute }}>
-                  {compactText(entry.content, 120)}
-                </p>
-              </div>
-            </div>
-          </button>
-        ))}
-
-        <div className="pt-2">
-          <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: theme.textGhost }}>
-            <UserPlus className="h-3.5 w-3.5" />
-            Personas
-          </div>
-          <div className="space-y-2">
-            {personas.slice(0, 10).map((persona) => {
-              const usageLabels = roleLabelsForSlug(assignments, persona.slug);
-              const executionSelected = assignments.execution.includes(persona.slug);
-              return (
-          <article
-            key={persona.slug}
-            className="flex w-full items-center gap-2 rounded-lg border p-2 text-left cursor-pointer"
-            style={{ background: usageLabels.length ? theme.goldSoft : theme.input, borderColor: persona.slug === activeSlug ? theme.borderActive : theme.border }}
-            onClick={() => onInspect(persona.slug)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                onInspect(persona.slug);
-              }
-            }}
-          >
-            <PersonaAvatar persona={persona} size="sm" />
-            <span className="min-w-0 flex-1">
-              <span className="flex min-w-0 items-center gap-1.5">
-                <span className="truncate text-xs font-semibold" style={{ color: theme.textSoft }}>{persona.name}</span>
-                <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-mono" style={{ background: theme.surfaceHi, color: theme.goldDeep }}>
-                  {modelLabel(persona.model)}
-                </span>
-              </span>
-              <span className="block truncate text-[10px]" style={{ color: usageLabels.length ? theme.goldDeep : theme.textGhost }}>
-                {usageLabels.length ? usageLabels.join(' / ') : persona.slug}
-              </span>
-            </span>
-            <button
-              type="button"
-              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition disabled:opacity-45"
-                    style={{ background: executionSelected ? theme.okBg : theme.fleetSoft, borderColor: executionSelected ? theme.ok : theme.border, color: executionSelected ? theme.ok : theme.navyDeep }}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onAddExecutor(persona.slug);
-                      onInspect(persona.slug);
-                    }}
-                    disabled={running || executionSelected || assignments.execution.length >= MAX_EXECUTORS}
-                    aria-label={`Adicionar ${persona.name} como executor`}
-            >
-              {executionSelected ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-            </button>
-          </article>
-              );
-            })}
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -1352,9 +1606,10 @@ function LucaMissionBar({
   mission,
   running,
   canRun,
+  operationMode,
   readyRoles,
   isWorkflowReady,
-  traceId,
+  isIndividualReady,
   assignedCount,
   onMissionChange,
   onRun,
@@ -1363,9 +1618,10 @@ function LucaMissionBar({
   mission: string;
   running: boolean;
   canRun: boolean;
+  operationMode: OperationMode;
   readyRoles: number;
   isWorkflowReady: boolean;
-  traceId: string | null;
+  isIndividualReady: boolean;
   assignedCount: number;
   onMissionChange: (value: string) => void;
   onRun: () => void | Promise<void>;
@@ -1384,57 +1640,48 @@ function LucaMissionBar({
     }
   }
 
+  const statusText = running
+    ? operationMode === 'individual' ? '9Router executa as respostas; o juiz entra em seguida' : '9Router está executando o fluxo'
+    : operationMode === 'individual'
+      ? isIndividualReady
+        ? `Resolução pronta com ${assignedCount} participante${assignedCount === 1 ? '' : 's'} e um juiz`
+        : 'Escolha participantes e uma persona juíza'
+      : isWorkflowReady
+        ? `Fluxo pronto com ${assignedCount} persona${assignedCount === 1 ? '' : 's'}`
+        : `${readyRoles} de ${WORKFLOW_ROLES.length} etapas configuradas`;
+  const statusColor = running
+    ? theme.goldDeep
+    : (operationMode === 'individual' ? isIndividualReady : isWorkflowReady)
+      ? theme.ok
+      : theme.textMute;
+
   return (
-    <div className="void-panel rounded-2xl p-3 flex flex-col gap-2 shrink-0">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-        <div className="flex-1 min-w-0">
-          <label className="sr-only" htmlFor="luca-ai-mission">Missao da bancada</label>
-          <textarea
-            id="luca-ai-mission"
-            value={mission}
-            onChange={(event) => onMissionChange(event.target.value)}
-            onKeyDown={onKeyDown}
-            rows={1}
-            className="w-full resize-none bg-transparent outline-none text-sm leading-relaxed py-2.5 px-3 rounded-xl"
-            style={{ color: theme.text, background: theme.input, border: `1px solid ${theme.border}`, minHeight: 44, maxHeight: 120 }}
-            placeholder="Descreva a missão para os agentes..."
-            disabled={running}
-          />
-        </div>
-
-        <button type="button" className="btn-fleet flex items-center justify-center gap-2 whitespace-nowrap" onClick={onClear} disabled={running}>
-          <RotateCcw className="w-4 h-4" />
-          Limpar
-        </button>
-
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          type="button"
-          onClick={submit}
-          disabled={!canRun}
-          className="btn-primary flex items-center justify-center gap-2 whitespace-nowrap"
-        >
-          {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-          Rodar fluxo
-        </motion.button>
+    <>
+      <div className="luca-ai-composer-status" style={{ color: statusColor }}>
+        {statusText}
       </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[10px]" style={{ color: theme.textGhost }}>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-full px-2 py-1" style={{ background: isWorkflowReady ? theme.okBg : theme.warningBg, color: isWorkflowReady ? theme.ok : theme.warning }}>
-            <Radio className="h-3 w-3" />
-            {readyRoles}/{WORKFLOW_ROLES.length} modulos
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full px-2 py-1" style={{ background: theme.fleetSoft, color: theme.navyDeep }}>
-            <Network className="h-3 w-3" />
-            {assignedCount} personas
-          </span>
+      <div className="luca-ai-composer">
+        <label className="sr-only" htmlFor="luca-ai-mission">Missão da bancada</label>
+        <textarea
+          id="luca-ai-mission"
+          value={mission}
+          onChange={(event) => onMissionChange(event.target.value)}
+          onKeyDown={onKeyDown}
+          rows={1}
+          className="luca-ai-composer-input"
+          placeholder={operationMode === 'individual' ? 'Faça o que quiser' : 'Envie uma missão para a equipe...'}
+          disabled={running}
+        />
+        <div className="luca-ai-composer-toolbar">
+          <button type="button" className="luca-ai-composer-action" onClick={onClear} disabled={running} aria-label="Limpar conversa" title="Limpar conversa">
+            <RotateCcw className="h-3.5 w-3.5" />
+          </button>
+          <motion.button whileTap={{ scale: 0.94 }} type="button" onClick={submit} disabled={!canRun} className="luca-ai-send-button" aria-label="Enviar missão" title={(operationMode === 'individual' ? isIndividualReady : isWorkflowReady) ? 'Enviar missão' : operationMode === 'individual' ? 'Escolha participantes e juiz' : 'Configure a equipe primeiro'}>
+            {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+          </motion.button>
         </div>
-        <span className="font-mono">
-          {running ? 'processando no GLM' : traceId ? `trace ${traceId.slice(-10)}` : 'pronta para nova missao'}
-        </span>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -1445,11 +1692,12 @@ function PersonaAvatar({ persona, size = 'md' }: { persona: YumePersonaSummary; 
   const sizeClass = size === 'xs'
     ? 'h-7 w-7 text-sm'
     : size === 'sm'
-      ? 'h-10 w-10 text-lg'
-      : 'h-12 w-12 text-xl';
+      ? 'h-8 w-8 text-base'
+      : 'h-11 w-11 text-lg';
+  const radius = size === 'md' ? 'rounded-xl' : 'rounded-full';
 
   return (
-    <div className={`${sizeClass} relative shrink-0 overflow-hidden rounded-lg border`} style={{ background: theme.goldSoft, borderColor: theme.borderHover, color: theme.goldDeep }}>
+    <div className={`${sizeClass} ${radius} relative shrink-0 overflow-hidden border`} style={{ background: theme.goldSoft, borderColor: 'rgba(255,255,255,0.08)', color: theme.goldDeep }}>
       <div className="absolute inset-0 flex items-center justify-center font-display font-bold">{initial}</div>
       {avatarUrl && (
         <img
@@ -1465,249 +1713,96 @@ function PersonaAvatar({ persona, size = 'md' }: { persona: YumePersonaSummary; 
   );
 }
 
-function WorkflowRoleCard({
-  role,
-  personas,
-  personaBySlug,
-  selectedSlugs,
-  disabled,
-  onSetSingle,
-  onAdd,
-  onRemove,
-}: {
-  role: WorkflowRoleConfig;
-  personas: YumePersonaSummary[];
-  personaBySlug: Map<string, YumePersonaSummary>;
-  selectedSlugs: string[];
-  disabled: boolean;
-  onSetSingle: (slug: string) => void;
-  onAdd: (slug: string) => void;
-  onRemove: (slug: string) => void;
-}) {
-  const theme = useTheme();
-  const Icon = role.icon;
-  const selectedPersonas = selectedSlugs
-    .map((slug) => personaBySlug.get(slug))
-    .filter((persona): persona is YumePersonaSummary => Boolean(persona));
-  const availablePersonas = personas.filter((persona) => !selectedSlugs.includes(persona.slug));
-  const selectId = `luca-ai-role-${role.id}`;
-
-  return (
-    <article className="flex min-h-[168px] flex-col rounded-lg border p-3" style={{ background: theme.input, borderColor: selectedSlugs.length ? theme.borderActive : theme.border }}>
-      <div className="flex items-center gap-2">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border" style={{ background: theme.goldSoft, borderColor: theme.border, color: theme.goldDeep }}>
-          <Icon className="h-4 w-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold" style={{ color: theme.textSoft }}>{role.label}</h3>
-          <div className="mt-0.5 text-[10px] font-mono" style={{ color: theme.textGhost }}>{selectedSlugs.length}/{role.maxSlugs}</div>
-        </div>
-      </div>
-
-      <div className="mt-3 min-h-[58px] space-y-2">
-        {selectedPersonas.length ? (
-          selectedPersonas.map((persona) => (
-            <AssignedPersona
-              key={persona.slug}
-              persona={persona}
-              canRemove={role.multiple}
-              disabled={disabled}
-              onRemove={() => onRemove(persona.slug)}
-            />
-          ))
-        ) : (
-          <div className="flex h-[52px] items-center rounded-lg border border-dashed px-3 text-xs" style={{ borderColor: theme.border, color: theme.textGhost }}>
-            Sem persona
-          </div>
-        )}
-      </div>
-
-      <label className="sr-only" htmlFor={selectId}>{role.label}</label>
-      {role.multiple ? (
-        <select
-          id={selectId}
-          value=""
-          onChange={(event) => {
-            onAdd(event.target.value);
-            event.currentTarget.value = '';
-          }}
-          className="mt-auto w-full rounded-lg border px-3 py-2 text-xs outline-none"
-          style={{ background: theme.surfaceHi, borderColor: theme.border, color: theme.textSoft }}
-          disabled={disabled || selectedSlugs.length >= role.maxSlugs || availablePersonas.length === 0}
-        >
-          <option value="">{selectedSlugs.length >= role.maxSlugs ? 'limite atingido' : 'adicionar executor'}</option>
-          {availablePersonas.map((persona) => (
-            <option key={persona.slug} value={persona.slug}>{persona.name}</option>
-          ))}
-        </select>
-      ) : (
-        <select
-          id={selectId}
-          value={selectedSlugs[0] ?? ''}
-          onChange={(event) => onSetSingle(event.target.value)}
-          className="mt-auto w-full rounded-lg border px-3 py-2 text-xs outline-none"
-          style={{ background: theme.surfaceHi, borderColor: theme.border, color: theme.textSoft }}
-          disabled={disabled || personas.length === 0}
-        >
-          <option value="">selecionar persona</option>
-          {personas.map((persona) => (
-            <option key={persona.slug} value={persona.slug}>{persona.name}</option>
-          ))}
-        </select>
-      )}
-    </article>
-  );
-}
-
-function AssignedPersona({
-  persona,
-  canRemove,
-  disabled,
-  onRemove,
-}: {
-  persona: YumePersonaSummary;
-  canRemove: boolean;
-  disabled: boolean;
-  onRemove: () => void;
-}) {
-  const theme = useTheme();
-  return (
-    <div className="flex items-center gap-2 rounded-lg border p-2" style={{ background: theme.surfaceHi, borderColor: theme.border }}>
-      <PersonaAvatar persona={persona} size="sm" />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-xs font-semibold" style={{ color: theme.textSoft }}>{persona.name}</div>
-        <div className="mt-0.5 truncate text-[10px] font-mono" style={{ color: theme.textGhost }}>{persona.slug}</div>
-      </div>
-      {canRemove && (
-        <button
-          type="button"
-          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition hover:scale-105 disabled:opacity-40"
-          style={{ background: theme.goldSoft, borderColor: theme.border, color: theme.goldDeep }}
-          onClick={onRemove}
-          disabled={disabled}
-          aria-label={`Remover ${persona.name}`}
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
-      )}
-    </div>
-  );
-}
-
-function PersonaCatalogItem({
-  persona,
-  usageLabels,
-  executionSelected,
-  disabled,
-  onAdd,
-}: {
-  persona: YumePersonaSummary;
-  usageLabels: string[];
-  executionSelected: boolean;
-  disabled: boolean;
-  onAdd: () => void;
-}) {
-  const theme = useTheme();
-  const selected = usageLabels.length > 0;
-  return (
-    <motion.article
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex min-h-[96px] items-center gap-3 rounded-lg border p-3"
-      style={{ background: selected ? theme.goldSoft : theme.input, borderColor: selected ? theme.borderActive : theme.border }}
-    >
-      <PersonaAvatar persona={persona} size="sm" />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <h3 className="truncate text-sm font-semibold" style={{ color: theme.textSoft }}>{persona.name}</h3>
-          {persona.imported && <span className="state-badge ok !px-2 !py-0.5">LUCA</span>}
-        </div>
-        <div className="mt-1 truncate text-[11px] font-mono" style={{ color: theme.textGhost }}>{persona.slug}</div>
-        {usageLabels.length ? (
-          <div className="mt-1 truncate text-[11px]" style={{ color: theme.goldDeep }}>
-            {usageLabels.join(' / ')}
-          </div>
-        ) : (persona.description || persona.purpose) && (
-          <p className="mt-1 line-clamp-2 text-xs leading-relaxed" style={{ color: theme.textMute }}>
-            {persona.description || persona.purpose}
-          </p>
-        )}
-      </div>
-      <button
-        type="button"
-        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border transition hover:scale-105 disabled:opacity-45"
-        style={{ background: executionSelected ? theme.okBg : theme.fleetSoft, borderColor: executionSelected ? theme.ok : theme.border, color: executionSelected ? theme.ok : theme.navyDeep }}
-        onClick={onAdd}
-        disabled={disabled}
-        aria-label={`Adicionar ${persona.name} como executor`}
-      >
-        {executionSelected ? <CheckCircle2 className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-      </button>
-    </motion.article>
-  );
-}
-
 function FinalDisplayCard({ entry, persona }: { entry: TeamTranscriptEntry; persona?: YumePersonaSummary }) {
   const theme = useTheme();
+  const isJudge = entry.stage === 'Juiz';
   return (
-    <article className="rounded-lg border" style={{ background: theme.fleetSoft, borderColor: theme.borderActive }}>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: theme.border }}>
-        <div className="flex min-w-0 items-center gap-3">
-          <SpeakerAvatar entry={entry} persona={persona} compact />
-          <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2">
-              <Eye className="h-4 w-4 shrink-0" style={{ color: theme.navyDeep }} />
-              <h3 className="truncate text-sm font-semibold" style={{ color: theme.navyDeep }}>Exibicao final</h3>
-            </div>
-            <div className="mt-0.5 truncate text-xs" style={{ color: theme.textMute }}>{entry.name}</div>
-          </div>
-        </div>
-        {entry.model && <span className="rounded-full px-2 py-0.5 text-[10px] font-mono" style={{ background: theme.goldSoft, color: theme.goldDeep }}>{entry.model}</span>}
+    <article className="luca-ai-message">
+      <div className="luca-ai-message-meta">
+        <SpeakerAvatar entry={entry} persona={persona} compact />
+        <h3 className="truncate text-[13px] font-semibold" style={{ color: theme.text }}>{entry.name}</h3>
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ color: theme.textMute }}>
+          {isJudge ? <Scale className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+          {isJudge ? 'Veredito do juiz' : 'Entrega final'}
+        </span>
       </div>
-      <div className="px-4 py-4">
+      <div className="luca-ai-message-body">
         <RichMessageBody content={entry.content} />
       </div>
     </article>
   );
 }
 
+function IndividualResponseCard({
+  entry,
+  persona,
+  onInspect,
+}: {
+  entry: TeamTranscriptEntry;
+  persona?: YumePersonaSummary;
+  onInspect: (slug: string | null) => void;
+}) {
+  const theme = useTheme();
+  return (
+    <motion.details
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="luca-ai-individual-response luca-ai-message group"
+    >
+      <summary
+        className="luca-ai-message-meta cursor-pointer list-none"
+        onClick={() => onInspect(entry.slug || null)}
+      >
+        <SpeakerAvatar entry={entry} persona={persona} compact />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-semibold" style={{ color: entry.status === 'error' ? theme.error : theme.text }}>{entry.name}</span>
+          <span className="block text-[11px]" style={{ color: theme.textGhost }}>{entry.status === 'error' ? 'Falha individual' : 'Resposta individual · expandir'}</span>
+        </span>
+        <ChevronDown className="luca-ai-individual-chevron h-4 w-4 shrink-0" style={{ color: theme.textMute }} />
+      </summary>
+      <div className="luca-ai-message-body mt-2 pl-1">
+        <RichMessageBody content={entry.content} />
+      </div>
+    </motion.details>
+  );
+}
+
 function TranscriptEntry({ entry, persona }: { entry: TeamTranscriptEntry; persona?: YumePersonaSummary }) {
   const theme = useTheme();
   const isOperator = entry.role === 'operator';
-  const isSystem = entry.role === 'system';
-  const tone = entry.status === 'error'
-    ? { background: theme.errorBg, border: theme.error, color: theme.error }
-    : isOperator
-      ? { background: theme.fleetSoft, border: theme.borderHover, color: theme.navyDeep }
-      : { background: theme.input, border: theme.border, color: theme.textSoft };
+  const toneColor = entry.status === 'error' ? theme.error : theme.text;
+
+  if (isOperator) {
+    return (
+      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="luca-ai-message flex justify-end">
+        <article
+          className="min-w-0 max-w-[min(100%,34rem)] rounded-2xl px-4 py-3"
+          style={{ background: 'rgba(255,255,255,0.06)', color: theme.text, border: '1px solid rgba(255,255,255,0.08)' }}
+        >
+          <RichMessageBody content={entry.content} compact />
+        </article>
+      </motion.div>
+    );
+  }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
+    <motion.article
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`flex min-w-0 gap-3 ${isOperator ? 'justify-end' : 'justify-start'}`}
+      className="luca-ai-message"
     >
-      {!isOperator && <SpeakerAvatar entry={entry} persona={persona} />}
-      <article
-        className={`min-w-0 overflow-hidden rounded-lg border ${isOperator ? 'max-w-[76%]' : 'max-w-[920px] flex-1'}`}
-        style={{ background: tone.background, borderColor: tone.border }}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3" style={{ borderColor: theme.border, background: isSystem ? theme.errorBg : theme.surfaceHi }}>
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <span className="truncate text-sm font-semibold" style={{ color: tone.color }}>{entry.name}</span>
-            {entry.stage && <StageBadge stage={entry.stage} />}
-            {entry.model && <span className="rounded-full px-2 py-0.5 text-[10px] font-mono" style={{ background: theme.goldSoft, color: theme.goldDeep }}>{entry.model}</span>}
-          </div>
-          <time className="text-[10px] font-mono" style={{ color: theme.textGhost }}>
-            {new Date(entry.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-          </time>
-        </div>
-        <div className="px-4 py-4">
-          <RichMessageBody content={entry.content} compact={isOperator} />
-        </div>
-      </article>
-      {isOperator && <SpeakerAvatar entry={entry} persona={persona} />}
-    </motion.div>
+      <div className="luca-ai-message-meta">
+        <SpeakerAvatar entry={entry} persona={persona} compact />
+        <span className="min-w-0 text-[13px] font-semibold luca-wrap" style={{ color: toneColor }}>{entry.name}</span>
+        {entry.stage && <StageBadge stage={entry.stage} />}
+        <time className="ml-auto shrink-0 text-[10px] font-mono" style={{ color: theme.textGhost }}>
+          {new Date(entry.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+        </time>
+      </div>
+      <div className="luca-ai-message-body">
+        <RichMessageBody content={entry.content} />
+      </div>
+    </motion.article>
   );
 }
 
@@ -1717,8 +1812,8 @@ function StageBadge({ stage }: { stage: string }) {
   const Icon = WORKFLOW_ROLES.find((role) => role.id === roleId)?.icon ?? GitBranch;
 
   return (
-    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide" style={{ background: theme.fleetSoft, color: theme.navyDeep }}>
-      <Icon className="h-3 w-3 shrink-0" />
+    <span className="inline-flex max-w-full items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium tracking-wide" style={{ color: theme.textMute }}>
+      <Icon className="h-3 w-3 shrink-0 opacity-70" />
       <span className="truncate">{stage}</span>
     </span>
   );
@@ -1726,16 +1821,16 @@ function StageBadge({ stage }: { stage: string }) {
 
 function SpeakerAvatar({ entry, persona, compact = false }: { entry: TeamTranscriptEntry; persona?: YumePersonaSummary; compact?: boolean }) {
   const theme = useTheme();
-  const sizeClass = compact ? 'h-9 w-9' : 'h-10 w-10';
-  if (persona) return <PersonaAvatar persona={persona} size="sm" />;
+  const sizeClass = compact ? 'h-7 w-7' : 'h-8 w-8';
+  if (persona) return <PersonaAvatar persona={persona} size="xs" />;
 
   const Icon = entry.status === 'error' ? AlertCircle : entry.role === 'operator' ? UserRound : MessageSquareText;
   const color = entry.status === 'error' ? theme.error : entry.role === 'operator' ? theme.navyDeep : theme.goldDeep;
   const background = entry.status === 'error' ? theme.errorBg : entry.role === 'operator' ? theme.fleetSoft : theme.goldSoft;
 
   return (
-    <div className={`${sizeClass} flex shrink-0 items-center justify-center rounded-lg border`} style={{ background, borderColor: theme.border, color }}>
-      <Icon className="h-4 w-4" />
+    <div className={`${sizeClass} flex shrink-0 items-center justify-center rounded-full border`} style={{ background, borderColor: 'rgba(255,255,255,0.08)', color }}>
+      <Icon className="h-3.5 w-3.5" />
     </div>
   );
 }
@@ -1745,36 +1840,84 @@ function RichMessageBody({ content, compact = false }: { content: string; compac
   const blocks = parseMessageBlocks(content);
 
   return (
-    <div className={`max-w-[78ch] space-y-3 ${compact ? 'text-sm' : 'text-[13px] sm:text-sm'}`} style={{ color: theme.textSoft }}>
+    <div
+      className={`luca-ai-prose luca-wrap ${compact ? 'text-[13px]' : ''}`}
+      style={{ color: theme.textSoft }}
+    >
       {blocks.map((block, index) => {
         if (block.kind === 'heading') {
+          const headingClass = block.level <= 1
+            ? 'text-[15px] font-semibold tracking-[-0.02em]'
+            : block.level === 2
+              ? 'text-[14.5px] font-semibold tracking-[-0.015em]'
+              : 'text-[13.5px] font-semibold';
           return (
-            <h4 key={`${block.kind}-${index}`} className="text-sm font-semibold leading-snug" style={{ color: theme.text }}>
+            <h4 key={`${block.kind}-${index}`} className={`${headingClass} leading-snug luca-wrap`} style={{ color: theme.text }}>
               <InlineText value={block.label} />
             </h4>
           );
         }
 
+        if (block.kind === 'table') {
+          return (
+            <div key={`${block.kind}-${index}`} className="max-w-full overflow-x-auto rounded-xl border" style={{ borderColor: theme.border }}>
+              <table className="w-full min-w-[min(100%,480px)] border-collapse text-left text-xs sm:text-sm">
+                <thead style={{ background: theme.surfaceHi }}>
+                  <tr>{block.headers.map((header, cellIndex) => <th key={`${header}-${cellIndex}`} className="border-b px-3 py-2.5 font-semibold luca-wrap sm:px-4 sm:py-3" style={{ borderColor: theme.border, color: theme.text }}><InlineText value={header} /></th>)}</tr>
+                </thead>
+                <tbody>
+                  {block.rows.map((row, rowIndex) => (
+                    <tr key={`row-${rowIndex}`} className="border-b last:border-b-0" style={{ borderColor: theme.border }}>
+                      {block.headers.map((_, cellIndex) => <td key={`cell-${cellIndex}`} className="px-3 py-2.5 align-top luca-wrap sm:px-4 sm:py-3"><InlineText value={row[cellIndex] || '—'} /></td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+
+        if (block.kind === 'code') {
+          return (
+            <div key={`${block.kind}-${index}`} className="max-w-full overflow-hidden rounded-xl border" style={{ borderColor: theme.border, background: theme.console }}>
+              {block.language && <div className="border-b px-4 py-2 font-mono text-[10px] uppercase tracking-wider" style={{ borderColor: theme.border, color: theme.textGhost }}>{block.language}</div>}
+              <pre className="luca-pre overflow-x-auto p-4 font-mono text-xs leading-relaxed" style={{ color: theme.consoleText }}><code>{block.body}</code></pre>
+            </div>
+          );
+        }
+
+        if (block.kind === 'image') {
+          return (
+            <figure key={`${block.kind}-${index}`} className="max-w-full overflow-hidden rounded-xl border" style={{ borderColor: theme.border, background: theme.input }}>
+              <img src={block.src} alt={block.alt} className="max-h-[680px] w-full object-contain" />
+              {block.alt && <figcaption className="border-t px-4 py-2 text-xs luca-wrap" style={{ borderColor: theme.border, color: theme.textMute }}>{block.alt}</figcaption>}
+            </figure>
+          );
+        }
+
         if (block.kind === 'bullet') {
           return (
-            <div key={`${block.kind}-${index}`} className="flex gap-3 rounded-lg border px-3 py-2.5" style={{ background: theme.surfaceHi, borderColor: theme.border }}>
-              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: theme.goldDeep }} />
-              <div className="min-w-0 flex-1 leading-relaxed">
+            <div key={`${block.kind}-${index}`} className="luca-ai-bullet">
+              <span className="luca-ai-bullet-dot" style={{ background: theme.textMute }} />
+              <div className="min-w-0 flex-1">
                 {block.label && (
-                  <span className="mb-0.5 block text-xs font-semibold uppercase tracking-wide" style={{ color: theme.goldDeep }}>
+                  <span className="font-semibold luca-wrap" style={{ color: theme.text }}>
                     <InlineText value={block.label} />
+                    {block.body ? ': ' : ''}
                   </span>
                 )}
-                <p className="luca-wrap">
-                  <InlineText value={block.body} />
-                </p>
+                {block.body ? (
+                  <span className="luca-wrap">
+                    <InlineText value={block.body} />
+                  </span>
+                ) : null}
               </div>
             </div>
           );
         }
 
         return (
-          <p key={`${block.kind}-${index}`} className="luca-wrap leading-relaxed">
+          <p key={`${block.kind}-${index}`} className="luca-wrap">
             {block.label && (
               <span className="font-semibold" style={{ color: theme.text }}>
                 <InlineText value={block.label} />

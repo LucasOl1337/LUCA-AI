@@ -78,6 +78,8 @@ export const lucaApi = {
     apiPost<{ ok: boolean; removed: boolean }>('/api/agent/persona/remove', { slug }, base),
   runLucaAiPersonaTeam: (mission: string, slugs: string[], workflow?: LucaAiWorkflowAssignment[], traceId?: string, base?: string) =>
     apiPost<LucaAiPersonaTeamRunResponse>('/api/luca-ai/persona-team/run', { mission, slugs, workflow, traceId }, base, 180000),
+  runLucaAiIndividualResolution: (mission: string, slugs: string[], judgeSlug: string, traceId?: string, base?: string) =>
+    apiPost<LucaAiPersonaTeamRunResponse>('/api/luca-ai/persona-team/run', { mission, mode: 'individual', slugs, judgeSlug, traceId }, base, 180000),
   listEvents: (params: { traceId?: string; type?: string; limit?: number } = {}, base?: string) =>
     apiGet<{ ok: boolean; events: RuntimeEvent[] }>(`/api/events${queryString(params)}`, 8000, base),
 };

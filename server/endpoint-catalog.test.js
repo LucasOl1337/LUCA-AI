@@ -20,6 +20,7 @@ test('endpoint catalog expõe modulos core com exemplos de payload no modo backe
   assert.ok(runtime.inbound.some((entry) => entry.id === 'supervisor-start' && /manual operator trigger/.test(entry.examplePayload ?? '')));
   assert.equal(runtime.outbound.some((entry) => entry.id === 'goals'), false);
   assert.ok(runtime.outbound.some((entry) => entry.id === 'events-summary' && /type\/source/i.test(entry.summary ?? '')));
+  assert.ok(runtime.outbound.some((entry) => entry.id === 'router-models' && entry.path === '/api/router/models'));
 });
 
 test('endpoint catalog filtra rotas locais fora do modo cloud', () => {

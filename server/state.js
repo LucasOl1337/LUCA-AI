@@ -512,7 +512,7 @@ export function addPersonaAgent(entry = {}) {
     slug,
     source: 'yume',
     name: entry.name || existing?.name || slug,
-    model: entry.model ?? existing?.model ?? '',
+    model: sanitizeAgentModel(entry.model, existing?.model),
     enabled: entry.enabled !== undefined ? Boolean(entry.enabled) : (existing?.enabled !== false),
     cachedVersion: entry.cachedVersion ?? existing?.cachedVersion ?? null,
     cachedSystemPrompt: entry.cachedSystemPrompt ?? existing?.cachedSystemPrompt ?? null,
@@ -529,7 +529,11 @@ export function updatePersonaAgent(slug, patch = {}) {
   if (!Array.isArray(state.personaAgents)) state.personaAgents = [];
   const record = state.personaAgents.find((p) => p.slug === slug);
   if (!record) return null;
-  Object.assign(record, patch);
+  const nextPatch = { ...patch };
+  if (typeof patch.model === 'string') {
+    nextPatch.model = sanitizeAgentModel(patch.model, record.model);
+  }
+  Object.assign(record, nextPatch);
   persistState();
   return record;
 }

@@ -2,12 +2,11 @@ import AgentCard from '@/components/AgentCard';
 import { ALL_AGENT_DEFS } from '@/lib/agents';
 import { useLuca } from '@/hooks/useLucaState';
 import { useTheme } from '@/hooks/useTheme';
-import type { PageId } from '@/components/Layout';
 
 interface AgentesPageProps {
   activeAgent: string | null;
   onOpenAgent: (id: string | null) => void;
-  onNavigate: (page: PageId) => void;
+  onNavigate: (page: 'database') => void;
 }
 
 export default function AgentesPage({ activeAgent, onOpenAgent, onNavigate }: AgentesPageProps) {
@@ -15,7 +14,7 @@ export default function AgentesPage({ activeAgent, onOpenAgent, onNavigate }: Ag
   const { getAgentStatus, backendReady } = useLuca();
 
   return (
-    <div className="h-full overflow-y-auto px-8 py-8">
+    <div className="luca-page-shell h-full overflow-y-auto px-8 py-8">
       <div className="max-w-[1200px] mx-auto">
         <header className="mb-8">
           <h1 className="void-title text-3xl">Esquadrão</h1>

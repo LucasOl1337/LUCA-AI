@@ -5,12 +5,11 @@ import AgentCard from './AgentCard';
 import { AGENT_DEFS } from '@/lib/agents';
 import { useLuca } from '@/hooks/useLucaState';
 import { useTheme } from '@/hooks/useTheme';
-import type { PageId } from './Layout';
 
 interface AgentRailProps {
   activeAgent: string | null;
   onOpenAgent: (id: string | null) => void;
-  onNavigate: (page: PageId) => void;
+  onNavigate: (page: 'database') => void;
 }
 
 export default function AgentRail({ activeAgent, onOpenAgent, onNavigate }: AgentRailProps) {

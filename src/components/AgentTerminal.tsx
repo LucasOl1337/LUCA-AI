@@ -81,7 +81,7 @@ export default function AgentTerminal({ activeAgent, onClose }: AgentTerminalPro
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center p-6"
+          className="luca-modal-layer fixed inset-0 z-50 flex items-center justify-center p-6"
           style={{ background: 'rgba(3,9,18,0.72)', backdropFilter: 'blur(6px)' }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -92,7 +92,7 @@ export default function AgentTerminal({ activeAgent, onClose }: AgentTerminalPro
           onTouchStart={onClose}
         >
           <motion.div
-            className="void-panel rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden"
+            className="luca-sheet void-panel rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden"
             role="dialog"
             aria-modal="true"
             aria-label={isHeartbeat ? 'heartbeat monitor' : `${title} terminal`}

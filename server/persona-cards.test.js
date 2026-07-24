@@ -21,13 +21,23 @@ test('normaliza personas do Yume com flag de importacao e avatar proxy local', (
         version: 4,
       },
     ],
-    [{ slug: 'maestro' }],
+    [{ slug: 'maestro', model: 'cx/gpt-5.6-sol' }],
   );
 
   assert.equal(personas.length, 1);
   assert.equal(personas[0].imported, true);
+  assert.equal(personas[0].model, 'cx/gpt-5.6-sol');
   assert.equal(personas[0].avatarUrl, '/api/personas/avatar?src=%2Fapi%2Favatars%2Fmaestro.png');
   assert.equal(personas[0].version, 4);
+});
+
+test('nao expoe o modelo remoto de uma persona ainda nao importada', () => {
+  const personas = normalizeYumePersonasForLuca([
+    { slug: 'legada', name: 'Legada', model: 'glm-5.2' },
+  ]);
+
+  assert.equal(personas[0].imported, false);
+  assert.equal(personas[0].model, '');
 });
 
 test('mantem avatar externo direto e nao tenta proxiar pelo LUCA', () => {

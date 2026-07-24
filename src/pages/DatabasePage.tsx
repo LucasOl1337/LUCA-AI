@@ -37,7 +37,7 @@ export default function DatabasePage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto px-8 py-8">
+    <div className="luca-page-shell h-full overflow-y-auto px-8 py-8">
       <div className="max-w-[1200px] mx-auto">
         <header className="flex items-end justify-between mb-6">
           <div>

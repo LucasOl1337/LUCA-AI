@@ -106,7 +106,7 @@ export default function PersonasPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto px-6 py-7 sm:px-8">
+    <div className="luca-page-shell h-full overflow-y-auto px-6 py-7 sm:px-8">
       <div className="mx-auto max-w-[1360px] space-y-6">
         <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -246,8 +246,8 @@ function PersonaCard({ persona, delay, busy, onImport, onRemove }: PersonaCardPr
       initial={{ opacity: 0, y: 14, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.25, delay, ease: [0.4, 0, 0.2, 1] }}
-      className="group relative aspect-square overflow-hidden rounded-lg border"
-      style={{ background: theme.input, borderColor: persona.imported ? theme.borderActive : theme.border, boxShadow: persona.imported ? `0 0 0 1px ${theme.goldGlow}` : undefined }}
+      className="group relative aspect-square overflow-hidden rounded-[18px]"
+      style={{ background: theme.input, boxShadow: persona.imported ? `inset 3px 0 0 ${theme.gold}` : 'var(--l-shadow-card)' }}
     >
       <div className="absolute inset-0 flex items-center justify-center" style={{ background: theme.goldSoft, color: theme.goldDeep }}>
         <span className="font-display text-6xl font-bold">{initial}</span>
@@ -267,21 +267,20 @@ function PersonaCard({ persona, delay, busy, onImport, onRemove }: PersonaCardPr
           {persona.imported ? 'LUCA' : 'Yume'}
         </span>
         {persona.version !== null && persona.version !== undefined && (
-          <span className="rounded-full px-2 py-1 text-[10px] font-mono" style={{ background: 'rgba(30,18,9,0.50)', color: '#fff7ed' }}>
+          <span className="rounded-full px-2 py-1 text-[10px] font-mono" style={{ background: 'rgba(5,8,13,0.62)', color: theme.text }}>
             v{persona.version}
           </span>
         )}
       </div>
-      <div className="absolute inset-x-0 bottom-0 translate-y-2 p-3 opacity-0 transition duration-200 group-hover:translate-y-0 group-hover:opacity-100">
-        <div className="rounded-lg p-3 shadow-lg" style={{ background: 'rgba(13, 26, 15, 0.86)', color: '#fdf6ec' }}>
+      <div className="absolute inset-x-0 bottom-0 translate-y-2 p-3 opacity-0 transition duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+        <div className="rounded-xl p-3 shadow-lg" style={{ background: 'rgba(10, 14, 20, 0.90)', color: theme.text, backdropFilter: 'blur(20px)' }}>
           <h2 className="truncate text-sm font-semibold">{persona.name}</h2>
           <div className="mt-1 truncate text-[11px] font-mono opacity-75">{persona.slug}</div>
-          {persona.model && <div className="mt-2 truncate text-[11px] opacity-80">{persona.model}</div>}
           {persona.description && <p className="mt-2 line-clamp-2 text-xs leading-relaxed opacity-80">{persona.description}</p>}
           <button
             type="button"
             className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition disabled:opacity-50"
-            style={{ background: persona.imported ? 'rgba(192,57,43,0.20)' : 'rgba(47,158,106,0.24)', color: '#fdf6ec', border: '1px solid rgba(253,246,236,0.22)' }}
+            style={{ background: persona.imported ? theme.errorBg : theme.goldSoft, color: theme.text }}
             disabled={busy}
             onClick={persona.imported ? onRemove : onImport}
           >

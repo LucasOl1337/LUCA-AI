@@ -93,11 +93,11 @@ export default function CopyLogButton({ text, label = 'copiar log' }: CopyLogBut
       onClick={copyFromClick}
       title={label}
       aria-label={label}
-      className="inline-flex h-10 items-center gap-1.5 px-3 rounded-md text-[10px] font-medium tracking-wide uppercase transition-all duration-200"
-      style={{ color: copied ? 'var(--l-alive)' : failed ? 'var(--l-error)' : 'var(--l-text-mute)', border: '1px solid var(--l-border)' }}
+      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[10px] font-medium tracking-wide uppercase transition-all duration-200"
+      style={{ color: copied ? 'var(--l-alive)' : failed ? 'var(--l-error)' : 'var(--l-text-mute)', background: 'rgba(255,255,255,.08)' }}
     >
       {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-      {copied ? 'copiado' : failed ? 'falhou' : 'copiar'}
+      <span className="sr-only">{copied ? 'copiado' : failed ? 'falhou' : 'copiar'}</span>
     </button>
   );
 }
