@@ -9,7 +9,6 @@ import { useTheme } from '@/hooks/useTheme';
 type FilterMode = 'all' | 'imported' | 'available';
 
 const YUME_DASHBOARD_URL = 'http://127.0.0.1:2222';
-const LOCAL_LUCA_BRIDGE_URL = 'http://127.0.0.1:4242';
 
 function withBaseUrl(value: string | undefined, base: string | undefined): string | undefined {
   const raw = String(value || '').trim();
@@ -36,7 +35,9 @@ export default function PersonasPage() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<FilterMode>('all');
 
-  const bridgeBase = runtimeMode === 'cloud' ? LOCAL_LUCA_BRIDGE_URL : undefined;
+  // No domínio, o Express está na mesma origem via Cloudflare Tunnel.
+  // Usar 127.0.0.1 aqui apontaria para a máquina do visitante.
+  const bridgeBase: string | undefined = undefined;
   const importedInState = state?.personaAgents?.length ?? 0;
 
   const load = useCallback(async () => {
@@ -46,14 +47,12 @@ export default function PersonasPage() {
       const data = await lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined);
       setPersonas(normalizePersonaAssetUrls(data.personas ?? [], bridgeBase));
     } catch (err) {
-      const fallback = runtimeMode === 'cloud'
-        ? `Nao consegui acessar a ponte local do LUCA em ${LOCAL_LUCA_BRIDGE_URL}.`
-        : 'Falha ao carregar personas do Yume.';
+      const fallback = 'Falha ao carregar personas do Yume.';
       setError(buildApiErrorMessage(err, fallback));
     } finally {
       setLoading(false);
     }
-  }, [bridgeBase, runtimeMode]);
+  }, [bridgeBase]);
 
   useEffect(() => {
     void load();

@@ -36,7 +36,6 @@ import { useLuca } from '@/hooks/useLucaState';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useTheme } from '@/hooks/useTheme';
 
-const LOCAL_LUCA_BRIDGE_URL = 'http://127.0.0.1:4242';
 const MAX_EXECUTORS = 4;
 const LUCA_AI_CLEAN_UI_VERSION = '9router-clean-v1';
 const LUCA_AI_CLEAN_UI_STORAGE_KEY = 'luca.lucaAi.cleanUiVersion';
@@ -485,7 +484,9 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const [busyPersonaSlug, setBusyPersonaSlug] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
 
-  const bridgeBase = runtimeMode === 'cloud' ? LOCAL_LUCA_BRIDGE_URL : undefined;
+  // O frontend publicado e o runtime Express compartilham a mesma origem
+  // através do Cloudflare Tunnel. Nunca tente acessar o loopback do visitante.
+  const bridgeBase: string | undefined = undefined;
   const assignments = useMemo(() => normalizeWorkflowAssignments(workflowState), [workflowState]);
   const assignedSlugs = useMemo(() => flattenWorkflowAssignments(assignments), [assignments]);
   const individualAssignments = useMemo<IndividualAssignments>(() => ({
@@ -508,14 +509,12 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       const data = await lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined);
       setPersonas(normalizePersonaAssetUrls(data.personas ?? [], bridgeBase));
     } catch (err) {
-      const fallback = runtimeMode === 'cloud'
-        ? `Nao consegui acessar a ponte local do LUCA em ${LOCAL_LUCA_BRIDGE_URL}.`
-        : 'Falha ao carregar personas do Yume.';
+      const fallback = 'Falha ao carregar personas do Yume.';
       setError(buildApiErrorMessage(err, fallback));
     } finally {
       setLoading(false);
     }
-  }, [bridgeBase, runtimeMode]);
+  }, [bridgeBase]);
 
   useEffect(() => {
     void loadPersonas();
