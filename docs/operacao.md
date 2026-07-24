@@ -29,6 +29,6 @@ O teste do catalogo local le `../TARS/ferramentas` e `../Yume/ferramentas`. Mant
 
 O runtime grava estado em `.luca/system-state.json` e eventos em `.luca/runtime-events.jsonl`. A pasta esta ignorada pelo Git. Copie esses arquivos antes de limpar o estado quando precisar preservar missoes, personas importadas ou historico.
 
-## Release cloud
+## Produção
 
-O repositorio nao possui workflow de CI nem script de deploy. `wrangler.jsonc` publica `dist/` no dominio de producao e declara a migration do Durable Object. O Wrangler nao esta fixado nas dependencias do projeto.
+`deploy/run-luca-ai.ps1` inicia o Express em loopback com o 9Router e o Kamui da VM. O Tunnel configurado fora do repositório publica `luca-ai.com.br` e o acesso público não exige conta Cloudflare.

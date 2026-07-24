@@ -28,7 +28,7 @@ export default function GlobalChat() {
           className="text-[9px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full"
           style={{ color: backendReady || cloudRuntime ? theme.alive : theme.error, background: backendReady || cloudRuntime ? theme.aliveSoft : theme.errorBg }}
         >
-          {cloudRuntime ? 'glm' : backendReady ? 'ao vivo' : 'offline'}
+          {cloudRuntime ? '9router' : backendReady ? 'ao vivo' : 'offline'}
         </span>
         <CopyLogButton text={formatGlobalChatLog(globalChatMessages)} label="copiar log do chat" />
       </header>

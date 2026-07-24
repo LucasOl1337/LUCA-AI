@@ -135,8 +135,7 @@ export default function MissionBar() {
     || ['running', 'pending', 'verifying'].includes(String(runStatus ?? ''))
     || Boolean(activeMission && !runSettled);
   const hasMissionSurface = Boolean(activeMission || state?.activeRun || state?.temporaryDashboard);
-  const heartbeatModelSelector = state?.heartbeatMonitor?.modelSelector as { model?: string } | undefined;
-  const activeCloudModel = heartbeatModelSelector?.model || state?.governance?.provider || 'modelo';
+  const activeCloudModel = state?.governance?.provider || '9router';
   const missionConcurrency = state?.governance?.missionConcurrency ?? state?.heartbeatMonitor?.governance?.missionConcurrency ?? null;
   const concurrencyMissionId = String(missionConcurrency?.latestUnmatched?.missionId || '').trim();
   const activeMissionId = String(activeMission?.id || state?.activeMission?.id || '').trim();

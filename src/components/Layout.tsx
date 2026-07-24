@@ -68,12 +68,10 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
   }, [mobileNavOpen]);
 
   const cloudRuntime = runtimeMode === 'cloud';
-  const heartbeatModelSelector = state?.heartbeatMonitor?.modelSelector as { model?: string } | undefined;
-  const activeCloudModel = heartbeatModelSelector?.model || state?.governance?.provider || 'modelo cloud';
   const runtimeOnline = cloudRuntime ? connectionState !== 'offline' : backendReady;
   const statusTone = connectionState === 'checking' ? theme.warning : runtimeOnline ? theme.alive : theme.error;
   const runtimeLabel = cloudRuntime
-    ? connectionState === 'checking' ? 'conectando cloud' : runtimeOnline ? `${activeCloudModel} cloud` : 'runtime cloud offline'
+    ? connectionState === 'checking' ? 'conectando 9router' : runtimeOnline ? '9router online' : '9router offline'
     : connectionState === 'checking' ? 'checando sistema' : backendReady ? 'sistema online' : 'sistema offline';
   const activeItem = navItems.find((item) => item.id === activePage) ?? navItems[0];
 

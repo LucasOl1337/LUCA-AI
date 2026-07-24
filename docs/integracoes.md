@@ -1,6 +1,6 @@
 # Integracoes
 
-Leia SOMENTE ao mudar roteador LLM, Kamui, personas Yume ou a ponte local do modo cloud.
+Leia SOMENTE ao mudar roteador LLM, Kamui, personas Yume ou a publicação pela VM.
 
 ## Roteador local
 
@@ -28,8 +28,8 @@ Ao importar uma persona, o LUCA preserva nome, prompt e versao lidos do Yume, ma
 
 O LUCA lista personas, le prompt e versao e guarda o cache no estado local. Nao adicione escrita no Yume a esse cliente.
 
-No modo cloud, as telas de personas e LUCA-AI tentam acessar `http://127.0.0.1:4242` como ponte local. Mantenha o runtime Express ativo para importar ou executar recursos Yume pela interface cloud.
+No domínio público, as telas de Personas e LUCA-AI usam `/api` na mesma origem. O Cloudflare Tunnel encaminha essas chamadas para o Express em `127.0.0.1:4242`; o navegador do visitante nunca tenta acessar o próprio loopback.
 
-## Worker Cloudflare
+## Publicação atual
 
-O Worker usa `GLM_API_KEY` como secret e le `GLM_BASE`, `GLM_MODEL`, `GLM_MODEL_OPTIONS` e `MODEL_SELECTOR_KEY` da configuracao. Valide `GET /api/health` e `GET /api/preflight` depois de mudar provider ou bindings.
+O ambiente de produção usa somente o 9Router da VM. O Cloudflare fornece DNS e Tunnel, sem executar modelos e sem exigir conta Cloudflare do visitante. O runtime legado em `worker/` não participa da publicação de `luca-ai.com.br`.

@@ -78,7 +78,7 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
               : connectionState === 'checking'
                 ? 'Conectando ao runtime para preparar o LUCA-AI e o catálogo de personas.'
               : cloudRuntime
-                ? 'Modo público online. O runtime cloud está pronto para atender o LUCA-AI.'
+                ? 'Modo público online. O runtime da VM está conectado ao 9Router e pronto para atender o LUCA-AI.'
               : backendReady
                 ? 'Sistema online. Abra o LUCA-AI para iniciar uma missão ou Personas para montar o catálogo.'
                 : 'Sem conexão com o backend. Verifique se o servidor está em 127.0.0.1:4242.'}

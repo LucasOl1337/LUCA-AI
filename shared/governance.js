@@ -4,8 +4,8 @@ const FINAL_EVENT_TYPES = new Set(['mission.completed', 'mission.failed', 'missi
 const DEFAULT_MISSION_LOCK_TIMEOUT_MS = 20 * 60 * 1000;
 
 export const DEFAULT_GOVERNANCE_POLICY = {
-  runtime: 'cloudflare-worker',
-  provider: 'glm-5.1',
+  runtime: 'vm-cloudflare-tunnel',
+  provider: '9router',
   liveMissionConcurrency: 'single_active_mission',
   irreversibleActions: 'blocked_without_operator',
   shellAccess: false,
@@ -96,8 +96,8 @@ export function buildGovernanceSummary(overrides = {}) {
     `Provider principal: ${policy.provider}`,
     `Concorrencia de missoes: ${concurrencyLabel}`,
     `Acoes irreversiveis: ${policy.irreversibleActionList.join(', ')}`,
-    `Shell: ${policy.shellAccess ? 'permitido' : 'indisponivel no runtime cloud'}`,
-    `Filesystem write: ${policy.filesystemWriteAccess ? 'permitido' : 'indisponivel no runtime cloud'}`,
+    `Shell: ${policy.shellAccess ? 'permitido' : 'indisponivel no runtime publicado'}`,
+    `Filesystem write: ${policy.filesystemWriteAccess ? 'permitido' : 'indisponivel no runtime publicado'}`,
     `Preflight obrigatorio: ${policy.requiredPreflightEndpoints.join(', ')}`,
     `Budget padrao: ${policy.defaultBudget.maxIterations} iteracoes / ${policy.defaultBudget.maxSeconds}s / ${policy.defaultBudget.maxToolCalls} tool calls`,
   ];

@@ -7,6 +7,7 @@ test('buildGovernanceSummary expõe politica cloud compativel com LUCA', () => {
   const summary = buildGovernanceSummary();
 
   assert.equal(summary.runtime, DEFAULT_GOVERNANCE_POLICY.runtime);
+  assert.equal(summary.provider, '9router');
   assert.equal(summary.liveMissionConcurrency, 'single_active_mission');
   assert.equal(summary.irreversibleActions, 'blocked_without_operator');
   assert.equal(summary.shellAccess, false);
