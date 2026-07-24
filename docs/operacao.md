@@ -34,4 +34,4 @@ Se existir `.luca/system-state.json` de uma versão anterior, as personas são m
 
 O servidor escuta `127.0.0.1` por padrão. A proteção Cloudflare Access é obrigatória na publicação e opcional apenas no desenvolvimento local. Não altere `HOST` para uma interface pública.
 
-Para a publicação em `lucaai.com.br`, mantenha `HOST=127.0.0.1`, use `deploy/run-luca-ai.ps1` no processo supervisionado da VM e conecte o Cloudflare Tunnel ao mesmo endereço. Ative `REQUIRE_CLOUDFLARE_ACCESS=true` e configure a política Access antes de criar a rota DNS. Nunca exponha as portas 20128 ou 1338.
+Para a publicação em `luca-ai.com.br`, mantenha `HOST=127.0.0.1`, use `deploy/run-luca-ai.ps1` no processo supervisionado da VM e conecte o Cloudflare Tunnel ao mesmo endereço. Ative `REQUIRE_CLOUDFLARE_ACCESS=true` e configure a política Access antes de criar a rota DNS. Nunca exponha as portas 20128 ou 1338.
