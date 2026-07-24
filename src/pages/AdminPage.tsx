@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Activity, RefreshCw, Search, ShieldCheck, UsersRound } from 'lucide-react';
+import { Activity, Gauge, MousePointerClick, Play, RefreshCw, Search, ShieldCheck, UsersRound } from 'lucide-react';
 import type { AuthUser } from '@/hooks/useAuth';
 
 interface Overview {
@@ -8,6 +8,9 @@ interface Overview {
   activeToday: number;
   activeSessions: number;
   totalLogins: number;
+  totalRequests: number;
+  totalActions: number;
+  totalRuns: number;
   generatedAt: string;
 }
 
@@ -62,6 +65,9 @@ export default function AdminPage() {
         <article><Activity /><span>Ativos nas últimas 24h</span><strong>{overview?.activeToday ?? '—'}</strong></article>
         <article><ShieldCheck /><span>Sessões ativas</span><strong>{overview?.activeSessions ?? '—'}</strong></article>
         <article><RefreshCw /><span>Total de logins</span><strong>{overview?.totalLogins ?? '—'}</strong></article>
+        <article><Gauge /><span>Solicitações à plataforma</span><strong>{overview?.totalRequests ?? '—'}</strong></article>
+        <article><MousePointerClick /><span>Ações realizadas</span><strong>{overview?.totalActions ?? '—'}</strong></article>
+        <article><Play /><span>Execuções iniciadas</span><strong>{overview?.totalRuns ?? '—'}</strong></article>
       </section>
 
       <section className="admin-users-panel">
@@ -71,8 +77,8 @@ export default function AdminPage() {
         </div>
         {error ? <p className="admin-state error">{error}</p> : (
           <div className="admin-table-wrap">
-            <table><thead><tr><th>Usuário</th><th>Papel</th><th>Cadastro</th><th>Última atividade</th><th>Logins</th><th>Sessões</th></tr></thead>
-              <tbody>{users.map((user) => <tr key={user.id}><td><strong>{user.name}</strong><span>{user.email}</span></td><td><em data-role={user.role}>{user.role === 'admin' ? 'Admin' : 'Usuário'}</em></td><td>{formatDate(user.createdAt)}</td><td>{formatDate(user.lastSeenAt)}</td><td>{user.loginCount}</td><td>{user.sessionCount}</td></tr>)}</tbody>
+            <table><thead><tr><th>Usuário</th><th>Papel</th><th>Cadastro</th><th>Última atividade</th><th>Logins</th><th>Solicitações</th><th>Ações</th><th>Execuções</th><th>Erros</th><th>Sessões</th></tr></thead>
+              <tbody>{users.map((user) => <tr key={user.id}><td><strong>{user.name}</strong><span>{user.email}</span></td><td><em data-role={user.role}>{user.role === 'admin' ? 'Admin' : 'Usuário'}</em></td><td>{formatDate(user.createdAt)}</td><td>{formatDate(user.lastSeenAt)}</td><td>{user.loginCount}</td><td>{user.requestCount}</td><td>{user.actionCount}</td><td>{user.runCount}</td><td>{user.errorCount}</td><td>{user.sessionCount}</td></tr>)}</tbody>
             </table>
             {!loading && users.length === 0 && <p className="admin-state">Nenhuma conta encontrada.</p>}
           </div>

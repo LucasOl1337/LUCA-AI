@@ -32,6 +32,25 @@ test('contas seguintes são usuários e login incrementa tracking', () => {
   assert.equal(store.listUsers()[0].email, 'user@example.com');
 });
 
+test('tracking contabiliza solicitações, ações, execuções e erros por conta', () => {
+  const { store } = temporaryStore();
+  const account = store.register({ email: 'user@example.com', password: 'senha-forte-456' });
+  store.recordUsage(account.user.id, { method: 'GET', path: '/api/state', statusCode: 200 });
+  store.recordUsage(account.user.id, { method: 'POST', path: '/api/luca-ai/persona-team/run', statusCode: 200 });
+  store.recordUsage(account.user.id, { method: 'POST', path: '/api/mission/context', statusCode: 422 });
+  store.recordUsage(account.user.id, { method: 'WS', path: '/ws', statusCode: 101, websocket: true });
+
+  const tracked = store.listUsers()[0];
+  assert.equal(tracked.requestCount, 4);
+  assert.equal(tracked.actionCount, 2);
+  assert.equal(tracked.runCount, 1);
+  assert.equal(tracked.errorCount, 1);
+  assert.equal(tracked.websocketCount, 1);
+  assert.equal(store.overview().totalRequests, 4);
+  assert.equal(store.overview().totalActions, 2);
+  assert.equal(store.overview().totalRuns, 1);
+});
+
 test('allowlist de admin impede que outra primeira conta capture o papel', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-auth-'));
   const store = new AuthStore(path.join(directory, 'auth.json'), { adminEmails: ['owner@example.com'] });

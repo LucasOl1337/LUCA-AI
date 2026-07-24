@@ -988,9 +988,10 @@
 .auth-card form { display: flex; flex-direction: column; gap: 18px; margin-top: 36px; }
 .auth-card label > span { display: block; margin: 0 0 8px 2px; color: rgba(228,240,255,.68); font-size: 11px; font-weight: 650; }
 .auth-card label > div { height: 52px; display: flex; align-items: center; gap: 11px; padding: 0 15px; border: 1px solid rgba(255,255,255,.1); border-radius: 13px; background: rgba(255,255,255,.045); transition: border-color .15s, box-shadow .15s; }
-.auth-card label > div:focus-within { border-color: rgba(47,153,246,.7); box-shadow: 0 0 0 3px rgba(35,135,224,.1); }
+.auth-card label > div:focus-within { border-color: rgba(255,255,255,.2); box-shadow: none; }
 .auth-card label svg { width: 17px; height: 17px; flex: none; color: rgba(228,240,255,.36); }
-.auth-card label input { width: 100%; min-width: 0; border: 0; outline: 0; color: #edf5ff; background: transparent; font-size: 14px; }
+.auth-card label input { width: 100%; min-width: 0; border: 0; outline: 0; color: #edf5ff; caret-color: #edf5ff; background: transparent; font-size: 14px; }
+.auth-card label input::selection { color: inherit; background: rgba(255,255,255,.14); }
 .auth-card label input::placeholder { color: rgba(228,240,255,.25); }
 .auth-card label button { width: 34px; height: 34px; display: grid; flex: none; place-items: center; color: rgba(228,240,255,.45); }
 .auth-error { margin: -4px 0 0; padding: 10px 12px; border: 1px solid rgba(255,91,91,.22); border-radius: 10px; color: #ff9b9b; background: rgba(190,38,38,.1); font-size: 12px; }
@@ -1018,7 +1019,7 @@
 .admin-heading p { color: var(--l-text-mute); font-size: 13px; }
 .admin-heading button { min-height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border: 1px solid var(--l-border); border-radius: 11px; color: var(--l-text-soft); background: var(--l-surface); font-size: 11px; }
 .admin-heading button svg { width: 14px; height: 14px; }
-.admin-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 28px 0 16px; }
+.admin-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 28px 0 16px; }
 .admin-metrics article { position: relative; min-height: 126px; display: flex; flex-direction: column; justify-content: flex-end; padding: 18px; border: 1px solid var(--l-border); border-radius: 16px; background: rgba(17,22,30,.78); box-shadow: var(--l-shadow-card); }
 .admin-metrics article > svg { position: absolute; top: 17px; right: 17px; width: 18px; height: 18px; color: var(--l-gold-bright); }
 .admin-metrics span { color: var(--l-text-mute); font-size: 10px; }
@@ -1032,7 +1033,7 @@
 .admin-users-toolbar input { width: 190px; border: 0; outline: 0; color: var(--l-text); background: transparent; font-size: 11px; }
 .admin-users-toolbar form button { align-self: stretch; padding: 0 13px; border-left: 1px solid var(--l-border); color: var(--l-gold-bright); font-size: 10px; font-weight: 700; }
 .admin-table-wrap { overflow-x: auto; }
-.admin-table-wrap table { width: 100%; border-collapse: collapse; min-width: 760px; }
+.admin-table-wrap table { width: 100%; border-collapse: collapse; min-width: 1120px; }
 .admin-table-wrap th { padding: 12px 18px; color: var(--l-text-ghost); text-align: left; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
 .admin-table-wrap td { padding: 14px 18px; border-top: 1px solid rgba(255,255,255,.055); color: var(--l-text-mute); font-size: 11px; }
 .admin-table-wrap td:first-child { display: flex; flex-direction: column; }

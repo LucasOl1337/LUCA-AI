@@ -43,6 +43,18 @@ function safeEqualHex(left, right) {
   }
 }
 
+function usageSnapshot(user) {
+  const usage = user.usage && typeof user.usage === 'object' ? user.usage : {};
+  return {
+    requestCount: Number(usage.requestCount || 0),
+    actionCount: Number(usage.actionCount || 0),
+    runCount: Number(usage.runCount || 0),
+    errorCount: Number(usage.errorCount || 0),
+    websocketCount: Number(usage.websocketCount || 0),
+    lastRequestAt: String(usage.lastRequestAt || ''),
+  };
+}
+
 function publicUser(user) {
   return {
     id: user.id,
@@ -54,6 +66,7 @@ function publicUser(user) {
     lastLoginAt: user.lastLoginAt,
     lastSeenAt: user.lastSeenAt,
     loginCount: user.loginCount,
+    ...usageSnapshot(user),
   };
 }
 
@@ -117,6 +130,14 @@ export class AuthStore {
       lastLoginAt: timestamp,
       lastSeenAt: timestamp,
       loginCount: 1,
+      usage: {
+        requestCount: 0,
+        actionCount: 0,
+        runCount: 0,
+        errorCount: 0,
+        websocketCount: 0,
+        lastRequestAt: '',
+      },
     };
     this.data.users.push(user);
     const session = this.#createSession(user, { ip, userAgent, persist: false });
@@ -194,6 +215,39 @@ export class AuthStore {
     if (before !== this.data.sessions.length) this.#persist();
   }
 
+  recordUsage(userId, {
+    method = 'GET',
+    path: requestPath = '',
+    statusCode = 200,
+    websocket = false,
+  } = {}) {
+    const user = this.data.users.find((candidate) => candidate.id === userId);
+    if (!user) return;
+
+    const current = usageSnapshot(user);
+    const normalizedMethod = String(method || 'GET').toUpperCase();
+    const normalizedPath = String(requestPath || '').split('?')[0];
+    const isAction = !websocket && !['GET', 'HEAD', 'OPTIONS'].includes(normalizedMethod);
+    const isRun = normalizedMethod === 'POST' && (
+      normalizedPath === '/api/luca-ai/persona-team/run'
+      || normalizedPath === '/api/mission/activate'
+      || normalizedPath === '/api/agent/run'
+      || normalizedPath === '/api/supervisor/start'
+    );
+    const timestamp = nowIso();
+
+    user.usage = {
+      requestCount: current.requestCount + 1,
+      actionCount: current.actionCount + (isAction ? 1 : 0),
+      runCount: current.runCount + (isRun ? 1 : 0),
+      errorCount: current.errorCount + (Number(statusCode) >= 400 ? 1 : 0),
+      websocketCount: current.websocketCount + (websocket ? 1 : 0),
+      lastRequestAt: timestamp,
+    };
+    user.lastSeenAt = timestamp;
+    this.#persist();
+  }
+
   overview() {
     this.#cleanupSessions();
     const now = Date.now();
@@ -204,6 +258,9 @@ export class AuthStore {
       activeToday: this.data.users.filter((user) => Date.parse(user.lastSeenAt || 0) >= activeSince).length,
       activeSessions: this.data.sessions.filter((session) => Date.parse(session.expiresAt) > now).length,
       totalLogins: this.data.users.reduce((sum, user) => sum + Number(user.loginCount || 0), 0),
+      totalRequests: this.data.users.reduce((sum, user) => sum + usageSnapshot(user).requestCount, 0),
+      totalActions: this.data.users.reduce((sum, user) => sum + usageSnapshot(user).actionCount, 0),
+      totalRuns: this.data.users.reduce((sum, user) => sum + usageSnapshot(user).runCount, 0),
       generatedAt: nowIso(),
     };
   }

@@ -186,6 +186,12 @@ const wss = new WebSocketServer({
       return;
     }
     info.req.auth = session;
+    authService.store.recordUsage(session.user.id, {
+      method: 'WS',
+      path: '/ws',
+      statusCode: 101,
+      websocket: true,
+    });
     done(true);
   },
 });

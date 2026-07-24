@@ -21,7 +21,9 @@ function sameOriginRequest(req) {
   const origin = String(req.headers.origin || '').trim();
   if (!origin) return true;
   try {
-    return new URL(origin).host === String(req.headers.host || '');
+    const forwardedHost = String(req.headers['x-forwarded-host'] || '').split(',')[0].trim();
+    const publicHost = forwardedHost && req.headers['cf-ray'] ? forwardedHost : String(req.headers.host || '');
+    return new URL(origin).host === publicHost;
   } catch {
     return false;
   }
@@ -145,6 +147,13 @@ export function createAuthService({ rootDir = process.cwd(), dataPath = '', admi
       return;
     }
     req.auth = session;
+    res.once('finish', () => {
+      store.recordUsage(session.user.id, {
+        method: req.method,
+        path: req.originalUrl,
+        statusCode: res.statusCode,
+      });
+    });
     next();
   }
 

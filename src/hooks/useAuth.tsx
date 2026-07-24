@@ -10,6 +10,12 @@ export interface AuthUser {
   lastLoginAt: string;
   lastSeenAt: string;
   loginCount: number;
+  requestCount: number;
+  actionCount: number;
+  runCount: number;
+  errorCount: number;
+  websocketCount: number;
+  lastRequestAt: string;
 }
 
 interface AuthContextValue {

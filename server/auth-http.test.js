@@ -35,6 +35,19 @@ test('fluxo HTTP protege API e libera painel para a primeira conta admin', async
   });
   assert.equal(crossSiteRegister.status, 403);
 
+  const forwardedRegister = await fetch(`${baseUrl}/api/auth/register`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      origin: 'https://luca-ai.com.br',
+      host: 'luca-origin.bombapvp.com',
+      'cf-ray': 'test-ray',
+      'x-forwarded-host': 'luca-ai.com.br',
+    },
+    body: JSON.stringify({ name: 'Proxy', email: 'invalido', password: 'senha-segura-123' }),
+  });
+  assert.equal(forwardedRegister.status, 400);
+
   const registered = await fetch(`${baseUrl}/api/auth/register`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -48,7 +61,9 @@ test('fluxo HTTP protege API e libera painel para a primeira conta admin', async
   assert.equal(privateResponse.status, 200);
   const usersResponse = await fetch(`${baseUrl}/api/admin/users`, { headers: { cookie } });
   assert.equal(usersResponse.status, 200);
-  assert.equal((await usersResponse.json()).users.length, 1);
+  const usersPayload = await usersResponse.json();
+  assert.equal(usersPayload.users.length, 1);
+  assert.equal(usersPayload.users.find((user) => user.email === 'admin@luca.test').requestCount, 1);
 
   const logout = await fetch(`${baseUrl}/api/auth/logout`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: '{}' });
   assert.equal(logout.status, 200);

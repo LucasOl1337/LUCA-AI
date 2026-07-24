@@ -36,3 +36,5 @@ Em produção, `luca-ai.service` inicia o Express em loopback na VM `sennin-core
 O produto possui autenticação própria por e-mail e senha. Contas listadas em `LUCA_ADMIN_EMAILS` visualizam o item `Admin` no menu. Somente quando essa variável não está configurada, a primeira conta criada se torna administradora para permitir o bootstrap.
 
 Os dados persistentes ficam em `/var/lib/luca-ai` na VM (`LUCA_DATA_DIR`), incluindo `auth.json`, estado, eventos e heartbeat. Esse diretório deve fazer parte do backup privado da VM. Os arquivos contêm hashes de senha e de tokens de sessão, nunca senhas ou tokens em texto puro.
+
+O painel `Admin` acompanha por conta logins, sessões, solicitações autenticadas, ações de escrita, execuções iniciadas, erros, conexões WebSocket e última atividade. O tracking guarda somente contadores e timestamps; conteúdo de prompts e respostas não é copiado para `auth.json`.

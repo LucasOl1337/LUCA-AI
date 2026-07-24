@@ -2,6 +2,15 @@ import { useState } from 'react';
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, UserRound } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
+function keepCaretFree(event: React.FocusEvent<HTMLInputElement>) {
+  const input = event.currentTarget;
+  requestAnimationFrame(() => {
+    if (input.selectionStart === 0 && input.selectionEnd === input.value.length) {
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+  });
+}
+
 export default function AuthPage() {
   const { login, register } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -51,10 +60,10 @@ export default function AuthPage() {
 
           <form onSubmit={submit}>
             {mode === 'register' && (
-              <label><span>Nome</span><div><UserRound /><input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" placeholder="Como devemos chamar você?" maxLength={80} /></div></label>
+              <label><span>Nome</span><div><UserRound /><input value={name} onChange={(event) => setName(event.target.value)} onFocus={keepCaretFree} autoComplete="name" placeholder="Como devemos chamar você?" maxLength={80} /></div></label>
             )}
-            <label><span>E-mail</span><div><Mail /><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder="voce@empresa.com" required /></div></label>
-            <label><span>Senha</span><div><LockKeyhole /><input type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder="Mínimo de 8 caracteres" minLength={8} maxLength={128} required /><button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOff /> : <Eye />}</button></div></label>
+            <label><span>E-mail</span><div><Mail /><input type="text" inputMode="email" value={email} onChange={(event) => setEmail(event.target.value)} onFocus={keepCaretFree} autoComplete="email" placeholder="voce@empresa.com" required /></div></label>
+            <label><span>Senha</span><div><LockKeyhole /><input type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} onFocus={keepCaretFree} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder="Mínimo de 8 caracteres" minLength={8} maxLength={128} required /><button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOff /> : <Eye />}</button></div></label>
             {error && <p className="auth-error" role="alert">{error}</p>}
             <button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Aguarde…' : mode === 'login' ? 'Entrar' : 'Criar conta'}<ArrowRight /></button>
           </form>
