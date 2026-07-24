@@ -88,7 +88,7 @@ if ! grep -q 'hostname: luca-ai.com.br' "$tunnel_config"; then
   mv "$config_tmp" "$tunnel_config"
 fi
 
-cloudflared tunnel ingress validate --config "$tunnel_config"
+cloudflared tunnel --config "$tunnel_config" ingress validate
 systemctl restart cloudflared-bombapvp-lab.service
 systemctl is-active --quiet luca-ai.service
 systemctl is-active --quiet cloudflared-bombapvp-lab.service
