@@ -9,6 +9,22 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
   const isVisible = (entry) => entry.availability === 'both' || entry.availability === runtime;
   const modules = [
       {
+        id: 'accounts',
+        label: 'Contas e acesso',
+        description: 'autenticação própria do LUCA e acompanhamento administrativo de usuários',
+        featured: true,
+        outbound: [
+          endpoint('auth-session', 'GET', '/api/auth/session', 'retorna a sessão atual sem expor o token', 'both'),
+          endpoint('admin-overview', 'GET', '/api/admin/overview', 'métricas agregadas de cadastros, sessões e logins para administradores', 'local'),
+          endpoint('admin-users', 'GET', '/api/admin/users', 'lista rastreável de usuários cadastrados para administradores', 'local'),
+        ],
+        inbound: [
+          endpoint('auth-register', 'POST', '/api/auth/register', 'cria conta por e-mail e senha e inicia a sessão sem confirmação de e-mail', 'both'),
+          endpoint('auth-login', 'POST', '/api/auth/login', 'autentica por e-mail e senha', 'both'),
+          endpoint('auth-logout', 'POST', '/api/auth/logout', 'encerra a sessão atual', 'both'),
+        ],
+      },
+      {
         id: 'runtime',
         label: runtime === 'cloud' ? 'Runtime Cloudflare' : 'Runtime local',
         description: runtime === 'cloud'

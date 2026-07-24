@@ -9,5 +9,6 @@ $env:ROUTER_BASE_URL = 'http://127.0.0.1:20128/v1'
 $env:ROUTER_MODEL = 'cx/gpt-5.6-sol-high'
 $env:KAMUI_BASE = 'http://127.0.0.1:1338'
 $env:REQUIRE_CLOUDFLARE_ACCESS = 'false'
+$env:LUCA_ADMIN_EMAILS = 'lucasplays2000@gmail.com'
 
 & node server/index.js

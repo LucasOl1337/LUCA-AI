@@ -1,16 +1,15 @@
 import express from 'express';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { WebSocketServer } from 'ws';
 import {
   API_RATE_LIMIT_MAX,
   API_RATE_LIMIT_WINDOW_MS,
-  CLOUDFLARE_ACCESS_EMAILS,
   HOST,
   PORT,
-  REQUIRE_CLOUDFLARE_ACCESS,
   AGENTS,
   AGENT_ALIASES,
   ROUTER_BASE_URL,
@@ -118,6 +117,7 @@ import {
   PERSONA_WORKFLOW_ROLES,
   runIndividualResolution,
 } from './persona-team.js';
+import { createAuthService } from './auth.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -141,26 +141,6 @@ function requestIdentity(req) {
   return String(req.headers['cf-connecting-ip'] || req.ip || req.socket.remoteAddress || 'unknown');
 }
 
-function isDirectLoopback(req) {
-  const address = String(req.socket.remoteAddress || '');
-  return !req.headers['cf-ray'] && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(address);
-}
-
-function requireCloudflareAccess(req, res, next) {
-  if (!REQUIRE_CLOUDFLARE_ACCESS || isDirectLoopback(req)) {
-    next();
-    return;
-  }
-  const email = String(req.headers['cf-access-authenticated-user-email'] || '').trim().toLowerCase();
-  const assertion = String(req.headers['cf-access-jwt-assertion'] || '').trim();
-  const emailAllowed = CLOUDFLARE_ACCESS_EMAILS.length === 0 || CLOUDFLARE_ACCESS_EMAILS.includes(email);
-  if (!email || !assertion || !emailAllowed) {
-    res.status(401).json({ ok: false, error: 'cloudflare_access_required' });
-    return;
-  }
-  next();
-}
-
 function rateLimitApi(req, res, next) {
   const now = Date.now();
   const key = requestIdentity(req);
@@ -179,10 +159,36 @@ function rateLimitApi(req, res, next) {
   next();
 }
 
-app.use('/api', requireCloudflareAccess, rateLimitApi);
+const adminEmails = String(process.env.LUCA_ADMIN_EMAILS ?? '')
+  .split(',')
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
+const internalAuthToken = crypto.randomBytes(32).toString('hex');
+const authService = createAuthService({
+  adminEmails,
+  internalToken: internalAuthToken,
+  dataPath: process.env.LUCA_AUTH_DATA_PATH,
+});
+
+app.use('/api', rateLimitApi);
+authService.registerRoutes(app);
+app.use('/api', authService.requireUser);
+authService.registerAdminRoutes(app);
 
 const httpServer = createServer(app);
-const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+const wss = new WebSocketServer({
+  server: httpServer,
+  path: '/ws',
+  verifyClient(info, done) {
+    const session = authService.sessionFromRequest(info.req, { touch: true });
+    if (!session) {
+      done(false, 401, 'Authentication required');
+      return;
+    }
+    info.req.auth = session;
+    done(true);
+  },
+});
 
 let supervisorTimer = null;
 let heartbeatProcess = null;
@@ -448,7 +454,7 @@ async function runLocalPreflight() {
     probeEndpoint: async (endpointPath) => {
       try {
         const response = await fetch(`${baseUrl}${endpointPath}`, {
-          headers: { Accept: 'application/json' },
+          headers: { Accept: 'application/json', 'x-luca-internal-auth': internalAuthToken },
         });
         const body = await response.json().catch(() => null);
         const ok = response.ok && (

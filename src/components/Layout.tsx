@@ -5,14 +5,17 @@ import {
   ChevronLeft,
   ChevronRight,
   Home,
+  LogOut,
   Menu,
+  ShieldCheck,
   StickyNote,
   X,
 } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import { useLuca } from '@/hooks/useLucaState';
+import { useAuth } from '@/hooks/useAuth';
 
-export type PageId = 'inicio' | 'luca-ai' | 'personas';
+export type PageId = 'inicio' | 'luca-ai' | 'personas' | 'admin';
 
 interface LayoutProps {
   activePage: PageId;
@@ -31,6 +34,7 @@ const navItems: NavItem[] = [
   { id: 'inicio', label: 'Início', icon: Home, hint: 'visão geral do LUCA-AI' },
   { id: 'luca-ai', label: 'LUCA-AI', icon: BrainCircuit, hint: 'bancada isolada com equipe de personas' },
   { id: 'personas', label: 'Personas', icon: StickyNote, hint: 'personas do Yume disponíveis no LUCA' },
+  { id: 'admin', label: 'Admin', icon: ShieldCheck, hint: 'usuários e atividade da plataforma' },
 ];
 
 const dockIds: PageId[] = ['inicio', 'luca-ai', 'personas'];
@@ -40,6 +44,7 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
   const [isNarrow, setIsNarrow] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const theme = useTheme();
+  const { user, logout } = useAuth();
   const { backendReady, connectionState, runtimeMode, state } = useLuca();
 
   useEffect(() => {
@@ -120,7 +125,7 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
               Espaços
             </div>
           )}
-          {navItems.map((item) => {
+          {navItems.filter((item) => item.id !== 'admin' || user?.role === 'admin').map((item) => {
             const Icon = item.icon;
             const selected = activePage === item.id;
             return (
@@ -139,7 +144,14 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
           })}
         </nav>
 
-        <div className="px-2 pb-3 pt-2">
+        <div className="px-2 pb-2 pt-2">
+          {!compact && user && (
+            <div className="luca-account-summary">
+              <span>{user.name.slice(0, 1).toUpperCase()}</span>
+              <div><strong>{user.name}</strong><small>{user.email}</small></div>
+              <button type="button" onClick={() => void logout()} aria-label="Sair da conta" title="Sair"><LogOut /></button>
+            </div>
+          )}
           <div
             className={`min-h-11 flex items-center gap-2 rounded-xl px-3 ${compact ? 'justify-center' : ''}`}
             style={{ background: 'rgba(255,255,255,.08)', boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,.18)' }}
