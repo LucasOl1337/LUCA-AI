@@ -1,15 +1,26 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+function resolveRelatedCatalog(project) {
+  const envName = `LUCA_${project.toUpperCase()}_CATALOG_DIR`;
+  const candidates = [
+    process.env[envName],
+    path.resolve(process.cwd(), '..', project, 'ferramentas'),
+    path.resolve(process.cwd(), '..', 'Em espera', project, 'ferramentas'),
+  ].filter(Boolean);
+
+  return candidates.find((candidate) => fs.existsSync(candidate)) || candidates[0];
+}
+
 const DEFAULT_RELATED_CATALOGS = [
   {
     project: 'TARS',
-    catalogPath: path.resolve(process.cwd(), '..', 'TARS', 'ferramentas'),
+    catalogPath: resolveRelatedCatalog('TARS'),
     source: 'tars-tool-catalog-pattern',
   },
   {
     project: 'Yume',
-    catalogPath: path.resolve(process.cwd(), '..', 'Yume', 'ferramentas'),
+    catalogPath: resolveRelatedCatalog('Yume'),
     source: 'yume-tool-catalog-loader-pattern',
   },
 ];

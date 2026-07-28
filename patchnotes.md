@@ -1,5 +1,31 @@
 # Patch Notes — LUCA-AI
 
+## 2026-07-27 — comercial “uma missão, uma equipe”
+
+**Comparação:** PC e `origin/codex/restore-current-luca` partiam de `71fa5b7`; a diferença local inclui `package.json`, lockfile e o novo pacote `promo/` (2.598 inserções e 65 remoções nos arquivos rastreados, além dos ativos novos).  
+**Branch:** `codex/restore-current-luca`, preservada por já ser uma branch de trabalho.  
+**Conflitos:** nenhum após `fetch`.
+
+### Entrega
+
+- Comercial de 42 segundos em 1920×1080/30 fps, dividido entre dor de orquestração, escolha de personas, fluxo de responsabilidades, entrega e chamada final.
+- Capturas reais das telas de autenticação, home, personas, fluxo 5/5, missão pronta e entrega final.
+- Composição Remotion com movimentos, cursor, transições, tipografia JetBrains Mono, coruja/ícone canônicos e identidade azul/verde do produto.
+- Novo comando `npm run promo`, que primeiro constrói o produto, captura as telas e então renderiza o MP4.
+- Dependências de Remotion e Playwright registradas no pacote e lockfile principal.
+- A descoberta de catálogos irmãos aceita `LUCA_TARS_CATALOG_DIR`/`LUCA_YUME_CATALOG_DIR` e a pasta organizacional `Em espera`, sem perder o layout irmão tradicional.
+- O teste de integração acompanha o ID vigente `nexarq.agenda` do Yume, mantendo-o apenas advisory e não executável pelo LUCA.
+
+### Impacto
+
+O runtime, Worker e schema do LUCA não mudam por causa do filme. O ciclo acrescenta um pipeline reprodutível de demonstração baseado na interface real, com a promessa “Sua missão. Uma equipe inteira.”
+
+### Segurança
+
+`.codex-tmp/` foi adicionado ao `.gitignore`. Essa pasta contém perfil de captura, imagens intermediárias e estado efêmero que pode carregar sessão; ela permanece no PC e não entra no GitHub. Apenas os ativos sanitizados copiados para `promo/public/` serão versionados. Nenhum deploy para `app.luca-ai.com.br` faz parte deste commit.
+
+---
+
 **Data:** 2026-07-24
 **Estado do commit:** `(2026-07-24)+(producao-vm) safe commit`
 **Repositório:** https://github.com/LucasOl1337/LUCA-AI (público)

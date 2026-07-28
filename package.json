@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "server": "node server/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "node --test \"server/**/*.test.js\""
+    "test": "node --test \"server/**/*.test.js\"",
+    "promo": "npm run build && node promo/scripts/capture-product.mjs && remotion render promo/src/index.tsx Promo promo/dist/luca-ai-commercial.mp4 --codec=h264 --crf=16 --overwrite --public-dir=promo/public"
   },
   "dependencies": {
     "express": "^5.2.1",
@@ -22,11 +23,14 @@
     "ws": "^8.20.0"
   },
   "devDependencies": {
+    "@remotion/cli": "^4.0.344",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.4",
     "autoprefixer": "^10.4.20",
+    "playwright": "^1.55.1",
     "postcss": "^8.5.0",
+    "remotion": "^4.0.344",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.9.3",
     "vite": "^7.1.12"

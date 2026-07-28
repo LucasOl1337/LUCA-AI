@@ -27,7 +27,7 @@ test('buildToolCatalog expõe ferramentas operacionais locais do LUCA', () => {
   assert.ok(catalog.relatedCatalogs.some((entry) => entry.project === 'TARS'));
   assert.ok(catalog.relatedCatalogs.some((entry) => entry.project === 'Yume'));
   assert.ok(catalog.advisoryTools.some((tool) => tool.id === 'tars:mission_log' && tool.canonicalId === 'mission_log'));
-  assert.ok(catalog.advisoryTools.some((tool) => tool.id === 'yume:agendar_consulta' && tool.executable === false));
+  assert.ok(catalog.advisoryTools.some((tool) => tool.id === 'yume:nexarq.agenda' && tool.executable === false));
   assert.deepEqual(catalog.errors, []);
 });
 
