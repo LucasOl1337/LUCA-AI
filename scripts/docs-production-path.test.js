@@ -51,4 +51,10 @@ test('docs/* still document VM Express + edge proxy as production', () => {
   assert.equal(arq.includes('Worker de borda'), false);
   assert.match(arq, /proxy de borda \(deploy\/luca-ai-vm-proxy\.js\)/);
   assert.match(arq, /borda Cloudflare \(proxy\/Tunnel\)/);
+  // operacao/integracoes must not reintroduce Worker label for the edge proxy
+  assert.equal(op.includes('Worker de borda'), false);
+  assert.match(op, /proxy de borda `luca-ai-vm-proxy`/);
+  assert.equal(integ.includes('único Worker ativo'), false);
+  assert.equal(integ.includes('unico Worker ativo'), false);
+  assert.match(integ, /proxy mínimo de borda versionado em `deploy\/luca-ai-vm-proxy\.js`/);
 });
