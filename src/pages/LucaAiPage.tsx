@@ -475,6 +475,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorRetry, setErrorRetry] = useState<'personas' | 'run' | null>(null);
   const [activePersonaSlug, setActivePersonaSlug] = usePersistentState<string | null>('lucaAi.activePersonaSlug', null);
   const [activeTraceId, setActiveTraceId] = useState<string | null>(null);
   const [processEvents, setProcessEvents] = useState<RuntimeEvent[]>([]);
@@ -505,12 +506,14 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const loadPersonas = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setErrorRetry(null);
     try {
       const data = await lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined);
       setPersonas(normalizePersonaAssetUrls(data.personas ?? [], bridgeBase));
     } catch (err) {
       const fallback = 'Falha ao carregar personas do Yume.';
       setError(buildApiErrorMessage(err, fallback));
+      setErrorRetry('personas');
     } finally {
       setLoading(false);
     }
@@ -606,6 +609,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     if (!persona || persona.imported) return Boolean(persona);
     setBusyPersonaSlug(slug);
     setError(null);
+    setErrorRetry(null);
     try {
       await lucaApi.importYumePersona(slug, bridgeBase);
       const data = await lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined);
@@ -614,6 +618,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       return true;
     } catch (err) {
       setError(buildApiErrorMessage(err, `Falha ao conectar ${persona.name || slug} ao LUCA.`));
+      setErrorRetry('personas');
       return false;
     } finally {
       setBusyPersonaSlug(null);
@@ -709,8 +714,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     const traceId = createTraceId();
     setRunning(true);
     setError(null);
+    setErrorRetry(null);
     setFinalResult(null);
-    setMission('');
     setActiveTraceId(traceId);
     setProcessEvents(operationMode === 'team'
       ? plannedRuntimeEvents(traceId, trimmedMission, assignmentsToRun, personaBySlug)
@@ -778,14 +783,20 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           timestamp: data.generatedAt || new Date().toISOString(),
         });
       }
-      if (!data.ok) setError(operationMode === 'individual'
-        ? 'As respostas individuais foram acionadas, mas o juiz não concluiu um veredito útil.'
-        : 'A equipe foi acionada, mas nenhuma persona retornou resposta util.');
+      if (data.ok) {
+        setMission('');
+      } else {
+        setError(operationMode === 'individual'
+          ? 'As respostas individuais foram acionadas, mas o juiz não concluiu um veredito útil.'
+          : 'A equipe foi acionada, mas nenhuma persona retornou resposta util.');
+        setErrorRetry('run');
+      }
     } catch (err) {
       const message = buildApiErrorMessage(err, operationMode === 'individual'
         ? 'Falha ao rodar resolução individual.'
         : 'Falha ao rodar fluxo de personas.');
       setError(message);
+      setErrorRetry('run');
       const errorEntry: TeamTranscriptEntry = {
         id: nowId('system-error'),
         role: 'system',
@@ -903,13 +914,26 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         </header>
 
         {error && (
-        <div className="luca-ai-chat-notice" data-luca-chat-error data-tone="error" role="alert">
+        <div
+          className="luca-ai-chat-notice"
+          data-luca-chat-error
+          data-tone="error"
+          data-luca-chat-error-kind={errorRetry === 'run' ? 'run' : 'personas'}
+          role="alert"
+        >
           <Notice
             title="Atenção"
             body={error}
-            onRetry={() => void loadPersonas()}
-            onDismiss={() => setError(null)}
-            busy={loading}
+            onRetry={() => {
+              if (errorRetry === 'run') void runMission();
+              else void loadPersonas();
+            }}
+            onDismiss={() => {
+              setError(null);
+              setErrorRetry(null);
+            }}
+            busy={loading || running}
+            retryLabel={errorRetry === 'run' ? 'Reenviar missão' : 'Tentar novamente'}
           />
         </div>
       )}
@@ -1043,12 +1067,14 @@ function Notice({
   onRetry,
   onDismiss,
   busy,
+  retryLabel = 'Tentar novamente',
 }: {
   title: string;
   body: string;
   onRetry?: () => void;
   onDismiss?: () => void;
   busy?: boolean;
+  retryLabel?: string;
 }) {
   const theme = useTheme();
   const recoverable = Boolean(onRetry || onDismiss);
@@ -1074,7 +1100,7 @@ function Notice({
                 onClick={onRetry}
                 disabled={busy}
               >
-                {busy ? "Recarregando…" : "Tentar novamente"}
+                {busy ? (retryLabel === 'Reenviar missão' ? 'Reenviando…' : 'Recarregando…') : retryLabel}
               </button>
             ) : null}
             {onDismiss ? (
