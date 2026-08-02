@@ -70,7 +70,7 @@ export function normalizeChartItems(items: unknown[]): ChartItem[] {
     .slice(0, 5);
 }
 
-const PIE_PALETTE = ['#C9A227', '#7FB3D5', '#1E4E8C', '#43d18a', '#b58cff'];
+const PIE_PALETTE = ['#0a84ff', '#7FB3D5', '#1E4E8C', '#43d18a', '#b58cff'];
 
 export function pieGradient(items: ChartItem[]): string {
   const total = items.reduce((sum, item) => sum + item.value, 0) || 1;
