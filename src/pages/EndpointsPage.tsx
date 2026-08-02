@@ -53,11 +53,22 @@ export default function EndpointsPage() {
   const theme = useTheme();
   const [catalog, setCatalog] = useState<CatalogResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<CatalogTab>('inbound');
 
+  function retryCatalog() {
+    setError(null);
+    setCatalog(null);
+    setLoading(true);
+    setReloadKey((key) => key + 1);
+  }
+
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setError(null);
     fetch('/api/catalog/endpoints')
       .then(async (response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -70,11 +81,14 @@ export default function EndpointsPage() {
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   const selectedModule = useMemo(
     () => catalog?.modules.find((item) => item.id === selectedId) ?? catalog?.modules[0] ?? null,
@@ -110,14 +124,33 @@ export default function EndpointsPage() {
         </header>
 
         {error && (
-          <div className="void-panel rounded-2xl p-5">
+          <div
+            className="void-panel rounded-2xl p-5"
+            data-endpoints-error
+            data-tone="error"
+            role="alert"
+          >
             <div className="text-sm font-semibold" style={{ color: theme.error }}>Falha ao carregar o catálogo</div>
             <div className="mt-2 text-xs font-mono" style={{ color: theme.textMute }}>{error}</div>
+            <p className="mt-3 text-xs leading-relaxed" style={{ color: theme.textSoft }}>
+              O runtime não devolveu o catálogo de endpoints. Tente de novo ou confira se o servidor local está no ar.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="btn-primary !px-4 !py-2 !text-xs"
+                data-endpoints-retry
+                onClick={retryCatalog}
+                disabled={loading}
+              >
+                {loading ? 'Recarregando…' : 'Tentar novamente'}
+              </button>
+            </div>
           </div>
         )}
 
         {!catalog && !error && (
-          <div className="flex min-h-[240px] items-center justify-center">
+          <div className="flex min-h-[240px] items-center justify-center" data-endpoints-loading>
             <div className="flex items-center gap-3 text-sm uppercase tracking-[0.24em]" style={{ color: theme.textMute }}>
               <Loader2 className="h-4 w-4 animate-spin" />
               carregando catálogo
