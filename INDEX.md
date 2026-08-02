@@ -24,5 +24,5 @@
 | [`docs/integracoes.md`](./docs/integracoes.md) | SOMENTE ao mudar roteador LLM, Kamui, personas Yume ou a publicacao pela VM. |
 | `praisonai-tests/README.md` | SOMENTE ao executar os exemplos Python desse diretorio. |
 | `grokimaginevideos/README.md` | SOMENTE ao trabalhar nesse checkout co-locado. |
-| `DocsDev/` | SOMENTE ao buscar contexto historico que o codigo e os documentos oficiais nao resolvem; nao trate como fonte de verdade. |
+| `DocsDev/` | SOMENTE ao buscar contexto historico que o codigo e os documentos oficiais nao resolvem; nao trate como fonte de verdade. `DocsDev/codegraph/` e snapshot pre-VM (Worker DO) — leia o README SUPERSEDED antes. |
 | `DocsDev/arquivados/` | NUNCA leia durante trabalho normal; use apenas por ordem explicita do dono. |
