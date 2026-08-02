@@ -1056,7 +1056,14 @@ function LucaAiStartState({
   const error = state === 'error';
 
   return (
-    <div className="flex h-full min-h-0 items-center justify-center overflow-y-auto p-4 sm:p-8">
+    <div
+      className="flex h-full min-h-0 items-center justify-center overflow-y-auto p-4 sm:p-8"
+      data-luca-start-state={state}
+      data-luca-start-error={error ? '' : undefined}
+      data-luca-start-empty={!loading && !error ? '' : undefined}
+      data-tone={error ? 'error' : undefined}
+      role={error ? 'alert' : undefined}
+    >
       <section className="void-panel relative w-full max-w-[760px] overflow-hidden rounded-[26px] p-6 sm:p-10">
         <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full" style={{ background: `radial-gradient(circle, ${theme.goldSoft}, transparent 68%)` }} />
         <div className="relative max-w-[560px]">
@@ -1075,9 +1082,46 @@ function LucaAiStartState({
                 : 'Escolha no catálogo as personas que poderão supervisionar, executar, aprovar e apresentar as missões desta bancada.'}
           </p>
           {!loading && (
-            <div className="mt-7 flex flex-wrap gap-2">
-              <button type="button" className="btn-primary" onClick={onOpenPersonas}>Abrir Personas</button>
-              <button type="button" className="btn-fleet" onClick={() => void onReload()}>Verificar novamente</button>
+            <div className="mt-7 flex flex-wrap gap-2" data-luca-start-actions={error ? 'error' : 'empty'}>
+              {error ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    data-luca-start-retry
+                    onClick={() => void onReload()}
+                  >
+                    Tentar novamente
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-fleet"
+                    data-luca-start-open-personas
+                    onClick={onOpenPersonas}
+                  >
+                    Abrir Personas
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    data-luca-start-open-personas
+                    onClick={onOpenPersonas}
+                  >
+                    Abrir Personas
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-fleet"
+                    data-luca-start-retry
+                    onClick={() => void onReload()}
+                  >
+                    Verificar novamente
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>

@@ -9,7 +9,10 @@ Ledger do enxame `swarm/LUCA-AI/enxame-continuo`. Uma entrega de valor por sess�
 
 
 ## Em andamento
-_(nenhum — sessão fechou)_
+### 2026-08-02T10:10:21Z — NX-LUCA-AI-continuo
+- Área: recovery UX — LucaAiStartState error/empty com CTA indiferenciado
+- Escopo: `src/pages/LucaAiPage.tsx`, `server/luca-start-state-cta.test.js`
+- NÃO tocar: Personas recovery, Admin/Endpoints error, picker empty (bugs), visual auth, landing meta
 
 
 ## Concluído
