@@ -4,7 +4,7 @@ Coletor do enxame `contínuo`. Só este assunto. Sem push/PR/deploy/main.
 
 ## Estado
 - Branch execução: `swarm/LUCA-AI/enxame-continuo` @ `6095faf` (worktree `C:/Projetos/LUCA-AI-enxame`)
-- Branch integração: `swarm/LUCA-AI/continuo-integracao` @ `b9d4d84` (local; tip produto+ledger; relatório em commit seguinte)
+- Branch integração: `swarm/LUCA-AI/continuo-integracao` @ `9a736dd` (local)
 - Base produto: `codex/restore-current-luca` / `b14f395`
 - Coleta: 2026-08-02 (AFK cron NX coletor contínuo — rodadas start-state + landing system status + Layout shell)
 
@@ -75,7 +75,7 @@ CRLF preservado em Layout/Landing/LucaAi/Personas/Admin. Conflitos: nenhum (cher
 
 ## Decisão
 **aprovar** start-state + landing system status + Layout shell reconnect; manter Endpoints/Admin/Personas já aprovados.  
-Integração local: `swarm/LUCA-AI/continuo-integracao` @ `b9d4d84` (+ commit do relatório).  
+Integração local: `swarm/LUCA-AI/continuo-integracao` @ `9a736dd`.  
 Main / `codex/restore-current-luca` **não** atualizados. Precisa humano só para merge futuro na base comercial.
 
 ## Próximo livre (executor)
