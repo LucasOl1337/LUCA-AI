@@ -1,13 +1,22 @@
 # SwarmLedger — visual (LUCA-AI)
 
 ## Livre
-- Accents de agentes (`#C9A227` brass) em `src/lib/agents.ts` vs ação azul do tema operacional
-- Páginas secundárias / shell residual se aparecer hex solto fora de auth
+- `src/lib/canvas.ts` PIE_PALETTE brass residual (após agents)
+- Páginas secundárias / shell residual se aparecer hex solto fora de auth/agents
 
 ## Em andamento
 _(nenhum — sessão fechou)_
 
+
 ## Concluído
+### 2026-08-02 — NX-LUCA-AI-visual (agent accents)
+- Área: accents brass de agentes → ação azul do produto (`#0a84ff` = `--l-gold`/`theme.gold`)
+- Escopo: `src/lib/agents.ts`, `server/agent-accent-visual-tokens.test.js`, `SwarmLedger-visual.md`
+- Base: `f37c2e0` → HEAD: 8bc935e
+- Evidência: `node --test server/agent-accent-visual-tokens.test.js` PASS (+ auth/state-pill regression); `git diff --numstat` agents = 6/6 (sem flip EOL)
+- Resultado: maestro / transformador / designer / supervisor e 1º slot de `CHAT_ACCENTS` saem de `#C9A227`; heartbeat/planejador/pesquisador/database mantêm acentos distintos
+- NÃO push / deploy / PR
+
 ### 2026-08-02 — NX-LUCA-AI-visual (StatePill)
 - Área: StatePill rodapé cockpit → tokens do produto (`theme.goldHaze`)
 - Escopo: `src/components/StatePill.tsx`, `server/state-pill-visual-tokens.test.js`, `SwarmLedger-visual.md`
