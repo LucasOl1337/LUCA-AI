@@ -1,12 +1,20 @@
 # SwarmLedger — visual (LUCA-AI)
 
 ## Livre
-- Páginas secundárias / shell residual se aparecer hex solto fora de auth/agents/canvas pie/stateTone/LucaOwl
+- Shell residual: AgentRail `rgba(67,209,138,0.08)` / runtime card `rgba(184,216,176,0.18)` / soft `#ff8a83` em auth-error/admin se ainda ad-hoc
+- **Não** reabrir auth/StatePill/agents/pie/stateTone/LucaOwl/state-badge/term-line
 
 ## Em andamento
 _(nenhum — sessão fechou)_
 
 ## Concluído
+### 2026-08-02 — NX-LUCA-AI-visual (state-badge + term-line)
+- Área: `.state-badge` ok/error/warning + `.term-line-*` soft hex → rails `--l-ok` / `--l-error` / `--l-warning` / `--l-navy-deep`
+- Escopo: `src/index.css`, `server/state-badge-visual-tokens.test.js`, `SwarmLedger-visual.md`
+- Base: `aacda41` → HEAD: e65f039
+- Evidência: `node --test server/state-badge-visual-tokens.test.js` PASS (+ owl/state-tone/pie/agent/auth/state-pill = 7); `git diff --numstat` index.css = 6/6 (sem flip EOL)
+- Resultado: badge ok/error/warning usam `var(--l-ok|error|warning)`; term start/done/fail → `--l-navy-deep`/`--l-ok`/`--l-error`; ban `#8dffb0`/`#ffc566`/`#6ee790` + soft `#ff8a83` nas rules
+- NÃO push / deploy / PR
 ### 2026-08-02 — NX-LUCA-AI-visual (LucaOwl)
 - Área: LucaOwl SVG strokes/halo ciano ad-hoc → rails navy do produto
 - Escopo: `src/components/LucaOwl.tsx`, `server/luca-owl-visual-tokens.test.js`, `SwarmLedger-visual.md`
