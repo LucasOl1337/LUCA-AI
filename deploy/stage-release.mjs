@@ -126,7 +126,8 @@ function ensureDist(skipBuild) {
 }
 
 function tarCreate(archivePath, cwd, paths, extraArgs = []) {
-  const args = ['-cf', archivePath, ...extraArgs, ...paths];
+  // --force-local: Windows drive letters (C:) look like remote hosts to GNU tar
+  const args = ['--force-local', '-cf', archivePath, ...extraArgs, ...paths];
   const result = spawnSync('tar', args, {
     cwd,
     encoding: 'utf8',

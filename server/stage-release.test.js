@@ -17,6 +17,7 @@ test('STAGE_RELEASE_V1 marker, scripts, and install-vm contract', () => {
   assert.ok(stageSource.includes('STAGE_RELEASE_V1'));
   assert.ok(stageSource.includes("from './assert-production-deploy.mjs'"));
   assert.ok(stageSource.includes('assertProductionDeployAllowed'));
+  assert.ok(stageSource.includes('--force-local'));
   assert.ok(stageSource.includes('source.tar'));
   assert.ok(stageSource.includes('dist.tar'));
   assert.ok(stageSource.includes("tarCreate(outFile, root, ['dist'])"));
