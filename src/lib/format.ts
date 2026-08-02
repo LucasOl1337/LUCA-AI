@@ -25,9 +25,10 @@ export function heartbeatFresh(updatedAt?: string | null): boolean {
 }
 
 export function stateTone(state: string): string {
-  if (state === 'running' || state === 'online' || state === 'ready') return '#43d18a';
-  if (state === 'error' || state === 'offline') return '#f87171';
-  return '#fbbf24';
+  // Product status rails: --l-ok / --l-error / --l-warning (useTheme.ok/error/warning)
+  if (state === 'running' || state === 'online' || state === 'ready') return '#30d158';
+  if (state === 'error' || state === 'offline') return '#ff453a';
+  return '#ff9f0a';
 }
 
 export function heartbeatLineClass(line: string): string {
