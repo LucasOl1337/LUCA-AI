@@ -1,13 +1,20 @@
 # SwarmLedger — visual (LUCA-AI)
 
 ## Livre
-- Shell residual: AgentRail `rgba(67,209,138,0.08)` / runtime card `rgba(184,216,176,0.18)` / soft `#ff8a83` em auth-error/admin se ainda ad-hoc
-- **Não** reabrir auth/StatePill/agents/pie/stateTone/LucaOwl/state-badge/term-line
+- Shell residual: runtime event card `rgba(184,216,176,0.18)` → border/ok rail; soft `#ff8a83` em auth-error/admin se ainda ad-hoc (shared error text)
+- **Não** reabrir auth/StatePill/agents/pie/stateTone/LucaOwl/state-badge/term-line/AgentRail power bg
 
 ## Em andamento
 _(nenhum — sessão fechou)_
 
 ## Concluído
+### 2026-08-02 — NX-LUCA-AI-visual (AgentRail power bg)
+- Área: botão power AgentRail tint ad-hoc heartbeat → `theme.aliveSoft` (`--l-alive-soft` / product ok rail)
+- Escopo: `src/components/AgentRail.tsx`, `server/agent-rail-visual-tokens.test.js`, `SwarmLedger-visual.md`
+- Base: `ccebc17` → HEAD: 751233c
+- Evidência: `node --test server/agent-rail-visual-tokens.test.js` PASS (+ state-badge/owl/state-tone/pie/agent/auth/state-pill = 8); `git diff --numstat` AgentRail = 1/1 (sem flip EOL)
+- Resultado: power on/busy usa `theme.aliveSoft` (`rgba(48,209,88,0.15)`); ban `rgba(67,209,138,0.08)` residual do heartbeat
+- NÃO push / deploy / PR
 ### 2026-08-02 — NX-LUCA-AI-visual (state-badge + term-line)
 - Área: `.state-badge` ok/error/warning + `.term-line-*` soft hex → rails `--l-ok` / `--l-error` / `--l-warning` / `--l-navy-deep`
 - Escopo: `src/index.css`, `server/state-badge-visual-tokens.test.js`, `SwarmLedger-visual.md`
