@@ -4,13 +4,17 @@ Ledger de higiene documental (enxame `docs`). Uma melhoria canônica por rodada.
 
 ## Em andamento
 
-### 2026-08-02T14:04:37Z — NX-LUCA-AI-docs (Hermes cron)
-- Área: DocsDev/codegraph/codegraph-visual.html ainda ensina Cloud Worker como path vivo
-- Escopo: `DocsDev/codegraph/codegraph-visual.html`, `scripts/docs-production-path.test.js`, `DocsSwarm.md`
-- NÃO tocar: AGENTS/INDEX/README/docs canônicos (já alinhados); inventory/README SUPERSEDED; product code; push/deploy
+_(nenhum — sessão fechou)_
 
 
 ## Concluído
+
+### 2026-08-02T14:05:10Z — NX-LUCA-AI-docs (Hermes cron)
+- Área: DocsDev/codegraph/codegraph-visual.html ainda ensina Cloud Worker como path vivo
+- Escopo: `DocsDev/codegraph/codegraph-visual.html`, `scripts/docs-production-path.test.js`, `DocsSwarm.md`
+- Base: `1d4f0bb` → HEAD fix: `31a1ea8`
+- Evidência: `node --test scripts/docs-production-path.test.js` → 6/6 pass; numstat visual 5/5, lock 13/0 (sem flip EOL)
+- Resultado: banner HISTÓRICO/SUPERSEDED + ponteiros Express/VM; nó Cloud Worker (legado); fluxo cloud marcado histórico; lock cobre visual HTML
 
 ### 2026-08-02T12:09:44Z — NX-LUCA-AI-docs (Hermes cron)
 - Área: DocsDev/codegraph + release-v0.1.0 ensinam Worker DO como path vivo
@@ -49,7 +53,6 @@ Ledger de higiene documental (enxame `docs`). Uma melhoria canônica por rodada.
 
 ## Livre
 
-- `DocsDev/codegraph-visual.html` residual “Cloud Worker” no diagrama (só se agente ainda tratar HTML como canônico; README já SUPERSEDED)
 - Outros `DocsDev/*` fora de codegraph (design-original / kamui-original) só se reaparecerem como verdade de produção
 - `changelog.md` / `patchnotes.md` na raiz: histórico de produto vs canônico (só se contradisser AGENTS/INDEX/docs)
 - `package.json` `"test"` só pega `server/**/*.test.js` — locks em `scripts/` não rodam no `npm test` (só se virar gap operacional de release)
