@@ -1,11 +1,23 @@
-# SwarmLedger — ready-to-ship (LUCA-AI)
-
 ## Em andamento
 _(nenhum — sessão fechou)_
 
-
-
 ## Concluído
+### 2026-08-02T14:19:59Z — NX-LUCA-ready-to-ship
+- Área: stage-release Windows tar paths
+- Escopo: `deploy/stage-release.mjs`, `server/stage-release.test.js`
+- Base: `97f29a1d98f9a892c930a1d72211c5cee943690b` → HEAD: `171dad5d8c2486a1ddfa3b0a2213b1906e6c662d`
+- Entrega: `tar --force-local` no `STAGE_RELEASE_V1` (GNU tar no Windows trata `C:` como host remoto).
+- Evidência: write smoke com fixture `dist/index.html` + `ALLOW_NON_MAIN_DEPLOY=1` → source/dist/state tarballs; suite stage 4 pass; suite RTS 18 pass após re-run.
+- Risco: baixo — só flag de tar local; comportamento Linux inalterado.
+
+### 2026-08-02T14:18:23Z — NX-LUCA-ready-to-ship
+- Área: stage de packaging comercial com deploy guard
+- Escopo: `deploy/stage-release.mjs`, `server/stage-release.test.js`, `package.json`
+- Base: `a7bc434221212dadad15f15707df5cf5f876a6ad` → HEAD: `97f29a1d98f9a892c930a1d72211c5cee943690b`
+- Entrega: `STAGE_RELEASE_V1` em `deploy/stage-release.mjs` chama `assertProductionDeployAllowed` antes de montar `source.tar`/`dist.tar`/`state.tar` para `install-vm.sh`; dry-run aberto off-main; scripts npm `stage:release` / `deploy:stage`.
+- Evidência: `node --test server/stage-release.test.js server/deploy-branch-guard.test.js server/install-vm-health-gate.test.js server/release-metadata.test.js server/worker-health-version.test.js server/preflight-health-version.test.js` (18 pass); CLI dry-run ok + write bloqueado off-main.
+- Risco: baixo — packaging local; não altera Express/install-vm/preflight. Write real exige `main` ou `ALLOW_NON_MAIN_DEPLOY=1`; `dist/` precisa existir ou build roda.
+
 ### 2026-08-02T12:44:34Z — NX-LUCA-ready-to-ship
 - Área: guard de deploy/branch (main-only)
 - Escopo: `deploy/assert-production-deploy.mjs`, `server/deploy-branch-guard.test.js`, `package.json`
@@ -47,6 +59,7 @@ _(nenhum — sessão fechou)_
 - Risco: baixo — só campo novo no health; preflight existente não exige o campo.
 
 ## Livre
-- Docs/operacao que citem o campo `version` no preflight/worker health (opcional)
+- Docs/operacao que citem o campo `version` no preflight/worker health (opcional; docs swarm)
 - Ao bump de `package.json`, atualizar `shared/release-version.js` (lock `worker-health-version`)
-- Wiring do guard em pipeline real de packaging/VM só se aparecer script de stage (hoje install-vm assume tarball já preparado)
+- Multi-file release notes / changelog consistency se o processo de bump ainda divergir
+- Não reabrir health/install-vm/preflight/worker/deploy-guard/`STAGE_RELEASE_V1`
