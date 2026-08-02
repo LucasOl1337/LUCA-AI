@@ -51,7 +51,7 @@ export default function AgentRail({ activeAgent, onOpenAgent, onNavigate }: Agen
         aria-busy={supervisorBusy}
         className="shrink-0 flex flex-col items-center justify-center gap-1 w-[88px] h-[104px] rounded-2xl transition-all"
         style={{
-          background: running || supervisorBusy ? 'rgba(67,209,138,0.08)' : theme.input,
+          background: running || supervisorBusy ? theme.aliveSoft : theme.input,
           border: `1px solid ${running ? theme.alive : supervisorBusy ? theme.gold : theme.border}`,
         }}
       >
