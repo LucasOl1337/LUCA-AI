@@ -1,7 +1,6 @@
 # SwarmLedger — visual (LUCA-AI)
 
 ## Livre
-- StatePill com tint brass legado `rgba(201,162,39,0.04)` em `src/components/StatePill.tsx`
 - Accents de agentes (`#C9A227` brass) em `src/lib/agents.ts` vs ação azul do tema operacional
 - Páginas secundárias / shell residual se aparecer hex solto fora de auth
 
@@ -9,6 +8,14 @@
 _(nenhum — sessão fechou)_
 
 ## Concluído
+### 2026-08-02 — NX-LUCA-AI-visual (StatePill)
+- Área: StatePill rodapé cockpit → tokens do produto (`theme.goldHaze`)
+- Escopo: `src/components/StatePill.tsx`, `server/state-pill-visual-tokens.test.js`, `SwarmLedger-visual.md`
+- Base: `b1c5a0f` → HEAD: 3d6ac28
+- Evidência: `node --test server/state-pill-visual-tokens.test.js` PASS; `git diff --numstat` StatePill = 1/1 (sem flip EOL)
+- Resultado: fundo ligado deixa brass `rgba(201,162,39,0.04)` e usa `theme.goldHaze` (`rgba(10, 132, 255, 0.10)`); borda/texto já vinham do tema
+- NÃO push / deploy / PR
+
 ### 2026-08-02 — NX-LUCA-AI-visual
 - Área: Auth shell → tokens do produto (liquid glass / `--l-*`)
 - Escopo: `src/index.css` (bloco autenticação + admin residual no mesmo bloco), `server/auth-visual-tokens.test.js`, `SwarmLedger-visual.md`
