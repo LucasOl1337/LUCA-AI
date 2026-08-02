@@ -1,12 +1,19 @@
 # SwarmLedger — visual (LUCA-AI)
 
 ## Livre
-- Páginas secundárias / shell residual se aparecer hex solto fora de auth/agents/canvas pie/stateTone (próximo: `LucaOwl` SVG strokes se ainda ad-hoc)
+- Páginas secundárias / shell residual se aparecer hex solto fora de auth/agents/canvas pie/stateTone/LucaOwl
 
 ## Em andamento
 _(nenhum — sessão fechou)_
 
 ## Concluído
+### 2026-08-02 — NX-LUCA-AI-visual (LucaOwl)
+- Área: LucaOwl SVG strokes/halo ciano ad-hoc → rails navy do produto
+- Escopo: `src/components/LucaOwl.tsx`, `server/luca-owl-visual-tokens.test.js`, `SwarmLedger-visual.md`
+- Base: `e1b12ce` → HEAD: 53b2912
+- Evidência: `node --test server/luca-owl-visual-tokens.test.js` PASS (+ auth/state-pill/agent/pie/state-tone = 6); `git diff --numstat` LucaOwl = 13/11 (sem flip EOL)
+- Resultado: pulse alive `#64d2ff` / offline `#1E4E8C`; anéis `#1E4E8C`/`#0a84ff`/`#64d2ff`; estrelas `#82c7ff`; halo/borda/ECG alpha navy; ban cianos `#00c8f0`/`#406888`/`#1a3090`/`#2050c0`/`#60a8e8`/`#c0d8ff`
+- NÃO push / deploy / PR
 ### 2026-08-02 — NX-LUCA-AI-visual (stateTone)
 - Área: `stateTone` residual hex → rails de status do produto (`--l-ok` / `--l-error` / `--l-warning`)
 - Escopo: `src/lib/format.ts`, `server/state-tone-visual-tokens.test.js`, `SwarmLedger-visual.md`
