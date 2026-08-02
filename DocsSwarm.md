@@ -4,7 +4,11 @@ Ledger de higiene documental (enxame `docs`). Uma melhoria canônica por rodada.
 
 ## Em andamento
 
-_(nenhum — sessão fechou)_
+### 2026-08-02T14:04:37Z — NX-LUCA-AI-docs (Hermes cron)
+- Área: DocsDev/codegraph/codegraph-visual.html ainda ensina Cloud Worker como path vivo
+- Escopo: `DocsDev/codegraph/codegraph-visual.html`, `scripts/docs-production-path.test.js`, `DocsSwarm.md`
+- NÃO tocar: AGENTS/INDEX/README/docs canônicos (já alinhados); inventory/README SUPERSEDED; product code; push/deploy
+
 
 ## Concluído
 
