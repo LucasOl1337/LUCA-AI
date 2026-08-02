@@ -902,7 +902,17 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           </button>
         </header>
 
-        {error && <div className="luca-ai-chat-notice"><Notice title="Atenção" body={error} /></div>}
+        {error && (
+        <div className="luca-ai-chat-notice" data-luca-chat-error data-tone="error" role="alert">
+          <Notice
+            title="Atenção"
+            body={error}
+            onRetry={() => void loadPersonas()}
+            onDismiss={() => setError(null)}
+            busy={loading}
+          />
+        </div>
+      )}
 
         <main className="luca-ai-chat-stage">
           {activeWorkspaceView === 'result' ? (
@@ -1027,14 +1037,59 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   );
 }
 
-function Notice({ title, body }: { title: string; body: string }) {
+function Notice({
+  title,
+  body,
+  onRetry,
+  onDismiss,
+  busy,
+}: {
+  title: string;
+  body: string;
+  onRetry?: () => void;
+  onDismiss?: () => void;
+  busy?: boolean;
+}) {
   const theme = useTheme();
+  const recoverable = Boolean(onRetry || onDismiss);
   return (
-    <div className="flex items-start gap-3 rounded-lg px-4 py-3" style={{ background: theme.warningBg, border: `1px solid ${theme.warning}` }}>
-      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: theme.warning }} />
-      <div>
-        <div className="text-sm font-semibold" style={{ color: theme.goldDeep }}>{title}</div>
+    <div
+      className="flex items-start gap-3 rounded-lg px-4 py-3"
+      style={{
+        background: recoverable ? theme.errorBg : theme.warningBg,
+        border: `1px solid ${recoverable ? theme.error : theme.warning}`,
+      }}
+    >
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: recoverable ? theme.error : theme.warning }} />
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-semibold" style={{ color: recoverable ? theme.error : theme.goldDeep }}>{title}</div>
         <div className="mt-1 text-xs leading-relaxed" style={{ color: theme.textSoft }}>{body}</div>
+        {recoverable ? (
+          <div className="mt-3 flex flex-wrap gap-2" data-luca-chat-error-actions>
+            {onRetry ? (
+              <button
+                type="button"
+                className="btn-primary !px-4 !py-2 !text-xs"
+                data-luca-chat-retry
+                onClick={onRetry}
+                disabled={busy}
+              >
+                {busy ? "Recarregando…" : "Tentar novamente"}
+              </button>
+            ) : null}
+            {onDismiss ? (
+              <button
+                type="button"
+                className="btn-fleet !px-4 !py-2 !text-xs"
+                data-luca-chat-dismiss
+                onClick={onDismiss}
+                disabled={busy}
+              >
+                Dispensar
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );
