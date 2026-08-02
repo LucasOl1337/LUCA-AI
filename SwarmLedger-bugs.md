@@ -5,6 +5,13 @@ _(nenhum — sessão fechou)_
 
 
 ## Concluído
+### 2026-08-02T09:42:54Z — NX-LUCA-AI-bugs
+- Área: recovery UX — picker de personas no LUCA-AI empty sem CTA
+- Escopo: `src/pages/LucaAiPage.tsx`, `server/luca-picker-empty-cta.test.js`, `SwarmLedger-bugs.md`
+- Base: `263d679` → HEAD: `aabcde0`
+- Evidência: `node --test server/luca-picker-empty-cta.test.js` (+ admin/tools locks) → 7/7 pass; `git diff --numstat` LucaAiPage 38/1 (CRLF preservado)
+- Resultado: lista vazia do `PersonaPickerSheet` deixa de ser parágrafo morto; agora `data-luca-picker-empty` + hint contextual + CTA `data-luca-picker-clear` ("Limpar busca" com termo) e `data-luca-picker-close` ("Fechar")
+
 ### 2026-08-02T08:27:03Z — NX-LUCA-AI-bugs
 - Área: recovery UX — Admin empty sem CTA primário
 - Escopo: `src/pages/AdminPage.tsx`, `src/index.css`, `server/admin-empty-cta.test.js`, `SwarmLedger-bugs.md`
@@ -22,5 +29,6 @@ _(nenhum — sessão fechou)_
 ## Livre
 - Histórico empty sem CTA (`src/pages/HistoricoPage.tsx`) — página órfã sem route no App atual
 - GlobalChat empty sem ação (`src/components/GlobalChat.tsx`) — shell Operacional legado
-- ToolsPage empty “Nenhuma ferramenta” sem CTA de navegação (após error retry)
+- ToolsPage empty “Nenhuma ferramenta” sem CTA de navegação (após error retry; página órfã no App)
 - Admin error retry ainda só no tip contínuo (`158adde`); não reabrir empty daqui
+- Picker empty CTA shipped — não reabrir `PersonaPickerSheet`
