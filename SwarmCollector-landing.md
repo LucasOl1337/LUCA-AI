@@ -4,7 +4,7 @@ Coletor do enxame `landing`. Só este assunto. Sem push/PR/deploy/main.
 
 ## Estado
 - Branch execução: `swarm/LUCA-AI/landing` @ `d44850c`
-- Branch integração: `swarm/LUCA-AI/landing-integracao` @ `7f99b07` (cherry-pick local dos commits de produto + ledger)
+- Branch integração: `swarm/LUCA-AI/landing-integracao` @ tip atual (produto até `7c3fb45`; ledger `7f99b07`; relatório coletor no tip)
 - Base produto: `codex/restore-current-luca` / `b14f395`
 - Coleta: 2026-08-02T13:57Z (AFK cron NX coletor landing)
 
@@ -54,7 +54,7 @@ Conflitos: nenhum nos product commits. Ledger close via multi cherry-pick `--no-
 
 ## Decisão
 **aprovar** webmanifest + mobile CTA + hero lead + robots/sitemap + ledger.  
-Integração local em `swarm/LUCA-AI/landing-integracao` @ `7f99b07`.  
+Integração local em `swarm/LUCA-AI/landing-integracao` (produto `7c3fb45` + ledger `7f99b07` + relatório coletor).  
 Main / `codex/restore-current-luca` **não** atualizados. Precisa humano só para merge futuro na base comercial.
 
 ## Próximo livre (executor)
