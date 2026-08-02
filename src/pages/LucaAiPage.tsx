@@ -1402,7 +1402,44 @@ function PersonaPickerSheet({ role, personas, selectedSlugs, query, busySlug, on
               );
             })}
           </div>
-          {!visiblePersonas.length && <p className="px-4 py-12 text-center text-sm" style={{ color: theme.textMute }}>Nenhuma persona corresponde à busca.</p>}
+          {!visiblePersonas.length && (
+            <div
+              className="flex min-h-[220px] flex-col items-center justify-center gap-3 px-4 py-12 text-center"
+              data-luca-picker-empty
+              data-tone="empty"
+            >
+              <p className="text-sm font-semibold" style={{ color: theme.textSoft }}>
+                {term
+                  ? "Nenhuma persona corresponde à busca."
+                  : "Nenhuma persona disponível no catálogo."}
+              </p>
+              <p className="max-w-[40ch] text-xs leading-relaxed" style={{ color: theme.textMute }}>
+                {term
+                  ? "Limpe a busca para ver o catálogo completo ou ajuste o termo."
+                  : "Conecte personas no Yume e abra o picker de novo."}
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {term ? (
+                  <button
+                    type="button"
+                    className="btn-primary !px-4 !py-2 !text-xs"
+                    data-luca-picker-clear
+                    onClick={() => onQuery("")}
+                  >
+                    Limpar busca
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn-fleet !px-4 !py-2 !text-xs"
+                  data-luca-picker-close
+                  onClick={onClose}
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </motion.aside>
     </motion.div>
