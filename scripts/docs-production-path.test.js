@@ -26,6 +26,17 @@ test('INDEX.md routes deploy/ for publication and worker/ as legacy', () => {
   assert.match(index, /publica(?:ç|c)(?:ã|a)o pela VM/);
 });
 
+
+test('README.md stack does not list bare Cloudflare Workers as product runtime', () => {
+  const readme = read('README.md');
+  assert.match(readme, /Express/i);
+  assert.match(readme, /Cloudflare Tunnel/i);
+  assert.match(readme, /luca-ai-vm-proxy\.js/);
+  assert.match(readme, /worker\/.*legado|legado.*worker\//i);
+  // bare stack list used to end with "Cloudflare Workers e Cloudflare Tunnel"
+  assert.equal(/Cloudflare Workers e Cloudflare Tunnel/.test(readme), false);
+});
+
 test('docs/* still document VM Express + edge proxy as production', () => {
   const op = read('docs/operacao.md');
   const arq = read('docs/arquitetura.md');
