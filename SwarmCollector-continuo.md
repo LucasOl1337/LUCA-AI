@@ -4,7 +4,7 @@ Coletor do enxame `contínuo`. Só este assunto. Sem push/PR/deploy/main.
 
 ## Estado
 - Branch execução: `swarm/LUCA-AI/enxame-continuo` @ `2d79def` (worktree `C:/Projetos/LUCA-AI-enxame`)
-- Branch integração: `swarm/LUCA-AI/continuo-integracao` @ `4144334` (local)
+- Branch integração: `swarm/LUCA-AI/continuo-integracao` @ `5cc329d` (local)
 - Base produto: `codex/restore-current-luca` / `b14f395`
 - Coleta: 2026-08-02 (AFK cron NX coletor contínuo — rodada Personas)
 
