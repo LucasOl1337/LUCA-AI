@@ -73,3 +73,31 @@ test('runOperationalPreflight falha quando /api/health omite version', async () 
   assert.equal(health?.ok, false);
   assert.match(String(health?.detail || ''), /version ausente/i);
 });
+
+test('runOperationalPreflight bloqueia health sem version mesmo com detail custom (PREFLIGHT_HEALTH_VERSION_ALWAYS_V1)', async () => {
+  const report = await runOperationalPreflight({
+    governance: {
+      requiredPreflightEndpoints: ['/api/health'],
+      missionConcurrency: { blocked: false, unmatchedCount: 0 },
+    },
+    state: {
+      activeMission: null,
+      agents: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }, { id: 'e' }],
+    },
+    probeEndpoint: async (path) => {
+      if (path === '/api/health') {
+        return {
+          ok: true,
+          body: { ok: true, service: 'luca-ai-cloud', model: 'x' },
+          detail: 'GLM secret configurado',
+        };
+      }
+      return { ok: false, error: 'unexpected_path' };
+    },
+  });
+
+  const health = report.checks.find((check) => check.id === 'endpoint:/api/health');
+  assert.equal(health?.ok, false);
+  assert.match(String(health?.detail || ''), /version/i);
+  assert.equal(report.readyForLiveMission, false);
+});

@@ -15,26 +15,31 @@ function buildEndpointCheck(path, response = {}) {
   const body = response.body;
   let detail = response.detail || '';
 
-  if (!detail) {
-    if (!ok) {
-      detail = response.error || `falha ao validar ${path}`;
-    } else if (path === '/api/health') {
-      // PREFLIGHT_HEALTH_VERSION_V1: commercial ops need package version on health
-      const version = typeof body?.version === 'string' ? body.version.trim() : '';
-      if (!version) {
-        return {
-          id: `endpoint:${path}`,
-          label: `GET ${path}`,
-          ok: false,
-          detail: body?.service
-            ? `${body.service} • version ausente no /api/health`
-            : 'version ausente no /api/health',
-          source: 'kamui-service-health-pattern',
-        };
-      }
+  // PREFLIGHT_HEALTH_VERSION_V1 + PREFLIGHT_HEALTH_VERSION_ALWAYS_V1:
+  // custom probe detail must not skip version gate (cloud preflight used detail to bypass)
+  if (path === '/api/health' && ok) {
+    const version = typeof body?.version === 'string' ? body.version.trim() : '';
+    if (!version) {
+      return {
+        id: `endpoint:${path}`,
+        label: `GET ${path}`,
+        ok: false,
+        detail: body?.service
+          ? `${body.service} • version ausente no /api/health`
+          : 'version ausente no /api/health',
+        source: 'kamui-service-health-pattern',
+      };
+    }
+    if (!detail) {
       detail = body?.service
         ? `${body.service}${body.supervisorMode ? ` • ${body.supervisorMode}` : ''} • v${version}`
         : `v${version}`;
+    }
+  }
+
+  if (!detail) {
+    if (!ok) {
+      detail = response.error || `falha ao validar ${path}`;
     } else if (path === '/api/state') {
       const agents = Array.isArray(body?.agents) ? body.agents.length : 0;
       detail = `${agents} agentes • missão ativa: ${body?.activeMission ? 'sim' : 'não'}`;
