@@ -4,45 +4,47 @@ Coletor do enxame `ready-to-ship`. Só este assunto. Sem push/PR/deploy/main.
 
 ## Estado
 - Branch execução: `swarm/LUCA-AI/ready-to-ship` @ `c916295`
-- Branch integração: `swarm/LUCA-AI/ready-to-ship-integracao` @ `9abce8c` (merge local do tip de execução)
+- Branch integração: `swarm/LUCA-AI/ready-to-ship-integracao` @ `67eca65` → este commit de revalidação
 - Base produto: `codex/restore-current-luca` / `b14f395`
-- Coleta: 2026-08-02 (AFK cron NX coletor ready-to-ship)
+- Coleta: 2026-08-02 (AFK cron NX coletor ready-to-ship, revalidação)
+- Fila nova: **vazia** (`ready-to-ship` é ancestral de integração; `git log integracao..execucao` = 0)
 
 ## Fila revisada
 
 | Commit | Mensagem | Classificação | Ação |
 |---|---|---|---|
-| `e5fa97d` | `fix(release): expose package version on /api/health` | **aprovar** | Já em integração (coletor anterior `87c183c`) |
+| `e5fa97d` | `fix(release): expose package version on /api/health` | **aprovar** | Já em integração (`87c183c`) |
 | `052c991` | `chore(enxame): fecha rodada ready-to-ship no SwarmLedger` | **aprovar** | Já em integração |
-| `6ba3f18` | `fix(release): fail closed install-vm when /api/health version drifts` | **aprovar** | Integrado via merge `9abce8c` |
-| `c916295` | `chore(enxame): fecha rodada ready-to-ship no SwarmLedger` | **aprovar** | Ledger da rodada install-vm gate |
+| `6ba3f18` | `fix(release): fail closed install-vm when /api/health version drifts` | **aprovar** | Já em integração (`9abce8c`) |
+| `c916295` | `chore(enxame): fecha rodada ready-to-ship no SwarmLedger` | **aprovar** | Já em integração |
 
-## Diff em escopo (nova rodada)
-- `deploy/install-vm.sh` — marker `INSTALL_VM_HEALTH_GATE_V1`: após `/api/auth/session`, lê `package.json` version, `curl /api/health`, fail closed se `ok`/`service=luca-ai`/`version` divergirem; imprime `HEALTH_VERSION`
-- `server/install-vm-health-gate.test.js` — source-lock ordem session→health→state + ban fallback `0.9.5`
-- `SwarmLedger-ready-to-ship.md` — claim fechado; Livre residual: worker DO health, preflight/docs, deploy/branch guard se wrangler voltar
+Nenhum commit novo na execução desde a coleta anterior (`67eca65`).
 
-Já shipado e revalidado:
-- `server/config.js` / `server/index.js` / `server/release-metadata.test.js` — `PACKAGE_VERSION` no health
+## Diff em escopo (rodadas já integradas)
+- `server/config.js` / `server/index.js` / `server/release-metadata.test.js` — `PACKAGE_VERSION` no `/api/health`
+- `deploy/install-vm.sh` — `INSTALL_VM_HEALTH_GATE_V1` fail-closed session→health→state
+- `server/install-vm-health-gate.test.js` — source-lock do gate
+- `SwarmLedger-ready-to-ship.md` — Em andamento vazio; Livre residual só worker DO / preflight / deploy guard se wrangler voltar
 
 Fora de escopo (não tocado): `src/*`, `index.html` (landing), docs, `_afk-marketing/*`, worker DO cloud, push/deploy.
 
-## Validação
+## Validação (revalidação 2026-08-02)
 ```
-git checkout swarm/LUCA-AI/ready-to-ship-integracao
-git merge --no-edit swarm/LUCA-AI/ready-to-ship
-# → 9abce8c (ort, clean)
+git rev-parse ready-to-ship ready-to-ship-integracao
+# c916295 / 67eca65
+git log --oneline integracao..execucao  # vazio
+git merge-base --is-ancestor ready-to-ship ready-to-ship-integracao  # yes
 
+cd C:/Projetos/LUCA-AI-ready-to-ship
 node --check server/config.js server/index.js
 node --test server/install-vm-health-gate.test.js server/release-metadata.test.js
 # 4/4 pass
-
-# runtime read: package.json version 0.2.0; health field version: PACKAGE_VERSION presente
+# pkg 0.2.0 · PACKAGE_VERSION true · health version: PACKAGE_VERSION · INSTALL_VM_HEALTH_GATE_V1 true
 ```
-Conflitos: nenhum (merge ort linear sobre `052c991`; escopo só release/install gate).
+Conflitos: nenhum. Merge novo: **não necessário**.
 
 ## Decisão
-**aprovar** e manter integração local em `swarm/LUCA-AI/ready-to-ship-integracao` @ `9abce8c`.  
+**aprovar** (revalidação; sem delta). Integração local permanece em `swarm/LUCA-AI/ready-to-ship-integracao` com tip de execução `c916295` já contido.  
 Main / `codex/restore-current-luca` **não** atualizados. Precisa humano só para merge futuro na base comercial.
 
 ## Próximo livre (executor)
@@ -57,3 +59,4 @@ Não reabrir: Express health field (`e5fa97d`) nem install-vm health gate (`6ba3
 - Sem `git add -A` (dirty `_afk-marketing/` intocado)
 - Sem reabrir continuous/landing/visual/docs/bugs
 - Sem worktree nova (branches only, conforme prompt do coletor)
+- Sem inventar fila quando execução não avançou
