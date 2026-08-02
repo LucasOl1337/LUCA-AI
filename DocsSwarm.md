@@ -4,7 +4,11 @@ Ledger de higiene documental (enxame `docs`). Uma melhoria canônica por rodada.
 
 ## Em andamento
 
-_(nenhum — sessão fechou)_
+### 2026-08-02T09:19:36Z — NX-LUCA-AI-docs (Hermes cron)
+- Área: docs/arquitetura intro + fluxo produção ainda dizem Worker
+- Escopo: `docs/arquitetura.md`, `scripts/docs-production-path.test.js`, `DocsSwarm.md`
+- NÃO tocar: AGENTS/INDEX/README (rodadas anteriores), DocsDev rewrite, push/deploy
+
 
 ## Concluído
 

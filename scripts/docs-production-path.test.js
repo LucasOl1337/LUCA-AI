@@ -47,4 +47,8 @@ test('docs/* still document VM Express + edge proxy as production', () => {
   assert.ok(integ.includes('luca-ai-vm-proxy.js'));
   assert.ok(existsSync(join(root, 'deploy/luca-ai-vm-proxy.js')));
   assert.ok(existsSync(join(root, 'worker/src/index.js')));
+  // live production flow must name edge proxy, not "Worker de borda" / bare Worker gate
+  assert.equal(arq.includes('Worker de borda'), false);
+  assert.match(arq, /proxy de borda \(deploy\/luca-ai-vm-proxy\.js\)/);
+  assert.match(arq, /borda Cloudflare \(proxy\/Tunnel\)/);
 });
