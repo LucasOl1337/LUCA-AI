@@ -1,7 +1,10 @@
 # SwarmLedger-bugs — LUCA-AI
 
 ## Em andamento
-_(nenhum — sessão fechou)_
+### 2026-08-02T13:20:00Z — NX-LUCA-AI-bugs
+- Área: recovery UX — Atividade empty sem CTA
+- Escopo: `src/pages/LucaAiPage.tsx`, `server/luca-activity-empty-cta.test.js`, `SwarmLedger-bugs.md`
+- NÃO tocar: chat notice/canvas/picker empties; start-state; Admin/Personas error (contínuo); landing/layout; orphans
 
 
 ## Concluído

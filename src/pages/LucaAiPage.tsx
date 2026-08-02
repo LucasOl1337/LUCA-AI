@@ -1550,11 +1550,34 @@ function LucaProcessTerminal({
             </div>
           </>
         ) : (
-          <div className="flex h-full min-h-[180px] flex-col items-center justify-center px-5 text-center">
-            <Terminal className="mb-3 h-7 w-7" style={{ color: theme.textGhost }} />
-            <p className="max-w-[24ch] text-xs leading-relaxed" style={{ color: theme.textMute }}>
-              A atividade dos agentes aparece aqui durante a execução.
+          <div
+            className="flex h-full min-h-[180px] flex-col items-center justify-center gap-3 px-5 text-center"
+            data-luca-activity-empty
+            data-tone="empty"
+          >
+            <Terminal className="h-7 w-7" style={{ color: theme.textGhost }} />
+            <p className="text-sm font-semibold" style={{ color: theme.textSoft }}>
+              Nenhuma atividade nesta sessão
             </p>
+            <p className="max-w-[28ch] text-xs leading-relaxed" style={{ color: theme.textMute }}>
+              {running
+                ? 'Aguardando o primeiro evento da execução em curso.'
+                : 'Envie uma missão com a equipe configurada para ver o fluxo dos agentes aqui.'}
+            </p>
+            {!running && (
+              <button
+                type="button"
+                className="btn-primary !px-4 !py-2 !text-xs"
+                data-luca-activity-focus-mission
+                onClick={() => {
+                  const el = document.getElementById('luca-ai-mission') as HTMLTextAreaElement | null;
+                  el?.focus();
+                  el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }}
+              >
+                Escrever missão
+              </button>
+            )}
           </div>
         )}
       </div>
