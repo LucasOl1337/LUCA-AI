@@ -1,14 +1,19 @@
 # SwarmLedger — visual (LUCA-AI)
 
 ## Livre
-- `src/lib/canvas.ts` PIE_PALETTE brass residual (após agents)
-- Páginas secundárias / shell residual se aparecer hex solto fora de auth/agents
+- Páginas secundárias / shell residual se aparecer hex solto fora de auth/agents/canvas pie
 
 ## Em andamento
 _(nenhum — sessão fechou)_
 
-
 ## Concluído
+### 2026-08-02 — NX-LUCA-AI-visual (pie palette)
+- Área: canvas PIE_PALETTE brass residual → ação azul do produto (`#0a84ff` = `--l-gold`/`theme.gold`)
+- Escopo: `src/lib/canvas.ts`, `server/pie-palette-visual-tokens.test.js`, `SwarmLedger-visual.md`
+- Base: `84a54ca` → HEAD: f73b35e
+- Evidência: `node --test server/pie-palette-visual-tokens.test.js` PASS (+ auth/state-pill/agent-accent regression); `git diff --numstat` canvas = 1/1 (sem flip EOL)
+- Resultado: primeiro slot de `PIE_PALETTE` sai de `#C9A227`; fatias `#7FB3D5` / `#1E4E8C` / `#43d18a` / `#b58cff` mantidas
+- NÃO push / deploy / PR
 ### 2026-08-02 — NX-LUCA-AI-visual (agent accents)
 - Área: accents brass de agentes → ação azul do produto (`#0a84ff` = `--l-gold`/`theme.gold`)
 - Escopo: `src/lib/agents.ts`, `server/agent-accent-visual-tokens.test.js`, `SwarmLedger-visual.md`
