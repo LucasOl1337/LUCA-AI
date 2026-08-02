@@ -19,7 +19,22 @@ function buildEndpointCheck(path, response = {}) {
     if (!ok) {
       detail = response.error || `falha ao validar ${path}`;
     } else if (path === '/api/health') {
-      detail = body?.service ? `${body.service}${body.supervisorMode ? ` • ${body.supervisorMode}` : ''}` : 'health respondeu';
+      // PREFLIGHT_HEALTH_VERSION_V1: commercial ops need package version on health
+      const version = typeof body?.version === 'string' ? body.version.trim() : '';
+      if (!version) {
+        return {
+          id: `endpoint:${path}`,
+          label: `GET ${path}`,
+          ok: false,
+          detail: body?.service
+            ? `${body.service} • version ausente no /api/health`
+            : 'version ausente no /api/health',
+          source: 'kamui-service-health-pattern',
+        };
+      }
+      detail = body?.service
+        ? `${body.service}${body.supervisorMode ? ` • ${body.supervisorMode}` : ''} • v${version}`
+        : `v${version}`;
     } else if (path === '/api/state') {
       const agents = Array.isArray(body?.agents) ? body.agents.length : 0;
       detail = `${agents} agentes • missão ativa: ${body?.activeMission ? 'sim' : 'não'}`;

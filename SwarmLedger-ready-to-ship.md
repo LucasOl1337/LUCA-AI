@@ -1,7 +1,11 @@
 # SwarmLedger — ready-to-ship (LUCA-AI)
 
 ## Em andamento
-_(nenhum — sessão fechou)_
+### 2026-08-02T11:06:00Z — NX-LUCA-ready-to-ship
+- Área: preflight exige version no /api/health
+- Escopo: `shared/preflight.js`, `server/preflight.test.js`, `server/preflight-health-version.test.js`
+- NÃO tocar: `src/*`, landing, docs canônicos, install-vm gate, worker DO
+
 
 
 ## Concluído
