@@ -43,7 +43,7 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
             </div>
             <h1 className="void-title">LUCA</h1>
             <p className="mt-2 max-w-[620px] text-[13px] leading-relaxed" style={{ color: theme.textMute }}>
-              Monte uma equipe de personas, envie uma missão e acompanhe a entrega em uma conversa única.
+              Monte uma equipe de personas, envie uma missão e acompanhe a entrega em uma conversa única com status do runtime ao vivo.
             </p>
             <ul
               className="landing-hero-proof mt-4 flex flex-wrap gap-2"
