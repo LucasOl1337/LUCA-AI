@@ -12,7 +12,7 @@ _(nenhum — sessão fechou)_
 ### 2026-08-02 — NX-LUCA-AI-visual
 - Área: Auth shell → tokens do produto (liquid glass / `--l-*`)
 - Escopo: `src/index.css` (bloco autenticação + admin residual no mesmo bloco), `server/auth-visual-tokens.test.js`, `SwarmLedger-visual.md`
-- Base: `b14f395` → HEAD: (fix commit abaixo)
+- Base: `b14f395` → HEAD: d9c8773
 - Evidência: `node --test server/auth-visual-tokens.test.js` PASS; `git diff --numstat src/index.css` = 31/31 (sem flip EOL)
 - Resultado: tela de login/cadastro e estilos admin adjacentes usam `--l-void`, `--l-navy-*`, `--l-focus`, `--l-error-bg` e botão alinhado a `.btn-primary` (`rgba(10,132,255,.72)`); hex soltos da paleta auth removidos
 - NÃO push / deploy / PR
