@@ -79,3 +79,16 @@ test('DocsDev/codegraph is marked SUPERSEDED and not production truth', () => {
   assert.match(index, /SUPERSEDED|pre-VM|pré-VM|pre-vm/i);
   assert.ok(existsSync(join(root, 'DocsDev/codegraph/README.md')));
 });
+test('DocsDev/codegraph/codegraph-visual.html is marked SUPERSEDED not live production map', () => {
+  const visual = read('DocsDev/codegraph/codegraph-visual.html');
+  assert.match(visual, /HIST[OÓ]RICO\s*\/\s*SUPERSEDED/i);
+  assert.match(visual, /luca-ai-vm-proxy\.js/);
+  assert.match(visual, /Cloud Worker \(legado\)/);
+  assert.match(visual, /hist[oó]rico pr[eé]-VM|legado/i);
+  // bare "Cloud Worker" node label without legado framing is banned
+  assert.equal(/<text[^>]*>Cloud Worker<\/text>/.test(visual), false);
+  // cloud flow must not present runtimeMode=cloud as current commercial path without historical frame
+  assert.match(visual, /Cloud \(hist[oó]rico pr[eé]-VM \/ legado\)/);
+  assert.match(visual, /N[AÃ]O [eé] o path comercial atual/);
+  assert.ok(existsSync(join(root, 'DocsDev/codegraph/codegraph-visual.html')));
+});
