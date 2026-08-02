@@ -23,7 +23,7 @@ Primeira release oficial do LUCA-AI, consolidando o estado funcional publicado n
 
 - **Heartbeat real:** `heartbeat_monitor.py` gera `heartbeat-report.json` e o servidor transmite o status ao frontend por WebSocket.
 - **Runtime Node/Vite:** `package.json` declara scripts de build, servidor, typecheck e testes Node para o app raiz.
-- **Worker Cloudflare:** `worker/src/index.js` e `wrangler.jsonc` registram a superficie de worker usada pelo projeto.
+- **Worker Cloudflare (histórico da tag):** `worker/src/index.js` e `wrangler.jsonc` registravam a superfície cloud da baseline `v0.1.0`. Após a migração de 2026-07-24, a produção comercial usa Express na VM; `worker/` permanece legado (ver `AGENTS.md` / `docs/arquitetura.md`).
 
 ---
 
