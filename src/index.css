@@ -925,6 +925,22 @@
 @media (max-width: 560px) {
   .luca-topbar .luca-topbar-endpoint { display: none; }
   .luca-page-shell { padding: 12px !important; }
+
+  /* Landing conversion: full-width mobile CTAs ≥44px */
+  .luca-hero [data-landing-cta-row] {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+  }
+  .luca-hero [data-landing-cta] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: var(--l-touch);
+  }
 }
 
 @keyframes luca-fade-in { from { opacity: 0; } }
