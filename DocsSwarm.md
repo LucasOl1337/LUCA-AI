@@ -4,13 +4,16 @@ Ledger de higiene documental (enxame `docs`). Uma melhoria canônica por rodada.
 
 ## Em andamento
 
-### 2026-08-02T12:07:57Z — NX-LUCA-AI-docs (Hermes cron)
-- Área: DocsDev/codegraph + release-v0.1.0 ainda ensinam Worker DO como path vivo
-- Escopo: `DocsDev/codegraph/README.md`, `DocsDev/codegraph/inventory.md`, `DocsDev/releases/release-v0.1.0.md`, `INDEX.md`, `scripts/docs-production-path.test.js`, `DocsSwarm.md`
-- NÃO tocar: AGENTS/README/docs/* (canônicos já lockados), package.json, product code, push/deploy
-
+_(nenhum — sessão fechou)_
 
 ## Concluído
+
+### 2026-08-02T12:09:44Z — NX-LUCA-AI-docs (Hermes cron)
+- Área: DocsDev/codegraph + release-v0.1.0 ensinam Worker DO como path vivo
+- Escopo: `DocsDev/codegraph/README.md`, `DocsDev/codegraph/inventory.md`, `DocsDev/releases/release-v0.1.0.md`, `INDEX.md`, `scripts/docs-production-path.test.js`, `DocsSwarm.md`
+- Base: `4103c06` → HEAD fix: `886cc9f`
+- Evidência: `node --test scripts/docs-production-path.test.js` → 5/5 pass; numstat README 24/0, inventory 6/0, release 1/1, INDEX 1/1, lock 21/0 (sem flip EOL)
+- Resultado: codegraph marcado HISTÓRICO/SUPERSEDED com ponteiros canônicos; release-v0.1.0 Worker = histórico da tag; INDEX aponta README SUPERSEDED
 
 ### 2026-08-02T11:53:14Z — NX-LUCA-AI-docs (Hermes cron)
 - Área: docs/operacao + integracoes ainda nomeavam borda como Worker
@@ -42,6 +45,7 @@ Ledger de higiene documental (enxame `docs`). Uma melhoria canônica por rodada.
 
 ## Livre
 
-- Paths em `DocsDev/` históricos que citam worker como produção (não reescrever DocsDev sem ordem; arquivar ponta se reaparecer no canônico)
+- `DocsDev/codegraph-visual.html` residual “Cloud Worker” no diagrama (só se agente ainda tratar HTML como canônico; README já SUPERSEDED)
+- Outros `DocsDev/*` fora de codegraph (design-original / kamui-original) só se reaparecerem como verdade de produção
 - `changelog.md` / `patchnotes.md` na raiz: histórico de produto vs canônico (só se contradisser AGENTS/INDEX/docs)
 - `package.json` `"test"` só pega `server/**/*.test.js` — locks em `scripts/` não rodam no `npm test` (só se virar gap operacional de release)
