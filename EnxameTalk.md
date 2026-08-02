@@ -5,14 +5,21 @@ Ledger do enxame `swarm/LUCA-AI/enxame-continuo`. Uma entrega de valor por sess�
 ## Livre
 - Tools empty “Nenhuma ferramenta disponível” se a rota voltar ao App (`src/pages/ToolsPage.tsx`)
 - Histórico / GlobalChat empty — páginas **órfãs** (não montadas em `App.tsx`); só se rotas retornarem
-- NÃO reabrir: Personas recovery, Admin/Endpoints error CTA, LucaAiStartState error/empty CTA
+- NÃO reabrir: Personas recovery, Admin/Endpoints error CTA, LucaAiStartState error/empty CTA, landing system status reconnect (`data-landing-system-*`)
+- residual live luca-ai friction only if disjunct of start-state + landing system status
 
 
 ## Em andamento
 _(nenhum — sessão fechou)_
 
-
 ## Concluído
+### 2026-08-02T12:13:53Z — NX-LUCA-AI-continuo
+- Área: recovery UX — status do sistema na landing offline/erro sem CTA
+- Escopo: `src/pages/LandingPage.tsx`, `server/landing-system-status-cta.test.js`, `EnxameTalk.md`
+- Base: `68b6d51` → HEAD: `b52171f`
+- Evidência: `node --test server/landing-system-status-cta.test.js` (+ start/personas/admin/endpoints locks) → 10/10 pass; `git diff --numstat` LandingPage 60/17 (CRLF preservado)
+- Resultado: cartão `Estado do sistema` em `inicio` deixa de ser só badge; offline/operationError vira `role=alert` + `data-landing-system-error` + CTA primário `data-landing-system-retry` (“Tentar novamente” → `clearOperationError` + `refresh`) e secundário `data-landing-system-dismiss` (“Dispensar”) só com `operationError`
+- NÃO push / deploy / PR
 ### 2026-08-02T10:11:27Z — NX-LUCA-AI-continuo
 - Área: recovery UX — LucaAiStartState error/empty com CTA indiferenciado
 - Escopo: `src/pages/LucaAiPage.tsx`, `server/luca-start-state-cta.test.js`, `EnxameTalk.md`
