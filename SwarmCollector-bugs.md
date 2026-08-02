@@ -4,7 +4,7 @@ Coletor do enxame `bugs`. Só este assunto. Sem push/PR/deploy/main.
 
 ## Estado
 - Branch execução: `swarm/LUCA-AI/bugs` @ `1e2a890`
-- Branch integração: `swarm/LUCA-AI/bugs-integracao` @ `7e23deb` (produto bugs ≡ tip de execução; tip do coletor abaixo após ledger sync)
+- Branch integração: `swarm/LUCA-AI/bugs-integracao` @ `18f470d` (produto bugs ≡ execução `1e2a890` / cherry-picks até `7e23deb`)
 - Base produto: `codex/restore-current-luca` / `b14f395`
 - Coleta: 2026-08-02T16:19:01Z (AFK cron NX coletor bugs)
 - Fila nova desde `4ae66f7`: **2 produto + 2 ledger** (activity empty + run re-send)
@@ -76,7 +76,7 @@ rg data-luca-activity-empty|data-luca-activity-focus-mission|data-luca-chat-erro
 Conflitos: nenhum. Cherry-picks limpos. Superfícies disjuntas do contínuo. Órfãos (Tools empty / Histórico / GlobalChat) não reabertos. Chat-notice shell reaproveitado com kind run — sem reabrir dismiss/personas path.
 
 ## Decisão
-**aprovar**. Integração local completa em `swarm/LUCA-AI/bugs-integracao` (produto ≡ `bugs` @ `1e2a890`; tip coletor no commit de fechamento).  
+**aprovar**. Integração local completa em `swarm/LUCA-AI/bugs-integracao` @ `18f470d` (produto ≡ `bugs` @ `1e2a890`).  
 Main / `codex/restore-current-luca` **não** atualizados. Precisa humano só para merge futuro na base comercial.
 
 ## Próximo livre (executor)
