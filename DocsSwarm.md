@@ -4,13 +4,17 @@ Ledger de higiene documental (enxame `docs`). Uma melhoria canônica por rodada.
 
 ## Em andamento
 
-### 2026-08-02T11:52:19Z — NX-LUCA-AI-docs (Hermes cron)
-- Área: docs/operacao + integracoes ainda nomeiam borda como Worker
-- Escopo: `docs/operacao.md`, `docs/integracoes.md`, `scripts/docs-production-path.test.js`, `DocsSwarm.md`
-- NÃO tocar: AGENTS.md, INDEX.md, README.md, docs/arquitetura.md (já fechados), DocsDev/, push/deploy
+_(nenhum — sessão fechou)_
 
 
 ## Concluído
+
+### 2026-08-02T11:53:14Z — NX-LUCA-AI-docs (Hermes cron)
+- Área: docs/operacao + integracoes ainda nomeavam borda como Worker
+- Escopo: `docs/operacao.md`, `docs/integracoes.md`, `scripts/docs-production-path.test.js`, `DocsSwarm.md`
+- Base: `c21b74f` → HEAD fix: `f4fc379`
+- Evidência: `node --test scripts/docs-production-path.test.js` → 4/4 pass; `git diff --numstat` 1/1 operacao, 1/1 integracoes, 6/0 test (sem flip EOL)
+- Resultado: operacao diz "proxy de borda"; integracoes deixa de chamar o proxy de "único Worker ativo"; lock cobre op+integ
 
 ### 2026-08-02T09:19:36Z — NX-LUCA-AI-docs (Hermes cron)
 - Área: docs/arquitetura intro + fluxo produção ainda diziam Worker
