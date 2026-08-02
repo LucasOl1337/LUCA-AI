@@ -1043,6 +1043,39 @@
 .admin-table-wrap em[data-role='admin'] { color: #72c2ff; background: rgba(30,139,229,.13); }
 .admin-state { padding: 34px; color: var(--l-text-ghost); text-align: center; font-size: 12px; }
 .admin-state.error { color: #ff9a94; }
+.admin-state[data-admin-error] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+.admin-error-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--l-error, #ff9a94);
+}
+.admin-error-detail {
+  margin: 0;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--l-text-mute, rgba(255,255,255,0.55));
+}
+.admin-error-hint {
+  margin: 4px 0 0;
+  max-width: 420px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--l-text-soft, rgba(255,255,255,0.72));
+}
+.admin-error-actions {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
 
 @media (max-width: 900px) {
   .auth-shell { display: block; }
