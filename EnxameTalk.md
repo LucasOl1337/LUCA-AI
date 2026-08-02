@@ -5,17 +5,22 @@ Ledger do enxame `swarm/LUCA-AI/enxame-continuo`. Uma entrega de valor por sess�
 ## Livre
 - Tools empty “Nenhuma ferramenta disponível” se a rota voltar ao App (`src/pages/ToolsPage.tsx`)
 - Histórico / GlobalChat empty — páginas **órfãs** (não montadas em `App.tsx`); só se rotas retornarem
-- NÃO reabrir: Personas recovery, Admin/Endpoints error CTA
+- NÃO reabrir: Personas recovery, Admin/Endpoints error CTA, LucaAiStartState error/empty CTA
 
 
 ## Em andamento
-### 2026-08-02T10:10:21Z — NX-LUCA-AI-continuo
-- Área: recovery UX — LucaAiStartState error/empty com CTA indiferenciado
-- Escopo: `src/pages/LucaAiPage.tsx`, `server/luca-start-state-cta.test.js`
-- NÃO tocar: Personas recovery, Admin/Endpoints error, picker empty (bugs), visual auth, landing meta
+_(nenhum — sessão fechou)_
 
 
 ## Concluído
+### 2026-08-02T10:11:27Z — NX-LUCA-AI-continuo
+- Área: recovery UX — LucaAiStartState error/empty com CTA indiferenciado
+- Escopo: `src/pages/LucaAiPage.tsx`, `server/luca-start-state-cta.test.js`, `EnxameTalk.md`
+- Base: `2d79def` → HEAD: `b3688ba`
+- Evidência: `node --test server/luca-start-state-cta.test.js` → 2/2 pass; `git diff --numstat` LucaAiPage 48/4 (CRLF preservado)
+- Resultado: falha de carga de personas no LUCA-AI vira `role=alert` + `data-luca-start-error` + CTA primário `data-luca-start-retry` (“Tentar novamente”); empty mantém `Abrir Personas` primário + `Verificar novamente` secundário
+- NÃO push / deploy / PR
+
 ### 2026-08-02T09:34:48Z — NX-LUCA-AI-continuo
 - Área: recovery UX — Personas Yume error/empty sem CTA
 - Escopo: `src/pages/PersonasPage.tsx`, `server/personas-recovery-cta.test.js`, `EnxameTalk.md`
