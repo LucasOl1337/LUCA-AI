@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { AlertCircle, ExternalLink, Loader2, Plus, RefreshCw, Search, Sparkles, Trash2, UserPlus, UsersRound } from 'lucide-react';
 import { buildApiErrorMessage, lucaApi } from '@/lib/api';
@@ -164,7 +164,24 @@ export default function PersonasPage() {
           </div>
         </section>
 
-        {error && <Notice tone="error" title="Yume indisponivel" body={error} />}
+        {error && (
+          <Notice
+            tone="error"
+            title="Yume indisponivel"
+            body={error}
+            actions={(
+              <button
+                type="button"
+                className="btn-primary !px-4 !py-2 !text-xs"
+                data-personas-retry
+                onClick={() => void load()}
+                disabled={loading}
+              >
+                {loading ? 'Recarregando…' : 'Tentar novamente'}
+              </button>
+            )}
+          />
+        )}
 
         {loading && personas.length === 0 ? (
           <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
@@ -193,8 +210,59 @@ export default function PersonasPage() {
         )}
 
         {!loading && filteredPersonas.length === 0 && (
-          <div className="flex min-h-[220px] items-center justify-center rounded-lg border" style={{ borderColor: theme.border, color: theme.textMute }}>
-            Nenhuma persona encontrada.
+          <div
+            className="flex min-h-[220px] flex-col items-center justify-center gap-4 rounded-lg border px-6 py-10 text-center"
+            style={{ borderColor: theme.border, color: theme.textMute }}
+            data-personas-empty
+          >
+            <div>
+              <p className="text-sm font-semibold" style={{ color: theme.textSoft }}>
+                {personas.length === 0
+                  ? 'Nenhuma persona no catálogo Yume.'
+                  : 'Nenhuma persona corresponde à busca ou filtro.'}
+              </p>
+              <p className="mt-2 max-w-[48ch] text-xs leading-relaxed" style={{ color: theme.textGhost }}>
+                {personas.length === 0
+                  ? 'Abra o Yume para criar personas ou recarregue o catálogo quando o bridge estiver no ar.'
+                  : 'Limpe a busca e o filtro, ou recarregue o catálogo se o Yume acabou de sincronizar.'}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {(query.trim() || filter !== 'all') ? (
+                <button
+                  type="button"
+                  className="btn-primary !px-4 !py-2 !text-xs"
+                  data-personas-clear-filters
+                  onClick={() => {
+                    setQuery('');
+                    setFilter('all');
+                  }}
+                >
+                  Limpar busca e filtro
+                </button>
+              ) : (
+                <a
+                  href={YUME_DASHBOARD_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-primary !px-4 !py-2 !text-xs inline-flex items-center gap-2"
+                  data-personas-open-yume
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Abrir Yume
+                </a>
+              )}
+              <button
+                type="button"
+                className="btn-fleet !px-4 !py-2 !text-xs inline-flex items-center gap-2"
+                data-personas-empty-reload
+                onClick={() => void load()}
+                disabled={loading}
+              >
+                {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                Recarregar catálogo
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -212,16 +280,33 @@ function Metric({ label, value }: { label: string; value: number }) {
   );
 }
 
-function Notice({ tone, title, body }: { tone: 'warning' | 'error'; title: string; body: string }) {
+function Notice({
+  tone,
+  title,
+  body,
+  actions,
+}: {
+  tone: 'warning' | 'error';
+  title: string;
+  body: string;
+  actions?: ReactNode;
+}) {
   const theme = useTheme();
   const color = tone === 'error' ? theme.error : theme.warning;
   const bg = tone === 'error' ? theme.errorBg : theme.warningBg;
   return (
-    <div className="flex items-start gap-3 rounded-lg px-4 py-3" style={{ background: bg, border: `1px solid ${color}` }}>
+    <div
+      className="flex items-start gap-3 rounded-lg px-4 py-3"
+      style={{ background: bg, border: `1px solid ${color}` }}
+      data-personas-error={tone === 'error' ? '' : undefined}
+      data-tone={tone}
+      role={tone === 'error' ? 'alert' : undefined}
+    >
       <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" style={{ color }} />
-      <div>
+      <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold" style={{ color }}>{title}</div>
         <div className="mt-1 text-xs leading-relaxed" style={{ color: theme.textSoft }}>{body}</div>
+        {actions ? <div className="mt-3 flex flex-wrap gap-2">{actions}</div> : null}
       </div>
     </div>
   );
