@@ -9,6 +9,7 @@ import {
   API_RATE_LIMIT_MAX,
   API_RATE_LIMIT_WINDOW_MS,
   HOST,
+  PACKAGE_VERSION,
   PORT,
   AGENTS,
   AGENT_ALIASES,
@@ -2261,6 +2262,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
     service: 'luca-ai',
+    version: PACKAGE_VERSION,
     supervisorMode: state.supervisorMode,
     agents: Array.isArray(state.agents) ? state.agents.length : 0,
     personaAgents: Array.isArray(state.personaAgents) ? state.personaAgents.length : 0,

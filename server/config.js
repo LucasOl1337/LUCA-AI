@@ -1,3 +1,18 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+export function readProjectVersion(rootDir = process.cwd()) {
+  try {
+    const raw = fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8');
+    const version = String(JSON.parse(raw)?.version || '').trim();
+    return version || null;
+  } catch {
+    return null;
+  }
+}
+
+export const PACKAGE_VERSION = readProjectVersion();
+
 export const HOST = process.env.HOST ?? '127.0.0.1';
 export const PORT = Number(process.env.PORT ?? 4242);
 export const ROUTER_API_KEY = process.env.ROUTER_API_KEY ?? process.env.NINE_ROUTER_API_KEY ?? '';
