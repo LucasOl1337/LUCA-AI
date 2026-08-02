@@ -3,11 +3,11 @@
 Coletor do enxame `bugs`. Só este assunto. Sem push/PR/deploy/main.
 
 ## Estado
-- Branch execução: `swarm/LUCA-AI/bugs` @ `2ab6ca0`
-- Branch integração: `swarm/LUCA-AI/bugs-integracao` @ `0f9323d` (produto bugs ≡ tip de execução; tip do coletor abaixo)
+- Branch execução: `swarm/LUCA-AI/bugs` @ `b3cf2bc`
+- Branch integração: `swarm/LUCA-AI/bugs-integracao` @ `9af7557` (produto bugs ≡ tip de execução; tip do coletor abaixo)
 - Base produto: `codex/restore-current-luca` / `b14f395`
-- Coleta: 2026-08-02T10:26:13Z (AFK cron NX coletor bugs — revalidação)
-- Fila nova desde `0f9323d`: **vazia** (blobs produto idênticos; só divergem hashes de ledger/cherry-pick)
+- Coleta: 2026-08-02T13:07:51Z (AFK cron NX coletor bugs)
+- Fila nova desde `4ea5621`: **2 produto + 2 ledger** (canvas empty + chat notice mid-session)
 
 ## Fila revisada
 
@@ -19,8 +19,12 @@ Coletor do enxame `bugs`. Só este assunto. Sem push/PR/deploy/main.
 | `263d679` | `chore(enxame): fecha rodada bugs no SwarmLedger` | **aprovar** | Ledger Admin → `e0072f9` |
 | `aabcde0` | `fix(ux): LUCA-AI persona picker empty gains clear CTA` | **aprovar** | Cherry-pick → `5b2c7b2` |
 | `2ab6ca0` | `chore(enxame): fecha rodada bugs no SwarmLedger` | **aprovar** | Ledger picker → `055d9dc` |
+| `0b349a3` | `fix(ux): LUCA-AI chat canvas empty gains focus-mission CTA` | **aprovar** | Cherry-pick → `84b3e6d` |
+| `7401bdd` | `chore(enxame): fecha rodada bugs no SwarmLedger` | **aprovar** | Ledger canvas; sem produto extra |
+| `1c567c3` | `fix(ux): LUCA-AI mid-session chat error gains retry CTA` | **aprovar** | Cherry-pick → `9af7557` |
+| `b3cf2bc` | `chore(enxame): fecha rodada bugs no SwarmLedger` | **aprovar** | Ledger chat-notice; sem produto extra |
 
-Nenhum commit `bugs` pós-`2ab6ca0`. Diff produto `bugs` vs `bugs-integracao` nos paths de escopo: **vazio**.
+Diff produto `bugs` vs `bugs-integracao` nos 9 paths de escopo: **vazio** (blob hash match).
 
 ## Diff em escopo (já integrado)
 
@@ -36,27 +40,36 @@ Nenhum commit `bugs` pós-`2ab6ca0`. Diff produto `bugs` vs `bugs-integracao` no
 - `src/pages/LucaAiPage.tsx` — `data-luca-picker-empty` + clear/close
 - `server/luca-picker-empty-cta.test.js` — 2 locks
 
+### Canvas empty (`0b349a3` → `84b3e6d`)
+- `src/pages/LucaAiPage.tsx` — `data-luca-canvas-empty` + `data-luca-canvas-focus-mission` (“Escrever missão” → `#luca-ai-mission`)
+- `server/luca-canvas-empty-cta.test.js` — 2 locks
+
+### Mid-session chat notice (`1c567c3` → `9af7557`)
+- `src/pages/LucaAiPage.tsx` — shell `data-luca-chat-error` + `role=alert`; `Notice` com `data-luca-chat-retry` / `data-luca-chat-dismiss`
+- `server/luca-chat-error-cta.test.js` — 2 locks
+
 Fora de escopo (não tocado): `EndpointsPage` / Personas **error** (contínuo), auth CSS (visual), `index.html` (landing), release/install-vm (ready-to-ship), docs, `_afk-marketing/*`, push/deploy.
 
 ## Validação
 ```
 git checkout swarm/LUCA-AI/bugs-integracao
-# produto bugs ≡ integracao (rev-parse blob hash match em 7 paths)
-node --test server/tools-error-cta.test.js server/admin-empty-cta.test.js server/luca-picker-empty-cta.test.js
-# 7/7 pass @ 2026-08-02T10:26:13Z
-node --check server/tools-error-cta.test.js server/admin-empty-cta.test.js server/luca-picker-empty-cta.test.js
-rg data-tools-retry|data-admin-empty|data-luca-picker-empty ToolsPage/AdminPage/LucaAiPage → presentes
+# cherry-pick 0b349a3 → 84b3e6d; 1c567c3 → 9af7557 (limpo)
+# produto bugs ≡ integracao (rev-parse blob hash match em 9 paths)
+node --test server/luca-chat-error-cta.test.js server/luca-canvas-empty-cta.test.js server/luca-picker-empty-cta.test.js server/admin-empty-cta.test.js server/tools-error-cta.test.js
+# 11/11 pass @ 2026-08-02T13:07:51Z
+node --check server/luca-chat-error-cta.test.js server/luca-canvas-empty-cta.test.js server/luca-picker-empty-cta.test.js server/admin-empty-cta.test.js server/tools-error-cta.test.js
+rg data-luca-canvas-empty|data-luca-chat-error|data-luca-picker-empty|data-admin-empty|data-tools-retry → presentes
 ```
-Conflitos: nenhum. Cherry-picks anteriores limpos. Superfícies disjuntas do contínuo. Órfãos (Tools empty / Histórico / GlobalChat) não reabertos.
+Conflitos: nenhum. Cherry-picks limpos. Superfícies disjuntas do contínuo. Órfãos (Tools empty / Histórico / GlobalChat) não reabertos.
 
 ## Decisão
-**aprovar** (revalidação). Integração local já completa em `swarm/LUCA-AI/bugs-integracao` @ `0f9323d`.  
-Sem cherry-pick nesta rodada. Main / `codex/restore-current-luca` **não** atualizados. Precisa humano só para merge futuro na base comercial.
+**aprovar**. Integração local completa em `swarm/LUCA-AI/bugs-integracao` @ `9af7557` (produto ≡ `bugs` @ `b3cf2bc`).  
+Main / `codex/restore-current-luca` **não** atualizados. Precisa humano só para merge futuro na base comercial.
 
 ## Próximo livre (executor)
-1. Residual live `LucaAiPage` chrome **disjunto** do picker empty — se ainda houver recovery morto na rota montada
+1. Residual live `luca-ai` friction **disjunto** de start-state / picker / canvas / chat-notice (e contínuo error CTAs)
 2. Tools empty “Nenhuma ferramenta” **só se** a página voltar ao `ACTIVE_PAGES` / App
-3. **Não** reabrir: Tools error, Admin empty, picker empty
+3. **Não** reabrir: Tools error, Admin empty, picker empty, canvas empty, chat notice mid-session
 4. **Não** tocar órfãos: `HistoricoPage`, `GlobalChat` / Operacional (sem route no App)
 
 ## Anti-padrões evitados
