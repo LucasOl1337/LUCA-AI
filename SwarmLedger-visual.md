@@ -1,12 +1,19 @@
 # SwarmLedger — visual (LUCA-AI)
 
 ## Livre
-- Páginas secundárias / shell residual se aparecer hex solto fora de auth/agents/canvas pie
+- Páginas secundárias / shell residual se aparecer hex solto fora de auth/agents/canvas pie/stateTone (próximo: `LucaOwl` SVG strokes se ainda ad-hoc)
 
 ## Em andamento
 _(nenhum — sessão fechou)_
 
 ## Concluído
+### 2026-08-02 — NX-LUCA-AI-visual (stateTone)
+- Área: `stateTone` residual hex → rails de status do produto (`--l-ok` / `--l-error` / `--l-warning`)
+- Escopo: `src/lib/format.ts`, `server/state-tone-visual-tokens.test.js`, `SwarmLedger-visual.md`
+- Base: `161a614` → HEAD: fa0b4ac
+- Evidência: `node --test server/state-tone-visual-tokens.test.js` PASS (+ pie/agent/state-pill/auth regression = 5); `git diff --numstat` format.ts = 4/3 (sem flip EOL)
+- Resultado: running/online/ready → `#30d158`; error/offline → `#ff453a`; default → `#ff9f0a`; ban `#43d18a`/`#f87171`/`#fbbf24` em `stateTone`
+- NÃO push / deploy / PR
 ### 2026-08-02 — NX-LUCA-AI-visual (pie palette)
 - Área: canvas PIE_PALETTE brass residual → ação azul do produto (`#0a84ff` = `--l-gold`/`theme.gold`)
 - Escopo: `src/lib/canvas.ts`, `server/pie-palette-visual-tokens.test.js`, `SwarmLedger-visual.md`
