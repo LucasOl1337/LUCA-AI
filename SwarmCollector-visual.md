@@ -3,76 +3,83 @@
 Coletor do enxame `visual`. Só este assunto. Sem push/PR/deploy/main.
 
 ## Estado
-- Branch execução: `swarm/LUCA-AI/visual` @ `161a614` (worktree `C:/Projetos/LUCA-AI-enxame-visual`)
-- Branch integração: `swarm/LUCA-AI/visual-integracao` @ `1d1c533` (após coleta)
+- Branch execução: `swarm/LUCA-AI/visual` @ `ccebc17` (worktree `C:/Projetos/LUCA-AI-enxame-visual`)
+- Branch integração: `swarm/LUCA-AI/visual-integracao` @ `35eadb9` (produto) + este relatório
 - Base produto: `codex/restore-current-luca` / `b14f395`
-- Coleta: 2026-08-02 (AFK cron NX coletor visual — rodada 2)
-- Método: cherry-pick (não FF: integração já tinha relatório `0cbec1e` fora da execução)
+- Coleta: 2026-08-02 (AFK cron NX coletor visual — rodada 3)
+- Método: cherry-pick (não FF: integração tem relatórios coletor `0cbec1e`/`0187dd3` fora da execução)
 
 ## Fila revisada
 
 | Commit (execução) | Integrado como | Mensagem | Classificação | Ação |
 |---|---|---|---|---|
-| `d9c8773` | `d9c8773` | `fix(visual): auth shell usa tokens --l-* do produto` | **aprovar** | Já em `visual-integracao` (coleta anterior) |
+| `d9c8773` | `d9c8773` | `fix(visual): auth shell usa tokens --l-* do produto` | **aprovar** | Já em integração (coleta 1) |
 | `b1c5a0f` | `b1c5a0f` | `chore(enxame): fecha rodada visual no SwarmLedger` | **aprovar** | Já integrado |
 | `3d6ac28` | `3d6ac28` | `fix(visual): StatePill on-state usa theme.goldHaze` | **aprovar** | Já integrado |
 | `f37c2e0` | `f37c2e0` | `chore(enxame): fecha rodada visual no SwarmLedger` | **aprovar** | Já integrado |
-| `8bc935e` | `90cadef` | `fix(visual): accents de agentes usam ação azul do produto` | **aprovar** | Cherry-pick limpo → integração |
-| `84a54ca` | `3918806` | `chore(enxame): fecha rodada visual no SwarmLedger` | **aprovar** | Ledger rodada agent accents |
-| `f73b35e` | `a83cdbe` | `fix(visual): pie palette usa ação azul do produto` | **aprovar** | Cherry-pick limpo → integração |
-| `161a614` | `1d1c533` | `chore(enxame): fecha rodada visual no SwarmLedger` | **aprovar** | Ledger rodada pie palette |
+| `8bc935e` | `90cadef` | `fix(visual): accents de agentes usam ação azul do produto` | **aprovar** | Já integrado (coleta 2) |
+| `84a54ca` | `3918806` | `chore(enxame): fecha rodada visual no SwarmLedger` | **aprovar** | Já integrado |
+| `f73b35e` | `a83cdbe` | `fix(visual): pie palette usa ação azul do produto` | **aprovar** | Já integrado |
+| `161a614` | `1d1c533` | `chore(enxame): fecha rodada visual no SwarmLedger` | **aprovar** | Já integrado |
+| `fa0b4ac` | `0358b68` | `fix(visual): stateTone usa rails de status do produto` | **aprovar** | Cherry-pick limpo → integração |
+| `e1b12ce` | `3d2906d` | `chore(enxame): fecha rodada visual no SwarmLedger` | **aprovar** | Ledger rodada stateTone |
+| `53b2912` | `1adc397` | `fix(visual): LucaOwl strokes usam rails navy do produto` | **aprovar** | Cherry-pick limpo → integração |
+| `aacda41` | `2daf4dc` | `chore(enxame): fecha rodada visual no SwarmLedger` | **aprovar** | Ledger rodada LucaOwl |
+| `e65f039` | `e36a010` | `fix(visual): state-badge e term-line usam rails de status do produto` | **aprovar** | Cherry-pick limpo → integração |
+| `ccebc17` | `35eadb9` | `chore(enxame): fecha rodada visual no SwarmLedger` | **aprovar** | Ledger rodada state-badge |
 
 ## Diff em escopo (esta coleta)
-- `src/lib/agents.ts` — brass `#C9A227` → `#0a84ff` em maestro / transformador / designer / supervisor + 1º slot `CHAT_ACCENTS`; heartbeat/planejador/pesquisador/database intactos
-- `server/agent-accent-visual-tokens.test.js` — source-lock bane `#C9A227` e exige ação azul nos roles de sistema
-- `src/lib/canvas.ts` — `PIE_PALETTE[0]` brass → `#0a84ff`; fatias restantes mantidas
-- `server/pie-palette-visual-tokens.test.js` — source-lock bane brass no canvas e exige 1º slot `#0a84ff`
-- `SwarmLedger-visual.md` — claims agent accents + pie fechados; Livre: hex residual em páginas secundárias / shell fora de auth/agents/canvas pie
+- `src/lib/format.ts` — `stateTone` `#43d18a`/`#f87171`/`#fbbf24` → `#30d158`/`#ff453a`/`#ff9f0a` (= `--l-ok`/`--l-error`/`--l-warning`)
+- `server/state-tone-visual-tokens.test.js` — source-lock bane hex residual e exige rails de status
+- `src/components/LucaOwl.tsx` — strokes/halo ciano ad-hoc → navy produto (`#64d2ff`/`#1E4E8C`/`#0a84ff`/`#82c7ff`)
+- `server/luca-owl-visual-tokens.test.js` — ban cianos + exige rails navy
+- `src/index.css` — `.state-badge.ok/error/warning` + `.term-line-*` soft hex → `var(--l-ok|error|warning|navy-deep)`
+- `server/state-badge-visual-tokens.test.js` — ban `#8dffb0`/`#ffc566`/`#6ee790` + soft `#ff8a83` nas rules
+- `SwarmLedger-visual.md` — claims stateTone + LucaOwl + state-badge fechados; Livre: AgentRail `aliveSoft` residual / runtime card border / soft auth residual
 
-Já na integração (coleta 1): auth shell `--l-*`, StatePill `theme.goldHaze`, locks auth/state-pill.
+Já na integração (coletas 1–2): auth shell, StatePill, agent accents, pie palette + locks.
 
-Fora de escopo (não tocado): `ToolsPage`/`EndpointsPage` (bugs/contínuo), `index.html` (landing), release health (ready-to-ship), docs, `_afk-marketing/*`, push/deploy.
+Fora de escopo (não tocado): bugs/contínuo recovery CTAs, `index.html` (landing), release health (ready-to-ship), docs, `_afk-marketing/*`, push/deploy.
 
 ## Validação
 ```
 git checkout swarm/LUCA-AI/visual-integracao
-# pendentes execução → integração (divergente por 0cbec1e coletor)
-git cherry-pick 8bc935e 84a54ca f73b35e 161a614
-# → 90cadef 3918806 a83cdbe 1d1c533
+git cherry-pick fa0b4ac e1b12ce 53b2912 aacda41 e65f039 ccebc17
+# → 0358b68 3d2906d 1adc397 2daf4dc e36a010 35eadb9
 
 node --test \
-  server/auth-visual-tokens.test.js \
-  server/state-pill-visual-tokens.test.js \
+  server/state-badge-visual-tokens.test.js \
+  server/luca-owl-visual-tokens.test.js \
+  server/state-tone-visual-tokens.test.js \
+  server/pie-palette-visual-tokens.test.js \
   server/agent-accent-visual-tokens.test.js \
-  server/pie-palette-visual-tokens.test.js
-# 4/4 pass
+  server/auth-visual-tokens.test.js \
+  server/state-pill-visual-tokens.test.js
+# 7/7 pass
 
-node --check server/agent-accent-visual-tokens.test.js server/pie-palette-visual-tokens.test.js
+rg -n "C9A227|#00c8f0|#8dffb0" src/lib src/components/LucaOwl.tsx src/index.css
+# vazio (só bans nos tests)
 
-git diff --numstat f37c2e0..HEAD -- \
-  src/lib/agents.ts src/lib/canvas.ts \
-  server/agent-accent-visual-tokens.test.js server/pie-palette-visual-tokens.test.js \
-  SwarmLedger-visual.md
-# agents 6/6 · canvas 1/1 · agent-test 33/0 · pie-test 25/0 · ledger 16/2 (sem flip EOL)
+rg -n "#43d18a" src/lib/format.ts          # vazio em stateTone
+# residual intencional: agents heartbeat + pie slice + CHAT_ACCENTS[3]
 
-rg -n "C9A227" src/lib/agents.ts src/lib/canvas.ts   # vazio (só bans nos tests)
-rg -n "^## " SwarmLedger-visual.md                   # Livre / Em andamento / Concluído (1 cada)
+rg -n "^## " SwarmLedger-visual.md         # Livre / Em andamento / Concluído (1 cada)
 ```
-Conflitos: nenhum nos cherry-picks. Paths disjuntos de bugs/contínuo/landing. Residual brass em produto: **0** em `src/` (só asserts de ban nos tests). Hex soltos restantes fora do brass: `LucaOwl.tsx` strokes, `format.ts` state colors, theme intentional em `useTheme.tsx`.
+Conflitos: nenhum nos cherry-picks. Paths disjuntos de bugs/contínuo/landing. Brass/ciano/soft-badge residual em produto: **0** nas superfícies shipadas.
 
 ## Decisão
-**aprovar** as quatro commits novas da execução e manter integração local em `swarm/LUCA-AI/visual-integracao` @ `1d1c533` (produto equivalente a `161a614` + relatório coletor).  
+**aprovar** as seis commits novas da execução e manter integração local em `swarm/LUCA-AI/visual-integracao` @ `35eadb9` + este relatório.  
 Main / `codex/restore-current-luca` **não** atualizados. Precisa humano só para merge futuro na base comercial.
 
 ## Próximo livre (executor)
-1. Hex residual de tela única: preferir `src/components/LucaOwl.tsx` strokes **ou** `src/lib/format.ts` state colors (uma superfície por rodada)
-2. **Não** reabrir auth CSS, StatePill, agent accents, nem `PIE_PALETTE`
+1. AgentRail power bg `rgba(67,209,138,0.08)` → `theme.aliveSoft`; runtime event card border `rgba(184,216,176,0.18)` → product border/ok; soft `#ff8a83` só se ainda ad-hoc fora da convenção de erro
+2. **Não** reabrir auth CSS, StatePill, agent accents, `PIE_PALETTE`, `stateTone`, LucaOwl, state-badge/term-line
 3. Não “migrar” defaults de `useTheme.tsx` (rails do tema operacional)
 
 ## Anti-padrões evitados
 - Sem merge/push/PR/deploy
 - Sem `git add -A` (só este relatório; dirty `_afk-marketing/` intocado)
-- Sem reabrir auth/StatePill/agents/pie já shipados
+- Sem reabrir superfícies já shipadas
 - Sem misturar bugs/contínuo/landing/docs/ready-to-ship
 - Sem redesign soft-SaaS; só migração de token
 - FF abortado de propósito → cherry-pick (histórico do coletor anterior preservado)
