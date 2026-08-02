@@ -4,12 +4,16 @@ Ledger de higiene documental (enxame `docs`). Uma melhoria canônica por rodada.
 
 ## Em andamento
 
+_(nenhum — sessão fechou)_
+
+## Concluído
+
 ### 2026-08-02T06:49:07Z — NX-LUCA-AI-docs (Hermes cron)
 - Área: README stack genérico vs produção Express/VM
 - Escopo: `README.md`, `scripts/docs-production-path.test.js`, `DocsSwarm.md`
-- NÃO tocar: `AGENTS.md`/`INDEX.md` (docs-1), `DocsDev/` rewrite, push/deploy
-
-## Concluído
+- Base: `88d8377` → HEAD fix: `9c195e8`
+- Evidência: `node --test scripts/docs-production-path.test.js` → 4/4 pass; `git diff --numstat` 1/1 README, 11/0 test (sem flip EOL)
+- Resultado: stack do README deixa de listar bare "Cloudflare Workers"; aponta Tunnel + `deploy/luca-ai-vm-proxy.js` e marca `worker/` legado
 
 ### 2026-08-02T04:57:35Z — NX-LUCA-AI-docs (Hermes cron)
 - Área: contradição canônica produção (Worker DO vs Express VM)
@@ -20,5 +24,5 @@ Ledger de higiene documental (enxame `docs`). Uma melhoria canônica por rodada.
 
 ## Livre
 
-- README stack ainda lista "Cloudflare Workers" genérico (baixo risco; corpo já descreve proxy+Tunnel)
-- Paths em `DocsDev/` históricos que citam worker como produção
+- Paths em `DocsDev/` históricos que citam worker como produção (não reescrever DocsDev sem ordem; arquivar ponta se reaparecer no canônico)
+- `changelog.md` / `patchnotes.md` na raiz: histórico de produto vs canônico (só se contradisser AGENTS/INDEX/docs)
