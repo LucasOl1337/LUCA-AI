@@ -66,6 +66,27 @@ for _attempt in $(seq 1 30); do
   sleep 1
 done
 curl -fsS --max-time 5 http://127.0.0.1:4242/api/auth/session >/dev/null
+# INSTALL_VM_HEALTH_GATE_V1: fail closed if health/version diverge from package.json
+expected_version="$(node -p "require('./package.json').version" 2>/dev/null || true)"
+test -n "$expected_version"
+health_json="$(curl -fsS --max-time 5 http://127.0.0.1:4242/api/health)"
+printf '%s' "$health_json" | node -e '
+const fs = require("fs");
+const expected = process.argv[1];
+const body = JSON.parse(fs.readFileSync(0, "utf8"));
+if (body.ok !== true) {
+  console.error("health.ok != true", body);
+  process.exit(1);
+}
+if (body.service !== "luca-ai") {
+  console.error("health.service unexpected", body.service);
+  process.exit(1);
+}
+if (!body.version || String(body.version).trim() !== expected) {
+  console.error("health.version mismatch", { expected, got: body.version });
+  process.exit(1);
+}
+' "$expected_version"
 private_status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:4242/api/state)"
 test "$private_status" = 401
 
@@ -115,3 +136,4 @@ systemctl is-active --quiet cloudflared-bombapvp-lab.service
 
 printf 'DEPLOYED_COMMIT=%s\n' "$commit"
 printf 'PRIVATE_STATUS=%s\n' "$private_status"
+printf 'HEALTH_VERSION=%s\n' "$expected_version"
