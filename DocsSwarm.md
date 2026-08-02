@@ -4,13 +4,17 @@ Ledger de higiene documental (enxame `docs`). Uma melhoria canônica por rodada.
 
 ## Em andamento
 
-### 2026-08-02T09:19:36Z — NX-LUCA-AI-docs (Hermes cron)
-- Área: docs/arquitetura intro + fluxo produção ainda dizem Worker
-- Escopo: `docs/arquitetura.md`, `scripts/docs-production-path.test.js`, `DocsSwarm.md`
-- NÃO tocar: AGENTS/INDEX/README (rodadas anteriores), DocsDev rewrite, push/deploy
+_(nenhum — sessão fechou)_
 
 
 ## Concluído
+
+### 2026-08-02T09:19:36Z — NX-LUCA-AI-docs (Hermes cron)
+- Área: docs/arquitetura intro + fluxo produção ainda diziam Worker
+- Escopo: `docs/arquitetura.md`, `scripts/docs-production-path.test.js`, `DocsSwarm.md`
+- Base: `64960c1` → HEAD fix: `cecc361`
+- Evidência: `node --test scripts/docs-production-path.test.js` → 4/4 pass; `git diff --numstat` 2/2 arquitetura, 4/0 test (sem flip EOL)
+- Resultado: intro aponta borda Cloudflare (proxy/Tunnel); fluxo de produção nomeia `deploy/luca-ai-vm-proxy.js` em vez de "Worker de borda"; `worker/` permanece só na tabela legado
 
 ### 2026-08-02T06:49:07Z — NX-LUCA-AI-docs (Hermes cron)
 - Área: README stack genérico vs produção Express/VM
@@ -30,3 +34,4 @@ Ledger de higiene documental (enxame `docs`). Uma melhoria canônica por rodada.
 
 - Paths em `DocsDev/` históricos que citam worker como produção (não reescrever DocsDev sem ordem; arquivar ponta se reaparecer no canônico)
 - `changelog.md` / `patchnotes.md` na raiz: histórico de produto vs canônico (só se contradisser AGENTS/INDEX/docs)
+- `package.json` `"test"` só pega `server/**/*.test.js` — locks em `scripts/` não rodam no `npm test` (só se virar gap operacional de release)
