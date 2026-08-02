@@ -1608,18 +1608,36 @@ function LucaMissionCanvas({
             </button>
           )
         )) : !finalResult && (
-          <div className="flex min-h-[48vh] flex-col items-center justify-center px-4 text-center sm:px-6">
-            <div className="mb-5 grid h-14 w-14 place-items-center overflow-hidden rounded-2xl border" style={{ borderColor: theme.border, background: theme.goldSoft }}>
+          <div
+            className="flex min-h-[48vh] flex-col items-center justify-center gap-3 px-4 text-center sm:px-6"
+            data-luca-canvas-empty
+            data-tone="empty"
+          >
+            <div className="mb-2 grid h-14 w-14 place-items-center overflow-hidden rounded-2xl border" style={{ borderColor: theme.border, background: theme.goldSoft }}>
               <img src="/icon-512.png" alt="" className="h-full w-full object-cover object-[center_28%]" />
             </div>
             <h1 className="text-xl font-semibold tracking-[-0.025em]" style={{ color: theme.text }}>
               {operationMode === 'individual' ? 'Qual problema deve ser julgado?' : 'O que a equipe deve entregar?'}
             </h1>
-            <p className="mt-2 max-w-[46ch] text-sm leading-relaxed luca-wrap" style={{ color: theme.textMute }}>
+            <p className="mt-0 max-w-[46ch] text-sm leading-relaxed luca-wrap" style={{ color: theme.textMute }}>
               {operationMode === 'individual'
                 ? 'Abra Seleção no topo, escolha até cinco participantes e um juiz. Cada resposta fica isolada e o veredito encerra a rodada.'
                 : 'Abra Equipe no topo, escolha as personas e envie a missão abaixo. As respostas aparecem aqui como uma conversa.'}
             </p>
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                className="btn-primary !px-4 !py-2 !text-xs"
+                data-luca-canvas-focus-mission
+                onClick={() => {
+                  const el = document.getElementById('luca-ai-mission') as HTMLTextAreaElement | null;
+                  el?.focus();
+                  el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }}
+              >
+                Escrever missão
+              </button>
+            </div>
           </div>
         )}
 
