@@ -170,9 +170,9 @@
     min-height: 26px;
     border: 0 !important;
   }
-  .state-badge.ok { background: var(--l-ok-bg); color: #8dffb0; }
-  .state-badge.error { background: var(--l-error-bg); color: #ff8a83; }
-  .state-badge.warning { background: var(--l-warning-bg); color: #ffc566; }
+  .state-badge.ok { background: var(--l-ok-bg); color: var(--l-ok); }
+  .state-badge.error { background: var(--l-error-bg); color: var(--l-error); }
+  .state-badge.warning { background: var(--l-warning-bg); color: var(--l-warning); }
   .state-badge.dormant { background: rgba(255, 255, 255, 0.09); color: var(--l-text-mute); }
 
   .gold-text { color: var(--l-gold-bright); }
@@ -240,9 +240,9 @@
     box-shadow: inset 0 2px 18px rgba(0, 0, 0, 0.48), inset 0 0.5px 0 rgba(255, 255, 255, 0.10);
   }
   .term p { overflow-wrap: anywhere; word-break: normal; }
-  .term-line-start { color: #64d2ff; }
-  .term-line-done { color: #6ee790; }
-  .term-line-fail { color: #ff8a83; }
+  .term-line-start { color: var(--l-navy-deep); }
+  .term-line-done { color: var(--l-ok); }
+  .term-line-fail { color: var(--l-error); }
 
   .agent-card {
     background: var(--l-surface);
