@@ -15,7 +15,7 @@ export default function StatePill({ label, on, color }: StatePillProps) {
     <div
       className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-semibold tracking-[0.18em] uppercase"
       style={{
-        background: on ? 'rgba(201,162,39,0.04)' : 'transparent',
+        background: on ? theme.goldHaze : 'transparent',
         border: `1px solid ${on ? theme.border : 'transparent'}`,
         color: on ? theme.textSoft : theme.textMute,
       }}
