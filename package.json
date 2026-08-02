@@ -11,6 +11,8 @@
     "server": "node server/index.js",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"server/**/*.test.js\"",
+    "deploy:guard": "node deploy/assert-production-deploy.mjs",
+    "deploy:check": "node deploy/assert-production-deploy.mjs",
     "promo": "npm run build && node promo/scripts/capture-product.mjs && remotion render promo/src/index.tsx Promo promo/dist/luca-ai-commercial.mp4 --codec=h264 --crf=16 --overwrite --public-dir=promo/public"
   },
   "dependencies": {

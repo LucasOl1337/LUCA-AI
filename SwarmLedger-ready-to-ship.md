@@ -1,9 +1,19 @@
 # SwarmLedger — ready-to-ship (LUCA-AI)
 
 ## Em andamento
-_(nenhum — sessão coletor em integração)_
+_(nenhum — sessão fechou)_
+
+
 
 ## Concluído
+### 2026-08-02T12:44:34Z — NX-LUCA-ready-to-ship
+- Área: guard de deploy/branch (main-only)
+- Escopo: `deploy/assert-production-deploy.mjs`, `server/deploy-branch-guard.test.js`, `package.json`
+- Base: `d279ea95002efc7f9ad1b04880de20a45e868a6d` → HEAD: `65f2f7a50ced4796ee046b52c1306addf33e8419`
+- Entrega: `DEPLOY_MAIN_ONLY_V1` em `deploy/assert-production-deploy.mjs` bloqueia deploy comercial fora de `main` salvo `ALLOW_NON_MAIN_DEPLOY=1`; dry-run (`DEPLOY_DRY_RUN=1`) permanece aberto; scripts npm `deploy:guard` / `deploy:check`.
+- Evidência: `node --test server/deploy-branch-guard.test.js server/install-vm-health-gate.test.js server/release-metadata.test.js server/worker-health-version.test.js server/preflight-health-version.test.js` (14 pass).
+- Risco: baixo — só gate de pré-deploy; não altera Express/install-vm/preflight. Operador precisa chamar `npm run deploy:guard` antes de packaging/wrangler.
+
 ### 2026-08-02T11:11:28Z — NX-LUCA-ready-to-ship
 - Área: worker cloud /api/health version + preflight always-require version
 - Escopo: `shared/release-version.js`, `shared/preflight.js`, `worker/src/index.js`, `server/preflight.test.js`, `server/worker-health-version.test.js`
@@ -37,6 +47,6 @@ _(nenhum — sessão coletor em integração)_
 - Risco: baixo — só campo novo no health; preflight existente não exige o campo.
 
 ## Livre
-- Guard de deploy/branch se wrangler/worker cloud voltar a ser caminho de release
 - Docs/operacao que citem o campo `version` no preflight/worker health (opcional)
 - Ao bump de `package.json`, atualizar `shared/release-version.js` (lock `worker-health-version`)
+- Wiring do guard em pipeline real de packaging/VM só se aparecer script de stage (hoje install-vm assume tarball já preparado)
