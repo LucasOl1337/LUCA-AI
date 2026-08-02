@@ -5,17 +5,21 @@ Ledger do enxame `swarm/LUCA-AI/enxame-continuo`. Uma entrega de valor por sess�
 ## Livre
 - Tools empty “Nenhuma ferramenta disponível” se a rota voltar ao App (`src/pages/ToolsPage.tsx`)
 - Histórico / GlobalChat empty — páginas **órfãs** (não montadas em `App.tsx`); só se rotas retornarem
-- NÃO reabrir: Personas recovery, Admin/Endpoints error CTA, LucaAiStartState error/empty CTA, landing system status reconnect (`data-landing-system-*`)
-- residual live luca-ai friction only if disjunct of start-state + landing system status
+- NÃO reabrir: Personas recovery, Admin/Endpoints error CTA, LucaAiStartState error/empty CTA, landing system status reconnect (`data-landing-system-*`), Layout shell reconnect (`data-layout-system-*`)
+- residual live luca-ai friction only if disjunct of start-state + landing system status + layout shell
 
 
 ## Em andamento
-### 2026-08-02T12:41:50Z — NX-LUCA-AI-continuo
-- Área: recovery UX — Layout shell offline só badge, sem reconectar
-- Escopo: `src/components/Layout.tsx`, `server/layout-system-status-cta.test.js`, `EnxameTalk.md`
-- NÃO tocar: landing system status, start-state, personas/admin/endpoints error, bugs picker/canvas/chat-notice, visual/docs
+_(nenhum — sessão fechou)_
 
 ## Concluído
+### 2026-08-02T12:44:18Z — NX-LUCA-AI-continuo
+- Área: recovery UX — Layout shell offline só badge, sem reconectar
+- Escopo: `src/components/Layout.tsx`, `server/layout-system-status-cta.test.js`, `EnxameTalk.md`
+- Base: `51dc723` → HEAD: `f053ac9`
+- Evidência: `node --test server/layout-system-status-cta.test.js` (+ landing/start/personas/admin/endpoints locks) → 12/12 pass; `git diff --numstat` Layout 65/14 (CRLF preservado)
+- Resultado: badge/footer do shell em offline deixa de ser só status; vira botão `data-layout-system-retry` (sidebar + mobile) com `needsShellRecovery = !checking && !runtimeOnline` → `refresh()`; online/checking permanece leitura
+- NÃO push / deploy / PR
 ### 2026-08-02T12:13:53Z — NX-LUCA-AI-continuo
 - Área: recovery UX — status do sistema na landing offline/erro sem CTA
 - Escopo: `src/pages/LandingPage.tsx`, `server/landing-system-status-cta.test.js`, `EnxameTalk.md`
