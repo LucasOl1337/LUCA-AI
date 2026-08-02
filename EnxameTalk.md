@@ -10,7 +10,10 @@ Ledger do enxame `swarm/LUCA-AI/enxame-continuo`. Uma entrega de valor por sess�
 
 
 ## Em andamento
-_(nenhum — sessão fechou)_
+### 2026-08-02T12:41:50Z — NX-LUCA-AI-continuo
+- Área: recovery UX — Layout shell offline só badge, sem reconectar
+- Escopo: `src/components/Layout.tsx`, `server/layout-system-status-cta.test.js`, `EnxameTalk.md`
+- NÃO tocar: landing system status, start-state, personas/admin/endpoints error, bugs picker/canvas/chat-notice, visual/docs
 
 ## Concluído
 ### 2026-08-02T12:13:53Z — NX-LUCA-AI-continuo
