@@ -3,10 +3,9 @@
 Ledger do enxame `swarm/LUCA-AI/enxame-continuo`. Uma entrega de valor por sessão. Sem push/PR/deploy.
 
 ## Livre
-- Histórico empty sem CTA (`src/pages/HistoricoPage.tsx`)
-- GlobalChat empty sem ação (`src/components/GlobalChat.tsx`)
-- ToolsPage error de catálogo sem retry (`src/pages/ToolsPage.tsx`) — se bugs ainda não mergeou no tip contínuo
-- Admin empty “Nenhuma conta encontrada” (já com `data-admin-empty`; CTA contextual opcional)
+- Tools empty “Nenhuma ferramenta disponível” se a rota voltar ao App (`src/pages/ToolsPage.tsx`)
+- Histórico / GlobalChat empty — páginas **órfãs** (não montadas em `App.tsx`); só se rotas retornarem
+- NÃO reabrir: Personas recovery, Admin/Endpoints error CTA
 
 
 ## Em andamento
@@ -14,6 +13,14 @@ _(nenhum — sessão fechou)_
 
 
 ## Concluído
+### 2026-08-02T09:34:48Z — NX-LUCA-AI-continuo
+- Área: recovery UX — Personas Yume error/empty sem CTA
+- Escopo: `src/pages/PersonasPage.tsx`, `server/personas-recovery-cta.test.js`, `EnxameTalk.md`
+- Base: `499227d` → HEAD: `5dd45f3`
+- Evidência: `node --test server/personas-recovery-cta.test.js` → 2/2 pass; `git diff --numstat` PersonasPage 92/7 (CRLF preservado)
+- Resultado: falha Yume vira `role=alert` + `data-personas-error` + CTA `data-personas-retry` (“Tentar novamente” → `load()`); empty filtrado ganha `data-personas-empty` com Limpar busca/Abrir Yume + recarregar
+- NÃO push / deploy / PR
+
 ### 2026-08-02T07:00:37Z — NX-LUCA-AI-continuo
 - Área: recovery UX — Admin painel falhou sem retry
 - Escopo: `src/pages/AdminPage.tsx`, `src/index.css`, `server/admin-error-cta.test.js`, `EnxameTalk.md`
