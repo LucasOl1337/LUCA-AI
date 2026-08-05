@@ -39,6 +39,7 @@ export function normalizeYumePersonaForLuca(persona = {}, importedAgents = new M
   const slug = String(persona.slug || '').trim();
   const avatarUrl = buildYumeAvatarProxyUrl(persona.avatar_url);
   const importedAgent = importedAgents.get(slug);
+  const isOfficial = persona.is_official === true;
   const yumeModel = String(persona.model || '').trim();
   const localModel = String(importedAgent?.model || '').trim();
   const model = resolvePersonaRuntimeModel({
@@ -65,10 +66,53 @@ export function normalizeYumePersonaForLuca(persona = {}, importedAgents = new M
     purpose: String(persona.purpose || '').trim(),
     avatar_url: String(persona.avatar_url || '').trim(),
     avatarUrl,
-    is_official: persona.is_official !== false,
+    is_official: isOfficial,
     version: persona.version ?? null,
     updated_at: persona.updated_at ?? null,
-    imported: Boolean(slug && importedAgent),
+    // O roster editorial pertence ao Yume. O estado local guarda somente
+    // cache/configuração operacional e nunca decide quem é principal.
+    imported: Boolean(slug && isOfficial),
+  };
+}
+
+export function reconcileOfficialPersonaAgents(personas = [], personaAgents = [], now = new Date().toISOString()) {
+  const catalog = Array.isArray(personas) ? personas : [];
+  if (catalog.some((persona) => typeof persona?.is_official !== 'boolean')) {
+    throw new Error('yume_official_roster_contract_invalid');
+  }
+  const existingBySlug = new Map(
+    (Array.isArray(personaAgents) ? personaAgents : [])
+      .map((agent) => [String(agent?.slug || '').trim(), agent])
+      .filter(([slug]) => Boolean(slug)),
+  );
+
+  const roster = catalog
+    .filter((persona) => persona?.is_official === true)
+    .map((persona) => {
+      const slug = String(persona.slug || '').trim();
+      if (!slug) return null;
+      const existing = existingBySlug.get(slug);
+      return {
+        ...(existing || {}),
+        id: `yume:${slug}`,
+        slug,
+        source: 'yume',
+        name: String(persona.name || existing?.name || slug).trim(),
+        model: String(existing?.model || '').trim(),
+        yumeModel: String(persona.model || '').trim(),
+        enabled: existing?.enabled !== false,
+        cachedVersion: existing?.cachedVersion ?? null,
+        cachedSystemPrompt: existing?.cachedSystemPrompt ?? null,
+        cachedAt: existing?.cachedAt ?? null,
+        lastError: existing?.lastError ?? null,
+        addedAt: existing?.addedAt || now,
+      };
+    })
+    .filter(Boolean);
+
+  return {
+    roster,
+    changed: JSON.stringify(roster) !== JSON.stringify(Array.isArray(personaAgents) ? personaAgents : []),
   };
 }
 
