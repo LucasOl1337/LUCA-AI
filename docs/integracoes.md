@@ -28,13 +28,18 @@ Ao importar uma persona, o LUCA preserva nome, prompt e versao lidos do Yume. O 
 
 O LUCA lista personas, le prompt e versao e guarda o cache no estado local. Nao adicione escrita no Yume a esse cliente.
 
-O catálogo completo e o roster do LUCA são estados diferentes. `GET /api/personas/available`
-marca com `imported: true` somente as personas presentes em `personaAgents`; esse é o
-roster principal e a única fonte elegível para atribuições e execuções reais. Personas
-com `imported: false` aparecem recolhidas como disponíveis no Yume. Selecionar uma delas
-chama `POST /api/agent/persona/add` antes da atribuição; removê-la do LUCA também limpa
-atribuições persistidas no próximo snapshot do catálogo. O campo aditivo
-`is_official` continua sendo metadado editorial do Yume e não substitui o roster local.
+O roster principal tem uma única fonte editorial: `is_official === true` no Yume.
+`GET /api/personas/available` consulta esse catálogo via Kamui, reconcilia o cache
+operacional `personaAgents` e devolve `imported: true` somente para personas oficiais.
+Nome, modelo Yume e composição do roster vêm do Yume; o estado local preserva apenas
+override de modelo, habilitação e cache de prompt das oficiais. Personas secundárias
+continuam visíveis em uma seção recolhida, mas não podem ser atribuídas nem executadas.
+
+O Express sincroniza os workspaces na inicialização, a cada 60 segundos por padrão e
+antes de listar ou executar equipes. `LUCA_PERSONA_ROSTER_SYNC_MS` ajusta o intervalo
+(mínimo de 15 segundos). Os endpoints legados de adicionar/remover agora apenas
+reconciliam com o Yume: não criam uma decisão editorial local. A promoção ou remoção do
+roster é feita no editor do Yume e se propaga pelo Kamui para todos os consumidores.
 
 No domínio público, as telas de Personas e LUCA-AI usam `/api` na mesma origem. O proxy de borda encaminha o tráfego para `luca-origin.bombapvp.com`; o Cloudflare Tunnel executado na VM entrega as chamadas ao Express em `127.0.0.1:4242`. O navegador do visitante e o PC de desenvolvimento nunca participam do caminho interno.
 

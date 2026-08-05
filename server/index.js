@@ -54,9 +54,8 @@ import {
   updateAgentTask,
   upsertDashboardItem,
   getPersonaAgents,
-  addPersonaAgent,
+  replacePersonaAgents,
   updatePersonaAgent,
-  removePersonaAgent,
   ensureWorkspace,
   listWorkspaceUserIds,
 } from './state.js';
@@ -129,7 +128,12 @@ import { buildOkStateResponse } from './state-response.js';
 import { buildMissionReport } from './mission-report.js';
 import { buildYumeMemoryEvent } from './yume-memory-event.js';
 import { runRuntimeReadinessChecks } from './runtime-readiness.js';
-import { buildKamuiYumeAvatarUrl, normalizeYumeAvatarPath, normalizeYumePersonasForLuca } from './persona-cards.js';
+import {
+  buildKamuiYumeAvatarUrl,
+  normalizeYumeAvatarPath,
+  normalizeYumePersonasForLuca,
+  reconcileOfficialPersonaAgents,
+} from './persona-cards.js';
 import {
   buildIndividualJudgePrompt,
   buildPersonaTeamPrompt,
@@ -141,6 +145,10 @@ import {
 import { createAuthService } from './auth.js';
 
 const app = express();
+const PERSONA_ROSTER_SYNC_INTERVAL_MS = Math.max(
+  15_000,
+  Number(process.env.LUCA_PERSONA_ROSTER_SYNC_MS || 60_000) || 60_000,
+);
 app.disable('x-powered-by');
 app.set('trust proxy', 'loopback');
 app.use((req, res, next) => {
@@ -1677,6 +1685,33 @@ Responda como ${def.name}, em 1 a 4 linhas. Use [chat:tipo] para o que deve apar
 // especialista. Nunca escreve no Yume.
 // ---------------------------------------------------------------------------
 
+function applyOfficialPersonaRoster(personas) {
+  const reconciled = reconcileOfficialPersonaAgents(personas, getPersonaAgents());
+  if (reconciled.changed) replacePersonaAgents(reconciled.roster);
+  return reconciled;
+}
+
+async function syncOfficialPersonaRoster() {
+  const personas = await listYumePersonas();
+  const reconciled = applyOfficialPersonaRoster(personas);
+  return { personas, ...reconciled };
+}
+
+async function syncAllOfficialPersonaRosters() {
+  const personas = await listYumePersonas();
+  let changedWorkspaces = 0;
+  for (const userId of listWorkspaceUserIds()) {
+    runWithWorkspaceUser(userId, () => {
+      const reconciled = applyOfficialPersonaRoster(personas);
+      if (reconciled.changed) {
+        changedWorkspaces += 1;
+        emitState();
+      }
+    });
+  }
+  return { personas, changedWorkspaces };
+}
+
 async function resolvePersonaSystemPrompt(slug) {
   const persona = getPersonaAgents().find((p) => p.slug === slug);
   try {
@@ -2650,10 +2685,11 @@ app.get('/api/personas/avatar', async (req, res) => {
 
 app.get('/api/personas/available', async (_req, res) => {
   try {
-    const personas = await listYumePersonas();
+    const { personas, roster } = await syncOfficialPersonaRoster();
     res.json({
       ok: true,
-      personas: normalizeYumePersonasForLuca(personas, getPersonaAgents()),
+      personas: normalizeYumePersonasForLuca(personas, roster),
+      rosterSource: 'yume.is_official',
     });
   } catch (error) {
     res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
@@ -2755,6 +2791,24 @@ app.post('/api/luca-ai/persona-team/run', async (req, res) => {
   const input = normalizePersonaTeamRunInput(req.body);
   if (!input.ok) {
     res.status(400).json(input);
+    return;
+  }
+  try {
+    const { roster } = await syncOfficialPersonaRoster();
+    const officialSlugs = new Set(roster.map((agent) => agent.slug));
+    const requestedSlugs = [...new Set([...input.slugs, input.judgeSlug].filter(Boolean))];
+    const secondarySlugs = requestedSlugs.filter((slug) => !officialSlugs.has(slug));
+    if (secondarySlugs.length > 0) {
+      res.status(409).json({
+        ok: false,
+        error: 'persona_not_official',
+        secondarySlugs,
+        rosterSource: 'yume.is_official',
+      });
+      return;
+    }
+  } catch (error) {
+    res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
     return;
   }
   const runStartedAt = new Date().toISOString();
@@ -2972,34 +3026,35 @@ app.post('/api/agent/persona/add', async (req, res) => {
     return;
   }
   try {
-    const promptData = await fetchYumePersonaSystemPrompt(slug);
-    const versionInfo = await getYumePersonaVersion(slug);
-    // Import não cria override de motor: runtime usa o model do Yume (catálogo)
-    // até o usuário mudar no seletor (POST /api/agent/config).
-    const record = addPersonaAgent({
-      slug,
-      name: promptData?.name || slug,
-      enabled: true,
-      yumeModel: promptData?.model || '',
-      cachedSystemPrompt: promptData?.system_prompt || '',
-      cachedVersion: versionInfo?.version ?? null,
-      cachedAt: new Date().toISOString(),
-    });
-    publishChatMessage({ agentId: 'maestro', type: 'info', content: `Persona "${record.name}" importada do Yume como agente especialista (read-only).` });
-    emitEvent({ type: 'persona.added', slug, agentId: record.id });
+    const { roster } = await syncOfficialPersonaRoster();
+    const record = roster.find((agent) => agent.slug === slug) || null;
+    if (!record) {
+      res.status(409).json({ ok: false, error: 'persona_not_official', slug, rosterSource: 'yume.is_official' });
+      return;
+    }
     emitState();
-    res.json({ ok: true, agent: record });
+    res.json({ ok: true, agent: record, synchronized: true, rosterSource: 'yume.is_official' });
   } catch (error) {
     res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
   }
 });
 
-app.post('/api/agent/persona/remove', (req, res) => {
+app.post('/api/agent/persona/remove', async (req, res) => {
   const slug = String(req.body?.slug ?? '').trim();
-  const removed = removePersonaAgent(slug);
-  emitEvent({ type: 'persona.removed', slug });
-  emitState();
-  res.json({ ok: true, removed });
+  try {
+    const existed = getPersonaAgents().some((agent) => agent.slug === slug);
+    const { roster } = await syncOfficialPersonaRoster();
+    const remainsOfficial = roster.some((agent) => agent.slug === slug);
+    emitState();
+    res.json({
+      ok: true,
+      removed: existed && !remainsOfficial,
+      synchronized: true,
+      rosterSource: 'yume.is_official',
+    });
+  } catch (error) {
+    res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
+  }
 });
 
 app.post('/api/mission/complete', async (req, res) => {
@@ -3151,11 +3206,30 @@ app.post('/api/supervisor/pause', (_req, res) => {
 
 app.post('/api/agent/run', async (req, res) => {
   const rawId = String(req.body?.agentId ?? '').trim();
+  const requestedPersonaSlug = rawId.startsWith('yume:')
+    ? rawId.slice('yume:'.length)
+    : (getPersonaAgents().some((agent) => agent.slug === rawId) ? rawId : null);
+
+  if (requestedPersonaSlug) {
+    try {
+      await syncOfficialPersonaRoster();
+    } catch (error) {
+      res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
+      return;
+    }
+    if (!getPersonaAgents().some((agent) => agent.slug === requestedPersonaSlug)) {
+      res.status(409).json({
+        ok: false,
+        error: 'persona_not_official',
+        slug: requestedPersonaSlug,
+        rosterSource: 'yume.is_official',
+      });
+      return;
+    }
+  }
 
   // persona-agent do Yume: roda como especialista no chat da missao ativa.
-  const personaSlug = rawId.startsWith('yume:')
-    ? rawId.slice('yume:'.length)
-    : (getPersonaAgents().some((p) => p.slug === rawId) ? rawId : null);
+  const personaSlug = requestedPersonaSlug;
   if (personaSlug) {
     if (!getState().activeMission) {
       res.status(409).json({ ok: false, error: 'mission_required' });
@@ -3240,5 +3314,14 @@ wss.on('connection', (socket, req) => {
 httpServer.listen(PORT, HOST, () => {
   startHeartbeatMonitor();
   startScheduler();
+  void syncAllOfficialPersonaRosters().catch((error) => {
+    console.warn(`[persona-roster] falha na sincronizacao inicial: ${error?.message || String(error)}`);
+  });
+  const personaRosterTimer = setInterval(() => {
+    void syncAllOfficialPersonaRosters().catch((error) => {
+      console.warn(`[persona-roster] falha na sincronizacao: ${error?.message || String(error)}`);
+    });
+  }, PERSONA_ROSTER_SYNC_INTERVAL_MS);
+  personaRosterTimer.unref?.();
   console.log(`LUCA backend em http://${HOST}:${PORT}`);
 });

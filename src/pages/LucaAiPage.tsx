@@ -749,30 +749,18 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     && (operationMode === 'individual' ? isIndividualReady : isWorkflowReady)
     && !running;
 
-  async function ensurePersonaImported(slug: string): Promise<boolean> {
+  async function ensurePersonaOfficial(slug: string): Promise<boolean> {
     const persona = personaBySlug.get(slug);
-    if (!persona || persona.imported) return Boolean(persona);
-    setBusyPersonaSlug(slug);
-    setError(null);
-    setErrorRetry(null);
-    try {
-      await lucaApi.importYumePersona(slug, bridgeBase);
-      const data = await lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined);
-      setPersonas(normalizePersonaAssetUrls(data.personas ?? [], bridgeBase));
-      if (runtimeMode === 'backend') await refresh();
-      return true;
-    } catch (err) {
-      setError(buildApiErrorMessage(err, `Falha ao conectar ${persona.name || slug} ao LUCA.`));
-      setErrorRetry('personas');
-      return false;
-    } finally {
-      setBusyPersonaSlug(null);
-    }
+    if (!persona) return false;
+    if (persona.imported) return true;
+    setError(`${persona.name || slug} é uma persona secundária. Promova a categoria no Yume para habilitá-la em todos os serviços.`);
+    setErrorRetry('personas');
+    return false;
   }
 
   async function setPersonaModel(slug: string, model: string) {
     if (!slug || !model) return;
-    if (!(await ensurePersonaImported(slug))) return;
+    if (!(await ensurePersonaOfficial(slug))) return;
     setBusyPersonaSlug(slug);
     setError(null);
     setErrorRetry(null);
@@ -790,7 +778,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   }
 
   async function setSingleRole(roleId: WorkflowRoleId, slug: string) {
-    if (slug && !(await ensurePersonaImported(slug))) return;
+    if (slug && !(await ensurePersonaOfficial(slug))) return;
     setWorkflowState((prev) => {
       const next = normalizeWorkflowAssignments(prev);
       next[roleId] = slug ? [slug] : [];
@@ -802,7 +790,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   async function addRoleSlug(roleId: WorkflowRoleId, slug: string) {
     const role = WORKFLOW_ROLES.find((item) => item.id === roleId);
     if (!role || !slug) return;
-    if (!(await ensurePersonaImported(slug))) return;
+    if (!(await ensurePersonaOfficial(slug))) return;
     setWorkflowState((prev) => {
       const next = normalizeWorkflowAssignments(prev);
       next[roleId] = uniqueSlugs([...next[roleId], slug], role.maxSlugs);
@@ -824,7 +812,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   }
 
   async function addIndividualParticipant(slug: string) {
-    if (!slug || !(await ensurePersonaImported(slug))) return;
+    if (!slug || !(await ensurePersonaOfficial(slug))) return;
     setIndividualState((prev) => ({
       participants: uniqueSlugs([...(prev?.participants || []), slug], 5),
       judge: prev?.judge || null,
@@ -833,7 +821,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   }
 
   async function setIndividualJudge(slug: string) {
-    if (slug && !(await ensurePersonaImported(slug))) return;
+    if (slug && !(await ensurePersonaOfficial(slug))) return;
     setIndividualState((prev) => ({
       participants: uniqueSlugs(prev?.participants || [], 5),
       judge: slug || null,
@@ -852,37 +840,17 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setIndividualState(createEmptyIndividualAssignments());
   }
 
-  // Conecta (importa) os slugs de um preset com uma só releitura do catálogo no final.
-  async function importPresetSlugs(slugs: string[]): Promise<{ ok: Set<string>; failed: string[] }> {
+  // Presets só podem usar o roster oficial recebido do Yume via Kamui.
+  async function resolveOfficialPresetSlugs(slugs: string[]): Promise<{ ok: Set<string>; failed: string[] }> {
     const ok = new Set<string>();
     const failed: string[] = [];
-    let touched = false;
     for (const slug of slugs) {
       const persona = personaBySlug.get(slug);
-      if (!persona) {
+      if (!persona?.imported) {
         failed.push(slug);
         continue;
       }
-      if (persona.imported) {
-        ok.add(slug);
-        continue;
-      }
-      try {
-        await lucaApi.importYumePersona(slug, bridgeBase);
-        ok.add(slug);
-        touched = true;
-      } catch {
-        failed.push(slug);
-      }
-    }
-    if (touched) {
-      try {
-        const data = await lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined);
-        setPersonas(normalizePersonaAssetUrls(data.personas ?? [], bridgeBase));
-        if (runtimeMode === 'backend') await refresh();
-      } catch {
-        // A lista será recarregada no próximo ciclo; os slugs importados já valem.
-      }
+      ok.add(slug);
     }
     return { ok, failed };
   }
@@ -910,7 +878,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         setErrorRetry('personas');
         return;
       }
-      const { ok, failed } = await importPresetSlugs(wanted);
+      const { ok, failed } = await resolveOfficialPresetSlugs(wanted);
       const next = createEmptyWorkflowAssignments();
       for (const role of WORKFLOW_ROLES) {
         next[role.id] = uniqueSlugs((preset.assignments[role.id] ?? []).filter((slug) => ok.has(slug)), role.maxSlugs);
@@ -941,7 +909,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         setErrorRetry('personas');
         return;
       }
-      const { ok, failed } = await importPresetSlugs(wanted);
+      const { ok, failed } = await resolveOfficialPresetSlugs(wanted);
       const participants = uniqueSlugs(preset.participants.filter((slug) => ok.has(slug)), 5);
       const judge = ok.has(preset.judge) ? preset.judge : null;
       setIndividualState({ participants, judge });
@@ -2047,6 +2015,7 @@ function PersonaPickerSheet({ role, personas, selectedSlugs, query, busySlug, on
   const renderPersonaOption = (persona: YumePersonaSummary) => {
     const selected = selectedSlugs.includes(persona.slug);
     const busy = busySlug === persona.slug;
+    const secondary = !persona.imported;
     return (
       <button
         key={persona.slug}
@@ -2054,11 +2023,11 @@ function PersonaPickerSheet({ role, personas, selectedSlugs, query, busySlug, on
         className="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition"
         data-testid={`persona-option-${persona.slug}`}
         onClick={() => selected ? onRemove(persona.slug) : void onChoose(persona.slug)}
-        disabled={Boolean(busySlug) || (!selected && limitReached)}
+        disabled={secondary || Boolean(busySlug) || (!selected && limitReached)}
         style={{
           background: selected ? theme.goldSoft : theme.input,
           borderColor: selected ? theme.borderActive : theme.border,
-          opacity: !selected && limitReached ? 0.5 : 1,
+          opacity: secondary || (!selected && limitReached) ? 0.5 : 1,
         }}
       >
         <PersonaAvatar persona={persona} size="sm" />
@@ -2073,9 +2042,9 @@ function PersonaPickerSheet({ role, personas, selectedSlugs, query, busySlug, on
           ) : null}
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" style={{ color: theme.goldDeep }} /> : selected ? <CheckCircle2 className="h-4 w-4" style={{ color: theme.alive }} /> : <Plus className="h-4 w-4" style={{ color: theme.goldDeep }} />}
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" style={{ color: theme.goldDeep }} /> : selected ? <CheckCircle2 className="h-4 w-4" style={{ color: theme.alive }} /> : secondary ? <ShieldCheck className="h-4 w-4" style={{ color: theme.textGhost }} /> : <Plus className="h-4 w-4" style={{ color: theme.goldDeep }} />}
           <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: persona.imported ? theme.alive : theme.textGhost }}>
-            {selected ? 'selecionada' : persona.imported ? 'no LUCA' : 'adicionar'}
+            {selected ? 'selecionada' : persona.imported ? 'oficial' : 'secundária'}
           </span>
         </span>
       </button>
@@ -2109,7 +2078,7 @@ function PersonaPickerSheet({ role, personas, selectedSlugs, query, busySlug, on
             </div>
             {rosterPersonas.length > 0 ? rosterPersonas.map(renderPersonaOption) : (
               <p className="rounded-xl border px-3 py-4 text-xs leading-relaxed" style={{ borderColor: theme.border, color: theme.textMute }}>
-                Nenhuma persona do roster corresponde à busca. Use as disponíveis abaixo para adicionar uma especialista ao LUCA.
+                Nenhuma persona oficial corresponde à busca. A composição do roster é gerenciada no Yume.
               </p>
             )}
           </section>
@@ -2124,8 +2093,8 @@ function PersonaPickerSheet({ role, personas, selectedSlugs, query, busySlug, on
               onClick={() => setSecondaryOpen((open) => !open)}
             >
               <span className="min-w-0 flex-1">
-                <span id="luca-picker-secondary-title" className="block text-xs font-semibold">Disponíveis no Yume</span>
-                <span className="mt-0.5 block text-[10px]" style={{ color: theme.textMute }}>{secondaryPersonas.length} fora do roster</span>
+                <span id="luca-picker-secondary-title" className="block text-xs font-semibold">Secundárias no Yume</span>
+                <span className="mt-0.5 block text-[10px]" style={{ color: theme.textMute }}>{secondaryPersonas.length} fora do roster e bloqueadas para execução</span>
               </span>
               <ChevronDown className={`h-4 w-4 shrink-0 motion-safe:transition-transform ${secondaryOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
             </button>

@@ -613,6 +613,14 @@ export function getPersonaAgents() {
   return state.personaAgents;
 }
 
+export function replacePersonaAgents(entries = []) {
+  const state = activeState();
+  if (!state) return [];
+  state.personaAgents = Array.isArray(entries) ? entries.slice(0, 50) : [];
+  persistState();
+  return state.personaAgents;
+}
+
 function resolvePersonaLocalModel(value, fallback = '') {
   const model = String(value ?? '').trim();
   if (!model) return '';

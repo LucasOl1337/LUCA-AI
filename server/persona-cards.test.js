@@ -6,6 +6,7 @@ import {
   buildYumeAvatarProxyUrl,
   normalizeYumeAvatarPath,
   normalizeYumePersonasForLuca,
+  reconcileOfficialPersonaAgents,
 } from './persona-cards.js';
 import { ROUTER_MODEL, resolvePersonaRuntimeModel } from './config.js';
 
@@ -19,7 +20,7 @@ test('normaliza personas do Yume com flag de importacao e avatar proxy local', (
         description: 'orquestrador',
         purpose: 'coordena',
         avatar_url: '/api/avatars/maestro.png',
-        is_official: false,
+        is_official: true,
         version: 4,
       },
     ],
@@ -33,13 +34,41 @@ test('normaliza personas do Yume com flag de importacao e avatar proxy local', (
   assert.equal(personas[0].localModel, 'cx/gpt-5.6-sol');
   assert.equal(personas[0].modelOverridden, true);
   assert.equal(personas[0].avatarUrl, '/api/personas/avatar?src=%2Fapi%2Favatars%2Fmaestro.png');
-  assert.equal(personas[0].is_official, false);
+  assert.equal(personas[0].is_official, true);
   assert.equal(personas[0].version, 4);
 });
 
-test('mantem personas de Yume antigo visiveis como oficiais por compatibilidade', () => {
+test('falha fechada quando o Yume nao declara a categoria editorial', () => {
   const [persona] = normalizeYumePersonasForLuca([{ slug: 'legada', name: 'Legada' }]);
-  assert.equal(persona.is_official, true);
+  assert.equal(persona.is_official, false);
+  assert.equal(persona.imported, false);
+  assert.throws(
+    () => reconcileOfficialPersonaAgents([{ slug: 'legada', name: 'Legada' }], []),
+    /yume_official_roster_contract_invalid/,
+  );
+});
+
+test('reconcilia o roster local exclusivamente pelas oficiais do Yume', () => {
+  const result = reconcileOfficialPersonaAgents(
+    [
+      { slug: 'aurora', name: 'Aurora', model: 'gcli/grok-4.5', is_official: true },
+      { slug: 'jinx', name: 'Jinx', model: 'cx/gpt-5.6-sol', is_official: false },
+      { slug: 'lucas', name: 'Lucas', model: 'cx/gpt-5.6-sol', is_official: true },
+    ],
+    [
+      { slug: 'aurora', name: 'Aurora antiga', model: 'kimi/k3', enabled: false, cachedVersion: 12, addedAt: 'antes' },
+      { slug: 'jinx', name: 'Jinx', model: '', enabled: true, addedAt: 'antes' },
+    ],
+    'agora',
+  );
+
+  assert.equal(result.changed, true);
+  assert.deepEqual(result.roster.map((agent) => agent.slug), ['aurora', 'lucas']);
+  assert.equal(result.roster[0].model, 'kimi/k3');
+  assert.equal(result.roster[0].enabled, false);
+  assert.equal(result.roster[0].cachedVersion, 12);
+  assert.equal(result.roster[0].yumeModel, 'gcli/grok-4.5');
+  assert.equal(result.roster[1].addedAt, 'agora');
 });
 
 test('expoe modelo Yume valido no 9Router mesmo sem import, e marca motor efetivo', () => {
@@ -65,7 +94,7 @@ test('expoe modelo Yume valido no 9Router mesmo sem import, e marca motor efetiv
 
 test('import sem override local preserva motor do Yume no seletor', () => {
   const personas = normalizeYumePersonasForLuca(
-    [{ slug: 'anfitriao', name: 'O Anfitrião', model: 'gcli/grok-4.5-high' }],
+    [{ slug: 'anfitriao', name: 'O Anfitrião', model: 'gcli/grok-4.5-high', is_official: true }],
     [{ slug: 'anfitriao', model: '' }],
   );
   assert.equal(personas[0].imported, true);

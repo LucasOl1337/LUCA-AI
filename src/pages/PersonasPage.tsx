@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, BadgeCheck, ChevronDown, ExternalLink, Layers3, Loader2, Plus, RefreshCw, Search, Sparkles, Trash2, UserPlus, UsersRound } from 'lucide-react';
+import { AlertCircle, BadgeCheck, ChevronDown, ExternalLink, Layers3, Loader2, Plus, RefreshCw, Search, Sparkles, UsersRound } from 'lucide-react';
 import { buildApiErrorMessage, lucaApi } from '@/lib/api';
 import type { YumePersonaSummary } from '@/lib/types';
-import { useLuca } from '@/hooks/useLucaState';
 import { useTheme } from '@/hooks/useTheme';
 
 type FilterMode = 'all' | 'imported' | 'available';
 
-const YUME_DASHBOARD_URL = 'http://127.0.0.1:2222';
+const YUME_DASHBOARD_URL = import.meta.env.VITE_YUME_DASHBOARD_URL || 'http://57.156.59.165:2222';
 
 function withBaseUrl(value: string | undefined, base: string | undefined): string | undefined {
   const raw = String(value || '').trim();
@@ -27,11 +26,9 @@ function normalizePersonaAssetUrls(personas: YumePersonaSummary[], base: string 
 
 export default function PersonasPage() {
   const theme = useTheme();
-  const { runtimeMode, refresh, state } = useLuca();
   const [personas, setPersonas] = useState<YumePersonaSummary[]>([]);
-  const [loading, setLoading] = useState(runtimeMode === 'backend');
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [busySlug, setBusySlug] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<FilterMode>('all');
   const [secondaryOpen, setSecondaryOpen] = useState(false);
@@ -39,7 +36,6 @@ export default function PersonasPage() {
   // No domínio, o Express está na mesma origem via Cloudflare Tunnel.
   // Usar 127.0.0.1 aqui apontaria para a máquina do visitante.
   const bridgeBase: string | undefined = undefined;
-  const importedInState = state?.personaAgents?.length ?? 0;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,36 +76,8 @@ export default function PersonasPage() {
   const secondaryExpanded = secondaryOpen;
   const visiblePersonaCount = (showRoster ? rosterPersonas.length : 0) + (showSecondary ? secondaryPersonas.length : 0);
 
-  const importedCount = personas.filter((persona) => persona.imported).length || importedInState;
+  const importedCount = personas.filter((persona) => persona.imported).length;
   const availableCount = Math.max(0, personas.length - personas.filter((persona) => persona.imported).length);
-
-  async function importPersona(slug: string) {
-    setBusySlug(slug);
-      setError(null);
-    try {
-      await lucaApi.importYumePersona(slug, bridgeBase);
-      await load();
-      if (runtimeMode === 'backend') await refresh();
-    } catch (err) {
-      setError(buildApiErrorMessage(err, `Falha ao importar ${slug}.`));
-    } finally {
-      setBusySlug(null);
-    }
-  }
-
-  async function removePersona(slug: string) {
-    setBusySlug(slug);
-      setError(null);
-    try {
-      await lucaApi.removeYumePersona(slug, bridgeBase);
-      await load();
-      if (runtimeMode === 'backend') await refresh();
-    } catch (err) {
-      setError(buildApiErrorMessage(err, `Falha ao remover ${slug}.`));
-    } finally {
-      setBusySlug(null);
-    }
-  }
 
   return (
     <div className="luca-page-shell h-full overflow-y-auto px-6 py-7 sm:px-8">
@@ -122,14 +90,14 @@ export default function PersonasPage() {
             </div>
             <h1 className="void-title text-3xl">Persona Cards</h1>
             <p className="mt-2 text-sm" style={{ color: theme.textMute }}>
-              Cada card e uma persona do Yume pronta para virar especialista no LUCA.
+              O roster principal é sincronizado pelo Kamui com o catálogo oficial do Yume.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <Metric label="catalogo" value={personas.length} />
-            <Metric label="no luca" value={importedCount} />
-            <Metric label="livres" value={availableCount} />
+            <Metric label="oficiais" value={importedCount} />
+            <Metric label="secundarias" value={availableCount} />
             <button type="button" className="btn-fleet inline-flex items-center gap-2" onClick={load} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               Recarregar
@@ -154,8 +122,8 @@ export default function PersonasPage() {
           <div className="flex rounded-lg border p-1" style={{ background: theme.input, borderColor: theme.border }}>
             {[
               ['all', 'Todas'],
-              ['imported', 'No LUCA'],
-              ['available', 'Disponiveis'],
+              ['imported', 'Oficiais'],
+              ['available', 'Secundarias'],
             ].map(([id, label]) => {
               const active = filter === id;
               return (
@@ -215,7 +183,7 @@ export default function PersonasPage() {
                       </span>
                     </div>
                     <p className="mt-1 text-xs" style={{ color: theme.textMute }}>
-                      Estas personas estão no LUCA e podem participar de execuções reais.
+                      Fonte única: personas oficiais do Yume, sincronizadas via Kamui e habilitadas para execuções reais.
                     </p>
                   </div>
                 </div>
@@ -231,15 +199,12 @@ export default function PersonasPage() {
                         key={persona.slug}
                         persona={persona}
                         delay={index * 0.025}
-                        busy={busySlug === persona.slug}
-                        onImport={() => importPersona(persona.slug)}
-                        onRemove={() => removePersona(persona.slug)}
                       />
                     ))}
                   </motion.div>
                 ) : (
                   <div className="rounded-xl border px-5 py-6 text-sm" style={{ borderColor: theme.border, color: theme.textMute }}>
-                    O roster está vazio. Expanda as personas disponíveis abaixo para adicionar a primeira especialista.
+                    Nenhuma persona está marcada como oficial no Yume.
                   </div>
                 )}
               </section>
@@ -266,7 +231,7 @@ export default function PersonasPage() {
                       </span>
                     </span>
                     <span className="mt-0.5 block text-xs" style={{ color: theme.textMute }}>
-                      Fora do roster e bloqueadas para execução até serem adicionadas ao LUCA.
+                      Fora do roster global e bloqueadas para execução. A promoção é feita no Yume.
                     </span>
                   </span>
                   <ChevronDown
@@ -288,9 +253,6 @@ export default function PersonasPage() {
                         key={persona.slug}
                         persona={persona}
                         delay={index * 0.025}
-                        busy={busySlug === persona.slug}
-                        onImport={() => importPersona(persona.slug)}
-                        onRemove={() => removePersona(persona.slug)}
                       />
                     ))}
                     {!query.trim() && <NewPersonaCard delay={secondaryPersonas.length * 0.025} />}
@@ -407,12 +369,9 @@ function Notice({
 interface PersonaCardProps {
   persona: YumePersonaSummary;
   delay: number;
-  busy: boolean;
-  onImport: () => void;
-  onRemove: () => void;
 }
 
-function PersonaCard({ persona, delay, busy, onImport, onRemove }: PersonaCardProps) {
+function PersonaCard({ persona, delay }: PersonaCardProps) {
   const theme = useTheme();
   const avatarUrl = persona.avatarUrl || persona.avatar_url || '';
   const initial = (persona.name || persona.slug || '?').trim().charAt(0).toUpperCase();
@@ -440,7 +399,7 @@ function PersonaCard({ persona, delay, busy, onImport, onRemove }: PersonaCardPr
       )}
       <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 p-3">
         <span className={persona.imported ? 'state-badge ok' : 'state-badge dormant'}>
-          {persona.imported ? 'LUCA' : 'Yume'}
+          {persona.imported ? 'Oficial' : 'Secundária'}
         </span>
         {persona.version !== null && persona.version !== undefined && (
           <span className="rounded-full px-2 py-1 text-[10px] font-mono" style={{ background: 'rgba(5,8,13,0.62)', color: theme.text }}>
@@ -453,22 +412,16 @@ function PersonaCard({ persona, delay, busy, onImport, onRemove }: PersonaCardPr
           <h2 className="truncate text-sm font-semibold">{persona.name}</h2>
           <div className="mt-1 truncate text-[11px] font-mono opacity-75">{persona.slug}</div>
           {persona.description && <p className="mt-2 line-clamp-2 text-xs leading-relaxed opacity-80">{persona.description}</p>}
-          <button
-            type="button"
-            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition disabled:opacity-50"
-            style={{ background: persona.imported ? theme.errorBg : theme.goldSoft, color: theme.text }}
-            disabled={busy}
-            onClick={persona.imported ? onRemove : onImport}
+          <a
+            href={YUME_DASHBOARD_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition"
+            style={{ background: theme.goldSoft, color: theme.text }}
           >
-            {busy ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : persona.imported ? (
-              <Trash2 className="h-3.5 w-3.5" />
-            ) : (
-              <UserPlus className="h-3.5 w-3.5" />
-            )}
-            {persona.imported ? 'Remover do LUCA' : 'Adicionar ao LUCA'}
-          </button>
+            <ExternalLink className="h-3.5 w-3.5" />
+            Gerenciar categoria no Yume
+          </a>
         </div>
       </div>
     </motion.article>
