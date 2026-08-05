@@ -37,10 +37,16 @@ chmod 700 /var/lib/luca-ai
 find /var/lib/luca-ai -type f -exec chmod 600 {} +
 
 set -a
-# A chave é reutilizada somente dentro da VM e nunca impressa nem copiada ao repositório.
+# Chaves reutilizadas somente dentro da VM e nunca impressas nem copiadas ao repositório.
 source /etc/sennin/yume.env
+# Token interno do Kamui: sem ele o proxy não injeta YUME_INTERNAL_API_TOKEN no tether.
+if [[ -f /etc/sennin/kamui.env ]]; then
+  # shellcheck disable=SC1091
+  source /etc/sennin/kamui.env
+fi
 set +a
 test -n "${YUME_9ROUTER_API_KEY:-}"
+test -n "${KAMUI_INTERNAL_API_TOKEN:-}"
 install -d -o root -g root -m 750 /etc/sennin
 env_tmp="$(mktemp /etc/sennin/luca-ai.env.XXXXXX)"
 chmod 600 "$env_tmp"
@@ -49,7 +55,8 @@ printf '%s\n' \
   'ROUTER_MODEL=cx/gpt-5.6-sol-high' \
   'KAMUI_BASE=http://127.0.0.1:1338' \
   'LUCA_ADMIN_EMAILS=lucasplays2000@gmail.com' \
-  "ROUTER_API_KEY=$YUME_9ROUTER_API_KEY" > "$env_tmp"
+  "ROUTER_API_KEY=$YUME_9ROUTER_API_KEY" \
+  "KAMUI_INTERNAL_API_TOKEN=$KAMUI_INTERNAL_API_TOKEN" > "$env_tmp"
 mv "$env_tmp" /etc/sennin/luca-ai.env
 
 ln -s "$release" "$release_root/current.next"

@@ -11,6 +11,11 @@ export const KAMUI_BASE = (process.env.KAMUI_BASE || 'http://127.0.0.1:1338').re
 const CALLER = 'luca';
 const USER_AGENT = 'luca-ai-service (kamui-client)';
 const DEFAULT_TIMEOUT_MS = Number(process.env.KAMUI_TIMEOUT_MS || 8000);
+// Kamui only injects YUME_INTERNAL_API_TOKEN into tether calls after authenticating
+// the caller with KAMUI_INTERNAL_API_TOKEN (header x-sennin-internal-token or Bearer).
+const KAMUI_INTERNAL_API_TOKEN = String(
+  process.env.KAMUI_INTERNAL_API_TOKEN || process.env.SENNIN_INTERNAL_API_TOKEN || '',
+).trim();
 
 export class KamuiError extends Error {
   constructor(message, { status = null, endpoint = null } = {}) {
@@ -21,6 +26,24 @@ export class KamuiError extends Error {
   }
 }
 
+function kamuiHeaders(extra = {}) {
+  const headers = {
+    Accept: 'application/json',
+    'X-Kamui-Caller': CALLER,
+    'User-Agent': USER_AGENT,
+    ...extra,
+  };
+  if (KAMUI_INTERNAL_API_TOKEN) {
+    headers['x-sennin-internal-token'] = KAMUI_INTERNAL_API_TOKEN;
+  }
+  return headers;
+}
+
+/** Headers for any authenticated Kamui call from LUCA (proxy, avatar, etc.). */
+export function buildKamuiRequestHeaders(extra = {}) {
+  return kamuiHeaders(extra);
+}
+
 async function kamuiGet(path, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   const url = `${KAMUI_BASE}${path}`;
   const controller = new AbortController();
@@ -28,11 +51,7 @@ async function kamuiGet(path, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   try {
     const resp = await fetch(url, {
       method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        'X-Kamui-Caller': CALLER,
-        'User-Agent': USER_AGENT,
-      },
+      headers: kamuiHeaders(),
       signal: controller.signal,
     });
     const text = await resp.text();

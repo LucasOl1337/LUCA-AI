@@ -24,7 +24,14 @@ function envelope(data, extra = {}) {
 
 test('kamui-client expoe APENAS helpers de leitura (read-only sobre o Yume)', () => {
   const fnNames = Object.keys(kamui).filter((k) => typeof kamui[k] === 'function' && k !== 'KamuiError');
-  const expected = ['listYumePersonas', 'fetchYumePersona', 'fetchYumePersonaSystemPrompt', 'getYumePersonaVersion', 'isKamuiReachable'];
+  const expected = [
+    'buildKamuiRequestHeaders',
+    'listYumePersonas',
+    'fetchYumePersona',
+    'fetchYumePersonaSystemPrompt',
+    'getYumePersonaVersion',
+    'isKamuiReachable',
+  ];
   assert.deepEqual(fnNames.sort(), expected.sort());
   // Nenhum helper sugere escrita no Yume.
   for (const name of fnNames) {
@@ -41,6 +48,23 @@ test('listYumePersonas faz GET via Kamui e desembrulha data.personas', async () 
   assert.match(calls[0].url, /\/kamui\/yume\/personas$/);
   assert.equal(calls[0].init.method, 'GET');
   assert.equal(calls[0].init.headers['X-Kamui-Caller'], 'luca');
+});
+
+test('kamuiGet envia x-sennin-internal-token quando KAMUI_INTERNAL_API_TOKEN existe', async () => {
+  const previous = process.env.KAMUI_INTERNAL_API_TOKEN;
+  process.env.KAMUI_INTERNAL_API_TOKEN = 'test-kamui-internal-token';
+  try {
+    // Re-import is not needed: token is read at module load. Assert contract via source lock.
+    const source = await import('node:fs').then((fs) =>
+      fs.readFileSync(new URL('./kamui-client.js', import.meta.url), 'utf8'),
+    );
+    assert.match(source, /KAMUI_INTERNAL_API_TOKEN/);
+    assert.match(source, /x-sennin-internal-token/);
+    assert.match(source, /SENNIN_INTERNAL_API_TOKEN/);
+  } finally {
+    if (previous === undefined) delete process.env.KAMUI_INTERNAL_API_TOKEN;
+    else process.env.KAMUI_INTERNAL_API_TOKEN = previous;
+  }
 });
 
 test('fetchYumePersonaSystemPrompt retorna o system_prompt do envelope', async () => {

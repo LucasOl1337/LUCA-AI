@@ -61,6 +61,7 @@ import {
   getYumePersonaVersion,
   isKamuiReachable,
   KAMUI_BASE,
+  buildKamuiRequestHeaders,
 } from './kamui-client.js';
 import {
   normalizeMissionContext,
@@ -2515,11 +2516,10 @@ app.get('/api/personas/avatar', async (req, res) => {
   try {
     const upstream = await fetch(buildKamuiYumeAvatarUrl(avatarPath), {
       method: 'GET',
-      headers: {
+      headers: buildKamuiRequestHeaders({
         Accept: 'image/*',
-        'X-Kamui-Caller': 'luca',
         'User-Agent': 'luca-ai-service (persona-avatar-proxy)',
-      },
+      }),
     });
     const contentType = upstream.headers.get('content-type') || '';
     if (!upstream.ok) {

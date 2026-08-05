@@ -32,3 +32,9 @@ test('install-vm health gate requires package version and Express health field',
   assert.ok(installVm.includes('test -n "$expected_version"'));
   assert.equal(installVm.includes('0.9.5'), false);
 });
+
+test('install-vm wires KAMUI_INTERNAL_API_TOKEN into luca-ai.env', () => {
+  assert.ok(installVm.includes('KAMUI_INTERNAL_API_TOKEN'));
+  assert.ok(installVm.includes('source /etc/sennin/kamui.env') || installVm.includes('kamui.env'));
+  assert.ok(installVm.includes('test -n "${KAMUI_INTERNAL_API_TOKEN:-}"'));
+});
