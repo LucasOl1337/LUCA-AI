@@ -1,12 +1,30 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { getWorkspaceUserId } from './workspace-context.js';
 
-const stateDir = path.resolve(process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'));
-const eventLogPath = path.join(stateDir, 'runtime-events.jsonl');
+const rootStateDir = path.resolve(process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'));
+const workspacesRoot = path.join(rootStateDir, 'workspaces');
+const legacyEventLogPath = path.join(rootStateDir, 'runtime-events.jsonl');
 
-function ensureStateDir() {
-  fs.mkdirSync(stateDir, { recursive: true });
+function safeUserDir(userId) {
+  const clean = String(userId || '').trim();
+  if (!clean) return null;
+  return createHash('sha256').update(clean).digest('hex').slice(0, 32);
+}
+
+function eventLogPathFor(userId) {
+  const dirName = safeUserDir(userId);
+  if (!dirName) return legacyEventLogPath;
+  return path.join(workspacesRoot, dirName, 'runtime-events.jsonl');
+}
+
+function resolveEventLogPath() {
+  return eventLogPathFor(getWorkspaceUserId());
+}
+
+function ensureStateDir(filePath = resolveEventLogPath()) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
 }
 
 function normalizePayload(payload) {
@@ -108,6 +126,7 @@ export function appendEvent(event = {}) {
   if (!type) throw new Error('event_type_required');
   const createdAt = event?.time ?? new Date().toISOString();
   const metadata = normalizeEventMetadata(event);
+  const ownerUserId = getWorkspaceUserId();
   const entry = {
     id: event.id ?? `evt_${randomUUID()}`,
     type,
@@ -117,9 +136,11 @@ export function appendEvent(event = {}) {
     missionId: metadata.missionId,
     goalId: metadata.goalId,
     traceId: metadata.traceId,
+    ownerUserId: ownerUserId || null,
     payload: normalizePayload(event.payload ?? normalizeImplicitPayload(event)),
   };
-  ensureStateDir();
+  const eventLogPath = resolveEventLogPath();
+  ensureStateDir(eventLogPath);
   fs.appendFileSync(eventLogPath, `${safeJsonStringify(entry)}\n`, 'utf8');
   return entry;
 }
@@ -130,6 +151,7 @@ export function listEvents({ limit = 100, type = '', missionId = '', goalId = ''
   const wantedMissionId = String(missionId ?? '').trim();
   const wantedGoalId = String(goalId ?? '').trim();
   const wantedTraceId = String(traceId ?? '').trim();
+  const eventLogPath = resolveEventLogPath();
   if (!fs.existsSync(eventLogPath)) return [];
   const events = [];
   readLinesFromEnd(eventLogPath, (line) => {

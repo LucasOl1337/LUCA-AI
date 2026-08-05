@@ -7,9 +7,27 @@ import {
 import { formatBrazilTime } from '../shared/time.js';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { getWorkspaceUserId, requireWorkspaceUserId } from './workspace-context.js';
 
-const stateDir = path.resolve(process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'));
-const statePath = path.join(stateDir, 'system-state.json');
+const rootStateDir = path.resolve(process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'));
+const workspacesRoot = path.join(rootStateDir, 'workspaces');
+const legacyStatePath = path.join(rootStateDir, 'system-state.json');
+
+function safeUserDir(userId) {
+  const clean = String(userId || '').trim();
+  if (!clean) throw new Error('workspace_user_required');
+  // Stable filesystem-safe id without exposing raw email/id characters.
+  return createHash('sha256').update(clean).digest('hex').slice(0, 32);
+}
+
+function workspaceDirFor(userId) {
+  return path.join(workspacesRoot, safeUserDir(userId));
+}
+
+function statePathFor(userId) {
+  return path.join(workspaceDirFor(userId), 'system-state.json');
+}
 
 function makeDatabase() {
   return {
@@ -75,9 +93,9 @@ function normalizeAgentList(savedAgents) {
   });
 }
 
-function loadPersistedState() {
+function loadStateFromPath(filePath) {
   try {
-    const parsed = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     const initial = makeInitialState();
     return {
       ...initial,
@@ -103,12 +121,32 @@ function loadPersistedState() {
   }
 }
 
-const state = loadPersistedState();
+/** @type {Map<string, any>} */
+const workspaces = new Map();
 
-function persistState() {
+function loadWorkspace(userId) {
+  const id = String(userId || '').trim();
+  if (!id) throw new Error('workspace_user_required');
+  if (workspaces.has(id)) return workspaces.get(id);
+  const filePath = statePathFor(id);
+  const state = loadStateFromPath(filePath);
+  // One-time migration: if user has empty workspace and legacy global file exists,
+  // do NOT share it — leave legacy untouched so accounts stay isolated.
+  workspaces.set(id, state);
+  return state;
+}
+
+function activeState() {
+  return loadWorkspace(requireWorkspaceUserId());
+}
+
+function persistStateFor(userId, state) {
   try {
-    fs.mkdirSync(stateDir, { recursive: true });
-    fs.writeFileSync(statePath, JSON.stringify({
+    const dir = workspaceDirFor(userId);
+    fs.mkdirSync(dir, { recursive: true });
+    const filePath = statePathFor(userId);
+    fs.writeFileSync(filePath, JSON.stringify({
+      ownerUserId: userId,
       activeMission: state.activeMission,
       activeRun: state.activeRun,
       missionHistory: state.missionHistory,
@@ -126,6 +164,11 @@ function persistState() {
   }
 }
 
+function persistState() {
+  const userId = requireWorkspaceUserId();
+  persistStateFor(userId, activeState());
+}
+
 export function persist() {
   persistState();
 }
@@ -134,7 +177,7 @@ function defaultAgentLine(agent) {
   return `${agent.name} pronto.`;
 }
 
-function ensureConfiguredAgents() {
+function ensureConfiguredAgents(state = activeState()) {
   let changed = false;
   for (const agent of AGENTS) {
     if (!state.agents.some((item) => item.id === agent.id)) {
@@ -161,7 +204,7 @@ function ensureConfiguredAgents() {
   if (changed) persistState();
 }
 
-function rebuildAgentsPreservingConfig() {
+function rebuildAgentsPreservingConfig(state = activeState()) {
   const config = new Map(state.agents.map((agent) => [agent.id, { enabled: agent.enabled, model: agent.model }]));
   return AGENTS.map((agent) => ({
     id: agent.id,
@@ -175,7 +218,8 @@ function rebuildAgentsPreservingConfig() {
 }
 
 export function getState() {
-  ensureConfiguredAgents();
+  const state = activeState();
+  ensureConfiguredAgents(state);
   return {
     supervisorMode: state.supervisorMode,
     activeMission: state.activeMission,
@@ -189,10 +233,12 @@ export function getState() {
     missionQueue: state.missionQueue,
     personaAgents: state.personaAgents,
     agents: state.agents,
+    ownerUserId: requireWorkspaceUserId(),
   };
 }
 
 function archiveCurrentMission(reason = 'archived') {
+  const state = activeState();
   if (!state.activeMission && !state.activeRun) return;
   const archived = {
     id: state.activeRun?.id ?? `mission-${Date.now()}`,
@@ -228,19 +274,20 @@ function archiveCurrentMission(reason = 'archived') {
 }
 
 function resetActiveScope() {
+  const state = activeState();
   state.activeMission = null;
   state.activeRun = null;
   state.temporaryDashboard = null;
   state.globalChatMessages = [];
   state.database.layers.dashboardIntegration.items = [];
   state.database.heartbeat = [];
-  state.agents = rebuildAgentsPreservingConfig();
+  state.agents = rebuildAgentsPreservingConfig(state);
 }
 
 export function startNewMissionScope(mission) {
   archiveCurrentMission('new_mission_started');
   resetActiveScope();
-  state.activeMission = mission;
+  activeState().activeMission = mission;
   persistState();
 }
 
@@ -261,6 +308,7 @@ function makeRunAgentState() {
 }
 
 export function createRun(mission) {
+  const state = activeState();
   const run = {
     id: `run-${Date.now()}`,
     missionTitle: mission?.title ?? 'missao sem titulo',
@@ -279,12 +327,14 @@ export function createRun(mission) {
 }
 
 export function setRunBriefing(briefing) {
+  const state = activeState();
   if (!state.activeRun) return;
   state.activeRun.briefing = String(briefing ?? '');
   persistState();
 }
 
 export function setSupervisorFinalReport(report) {
+  const state = activeState();
   if (!state.activeRun) return;
   state.activeRun.finalReport = report ? {
     ...report,
@@ -294,6 +344,7 @@ export function setSupervisorFinalReport(report) {
 }
 
 export function incrementSupervisorTick() {
+  const state = activeState();
   if (!state.activeRun) return 0;
   state.activeRun.supervisorTickCount = (state.activeRun.supervisorTickCount ?? 0) + 1;
   persistState();
@@ -301,6 +352,7 @@ export function incrementSupervisorTick() {
 }
 
 export function createAgentTask(agentId, instruction) {
+  const state = activeState();
   if (!state.activeRun) return null;
   const task = {
     id: `task-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -322,6 +374,7 @@ export function createAgentTask(agentId, instruction) {
 }
 
 export function updateAgentTask(taskId, patch) {
+  const state = activeState();
   if (!state.activeRun) return null;
   const task = state.activeRun.tasks.find((item) => item.id === taskId);
   if (!task) return null;
@@ -340,12 +393,14 @@ export function updateAgentTask(taskId, patch) {
 }
 
 export function markAgentChatSeen(agentId, messageId) {
+  const state = activeState();
   if (!state.activeRun?.agents?.[agentId]) return;
   state.activeRun.agents[agentId].lastSeenChatMessageId = messageId ?? null;
   persistState();
 }
 
 export function completeRun(reason) {
+  const state = activeState();
   if (!state.activeRun) return;
   state.activeRun.status = 'completed';
   state.activeRun.completedAt = new Date().toISOString();
@@ -354,6 +409,7 @@ export function completeRun(reason) {
 }
 
 export function setTemporaryDashboard(dashboard) {
+  const state = activeState();
   state.temporaryDashboard = dashboard ? {
     ...dashboard,
     updatedAt: new Date().toISOString(),
@@ -362,6 +418,7 @@ export function setTemporaryDashboard(dashboard) {
 }
 
 export function addGlobalChatMessage(message) {
+  const state = activeState();
   const next = {
     id: message.id ?? `chat-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     missionId: message.missionId ?? state.activeMission?.title ?? 'standby',
@@ -372,6 +429,7 @@ export function addGlobalChatMessage(message) {
     meta: message.meta ?? null,
     timestamp: message.timestamp ?? formatBrazilTime(),
     createdAt: message.createdAt ?? new Date().toISOString(),
+    ownerUserId: requireWorkspaceUserId(),
   };
   if (!next.content) return null;
   state.globalChatMessages = [...state.globalChatMessages, next].slice(-120);
@@ -380,6 +438,7 @@ export function addGlobalChatMessage(message) {
 }
 
 export function setSupervisorMode(mode) {
+  const state = activeState();
   state.supervisorMode = mode;
   const sup = state.agents.find((a) => a.id === 'supervisor');
   if (sup) sup.status = mode;
@@ -387,7 +446,8 @@ export function setSupervisorMode(mode) {
 }
 
 export function appendLine(agentId, line) {
-  ensureConfiguredAgents();
+  const state = activeState();
+  ensureConfiguredAgents(state);
   const agent = state.agents.find((a) => a.id === agentId);
   if (!agent) return;
   agent.lines = [...agent.lines, line].slice(-80);
@@ -395,7 +455,8 @@ export function appendLine(agentId, line) {
 }
 
 export function setAgentStatus(agentId, status) {
-  ensureConfiguredAgents();
+  const state = activeState();
+  ensureConfiguredAgents(state);
   const agent = state.agents.find((a) => a.id === agentId);
   if (!agent) return;
   agent.status = status;
@@ -403,7 +464,8 @@ export function setAgentStatus(agentId, status) {
 }
 
 export function setAgentConfig(agentId, patch = {}) {
-  ensureConfiguredAgents();
+  const state = activeState();
+  ensureConfiguredAgents(state);
   const agent = state.agents.find((a) => a.id === agentId);
   if (!agent) return null;
   if (typeof patch.model === 'string') {
@@ -425,12 +487,13 @@ export function setAgentConfig(agentId, patch = {}) {
 }
 
 export function getAgentConfig(agentId) {
-  ensureConfiguredAgents();
+  const state = activeState();
+  ensureConfiguredAgents(state);
   return state.agents.find((a) => a.id === agentId) ?? null;
 }
 
 export function setMission(mission) {
-  state.activeMission = mission;
+  activeState().activeMission = mission;
   persistState();
 }
 
@@ -441,11 +504,13 @@ export function resetMission() {
 }
 
 export function addHeartbeat(agentId, status, note) {
+  const state = activeState();
   state.database.heartbeat = [...state.database.heartbeat, { agentId, status, note, time: new Date().toISOString() }].slice(-60);
   persistState();
 }
 
 export function upsertDashboardItem(item) {
+  const state = activeState();
   const list = state.database.layers.dashboardIntegration.items;
   const next = [...list.filter((x) => x.id !== item.id), item];
   state.database.layers.dashboardIntegration.items = next.slice(-20);
@@ -453,19 +518,22 @@ export function upsertDashboardItem(item) {
 }
 
 export function appendHeartbeatLog(line) {
+  const state = activeState();
   state.heartbeatLogs = [...state.heartbeatLogs, line].slice(-120);
   persistState();
 }
 
 export function clearAgentContexts() {
+  const state = activeState();
   state.heartbeatLogs = [];
   state.database.heartbeat = [];
   state.globalChatMessages = [];
-  state.agents = rebuildAgentsPreservingConfig();
+  state.agents = rebuildAgentsPreservingConfig(state);
   persistState();
 }
 
 export function archiveActiveMission({ status = 'completed', reason = '', evidence = [] } = {}) {
+  const state = activeState();
   const mission = state.activeMission;
   if (!mission && !state.activeRun) return false;
   const completedAt = new Date().toISOString();
@@ -488,21 +556,23 @@ export function archiveActiveMission({ status = 'completed', reason = '', eviden
 }
 
 export function setScheduledMissions(list) {
-  state.scheduledMissions = Array.isArray(list) ? list.slice(0, 30) : [];
+  activeState().scheduledMissions = Array.isArray(list) ? list.slice(0, 30) : [];
   persistState();
 }
 
 export function setMissionQueue(list) {
-  state.missionQueue = Array.isArray(list) ? list.slice(-80) : [];
+  activeState().missionQueue = Array.isArray(list) ? list.slice(-80) : [];
   persistState();
 }
 
 export function getPersonaAgents() {
+  const state = activeState();
   if (!Array.isArray(state.personaAgents)) state.personaAgents = [];
   return state.personaAgents;
 }
 
 export function addPersonaAgent(entry = {}) {
+  const state = activeState();
   const slug = String(entry.slug || '').trim();
   if (!slug) return null;
   if (!Array.isArray(state.personaAgents)) state.personaAgents = [];
@@ -526,6 +596,7 @@ export function addPersonaAgent(entry = {}) {
 }
 
 export function updatePersonaAgent(slug, patch = {}) {
+  const state = activeState();
   if (!Array.isArray(state.personaAgents)) state.personaAgents = [];
   const record = state.personaAgents.find((p) => p.slug === slug);
   if (!record) return null;
@@ -539,10 +610,43 @@ export function updatePersonaAgent(slug, patch = {}) {
 }
 
 export function removePersonaAgent(slug) {
+  const state = activeState();
   if (!Array.isArray(state.personaAgents)) state.personaAgents = [];
   const before = state.personaAgents.length;
   state.personaAgents = state.personaAgents.filter((p) => p.slug !== slug);
   const changed = state.personaAgents.length !== before;
   if (changed) persistState();
   return changed;
+}
+
+/** List known workspace owner ids (connected or already persisted). */
+export function listWorkspaceUserIds() {
+  const ids = new Set(workspaces.keys());
+  try {
+    if (fs.existsSync(workspacesRoot)) {
+      for (const entry of fs.readdirSync(workspacesRoot, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const metaPath = path.join(workspacesRoot, entry.name, 'system-state.json');
+        if (!fs.existsSync(metaPath)) continue;
+        try {
+          const parsed = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+          if (parsed?.ownerUserId) ids.add(String(parsed.ownerUserId));
+        } catch {
+          // ignore corrupt workspace files
+        }
+      }
+    }
+  } catch {
+    // ignore scan failures
+  }
+  return [...ids];
+}
+
+export function ensureWorkspace(userId) {
+  return loadWorkspace(String(userId || '').trim());
+}
+
+// Keep legacy root state file if present, but never share it across accounts.
+export function legacyGlobalStateExists() {
+  return fs.existsSync(legacyStatePath);
 }

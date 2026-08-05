@@ -54,7 +54,10 @@ import {
   addPersonaAgent,
   updatePersonaAgent,
   removePersonaAgent,
+  ensureWorkspace,
+  listWorkspaceUserIds,
 } from './state.js';
+import { runWithWorkspaceUser, getWorkspaceUserId } from './workspace-context.js';
 import {
   listYumePersonas,
   fetchYumePersonaSystemPrompt,
@@ -175,21 +178,32 @@ const authService = createAuthService({
 app.use('/api', rateLimitApi);
 authService.registerRoutes(app);
 app.get('/api/health', (_req, res) => {
-  const state = getState();
+  // Health is public and account-agnostic: do not load a user workspace here.
   res.json({
     ok: true,
     service: 'luca-ai',
     version: PACKAGE_VERSION,
-    supervisorMode: state.supervisorMode,
-    agents: Array.isArray(state.agents) ? state.agents.length : 0,
-    personaAgents: Array.isArray(state.personaAgents) ? state.personaAgents.length : 0,
-    activeMission: Boolean(state.activeMission),
-    scheduledMissions: Array.isArray(state.scheduledMissions) ? state.scheduledMissions.length : 0,
+    supervisorMode: 'standby',
+    agents: Array.isArray(AGENTS) ? AGENTS.length : 0,
+    personaAgents: 0,
+    activeMission: false,
+    scheduledMissions: 0,
     kamuiBase: process.env.KAMUI_BASE || 'http://127.0.0.1:1338',
+    workspaces: listWorkspaceUserIds().length,
   });
 });
 
 app.use('/api', authService.requireUser);
+// ACCOUNT_WORKSPACE_ISOLATION_V1 — every authenticated API call runs inside the caller's workspace.
+app.use('/api', (req, res, next) => {
+  const userId = req.auth?.user?.id;
+  if (!userId) {
+    next();
+    return;
+  }
+  ensureWorkspace(userId);
+  runWithWorkspaceUser(userId, () => next());
+});
 authService.registerAdminRoutes(app);
 
 const httpServer = createServer(app);
@@ -374,8 +388,11 @@ function emitEvent(event) {
     // Observability must not break the runtime event path.
   }
   const payload = JSON.stringify({ kind: 'event', event });
+  const ownerUserId = getWorkspaceUserId();
   for (const client of wss.clients) {
-    if (client.readyState === 1) client.send(payload);
+    if (client.readyState !== 1) continue;
+    if (ownerUserId && client.userId && client.userId !== ownerUserId) continue;
+    client.send(payload);
   }
 }
 
@@ -385,8 +402,11 @@ function emitState() {
     kind: 'state',
     state,
   });
+  const ownerUserId = getWorkspaceUserId();
   for (const client of wss.clients) {
-    if (client.readyState === 1) client.send(payload);
+    if (client.readyState !== 1) continue;
+    if (ownerUserId && client.userId && client.userId !== ownerUserId) continue;
+    client.send(payload);
   }
 }
 
@@ -2270,7 +2290,15 @@ async function processScheduledMissions() {
 let schedulerTimer = null;
 function startScheduler() {
   if (schedulerTimer) return;
-  schedulerTimer = setInterval(() => { processScheduledMissions().catch(() => {}); }, 15000);
+  schedulerTimer = setInterval(() => {
+    const userIds = listWorkspaceUserIds();
+    if (!userIds.length) return;
+    for (const userId of userIds) {
+      runWithWorkspaceUser(userId, () => {
+        processScheduledMissions().catch(() => {});
+      });
+    }
+  }, 15000);
 }
 
 
@@ -3016,8 +3044,17 @@ if (fs.existsSync(indexPath)) {
   });
 }
 
-wss.on('connection', (socket) => {
-  socket.send(JSON.stringify({ kind: 'state', state: publicStateSnapshot() }));
+wss.on('connection', (socket, req) => {
+  const userId = req?.auth?.user?.id || null;
+  socket.userId = userId;
+  if (!userId) {
+    socket.close(1008, 'workspace_user_required');
+    return;
+  }
+  ensureWorkspace(userId);
+  runWithWorkspaceUser(userId, () => {
+    socket.send(JSON.stringify({ kind: 'state', state: publicStateSnapshot() }));
+  });
 });
 
 httpServer.listen(PORT, HOST, () => {
