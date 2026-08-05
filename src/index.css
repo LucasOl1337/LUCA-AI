@@ -380,6 +380,118 @@
   margin-left: auto;
 }
 
+/* SHARE_LINKS_V1 — toolbar actions + share popover */
+.luca-ai-toolbar-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.luca-ai-toolbar-actions .luca-ai-team-trigger { margin-left: 0; }
+.luca-ai-share-anchor { position: relative; }
+.luca-ai-share-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--l-border);
+  background: var(--l-surface-hi);
+  -webkit-backdrop-filter: blur(var(--l-glass-blur)) saturate(var(--l-glass-saturate));
+  backdrop-filter: blur(var(--l-glass-blur)) saturate(var(--l-glass-saturate));
+  box-shadow: var(--l-shadow-card);
+}
+.luca-ai-share-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--l-text);
+  margin-bottom: 8px;
+}
+.luca-ai-share-head svg { color: var(--l-navy-deep); }
+.luca-ai-share-close {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  color: var(--l-text-mute);
+}
+.luca-ai-share-close:hover { color: var(--l-text); background: rgba(255, 255, 255, 0.06); }
+.luca-ai-share-hint {
+  margin: 0 0 10px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--l-text-mute);
+}
+.luca-ai-share-error {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 69, 58, 0.4);
+  background: var(--l-error-bg);
+  color: var(--l-text);
+  font-size: 11.5px;
+}
+.luca-ai-share-url {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(100, 210, 255, 0.28);
+  background: rgba(10, 132, 255, 0.08);
+  color: var(--l-navy-deep);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: all;
+}
+.luca-ai-share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.luca-ai-share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--l-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--l-text-soft);
+  font-size: 12px;
+  transition: border-color 160ms var(--l-ease), background 160ms var(--l-ease), color 160ms var(--l-ease);
+}
+.luca-ai-share-btn:hover:not(:disabled) {
+  border-color: var(--l-border-hover);
+  color: var(--l-text);
+}
+.luca-ai-share-btn:disabled { opacity: 0.55; cursor: default; }
+.luca-ai-share-btn.primary {
+  border-color: rgba(10, 132, 255, 0.5);
+  background: var(--l-navy-soft);
+  color: var(--l-navy-deep);
+}
+.luca-ai-share-btn.primary:hover:not(:disabled) {
+  border-color: var(--l-border-active);
+  background: var(--l-navy-glow);
+  color: #fff;
+}
+.luca-ai-share-btn.danger:hover:not(:disabled) {
+  border-color: rgba(255, 69, 58, 0.55);
+  background: var(--l-error-bg);
+  color: var(--l-error);
+}
+
 /* Sidebar sessions rail (Hermes-style: spaces above, projects/sessions below) */
 .luca-sidebar-sessions {
   height: 100%;

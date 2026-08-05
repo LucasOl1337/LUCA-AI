@@ -381,6 +381,21 @@ export interface LucaAiChatFolder {
   updatedAt?: string;
 }
 
+export interface LucaAiChatSessionShare {
+  token: string;
+  url: string;
+  sessionId: string;
+  createdAt?: string;
+  updatedAt?: string;
+  messageCount?: number;
+}
+
+export interface LucaAiChatSessionShareResponse {
+  ok: boolean;
+  share: LucaAiChatSessionShare | null;
+  error?: string;
+}
+
 export interface LucaAiChatSessionSummary {
   id: string;
   title: string;

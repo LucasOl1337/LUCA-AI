@@ -74,6 +74,13 @@ import {
   updateChatSession,
 } from './chat-library.js';
 import {
+  createShareLink,
+  getShareLinkForSession,
+  revokeShareLink,
+  resolvePublicShare,
+  renderShareHtml,
+} from './share-links.js';
+import {
   listYumePersonas,
   fetchYumePersonaSystemPrompt,
   getYumePersonaVersion,
@@ -216,6 +223,18 @@ app.get('/api/health', (_req, res) => {
     kamuiBase: process.env.KAMUI_BASE || 'http://127.0.0.1:1338',
     workspaces: listWorkspaceUserIds().length,
   });
+});
+
+// SHARE_LINKS_V1 — public read-only viewer. No auth, no workspace, snapshot only.
+app.get('/s/:token', (req, res) => {
+  const share = resolvePublicShare(req.params.token);
+  if (!share) {
+    res.status(404).setHeader('Cache-Control', 'no-store');
+    res.type('html').send('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Link indisponível — LUCA</title><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#090c11;color:rgba(255,255,255,.72);font-family:Inter,system-ui,sans-serif;text-align:center;padding:24px}h1{font-size:20px;color:rgba(255,255,255,.94);margin:0 0 8px}</style></head><body><div><h1>Link indisponível</h1><p>Este link de compartilhamento não existe ou foi revogado pelo autor.</p></div></body></html>');
+    return;
+  }
+  res.setHeader('Cache-Control', 'no-store');
+  res.type('html').send(renderShareHtml(share));
 });
 
 app.use('/api', authService.requireUser);
@@ -2782,6 +2801,34 @@ app.delete('/api/luca-ai/chat/sessions/:sessionId', (req, res) => {
   try {
     const result = deleteChatSession(req.params.sessionId);
     res.json({ ok: true, ...result, ...getChatLibrarySnapshot() });
+  } catch (error) {
+    chatLibraryError(res, error);
+  }
+});
+
+// SHARE_LINKS_V1 — owner-side management of public share links.
+app.get('/api/luca-ai/chat/sessions/:sessionId/share', (req, res) => {
+  try {
+    getChatSession(req.params.sessionId); // ownership check inside caller workspace
+    res.json({ ok: true, share: getShareLinkForSession(req.params.sessionId) });
+  } catch (error) {
+    chatLibraryError(res, error);
+  }
+});
+
+app.post('/api/luca-ai/chat/sessions/:sessionId/share', (req, res) => {
+  try {
+    const share = createShareLink(req.params.sessionId);
+    res.json({ ok: true, share });
+  } catch (error) {
+    chatLibraryError(res, error);
+  }
+});
+
+app.delete('/api/luca-ai/chat/sessions/:sessionId/share', (req, res) => {
+  try {
+    const result = revokeShareLink(req.params.sessionId);
+    res.json({ ok: true, ...result, share: null });
   } catch (error) {
     chatLibraryError(res, error);
   }

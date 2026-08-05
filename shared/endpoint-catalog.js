@@ -195,6 +195,7 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
                 endpoint('yume-memory-event', 'GET', '/api/integrations/yume/memory-event', 'preview local do payload MemoryEventIn para arquivar relatorio/evidencias no Yume sem sincronizacao automatica', 'local'),
                 endpoint('luca-ai-chat-library', 'GET', '/api/luca-ai/chat/library', 'lista pastas e sessões de chat do LUCA-AI por conta', 'both'),
                 endpoint('luca-ai-chat-session-get', 'GET', '/api/luca-ai/chat/sessions/:sessionId', 'carrega o conteúdo completo de uma sessão de chat do LUCA-AI', 'both'),
+                endpoint('luca-ai-chat-session-share-get', 'GET', '/api/luca-ai/chat/sessions/:sessionId/share', 'consulta o link público ativo de compartilhamento da sessão', 'both'),
               ],
               inbound: [
                 endpoint(
@@ -255,6 +256,20 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
                   'DELETE',
                   '/api/luca-ai/chat/sessions/:sessionId',
                   'apaga permanentemente uma sessão de chat do LUCA-AI',
+                  'both',
+                ),
+                endpoint(
+                  'luca-ai-chat-session-share-create',
+                  'POST',
+                  '/api/luca-ai/chat/sessions/:sessionId/share',
+                  'cria ou atualiza o link público somente leitura da sessão (snapshot em /s/:token)',
+                  'both',
+                ),
+                endpoint(
+                  'luca-ai-chat-session-share-revoke',
+                  'DELETE',
+                  '/api/luca-ai/chat/sessions/:sessionId/share',
+                  'revoga o link público de compartilhamento da sessão',
                   'both',
                 ),
               ],

@@ -1,6 +1,7 @@
 import type {
   LucaAiChatLibraryResponse,
   LucaAiChatSession,
+  LucaAiChatSessionShareResponse,
   LucaAiPersonaTeamRunResponse,
   LucaAiWorkflowAssignment,
   LucaState,
@@ -179,6 +180,23 @@ export const lucaApi = {
   deleteChatSession: (sessionId: string, base?: string) =>
     apiDelete<LucaAiChatLibraryResponse>(
       `/api/luca-ai/chat/sessions/${encodeURIComponent(sessionId)}`,
+      base,
+    ),
+  getChatSessionShare: (sessionId: string, base?: string) =>
+    apiGet<LucaAiChatSessionShareResponse>(
+      `/api/luca-ai/chat/sessions/${encodeURIComponent(sessionId)}/share`,
+      8000,
+      base,
+    ),
+  createChatSessionShare: (sessionId: string, base?: string) =>
+    apiPost<LucaAiChatSessionShareResponse>(
+      `/api/luca-ai/chat/sessions/${encodeURIComponent(sessionId)}/share`,
+      {},
+      base,
+    ),
+  revokeChatSessionShare: (sessionId: string, base?: string) =>
+    apiDelete<LucaAiChatSessionShareResponse>(
+      `/api/luca-ai/chat/sessions/${encodeURIComponent(sessionId)}/share`,
       base,
     ),
 };

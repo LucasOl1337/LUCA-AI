@@ -8,6 +8,7 @@ import {
   ClipboardCheck,
   Eye,
   GitBranch,
+  Link2,
   Loader2,
   MessageSquareText,
   Play,
@@ -16,6 +17,7 @@ import {
   RotateCcw,
   Search,
   Scale,
+  Share2,
   ShieldCheck,
   Target,
   Terminal,
@@ -27,6 +29,7 @@ import {
 import { buildApiErrorMessage, lucaApi } from '@/lib/api';
 import type {
   LucaAiChatSession,
+  LucaAiChatSessionShare,
   LucaAiPersonaTeamReply,
   LucaAiPersonaTeamRunResponse,
   LucaAiWorkflowAssignment,
@@ -516,6 +519,12 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
   const [busyPersonaSlug, setBusyPersonaSlug] = useState<string | null>(null);
   const [applyingPresetId, setApplyingPresetId] = useState<string | null>(null);
+  // SHARE_LINKS_V1 — public read-only link for the active session.
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareInfo, setShareInfo] = useState<LucaAiChatSessionShare | null>(null);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const [hydratedSessionId, setHydratedSessionId] = useState<string | null>(null);
   const persistTimerRef = useRef<number | null>(null);
@@ -665,6 +674,87 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     latestPersistRef.current = { sessionId: id, payload };
     void persistSession(id, payload);
   }, [buildPersistPayload, persistSession]);
+
+  // SHARE_LINKS_V1 — reset panel when switching sessions.
+  useEffect(() => {
+    setShareOpen(false);
+    setShareInfo(null);
+    setShareError(null);
+    setShareCopied(false);
+  }, [activeSessionId]);
+
+  const absoluteShareUrl = useCallback((share: LucaAiChatSessionShare | null) => {
+    if (!share?.url) return '';
+    try {
+      return new URL(share.url, window.location.origin).toString();
+    } catch {
+      return share.url;
+    }
+  }, []);
+
+  const toggleSharePanel = useCallback(async () => {
+    if (shareOpen) {
+      setShareOpen(false);
+      return;
+    }
+    setShareOpen(true);
+    setShareError(null);
+    setShareCopied(false);
+    if (!activeSessionId) return;
+    setShareBusy(true);
+    try {
+      const data = await lucaApi.getChatSessionShare(activeSessionId, bridgeBase);
+      setShareInfo(data.share ?? null);
+    } catch (err) {
+      setShareError(buildApiErrorMessage(err, 'Falha ao consultar o link de compartilhamento.'));
+    } finally {
+      setShareBusy(false);
+    }
+  }, [activeSessionId, bridgeBase, shareOpen]);
+
+  const copyShareUrl = useCallback(async (share: LucaAiChatSessionShare | null) => {
+    const url = absoluteShareUrl(share);
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 2200);
+    } catch {
+      setShareError('Não foi possível copiar automaticamente. Copie o link manualmente.');
+    }
+  }, [absoluteShareUrl]);
+
+  const generateShare = useCallback(async () => {
+    if (!activeSessionId || shareBusy) return;
+    setShareBusy(true);
+    setShareError(null);
+    try {
+      // Snapshot must include everything on screen: flush pending edits first.
+      flushSessionNow(activeSessionId);
+      const data = await lucaApi.createChatSessionShare(activeSessionId, bridgeBase);
+      setShareInfo(data.share ?? null);
+      if (data.share) void copyShareUrl(data.share);
+    } catch (err) {
+      setShareError(buildApiErrorMessage(err, 'Falha ao gerar o link público.'));
+    } finally {
+      setShareBusy(false);
+    }
+  }, [activeSessionId, bridgeBase, copyShareUrl, flushSessionNow, shareBusy]);
+
+  const revokeShare = useCallback(async () => {
+    if (!activeSessionId || shareBusy) return;
+    setShareBusy(true);
+    setShareError(null);
+    try {
+      await lucaApi.revokeChatSessionShare(activeSessionId, bridgeBase);
+      setShareInfo(null);
+      setShareCopied(false);
+    } catch (err) {
+      setShareError(buildApiErrorMessage(err, 'Falha ao revogar o link.'));
+    } finally {
+      setShareBusy(false);
+    }
+  }, [activeSessionId, bridgeBase, shareBusy]);
 
   useEffect(() => {
     if (!libraryReady || !activeSessionId) return;
@@ -1266,17 +1356,84 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
               </button>
             </div>
           </div>
-          <button
-            type="button"
-            className={`luca-ai-team-trigger ${teamPanelOpen ? 'active' : ''}`}
-            onClick={() => setTeamPanelOpen((open) => !open)}
-            aria-expanded={teamPanelOpen}
-            aria-controls="luca-ai-team-side"
-          >
-            <BrainCircuit className="h-4 w-4" />
-            <span>{operationMode === 'individual' ? 'Seleção' : 'Equipe'}</span>
-            <span className="font-mono text-[10px]">{operationMode === 'individual' ? `${individualAssignments.participants.length}/5` : `${readyRoles}/${WORKFLOW_ROLES.length}`}</span>
-          </button>
+          <div className="luca-ai-toolbar-actions">
+            <div className="luca-ai-share-anchor">
+              <button
+                type="button"
+                className={`luca-ai-team-trigger luca-ai-share-trigger ${shareOpen ? 'active' : ''}`}
+                onClick={() => { void toggleSharePanel(); }}
+                aria-expanded={shareOpen}
+                aria-controls="luca-ai-share-panel"
+                title="Compartilhar sessão (link público somente leitura)"
+              >
+                <Share2 className="h-4 w-4" />
+                <span>Compartilhar</span>
+              </button>
+              <AnimatePresence>
+                {shareOpen && (
+                  <motion.div
+                    id="luca-ai-share-panel"
+                    className="luca-ai-share-panel"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 6 }}
+                    transition={{ duration: 0.16 }}
+                  >
+                    <div className="luca-ai-share-head">
+                      <Link2 className="h-4 w-4" />
+                      <span>Link público da sessão</span>
+                      <button type="button" className="luca-ai-share-close" onClick={() => setShareOpen(false)} aria-label="Fechar">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <p className="luca-ai-share-hint">
+                      Gera um link somente leitura com o snapshot atual da conversa e do resultado. Quem receber o link vê o conteúdo sem precisar de conta.
+                    </p>
+                    {shareError && <div className="luca-ai-share-error" role="alert">{shareError}</div>}
+                    {shareInfo ? (
+                      <>
+                        <div className="luca-ai-share-url" title={absoluteShareUrl(shareInfo)}>
+                          {absoluteShareUrl(shareInfo)}
+                        </div>
+                        <div className="luca-ai-share-actions">
+                          <button type="button" className="luca-ai-share-btn primary" disabled={shareBusy} onClick={() => { void copyShareUrl(shareInfo); }}>
+                            {shareCopied ? <CheckCircle2 className="h-4 w-4" /> : <ClipboardCheck className="h-4 w-4" />}
+                            {shareCopied ? 'Copiado!' : 'Copiar link'}
+                          </button>
+                          <button type="button" className="luca-ai-share-btn" disabled={shareBusy} onClick={() => { void generateShare(); }}>
+                            {shareBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                            Atualizar snapshot
+                          </button>
+                          <button type="button" className="luca-ai-share-btn danger" disabled={shareBusy} onClick={() => { void revokeShare(); }}>
+                            <X className="h-4 w-4" />
+                            Revogar
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="luca-ai-share-actions">
+                        <button type="button" className="luca-ai-share-btn primary" disabled={shareBusy || !activeSessionId} onClick={() => { void generateShare(); }}>
+                          {shareBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
+                          Gerar link público
+                        </button>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            <button
+              type="button"
+              className={`luca-ai-team-trigger ${teamPanelOpen ? 'active' : ''}`}
+              onClick={() => setTeamPanelOpen((open) => !open)}
+              aria-expanded={teamPanelOpen}
+              aria-controls="luca-ai-team-side"
+            >
+              <BrainCircuit className="h-4 w-4" />
+              <span>{operationMode === 'individual' ? 'Seleção' : 'Equipe'}</span>
+              <span className="font-mono text-[10px]">{operationMode === 'individual' ? `${individualAssignments.participants.length}/5` : `${readyRoles}/${WORKFLOW_ROLES.length}`}</span>
+            </button>
+          </div>
         </header>
 
         {error && (
