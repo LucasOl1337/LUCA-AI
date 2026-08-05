@@ -13,8 +13,9 @@ test('runMission keeps mission draft until successful completion', () => {
   assert.ok(start >= 0, 'runMission present');
   const slice = source.slice(start, start + 5200);
   assert.ok(slice.includes("setErrorRetry('run')") || slice.includes('setErrorRetry("run")'), 'run failure marks retry kind');
-  assert.ok(slice.includes('if (data.ok)'), 'only clears mission on ok');
-  assert.ok(slice.includes("setMission('')") || slice.includes('setMission("")'), 'clears mission on success');
+  assert.ok(slice.includes('if (!data.ok)'), 'errors only when run is not ok');
+  // Mission draft must survive success so the original question stays visible in session.
+  assert.equal(slice.includes("setMission('')") || slice.includes('setMission("")'), false, 'never clears mission draft in runMission');
   // Early wipe before await must not exist
   const beforeAwait = slice.slice(0, slice.indexOf('await lucaApi.runLucaAi'));
   assert.equal(beforeAwait.includes("setMission('')") || beforeAwait.includes('setMission("")'), false, 'no early mission wipe before API');

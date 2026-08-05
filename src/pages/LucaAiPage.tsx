@@ -945,20 +945,20 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   }
 
   function clearTranscript() {
-      setTranscript([]);
-      setFinalResult(null);
-      setProcessEvents([]);
-      setActiveTraceId(null);
-    }
+    setTranscript([]);
+    setFinalResult(null);
+    setProcessEvents([]);
+    setActiveTraceId(null);
+  }
 
-    function switchOperationMode(next: OperationMode) {
-      if (next === operationMode || running) return;
-      setOperationMode(next);
-      setPickerTarget(null);
-      // Keep transcript/finalResult/mission — mode is view/config, not a new session.
-      setProcessEvents([]);
-      setActiveTraceId(null);
-    }
+  function switchOperationMode(next: OperationMode) {
+    if (next === operationMode || running) return;
+    setOperationMode(next);
+    setPickerTarget(null);
+    // Keep transcript/finalResult/mission — mode is view/config, not a new session.
+    setProcessEvents([]);
+    setActiveTraceId(null);
+  }
 
   async function runMission() {
     const trimmedMission = mission.trim();
@@ -1069,13 +1069,13 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         });
       }
       if (!data.ok) {
-              setError(operationMode === 'individual'
-                ? 'As respostas individuais foram acionadas, mas o juiz não concluiu um veredito útil.'
-                : 'A equipe foi acionada, mas nenhuma persona retornou resposta util.');
-              setErrorRetry('run');
-            }
-            // Keep mission draft after success so the original question stays visible
-            // (composer + missionDraft in session). Operator bubble also remains in transcript.
+        setError(operationMode === 'individual'
+          ? 'As respostas individuais foram acionadas, mas o juiz não concluiu um veredito útil.'
+          : 'A equipe foi acionada, mas nenhuma persona retornou resposta util.');
+        setErrorRetry('run');
+      }
+      // Keep mission draft after success so the original question stays visible
+      // (composer + missionDraft in session). Operator bubble also remains in transcript.
     } catch (err) {
       if (!stillOwner()) return;
       const message = buildApiErrorMessage(err, operationMode === 'individual'
@@ -1244,6 +1244,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
               transcriptRef={transcriptRef}
               onInspect={setActivePersonaSlug}
               operationMode={operationMode}
+              missionDraft={mission}
             />
           ) : (
             <div className="h-full min-h-0 w-full overflow-y-auto px-4 py-4 sm:px-5">
