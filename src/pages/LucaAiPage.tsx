@@ -475,6 +475,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorRetry, setErrorRetry] = useState<'personas' | 'run' | null>(null);
   const [activePersonaSlug, setActivePersonaSlug] = usePersistentState<string | null>('lucaAi.activePersonaSlug', null);
   const [activeTraceId, setActiveTraceId] = useState<string | null>(null);
   const [processEvents, setProcessEvents] = useState<RuntimeEvent[]>([]);
@@ -505,12 +506,14 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const loadPersonas = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setErrorRetry(null);
     try {
       const data = await lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined);
       setPersonas(normalizePersonaAssetUrls(data.personas ?? [], bridgeBase));
     } catch (err) {
       const fallback = 'Falha ao carregar personas do Yume.';
       setError(buildApiErrorMessage(err, fallback));
+      setErrorRetry('personas');
     } finally {
       setLoading(false);
     }
@@ -606,6 +609,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     if (!persona || persona.imported) return Boolean(persona);
     setBusyPersonaSlug(slug);
     setError(null);
+    setErrorRetry(null);
     try {
       await lucaApi.importYumePersona(slug, bridgeBase);
       const data = await lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined);
@@ -614,6 +618,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       return true;
     } catch (err) {
       setError(buildApiErrorMessage(err, `Falha ao conectar ${persona.name || slug} ao LUCA.`));
+      setErrorRetry('personas');
       return false;
     } finally {
       setBusyPersonaSlug(null);
@@ -709,8 +714,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     const traceId = createTraceId();
     setRunning(true);
     setError(null);
+    setErrorRetry(null);
     setFinalResult(null);
-    setMission('');
     setActiveTraceId(traceId);
     setProcessEvents(operationMode === 'team'
       ? plannedRuntimeEvents(traceId, trimmedMission, assignmentsToRun, personaBySlug)
@@ -778,14 +783,20 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           timestamp: data.generatedAt || new Date().toISOString(),
         });
       }
-      if (!data.ok) setError(operationMode === 'individual'
-        ? 'As respostas individuais foram acionadas, mas o juiz não concluiu um veredito útil.'
-        : 'A equipe foi acionada, mas nenhuma persona retornou resposta util.');
+      if (data.ok) {
+        setMission('');
+      } else {
+        setError(operationMode === 'individual'
+          ? 'As respostas individuais foram acionadas, mas o juiz não concluiu um veredito útil.'
+          : 'A equipe foi acionada, mas nenhuma persona retornou resposta util.');
+        setErrorRetry('run');
+      }
     } catch (err) {
       const message = buildApiErrorMessage(err, operationMode === 'individual'
         ? 'Falha ao rodar resolução individual.'
         : 'Falha ao rodar fluxo de personas.');
       setError(message);
+      setErrorRetry('run');
       const errorEntry: TeamTranscriptEntry = {
         id: nowId('system-error'),
         role: 'system',
@@ -902,7 +913,30 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           </button>
         </header>
 
-        {error && <div className="luca-ai-chat-notice"><Notice title="Atenção" body={error} /></div>}
+        {error && (
+        <div
+          className="luca-ai-chat-notice"
+          data-luca-chat-error
+          data-tone="error"
+          data-luca-chat-error-kind={errorRetry === 'run' ? 'run' : 'personas'}
+          role="alert"
+        >
+          <Notice
+            title="Atenção"
+            body={error}
+            onRetry={() => {
+              if (errorRetry === 'run') void runMission();
+              else void loadPersonas();
+            }}
+            onDismiss={() => {
+              setError(null);
+              setErrorRetry(null);
+            }}
+            busy={loading || running}
+            retryLabel={errorRetry === 'run' ? 'Reenviar missão' : 'Tentar novamente'}
+          />
+        </div>
+      )}
 
         <main className="luca-ai-chat-stage">
           {activeWorkspaceView === 'result' ? (
@@ -1027,14 +1061,61 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   );
 }
 
-function Notice({ title, body }: { title: string; body: string }) {
+function Notice({
+  title,
+  body,
+  onRetry,
+  onDismiss,
+  busy,
+  retryLabel = 'Tentar novamente',
+}: {
+  title: string;
+  body: string;
+  onRetry?: () => void;
+  onDismiss?: () => void;
+  busy?: boolean;
+  retryLabel?: string;
+}) {
   const theme = useTheme();
+  const recoverable = Boolean(onRetry || onDismiss);
   return (
-    <div className="flex items-start gap-3 rounded-lg px-4 py-3" style={{ background: theme.warningBg, border: `1px solid ${theme.warning}` }}>
-      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: theme.warning }} />
-      <div>
-        <div className="text-sm font-semibold" style={{ color: theme.goldDeep }}>{title}</div>
+    <div
+      className="flex items-start gap-3 rounded-lg px-4 py-3"
+      style={{
+        background: recoverable ? theme.errorBg : theme.warningBg,
+        border: `1px solid ${recoverable ? theme.error : theme.warning}`,
+      }}
+    >
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: recoverable ? theme.error : theme.warning }} />
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-semibold" style={{ color: recoverable ? theme.error : theme.goldDeep }}>{title}</div>
         <div className="mt-1 text-xs leading-relaxed" style={{ color: theme.textSoft }}>{body}</div>
+        {recoverable ? (
+          <div className="mt-3 flex flex-wrap gap-2" data-luca-chat-error-actions>
+            {onRetry ? (
+              <button
+                type="button"
+                className="btn-primary !px-4 !py-2 !text-xs"
+                data-luca-chat-retry
+                onClick={onRetry}
+                disabled={busy}
+              >
+                {busy ? (retryLabel === 'Reenviar missão' ? 'Reenviando…' : 'Recarregando…') : retryLabel}
+              </button>
+            ) : null}
+            {onDismiss ? (
+              <button
+                type="button"
+                className="btn-fleet !px-4 !py-2 !text-xs"
+                data-luca-chat-dismiss
+                onClick={onDismiss}
+                disabled={busy}
+              >
+                Dispensar
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -1402,7 +1483,44 @@ function PersonaPickerSheet({ role, personas, selectedSlugs, query, busySlug, on
               );
             })}
           </div>
-          {!visiblePersonas.length && <p className="px-4 py-12 text-center text-sm" style={{ color: theme.textMute }}>Nenhuma persona corresponde à busca.</p>}
+          {!visiblePersonas.length && (
+            <div
+              className="flex min-h-[220px] flex-col items-center justify-center gap-3 px-4 py-12 text-center"
+              data-luca-picker-empty
+              data-tone="empty"
+            >
+              <p className="text-sm font-semibold" style={{ color: theme.textSoft }}>
+                {term
+                  ? "Nenhuma persona corresponde à busca."
+                  : "Nenhuma persona disponível no catálogo."}
+              </p>
+              <p className="max-w-[40ch] text-xs leading-relaxed" style={{ color: theme.textMute }}>
+                {term
+                  ? "Limpe a busca para ver o catálogo completo ou ajuste o termo."
+                  : "Conecte personas no Yume e abra o picker de novo."}
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {term ? (
+                  <button
+                    type="button"
+                    className="btn-primary !px-4 !py-2 !text-xs"
+                    data-luca-picker-clear
+                    onClick={() => onQuery("")}
+                  >
+                    Limpar busca
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn-fleet !px-4 !py-2 !text-xs"
+                  data-luca-picker-close
+                  onClick={onClose}
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </motion.aside>
     </motion.div>
@@ -1458,11 +1576,34 @@ function LucaProcessTerminal({
             </div>
           </>
         ) : (
-          <div className="flex h-full min-h-[180px] flex-col items-center justify-center px-5 text-center">
-            <Terminal className="mb-3 h-7 w-7" style={{ color: theme.textGhost }} />
-            <p className="max-w-[24ch] text-xs leading-relaxed" style={{ color: theme.textMute }}>
-              A atividade dos agentes aparece aqui durante a execução.
+          <div
+            className="flex h-full min-h-[180px] flex-col items-center justify-center gap-3 px-5 text-center"
+            data-luca-activity-empty
+            data-tone="empty"
+          >
+            <Terminal className="h-7 w-7" style={{ color: theme.textGhost }} />
+            <p className="text-sm font-semibold" style={{ color: theme.textSoft }}>
+              Nenhuma atividade nesta sessão
             </p>
+            <p className="max-w-[28ch] text-xs leading-relaxed" style={{ color: theme.textMute }}>
+              {running
+                ? 'Aguardando o primeiro evento da execução em curso.'
+                : 'Envie uma missão com a equipe configurada para ver o fluxo dos agentes aqui.'}
+            </p>
+            {!running && (
+              <button
+                type="button"
+                className="btn-primary !px-4 !py-2 !text-xs"
+                data-luca-activity-focus-mission
+                onClick={() => {
+                  const el = document.getElementById('luca-ai-mission') as HTMLTextAreaElement | null;
+                  el?.focus();
+                  el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }}
+              >
+                Escrever missão
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -1571,18 +1712,36 @@ function LucaMissionCanvas({
             </button>
           )
         )) : !finalResult && (
-          <div className="flex min-h-[48vh] flex-col items-center justify-center px-4 text-center sm:px-6">
-            <div className="mb-5 grid h-14 w-14 place-items-center overflow-hidden rounded-2xl border" style={{ borderColor: theme.border, background: theme.goldSoft }}>
+          <div
+            className="flex min-h-[48vh] flex-col items-center justify-center gap-3 px-4 text-center sm:px-6"
+            data-luca-canvas-empty
+            data-tone="empty"
+          >
+            <div className="mb-2 grid h-14 w-14 place-items-center overflow-hidden rounded-2xl border" style={{ borderColor: theme.border, background: theme.goldSoft }}>
               <img src="/icon-512.png" alt="" className="h-full w-full object-cover object-[center_28%]" />
             </div>
             <h1 className="text-xl font-semibold tracking-[-0.025em]" style={{ color: theme.text }}>
               {operationMode === 'individual' ? 'Qual problema deve ser julgado?' : 'O que a equipe deve entregar?'}
             </h1>
-            <p className="mt-2 max-w-[46ch] text-sm leading-relaxed luca-wrap" style={{ color: theme.textMute }}>
+            <p className="mt-0 max-w-[46ch] text-sm leading-relaxed luca-wrap" style={{ color: theme.textMute }}>
               {operationMode === 'individual'
                 ? 'Abra Seleção no topo, escolha até cinco participantes e um juiz. Cada resposta fica isolada e o veredito encerra a rodada.'
                 : 'Abra Equipe no topo, escolha as personas e envie a missão abaixo. As respostas aparecem aqui como uma conversa.'}
             </p>
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                className="btn-primary !px-4 !py-2 !text-xs"
+                data-luca-canvas-focus-mission
+                onClick={() => {
+                  const el = document.getElementById('luca-ai-mission') as HTMLTextAreaElement | null;
+                  el?.focus();
+                  el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }}
+              >
+                Escrever missão
+              </button>
+            </div>
           </div>
         )}
 
