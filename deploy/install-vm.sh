@@ -12,7 +12,9 @@ test -f "$staging/dist.tar"
 test -f "$staging/state.tar"
 
 install -d -m 750 "$backup"
-cp -a /etc/cloudflared/bombapvp-lab.yml "$backup/bombapvp-lab.yml.before-luca"
+# Legado: o yml do bombapvp-lab só existe na VM antiga; na sennin-core-01 o túnel é luca-ai.yml.
+[[ ! -f /etc/cloudflared/bombapvp-lab.yml ]] || cp -a /etc/cloudflared/bombapvp-lab.yml "$backup/bombapvp-lab.yml.before-luca"
+[[ ! -f /etc/cloudflared/luca-ai.yml ]] || cp -a /etc/cloudflared/luca-ai.yml "$backup/luca-ai.yml.before-luca"
 [[ ! -f /etc/systemd/system/luca-ai.service ]] || cp -a /etc/systemd/system/luca-ai.service "$backup/luca-ai.service"
 
 if ! id luca-ai >/dev/null 2>&1; then
