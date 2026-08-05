@@ -75,47 +75,29 @@ export default function AdminPage() {
           <div><h2>Contas</h2><span>{users.length} resultado(s)</span></div>
           <form onSubmit={(event) => { event.preventDefault(); void load(search); }}><Search /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar nome ou e-mail" /><button type="submit">Buscar</button></form>
         </div>
-        {error ? <p className="admin-state error">{error}</p> : (
+        {error ? (
+          <div className="admin-state error" data-admin-error data-tone="error" role="alert">
+            <p className="admin-error-title">Falha ao carregar o painel</p>
+            <p className="admin-error-detail">{error}</p>
+            <p className="admin-error-hint">Não foi possível buscar overview e contas. Tente de novo ou confira se o runtime está no ar.</p>
+            <div className="admin-error-actions">
+              <button
+                type="button"
+                className="btn-primary"
+                data-admin-retry
+                onClick={() => void load(search)}
+                disabled={loading}
+              >
+                {loading ? 'Recarregando…' : 'Tentar novamente'}
+              </button>
+            </div>
+          </div>
+        ) : (
           <div className="admin-table-wrap">
             <table><thead><tr><th>Usuário</th><th>Papel</th><th>Cadastro</th><th>Última atividade</th><th>Logins</th><th>Solicitações</th><th>Ações</th><th>Execuções</th><th>Erros</th><th>Sessões</th></tr></thead>
               <tbody>{users.map((user) => <tr key={user.id}><td><strong>{user.name}</strong><span>{user.email}</span></td><td><em data-role={user.role}>{user.role === 'admin' ? 'Admin' : 'Usuário'}</em></td><td>{formatDate(user.createdAt)}</td><td>{formatDate(user.lastSeenAt)}</td><td>{user.loginCount}</td><td>{user.requestCount}</td><td>{user.actionCount}</td><td>{user.runCount}</td><td>{user.errorCount}</td><td>{user.sessionCount}</td></tr>)}</tbody>
             </table>
-            {!loading && users.length === 0 && (
-              <div className="admin-state" data-admin-empty data-tone="empty">
-                <p className="admin-empty-title">Nenhuma conta encontrada</p>
-                <p className="admin-empty-hint">
-                  {search.trim()
-                    ? "Nenhuma conta corresponde à busca atual. Limpe o filtro ou tente de novo."
-                    : "Ainda não há contas cadastradas ou a lista não retornou resultados."}
-                </p>
-                <div className="admin-empty-actions">
-                  {search.trim() ? (
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      data-admin-empty-clear
-                      onClick={() => {
-                        setSearch("");
-                        void load("");
-                      }}
-                      disabled={loading}
-                    >
-                      Limpar busca
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      data-admin-empty-retry
-                      onClick={() => void load(search)}
-                      disabled={loading}
-                    >
-                      Atualizar lista
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
+            {!loading && users.length === 0 && <p className="admin-state" data-admin-empty>Nenhuma conta encontrada.</p>}
           </div>
         )}
       </section>

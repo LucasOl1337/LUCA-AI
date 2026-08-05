@@ -45,7 +45,7 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const theme = useTheme();
   const { user, logout } = useAuth();
-  const { backendReady, connectionState, runtimeMode, state } = useLuca();
+  const { backendReady, connectionState, runtimeMode, state, refresh } = useLuca();
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 900px)');
@@ -74,11 +74,18 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
 
   const cloudRuntime = runtimeMode === 'cloud';
   const runtimeOnline = cloudRuntime ? connectionState !== 'offline' : backendReady;
-  const statusTone = connectionState === 'checking' ? theme.warning : runtimeOnline ? theme.alive : theme.error;
+  const checking = connectionState === 'checking';
+  const needsShellRecovery = !checking && !runtimeOnline;
+  const statusTone = checking ? theme.warning : runtimeOnline ? theme.alive : theme.error;
   const runtimeLabel = cloudRuntime
-    ? connectionState === 'checking' ? 'conectando 9router' : runtimeOnline ? '9router online' : '9router offline'
-    : connectionState === 'checking' ? 'checando sistema' : backendReady ? 'sistema online' : 'sistema offline';
+    ? checking ? 'conectando 9router' : runtimeOnline ? '9router online' : '9router offline'
+    : checking ? 'checando sistema' : backendReady ? 'sistema online' : 'sistema offline';
+  const statusBadge = checking ? 'conectando' : runtimeOnline ? 'online' : 'offline';
   const activeItem = navItems.find((item) => item.id === activePage) ?? navItems[0];
+
+  async function retryShellConnection() {
+    await refresh();
+  }
 
   function navigate(page: PageId) {
     onPageChange(page);
@@ -152,13 +159,36 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
               <button type="button" onClick={() => void logout()} aria-label="Sair da conta" title="Sair"><LogOut /></button>
             </div>
           )}
-          <div
-            className={`min-h-11 flex items-center gap-2 rounded-xl px-3 ${compact ? 'justify-center' : ''}`}
-            style={{ background: 'rgba(255,255,255,.08)', boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,.18)' }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: statusTone }} />
-            {!compact && <span className="text-[10px] font-semibold tracking-[0.08em] uppercase truncate" style={{ color: theme.textMute }}>{runtimeLabel}</span>}
-          </div>
+          {needsShellRecovery ? (
+            <button
+              type="button"
+              className={`min-h-11 flex w-full items-center gap-2 rounded-xl px-3 text-left ${compact ? 'justify-center' : ''}`}
+              style={{ background: theme.errorBg, boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,.18)', color: theme.error }}
+              data-layout-system-status="sidebar"
+              data-layout-system-retry
+              data-tone="error"
+              aria-label="Tentar reconectar o sistema"
+              title="Tentar novamente"
+              onClick={() => void retryShellConnection()}
+            >
+              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: statusTone }} />
+              {!compact && (
+                <span className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.08em]">
+                  {runtimeLabel} · tentar novamente
+                </span>
+              )}
+            </button>
+          ) : (
+            <div
+              className={`min-h-11 flex items-center gap-2 rounded-xl px-3 ${compact ? 'justify-center' : ''}`}
+              style={{ background: 'rgba(255,255,255,.08)', boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,.18)' }}
+              data-layout-system-status="sidebar"
+              data-tone={checking ? 'warning' : 'ok'}
+            >
+              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: statusTone }} />
+              {!compact && <span className="text-[10px] font-semibold tracking-[0.08em] uppercase truncate" style={{ color: theme.textMute }}>{runtimeLabel}</span>}
+            </div>
+          )}
         </div>
       </>
     );
@@ -182,9 +212,30 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
           <strong className="block text-sm tracking-[0.08em]">LUCA</strong>
           <span className="block text-[10px] truncate" style={{ color: theme.textMute }}>{activeItem.label}</span>
         </div>
-        <span className="state-badge shrink-0" style={{ color: statusTone, background: runtimeOnline ? theme.aliveSoft : theme.errorBg }}>
-          {connectionState === 'checking' ? 'conectando' : runtimeOnline ? 'online' : 'offline'}
-        </span>
+        {needsShellRecovery ? (
+          <button
+            type="button"
+            className="state-badge shrink-0"
+            style={{ color: statusTone, background: theme.errorBg }}
+            data-layout-system-status="mobile"
+            data-layout-system-retry
+            data-tone="error"
+            aria-label="Tentar reconectar o sistema"
+            title="Tentar novamente"
+            onClick={() => void retryShellConnection()}
+          >
+            {statusBadge}
+          </button>
+        ) : (
+          <span
+            className="state-badge shrink-0"
+            style={{ color: statusTone, background: runtimeOnline ? theme.aliveSoft : theme.errorBg }}
+            data-layout-system-status="mobile"
+            data-tone={checking ? 'warning' : 'ok'}
+          >
+            {statusBadge}
+          </span>
+        )}
       </header>
 
       <div className="luca-stage" aria-hidden={mobileNavOpen && isNarrow ? true : undefined}>

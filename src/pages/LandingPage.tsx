@@ -19,12 +19,35 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
     connectionState,
     runtimeMode,
     operationError,
+    refresh,
+    clearOperationError,
   } = useLuca();
 
   const cloudRuntime = runtimeMode === 'cloud';
   const runtimeOnline = cloudRuntime ? connectionState !== 'offline' : backendReady;
-  const systemBadge = connectionState === 'checking' ? 'conectando' : runtimeOnline ? 'online' : 'offline';
-  const systemBadgeClass = connectionState === 'checking' ? 'warning' : runtimeOnline ? 'ok' : 'error';
+  const checking = connectionState === 'checking';
+  const systemBadge = checking ? 'conectando' : runtimeOnline ? 'online' : 'offline';
+  const systemBadgeClass = checking ? 'warning' : runtimeOnline ? 'ok' : 'error';
+  const needsRecovery = Boolean(operationError) || (!checking && !runtimeOnline);
+  const statusTone = operationError || !runtimeOnline
+    ? 'error'
+    : checking
+      ? 'warning'
+      : 'ok';
+  const statusCopy = operationError
+    ? operationError
+    : checking
+      ? 'Conectando ao runtime para preparar o LUCA-AI e o catálogo de personas.'
+      : cloudRuntime
+        ? 'Modo público online. O runtime da VM está conectado ao 9Router e pronto para atender o LUCA-AI.'
+        : backendReady
+          ? 'Sistema online. Abra o LUCA-AI para iniciar uma missão ou Personas para montar o catálogo.'
+          : 'Sem conexão com o backend. Verifique se o servidor está em 127.0.0.1:4242.';
+
+  async function retryConnection() {
+    clearOperationError();
+    await refresh();
+  }
 
   return (
     <div className="h-full overflow-y-auto">
@@ -68,24 +91,44 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className="void-panel flex items-start gap-3 rounded-[18px] p-4 sm:items-center"
+          className="void-panel flex flex-col gap-3 rounded-[18px] p-4 sm:flex-row sm:items-center"
           aria-label="Estado do sistema"
+          data-landing-system-status
+          data-tone={statusTone}
+          data-landing-system-error={needsRecovery ? '' : undefined}
+          role={needsRecovery ? 'alert' : undefined}
         >
-          <span className="mt-1 h-2 w-2 shrink-0 rounded-full sm:mt-0" style={{ background: connectionState === 'checking' ? theme.warning : runtimeOnline ? theme.alive : theme.error }} />
-          <p className="min-w-0 flex-1 text-[13px] leading-relaxed" style={{ color: theme.textMute }}>
-            {operationError
-              ? operationError
-              : connectionState === 'checking'
-                ? 'Conectando ao runtime para preparar o LUCA-AI e o catálogo de personas.'
-              : cloudRuntime
-                ? 'Modo público online. O runtime da VM está conectado ao 9Router e pronto para atender o LUCA-AI.'
-              : backendReady
-                ? 'Sistema online. Abra o LUCA-AI para iniciar uma missão ou Personas para montar o catálogo.'
-                : 'Sem conexão com o backend. Verifique se o servidor está em 127.0.0.1:4242.'}
-          </p>
-          <div className={`state-badge ${systemBadgeClass} shrink-0`}>
-            {systemBadge}
+          <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
+            <span className="mt-1 h-2 w-2 shrink-0 rounded-full sm:mt-0" style={{ background: checking ? theme.warning : runtimeOnline ? theme.alive : theme.error }} />
+            <p className="min-w-0 flex-1 text-[13px] leading-relaxed" style={{ color: theme.textMute }}>
+              {statusCopy}
+            </p>
+            <div className={`state-badge ${systemBadgeClass} shrink-0`}>
+              {systemBadge}
+            </div>
           </div>
+          {needsRecovery && (
+            <div className="flex shrink-0 flex-wrap items-center gap-2" data-landing-system-actions>
+              <button
+                type="button"
+                className="btn-primary"
+                data-landing-system-retry
+                onClick={() => void retryConnection()}
+              >
+                Tentar novamente
+              </button>
+              {operationError && (
+                <button
+                  type="button"
+                  className="btn-fleet"
+                  data-landing-system-dismiss
+                  onClick={clearOperationError}
+                >
+                  Dispensar
+                </button>
+              )}
+            </div>
+          )}
         </motion.section>
       </div>
     </div>
