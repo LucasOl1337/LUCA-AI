@@ -83,7 +83,7 @@
 <body>
   <header>
     <h1>LUCA-AI CodeGraph Visual</h1>
-    <p>Grafo autocontido dos modulos e fluxos principais. Use os links para abrir arquivos relativos ao repositorio.</p>
+    <p><strong>HISTÓRICO / SUPERSEDED</strong> — snapshot CodeGraph <em>pré-VM</em> (antes de 2026-07-24). Não é mapa da produção atual. Produção comercial = Express na VM + proxy de borda <code>deploy/luca-ai-vm-proxy.js</code> + Cloudflare Tunnel (<code>AGENTS.md</code>, <code>docs/*</code>). O nó “Cloud Worker” e o fluxo <code>runtimeMode=cloud</code> abaixo descrevem o runtime legado em <code>worker/</code> (rota histórica <code>app.luca-ai.com.br</code> / Durable Object), não o path vivo <code>luca-ai.com.br</code>. Leia <a href="./README.md">README SUPERSEDED</a> antes de tratar este HTML como verdade.</p>
   </header>
   <main>
     <section class="stats">
@@ -190,8 +190,8 @@
           <a href="../../worker/src/index.js">
             <g class="node" transform="translate(475,570)">
               <rect width="175" height="80" fill="#24192c" stroke="#b596ff"></rect>
-              <text x="16" y="30">Cloud Worker</text>
-              <text class="sub" x="16" y="53">LucaRuntime DO</text>
+              <text x="16" y="30">Cloud Worker (legado)</text>
+              <text class="sub" x="16" y="53">pré-VM DO · não prod</text>
             </g>
           </a>
 
@@ -231,7 +231,7 @@
         <h2>Arquivos principais</h2>
         <div class="list">
           <div class="item"><strong><a href="../../server/index.js">server/index.js</a></strong><small>Express, rotas, WebSocket, ciclo de agentes.</small></div>
-          <div class="item"><strong><a href="../../worker/src/index.js">worker/src/index.js</a></strong><small>Cloudflare Worker + Durable Object.</small></div>
+          <div class="item"><strong><a href="../../worker/src/index.js">worker/src/index.js</a></strong><small>Legado pré-VM: Cloudflare Worker + Durable Object (não é produção atual).</small></div>
           <div class="item"><strong><a href="../../src/hooks/useLucaState.tsx">useLucaState.tsx</a></strong><small>Provider de estado, WS, polling e acoes.</small></div>
           <div class="item"><strong><a href="../../src/pages/LucaAiPage.tsx">LucaAiPage.tsx</a></strong><small>Workflow de personas e eventos.</small></div>
           <div class="item"><strong><a href="../../server/state.js">server/state.js</a></strong><small>Store persistido local em `.luca`.</small></div>
@@ -246,7 +246,7 @@
         <code>Missao: MissionBar -> lucaApi.activateMission -> POST /api/mission/activate -> activateMissionInternal -> runCycle -> agentes -> setTemporaryDashboard -> WebSocket -> MissionCanvas</code>
         <code>Persona: Personas/LucaAiPage -> Kamui/Yume -> persona cache -> runLucaAiPersonaTeamWorkflow -> event log -> transcript/event timeline</code>
         <code>Relatorio: missionHistory + dashboard + chat + governance + eventFlows -> buildMissionReport -> ReportModal/download</code>
-        <code>Cloud: Frontend runtimeMode=cloud -> Worker -> LucaRuntime Durable Object -> SQL events/snapshots/jobs/goals -> estado publico</code>
+        <code>Cloud (histórico pré-VM / legado): Frontend runtimeMode=cloud -> Worker -> LucaRuntime Durable Object -> SQL events/snapshots/jobs/goals -> estado publico — NÃO é o path comercial atual (Express VM + deploy/luca-ai-vm-proxy.js + Tunnel)</code>
       </div>
     </section>
   </main>

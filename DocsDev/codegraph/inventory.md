@@ -1,3 +1,9 @@
+> **HISTÓRICO / SUPERSEDED (2026-08-02).** Snapshot CodeGraph **pré-migração VM**.
+> Produção atual = Express na VM + proxy de borda `deploy/luca-ai-vm-proxy.js` + Cloudflare Tunnel.
+> `worker/` + Durable Object = **legado** (rota histórica `app.luca-ai.com.br`), não o path comercial `luca-ai.com.br`.
+> Fonte canônica: `AGENTS.md`, `INDEX.md`, `docs/arquitetura.md`, `docs/operacao.md`, `docs/integracoes.md`.
+> Ver `DocsDev/codegraph/README.md`.
+
 # Inventario CodeGraph - LUCA-AI
 
 Gerado a partir do indice CodeGraph reindexado com `codegraph index . --force`.

@@ -1,6 +1,6 @@
 # Arquitetura
 
-Leia SOMENTE ao mudar um fluxo que cruza frontend, Express, contratos compartilhados ou Worker.
+Leia SOMENTE ao mudar um fluxo que cruza frontend, Express, contratos compartilhados ou borda Cloudflare (proxy/Tunnel).
 
 | Area | Contrato atual |
 | --- | --- |
@@ -18,7 +18,7 @@ src -> /api e /ws -> server -> shared -> .luca
 Fluxo de produção:
 
 ```text
-navegador -> cadastro/login LUCA -> cookie HttpOnly -> Worker de borda -> Tunnel da VM -> server (VM) -> 9Router/Kamui/Yume
+navegador -> cadastro/login LUCA -> cookie HttpOnly -> proxy de borda (deploy/luca-ai-vm-proxy.js) -> Tunnel da VM -> server (VM) -> 9Router/Kamui/Yume
 ```
 
 O Express é o único runtime de aplicação ativo da produção. O runtime em `worker/` permanece legado e não deve ser tratado como provider ou origem do frontend publicado. O script pequeno `deploy/luca-ai-vm-proxy.js` atua somente como proxy reverso de borda e não executa modelos, personas ou regras do produto.
