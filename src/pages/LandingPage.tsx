@@ -66,16 +66,32 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
             </div>
             <h1 className="void-title">LUCA</h1>
             <p className="mt-2 max-w-[620px] text-[13px] leading-relaxed" style={{ color: theme.textMute }}>
-              Monte uma equipe de personas, envie uma missão e acompanhe a entrega em uma conversa única.
+              Monte uma equipe de personas, envie uma missão e acompanhe a entrega em uma conversa única com status do runtime ao vivo.
             </p>
-            <div className="mt-5 flex flex-wrap items-center gap-2">
-              <button type="button" onClick={() => onNavigate('luca-ai')} className="btn-primary">
+            <ul
+              className="landing-hero-proof mt-4 flex flex-wrap gap-2"
+              data-landing-proof
+              aria-label="Prova de valor do LUCA-AI"
+            >
+              <li className="landing-hero-proof-item" data-landing-proof-item="personas">
+                Equipe de personas
+              </li>
+              <li className="landing-hero-proof-item" data-landing-proof-item="missao">
+                Missão em conversa única
+              </li>
+              <li className="landing-hero-proof-item" data-landing-proof-item="runtime">
+                Runtime com status ao vivo
+              </li>
+            </ul>
+            <div className="mt-5 flex flex-wrap items-center gap-2" data-landing-cta-row>
+              <button type="button" onClick={() => onNavigate('luca-ai')} className="btn-primary" data-landing-cta="open">
                 Abrir LUCA-AI
               </button>
               <button
                 type="button"
                 onClick={() => onNavigate('personas')}
                 className="btn-fleet"
+                data-landing-cta="personas"
               >
                 Ver personas
               </button>

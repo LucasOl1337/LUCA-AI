@@ -1,7 +1,7 @@
 {
-  "name": "LUCA — Centro Operacional",
+  "name": "LUCA — Centro Operacional de Agentes de IA",
   "short_name": "LUCA",
-  "description": "Centro operacional de agentes de IA.",
+  "description": "Monte uma equipe de personas, envie uma missão e acompanhe a entrega em uma conversa única no LUCA-AI.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#07101b",
