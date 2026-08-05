@@ -14,7 +14,7 @@ test('runOperationalPreflight aprova quando endpoints e governança estão verde
       agents: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }, { id: 'e' }],
     },
     probeEndpoint: async (path) => {
-      if (path === '/api/health') return { ok: true, body: { ok: true, service: 'luca-ai', supervisorMode: 'standby' } };
+      if (path === '/api/health') return { ok: true, body: { ok: true, service: 'luca-ai', supervisorMode: 'standby', version: '0.2.0' } };
       if (path === '/api/state') return { ok: true, body: { agents: [{}, {}, {}, {}, {}], activeMission: null } };
       if (path === '/api/events') return { ok: true, body: { ok: true, events: [{ type: 'heartbeat.tick' }] } };
       return { ok: false, error: 'unexpected_path' };
@@ -47,4 +47,57 @@ test('runOperationalPreflight bloqueia quando há missão concorrente ou endpoin
   assert.equal(report.readyForLiveMission, false);
   assert.equal(report.checks.some((check) => check.id === 'endpoint:/api/events' && check.ok === false), true);
   assert.equal(report.checks.some((check) => check.id === 'runtime:active-mission' && check.ok === false), true);
+});
+
+test('runOperationalPreflight falha quando /api/health omite version', async () => {
+  const report = await runOperationalPreflight({
+    governance: {
+      requiredPreflightEndpoints: ['/api/health', '/api/state', '/api/events'],
+      missionConcurrency: { blocked: false, unmatchedCount: 0 },
+    },
+    state: {
+      activeMission: null,
+      agents: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }, { id: 'e' }],
+    },
+    probeEndpoint: async (path) => {
+      if (path === '/api/health') return { ok: true, body: { ok: true, service: 'luca-ai', supervisorMode: 'standby' } };
+      if (path === '/api/state') return { ok: true, body: { agents: [{}, {}, {}, {}, {}], activeMission: null } };
+      if (path === '/api/events') return { ok: true, body: { ok: true, events: [{ type: 'heartbeat.tick' }] } };
+      return { ok: false, error: 'unexpected_path' };
+    },
+  });
+
+  assert.equal(report.ok, false);
+  assert.equal(report.readyForLiveMission, false);
+  const health = report.checks.find((check) => check.id === 'endpoint:/api/health');
+  assert.equal(health?.ok, false);
+  assert.match(String(health?.detail || ''), /version ausente/i);
+});
+
+test('runOperationalPreflight bloqueia health sem version mesmo com detail custom (PREFLIGHT_HEALTH_VERSION_ALWAYS_V1)', async () => {
+  const report = await runOperationalPreflight({
+    governance: {
+      requiredPreflightEndpoints: ['/api/health'],
+      missionConcurrency: { blocked: false, unmatchedCount: 0 },
+    },
+    state: {
+      activeMission: null,
+      agents: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }, { id: 'e' }],
+    },
+    probeEndpoint: async (path) => {
+      if (path === '/api/health') {
+        return {
+          ok: true,
+          body: { ok: true, service: 'luca-ai-cloud', model: 'x' },
+          detail: 'GLM secret configurado',
+        };
+      }
+      return { ok: false, error: 'unexpected_path' };
+    },
+  });
+
+  const health = report.checks.find((check) => check.id === 'endpoint:/api/health');
+  assert.equal(health?.ok, false);
+  assert.match(String(health?.detail || ''), /version/i);
+  assert.equal(report.readyForLiveMission, false);
 });

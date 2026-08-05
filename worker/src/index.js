@@ -27,6 +27,7 @@ import { resolveModelSelector, modelSelectorSummary } from '../../shared/model-s
 import { serializePublicState } from '../../shared/state-payload.js';
 import { normalizeSupervisorFinalReport } from '../../shared/supervisor-final-report.js';
 import { runOperationalPreflight } from '../../shared/preflight.js';
+import { RELEASE_VERSION } from '../../shared/release-version.js';
 import { formatBrazilTime } from '../../shared/time.js';
 
 const AGENTS = [
@@ -2259,7 +2260,7 @@ async function runCloudPreflight(env) {
       if (path === '/api/health') {
         return {
           ok: true,
-          body: { ok: true, service: 'luca-ai-cloud', model: modelSelector.model, modelSelector },
+          body: { ok: true, service: 'luca-ai-cloud', version: RELEASE_VERSION, model: modelSelector.model, modelSelector },
           detail: env.GLM_API_KEY ? 'GLM secret configurado' : 'GLM_API_KEY ausente',
         };
       }
@@ -2296,8 +2297,9 @@ async function runCloudPreflight(env) {
 async function handleApi(request, env, pathname, ctx) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   if (pathname === '/api/health') {
+    // WORKER_HEALTH_VERSION_V1: package version via shared/release-version.js (sync lock)
     const modelSelector = runtimeModelSelector(env);
-    return json({ ok: true, service: 'luca-ai-cloud', model: modelSelector.model, modelSelector, hasGlmKey: Boolean(env.GLM_API_KEY) });
+    return json({ ok: true, service: 'luca-ai-cloud', version: RELEASE_VERSION, model: modelSelector.model, modelSelector, hasGlmKey: Boolean(env.GLM_API_KEY) });
   }
   if (pathname === '/api/state' && request.method === 'GET') {
     const runtime = runtimeStub(env);
