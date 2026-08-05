@@ -1,0 +1,26 @@
+{
+  "id": "http_get_json",
+  "name": "GET JSON publico",
+  "description": "Faz GET em URL publica e interpreta JSON (APIs e health endpoints abertos).",
+  "category": "operacao",
+  "kind": "action",
+  "provider": "luca",
+  "capabilities": ["http", "json", "research"],
+  "tags": ["http", "json", "api", "operacional"],
+  "prompt_instruction": "Use para ler endpoints JSON publicos sem inventar payload.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "url": { "type": "string", "description": "URL absoluta http ou https" }
+    },
+    "required": ["url"]
+  },
+  "invoke": {
+    "type": "runtime",
+    "method": "TOOL",
+    "endpoint": "agent-tools:http_get_json"
+  },
+  "executable": true,
+  "availability": "both",
+  "source": "luca-agent-tools-v1"
+}

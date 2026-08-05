@@ -23,6 +23,7 @@ import {
   CONVERSATION_PARTNER_AGENT_ID,
 } from './config.js';
 import { call9Router, check9RouterHealth } from './router-client.js';
+import { runAgentWithTools } from './agent-loop.js';
 import {
   addHeartbeat,
   addGlobalChatMessage,
@@ -1826,16 +1827,18 @@ async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, wo
   });
 
   try {
-    const output = await call9Router({
+    const agentRun = await runAgentWithTools({
       system: prompt.system,
       user: prompt.user,
       agentId: `luca-ai-team-${slug}`,
       model,
       maxTokens: 900,
+      maxRounds: 3,
     });
     const completedAt = new Date().toISOString();
     const durationMs = Date.now() - startedMs;
-    const content = cleanPersonaTeamOutput(output);
+    const content = cleanPersonaTeamOutput(agentRun.content);
+    const toolTrace = Array.isArray(agentRun.toolTrace) ? agentRun.toolTrace : [];
     appendLucaAiTraceEvent(traceId, 'luca_ai.llm.completed', {
       slug,
       name: prompt.name,
@@ -1845,6 +1848,8 @@ async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, wo
       durationMs,
       outputSummary: summarizeLucaAiTraceText(content, 420),
       outputChars: content.length,
+      toolCount: toolTrace.length,
+      tools: toolTrace.map((item) => item.name),
     });
     return {
       ok: true,
@@ -1855,6 +1860,7 @@ async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, wo
       cached: Boolean(loaded.cached),
       stale: Boolean(loaded.stale),
       content,
+      toolTrace,
       startedAt,
       completedAt,
       durationMs,
@@ -1880,6 +1886,7 @@ async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, wo
       cached: Boolean(loaded.cached),
       stale: Boolean(loaded.stale),
       error: error?.message || String(error),
+      toolTrace: [],
       startedAt,
       completedAt,
       durationMs,
@@ -1913,16 +1920,18 @@ async function runLucaAiIndividualJudge({ slug, mission, replies, loaded, traceI
   });
 
   try {
-    const output = await call9Router({
+    const agentRun = await runAgentWithTools({
       system: prompt.system,
       user: prompt.user,
       agentId: `luca-ai-judge-${slug}`,
       model,
       maxTokens: 1400,
+      maxRounds: 3,
     });
     const completedAt = new Date().toISOString();
     const durationMs = Date.now() - startedMs;
-    const content = cleanPersonaTeamOutput(output);
+    const content = cleanPersonaTeamOutput(agentRun.content);
+    const toolTrace = Array.isArray(agentRun.toolTrace) ? agentRun.toolTrace : [];
     appendLucaAiTraceEvent(traceId, 'luca_ai.llm.completed', {
       slug,
       name: prompt.name,
@@ -1932,6 +1941,8 @@ async function runLucaAiIndividualJudge({ slug, mission, replies, loaded, traceI
       durationMs,
       outputSummary: summarizeLucaAiTraceText(content, 520),
       outputChars: content.length,
+      toolCount: toolTrace.length,
+      tools: toolTrace.map((item) => item.name),
     });
     return {
       ok: true,
@@ -1942,6 +1953,7 @@ async function runLucaAiIndividualJudge({ slug, mission, replies, loaded, traceI
       cached: Boolean(loaded.cached),
       stale: Boolean(loaded.stale),
       content,
+      toolTrace,
       startedAt,
       completedAt,
       durationMs,
@@ -1967,6 +1979,7 @@ async function runLucaAiIndividualJudge({ slug, mission, replies, loaded, traceI
       cached: Boolean(loaded.cached),
       stale: Boolean(loaded.stale),
       error: error?.message || String(error),
+      toolTrace: [],
       startedAt,
       completedAt,
       durationMs,

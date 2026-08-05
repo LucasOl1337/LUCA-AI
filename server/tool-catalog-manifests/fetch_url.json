@@ -1,0 +1,27 @@
+{
+  "id": "fetch_url",
+  "name": "Abrir URL publica",
+  "description": "Baixa uma pagina HTTP(S) publica e devolve titulo e texto legivel para o agente.",
+  "category": "operacao",
+  "kind": "action",
+  "provider": "luca",
+  "capabilities": ["browser", "http", "research"],
+  "tags": ["fetch", "url", "web", "operacional"],
+  "prompt_instruction": "Use quando a missao depender de conteudo de um site ou documentacao publica.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "url": { "type": "string", "description": "URL absoluta http ou https" },
+      "max_chars": { "type": "integer", "description": "limite de texto extraido" }
+    },
+    "required": ["url"]
+  },
+  "invoke": {
+    "type": "runtime",
+    "method": "TOOL",
+    "endpoint": "agent-tools:fetch_url"
+  },
+  "executable": true,
+  "availability": "both",
+  "source": "luca-agent-tools-v1"
+}

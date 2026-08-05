@@ -79,6 +79,10 @@ function findJsonPrefix(text) {
   return '';
 }
 
+function splitPayloadLines(text) {
+  return String(text || '').split(/\r?\n/);
+}
+
 export function extractChatCompletionContent(payloadText) {
   const text = String(payloadText || '').trim();
   if (!text) return 'Sem resposta textual do modelo.';
@@ -96,7 +100,7 @@ export function extractChatCompletionContent(payloadText) {
 
     const parts = [];
     const parseErrors = [];
-    for (const line of text.split(/\r?\n/)) {
+    for (const line of splitPayloadLines(text)) {
       const trimmed = line.trim();
       if (!trimmed.startsWith('data:')) continue;
       const chunk = trimmed.slice('data:'.length).trim();
@@ -106,10 +110,10 @@ export function extractChatCompletionContent(payloadText) {
         const content = extractChoiceContent(data);
         if (content) parts.push(content);
       } catch (error) {
-        const prefix = findJsonPrefix(chunk);
-        if (prefix) {
+        const nestedPrefix = findJsonPrefix(chunk);
+        if (nestedPrefix) {
           try {
-            const data = JSON.parse(prefix);
+            const data = JSON.parse(nestedPrefix);
             const content = extractChoiceContent(data);
             if (content) parts.push(content);
             continue;
@@ -126,7 +130,95 @@ export function extractChatCompletionContent(payloadText) {
   }
 }
 
-export async function call9Router({ system, user, agentId, model = ROUTER_MODEL, maxTokens = 1200 }) {
+function parseChatCompletionPayload(payloadText) {
+  const text = String(payloadText || '').trim();
+  if (!text) {
+    return { content: 'Sem resposta textual do modelo.', toolCalls: [], finishReason: null, raw: null };
+  }
+
+  const tryObject = (data) => {
+    const choice = data?.choices?.[0] || {};
+    const message = choice?.message || {};
+    const content = extractChoiceContent(data);
+    const toolCalls = Array.isArray(message.tool_calls)
+      ? message.tool_calls
+      : Array.isArray(choice?.tool_calls)
+        ? choice.tool_calls
+        : [];
+    return {
+      content: content || '',
+      toolCalls,
+      finishReason: choice?.finish_reason || data?.finish_reason || null,
+      raw: data,
+    };
+  };
+
+  try {
+    return tryObject(JSON.parse(text));
+  } catch {
+    const prefix = findJsonPrefix(text);
+    if (prefix) {
+      try {
+        return tryObject(JSON.parse(prefix));
+      } catch {
+        // fall through to SSE
+      }
+    }
+
+    const contentParts = [];
+    const toolCalls = [];
+    let finishReason = null;
+    let raw = null;
+    for (const line of splitPayloadLines(text)) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) continue;
+      const chunk = trimmed.slice('data:'.length).trim();
+      if (!chunk || chunk === '[DONE]') continue;
+      try {
+        const data = JSON.parse(chunk);
+        raw = data;
+        const content = extractChoiceContent(data);
+        if (content) contentParts.push(content);
+        const choice = data?.choices?.[0] || {};
+        const message = choice?.message || {};
+        if (Array.isArray(message.tool_calls)) toolCalls.push(...message.tool_calls);
+        if (choice?.finish_reason) finishReason = choice.finish_reason;
+      } catch {
+        // ignore partial SSE chunk
+      }
+    }
+    if (contentParts.length || toolCalls.length) {
+      return {
+        content: contentParts.join(''),
+        toolCalls,
+        finishReason,
+        raw,
+      };
+    }
+    return {
+      content: extractChatCompletionContent(text),
+      toolCalls: [],
+      finishReason: null,
+      raw: null,
+    };
+  }
+}
+
+/**
+ * Low-level chat completion against 9Router.
+ * Supports OpenAI-style tools/tool_choice and multi-turn messages.
+ */
+export async function call9RouterChat({
+  messages,
+  system,
+  user,
+  agentId,
+  model = ROUTER_MODEL,
+  maxTokens = 1200,
+  temperature = 0.3,
+  tools = null,
+  toolChoice = undefined,
+} = {}) {
   const route = assertAllowed9RouterModel(model);
   const headers = {
     'Content-Type': 'application/json',
@@ -136,25 +228,38 @@ export async function call9Router({ system, user, agentId, model = ROUTER_MODEL,
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), ROUTER_TIMEOUT_MS);
 
+  const finalMessages = Array.isArray(messages) && messages.length
+    ? messages
+    : [
+        { role: 'system', content: system || '' },
+        { role: 'user', content: user || '' },
+      ];
+
+  const body = {
+    model: route,
+    messages: finalMessages,
+    temperature,
+    max_tokens: maxTokens,
+  };
+  if (Array.isArray(tools) && tools.length) {
+    body.tools = tools;
+    if (toolChoice !== undefined) body.tool_choice = toolChoice;
+  }
+  if (agentId) body.user = String(agentId);
+
   let response;
   try {
     response = await fetch(url, {
       method: 'POST',
       headers,
       signal: controller.signal,
-      body: JSON.stringify({
-        model: route,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-        temperature: 0.3,
-        max_tokens: maxTokens,
-      }),
+      body: JSON.stringify(body),
     });
   } catch (error) {
     const aborted = error instanceof Error && error.name === 'AbortError';
-    const detail = aborted ? `timeout de ${Math.round(ROUTER_TIMEOUT_MS / 1000)}s` : (error instanceof Error ? error.message : String(error));
+    const detail = aborted
+      ? `timeout de ${Math.round(ROUTER_TIMEOUT_MS / 1000)}s`
+      : (error instanceof Error ? error.message : String(error));
     throw new Error(`9router_unreachable ${url}: ${detail}`);
   } finally {
     clearTimeout(timeout);
@@ -166,7 +271,30 @@ export async function call9Router({ system, user, agentId, model = ROUTER_MODEL,
   }
 
   const text = await response.text();
-  return extractChatCompletionContent(text);
+  return parseChatCompletionPayload(text);
+}
+
+export async function call9Router({
+  system,
+  user,
+  agentId,
+  model = ROUTER_MODEL,
+  maxTokens = 1200,
+  tools = null,
+  toolChoice = undefined,
+  messages = null,
+} = {}) {
+  const result = await call9RouterChat({
+    system,
+    user,
+    agentId,
+    model,
+    maxTokens,
+    tools,
+    toolChoice,
+    messages,
+  });
+  return result.content || 'Sem resposta textual do modelo.';
 }
 
 export async function check9RouterHealth(timeoutMs = 1500) {

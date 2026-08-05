@@ -253,38 +253,39 @@ export function buildPersonaTeamPrompt({
     ? `\nPapel nesta rodada: ${roleLabel}.\nContrato do papel: ${roleInstruction}`
     : '';
   const individualSystem = independent
-    ? '\nEsta e uma resolucao com contexto limpo e individual. Voce nao recebeu nomes nem respostas dos demais participantes; responda sem presumir consenso ou complementar trabalho alheio.'
-    : '';
-  const workflowUser = roleLabel
-    ? `
-Etapa atual: ${roleLabel}
-Contrato da etapa: ${roleInstruction}
-Contexto acumulado das etapas anteriores:
-${context || 'Ainda nao ha contexto acumulado; esta e a primeira etapa.'}
-`
-    : '';
-  const outputContract = role?.id === 'display'
-    ? 'Entregue a exibicao final em secoes curtas: Resumo, Decisao, Evidencias, Riscos, Proximas acoes.'
-    : 'Entregue uma contribuicao objetiva em 3 a 6 bullets. Inclua uma decisao, uma acao imediata e um risco/observacao quando fizer sentido.';
+      ? '\nEsta e uma resolucao com contexto limpo e individual. Voce nao recebeu nomes nem respostas dos demais participantes; responda sem presumir consenso ou complementar trabalho alheio.'
+      : '';
+    const workflowUser = roleLabel
+      ? `
+  Etapa atual: ${roleLabel}
+  Contrato da etapa: ${roleInstruction}
+  Contexto acumulado das etapas anteriores:
+  ${context || 'Ainda nao ha contexto acumulado; esta e a primeira etapa.'}
+  `
+      : '';
+    const outputContract = role?.id === 'display'
+      ? 'Entregue a exibicao final em secoes curtas: Resumo, Decisao, Evidencias, Riscos, Proximas acoes.'
+      : 'Entregue uma contribuicao objetiva em 3 a 6 bullets. Inclua uma decisao, uma acao imediata e um risco/observacao quando fizer sentido.';
 
-  return {
-    name,
-    system: `${basePrompt}
+    return {
+      name,
+      system: `${basePrompt}
 
----
-Voce esta trabalhando dentro do modulo LUCA-AI, uma bancada isolada de personas do Yume.
-Nao publique no chat global, nao acione agentes fixos do Operacional e nao assuma que existe uma missao ativa fora desta tela.
-Responda em pt-BR, com postura de agente especialista e foco em acao concreta.${workflowSystem}${individualSystem}`,
-    user: `Missao desta bancada:
-${mission}
+  ---
+  Voce esta trabalhando dentro do modulo LUCA-AI, uma bancada isolada de personas do Yume.
+  Nao publique no chat global, nao acione agentes fixos do Operacional e nao assuma que existe uma missao ativa fora desta tela.
+  Quando a missao depender de fato externo (URL, site, API), use as ferramentas operacionais do runtime antes de concluir.
+  Responda em pt-BR, com postura de agente especialista e foco em acao concreta.${workflowSystem}${individualSystem}`,
+      user: `Missao desta bancada:
+  ${mission}
 
-${independent ? '' : `Equipe ativa: ${teammates}\n`}
-Sua persona: ${name}${slug ? ` (${slug})` : ''}
-${workflowUser}
+  ${independent ? '' : `Equipe ativa: ${teammates}\n`}
+  Sua persona: ${name}${slug ? ` (${slug})` : ''}
+  ${workflowUser}
 
-${outputContract}`,
-  };
-}
+  ${outputContract}`,
+    };
+  }
 
 export function buildIndividualJudgePrompt({
   mission,
@@ -305,29 +306,30 @@ export function buildIndividualJudgePrompt({
   }).join('\n\n');
 
   return {
-    name,
-    system: `${basePrompt}
+      name,
+      system: `${basePrompt}
 
----
-Voce e o juiz independente de uma resolucao individual no modulo LUCA-AI.
-Nao produza uma resposta isolada antes de examinar todas as contribuicoes recebidas.
-Avalie evidencias, utilidade, consistencia e cobertura. Nao favoreca uma persona por identidade, inclusive se voce tambem participou da primeira rodada.
-Responda em pt-BR e nao acione agentes, ferramentas ou contexto externo.`,
-    user: `Missao original:
-${mission}
+  ---
+  Voce e o juiz independente de uma resolucao individual no modulo LUCA-AI.
+  Nao produza uma resposta isolada antes de examinar todas as contribuicoes recebidas.
+  Avalie evidencias, utilidade, consistencia e cobertura. Nao favoreca uma persona por identidade, inclusive se voce tambem participou da primeira rodada.
+  Se a missao original depender de fato externo e as contribuicoes nao tiverem evidencia suficiente, voce tambem pode usar as ferramentas operacionais do runtime.
+  Responda em pt-BR.`,
+      user: `Missao original:
+  ${mission}
 
-Persona juiza: ${name}${slug ? ` (${slug})` : ''}
+  Persona juiza: ${name}${slug ? ` (${slug})` : ''}
 
-Contribuicoes individuais:
-${contributions || 'Nenhuma contribuicao utilizavel foi recebida.'}
+  Contribuicoes individuais:
+  ${contributions || 'Nenhuma contribuicao utilizavel foi recebida.'}
 
-Produza obrigatoriamente estas secoes:
-1. Avaliacao dos participantes — diga o que foi util em cada resposta.
-2. Alertas de qualidade — identifique, por participante, qualquer trecho falso, nao sustentado ou incompleto. Se nao houver, diga explicitamente.
-3. Complementacao — combine o que for compativel e corrija as lacunas relevantes.
-4. Veredito final — apresente a melhor decisao final, sua justificativa e proximas acoes.`,
-  };
-}
+  Produza obrigatoriamente estas secoes:
+  1. Avaliacao dos participantes — diga o que foi util em cada resposta.
+  2. Alertas de qualidade — identifique, por participante, qualquer trecho falso, nao sustentado ou incompleto. Se nao houver, diga explicitamente.
+  3. Complementacao — combine o que for compativel e corrija as lacunas relevantes.
+  4. Veredito final — apresente a melhor decisao final, sua justificativa e proximas acoes.`,
+    };
+  }
 
 export async function runIndividualResolution({
   participantSlugs = [],
