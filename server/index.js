@@ -173,6 +173,21 @@ const authService = createAuthService({
 
 app.use('/api', rateLimitApi);
 authService.registerRoutes(app);
+app.get('/api/health', (_req, res) => {
+  const state = getState();
+  res.json({
+    ok: true,
+    service: 'luca-ai',
+    version: PACKAGE_VERSION,
+    supervisorMode: state.supervisorMode,
+    agents: Array.isArray(state.agents) ? state.agents.length : 0,
+    personaAgents: Array.isArray(state.personaAgents) ? state.personaAgents.length : 0,
+    activeMission: Boolean(state.activeMission),
+    scheduledMissions: Array.isArray(state.scheduledMissions) ? state.scheduledMissions.length : 0,
+    kamuiBase: process.env.KAMUI_BASE || 'http://127.0.0.1:1338',
+  });
+});
+
 app.use('/api', authService.requireUser);
 authService.registerAdminRoutes(app);
 
@@ -2257,20 +2272,6 @@ function startScheduler() {
   schedulerTimer = setInterval(() => { processScheduledMissions().catch(() => {}); }, 15000);
 }
 
-app.get('/api/health', (_req, res) => {
-  const state = getState();
-  res.json({
-    ok: true,
-    service: 'luca-ai',
-    version: PACKAGE_VERSION,
-    supervisorMode: state.supervisorMode,
-    agents: Array.isArray(state.agents) ? state.agents.length : 0,
-    personaAgents: Array.isArray(state.personaAgents) ? state.personaAgents.length : 0,
-    activeMission: Boolean(state.activeMission),
-    scheduledMissions: Array.isArray(state.scheduledMissions) ? state.scheduledMissions.length : 0,
-    kamuiBase: process.env.KAMUI_BASE || 'http://127.0.0.1:1338',
-  });
-});
 
 app.get('/api/state', (_req, res) => {
   res.json(publicStateSnapshot());
