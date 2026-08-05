@@ -388,6 +388,18 @@
   gap: 8px;
 }
 .luca-ai-toolbar-actions .luca-ai-team-trigger { margin-left: 0; }
+/* Destaque: compartilhar é ação primária de divulgação, não config neutra. */
+.luca-ai-share-trigger {
+  border-color: rgba(10, 132, 255, 0.5) !important;
+  background: var(--l-navy-soft) !important;
+  color: var(--l-navy-deep) !important;
+}
+.luca-ai-share-trigger:hover,
+.luca-ai-share-trigger.active {
+  border-color: var(--l-border-active) !important;
+  background: var(--l-navy-glow) !important;
+  color: #fff !important;
+}
 .luca-ai-share-anchor { position: relative; }
 .luca-ai-share-panel {
   position: absolute;
