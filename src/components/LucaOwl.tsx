@@ -1,6 +1,7 @@
 /**
  * LucaOwl — usa a imagem real da coruja cyber (salva em /public/cyber-owl.jpg).
  * Apenas o enquadramento, recorte circular e animações são customizados.
+ * Strokes/halo: rails do produto (navy/goldBright), não ciano ad-hoc.
  */
 
 interface LucaOwlProps {
@@ -9,20 +10,21 @@ interface LucaOwlProps {
 }
 
 export default function LucaOwl({ size = 300, alive = true }: LucaOwlProps) {
-  const pulse = alive ? '#00c8f0' : '#406888';
+  // alive → --l-navy-deep / theme.goldBright; offline → deep navy da pie palette
+  const pulse = alive ? '#64d2ff' : '#1E4E8C';
 
   return (
     <div
       className="relative select-none pointer-events-none"
       style={{ width: size, height: size }}
     >
-      {/* ── halo atmosférico ciano ── */}
+      {/* ── halo atmosférico (produto navy) ── */}
       <div
         className="absolute rounded-full animate-breathe"
         style={{
           inset: '-14%',
           background:
-            'radial-gradient(circle, rgba(0,190,255,0.20) 0%, rgba(20,10,70,0.12) 52%, transparent 74%)',
+            'radial-gradient(circle, rgba(10,132,255,0.20) 0%, rgba(15,19,26,0.12) 52%, transparent 74%)',
           filter: 'blur(36px)',
         }}
       />
@@ -32,14 +34,14 @@ export default function LucaOwl({ size = 300, alive = true }: LucaOwlProps) {
         viewBox="0 0 200 200"
         className="absolute inset-0 w-full h-full animate-spiral-slow overflow-visible"
       >
-        <circle cx="100" cy="100" r="102" fill="none" stroke="#1a3090" strokeWidth="1"    strokeDasharray="12 10" opacity="0.40" />
-        <circle cx="100" cy="100" r="107" fill="none" stroke="#2050c0" strokeWidth="0.5"  strokeDasharray="3 18"  opacity="0.20" />
+        <circle cx="100" cy="100" r="102" fill="none" stroke="#1E4E8C" strokeWidth="1"    strokeDasharray="12 10" opacity="0.40" />
+        <circle cx="100" cy="100" r="107" fill="none" stroke="#0a84ff" strokeWidth="0.5"  strokeDasharray="3 18"  opacity="0.20" />
       </svg>
       <svg
         viewBox="0 0 200 200"
         className="absolute inset-0 w-full h-full animate-spiral-reverse overflow-visible"
       >
-        <circle cx="100" cy="100" r="98"  fill="none" stroke="#60a8e8" strokeWidth="0.4"  strokeDasharray="5 26"  opacity="0.14" />
+        <circle cx="100" cy="100" r="98"  fill="none" stroke="#64d2ff" strokeWidth="0.4"  strokeDasharray="5 26"  opacity="0.14" />
       </svg>
 
       {/* ── container circular com a imagem real ── */}
@@ -49,9 +51,9 @@ export default function LucaOwl({ size = 300, alive = true }: LucaOwlProps) {
           inset: 0,
           borderRadius: '50%',
           overflow: 'hidden',
-          border: '2px solid rgba(40,80,180,0.55)',
+          border: '2px solid rgba(10,132,255,0.55)',
           boxShadow:
-            '0 0 0 1px rgba(20,40,120,0.30), 0 0 32px rgba(0,180,255,0.18), 0 0 80px rgba(0,140,220,0.10)',
+            '0 0 0 1px rgba(10,132,255,0.30), 0 0 32px rgba(10,132,255,0.18), 0 0 80px rgba(100,210,255,0.10)',
         }}
       >
         {/*
@@ -71,7 +73,7 @@ export default function LucaOwl({ size = 300, alive = true }: LucaOwlProps) {
         />
       </div>
 
-      {/* ── ECG ciano sobre a imagem ── */}
+      {/* ── ECG produto sobre a imagem ── */}
       <svg
         viewBox="0 0 200 200"
         className="absolute inset-0 w-full h-full overflow-visible"
@@ -89,7 +91,7 @@ export default function LucaOwl({ size = 300, alive = true }: LucaOwlProps) {
         </defs>
 
         {/* estrelas decorativas fora do círculo */}
-        <g fill="#c0d8ff" opacity="0.32">
+        <g fill="#82c7ff" opacity="0.32">
           <circle cx="16"  cy="72"  r="1.1" />
           <circle cx="12"  cy="100" r="1.4" />
           <circle cx="18"  cy="128" r="1.0" />
@@ -103,7 +105,7 @@ export default function LucaOwl({ size = 300, alive = true }: LucaOwlProps) {
 
         {/* ECG na base */}
         <g transform="translate(0 188)" clipPath="url(#ow-circle2)">
-          <line x1="18" y1="0" x2="182" y2="0" stroke="rgba(0,150,220,0.15)" strokeWidth="0.6" />
+          <line x1="18" y1="0" x2="182" y2="0" stroke="rgba(10,132,255,0.15)" strokeWidth="0.6" />
           <path
             d="M 18 0 L 66 0 L 74 0 L 82 -17 L 90 22 L 98 -26 L 106 11 L 114 0 L 182 0"
             fill="none"

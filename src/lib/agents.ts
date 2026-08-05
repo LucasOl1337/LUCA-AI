@@ -7,7 +7,7 @@ export interface AgentDef {
   role: string;
   owl?: string;        // avatar de coruja
   icon?: string;       // ícone alternativo (png/mp4)
-  accent: string;      // cor de acento (CSS var-like hex) por agente
+  accent: string;      // cor de acento por agente (rails do produto; ação = #0a84ff)
   isHeartbeat?: boolean;
   isDatabase?: boolean;
   system?: boolean;    // agente sistêmico (maestro / transformador)
@@ -18,16 +18,16 @@ export interface AgentDef {
 export const AGENT_DEFS: AgentDef[] = [
   { id: 'heartbeat', title: 'heartbeat', role: 'system', icon: '/icons/heartbeat.mp4', accent: '#43d18a', isHeartbeat: true },
   { id: 'database', title: 'database', role: 'database', icon: '/icons/database.png', accent: '#7FB3D5', isDatabase: true },
-  { id: 'maestro', title: 'maestro', role: 'router', owl: '/v2-design/owl-agent.png', accent: '#C9A227', system: true },
-  { id: 'transformador-missao', title: 'transformador de missão', role: 'mission-transformer', owl: '/v2-design/owl-agent.png', accent: '#C9A227', system: true },
+  { id: 'maestro', title: 'maestro', role: 'router', owl: '/v2-design/owl-agent.png', accent: '#0a84ff', system: true },
+  { id: 'transformador-missao', title: 'transformador de missão', role: 'mission-transformer', owl: '/v2-design/owl-agent.png', accent: '#0a84ff', system: true },
   { id: 'planejador', title: 'planejador', role: 'planner', owl: '/v2-design/owl-planner.png', accent: '#7FB3D5' },
   { id: 'pesquisador', title: 'pesquisador', role: 'researcher', owl: '/v2-design/owl-researcher.png', accent: '#1E4E8C' },
-  { id: 'designer', title: 'designer', role: 'designer', owl: '/v2-design/owl-designer.png', accent: '#C9A227' },
+  { id: 'designer', title: 'designer', role: 'designer', owl: '/v2-design/owl-designer.png', accent: '#0a84ff' },
 ];
 
 // Inclui o supervisor — usado na página Agentes (visão completa).
 export const SUPERVISOR_DEF: AgentDef = {
-  id: 'supervisor', title: 'supervisor', role: 'supervisor', owl: '/v2-design/owl-supervisor.png', accent: '#C9A227',
+  id: 'supervisor', title: 'supervisor', role: 'supervisor', owl: '/v2-design/owl-supervisor.png', accent: '#0a84ff',
 };
 
 export const ALL_AGENT_DEFS: AgentDef[] = [SUPERVISOR_DEF, ...AGENT_DEFS];
@@ -38,7 +38,7 @@ export function findAgentDef(id: string | null): AgentDef | undefined {
 }
 
 // Cor de acento estável por nome de agente (para bilhetes do chat).
-const CHAT_ACCENTS = ['#C9A227', '#7FB3D5', '#1E4E8C', '#43d18a', '#b58cff', '#f0a35c'];
+const CHAT_ACCENTS = ['#0a84ff', '#7FB3D5', '#1E4E8C', '#43d18a', '#b58cff', '#f0a35c'];
 export function chatAccent(agentName: string): string {
   let hash = 0;
   for (let i = 0; i < agentName.length; i++) hash = (hash * 31 + agentName.charCodeAt(i)) >>> 0;
