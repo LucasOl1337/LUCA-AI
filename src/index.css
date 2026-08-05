@@ -1139,3 +1139,40 @@
   .admin-metrics article { min-height: 108px; padding: 14px; }
   .admin-metrics strong { font-size: 24px; }
 }
+
+/* admin empty/error consolidation */
+.admin-state[data-admin-empty] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.admin-empty-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--l-text-soft, rgba(255,255,255,0.78));
+}
+
+.admin-empty-hint {
+  margin: 0;
+  max-width: 420px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--l-text-mute, rgba(255,255,255,0.55));
+}
+
+.admin-empty-actions {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.admin-empty-actions .btn-primary {
+  min-height: 44px;
+  padding: 0 16px;
+}
