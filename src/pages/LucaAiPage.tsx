@@ -517,7 +517,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const [busyPersonaSlug, setBusyPersonaSlug] = useState<string | null>(null);
   const [applyingPresetId, setApplyingPresetId] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
-  const skipNextPersistRef = useRef(false);
+  const [hydratedSessionId, setHydratedSessionId] = useState<string | null>(null);
   const persistTimerRef = useRef<number | null>(null);
   const latestPersistRef = useRef<{
     sessionId: string | null;
@@ -585,13 +585,12 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setActiveWorkspaceView('result');
     if (!session) {
       boundSessionIdRef.current = null;
-      skipNextPersistRef.current = true;
+      setHydratedSessionId(null);
       setMission('');
       setTranscript([]);
       setFinalResult(null);
       return;
     }
-    skipNextPersistRef.current = true;
     boundSessionIdRef.current = session.id;
     setOperationMode(session.operationMode === 'individual' ? 'individual' : 'team');
     setWorkflowState(normalizeWorkflowAssignments(session.workflowAssignments || createEmptyWorkflowAssignments()));
@@ -605,6 +604,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setTranscript(nextTranscript);
     setFinalResult(isTeamTranscriptEntry(session.finalResult) ? session.finalResult : null);
     setActivePersonaSlug(session.activePersonaSlug ? String(session.activePersonaSlug) : null);
+    setHydratedSessionId(session.id);
   }, [setActivePersonaSlug, setFinalResult, setIndividualState, setMission, setOperationMode, setTranscript, setWorkflowState]);
 
   useEffect(() => {
@@ -678,10 +678,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   useEffect(() => {
     if (!libraryReady || !activeSessionId || sessionsBusy) return undefined;
     if (boundSessionIdRef.current !== activeSessionId) return undefined;
-    if (skipNextPersistRef.current) {
-      skipNextPersistRef.current = false;
-      return undefined;
-    }
+    if (hydratedSessionId !== activeSessionId) return undefined;
     // Debounce while typing/configuring. Run path also flushes immediately.
     // Do NOT gate on `running` — that blocked the only write path during long
     // team/individual runs, so F5 mid-run or right after lost the transcript.
@@ -702,6 +699,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     assignments,
     buildPersistPayload,
     finalResult,
+    hydratedSessionId,
     individualAssignments,
     libraryReady,
     mission,

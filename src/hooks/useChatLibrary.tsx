@@ -235,6 +235,11 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
   const persistSession = useCallback(async (sessionId: string, patch: Record<string, unknown>) => {
     const id = String(sessionId || '').trim();
     if (!id) return;
+    // The provider survives SPA route changes. Mirror the patch synchronously so
+    // remounting LUCA cannot rehydrate an older empty body while PATCH is in flight.
+    setActiveSession((prev) => (
+      prev?.id === id ? { ...prev, ...patch, id } as LucaAiChatSession : prev
+    ));
     try {
       const data = await lucaApi.updateChatSession(id, patch);
       // Never reshuffle list; only refresh summaries in place.

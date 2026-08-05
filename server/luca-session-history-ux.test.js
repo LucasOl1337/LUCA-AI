@@ -89,3 +89,29 @@ test('session history is API-backed and survives F5 paths', () => {
   );
   assert.equal(cleanSlice.includes('setTranscript([])'), false, 'clean-ui effect does not wipe transcript');
 });
+
+test('SPA navigation rehydrates the optimistic session body, not a stale empty provider copy', () => {
+  const hookSource = readFileSync(join(root, '../src/hooks/useChatLibrary.tsx'), 'utf8');
+  const persistStart = hookSource.indexOf('const persistSession = useCallback');
+  const requestStart = hookSource.indexOf('await lucaApi.updateChatSession', persistStart);
+  assert.ok(persistStart >= 0 && requestStart > persistStart, 'persistSession request region present');
+  const beforeRequest = hookSource.slice(persistStart, requestStart);
+  assert.ok(
+    beforeRequest.includes('setActiveSession((prev)'),
+    'provider must receive the session patch before route navigation can remount LUCA',
+  );
+  assert.ok(beforeRequest.includes('...patch'), 'optimistic provider body includes transcript, verdict and draft');
+});
+
+test('Strict Mode cannot persist blank initial state before session hydration completes', () => {
+  assert.ok(source.includes('hydratedSessionId'), 'hydration is represented as stable session state');
+  assert.ok(
+    source.includes('hydratedSessionId !== activeSessionId'),
+    'autosave waits until the active session state is hydrated',
+  );
+  assert.equal(
+    source.includes('skipNextPersistRef'),
+    false,
+    'one-shot ref is unsafe because Strict Mode runs effects twice',
+  );
+});
