@@ -478,6 +478,64 @@
   letter-spacing: -0.01em;
 }
 
+/* Chat text must remain selectable (Hermes/ChatGPT-like). */
+.luca-ai-selectable,
+.luca-ai-selectable * {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+.luca-ai-message-copy {
+  display: inline-flex;
+  opacity: 0.35;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.luca-ai-message:hover .luca-ai-message-copy,
+.luca-ai-message:focus-within .luca-ai-message-copy,
+.luca-ai-message-copy:focus-within {
+  opacity: 1;
+}
+
+.luca-ai-message-copy button {
+  height: 1.75rem !important;
+  width: 1.75rem !important;
+  border-radius: 0.55rem !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.luca-ai-message-copy button:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: var(--l-text) !important;
+}
+
+.luca-ai-message-copy-operator {
+  position: absolute;
+  top: 0.35rem;
+  left: -0.35rem;
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+.luca-ai-message-operator:hover .luca-ai-message-copy-operator,
+.luca-ai-message-operator:focus-within .luca-ai-message-copy-operator,
+.luca-ai-message-copy-operator:focus-within {
+  opacity: 1;
+}
+
+.luca-ai-operator-bubble {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+@media (hover: none) {
+  .luca-ai-message-copy,
+  .luca-ai-message-copy-operator {
+    opacity: 0.85;
+  }
+}
+
 .luca-ai-prose {
   display: flex;
   flex-direction: column;

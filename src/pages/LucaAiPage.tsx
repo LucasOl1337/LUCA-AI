@@ -32,6 +32,7 @@ import type {
   RuntimeEvent,
   YumePersonaSummary,
 } from '@/lib/types';
+import CopyLogButton from '@/components/CopyLogButton';
 import { useLuca } from '@/hooks/useLucaState';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useTheme } from '@/hooks/useTheme';
@@ -1919,7 +1920,7 @@ function FinalDisplayCard({ entry, persona }: { entry: TeamTranscriptEntry; pers
   const theme = useTheme();
   const isJudge = entry.stage === 'Juiz';
   return (
-    <article className="luca-ai-message">
+    <article className="luca-ai-message group">
       <div className="luca-ai-message-meta">
         <SpeakerAvatar entry={entry} persona={persona} compact />
         <h3 className="truncate text-[13px] font-semibold" style={{ color: theme.text }}>{entry.name}</h3>
@@ -1927,8 +1928,11 @@ function FinalDisplayCard({ entry, persona }: { entry: TeamTranscriptEntry; pers
           {isJudge ? <Scale className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
           {isJudge ? 'Veredito do juiz' : 'Entrega final'}
         </span>
+        <span className="luca-ai-message-copy ml-auto">
+          <CopyLogButton text={entry.content} label="Copiar veredito" />
+        </span>
       </div>
-      <div className="luca-ai-message-body">
+      <div className="luca-ai-message-body luca-ai-selectable">
         <RichMessageBody content={entry.content} />
       </div>
     </article>
@@ -1960,9 +1964,16 @@ function IndividualResponseCard({
           <span className="block truncate text-[13px] font-semibold" style={{ color: entry.status === 'error' ? theme.error : theme.text }}>{entry.name}</span>
           <span className="block text-[11px]" style={{ color: theme.textGhost }}>{entry.status === 'error' ? 'Falha individual' : 'Resposta individual · expandir'}</span>
         </span>
+        <span
+          className="luca-ai-message-copy"
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <CopyLogButton text={entry.content} label={`Copiar resposta de ${entry.name}`} />
+        </span>
         <ChevronDown className="luca-ai-individual-chevron h-4 w-4 shrink-0" style={{ color: theme.textMute }} />
       </summary>
-      <div className="luca-ai-message-body mt-2 pl-1">
+      <div className="luca-ai-message-body luca-ai-selectable mt-2 pl-1">
         <RichMessageBody content={entry.content} />
       </div>
     </motion.details>
@@ -1976,13 +1987,18 @@ function TranscriptEntry({ entry, persona }: { entry: TeamTranscriptEntry; perso
 
   if (isOperator) {
     return (
-      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="luca-ai-message flex justify-end">
-        <article
-          className="min-w-0 max-w-[min(100%,34rem)] rounded-2xl px-4 py-3"
-          style={{ background: 'rgba(255,255,255,0.06)', color: theme.text, border: '1px solid rgba(255,255,255,0.08)' }}
-        >
-          <RichMessageBody content={entry.content} compact />
-        </article>
+      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="luca-ai-message luca-ai-message-operator group flex justify-end">
+        <div className="relative min-w-0 max-w-[min(100%,34rem)]">
+          <article
+            className="luca-ai-operator-bubble luca-ai-selectable min-w-0 rounded-2xl px-4 py-3"
+            style={{ background: 'rgba(255,255,255,0.06)', color: theme.text, border: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            <RichMessageBody content={entry.content} compact />
+          </article>
+          <span className="luca-ai-message-copy luca-ai-message-copy-operator">
+            <CopyLogButton text={entry.content} label="Copiar mensagem enviada" />
+          </span>
+        </div>
       </motion.div>
     );
   }
@@ -1991,7 +2007,7 @@ function TranscriptEntry({ entry, persona }: { entry: TeamTranscriptEntry; perso
     <motion.article
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      className="luca-ai-message"
+      className="luca-ai-message group"
     >
       <div className="luca-ai-message-meta">
         <SpeakerAvatar entry={entry} persona={persona} compact />
@@ -2000,8 +2016,11 @@ function TranscriptEntry({ entry, persona }: { entry: TeamTranscriptEntry; perso
         <time className="ml-auto shrink-0 text-[10px] font-mono" style={{ color: theme.textGhost }}>
           {new Date(entry.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
         </time>
+        <span className="luca-ai-message-copy">
+          <CopyLogButton text={entry.content} label={`Copiar mensagem de ${entry.name}`} />
+        </span>
       </div>
-      <div className="luca-ai-message-body">
+      <div className="luca-ai-message-body luca-ai-selectable">
         <RichMessageBody content={entry.content} />
       </div>
     </motion.article>
