@@ -945,11 +945,20 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   }
 
   function clearTranscript() {
-    setTranscript([]);
-    setFinalResult(null);
-    setProcessEvents([]);
-    setActiveTraceId(null);
-  }
+      setTranscript([]);
+      setFinalResult(null);
+      setProcessEvents([]);
+      setActiveTraceId(null);
+    }
+
+    function switchOperationMode(next: OperationMode) {
+      if (next === operationMode || running) return;
+      setOperationMode(next);
+      setPickerTarget(null);
+      // Keep transcript/finalResult/mission — mode is view/config, not a new session.
+      setProcessEvents([]);
+      setActiveTraceId(null);
+    }
 
   async function runMission() {
     const trimmedMission = mission.trim();
@@ -1059,14 +1068,14 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           timestamp: data.generatedAt || new Date().toISOString(),
         });
       }
-      if (data.ok) {
-        setMission('');
-      } else {
-        setError(operationMode === 'individual'
-          ? 'As respostas individuais foram acionadas, mas o juiz não concluiu um veredito útil.'
-          : 'A equipe foi acionada, mas nenhuma persona retornou resposta util.');
-        setErrorRetry('run');
-      }
+      if (!data.ok) {
+              setError(operationMode === 'individual'
+                ? 'As respostas individuais foram acionadas, mas o juiz não concluiu um veredito útil.'
+                : 'A equipe foi acionada, mas nenhuma persona retornou resposta util.');
+              setErrorRetry('run');
+            }
+            // Keep mission draft after success so the original question stays visible
+            // (composer + missionDraft in session). Operator bubble also remains in transcript.
     } catch (err) {
       if (!stillOwner()) return;
       const message = buildApiErrorMessage(err, operationMode === 'individual'
@@ -1171,10 +1180,10 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         <header className="luca-ai-chat-toolbar">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
 <div className="luca-ai-view-switch" role="group" aria-label="Modo de operação">
-              <button type="button" className={operationMode === 'team' ? 'active' : ''} disabled={running} aria-pressed={operationMode === 'team'} onClick={() => { setOperationMode('team'); setPickerTarget(null); clearTranscript(); }}>
+              <button type="button" className={operationMode === 'team' ? 'active' : ''} disabled={running} aria-pressed={operationMode === 'team'} onClick={() => switchOperationMode('team')}>
                 <GitBranch className="h-4 w-4" /> Equipe
               </button>
-              <button type="button" className={operationMode === 'individual' ? 'active' : ''} disabled={running} aria-pressed={operationMode === 'individual'} onClick={() => { setOperationMode('individual'); setPickerTarget(null); clearTranscript(); }}>
+              <button type="button" className={operationMode === 'individual' ? 'active' : ''} disabled={running} aria-pressed={operationMode === 'individual'} onClick={() => switchOperationMode('individual')}>
                 <UserRound className="h-4 w-4" /> Individual
               </button>
             </div>
@@ -1660,6 +1669,9 @@ function LucaWorkflowPanel({
   onSetModel,
   onOpenPersonas,
   onClose,
+  activePresetId,
+  applyingPresetId,
+  onApplyPreset,
 }: {
   personas: YumePersonaSummary[];
   personaBySlug: Map<string, YumePersonaSummary>;
@@ -1678,6 +1690,9 @@ function LucaWorkflowPanel({
   onSetModel: (slug: string, model: string) => void | Promise<void>;
   onOpenPersonas: () => void;
   onClose: () => void;
+  activePresetId: string | null;
+  applyingPresetId: string | null;
+  onApplyPreset: (preset: LucaTeamPreset) => void;
 }) {
   const theme = useTheme();
   const ready = readyRoles === WORKFLOW_ROLES.length;
@@ -1709,6 +1724,16 @@ function LucaWorkflowPanel({
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <PresetGallery
+          title="Equipes prontas"
+          presets={LUCA_TEAM_PRESETS}
+          resolveSlugs={teamPresetSlugs}
+          personaBySlug={personaBySlug}
+          activeId={activePresetId}
+          applyingId={applyingPresetId}
+          disabled={running || loading}
+          onApply={onApplyPreset}
+        />
         <div className="space-y-2">
           {WORKFLOW_ROLES.map((role) => (
             <WorkflowRoleRow
@@ -1738,6 +1763,101 @@ function LucaWorkflowPanel({
         </button>
       </footer>
     </aside>
+  );
+}
+
+interface PresetGalleryItem {
+  id: string;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+}
+
+function PresetGallery<T extends PresetGalleryItem>({
+  title,
+  presets,
+  resolveSlugs,
+  personaBySlug,
+  activeId,
+  applyingId,
+  disabled,
+  onApply,
+}: {
+  title: string;
+  presets: T[];
+  resolveSlugs: (preset: T) => string[];
+  personaBySlug: Map<string, YumePersonaSummary>;
+  activeId: string | null;
+  applyingId: string | null;
+  disabled: boolean;
+  onApply: (preset: T) => void;
+}) {
+  const theme = useTheme();
+  if (!presets.length) return null;
+  return (
+    <section className="mb-3" aria-label={title} data-luca-preset-gallery={title}>
+      <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: theme.textGhost }}>{title}</p>
+      <div className="space-y-2">
+        {presets.map((preset) => {
+          const Icon = preset.icon;
+          const active = activeId === preset.id;
+          const applying = applyingId === preset.id;
+          const slugs = resolveSlugs(preset);
+          const presetPersonas = slugs
+            .map((slug) => personaBySlug.get(slug))
+            .filter((persona): persona is YumePersonaSummary => Boolean(persona));
+          const shown = presetPersonas.slice(0, 5);
+          const extra = presetPersonas.length - shown.length;
+          return (
+            <button
+              key={preset.id}
+              type="button"
+              data-testid={`preset-${preset.id}`}
+              aria-pressed={active}
+              aria-label={`Aplicar preset ${preset.label}`}
+              className="w-full rounded-xl border p-3 text-left transition"
+              disabled={disabled || Boolean(applyingId)}
+              onClick={() => onApply(preset)}
+              style={{
+                borderColor: active ? theme.borderActive : theme.border,
+                background: active ? theme.goldSoft : 'transparent',
+                opacity: disabled || (applyingId && !applying) ? 0.72 : 1,
+              }}
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border" style={{ background: theme.goldSoft, borderColor: theme.border, color: theme.goldDeep }}>
+                  {applying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icon className="h-3.5 w-3.5" />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-semibold" style={{ color: active ? theme.goldDeep : theme.textSoft }}>{preset.label}</span>
+                  <span className="block truncate text-[10px]" style={{ color: theme.textGhost }}>
+                    {applying ? 'Conectando personas…' : `${slugs.length} persona${slugs.length === 1 ? '' : 's'} na seleção`}
+                  </span>
+                </span>
+                {active && !applying ? (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-semibold uppercase" style={{ background: theme.aliveSoft, color: theme.alive }}>
+                    <CheckCircle2 className="h-3 w-3" /> Aplicado
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-1.5 text-[10px] leading-relaxed" style={{ color: theme.textMute }}>{preset.description}</p>
+              {presetPersonas.length ? (
+                <div className="mt-2 flex items-center">
+                  <div className="flex -space-x-1.5">
+                    {shown.map((persona) => (
+                      <PersonaAvatar key={persona.slug} persona={persona} size="xs" />
+                    ))}
+                  </div>
+                  {extra > 0 ? (
+                    <span className="ml-2 text-[10px] font-medium" style={{ color: theme.textGhost }}>+{extra}</span>
+                  ) : null}
+                </div>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -2175,6 +2295,16 @@ function ProcessEventLine({ event }: { event: RuntimeEvent }) {
   );
 }
 
+function lastOperatorMission(transcript: TeamTranscriptEntry[]): string {
+  for (let i = transcript.length - 1; i >= 0; i -= 1) {
+    const entry = transcript[i];
+    if (entry.role === 'operator' && String(entry.content || '').trim()) {
+      return String(entry.content).trim();
+    }
+  }
+  return '';
+}
+
 function LucaMissionCanvas({
   transcript,
   finalResult,
@@ -2183,6 +2313,7 @@ function LucaMissionCanvas({
   transcriptRef,
   onInspect,
   operationMode,
+  missionDraft,
 }: {
   transcript: TeamTranscriptEntry[];
   finalResult: TeamTranscriptEntry | null;
@@ -2191,6 +2322,7 @@ function LucaMissionCanvas({
   transcriptRef: React.RefObject<HTMLDivElement | null>;
   onInspect: (slug: string | null) => void;
   operationMode: OperationMode;
+  missionDraft?: string;
 }) {
   const theme = useTheme();
   const headerStatus = running
@@ -2198,6 +2330,7 @@ function LucaMissionCanvas({
     : finalResult
       ? operationMode === 'individual' ? 'veredito do juiz pronto' : 'exibicao final pronta'
       : transcript.length ? 'rodada registrada' : 'aguardando missao';
+  const originalMission = lastOperatorMission(transcript) || String(missionDraft || '').trim();
   const supportingTranscript = finalResult
     ? transcript.filter((entry) => !(
       entry.slug === finalResult.slug
@@ -2216,8 +2349,27 @@ function LucaMissionCanvas({
           </div>
         )}
 
+        {originalMission && (supportingTranscript.length > 0 || finalResult) && (
+          <div
+            className="luca-ai-mission-pin mb-4 rounded-2xl border px-4 py-3"
+            data-luca-mission-pin
+            style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)' }}
+          >
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: theme.textGhost }}>
+              Pergunta original
+            </p>
+            <p className="text-sm leading-relaxed luca-wrap luca-ai-selectable" style={{ color: theme.text }}>
+              {originalMission}
+            </p>
+          </div>
+        )}
+
         {supportingTranscript.length ? supportingTranscript.map((entry) => (
-          entry.stage === 'Resposta individual' ? (
+          entry.role === 'operator' ? (
+            <div key={entry.id} className="block w-full min-w-0">
+              <TranscriptEntry entry={entry} persona={undefined} />
+            </div>
+          ) : entry.stage === 'Resposta individual' ? (
             <IndividualResponseCard
               key={entry.id}
               entry={entry}
