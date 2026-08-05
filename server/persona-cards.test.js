@@ -7,6 +7,7 @@ import {
   normalizeYumeAvatarPath,
   normalizeYumePersonasForLuca,
 } from './persona-cards.js';
+import { ROUTER_MODEL, resolvePersonaRuntimeModel } from './config.js';
 
 test('normaliza personas do Yume com flag de importacao e avatar proxy local', () => {
   const personas = normalizeYumePersonasForLuca(
@@ -18,6 +19,7 @@ test('normaliza personas do Yume com flag de importacao e avatar proxy local', (
         description: 'orquestrador',
         purpose: 'coordena',
         avatar_url: '/api/avatars/maestro.png',
+        is_official: false,
         version: 4,
       },
     ],
@@ -27,17 +29,82 @@ test('normaliza personas do Yume com flag de importacao e avatar proxy local', (
   assert.equal(personas.length, 1);
   assert.equal(personas[0].imported, true);
   assert.equal(personas[0].model, 'cx/gpt-5.6-sol');
+  assert.equal(personas[0].yumeModel, 'glm-5.1');
+  assert.equal(personas[0].localModel, 'cx/gpt-5.6-sol');
+  assert.equal(personas[0].modelOverridden, true);
   assert.equal(personas[0].avatarUrl, '/api/personas/avatar?src=%2Fapi%2Favatars%2Fmaestro.png');
+  assert.equal(personas[0].is_official, false);
   assert.equal(personas[0].version, 4);
 });
 
-test('nao expoe o modelo remoto de uma persona ainda nao importada', () => {
+test('mantem personas de Yume antigo visiveis como oficiais por compatibilidade', () => {
+  const [persona] = normalizeYumePersonasForLuca([{ slug: 'legada', name: 'Legada' }]);
+  assert.equal(persona.is_official, true);
+});
+
+test('expoe modelo Yume valido no 9Router mesmo sem import, e marca motor efetivo', () => {
   const personas = normalizeYumePersonasForLuca([
+    { slug: 'aurora', name: 'Aurora', model: 'gcli/grok-4.5' },
     { slug: 'legada', name: 'Legada', model: 'glm-5.2' },
+    { slug: 'grok-high', name: 'Grok High', model: 'gcli/grok-4.5-high' },
   ]);
 
   assert.equal(personas[0].imported, false);
-  assert.equal(personas[0].model, '');
+  assert.equal(personas[0].yumeModel, 'gcli/grok-4.5');
+  assert.equal(personas[0].model, 'gcli/grok-4.5');
+  assert.equal(personas[0].modelOverridden, false);
+
+  assert.equal(personas[1].imported, false);
+  assert.equal(personas[1].yumeModel, 'glm-5.2');
+  // rota fora do catalogo 9Router cai no default do LUCA
+  assert.equal(personas[1].model, ROUTER_MODEL);
+
+  assert.equal(personas[2].model, 'gcli/grok-4.5-high');
+  assert.equal(personas[2].modelOverridden, false);
+});
+
+test('import sem override local preserva motor do Yume no seletor', () => {
+  const personas = normalizeYumePersonasForLuca(
+    [{ slug: 'anfitriao', name: 'O Anfitrião', model: 'gcli/grok-4.5-high' }],
+    [{ slug: 'anfitriao', model: '' }],
+  );
+  assert.equal(personas[0].imported, true);
+  assert.equal(personas[0].localModel, '');
+  assert.equal(personas[0].yumeModel, 'gcli/grok-4.5-high');
+  assert.equal(personas[0].model, 'gcli/grok-4.5-high');
+  assert.equal(personas[0].modelOverridden, false);
+});
+
+test('resolvePersonaRuntimeModel prioriza override > local > yume > fallback', () => {
+  assert.equal(
+    resolvePersonaRuntimeModel({
+      localModel: 'cx/gpt-5.6-sol',
+      yumeModel: 'gcli/grok-4.5',
+      overrideModel: 'kimi/k3',
+    }),
+    'kimi/k3',
+  );
+  assert.equal(
+    resolvePersonaRuntimeModel({
+      localModel: 'cx/gpt-5.6-sol',
+      yumeModel: 'gcli/grok-4.5',
+    }),
+    'cx/gpt-5.6-sol',
+  );
+  assert.equal(
+    resolvePersonaRuntimeModel({
+      yumeModel: 'gcli/grok-4.5',
+    }),
+    'gcli/grok-4.5',
+  );
+  assert.equal(
+    resolvePersonaRuntimeModel({
+      localModel: '',
+      yumeModel: 'gcli/grok-4.5-high',
+    }),
+    'gcli/grok-4.5-high',
+  );
+  assert.equal(resolvePersonaRuntimeModel({ yumeModel: 'glm-5.2' }), ROUTER_MODEL);
 });
 
 test('mantem avatar externo direto e nao tenta proxiar pelo LUCA', () => {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, ExternalLink, Loader2, Plus, RefreshCw, Search, Sparkles, Trash2, UserPlus, UsersRound } from 'lucide-react';
+import { AlertCircle, BadgeCheck, ChevronDown, ExternalLink, Layers3, Loader2, Plus, RefreshCw, Search, Sparkles, Trash2, UserPlus, UsersRound } from 'lucide-react';
 import { buildApiErrorMessage, lucaApi } from '@/lib/api';
 import type { YumePersonaSummary } from '@/lib/types';
 import { useLuca } from '@/hooks/useLucaState';
@@ -34,6 +34,7 @@ export default function PersonasPage() {
   const [busySlug, setBusySlug] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<FilterMode>('all');
+  const [secondaryOpen, setSecondaryOpen] = useState(false);
 
   // No domínio, o Express está na mesma origem via Cloudflare Tunnel.
   // Usar 127.0.0.1 aqui apontaria para a máquina do visitante.
@@ -58,20 +59,26 @@ export default function PersonasPage() {
     void load();
   }, [load]);
 
-  const filteredPersonas = useMemo(() => {
+  useEffect(() => {
+    if (filter === 'available' || query.trim()) setSecondaryOpen(true);
+  }, [filter, query]);
+
+  const searchedPersonas = useMemo(() => {
     const term = query.trim().toLowerCase();
     return personas.filter((persona) => {
-      const matchesFilter =
-        filter === 'all' ||
-        (filter === 'imported' && persona.imported) ||
-        (filter === 'available' && !persona.imported);
-      if (!matchesFilter) return false;
       if (!term) return true;
       return [persona.name, persona.slug, persona.description, persona.model]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(term));
     });
-  }, [filter, personas, query]);
+  }, [personas, query]);
+
+  const rosterPersonas = searchedPersonas.filter((persona) => persona.imported);
+  const secondaryPersonas = searchedPersonas.filter((persona) => !persona.imported);
+  const showRoster = filter !== 'available';
+  const showSecondary = filter !== 'imported';
+  const secondaryExpanded = secondaryOpen;
+  const visiblePersonaCount = (showRoster ? rosterPersonas.length : 0) + (showSecondary ? secondaryPersonas.length : 0);
 
   const importedCount = personas.filter((persona) => persona.imported).length || importedInState;
   const availableCount = Math.max(0, personas.length - personas.filter((persona) => persona.imported).length);
@@ -133,7 +140,9 @@ export default function PersonasPage() {
         <section className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="relative w-full md:max-w-md">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: theme.textGhost }} />
+            <label htmlFor="persona-search" className="sr-only">Buscar persona</label>
             <input
+              id="persona-search"
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -156,6 +165,7 @@ export default function PersonasPage() {
                   className="rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition"
                   style={{ background: active ? theme.goldSoft : 'transparent', color: active ? theme.goldDeep : theme.textMute }}
                   onClick={() => setFilter(id as FilterMode)}
+                  aria-pressed={active}
                 >
                   {label}
                 </button>
@@ -189,27 +199,109 @@ export default function PersonasPage() {
               <div key={index} className="aspect-square animate-pulse rounded-lg" style={{ background: theme.surfaceHi, border: `1px solid ${theme.border}` }} />
             ))}
           </div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
-          >
-            {filteredPersonas.map((persona, index) => (
-              <PersonaCard
-                key={persona.slug}
-                persona={persona}
-                delay={index * 0.025}
-                busy={busySlug === persona.slug}
-                onImport={() => importPersona(persona.slug)}
-                onRemove={() => removePersona(persona.slug)}
-              />
-            ))}
-            <NewPersonaCard delay={filteredPersonas.length * 0.025} />
-          </motion.div>
-        )}
+        ) : visiblePersonaCount > 0 ? (
+          <div className="space-y-10">
+            {showRoster && (
+              <section aria-labelledby="luca-roster-title" className="space-y-4">
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <BadgeCheck className="h-4 w-4" style={{ color: theme.goldDeep }} aria-hidden="true" />
+                      <h2 id="luca-roster-title" className="text-sm font-semibold" style={{ color: theme.text }}>
+                        Roster principal
+                      </h2>
+                      <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: theme.goldSoft, color: theme.goldDeep }}>
+                        {rosterPersonas.length}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs" style={{ color: theme.textMute }}>
+                      Estas personas estão no LUCA e podem participar de execuções reais.
+                    </p>
+                  </div>
+                </div>
 
-        {!loading && filteredPersonas.length === 0 && (
+                {rosterPersonas.length > 0 ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+                  >
+                    {rosterPersonas.map((persona, index) => (
+                      <PersonaCard
+                        key={persona.slug}
+                        persona={persona}
+                        delay={index * 0.025}
+                        busy={busySlug === persona.slug}
+                        onImport={() => importPersona(persona.slug)}
+                        onRemove={() => removePersona(persona.slug)}
+                      />
+                    ))}
+                  </motion.div>
+                ) : (
+                  <div className="rounded-xl border px-5 py-6 text-sm" style={{ borderColor: theme.border, color: theme.textMute }}>
+                    O roster está vazio. Expanda as personas disponíveis abaixo para adicionar a primeira especialista.
+                  </div>
+                )}
+              </section>
+            )}
+
+            {showSecondary && (
+              <section aria-labelledby="luca-secondary-title" className="space-y-4">
+                <button
+                  type="button"
+                  className="flex min-h-12 w-full items-center gap-3 rounded-xl border px-4 py-3 text-left active:scale-[0.96] motion-safe:transition-transform"
+                  style={{ background: theme.input, borderColor: theme.border, color: theme.text }}
+                  aria-expanded={secondaryExpanded}
+                  aria-controls="luca-secondary-panel"
+                  onClick={() => setSecondaryOpen((open) => !open)}
+                >
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: theme.goldSoft, color: theme.goldDeep }}>
+                    <Layers3 className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span id="luca-secondary-title" className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                      Disponíveis no Yume
+                      <span className="rounded-full px-2 py-0.5 text-[10px]" style={{ background: theme.surfaceHi, color: theme.textMute }}>
+                        {secondaryPersonas.length}
+                      </span>
+                    </span>
+                    <span className="mt-0.5 block text-xs" style={{ color: theme.textMute }}>
+                      Fora do roster e bloqueadas para execução até serem adicionadas ao LUCA.
+                    </span>
+                  </span>
+                  <ChevronDown
+                    className={`h-5 w-5 shrink-0 motion-safe:transition-transform ${secondaryExpanded ? 'rotate-180' : ''}`}
+                    style={{ color: theme.textMute }}
+                    aria-hidden="true"
+                  />
+                </button>
+
+                {secondaryExpanded && (
+                  <motion.div
+                    id="luca-secondary-panel"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+                  >
+                    {secondaryPersonas.map((persona, index) => (
+                      <PersonaCard
+                        key={persona.slug}
+                        persona={persona}
+                        delay={index * 0.025}
+                        busy={busySlug === persona.slug}
+                        onImport={() => importPersona(persona.slug)}
+                        onRemove={() => removePersona(persona.slug)}
+                      />
+                    ))}
+                    {!query.trim() && <NewPersonaCard delay={secondaryPersonas.length * 0.025} />}
+                  </motion.div>
+                )}
+              </section>
+            )}
+          </div>
+        ) : null}
+
+        {!loading && visiblePersonaCount === 0 && (
           <div
             className="flex min-h-[220px] flex-col items-center justify-center gap-4 rounded-lg border px-6 py-10 text-center"
             style={{ borderColor: theme.border, color: theme.textMute }}
@@ -375,7 +467,7 @@ function PersonaCard({ persona, delay, busy, onImport, onRemove }: PersonaCardPr
             ) : (
               <UserPlus className="h-3.5 w-3.5" />
             )}
-            {persona.imported ? 'Remover' : 'Importar'}
+            {persona.imported ? 'Remover do LUCA' : 'Adicionar ao LUCA'}
           </button>
         </div>
       </div>

@@ -1,4 +1,9 @@
 import { KAMUI_BASE } from './kamui-client.js';
+import {
+  ROUTER_MODEL,
+  isAllowed9RouterModel,
+  resolvePersonaRuntimeModel,
+} from './config.js';
 
 const YUME_AVATAR_PREFIX = '/api/avatars/';
 
@@ -34,14 +39,33 @@ export function normalizeYumePersonaForLuca(persona = {}, importedAgents = new M
   const slug = String(persona.slug || '').trim();
   const avatarUrl = buildYumeAvatarProxyUrl(persona.avatar_url);
   const importedAgent = importedAgents.get(slug);
+  const yumeModel = String(persona.model || '').trim();
+  const localModel = String(importedAgent?.model || '').trim();
+  const model = resolvePersonaRuntimeModel({
+    localModel,
+    yumeModel,
+    fallback: ROUTER_MODEL,
+  });
+  const modelOverridden = Boolean(
+    importedAgent
+    && isAllowed9RouterModel(localModel)
+    && yumeModel
+    && localModel !== yumeModel,
+  );
+
   return {
     slug,
     name: String(persona.name || slug || 'Persona Yume').trim(),
-    model: String(importedAgent?.model || '').trim(),
+    // Motor efetivo que o LUCA usa no 9Router (sempre preenchido quando possível).
+    model,
+    yumeModel,
+    localModel: isAllowed9RouterModel(localModel) ? localModel : '',
+    modelOverridden,
     description: String(persona.description || '').trim(),
     purpose: String(persona.purpose || '').trim(),
     avatar_url: String(persona.avatar_url || '').trim(),
     avatarUrl,
+    is_official: persona.is_official !== false,
     version: persona.version ?? null,
     updated_at: persona.updated_at ?? null,
     imported: Boolean(slug && importedAgent),

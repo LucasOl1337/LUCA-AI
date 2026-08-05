@@ -185,7 +185,7 @@ export function createAuthService({ rootDir = process.cwd(), dataPath = '', admi
     next();
   }
 
-  function registerAdminRoutes(app) {
+  function registerAdminRoutes(app, { getUserChatLibrary = null, getUserChatSession = null } = {}) {
     app.get('/api/admin/overview', requireAdmin, (_req, res) => {
       res.json({ ok: true, overview: store.overview({ workspaces: workspaceCount() }) });
     });
@@ -213,6 +213,67 @@ export function createAuthService({ rootDir = process.cwd(), dataPath = '', admi
         ? Number(((report.overview.activeToday / report.overview.totalUsers) * 100).toFixed(1))
         : 0;
       res.json({ ok: true, report });
+    });
+
+    // Read-only inspect of another account's LUCA-AI chat library (no write / no session hijack).
+    app.get('/api/admin/users/:userId/chat/library', requireAdmin, (req, res) => {
+      if (typeof getUserChatLibrary !== 'function') {
+        res.status(501).json({ ok: false, error: 'chat_library_unavailable' });
+        return;
+      }
+      try {
+        const userId = String(req.params.userId || '').trim();
+        const account = store.listUsers().find((user) => user.id === userId) || null;
+        if (!account) {
+          res.status(404).json({ ok: false, error: 'user_not_found' });
+          return;
+        }
+        const library = getUserChatLibrary(userId);
+        res.json({
+          ok: true,
+          mode: 'admin_readonly',
+          account: {
+            id: account.id,
+            name: account.name,
+            email: account.email,
+            role: account.role,
+            lastSeenAt: account.lastSeenAt,
+          },
+          ...library,
+        });
+      } catch (error) {
+        res.status(Number(error?.status) || 500).json({ ok: false, error: error?.message || String(error) });
+      }
+    });
+
+    app.get('/api/admin/users/:userId/chat/sessions/:sessionId', requireAdmin, (req, res) => {
+      if (typeof getUserChatSession !== 'function') {
+        res.status(501).json({ ok: false, error: 'chat_library_unavailable' });
+        return;
+      }
+      try {
+        const userId = String(req.params.userId || '').trim();
+        const sessionId = String(req.params.sessionId || '').trim();
+        const account = store.listUsers().find((user) => user.id === userId) || null;
+        if (!account) {
+          res.status(404).json({ ok: false, error: 'user_not_found' });
+          return;
+        }
+        const session = getUserChatSession(userId, sessionId);
+        res.json({
+          ok: true,
+          mode: 'admin_readonly',
+          account: {
+            id: account.id,
+            name: account.name,
+            email: account.email,
+            role: account.role,
+          },
+          session,
+        });
+      } catch (error) {
+        res.status(Number(error?.status) || 500).json({ ok: false, error: error?.message || String(error) });
+      }
     });
   }
 

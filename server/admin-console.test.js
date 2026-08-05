@@ -30,3 +30,11 @@ test('ADMIN_CONSOLE_V1 backend exposes report and allowlist sync', () => {
   assert.match(store, /ensureAdminEmails/);
   assert.match(store, /report\(/);
 });
+
+test('ADMIN_CONSOLE_V1 backend exposes readonly chat inspect per user', () => {
+  assert.match(auth, /\/api\/admin\/users\/:userId\/chat\/library/);
+  assert.match(auth, /\/api\/admin\/users\/:userId\/chat\/sessions\/:sessionId/);
+  assert.match(auth, /admin_readonly/);
+  assert.match(page, /Ver chats/);
+  assert.match(page, /data-admin-chat-inspect/);
+});

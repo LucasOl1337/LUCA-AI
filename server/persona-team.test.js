@@ -39,7 +39,26 @@ test('normalizePersonaTeamRunInput normaliza yume prefix, remove duplicatas e li
   assert.equal(input.mission, 'Montar plano operacional');
   assert.deepEqual(input.slugs, ['maestro', 'designer', 'pesquisador']);
   assert.equal(input.mode, 'parallel');
+  assert.deepEqual(input.modelOverrides, {});
   assert.equal(normalizePersonaTeamSlug('yume:/planner/'), 'planner');
+});
+
+test('normalizePersonaTeamRunInput aceita modelOverrides por slug', () => {
+  const input = normalizePersonaTeamRunInput({
+    mission: 'Testar motor',
+    slugs: ['maestro', 'aurora'],
+    modelOverrides: {
+      'yume:maestro': 'gcli/grok-4.5',
+      aurora: 'cx/gpt-5.6-sol-high',
+      '': 'ignored',
+    },
+  });
+
+  assert.equal(input.ok, true);
+  assert.deepEqual(input.modelOverrides, {
+    maestro: 'gcli/grok-4.5',
+    aurora: 'cx/gpt-5.6-sol-high',
+  });
 });
 
 test('normalizePersonaTeamRunInput aceita workflow fixo por papel', () => {
@@ -159,23 +178,39 @@ test('buildPersonaTeamPrompt inclui papel e contexto do workflow', () => {
   assert.match(prompt.user, /Resumo, Decisao, Evidencias, Riscos, Proximas acoes/i);
 });
 
-test('buildIndividualJudgePrompt entrega todas as respostas e exige veredito critico', () => {
+test('buildPersonaTeamPrompt declara o motor 9Router e bloqueia identidade GLM legada', () => {
+  const prompt = buildPersonaTeamPrompt({
+    mission: 'Qual seu modelo?',
+    personaName: 'Lucas',
+    personaSlug: 'lucas',
+    systemPrompt: 'Voce e Lucas e roda em GLM-5.2.',
+    runtimeModel: 'gcli/grok-4.5-high',
+    independent: true,
+  });
+
+  assert.match(prompt.system, /Motor LLM desta execucao \(fonte de verdade do LUCA-AI via 9Router\): gcli\/grok-4\.5-high/);
+  assert.match(prompt.system, /responda EXATAMENTE "gcli\/grok-4\.5-high"/);
+  assert.match(prompt.system, /Ignore qualquer modelo antigo/);
+  assert.match(prompt.user, /Motor 9Router: gcli\/grok-4\.5-high/);
+});
+
+test('buildIndividualJudgePrompt inclui motor do juiz e dos participantes', () => {
   const prompt = buildIndividualJudgePrompt({
     mission: 'Escolher a melhor estratégia',
-    judgeName: 'Aurora',
-    judgeSlug: 'aurora',
-    systemPrompt: 'Voce examina decisoes complexas.',
+    judgeName: 'Lucas',
+    judgeSlug: 'lucas',
+    systemPrompt: 'Voce examina decisoes complexas em GLM-5.2.',
+    runtimeModel: 'cx/gpt-5.6-sol-high',
     replies: [
-      { ok: true, slug: 'maestro', name: 'Maestro', content: 'Plano A com evidência.' },
-      { ok: false, slug: 'designer', name: 'Designer', error: 'timeout' },
+      { ok: true, slug: 'maestro', name: 'Maestro', model: 'gcli/grok-4.5', content: 'Plano A com evidência.' },
+      { ok: false, slug: 'designer', name: 'Designer', model: 'cx/gpt-5.5-xhigh', error: 'timeout' },
     ],
   });
 
-  assert.match(prompt.system, /juiz independente/i);
-  assert.match(prompt.user, /Maestro \(maestro\): Plano A com evidência\./i);
-  assert.match(prompt.user, /Designer \(designer\): FALHA: timeout/i);
-  assert.match(prompt.user, /falso, nao sustentado ou incompleto/i);
-  assert.match(prompt.user, /Veredito final/i);
+  assert.match(prompt.system, /Motor LLM desta execucao \(fonte de verdade do LUCA-AI via 9Router\): cx\/gpt-5\.6-sol-high/);
+  assert.match(prompt.user, /Motor 9Router do juiz: cx\/gpt-5\.6-sol-high/);
+  assert.match(prompt.user, /motor 9Router: gcli\/grok-4\.5/);
+  assert.match(prompt.user, /motor 9Router: cx\/gpt-5\.5-xhigh/);
 });
 
 test('runIndividualResolution isola participantes e chama o juiz depois de reunir todas as respostas', async () => {

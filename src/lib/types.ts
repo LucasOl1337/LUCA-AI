@@ -29,14 +29,37 @@ export interface PersonaAgentEntry {
 export interface YumePersonaSummary {
   slug: string;
   name: string;
+  /** Motor efetivo no 9Router (override local, Yume se catálogo, ou default LUCA). */
   model?: string;
+  /** Modelo declarado no Yume (pode estar fora do catálogo 9Router). */
+  yumeModel?: string;
+  /** Override persistido no estado local do LUCA. */
+  localModel?: string;
+  modelOverridden?: boolean;
   description?: string;
   purpose?: string;
   avatar_url?: string;
   avatarUrl?: string;
+  is_official?: boolean;
   version?: number | null;
   updated_at?: string | null;
   imported: boolean;
+}
+
+export interface RouterModelProfile {
+  id: string;
+  name: string;
+  model: string;
+  capabilities?: Record<string, unknown>;
+}
+
+export interface RouterModelsResponse {
+  ok: boolean;
+  provider: string;
+  baseUrl?: string;
+  profiles: RouterModelProfile[];
+  routeIds: string[];
+  capabilities?: Record<string, unknown>;
 }
 
 export interface LucaAiPersonaTeamReply {
@@ -350,3 +373,45 @@ export type BackendEvent =
 export type WsPayload =
   | { kind: 'state'; state: LucaState }
   | { kind: 'event'; event: BackendEvent };
+
+export interface LucaAiChatFolder {
+  id: string;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface LucaAiChatSessionSummary {
+  id: string;
+  title: string;
+  folderId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  operationMode?: 'team' | 'individual' | string;
+  messageCount?: number;
+  preview?: string;
+}
+
+export interface LucaAiChatSession extends LucaAiChatSessionSummary {
+  workflowAssignments?: Record<string, string[]>;
+  individualAssignments?: {
+    participants?: string[];
+    judge?: string | null;
+  };
+  missionDraft?: string;
+  transcript?: Array<Record<string, unknown>>;
+  finalResult?: Record<string, unknown> | null;
+  activePersonaSlug?: string | null;
+}
+
+export interface LucaAiChatLibraryResponse {
+  ok: boolean;
+  folders: LucaAiChatFolder[];
+  sessions: LucaAiChatSessionSummary[];
+  activeSessionId?: string | null;
+  activeSession?: LucaAiChatSession | null;
+  session?: LucaAiChatSession | null;
+  folder?: LucaAiChatFolder | null;
+  createdReplacement?: boolean;
+  error?: string;
+}

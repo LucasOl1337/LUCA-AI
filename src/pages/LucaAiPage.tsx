@@ -26,15 +26,28 @@ import {
 } from 'lucide-react';
 import { buildApiErrorMessage, lucaApi } from '@/lib/api';
 import type {
+  LucaAiChatSession,
   LucaAiPersonaTeamReply,
   LucaAiPersonaTeamRunResponse,
   LucaAiWorkflowAssignment,
+  RouterModelProfile,
   RuntimeEvent,
   YumePersonaSummary,
 } from '@/lib/types';
 import CopyLogButton from '@/components/CopyLogButton';
 import { useLuca } from '@/hooks/useLucaState';
+import {
+  LUCA_INDIVIDUAL_PRESETS,
+  LUCA_TEAM_PRESETS,
+  individualPresetMatches,
+  individualPresetSlugs,
+  teamPresetMatches,
+  teamPresetSlugs,
+  type LucaIndividualPreset,
+  type LucaTeamPreset,
+} from '@/lib/lucaPresets';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { useChatLibrary } from '@/hooks/useChatLibrary';
 import { useTheme } from '@/hooks/useTheme';
 
 const MAX_EXECUTORS = 4;
@@ -331,6 +344,13 @@ function createEmptyIndividualAssignments(): IndividualAssignments {
   return { participants: [], judge: null };
 }
 
+
+function isTeamTranscriptEntry(value: unknown): value is TeamTranscriptEntry {
+  if (!value || typeof value !== 'object') return false;
+  const entry = value as TeamTranscriptEntry;
+  return typeof entry.id === 'string' && typeof entry.content === 'string' && typeof entry.role === 'string';
+}
+
 function inlineTextParts(value: string): InlineTextPart[] {
   const parts: InlineTextPart[] = [];
   const pattern = /\*\*(.+?)\*\*/g;
@@ -466,6 +486,7 @@ function plannedRuntimeEvents(traceId: string, mission: string, assignments: Wor
 export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const { runtimeMode, refresh } = useLuca();
   const [personas, setPersonas] = useState<YumePersonaSummary[]>([]);
+  const [routerProfiles, setRouterProfiles] = useState<RouterModelProfile[]>([]);
   const [operationMode, setOperationMode] = usePersistentState<OperationMode>('lucaAi.operationMode', 'team');
   const [workflowState, setWorkflowState] = usePersistentState<WorkflowAssignments>('lucaAi.workflowAssignments', createEmptyWorkflowAssignments());
   const [individualState, setIndividualState] = usePersistentState<IndividualAssignments>('lucaAi.individualAssignments', createEmptyIndividualAssignments());
@@ -484,11 +505,23 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const [teamPanelOpen, setTeamPanelOpen] = useState(true);
   const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
   const [busyPersonaSlug, setBusyPersonaSlug] = useState<string | null>(null);
+  const [applyingPresetId, setApplyingPresetId] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
+  const skipNextPersistRef = useRef(false);
+  const persistTimerRef = useRef<number | null>(null);
 
   // O frontend publicado e o runtime Express compartilham a mesma origem
   // através do Cloudflare Tunnel. Nunca tente acessar o loopback do visitante.
   const bridgeBase: string | undefined = undefined;
+  const {
+    ready: libraryReady,
+    busy: sessionsBusy,
+    activeSessionId,
+    activeSession,
+    persistSession,
+  } = useChatLibrary();
+  const boundSessionIdRef = useRef<string | null>(null);
+  const runOwnerSessionIdRef = useRef<string | null>(null);
   const assignments = useMemo(() => normalizeWorkflowAssignments(workflowState), [workflowState]);
   const assignedSlugs = useMemo(() => flattenWorkflowAssignments(assignments), [assignments]);
   const individualAssignments = useMemo<IndividualAssignments>(() => ({
@@ -509,8 +542,12 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setError(null);
     setErrorRetry(null);
     try {
-      const data = await lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined);
+      const [data, models] = await Promise.all([
+        lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined),
+        lucaApi.listRouterModels(bridgeBase, bridgeBase ? 15000 : undefined).catch(() => null),
+      ]);
       setPersonas(normalizePersonaAssetUrls(data.personas ?? [], bridgeBase));
+      if (models?.profiles?.length) setRouterProfiles(models.profiles);
     } catch (err) {
       const fallback = 'Falha ao carregar personas do Yume.';
       setError(buildApiErrorMessage(err, fallback));
@@ -523,6 +560,100 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   useEffect(() => {
     void loadPersonas();
   }, [loadPersonas]);
+
+  const applySession = useCallback((session: LucaAiChatSession | null | undefined) => {
+    setRunning(false);
+    setProcessEvents([]);
+    setActiveTraceId(null);
+    setError(null);
+    setErrorRetry(null);
+    setPickerTarget(null);
+    setActiveWorkspaceView('result');
+    if (!session) {
+      boundSessionIdRef.current = null;
+      skipNextPersistRef.current = true;
+      setMission('');
+      setTranscript([]);
+      setFinalResult(null);
+      return;
+    }
+    skipNextPersistRef.current = true;
+    boundSessionIdRef.current = session.id;
+    setOperationMode(session.operationMode === 'individual' ? 'individual' : 'team');
+    setWorkflowState(normalizeWorkflowAssignments(session.workflowAssignments || createEmptyWorkflowAssignments()));
+    setIndividualState({
+      participants: uniqueSlugs(session.individualAssignments?.participants || [], 5),
+      judge: session.individualAssignments?.judge ? String(session.individualAssignments.judge) : null,
+    });
+    setMission(String(session.missionDraft || ''));
+    const nextTranscript = ((Array.isArray(session.transcript) ? session.transcript : []) as unknown[])
+      .filter(isTeamTranscriptEntry);
+    setTranscript(nextTranscript);
+    setFinalResult(isTeamTranscriptEntry(session.finalResult) ? session.finalResult : null);
+    setActivePersonaSlug(session.activePersonaSlug ? String(session.activePersonaSlug) : null);
+  }, [setActivePersonaSlug, setFinalResult, setIndividualState, setMission, setOperationMode, setTranscript, setWorkflowState]);
+
+  useEffect(() => {
+    if (!libraryReady) return;
+    if (!activeSessionId) {
+      applySession(null);
+      return;
+    }
+    if (!activeSession || activeSession.id !== activeSessionId) {
+      if (boundSessionIdRef.current !== activeSessionId) {
+        skipNextPersistRef.current = true;
+        setRunning(false);
+        setProcessEvents([]);
+        setActiveTraceId(null);
+        setTranscript([]);
+        setFinalResult(null);
+        setMission('');
+        boundSessionIdRef.current = null;
+      }
+      return;
+    }
+    if (boundSessionIdRef.current === activeSession.id) return;
+    applySession(activeSession);
+  }, [activeSession, activeSessionId, applySession, libraryReady, setFinalResult, setMission, setTranscript]);
+
+  useEffect(() => {
+    if (!libraryReady || !activeSessionId || running || sessionsBusy) return undefined;
+    if (boundSessionIdRef.current !== activeSessionId) return undefined;
+    if (skipNextPersistRef.current) {
+      skipNextPersistRef.current = false;
+      return undefined;
+    }
+    const sessionId = activeSessionId;
+    if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = window.setTimeout(() => {
+      if (boundSessionIdRef.current !== sessionId) return;
+      void persistSession(sessionId, {
+        operationMode,
+        workflowAssignments: assignments,
+        individualAssignments,
+        missionDraft: mission,
+        transcript,
+        finalResult,
+        activePersonaSlug,
+      });
+    }, 450);
+    return () => {
+      if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
+    };
+  }, [
+    activePersonaSlug,
+    activeSessionId,
+    assignments,
+    finalResult,
+    individualAssignments,
+    libraryReady,
+    mission,
+    operationMode,
+    persistSession,
+    running,
+    sessionsBusy,
+    transcript,
+  ]);
 
   useEffect(() => {
     if (window.localStorage.getItem(LUCA_AI_CLEAN_UI_STORAGE_KEY) === LUCA_AI_CLEAN_UI_VERSION) return;
@@ -574,13 +705,13 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
 
   useEffect(() => {
     if (loading || !personas.length) return;
-    const availableSet = new Set(personas.map((persona) => persona.slug));
+    const rosterSet = new Set(personas.filter((persona) => persona.imported).map((persona) => persona.slug));
     setWorkflowState((prev) => {
       const normalized = normalizeWorkflowAssignments(prev);
       const next = createEmptyWorkflowAssignments();
       for (const role of WORKFLOW_ROLES) {
         next[role.id] = normalized[role.id]
-          .filter((slug) => availableSet.has(slug))
+          .filter((slug) => rosterSet.has(slug))
           .slice(0, role.maxSlugs);
       }
       return workflowAssignmentsEqual(normalized, next) ? prev : next;
@@ -589,13 +720,13 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
 
   useEffect(() => {
     if (loading || !personas.length) return;
-    const availableSet = new Set(personas.map((persona) => persona.slug));
+    const rosterSet = new Set(personas.filter((persona) => persona.imported).map((persona) => persona.slug));
     setIndividualState((prev) => {
       const participants = uniqueSlugs(
-        (Array.isArray(prev?.participants) ? prev.participants : []).filter((slug) => availableSet.has(slug)),
+        (Array.isArray(prev?.participants) ? prev.participants : []).filter((slug) => rosterSet.has(slug)),
         5,
       );
-      const judge = availableSet.has(String(prev?.judge || '')) ? String(prev.judge) : null;
+      const judge = rosterSet.has(String(prev?.judge || '')) ? String(prev.judge) : null;
       if (participants.join('|') === (prev?.participants || []).join('|') && judge === (prev?.judge || null)) return prev;
       return { participants, judge };
     });
@@ -621,6 +752,25 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setError(buildApiErrorMessage(err, `Falha ao conectar ${persona.name || slug} ao LUCA.`));
       setErrorRetry('personas');
       return false;
+    } finally {
+      setBusyPersonaSlug(null);
+    }
+  }
+
+  async function setPersonaModel(slug: string, model: string) {
+    if (!slug || !model) return;
+    if (!(await ensurePersonaImported(slug))) return;
+    setBusyPersonaSlug(slug);
+    setError(null);
+    setErrorRetry(null);
+    try {
+      await lucaApi.setAgentConfig(`yume:${slug}`, { model }, bridgeBase);
+      const data = await lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined);
+      setPersonas(normalizePersonaAssetUrls(data.personas ?? [], bridgeBase));
+      if (runtimeMode === 'backend') await refresh();
+    } catch (err) {
+      setError(buildApiErrorMessage(err, `Falha ao definir modelo de ${slug}.`));
+      setErrorRetry('personas');
     } finally {
       setBusyPersonaSlug(null);
     }
@@ -689,6 +839,111 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setIndividualState(createEmptyIndividualAssignments());
   }
 
+  // Conecta (importa) os slugs de um preset com uma só releitura do catálogo no final.
+  async function importPresetSlugs(slugs: string[]): Promise<{ ok: Set<string>; failed: string[] }> {
+    const ok = new Set<string>();
+    const failed: string[] = [];
+    let touched = false;
+    for (const slug of slugs) {
+      const persona = personaBySlug.get(slug);
+      if (!persona) {
+        failed.push(slug);
+        continue;
+      }
+      if (persona.imported) {
+        ok.add(slug);
+        continue;
+      }
+      try {
+        await lucaApi.importYumePersona(slug, bridgeBase);
+        ok.add(slug);
+        touched = true;
+      } catch {
+        failed.push(slug);
+      }
+    }
+    if (touched) {
+      try {
+        const data = await lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined);
+        setPersonas(normalizePersonaAssetUrls(data.personas ?? [], bridgeBase));
+        if (runtimeMode === 'backend') await refresh();
+      } catch {
+        // A lista será recarregada no próximo ciclo; os slugs importados já valem.
+      }
+    }
+    return { ok, failed };
+  }
+
+  function presetApplyError(label: string, missing: string[], failed: string[]): string | null {
+    if (missing.length) {
+      return `Preset "${label}": persona${missing.length === 1 ? '' : 's'} fora do catálogo Yume: ${missing.join(', ')}.`;
+    }
+    if (failed.length) {
+      return `Preset "${label}" aplicado sem ${failed.length} persona${failed.length === 1 ? '' : 's'}: ${failed.join(', ')}.`;
+    }
+    return null;
+  }
+
+  async function applyTeamPreset(preset: LucaTeamPreset) {
+    if (running || applyingPresetId) return;
+    setApplyingPresetId(preset.id);
+    setError(null);
+    setErrorRetry(null);
+    try {
+      const wanted = teamPresetSlugs(preset);
+      const missing = wanted.filter((slug) => !personaBySlug.has(slug));
+      if (missing.length) {
+        setError(presetApplyError(preset.label, missing, []) || '');
+        setErrorRetry('personas');
+        return;
+      }
+      const { ok, failed } = await importPresetSlugs(wanted);
+      const next = createEmptyWorkflowAssignments();
+      for (const role of WORKFLOW_ROLES) {
+        next[role.id] = uniqueSlugs((preset.assignments[role.id] ?? []).filter((slug) => ok.has(slug)), role.maxSlugs);
+      }
+      setWorkflowState(next);
+      const first = flattenWorkflowAssignments(next)[0];
+      if (first) setActivePersonaSlug(first);
+      const message = presetApplyError(preset.label, [], failed);
+      if (message) {
+        setError(message);
+        setErrorRetry('personas');
+      }
+    } finally {
+      setApplyingPresetId(null);
+    }
+  }
+
+  async function applyIndividualPreset(preset: LucaIndividualPreset) {
+    if (running || applyingPresetId) return;
+    setApplyingPresetId(preset.id);
+    setError(null);
+    setErrorRetry(null);
+    try {
+      const wanted = individualPresetSlugs(preset);
+      const missing = wanted.filter((slug) => !personaBySlug.has(slug));
+      if (missing.length) {
+        setError(presetApplyError(preset.label, missing, []) || '');
+        setErrorRetry('personas');
+        return;
+      }
+      const { ok, failed } = await importPresetSlugs(wanted);
+      const participants = uniqueSlugs(preset.participants.filter((slug) => ok.has(slug)), 5);
+      const judge = ok.has(preset.judge) ? preset.judge : null;
+      setIndividualState({ participants, judge });
+      const first = participants[0] ?? judge;
+      if (first) setActivePersonaSlug(first);
+      const message = presetApplyError(preset.label, [], failed);
+      if (message) {
+        setError(message);
+        setErrorRetry('personas');
+      }
+    } finally {
+      setApplyingPresetId(null);
+    }
+  }
+
   function clearTranscript() {
     setTranscript([]);
     setFinalResult(null);
@@ -710,6 +965,10 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       ? slugsToRun.length > 0 && Boolean(individualToRun.judge)
       : workflowReady(assignmentsToRun);
     if (!trimmedMission || !slugsToRun.length || !readyToRun || running) return;
+
+    const ownerSessionId = activeSessionId;
+    if (!ownerSessionId || boundSessionIdRef.current !== ownerSessionId) return;
+    runOwnerSessionIdRef.current = ownerSessionId;
 
     const startedAt = new Date().toISOString();
     const traceId = createTraceId();
@@ -737,7 +996,20 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     };
     setTranscript((prev) => [...prev, operatorEntry].slice(-100));
 
+    const stillOwner = () => (
+      runOwnerSessionIdRef.current === ownerSessionId
+      && boundSessionIdRef.current === ownerSessionId
+    );
+
     try {
+      const modelOverrides = Object.fromEntries(
+        runPersonas
+          .map((slug) => {
+            const model = String(personaBySlug.get(slug)?.model || '').trim();
+            return model ? [slug, model] : null;
+          })
+          .filter(Boolean) as Array<[string, string]>,
+      );
       const data = operationMode === 'individual'
         ? await lucaApi.runLucaAiIndividualResolution(
           trimmedMission,
@@ -745,6 +1017,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           String(individualToRun.judge),
           traceId,
           bridgeBase,
+          modelOverrides,
         )
         : await lucaApi.runLucaAiPersonaTeam(
           trimmedMission,
@@ -752,7 +1025,9 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           workflowPayload(assignmentsToRun),
           traceId,
           bridgeBase,
+          modelOverrides,
         );
+      if (!stillOwner()) return;
       if (data.traceId) setActiveTraceId(data.traceId);
       const nextMessages = operationMode === 'individual'
         ? (data.replies ?? []).map((reply) => transcriptEntryFromReply(reply, data.generatedAt || new Date().toISOString(), 'Resposta individual'))
@@ -793,6 +1068,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         setErrorRetry('run');
       }
     } catch (err) {
+      if (!stillOwner()) return;
       const message = buildApiErrorMessage(err, operationMode === 'individual'
         ? 'Falha ao rodar resolução individual.'
         : 'Falha ao rodar fluxo de personas.');
@@ -808,15 +1084,25 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       };
       setTranscript((prev) => [...prev, errorEntry].slice(-140));
     } finally {
-      try {
-        const data = await lucaApi.listEvents({ traceId, limit: 120 }, bridgeBase);
-        if (data.ok && data.events?.length) setProcessEvents(sortRuntimeEvents(data.events));
-      } catch {
-        // Evento em tempo real é auxiliar; mantemos os dados locais se o polling falhar.
+      if (stillOwner()) {
+        try {
+          const data = await lucaApi.listEvents({ traceId, limit: 120 }, bridgeBase);
+          if (stillOwner() && data.ok && data.events?.length) setProcessEvents(sortRuntimeEvents(data.events));
+        } catch {
+          // Evento em tempo real é auxiliar; mantemos os dados locais se o polling falhar.
+        }
+        if (stillOwner()) setRunning(false);
       }
-      setRunning(false);
+      if (runOwnerSessionIdRef.current === ownerSessionId) runOwnerSessionIdRef.current = null;
     }
   }
+
+  const activeTeamPresetId = useMemo(() => (
+    LUCA_TEAM_PRESETS.find((preset) => teamPresetMatches(assignments, preset))?.id ?? null
+  ), [assignments]);
+  const activeIndividualPresetId = useMemo(() => (
+    LUCA_INDIVIDUAL_PRESETS.find((preset) => individualPresetMatches(individualAssignments, preset))?.id ?? null
+  ), [individualAssignments]);
 
   const activePersona = activePersonaSlug ? personaBySlug.get(activePersonaSlug) ?? null : null;
   const activePersonaRoleIds = useMemo(() => (
@@ -884,7 +1170,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       <div className="luca-ai-chat-column">
         <header className="luca-ai-chat-toolbar">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <div className="luca-ai-view-switch" role="group" aria-label="Modo de operação">
+<div className="luca-ai-view-switch" role="group" aria-label="Modo de operação">
               <button type="button" className={operationMode === 'team' ? 'active' : ''} disabled={running} aria-pressed={operationMode === 'team'} onClick={() => { setOperationMode('team'); setPickerTarget(null); clearTranscript(); }}>
                 <GitBranch className="h-4 w-4" /> Equipe
               </button>
@@ -973,8 +1259,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           />
         </div>
       </div>
-
-      <AnimatePresence>
+<AnimatePresence>
         {teamPanelOpen && (
           <motion.aside
             id="luca-ai-team-side"
@@ -988,16 +1273,22 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
               <LucaIndividualPanel
                 personas={personas}
                 personaBySlug={personaBySlug}
+                routerProfiles={routerProfiles}
                 assignments={individualAssignments}
                 activeSlug={activePersonaSlug}
                 loading={loading}
                 running={running}
+                busySlug={busyPersonaSlug}
+                activePresetId={activeIndividualPresetId}
+                applyingPresetId={applyingPresetId}
                 onReload={loadPersonas}
                 onClear={clearIndividualAssignments}
                 onRemoveParticipant={removeIndividualParticipant}
                 onClearJudge={() => void setIndividualJudge('')}
                 onInspect={setActivePersonaSlug}
                 onOpenPicker={(id) => setPickerTarget({ mode: 'individual', id })}
+                onSetModel={setPersonaModel}
+                onApplyPreset={(preset) => void applyIndividualPreset(preset)}
                 onOpenPersonas={() => onNavigate('personas')}
                 onClose={() => setTeamPanelOpen(false)}
               />
@@ -1005,16 +1296,22 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
               <LucaWorkflowPanel
                 personas={personas}
                 personaBySlug={personaBySlug}
+                routerProfiles={routerProfiles}
                 assignments={assignments}
                 activeSlug={activePersonaSlug}
                 loading={loading}
                 running={running}
                 readyRoles={readyRoles}
+                busySlug={busyPersonaSlug}
+                activePresetId={activeTeamPresetId}
+                applyingPresetId={applyingPresetId}
                 onReload={loadPersonas}
                 onClearWorkflow={clearWorkflow}
                 onRemove={removeRoleSlug}
                 onInspect={setActivePersonaSlug}
                 onOpenPicker={(id) => setPickerTarget({ mode: 'team', id })}
+                onSetModel={setPersonaModel}
+                onApplyPreset={(preset) => void applyTeamPreset(preset)}
                 onOpenPersonas={() => onNavigate('personas')}
                 onClose={() => setTeamPanelOpen(false)}
               />
@@ -1215,33 +1512,45 @@ function LucaAiStartState({
 function LucaIndividualPanel({
   personas,
   personaBySlug,
+  routerProfiles,
   assignments,
   activeSlug,
   loading,
   running,
+  busySlug,
   onReload,
   onClear,
   onRemoveParticipant,
   onClearJudge,
   onInspect,
   onOpenPicker,
+  onSetModel,
   onOpenPersonas,
   onClose,
+  activePresetId,
+  applyingPresetId,
+  onApplyPreset,
 }: {
   personas: YumePersonaSummary[];
   personaBySlug: Map<string, YumePersonaSummary>;
+  routerProfiles: RouterModelProfile[];
   assignments: IndividualAssignments;
   activeSlug: string | null;
   loading: boolean;
   running: boolean;
+  busySlug: string | null;
   onReload: () => void | Promise<void>;
   onClear: () => void;
   onRemoveParticipant: (slug: string) => void;
   onClearJudge: () => void;
   onInspect: (slug: string | null) => void;
   onOpenPicker: (id: IndividualPickerId) => void;
+  onSetModel: (slug: string, model: string) => void | Promise<void>;
   onOpenPersonas: () => void;
   onClose: () => void;
+  activePresetId: string | null;
+  applyingPresetId: string | null;
+  onApplyPreset: (preset: LucaIndividualPreset) => void;
 }) {
   const theme = useTheme();
   const readyCount = Number(assignments.participants.length > 0) + Number(Boolean(assignments.judge));
@@ -1278,26 +1587,42 @@ function LucaIndividualPanel({
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <PresetGallery
+          title="Seleções prontas"
+          presets={LUCA_INDIVIDUAL_PRESETS}
+          resolveSlugs={individualPresetSlugs}
+          personaBySlug={personaBySlug}
+          activeId={activePresetId}
+          applyingId={applyingPresetId}
+          disabled={running || loading}
+          onApply={onApplyPreset}
+        />
         <div className="space-y-2">
           <WorkflowRoleRow
             role={INDIVIDUAL_PICKER_CONFIGS.participants}
             personaBySlug={personaBySlug}
+            routerProfiles={routerProfiles}
             selectedSlugs={assignments.participants}
             activeSlug={activeSlug}
             disabled={running}
+            busySlug={busySlug}
             onOpen={() => onOpenPicker('participants')}
             onRemove={onRemoveParticipant}
             onInspect={onInspect}
+            onSetModel={onSetModel}
           />
           <WorkflowRoleRow
             role={INDIVIDUAL_PICKER_CONFIGS.judge}
             personaBySlug={personaBySlug}
+            routerProfiles={routerProfiles}
             selectedSlugs={assignments.judge ? [assignments.judge] : []}
             activeSlug={activeSlug}
             disabled={running}
+            busySlug={busySlug}
             onOpen={() => onOpenPicker('judge')}
             onRemove={onClearJudge}
             onInspect={onInspect}
+            onSetModel={onSetModel}
           />
           <div className="rounded-xl px-3 py-3 text-[11px] leading-relaxed" style={{ background: theme.surfaceHi, color: theme.textMute }}>
             Cada participante recebe somente a missão original. Depois, a chamada separada do juiz recebe todas as respostas para comparar, corrigir e decidir.
@@ -1320,31 +1645,37 @@ function LucaIndividualPanel({
 function LucaWorkflowPanel({
   personas,
   personaBySlug,
+  routerProfiles,
   assignments,
   activeSlug,
   loading,
   running,
   readyRoles,
+  busySlug,
   onReload,
   onClearWorkflow,
   onRemove,
   onInspect,
   onOpenPicker,
+  onSetModel,
   onOpenPersonas,
   onClose,
 }: {
   personas: YumePersonaSummary[];
   personaBySlug: Map<string, YumePersonaSummary>;
+  routerProfiles: RouterModelProfile[];
   assignments: WorkflowAssignments;
   activeSlug: string | null;
   loading: boolean;
   running: boolean;
   readyRoles: number;
+  busySlug: string | null;
   onReload: () => void | Promise<void>;
   onClearWorkflow: () => void;
   onRemove: (roleId: WorkflowRoleId, slug: string) => void;
   onInspect: (slug: string | null) => void;
   onOpenPicker: (roleId: WorkflowRoleId) => void;
+  onSetModel: (slug: string, model: string) => void | Promise<void>;
   onOpenPersonas: () => void;
   onClose: () => void;
 }) {
@@ -1384,12 +1715,15 @@ function LucaWorkflowPanel({
               key={role.id}
               role={role}
               personaBySlug={personaBySlug}
+              routerProfiles={routerProfiles}
               selectedSlugs={assignments[role.id]}
               activeSlug={activeSlug}
               disabled={running}
+              busySlug={busySlug}
               onOpen={() => onOpenPicker(role.id)}
               onRemove={(slug) => onRemove(role.id, slug)}
               onInspect={onInspect}
+              onSetModel={onSetModel}
             />
           ))}
         </div>
@@ -1410,21 +1744,27 @@ function LucaWorkflowPanel({
 function WorkflowRoleRow({
   role,
   personaBySlug,
+  routerProfiles,
   selectedSlugs,
   activeSlug,
   disabled,
+  busySlug,
   onOpen,
   onRemove,
   onInspect,
+  onSetModel,
 }: {
   role: PersonaPickerConfig;
   personaBySlug: Map<string, YumePersonaSummary>;
+  routerProfiles: RouterModelProfile[];
   selectedSlugs: string[];
   activeSlug: string | null;
   disabled: boolean;
+  busySlug: string | null;
   onOpen: () => void;
   onRemove: (slug: string) => void;
   onInspect: (slug: string | null) => void;
+  onSetModel: (slug: string, model: string) => void | Promise<void>;
 }) {
   const theme = useTheme();
   const Icon = role.icon;
@@ -1456,10 +1796,21 @@ function WorkflowRoleRow({
       {selectedItems.length ? (
         <div className="mt-2 space-y-1.5">
           {selectedItems.map(({ slug, persona }) => (
-            <div key={slug} className="flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: theme.surfaceHi }}>
-              {persona ? <PersonaAvatar persona={persona} size="xs" /> : <span className="h-7 w-7 rounded-lg" style={{ background: theme.goldSoft }} />}
-              <button type="button" className="min-w-0 flex-1 truncate text-left text-[11px] font-medium" onClick={() => onInspect(slug)} style={{ color: theme.textSoft }}>{persona?.name || slug}</button>
-              <button type="button" className="grid h-7 w-7 place-items-center rounded-md transition" onClick={() => !disabled && onRemove(slug)} disabled={disabled} aria-label={`Remover ${persona?.name || slug} de ${role.label}`} style={{ color: theme.textGhost }}><X className="h-3.5 w-3.5" /></button>
+            <div key={slug} className="rounded-lg px-2 py-1.5" style={{ background: theme.surfaceHi }}>
+              <div className="flex items-center gap-2">
+                {persona ? <PersonaAvatar persona={persona} size="xs" /> : <span className="h-7 w-7 rounded-lg" style={{ background: theme.goldSoft }} />}
+                <button type="button" className="min-w-0 flex-1 truncate text-left text-[11px] font-medium" onClick={() => onInspect(slug)} style={{ color: theme.textSoft }}>{persona?.name || slug}</button>
+                <button type="button" className="grid h-7 w-7 place-items-center rounded-md transition" onClick={() => !disabled && onRemove(slug)} disabled={disabled} aria-label={`Remover ${persona?.name || slug} de ${role.label}`} style={{ color: theme.textGhost }}><X className="h-3.5 w-3.5" /></button>
+              </div>
+              <div className="mt-1.5 flex items-center gap-2 pl-9">
+                <PersonaModelSelect
+                  slug={slug}
+                  persona={persona}
+                  profiles={routerProfiles}
+                  disabled={disabled || busySlug === slug}
+                  onChange={onSetModel}
+                />
+              </div>
             </div>
           ))}
         </div>
@@ -1469,6 +1820,67 @@ function WorkflowRoleRow({
         </button>
       )}
     </article>
+  );
+}
+
+function PersonaModelSelect({
+  slug,
+  persona,
+  profiles,
+  disabled,
+  onChange,
+}: {
+  slug: string;
+  persona?: YumePersonaSummary;
+  profiles: RouterModelProfile[];
+  disabled?: boolean;
+  onChange: (slug: string, model: string) => void | Promise<void>;
+}) {
+  const theme = useTheme();
+  const value = String(persona?.model || '').trim();
+  const options = profiles.length
+    ? profiles
+    : value
+      ? [{ id: value, name: value, model: value }]
+      : [];
+  const hasValue = options.some((profile) => profile.model === value);
+  // Fundo opaco: option nativo no Windows herda contraste ruim de rgba translúcido.
+  const selectSurface = '#12161d';
+  const selectText = theme.text;
+
+  return (
+    <label className="flex min-w-0 flex-1 items-center gap-1.5" data-persona-model-select={slug}>
+      <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide" style={{ color: theme.textGhost }}>
+        Motor
+      </span>
+      <select
+        className="luca-persona-model-select min-w-0 flex-1 truncate rounded-md border px-1.5 py-1 font-mono text-[10px] outline-none"
+        value={hasValue ? value : ''}
+        disabled={disabled || !options.length}
+        aria-label={`Modelo 9Router de ${persona?.name || slug}`}
+        onChange={(event) => {
+          const next = event.target.value;
+          if (next) void onChange(slug, next);
+        }}
+        style={{ background: selectSurface, borderColor: theme.border, color: selectText, colorScheme: 'dark' }}
+      >
+        {!hasValue && <option value="">{value || 'Escolher modelo'}</option>}
+        {options.map((profile) => (
+          <option key={`${profile.id}-${profile.model}`} value={profile.model} style={{ background: selectSurface, color: selectText }}>
+            {profile.name}
+          </option>
+        ))}
+      </select>
+      {persona?.modelOverridden ? (
+        <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase" style={{ background: theme.goldSoft, color: theme.goldDeep }}>
+          LUCA
+        </span>
+      ) : (
+        <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase" style={{ background: theme.aliveSoft, color: theme.alive }} title="Motor do Yume (sem override local)">
+          Yume
+        </span>
+      )}
+    </label>
   );
 }
 
@@ -1485,20 +1897,65 @@ function PersonaPickerSheet({ role, personas, selectedSlugs, query, busySlug, on
 }) {
   const theme = useTheme();
   const RoleIcon = role.icon;
+  const [secondaryOpen, setSecondaryOpen] = useState(false);
   const term = query.trim().toLowerCase();
   const visiblePersonas = personas.filter((persona) => !term || [persona.name, persona.description, persona.purpose, persona.slug].filter(Boolean).some((value) => String(value).toLowerCase().includes(term)));
+  const rosterPersonas = visiblePersonas.filter((persona) => persona.imported);
+  const secondaryPersonas = visiblePersonas.filter((persona) => !persona.imported);
   const limitReached = role.multiple && selectedSlugs.length >= role.maxSlugs;
+
+  useEffect(() => {
+    if (term) setSecondaryOpen(true);
+  }, [term]);
+
+  const renderPersonaOption = (persona: YumePersonaSummary) => {
+    const selected = selectedSlugs.includes(persona.slug);
+    const busy = busySlug === persona.slug;
+    return (
+      <button
+        key={persona.slug}
+        type="button"
+        className="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition"
+        data-testid={`persona-option-${persona.slug}`}
+        onClick={() => selected ? onRemove(persona.slug) : void onChoose(persona.slug)}
+        disabled={Boolean(busySlug) || (!selected && limitReached)}
+        style={{
+          background: selected ? theme.goldSoft : theme.input,
+          borderColor: selected ? theme.borderActive : theme.border,
+          opacity: !selected && limitReached ? 0.5 : 1,
+        }}
+      >
+        <PersonaAvatar persona={persona} size="sm" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold" style={{ color: theme.textSoft }}>{persona.name}</span>
+          <span className="mt-0.5 block line-clamp-2 text-[11px] leading-relaxed" style={{ color: theme.textMute }}>{persona.description || persona.purpose || 'Especialista disponível no catálogo.'}</span>
+          {persona.model ? (
+            <span className="mt-1 inline-flex max-w-full items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[9px]" style={{ background: 'rgba(255,255,255,0.05)', color: theme.textGhost }}>
+              {persona.model}
+              {persona.modelOverridden ? ' · LUCA' : ''}
+            </span>
+          ) : null}
+        </span>
+        <span className="flex shrink-0 flex-col items-end gap-1">
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" style={{ color: theme.goldDeep }} /> : selected ? <CheckCircle2 className="h-4 w-4" style={{ color: theme.alive }} /> : <Plus className="h-4 w-4" style={{ color: theme.goldDeep }} />}
+          <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: persona.imported ? theme.alive : theme.textGhost }}>
+            {selected ? 'selecionada' : persona.imported ? 'no LUCA' : 'adicionar'}
+          </span>
+        </span>
+      </button>
+    );
+  };
 
   return (
     <motion.div className="luca-ai-picker-layer" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <button type="button" className="absolute inset-0 cursor-default" aria-label="Fechar seleção de personas" onClick={onClose} />
-      <motion.aside className="luca-ai-picker" initial={{ x: 36, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 36, opacity: 0 }} transition={{ duration: 0.2 }} aria-label={`Selecionar persona para ${role.label}`}>
+      <motion.aside className="luca-ai-picker" initial={{ x: 36, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 36, opacity: 0 }} transition={{ duration: 0.2 }} role="dialog" aria-modal="true" aria-labelledby="luca-persona-picker-title" onKeyDown={(event) => { if (event.key === 'Escape') onClose(); }}>
         <header className="border-b p-5" style={{ borderColor: theme.border }}>
           <div className="flex items-start gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: theme.goldSoft, color: theme.goldDeep }}><RoleIcon className="h-5 w-5" /></span>
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: theme.textGhost }}>Selecionar para</p>
-              <h2 className="mt-1 text-lg font-semibold" style={{ color: theme.text }}>{role.label}</h2>
+              <h2 id="luca-persona-picker-title" className="mt-1 text-lg font-semibold" style={{ color: theme.text }}>{role.label}</h2>
               <p className="mt-1 text-xs leading-relaxed" style={{ color: theme.textMute }}>{role.multiple ? `Escolha até ${role.maxSlugs} personas. Você pode combinar especialistas.` : 'Escolha a persona responsável por esta etapa.'}</p>
             </div>
             <button type="button" className="grid h-9 w-9 place-items-center rounded-lg" onClick={onClose} aria-label="Fechar"><X className="h-4 w-4" /></button>
@@ -1509,25 +1966,41 @@ function PersonaPickerSheet({ role, personas, selectedSlugs, query, busySlug, on
           </div>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          <div className="space-y-2">
-            {visiblePersonas.map((persona) => {
-              const selected = selectedSlugs.includes(persona.slug);
-              const busy = busySlug === persona.slug;
-              return (
-                <button key={persona.slug} type="button" className="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition" data-testid={`persona-option-${persona.slug}`} onClick={() => selected ? onRemove(persona.slug) : void onChoose(persona.slug)} disabled={Boolean(busySlug) || (!selected && limitReached)} style={{ background: selected ? theme.goldSoft : theme.input, borderColor: selected ? theme.borderActive : theme.border, opacity: !selected && limitReached ? 0.5 : 1 }}>
-                  <PersonaAvatar persona={persona} size="sm" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold" style={{ color: theme.textSoft }}>{persona.name}</span>
-                    <span className="mt-0.5 block line-clamp-2 text-[11px] leading-relaxed" style={{ color: theme.textMute }}>{persona.description || persona.purpose || 'Especialista disponível no catálogo.'}</span>
-                  </span>
-                  <span className="flex shrink-0 flex-col items-end gap-1">
-                    {busy ? <Loader2 className="h-4 w-4 animate-spin" style={{ color: theme.goldDeep }} /> : selected ? <CheckCircle2 className="h-4 w-4" style={{ color: theme.alive }} /> : <Plus className="h-4 w-4" style={{ color: theme.goldDeep }} />}
-                    <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: persona.imported ? theme.alive : theme.textGhost }}>{persona.imported ? 'no LUCA' : 'conectar'}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          <section aria-labelledby="luca-picker-roster-title" className="space-y-2">
+            <div className="flex items-center justify-between gap-3 px-1 pb-1">
+              <h3 id="luca-picker-roster-title" className="text-xs font-semibold" style={{ color: theme.textSoft }}>Roster principal</h3>
+              <span className="text-[10px] font-mono" style={{ color: theme.textGhost }}>{rosterPersonas.length}</span>
+            </div>
+            {rosterPersonas.length > 0 ? rosterPersonas.map(renderPersonaOption) : (
+              <p className="rounded-xl border px-3 py-4 text-xs leading-relaxed" style={{ borderColor: theme.border, color: theme.textMute }}>
+                Nenhuma persona do roster corresponde à busca. Use as disponíveis abaixo para adicionar uma especialista ao LUCA.
+              </p>
+            )}
+          </section>
+
+          <section aria-labelledby="luca-picker-secondary-title" className="mt-5 space-y-2">
+            <button
+              type="button"
+              className="flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 py-2 text-left active:scale-[0.96] motion-safe:transition-transform"
+              style={{ background: theme.input, borderColor: theme.border, color: theme.text }}
+              aria-expanded={secondaryOpen}
+              aria-controls="luca-picker-secondary-panel"
+              onClick={() => setSecondaryOpen((open) => !open)}
+            >
+              <span className="min-w-0 flex-1">
+                <span id="luca-picker-secondary-title" className="block text-xs font-semibold">Disponíveis no Yume</span>
+                <span className="mt-0.5 block text-[10px]" style={{ color: theme.textMute }}>{secondaryPersonas.length} fora do roster</span>
+              </span>
+              <ChevronDown className={`h-4 w-4 shrink-0 motion-safe:transition-transform ${secondaryOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+            </button>
+            {secondaryOpen && (
+              <div id="luca-picker-secondary-panel" className="space-y-2 pt-1">
+                {secondaryPersonas.length > 0 ? secondaryPersonas.map(renderPersonaOption) : (
+                  <p className="px-3 py-4 text-xs" style={{ color: theme.textMute }}>Nenhuma persona secundária corresponde à busca.</p>
+                )}
+              </div>
+            )}
+          </section>
           {!visiblePersonas.length && (
             <div
               className="flex min-h-[220px] flex-col items-center justify-center gap-3 px-4 py-12 text-center"
@@ -1928,6 +2401,11 @@ function FinalDisplayCard({ entry, persona }: { entry: TeamTranscriptEntry; pers
           {isJudge ? <Scale className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
           {isJudge ? 'Veredito do juiz' : 'Entrega final'}
         </span>
+        {entry.model ? (
+          <span className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px]" style={{ background: 'rgba(255,255,255,0.05)', color: theme.textGhost }} title="Motor 9Router">
+            {entry.model}
+          </span>
+        ) : null}
         <span className="luca-ai-message-copy ml-auto">
           <CopyLogButton text={entry.content} label="Copiar veredito" />
         </span>
@@ -1961,16 +2439,21 @@ function IndividualResponseCard({
       >
         <SpeakerAvatar entry={entry} persona={persona} compact />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-semibold" style={{ color: entry.status === 'error' ? theme.error : theme.text }}>{entry.name}</span>
-          <span className="block text-[11px]" style={{ color: theme.textGhost }}>{entry.status === 'error' ? 'Falha individual' : 'Resposta individual · expandir'}</span>
-        </span>
-        <span
-          className="luca-ai-message-copy"
-          onClick={(event) => event.stopPropagation()}
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          <CopyLogButton text={entry.content} label={`Copiar resposta de ${entry.name}`} />
-        </span>
+                  <span className="block truncate text-[13px] font-semibold" style={{ color: entry.status === 'error' ? theme.error : theme.text }}>{entry.name}</span>
+                  <span className="block text-[11px]" style={{ color: theme.textGhost }}>{entry.status === 'error' ? 'Falha individual' : 'Resposta individual · expandir'}</span>
+                </span>
+                {entry.model ? (
+                  <span className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px]" style={{ background: 'rgba(255,255,255,0.05)', color: theme.textGhost }} title="Motor 9Router">
+                    {entry.model}
+                  </span>
+                ) : null}
+                <span
+                  className="luca-ai-message-copy"
+                  onClick={(event) => event.stopPropagation()}
+                  onPointerDown={(event) => event.stopPropagation()}
+                >
+                  <CopyLogButton text={entry.content} label={`Copiar resposta de ${entry.name}`} />
+                </span>
         <ChevronDown className="luca-ai-individual-chevron h-4 w-4 shrink-0" style={{ color: theme.textMute }} />
       </summary>
       <div className="luca-ai-message-body luca-ai-selectable mt-2 pl-1">
@@ -2013,6 +2496,11 @@ function TranscriptEntry({ entry, persona }: { entry: TeamTranscriptEntry; perso
         <SpeakerAvatar entry={entry} persona={persona} compact />
         <span className="min-w-0 text-[13px] font-semibold luca-wrap" style={{ color: toneColor }}>{entry.name}</span>
         {entry.stage && <StageBadge stage={entry.stage} />}
+        {entry.model ? (
+          <span className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px]" style={{ background: 'rgba(255,255,255,0.05)', color: theme.textGhost }} title="Motor 9Router">
+            {entry.model}
+          </span>
+        ) : null}
         <time className="ml-auto shrink-0 text-[10px] font-mono" style={{ color: theme.textGhost }}>
           {new Date(entry.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
         </time>

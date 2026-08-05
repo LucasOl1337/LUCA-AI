@@ -3,6 +3,18 @@ const DEFAULT_MAX_MISSION_CHARS = 6000;
 const DEFAULT_MAX_EXECUTION_SLUGS = 4;
 const DEFAULT_MAX_INDIVIDUAL_PARTICIPANTS = 5;
 
+function normalizeModelOverrides(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const overrides = {};
+  for (const [rawKey, rawModel] of Object.entries(value)) {
+    const slug = normalizePersonaTeamSlug(rawKey);
+    const model = String(rawModel || '').trim();
+    if (!slug || !model) continue;
+    overrides[slug] = model;
+  }
+  return overrides;
+}
+
 export const PERSONA_WORKFLOW_ROLES = [
   {
     id: 'supervisor',
@@ -227,6 +239,7 @@ export function normalizePersonaTeamRunInput(body = {}, options = {}) {
     workflow,
     mode: individualMode ? 'individual' : workflow.length ? 'workflow' : 'parallel',
     judgeSlug: individualMode ? judgeSlug : undefined,
+    modelOverrides: normalizeModelOverrides(body?.modelOverrides || body?.models),
     traceId,
   };
 }
@@ -236,6 +249,7 @@ export function buildPersonaTeamPrompt({
   personaName,
   personaSlug,
   systemPrompt,
+  runtimeModel = '',
   teamNames = [],
   workflowRole = null,
   accumulatedContext = '',
@@ -244,6 +258,18 @@ export function buildPersonaTeamPrompt({
   const name = String(personaName || personaSlug || 'Persona Yume').trim();
   const slug = String(personaSlug || '').trim();
   const basePrompt = String(systemPrompt || '').trim() || `Voce e a persona ${name}.`;
+  const model = String(runtimeModel || '').trim();
+  const modelBlock = model
+    ? `
+Motor LLM desta execucao (fonte de verdade do LUCA-AI via 9Router): ${model}
+- Persona/slug e identidade operacional, NAO o nome do modelo.
+- Se perguntarem qual modelo voce usa, responda EXATAMENTE "${model}".
+- Ignore qualquer modelo antigo embutido no prompt da persona (ex.: GLM, glm-*, genericos).
+- Nao invente provider, familia ou versao fora desse ID.`
+    : `
+Motor LLM desta execucao nao foi declarado explicitamente.
+- Nao invente nomes de modelo (GLM, gpt, grok, etc.).
+- Se perguntarem o modelo e voce nao tiver o ID, diga que o motor e o 9Router do LUCA e que o ID nao foi exposto neste turno.`;
   const teammates = teamNames.filter(Boolean).join(', ') || name;
   const role = workflowRole?.roleId ? ROLE_BY_ID.get(workflowRole.roleId) : null;
   const roleLabel = workflowRole?.roleLabel || role?.label || '';
@@ -273,6 +299,7 @@ export function buildPersonaTeamPrompt({
 
   ---
   Voce esta trabalhando dentro do modulo LUCA-AI, uma bancada isolada de personas do Yume.
+  ${modelBlock}
   Nao publique no chat global, nao acione agentes fixos do Operacional e nao assuma que existe uma missao ativa fora desta tela.
   Quando a missao depender de fato externo (URL, site, API), use as ferramentas operacionais do runtime antes de concluir.
   Responda em pt-BR, com postura de agente especialista e foco em acao concreta.${workflowSystem}${individualSystem}`,
@@ -281,6 +308,7 @@ export function buildPersonaTeamPrompt({
 
   ${independent ? '' : `Equipe ativa: ${teammates}\n`}
   Sua persona: ${name}${slug ? ` (${slug})` : ''}
+  ${model ? `Motor 9Router: ${model}` : ''}
   ${workflowUser}
 
   ${outputContract}`,
@@ -292,17 +320,31 @@ export function buildIndividualJudgePrompt({
   judgeName,
   judgeSlug,
   systemPrompt,
+  runtimeModel = '',
   replies = [],
 }) {
   const name = String(judgeName || judgeSlug || 'Juiz').trim();
   const slug = String(judgeSlug || '').trim();
   const basePrompt = String(systemPrompt || '').trim() || `Voce e a persona ${name}.`;
+  const model = String(runtimeModel || '').trim();
+  const modelBlock = model
+    ? `
+Motor LLM desta execucao (fonte de verdade do LUCA-AI via 9Router): ${model}
+- Voce e a persona "${name}"${slug ? ` (${slug})` : ''}; isso e identidade operacional, nao o modelo.
+- Se perguntarem qual modelo voce usa, responda EXATAMENTE "${model}".
+- Ignore modelos antigos no prompt da persona (GLM, glm-*, etc.).
+- Ao avaliar participantes, nao invente o modelo deles; use apenas o que o runtime declarar ou diga que o ID nao foi informado.`
+    : `
+Motor LLM desta execucao nao foi declarado explicitamente.
+- Nao invente nomes de modelo.
+- Se perguntarem o modelo e voce nao tiver o ID, diga que o motor e o 9Router do LUCA e que o ID nao foi exposto neste turno.`;
   const contributions = replies.map((reply) => {
     const author = `${reply?.name || reply?.slug || 'Participante'}${reply?.slug ? ` (${reply.slug})` : ''}`;
+    const motor = reply?.model ? ` | motor 9Router: ${reply.model}` : '';
     const content = reply?.ok
       ? cleanPersonaTeamOutput(reply.content)
       : `FALHA: ${String(reply?.error || 'sem resposta').trim()}`;
-    return `${author}: ${content}`;
+    return `${author}${motor}: ${content}`;
   }).join('\n\n');
 
   return {
@@ -311,6 +353,7 @@ export function buildIndividualJudgePrompt({
 
   ---
   Voce e o juiz independente de uma resolucao individual no modulo LUCA-AI.
+  ${modelBlock}
   Nao produza uma resposta isolada antes de examinar todas as contribuicoes recebidas.
   Avalie evidencias, utilidade, consistencia e cobertura. Nao favoreca uma persona por identidade, inclusive se voce tambem participou da primeira rodada.
   Se a missao original depender de fato externo e as contribuicoes nao tiverem evidencia suficiente, voce tambem pode usar as ferramentas operacionais do runtime.
@@ -319,6 +362,7 @@ export function buildIndividualJudgePrompt({
   ${mission}
 
   Persona juiza: ${name}${slug ? ` (${slug})` : ''}
+  ${model ? `Motor 9Router do juiz: ${model}` : ''}
 
   Contribuicoes individuais:
   ${contributions || 'Nenhuma contribuicao utilizavel foi recebida.'}

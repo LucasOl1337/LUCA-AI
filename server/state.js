@@ -613,6 +613,14 @@ export function getPersonaAgents() {
   return state.personaAgents;
 }
 
+function resolvePersonaLocalModel(value, fallback = '') {
+  const model = String(value ?? '').trim();
+  if (!model) return '';
+  // Override local só existe se a rota estiver no catálogo 9Router.
+  // Vazio = seguir o motor do Yume em runtime.
+  return sanitizeAgentModel(model, '') === model ? model : String(fallback || '').trim();
+}
+
 export function addPersonaAgent(entry = {}) {
   const state = activeState();
   if (!state) return null;
@@ -620,19 +628,28 @@ export function addPersonaAgent(entry = {}) {
   if (!slug) return null;
   if (!Array.isArray(state.personaAgents)) state.personaAgents = [];
   const existing = state.personaAgents.find((p) => p.slug === slug);
+  // Import NÃO grava override: model local só se o caller mandar rota válida.
+  // Sem isso, sanitize caía no ROUTER_MODEL e mascarava o motor do Yume.
+  const hasModelField = Object.prototype.hasOwnProperty.call(entry, 'model');
+  const nextLocalModel = hasModelField
+    ? resolvePersonaLocalModel(entry.model, '')
+    : resolvePersonaLocalModel(existing?.model, '');
   const record = {
-    id: `yume:${slug}`,
-    slug,
-    source: 'yume',
-    name: entry.name || existing?.name || slug,
-    model: sanitizeAgentModel(entry.model, existing?.model),
-    enabled: entry.enabled !== undefined ? Boolean(entry.enabled) : (existing?.enabled !== false),
-    cachedVersion: entry.cachedVersion ?? existing?.cachedVersion ?? null,
-    cachedSystemPrompt: entry.cachedSystemPrompt ?? existing?.cachedSystemPrompt ?? null,
-    cachedAt: entry.cachedAt ?? existing?.cachedAt ?? null,
-    lastError: null,
-    addedAt: existing?.addedAt || new Date().toISOString(),
-  };
+      id: `yume:${slug}`,
+      slug,
+      source: 'yume',
+      name: entry.name || existing?.name || slug,
+      model: nextLocalModel,
+      yumeModel: entry.yumeModel !== undefined
+        ? String(entry.yumeModel || '').trim()
+        : String(existing?.yumeModel || '').trim(),
+      enabled: entry.enabled !== undefined ? Boolean(entry.enabled) : (existing?.enabled !== false),
+      cachedVersion: entry.cachedVersion ?? existing?.cachedVersion ?? null,
+      cachedSystemPrompt: entry.cachedSystemPrompt ?? existing?.cachedSystemPrompt ?? null,
+      cachedAt: entry.cachedAt ?? existing?.cachedAt ?? null,
+      lastError: null,
+      addedAt: existing?.addedAt || new Date().toISOString(),
+    };
   state.personaAgents = [record, ...state.personaAgents.filter((p) => p.slug !== slug)].slice(0, 50);
   persistState();
   return record;
@@ -646,7 +663,8 @@ export function updatePersonaAgent(slug, patch = {}) {
   if (!record) return null;
   const nextPatch = { ...patch };
   if (typeof patch.model === 'string') {
-    nextPatch.model = sanitizeAgentModel(patch.model, record.model);
+    // '' limpa override e volta ao motor do Yume.
+    nextPatch.model = resolvePersonaLocalModel(patch.model, '');
   }
   Object.assign(record, nextPatch);
   persistState();

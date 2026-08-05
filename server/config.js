@@ -39,8 +39,12 @@ const NINE_ROUTER_PROFILE_DEFINITIONS = [
   ['gpt-5-6-sol-ultra', 'GPT 5.6 Sol Ultra', 'cx/gpt-5.6-sol-xhigh'],
   ['gpt-5-6-luna-xhigh', 'GPT 5.6 Luna xhigh', 'cx/gpt-5.6-luna-xhigh'],
   ['gpt-5-6-luna-ultra', 'GPT 5.6 Luna Ultra', 'cx/gpt-5.6-luna-xhigh'],
+  ['gpt-5-5', 'GPT 5.5', 'cx/gpt-5.5'],
   ['gpt-5-5-xhigh', 'GPT 5.5 xhigh', 'cx/gpt-5.5-xhigh'],
   ['grok-4-5', 'Grok 4.5', 'gcli/grok-4.5'],
+  ['grok-4-5-high', 'Grok 4.5 High', 'gcli/grok-4.5-high'],
+  ['grok-4-5-medium', 'Grok 4.5 Medium', 'gcli/grok-4.5-medium'],
+  ['grok-4-5-low', 'Grok 4.5 Low', 'gcli/grok-4.5-low'],
   ['kimi-k3-general', 'Kimi K3 General', 'kimi/kimi-k3'],
   ['kimi-k3-code', 'Kimi K3 Code', 'kimi/k3'],
   ['kimi-k2-7-code', 'Kimi K2.7 Code', 'kimi/kimi-for-coding'],
@@ -142,4 +146,17 @@ export function defaultAgentModel(agentId) {
 
 export function sanitizeAgentModel(value, fallback = ROUTER_MODEL) {
   return sanitize9RouterModel(value, fallback);
+}
+
+/** Modelo efetivo da persona no LUCA: override local > Yume (se catálogo) > fallback. */
+export function resolvePersonaRuntimeModel({
+  localModel = '',
+  yumeModel = '',
+  overrideModel = '',
+  fallback = ROUTER_MODEL,
+} = {}) {
+  if (isAllowed9RouterModel(overrideModel)) return String(overrideModel).trim();
+  if (isAllowed9RouterModel(localModel)) return String(localModel).trim();
+  if (isAllowed9RouterModel(yumeModel)) return String(yumeModel).trim();
+  return sanitize9RouterModel(fallback, ROUTER_MODEL);
 }

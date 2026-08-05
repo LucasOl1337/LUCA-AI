@@ -14,6 +14,7 @@ import {
 import { useTheme } from '@/hooks/useTheme';
 import { useLuca } from '@/hooks/useLucaState';
 import { useAuth } from '@/hooks/useAuth';
+import SidebarSessionsRail from '@/components/SidebarSessionsRail';
 
 export type PageId = 'inicio' | 'luca-ai' | 'personas' | 'admin';
 
@@ -126,30 +127,39 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
           )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-1" aria-label="Navegação principal">
-          {!compact && (
-            <div className="px-3 pb-2 text-[10px] font-semibold tracking-[0.12em] uppercase" style={{ color: theme.textGhost }}>
-              Espaços
-            </div>
-          )}
-          {navItems.filter((item) => item.id !== 'admin' || user?.role === 'admin').map((item) => {
-            const Icon = item.icon;
-            const selected = activePage === item.id;
-            return (
-              <button
-                type="button"
-                key={item.id}
-                onClick={() => navigate(item.id)}
-                className={`rift-item w-full ${selected ? 'active' : ''} ${compact ? 'justify-center !px-0' : ''}`}
-                title={compact ? item.label : undefined}
-                aria-current={selected ? 'page' : undefined}
-              >
-                <Icon className="w-[18px] h-[18px] shrink-0" />
-                {!compact && <span className="min-w-0 flex-1 text-left truncate">{item.label}</span>}
-              </button>
-            );
-          })}
-        </nav>
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <nav className="shrink-0 px-2 py-2 space-y-1" aria-label="Navegação principal">
+            {!compact && (
+              <div className="px-3 pb-2 text-[10px] font-semibold tracking-[0.12em] uppercase" style={{ color: theme.textGhost }}>
+                Espaços
+              </div>
+            )}
+            {navItems.filter((item) => item.id !== 'admin' || user?.role === 'admin').map((item) => {
+              const Icon = item.icon;
+              const selected = activePage === item.id;
+              return (
+                <button
+                  type="button"
+                  key={item.id}
+                  onClick={() => navigate(item.id)}
+                  className={`rift-item w-full ${selected ? 'active' : ''} ${compact ? 'justify-center !px-0' : ''}`}
+                  title={compact ? item.label : undefined}
+                  aria-current={selected ? 'page' : undefined}
+                >
+                  <Icon className="w-[18px] h-[18px] shrink-0" />
+                  {!compact && <span className="min-w-0 flex-1 text-left truncate">{item.label}</span>}
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className="min-h-0 flex-1 overflow-hidden px-2 pb-2 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,.06)' }}>
+            <SidebarSessionsRail
+              compact={compact}
+              onOpenLucaAi={() => navigate('luca-ai')}
+            />
+          </div>
+        </div>
 
         <div className="px-2 pb-2 pt-2">
           {!compact && user && (

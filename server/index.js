@@ -21,6 +21,8 @@ import {
   NINE_ROUTER_ROUTE_IDS,
   MAX_CLOSURE_ATTEMPTS,
   CONVERSATION_PARTNER_AGENT_ID,
+  isAllowed9RouterModel,
+  resolvePersonaRuntimeModel,
 } from './config.js';
 import { call9Router, check9RouterHealth } from './router-client.js';
 import { runAgentWithTools } from './agent-loop.js';
@@ -59,6 +61,19 @@ import {
   listWorkspaceUserIds,
 } from './state.js';
 import { runWithWorkspaceUser, getWorkspaceUserId } from './workspace-context.js';
+import {
+  activateChatSession,
+  createChatFolder,
+  createChatSession,
+  deleteChatFolder,
+  deleteChatSession,
+  getChatLibrarySnapshot,
+  getChatLibrarySnapshotForUser,
+  getChatSession,
+  getChatSessionForUser,
+  renameChatFolder,
+  updateChatSession,
+} from './chat-library.js';
 import {
   listYumePersonas,
   fetchYumePersonaSystemPrompt,
@@ -206,7 +221,10 @@ app.use('/api', (req, res, next) => {
   ensureWorkspace(userId);
   runWithWorkspaceUser(userId, () => next());
 });
-authService.registerAdminRoutes(app);
+authService.registerAdminRoutes(app, {
+  getUserChatLibrary: getChatLibrarySnapshotForUser,
+  getUserChatSession: getChatSessionForUser,
+});
 
 const httpServer = createServer(app);
 const wss = new WebSocketServer({
@@ -1665,24 +1683,37 @@ async function resolvePersonaSystemPrompt(slug) {
     const versionInfo = await getYumePersonaVersion(slug);
     const currentVersion = versionInfo?.version ?? null;
     if (persona?.cachedSystemPrompt && persona.cachedVersion === currentVersion) {
-      return { systemPrompt: persona.cachedSystemPrompt, model: persona.model, version: currentVersion, cached: true };
+      // model no cache = motor do Yume (não o override local).
+      return {
+        systemPrompt: persona.cachedSystemPrompt,
+        model: persona.yumeModel || '',
+        version: currentVersion,
+        cached: true,
+      };
     }
     const data = await fetchYumePersonaSystemPrompt(slug);
     const systemPrompt = data?.system_prompt || '';
     const model = data?.model || '';
+    // yumeModel no cache; model local só via override explícito.
     updatePersonaAgent(slug, {
       cachedSystemPrompt: systemPrompt,
       cachedVersion: currentVersion,
       cachedAt: new Date().toISOString(),
       name: data?.name || persona?.name,
-      model: persona?.model || model,
+      yumeModel: model,
       lastError: null,
     });
     return { systemPrompt, model, version: currentVersion, cached: false };
   } catch (error) {
     if (persona?.cachedSystemPrompt) {
       updatePersonaAgent(slug, { lastError: error?.message || String(error) });
-      return { systemPrompt: persona.cachedSystemPrompt, model: persona.model, version: persona.cachedVersion, cached: true, stale: true };
+      return {
+        systemPrompt: persona.cachedSystemPrompt,
+        model: persona.yumeModel || '',
+        version: persona.cachedVersion,
+        cached: true,
+        stale: true,
+      };
     }
     throw error;
   }
@@ -1707,23 +1738,32 @@ async function runPersonaAgentChat(slug, { mode = 'chat_only', reason = '', chat
     return { ok: false, error: msg };
   }
   const personaPrompt = resolved.systemPrompt || `Voce e a persona ${persona.name}.`;
-  const model = persona.model || resolved.model || ROUTER_MODEL;
-  const system = `${personaPrompt}
+    const model = resolvePersonaRuntimeModel({
+      localModel: persona.model,
+      yumeModel: resolved.model,
+      fallback: ROUTER_MODEL,
+    });
+    const system = `${personaPrompt}
 
----
-Voce esta atuando como agente especialista dentro do LUCA-AI (orquestrador de missoes). Mantenha sua personalidade e expertise da persona acima. ${mode === 'conversation'
-    ? 'Voce esta numa conversa entre agentes: reaja ao que foi dito e traga contribuicao concreta.'
-    : 'Cumpra o pedido da missao no chat global.'} Para publicar no chat global, escreva uma linha [chat:tipo] mensagem (tipos: info, resultado, decisao, pergunta, alerta, acao).`;
-  const user = `Missao ativa
-Descricao: ${mission?.description ?? ''}
-Criterios de conclusao: ${mission?.success ?? ''}
+  ---
+  Voce esta atuando como agente especialista dentro do LUCA-AI (orquestrador de missoes). Mantenha sua personalidade e expertise da persona acima.
+  Motor LLM desta execucao (fonte de verdade do LUCA-AI via 9Router): ${model}
+  - Persona/slug e identidade operacional, NAO o nome do modelo.
+  - Se perguntarem qual modelo voce usa, responda EXATAMENTE "${model}".
+  - Ignore qualquer modelo antigo embutido no prompt da persona (ex.: GLM, glm-*).
+  ${mode === 'conversation'
+      ? 'Voce esta numa conversa entre agentes: reaja ao que foi dito e traga contribuicao concreta.'
+      : 'Cumpra o pedido da missao no chat global.'} Para publicar no chat global, escreva uma linha [chat:tipo] mensagem (tipos: info, resultado, decisao, pergunta, alerta, acao).`;
+    const user = `Missao ativa
+  Descricao: ${mission?.description ?? ''}
+  Criterios de conclusao: ${mission?.success ?? ''}
 
-Chat recente:
-${context}
+  Chat recente:
+  ${context}
 
-Motivo desta rodada: ${reason || 'contribua como especialista'}
+  Motivo desta rodada: ${reason || 'contribua como especialista'}
 
-Responda como ${persona.name}, em 1 a 5 linhas. Use [chat:tipo] para o que deve aparecer no chat global.`;
+  Responda como ${persona.name}, em 1 a 5 linhas. Use [chat:tipo] para o que deve aparecer no chat global.`;
   try {
     appendHeartbeatLog(`[persona] ${persona.name} (yume:${slug}) v${resolved.version ?? '?'}${resolved.stale ? ' cache' : ''} via Kamui`);
     const output = await call9Router({ system, user, agentId: `yume-${slug}`, model, maxTokens: 700 });
@@ -1742,7 +1782,7 @@ Responda como ${persona.name}, em 1 a 5 linhas. Use [chat:tipo] para o que deve 
   }
 }
 
-async function loadPersonaTeamPrompt(slug) {
+async function loadPersonaTeamPrompt(slug, { modelOverride = '' } = {}) {
   const persona = getPersonaAgents().find((p) => p.slug === slug);
   try {
     const data = await fetchYumePersonaSystemPrompt(slug);
@@ -1753,18 +1793,43 @@ async function loadPersonaTeamPrompt(slug) {
     } catch {
       version = data?.version ?? null;
     }
+    const yumeModel = String(data?.model || '').trim();
+    const localModel = String(persona?.model || '').trim();
+    const model = resolvePersonaRuntimeModel({
+      localModel,
+      yumeModel,
+      overrideModel: modelOverride,
+      fallback: ROUTER_MODEL,
+    });
     return {
       name: data?.name || persona?.name || slug,
-      model: persona?.model || ROUTER_MODEL,
+      model,
+      yumeModel,
+      localModel: isAllowed9RouterModel(localModel) ? localModel : '',
+      modelOverridden: Boolean(
+        (isAllowed9RouterModel(modelOverride) && modelOverride !== yumeModel)
+        || (isAllowed9RouterModel(localModel) && yumeModel && localModel !== yumeModel),
+      ),
       systemPrompt: data?.system_prompt || '',
       version,
       cached: false,
     };
   } catch (error) {
     if (persona?.cachedSystemPrompt) {
+      const yumeModel = '';
+      const localModel = String(persona.model || '').trim();
+      const model = resolvePersonaRuntimeModel({
+        localModel,
+        yumeModel,
+        overrideModel: modelOverride,
+        fallback: ROUTER_MODEL,
+      });
       return {
         name: persona.name || slug,
-        model: persona.model || '',
+        model,
+        yumeModel,
+        localModel: isAllowed9RouterModel(localModel) ? localModel : '',
+        modelOverridden: Boolean(isAllowed9RouterModel(modelOverride) || isAllowed9RouterModel(localModel)),
         systemPrompt: persona.cachedSystemPrompt,
         version: persona.cachedVersion ?? null,
         cached: true,
@@ -1806,6 +1871,7 @@ async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, wo
     personaName: name,
     personaSlug: slug,
     systemPrompt: loaded.systemPrompt,
+    runtimeModel: model,
     teamNames,
     workflowRole,
     accumulatedContext,
@@ -1903,6 +1969,7 @@ async function runLucaAiIndividualJudge({ slug, mission, replies, loaded, traceI
     judgeName: name,
     judgeSlug: slug,
     systemPrompt: loaded.systemPrompt,
+    runtimeModel: model,
     replies,
   });
   const startedAt = new Date().toISOString();
@@ -2593,6 +2660,97 @@ app.get('/api/personas/available', async (_req, res) => {
   }
 });
 
+function chatLibraryError(res, error) {
+  const status = Number(error?.status) || 500;
+  res.status(status).json({ ok: false, error: error?.message || String(error) });
+}
+
+app.get('/api/luca-ai/chat/library', (_req, res) => {
+  try {
+    res.json({ ok: true, ...getChatLibrarySnapshot() });
+  } catch (error) {
+    chatLibraryError(res, error);
+  }
+});
+
+app.post('/api/luca-ai/chat/folders', (req, res) => {
+  try {
+    const folder = createChatFolder({ name: req.body?.name });
+    res.json({ ok: true, folder, ...getChatLibrarySnapshot() });
+  } catch (error) {
+    chatLibraryError(res, error);
+  }
+});
+
+app.patch('/api/luca-ai/chat/folders/:folderId', (req, res) => {
+  try {
+    const folder = renameChatFolder(req.params.folderId, { name: req.body?.name });
+    res.json({ ok: true, folder, ...getChatLibrarySnapshot() });
+  } catch (error) {
+    chatLibraryError(res, error);
+  }
+});
+
+app.delete('/api/luca-ai/chat/folders/:folderId', (req, res) => {
+  try {
+    const result = deleteChatFolder(req.params.folderId, {
+      cascadeSessions: Boolean(req.body?.cascadeSessions || req.query?.cascade === '1'),
+    });
+    res.json({ ok: true, ...result, ...getChatLibrarySnapshot() });
+  } catch (error) {
+    chatLibraryError(res, error);
+  }
+});
+
+app.post('/api/luca-ai/chat/sessions', (req, res) => {
+  try {
+    const session = createChatSession({
+      title: req.body?.title,
+      folderId: req.body?.folderId || null,
+      seedFromActive: req.body?.seedFromActive !== false,
+    });
+    res.json({ ok: true, session, ...getChatLibrarySnapshot() });
+  } catch (error) {
+    chatLibraryError(res, error);
+  }
+});
+
+app.get('/api/luca-ai/chat/sessions/:sessionId', (req, res) => {
+  try {
+    const session = getChatSession(req.params.sessionId);
+    res.json({ ok: true, session });
+  } catch (error) {
+    chatLibraryError(res, error);
+  }
+});
+
+app.patch('/api/luca-ai/chat/sessions/:sessionId', (req, res) => {
+  try {
+    const session = updateChatSession(req.params.sessionId, req.body || {});
+    res.json({ ok: true, session, ...getChatLibrarySnapshot() });
+  } catch (error) {
+    chatLibraryError(res, error);
+  }
+});
+
+app.post('/api/luca-ai/chat/sessions/:sessionId/activate', (req, res) => {
+  try {
+    const session = activateChatSession(req.params.sessionId);
+    res.json({ ok: true, session, ...getChatLibrarySnapshot() });
+  } catch (error) {
+    chatLibraryError(res, error);
+  }
+});
+
+app.delete('/api/luca-ai/chat/sessions/:sessionId', (req, res) => {
+  try {
+    const result = deleteChatSession(req.params.sessionId);
+    res.json({ ok: true, ...result, ...getChatLibrarySnapshot() });
+  } catch (error) {
+    chatLibraryError(res, error);
+  }
+});
+
 app.post('/api/luca-ai/persona-team/run', async (req, res) => {
   const input = normalizePersonaTeamRunInput(req.body);
   if (!input.ok) {
@@ -2616,9 +2774,13 @@ app.post('/api/luca-ai/persona-team/run', async (req, res) => {
   const slugsToLoad = input.mode === 'individual'
     ? [...new Set([...input.slugs, input.judgeSlug])]
     : input.slugs;
+  const modelOverrides = input.modelOverrides || {};
   const loaded = await Promise.all(slugsToLoad.map(async (slug) => {
     try {
-      return { slug, loaded: await loadPersonaTeamPrompt(slug) };
+      return {
+        slug,
+        loaded: await loadPersonaTeamPrompt(slug, { modelOverride: modelOverrides[slug] || '' }),
+      };
     } catch (error) {
       return { slug, error: error?.message || String(error) };
     }
@@ -2779,6 +2941,8 @@ app.post('/api/luca-ai/persona-team/run', async (req, res) => {
       slug: entry.slug,
       name: entry.loaded?.name || entry.slug,
       model: entry.loaded?.model || '',
+      yumeModel: entry.loaded?.yumeModel || '',
+      modelOverridden: Boolean(entry.loaded?.modelOverridden),
       version: entry.loaded?.version ?? null,
       cached: Boolean(entry.loaded?.cached),
       stale: Boolean(entry.loaded?.stale),
@@ -2810,11 +2974,13 @@ app.post('/api/agent/persona/add', async (req, res) => {
   try {
     const promptData = await fetchYumePersonaSystemPrompt(slug);
     const versionInfo = await getYumePersonaVersion(slug);
+    // Import não cria override de motor: runtime usa o model do Yume (catálogo)
+    // até o usuário mudar no seletor (POST /api/agent/config).
     const record = addPersonaAgent({
       slug,
       name: promptData?.name || slug,
-      model: promptData?.model || '',
       enabled: true,
+      yumeModel: promptData?.model || '',
       cachedSystemPrompt: promptData?.system_prompt || '',
       cachedVersion: versionInfo?.version ?? null,
       cachedAt: new Date().toISOString(),

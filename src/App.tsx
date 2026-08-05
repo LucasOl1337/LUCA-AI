@@ -6,6 +6,7 @@ import PersonasPage from '@/pages/PersonasPage';
 import AdminPage from '@/pages/AdminPage';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useAuth } from '@/hooks/useAuth';
+import { ChatLibraryProvider } from '@/hooks/useChatLibrary';
 
 const ACTIVE_PAGES: readonly PageId[] = ['inicio', 'luca-ai', 'personas', 'admin'];
 
@@ -37,8 +38,10 @@ export default function App() {
   };
 
   return (
-    <Layout activePage={authorizedPage} onPageChange={navigate}>
-      {renderPage()}
-    </Layout>
+    <ChatLibraryProvider>
+      <Layout activePage={authorizedPage} onPageChange={navigate}>
+        {renderPage()}
+      </Layout>
+    </ChatLibraryProvider>
   );
 }
