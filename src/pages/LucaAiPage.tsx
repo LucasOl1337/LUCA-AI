@@ -2542,26 +2542,25 @@ function LucaMissionBar({
     }
   }
 
+  const isReady = operationMode === 'individual' ? isIndividualReady : isWorkflowReady;
+  // Pill only earns screen space while it informs: progress during a run or
+  // guidance while the selection is incomplete. "Pronta" idle state is noise —
+  // it used to stick permanently over the chat (reported as a stuck button).
+  const showStatus = running || !isReady;
   const statusText = running
     ? operationMode === 'individual' ? '9Router executa as respostas; o juiz entra em seguida' : '9Router está executando o fluxo'
     : operationMode === 'individual'
-      ? isIndividualReady
-        ? `Resolução pronta com ${assignedCount} participante${assignedCount === 1 ? '' : 's'} e um juiz`
-        : 'Escolha participantes e uma persona juíza'
-      : isWorkflowReady
-        ? `Fluxo pronto com ${assignedCount} persona${assignedCount === 1 ? '' : 's'}`
-        : `${readyRoles} de ${WORKFLOW_ROLES.length} etapas configuradas`;
-  const statusColor = running
-    ? theme.goldDeep
-    : (operationMode === 'individual' ? isIndividualReady : isWorkflowReady)
-      ? theme.ok
-      : theme.textMute;
+      ? 'Escolha participantes e uma persona juíza'
+      : `${readyRoles} de ${WORKFLOW_ROLES.length} etapas configuradas`;
+  const statusColor = running ? theme.goldDeep : theme.textMute;
 
   return (
     <>
-      <div className="luca-ai-composer-status" style={{ color: statusColor }}>
-        {statusText}
-      </div>
+      {showStatus && (
+        <div className="luca-ai-composer-status" style={{ color: statusColor }}>
+          {statusText}
+        </div>
+      )}
       <div className="luca-ai-composer">
         <label className="sr-only" htmlFor="luca-ai-mission">Missão da bancada</label>
         <textarea

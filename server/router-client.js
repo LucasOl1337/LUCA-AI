@@ -130,7 +130,27 @@ export function extractChatCompletionContent(payloadText) {
   }
 }
 
-function parseChatCompletionPayload(payloadText) {
+function mergeToolCallDelta(accumulator, deltaCalls) {
+  for (const delta of deltaCalls) {
+    const index = Number.isInteger(delta?.index) ? delta.index : accumulator.length;
+    if (!accumulator[index]) {
+      accumulator[index] = {
+        id: delta?.id || `tool_${index + 1}`,
+        type: delta?.type || 'function',
+        function: { name: '', arguments: '' },
+      };
+    }
+    const target = accumulator[index];
+    if (delta?.id) target.id = delta.id;
+    if (delta?.type) target.type = delta.type;
+    if (delta?.function?.name) target.function.name = delta.function.name;
+    if (typeof delta?.function?.arguments === 'string') {
+      target.function.arguments += delta.function.arguments;
+    }
+  }
+}
+
+export function parseChatCompletionPayload(payloadText) {
   const text = String(payloadText || '').trim();
   if (!text) {
     return { content: 'Sem resposta textual do modelo.', toolCalls: [], finishReason: null, raw: null };
@@ -181,16 +201,20 @@ function parseChatCompletionPayload(payloadText) {
         if (content) contentParts.push(content);
         const choice = data?.choices?.[0] || {};
         const message = choice?.message || {};
-        if (Array.isArray(message.tool_calls)) toolCalls.push(...message.tool_calls);
+        if (Array.isArray(message.tool_calls)) mergeToolCallDelta(toolCalls, message.tool_calls);
+        // Claude/Anthropic via 9Router streams tool_calls fragmentados em delta,
+        // com arguments fatiados em varios chunks — precisa acumular por index.
+        if (Array.isArray(choice?.delta?.tool_calls)) mergeToolCallDelta(toolCalls, choice.delta.tool_calls);
         if (choice?.finish_reason) finishReason = choice.finish_reason;
       } catch {
         // ignore partial SSE chunk
       }
     }
-    if (contentParts.length || toolCalls.length) {
+    const mergedToolCalls = toolCalls.filter((call) => call?.function?.name);
+    if (contentParts.length || mergedToolCalls.length) {
       return {
         content: contentParts.join(''),
-        toolCalls,
+        toolCalls: mergedToolCalls,
         finishReason,
         raw,
       };

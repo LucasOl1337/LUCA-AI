@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { call9Router, extractChatCompletionContent } from './router-client.js';
+import { call9Router, extractChatCompletionContent, parseChatCompletionPayload } from './router-client.js';
 
 test('extractChatCompletionContent le JSON OpenAI compativel', () => {
   const payload = JSON.stringify({
@@ -95,4 +95,34 @@ test('call9Router rejeita uma rota fora da whitelist antes do fetch', async () =
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('parseChatCompletionPayload mescla tool_calls fragmentados em SSE delta (Claude via 9Router)', () => {
+  const sse = [
+    'data: {"choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}',
+    'data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"toolu_1","type":"function","function":{"name":"fetch_url","arguments":""}}]},"finish_reason":null}]}',
+    'data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\\"url\\": \\""}}]},"finish_reason":null}]}',
+    'data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"https://example.com\\"}"}}]},"finish_reason":null}]}',
+    'data: {"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}',
+  ].join('\n\n');
+
+  const result = parseChatCompletionPayload(sse);
+  assert.equal(result.toolCalls.length, 1);
+  assert.equal(result.toolCalls[0].id, 'toolu_1');
+  assert.equal(result.toolCalls[0].function.name, 'fetch_url');
+  assert.equal(result.toolCalls[0].function.arguments, '{"url": "https://example.com"}');
+  assert.equal(result.finishReason, 'tool_calls');
+});
+
+test('parseChatCompletionPayload SSE com texto delta continua concatenando conteudo', () => {
+  const sse = [
+    'data: {"choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}',
+    'data: {"choices":[{"index":0,"delta":{"content":"te"},"finish_reason":null}]}',
+    'data: {"choices":[{"index":0,"delta":{"content":"ste ok"},"finish_reason":"stop"}]}',
+  ].join('\n\n');
+
+  const result = parseChatCompletionPayload(sse);
+  assert.equal(result.content, 'teste ok');
+  assert.equal(result.toolCalls.length, 0);
+  assert.equal(result.finishReason, 'stop');
 });
