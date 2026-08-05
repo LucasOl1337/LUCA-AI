@@ -46,13 +46,21 @@ import {
   type LucaIndividualPreset,
   type LucaTeamPreset,
 } from '@/lib/lucaPresets';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { useChatLibrary } from '@/hooks/useChatLibrary';
 import { useTheme } from '@/hooks/useTheme';
 
 const MAX_EXECUTORS = 4;
-const LUCA_AI_CLEAN_UI_VERSION = '9router-clean-v1';
+const LUCA_AI_CLEAN_UI_VERSION = 'session-isolation-v2';
 const LUCA_AI_CLEAN_UI_STORAGE_KEY = 'luca.lucaAi.cleanUiVersion';
+const LUCA_AI_LEGACY_LOCAL_KEYS = [
+  'luca.lucaAi.operationMode',
+  'luca.lucaAi.workflowAssignments',
+  'luca.lucaAi.individualAssignments',
+  'luca.lucaAi.missionDraft',
+  'luca.lucaAi.transcript',
+  'luca.lucaAi.finalResult',
+  'luca.lucaAi.activePersonaSlug',
+];
 
 interface LucaAiPageProps {
   onNavigate: (page: 'personas') => void;
@@ -487,18 +495,20 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const { runtimeMode, refresh } = useLuca();
   const [personas, setPersonas] = useState<YumePersonaSummary[]>([]);
   const [routerProfiles, setRouterProfiles] = useState<RouterModelProfile[]>([]);
-  const [operationMode, setOperationMode] = usePersistentState<OperationMode>('lucaAi.operationMode', 'team');
-  const [workflowState, setWorkflowState] = usePersistentState<WorkflowAssignments>('lucaAi.workflowAssignments', createEmptyWorkflowAssignments());
-  const [individualState, setIndividualState] = usePersistentState<IndividualAssignments>('lucaAi.individualAssignments', createEmptyIndividualAssignments());
-  const [mission, setMission] = usePersistentState<string>('lucaAi.missionDraft', '');
-  const [transcript, setTranscript] = usePersistentState<TeamTranscriptEntry[]>('lucaAi.transcript', []);
-  const [finalResult, setFinalResult] = usePersistentState<TeamTranscriptEntry | null>('lucaAi.finalResult', null);
+  // Session-bound UI lives in React state + backend chat-library.
+  // localStorage here would leak mission/transcript across sessions.
+  const [operationMode, setOperationMode] = useState<OperationMode>('team');
+  const [workflowState, setWorkflowState] = useState<WorkflowAssignments>(createEmptyWorkflowAssignments());
+  const [individualState, setIndividualState] = useState<IndividualAssignments>(createEmptyIndividualAssignments());
+  const [mission, setMission] = useState<string>('');
+  const [transcript, setTranscript] = useState<TeamTranscriptEntry[]>([]);
+  const [finalResult, setFinalResult] = useState<TeamTranscriptEntry | null>(null);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorRetry, setErrorRetry] = useState<'personas' | 'run' | null>(null);
-  const [activePersonaSlug, setActivePersonaSlug] = usePersistentState<string | null>('lucaAi.activePersonaSlug', null);
+  const [activePersonaSlug, setActivePersonaSlug] = useState<string | null>(null);
   const [activeTraceId, setActiveTraceId] = useState<string | null>(null);
   const [processEvents, setProcessEvents] = useState<RuntimeEvent[]>([]);
   const [activeWorkspaceView, setActiveWorkspaceView] = useState<'result' | 'activity'>('result');
@@ -656,13 +666,16 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   ]);
 
   useEffect(() => {
-    if (window.localStorage.getItem(LUCA_AI_CLEAN_UI_STORAGE_KEY) === LUCA_AI_CLEAN_UI_VERSION) return;
-    setTranscript([]);
-    setFinalResult(null);
-    setProcessEvents([]);
-    setActiveTraceId(null);
-    window.localStorage.setItem(LUCA_AI_CLEAN_UI_STORAGE_KEY, LUCA_AI_CLEAN_UI_VERSION);
-  }, [setFinalResult, setTranscript]);
+      if (window.localStorage.getItem(LUCA_AI_CLEAN_UI_STORAGE_KEY) === LUCA_AI_CLEAN_UI_VERSION) return;
+      for (const key of LUCA_AI_LEGACY_LOCAL_KEYS) {
+        try { window.localStorage.removeItem(key); } catch { /* ignore */ }
+      }
+      setTranscript([]);
+      setFinalResult(null);
+      setProcessEvents([]);
+      setActiveTraceId(null);
+      window.localStorage.setItem(LUCA_AI_CLEAN_UI_STORAGE_KEY, LUCA_AI_CLEAN_UI_VERSION);
+    }, []);
 
   useEffect(() => {
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight, behavior: 'smooth' });
@@ -1597,30 +1610,7 @@ function LucaIndividualPanel({
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        <PresetGallery
-          title="Seleções prontas"
-          presets={LUCA_INDIVIDUAL_PRESETS}
-          resolveSlugs={individualPresetSlugs}
-          personaBySlug={personaBySlug}
-          activeId={activePresetId}
-          applyingId={applyingPresetId}
-          disabled={running || loading}
-          onApply={onApplyPreset}
-        />
         <div className="space-y-2">
-          <WorkflowRoleRow
-            role={INDIVIDUAL_PICKER_CONFIGS.participants}
-            personaBySlug={personaBySlug}
-            routerProfiles={routerProfiles}
-            selectedSlugs={assignments.participants}
-            activeSlug={activeSlug}
-            disabled={running}
-            busySlug={busySlug}
-            onOpen={() => onOpenPicker('participants')}
-            onRemove={onRemoveParticipant}
-            onInspect={onInspect}
-            onSetModel={onSetModel}
-          />
           <WorkflowRoleRow
             role={INDIVIDUAL_PICKER_CONFIGS.judge}
             personaBySlug={personaBySlug}
@@ -1634,9 +1624,34 @@ function LucaIndividualPanel({
             onInspect={onInspect}
             onSetModel={onSetModel}
           />
+          <WorkflowRoleRow
+            role={INDIVIDUAL_PICKER_CONFIGS.participants}
+            personaBySlug={personaBySlug}
+            routerProfiles={routerProfiles}
+            selectedSlugs={assignments.participants}
+            activeSlug={activeSlug}
+            disabled={running}
+            busySlug={busySlug}
+            onOpen={() => onOpenPicker('participants')}
+            onRemove={onRemoveParticipant}
+            onInspect={onInspect}
+            onSetModel={onSetModel}
+          />
           <div className="rounded-xl px-3 py-3 text-[11px] leading-relaxed" style={{ background: theme.surfaceHi, color: theme.textMute }}>
             Cada participante recebe somente a missão original. Depois, a chamada separada do juiz recebe todas as respostas para comparar, corrigir e decidir.
           </div>
+        </div>
+        <div className="mt-3">
+          <PresetGallery
+            title="Seleções prontas"
+            presets={LUCA_INDIVIDUAL_PRESETS}
+            resolveSlugs={individualPresetSlugs}
+            personaBySlug={personaBySlug}
+            activeId={activePresetId}
+            applyingId={applyingPresetId}
+            disabled={running || loading}
+            onApply={onApplyPreset}
+          />
         </div>
       </div>
 
