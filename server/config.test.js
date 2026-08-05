@@ -7,6 +7,7 @@ import {
   NINE_ROUTER_ROUTE_IDS,
   ROUTER_BASE_URL,
   ROUTER_MODEL,
+  ROUTER_TIMEOUT_MS,
   assertAllowed9RouterModel,
   isAllowed9RouterModel,
   sanitize9RouterModel,
@@ -56,6 +57,13 @@ test('configuracao 9Router declara capacidades maximas sem controles de esforco'
 test('defaults usam a base local e uma rota da whitelist', () => {
   assert.equal(ROUTER_BASE_URL, 'http://127.0.0.1:20128/v1');
   assert.equal(isAllowed9RouterModel(ROUTER_MODEL), true);
+});
+
+test('timeout do 9Router tolera juiz lento sem cortar o veredito', () => {
+  assert.ok(
+    ROUTER_TIMEOUT_MS >= 120000,
+    `ROUTER_TIMEOUT_MS deve ser >= 120s para o juiz aguardar rodadas longas; atual: ${ROUTER_TIMEOUT_MS}ms`,
+  );
 });
 
 test('sanitizacao e fronteira do cliente bloqueiam rotas externas', () => {

@@ -126,3 +126,57 @@ test('runAgentWithTools forca fetch quando ha URL e o modelo ignora tools', asyn
   assert.equal(result.toolTrace[0].forced, true);
   assert.match(result.content, /Sharingan|prompt/i);
 });
+
+test('runAgentWithTools continua resposta cortada por limite de tokens', async () => {
+  let round = 0;
+  const seenMessages = [];
+  const result = await runAgentWithTools({
+    system: 'Voce e o juiz.',
+    user: 'Julgue as respostas.',
+    model: 'cx/test',
+    agentId: 'test-judge',
+    maxRounds: 3,
+    callChat: async ({ messages }) => {
+      round += 1;
+      seenMessages.push(messages.length);
+      if (round === 1) {
+        return {
+          content: '1. Avaliacao dos participantes: Lux foi util, mas o veredito ainda',
+          toolCalls: [],
+          finishReason: 'length',
+        };
+      }
+      return {
+        content: ' nao esta completo. 4. Veredito final: decisao consolidada.',
+        toolCalls: [],
+        finishReason: 'stop',
+      };
+    },
+    executeTool: async () => ({ ok: true }),
+  });
+
+  assert.equal(round, 2);
+  assert.equal(result.finishReason, 'stop');
+  assert.match(result.content, /Veredito final/);
+  assert.match(result.content, /nao esta completo/);
+});
+
+test('runAgentWithTools nao trava em loop de continuacao infinita', async () => {
+  let round = 0;
+  const result = await runAgentWithTools({
+    system: 'Voce e o juiz.',
+    user: 'Julgue as respostas.',
+    model: 'cx/test',
+    agentId: 'test-judge-loop',
+    maxRounds: 3,
+    callChat: async () => {
+      round += 1;
+      return { content: 'trecho cortado', toolCalls: [], finishReason: 'length' };
+    },
+    executeTool: async () => ({ ok: true }),
+  });
+
+  assert.ok(round <= 3);
+  assert.equal(result.content, 'trecho cortado');
+  assert.equal(result.finishReason, 'length');
+});

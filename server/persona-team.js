@@ -367,7 +367,9 @@ Motor LLM desta execucao nao foi declarado explicitamente.
   Contribuicoes individuais:
   ${contributions || 'Nenhuma contribuicao utilizavel foi recebida.'}
 
-  Produza obrigatoriamente estas secoes:
+  Produza obrigatoriamente estas partes, nesta ordem:
+  0. Resposta livre — comece com sua leitura espontanea da missao e das contribuicoes, no formato que preferir (paragrafos, raciocinio aberto, observacoes soltas). Use este espaco para pensar em voz alta como juiz, sem obrigacao de estrutura.
+  Depois da resposta livre, entregue a estrutura final obrigatoria:
   1. Avaliacao dos participantes — diga o que foi util em cada resposta.
   2. Alertas de qualidade — identifique, por participante, qualquer trecho falso, nao sustentado ou incompleto. Se nao houver, diga explicitamente.
   3. Complementacao — combine o que for compativel e corrija as lacunas relevantes.

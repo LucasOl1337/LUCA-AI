@@ -1961,7 +1961,7 @@ async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, wo
   }
 }
 
-async function runLucaAiIndividualJudge({ slug, mission, replies, loaded, traceId = null }) {
+export async function runLucaAiIndividualJudge({ slug, mission, replies, loaded, traceId = null }) {
   const name = loaded.name || slug;
   const model = loaded.model || ROUTER_MODEL;
   const prompt = buildIndividualJudgePrompt({

@@ -213,6 +213,22 @@ test('buildIndividualJudgePrompt inclui motor do juiz e dos participantes', () =
   assert.match(prompt.user, /motor 9Router: cx\/gpt-5\.5-xhigh/);
 });
 
+test('buildIndividualJudgePrompt pede resposta livre antes da estrutura final', () => {
+  const prompt = buildIndividualJudgePrompt({
+    mission: 'Avaliar proposta',
+    judgeName: 'Supervisor',
+    judgeSlug: 'supervisor',
+    replies: [{ ok: true, slug: 'lux', name: 'Lux', content: 'resposta util' }],
+  });
+
+  assert.match(prompt.user, /Resposta livre/);
+  assert.match(prompt.user, /Veredito final/);
+  assert.ok(
+    prompt.user.indexOf('Resposta livre') < prompt.user.indexOf('Avaliacao dos participantes'),
+    'resposta livre deve vir antes das secoes estruturadas',
+  );
+});
+
 test('runIndividualResolution isola participantes e chama o juiz depois de reunir todas as respostas', async () => {
   const participantInputs = [];
   const result = await runIndividualResolution({

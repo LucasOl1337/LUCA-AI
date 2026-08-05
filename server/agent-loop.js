@@ -75,6 +75,7 @@ export async function runAgentWithTools({
   const toolTrace = [];
   const urlsInMission = extractUrlsFromText(user);
   let forcedBootstrap = false;
+  let continuationUsed = false;
 
   for (let round = 0; round < Math.max(1, maxRounds); round += 1) {
     const response = await callChat({
@@ -131,6 +132,21 @@ export async function runAgentWithTools({
       messages.push({
         role: 'user',
         content: `Resultado operacional de fetch_url para ${url}:\n${summarizeToolResult(result)}\n\nCom base nisso, responda a missao. Nao peca print se o texto acima for suficiente.`,
+      });
+      continue;
+    }
+
+    // Continuation: provider cut the reply at max_tokens; ask for the rest once
+    // instead of publishing a truncated verdict as if it were complete.
+    if (response.finishReason === 'length' && !continuationUsed) {
+      continuationUsed = true;
+      messages.push({
+        role: 'assistant',
+        content: response.content || '',
+      });
+      messages.push({
+        role: 'user',
+        content: 'Sua resposta foi cortada no limite de tokens. Continue exatamente de onde parou, sem repetir o que ja escreveu, e conclua todas as secoes pendentes.',
       });
       continue;
     }
