@@ -48,9 +48,10 @@ function sendAuthError(res, error) {
   res.status(500).json({ ok: false, error: 'auth_internal_error' });
 }
 
-export function createAuthService({ rootDir = process.cwd(), dataPath = '', adminEmails = [], internalToken = '' } = {}) {
+export function createAuthService({ rootDir = process.cwd(), dataPath = '', adminEmails = [], internalToken = '', workspaceCounter = null } = {}) {
   const stateDirectory = process.env.LUCA_DATA_DIR || path.resolve(rootDir, '.luca');
   const store = new AuthStore(dataPath || path.resolve(stateDirectory, 'auth.json'), { adminEmails });
+  store.ensureAdminEmails(adminEmails);
   const authAttempts = new Map();
 
   function protectAuthAttempt(req, res, next) {
@@ -83,8 +84,18 @@ export function createAuthService({ rootDir = process.cwd(), dataPath = '', admi
     return store.resolveSession(tokenFromRequest(req), options);
   }
 
+  function workspaceCount() {
+    try {
+      if (typeof workspaceCounter === 'function') return Number(workspaceCounter() || 0);
+    } catch {
+      // ignore workspace probe failures
+    }
+    return 0;
+  }
+
   function registerRoutes(app) {
     app.get('/api/auth/session', (req, res) => {
+      store.syncAdminRoles({ persist: true });
       const session = sessionFromRequest(req, { touch: true });
       res.json({ ok: true, user: session?.user ?? null });
     });
@@ -113,8 +124,11 @@ export function createAuthService({ rootDir = process.cwd(), dataPath = '', admi
           ip: requestIp(req),
           userAgent: req.headers['user-agent'],
         });
+        // Re-sync allowlist after login so env changes promote existing accounts.
+        store.syncAdminRoles({ persist: true });
+        const refreshed = store.resolveSession(result.token, { touch: false });
         res.setHeader('Set-Cookie', cookieHeader(result.token, req, 30 * 24 * 60 * 60));
-        res.json({ ok: true, user: result.user });
+        res.json({ ok: true, user: refreshed?.user || result.user });
       } catch (error) {
         sendAuthError(res, error);
       }
@@ -158,6 +172,12 @@ export function createAuthService({ rootDir = process.cwd(), dataPath = '', admi
   }
 
   function requireAdmin(req, res, next) {
+    store.syncAdminRoles({ persist: true });
+    // Refresh role from store after allowlist sync.
+    if (req.auth?.user?.id) {
+      const fresh = store.listUsers().find((user) => user.id === req.auth.user.id);
+      if (fresh) req.auth.user = fresh;
+    }
     if (req.auth?.user?.role !== 'admin') {
       res.status(403).json({ ok: false, error: 'admin_required' });
       return;
@@ -167,10 +187,32 @@ export function createAuthService({ rootDir = process.cwd(), dataPath = '', admi
 
   function registerAdminRoutes(app) {
     app.get('/api/admin/overview', requireAdmin, (_req, res) => {
-      res.json({ ok: true, overview: store.overview() });
+      res.json({ ok: true, overview: store.overview({ workspaces: workspaceCount() }) });
     });
     app.get('/api/admin/users', requireAdmin, (req, res) => {
-      res.json({ ok: true, users: store.listUsers({ search: req.query.search }) });
+      res.json({
+        ok: true,
+        users: store.listUsers({
+          search: req.query.search,
+          sort: req.query.sort,
+        }),
+      });
+    });
+    app.get('/api/admin/report', requireAdmin, (req, res) => {
+      const report = store.report({ limit: req.query.limit });
+      report.overview = store.overview({ workspaces: workspaceCount() });
+      report.funnel.registered = report.overview.totalUsers;
+      report.funnel.activeToday = report.overview.activeToday;
+      report.funnel.withActions = report.overview.usersWithActions;
+      report.funnel.withRuns = report.overview.usersWithRuns;
+      report.funnel.withoutRuns = report.overview.usersWithoutRuns;
+      report.funnel.activationRate = report.overview.totalUsers
+        ? Number(((report.overview.usersWithRuns / report.overview.totalUsers) * 100).toFixed(1))
+        : 0;
+      report.funnel.activeRate = report.overview.totalUsers
+        ? Number(((report.overview.activeToday / report.overview.totalUsers) * 100).toFixed(1))
+        : 0;
+      res.json({ ok: true, report });
     });
   }
 

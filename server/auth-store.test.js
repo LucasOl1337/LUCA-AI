@@ -60,6 +60,36 @@ test('allowlist de admin impede que outra primeira conta capture o papel', () =>
   assert.equal(owner.user.role, 'admin');
 });
 
+test('allowlist promove conta existente no syncAdminRoles sem demover admins', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-auth-'));
+  const pathAuth = path.join(directory, 'auth.json');
+  const store = new AuthStore(pathAuth);
+  const first = store.register({ email: 'first@example.com', password: 'senha-forte-123' });
+  const later = store.register({ email: 'lucasplays2000@gmail.com', password: 'senha-forte-456' });
+  assert.equal(first.user.role, 'admin');
+  assert.equal(later.user.role, 'user');
+
+  const promoted = new AuthStore(pathAuth, { adminEmails: ['lucasplays2000@gmail.com'] });
+  const users = promoted.listUsers();
+  assert.equal(users.find((user) => user.email === 'lucasplays2000@gmail.com')?.role, 'admin');
+  assert.equal(users.find((user) => user.email === 'first@example.com')?.role, 'admin');
+});
+
+test('report de admin monta funil e rankings de uso', () => {
+  const { store } = temporaryStore();
+  const a = store.register({ email: 'a@example.com', password: 'senha-forte-123' });
+  const b = store.register({ email: 'b@example.com', password: 'senha-forte-456' });
+  store.recordUsage(a.user.id, { method: 'POST', path: '/api/luca-ai/persona-team/run', statusCode: 200 });
+  store.recordUsage(a.user.id, { method: 'POST', path: '/api/luca-ai/persona-team/run', statusCode: 200 });
+  store.recordUsage(b.user.id, { method: 'GET', path: '/api/state', statusCode: 200 });
+  const report = store.report({ limit: 5 });
+  assert.equal(report.funnel.registered, 2);
+  assert.equal(report.funnel.withRuns, 1);
+  assert.equal(report.rankings.byRuns[0].email, 'a@example.com');
+  assert.equal(report.rankings.byRuns[0].rank, 1);
+  assert.ok(report.overview.totalRuns >= 2);
+});
+
 test('rejeita senha inválida, duplicidade e credenciais incorretas', () => {
   const { store } = temporaryStore();
   assert.throws(() => store.register({ email: 'x@example.com', password: 'curta' }), AuthError);

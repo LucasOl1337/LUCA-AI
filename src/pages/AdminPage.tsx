@@ -1,24 +1,77 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Activity, Gauge, MousePointerClick, Play, RefreshCw, Search, ShieldCheck, UsersRound } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Activity,
+  Gauge,
+  MousePointerClick,
+  Play,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Trophy,
+  UsersRound,
+  Workflow,
+  AlertTriangle,
+} from 'lucide-react';
 import type { AuthUser } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Overview {
   totalUsers: number;
   admins: number;
   activeToday: number;
+  activeHour?: number;
   activeSessions: number;
+  usersWithRuns?: number;
+  usersWithActions?: number;
+  usersWithoutRuns?: number;
   totalLogins: number;
   totalRequests: number;
   totalActions: number;
   totalRuns: number;
+  totalErrors?: number;
+  totalWebsockets?: number;
+  workspaces?: number;
+  allowlistedAdmins?: string[];
   generatedAt: string;
 }
 
-interface TrackedUser extends AuthUser { sessionCount: number }
+interface TrackedUser extends AuthUser {
+  sessionCount: number;
+}
+
+interface AdminReport {
+  overview: Overview;
+  funnel: {
+    registered: number;
+    activeToday: number;
+    withActions: number;
+    withRuns: number;
+    withoutRuns: number;
+    activationRate: number;
+    activeRate: number;
+  };
+  rankings: {
+    byRuns: Array<TrackedUser & { rank: number }>;
+    byActions: Array<TrackedUser & { rank: number }>;
+    byRequests: Array<TrackedUser & { rank: number }>;
+    byActivity: Array<TrackedUser & { rank: number }>;
+  };
+  generatedAt: string;
+}
 
 function formatDate(value: string) {
   if (!value) return '—';
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
+}
+
+function formatRelative(value?: string) {
+  const ts = Date.parse(value || '');
+  if (!ts) return '—';
+  const diff = Math.max(0, Date.now() - ts);
+  if (diff < 60_000) return `há ${Math.max(1, Math.round(diff / 1000))}s`;
+  if (diff < 3_600_000) return `há ${Math.round(diff / 60_000)} min`;
+  if (diff < 172_800_000) return `há ${Math.round(diff / 3_600_000)}h`;
+  return formatDate(value || '');
 }
 
 async function adminRequest(path: string) {
@@ -27,59 +80,227 @@ async function adminRequest(path: string) {
   return response.json();
 }
 
+function MetricCard({
+  icon: Icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: typeof UsersRound;
+  label: string;
+  value: string | number;
+  hint?: string;
+}) {
+  return (
+    <article>
+      <Icon />
+      <span>{label}</span>
+      <strong>{value}</strong>
+      {hint ? <small>{hint}</small> : null}
+    </article>
+  );
+}
+
+function RankList({
+  title,
+  rows,
+  metric,
+}: {
+  title: string;
+  rows: Array<TrackedUser & { rank: number }>;
+  metric: (user: TrackedUser) => string;
+}) {
+  return (
+    <div className="admin-rank-card" data-admin-rank>
+      <header>
+        <h3>{title}</h3>
+        <span>{rows.length} top</span>
+      </header>
+      {rows.length === 0 ? (
+        <p className="admin-rank-empty">Sem dados ainda.</p>
+      ) : (
+        <ol>
+          {rows.map((user) => (
+            <li key={`${title}-${user.id}`}>
+              <span className="admin-rank-pos">{user.rank}</span>
+              <span className="admin-rank-user">
+                <strong>{user.name}</strong>
+                <small>{user.email}</small>
+              </span>
+              <span className="admin-rank-metric">{metric(user)}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
 export default function AdminPage() {
+  const { user } = useAuth();
   const [overview, setOverview] = useState<Overview | null>(null);
+  const [report, setReport] = useState<AdminReport | null>(null);
   const [users, setUsers] = useState<TrackedUser[]>([]);
   const [search, setSearch] = useState('');
+  const [sort, setSort] = useState('activity_desc');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const load = useCallback(async (query = '') => {
+  const load = useCallback(async (query = search, nextSort = sort) => {
     setLoading(true);
     setError('');
     try {
-      const [overviewPayload, usersPayload] = await Promise.all([
+      const [overviewPayload, usersPayload, reportPayload] = await Promise.all([
         adminRequest('/api/admin/overview'),
-        adminRequest(`/api/admin/users?search=${encodeURIComponent(query)}`),
+        adminRequest(`/api/admin/users?search=${encodeURIComponent(query)}&sort=${encodeURIComponent(nextSort)}`),
+        adminRequest('/api/admin/report?limit=8'),
       ]);
       setOverview(overviewPayload.overview);
       setUsers(usersPayload.users);
+      setReport(reportPayload.report);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Falha ao carregar o painel.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [search, sort]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const funnel = report?.funnel;
+  const generatedLabel = useMemo(() => {
+    const stamp = report?.generatedAt || overview?.generatedAt;
+    return stamp ? formatDate(stamp) : '—';
+  }, [overview?.generatedAt, report?.generatedAt]);
 
   return (
-    <div className="admin-page luca-page-shell">
+    <div className="admin-page luca-page-shell" data-admin-console>
       <header className="admin-heading">
-        <div><span>ADMINISTRAÇÃO</span><h1>Usuários</h1><p>Acompanhe a base cadastrada e a atividade de acesso ao LUCA.</p></div>
-        <button type="button" onClick={() => void load(search)} disabled={loading}><RefreshCw className={loading ? 'animate-spin' : ''} />Atualizar</button>
+        <div>
+          <span>ADMINISTRAÇÃO</span>
+          <h1>Console de operações</h1>
+          <p>
+            Relatórios de contas, ativação e uso do LUCA — no estilo do painel Sharingan.
+            {user?.email ? ` Operando como ${user.email}.` : ''}
+          </p>
+        </div>
+        <div className="admin-heading-actions">
+          <span className="admin-updated">Atualizado {generatedLabel}</span>
+          <button type="button" onClick={() => void load(search, sort)} disabled={loading}>
+            <RefreshCw className={loading ? 'animate-spin' : ''} />
+            Atualizar
+          </button>
+        </div>
       </header>
 
-      <section className="admin-metrics">
-        <article><UsersRound /><span>Usuários cadastrados</span><strong>{overview?.totalUsers ?? '—'}</strong></article>
-        <article><Activity /><span>Ativos nas últimas 24h</span><strong>{overview?.activeToday ?? '—'}</strong></article>
-        <article><ShieldCheck /><span>Sessões ativas</span><strong>{overview?.activeSessions ?? '—'}</strong></article>
-        <article><RefreshCw /><span>Total de logins</span><strong>{overview?.totalLogins ?? '—'}</strong></article>
-        <article><Gauge /><span>Solicitações à plataforma</span><strong>{overview?.totalRequests ?? '—'}</strong></article>
-        <article><MousePointerClick /><span>Ações realizadas</span><strong>{overview?.totalActions ?? '—'}</strong></article>
-        <article><Play /><span>Execuções iniciadas</span><strong>{overview?.totalRuns ?? '—'}</strong></article>
+      <section className="admin-metrics" aria-label="Indicadores">
+        <MetricCard icon={UsersRound} label="Contas cadastradas" value={overview?.totalUsers ?? '—'} />
+        <MetricCard icon={Activity} label="Ativos 24h" value={overview?.activeToday ?? '—'} hint={overview?.activeHour != null ? `${overview.activeHour} na última hora` : undefined} />
+        <MetricCard icon={ShieldCheck} label="Sessões ativas" value={overview?.activeSessions ?? '—'} />
+        <MetricCard icon={Workflow} label="Workspaces" value={overview?.workspaces ?? '—'} />
+        <MetricCard icon={Play} label="Execuções" value={overview?.totalRuns ?? '—'} />
+        <MetricCard icon={MousePointerClick} label="Ações" value={overview?.totalActions ?? '—'} />
+        <MetricCard icon={Gauge} label="Solicitações" value={overview?.totalRequests ?? '—'} />
+        <MetricCard icon={AlertTriangle} label="Erros" value={overview?.totalErrors ?? '—'} />
       </section>
 
-      <section className="admin-users-panel">
-        <div className="admin-users-toolbar">
-          <div><h2>Contas</h2><span>{users.length} resultado(s)</span></div>
-          <form onSubmit={(event) => { event.preventDefault(); void load(search); }}><Search /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar nome ou e-mail" /><button type="submit">Buscar</button></form>
+      <section className="admin-section" data-admin-product>
+        <div className="admin-section-header">
+          <div>
+            <h2>Visão de produto</h2>
+            <p>Funil de ativação por conta autenticada: cadastrou → ficou ativo → rodou missão/persona.</p>
+          </div>
         </div>
+        <div className="admin-funnel" aria-label="Funil de ativação">
+          <article>
+            <span>Cadastradas</span>
+            <strong>{funnel?.registered ?? overview?.totalUsers ?? '—'}</strong>
+          </article>
+          <article>
+            <span>Ativas 24h</span>
+            <strong>{funnel?.activeToday ?? overview?.activeToday ?? '—'}</strong>
+            <small>{funnel ? `${funnel.activeRate}%` : ''}</small>
+          </article>
+          <article>
+            <span>Com ações</span>
+            <strong>{funnel?.withActions ?? overview?.usersWithActions ?? '—'}</strong>
+          </article>
+          <article>
+            <span>Com execuções</span>
+            <strong>{funnel?.withRuns ?? overview?.usersWithRuns ?? '—'}</strong>
+            <small>{funnel ? `${funnel.activationRate}% ativação` : ''}</small>
+          </article>
+          <article>
+            <span>Sem execuções</span>
+            <strong>{funnel?.withoutRuns ?? overview?.usersWithoutRuns ?? '—'}</strong>
+          </article>
+        </div>
+      </section>
+
+      <section className="admin-section" data-admin-rankings>
+        <div className="admin-section-header">
+          <div>
+            <h2>Ranking de uso</h2>
+            <p>Contas que mais operam a bancada — execuções, ações e presença.</p>
+          </div>
+          <Trophy className="admin-section-icon" />
+        </div>
+        <div className="admin-rank-grid">
+          <RankList title="Por execuções" rows={report?.rankings.byRuns || []} metric={(u) => `${u.runCount || 0} runs`} />
+          <RankList title="Por ações" rows={report?.rankings.byActions || []} metric={(u) => `${u.actionCount || 0} ações`} />
+          <RankList title="Por solicitações" rows={report?.rankings.byRequests || []} metric={(u) => `${u.requestCount || 0} req`} />
+          <RankList title="Por atividade" rows={report?.rankings.byActivity || []} metric={(u) => formatRelative(u.lastSeenAt)} />
+        </div>
+      </section>
+
+      <section className="admin-users-panel" data-admin-users>
+        <div className="admin-users-toolbar">
+          <div>
+            <h2>Contas registradas</h2>
+            <span>{users.length} resultado(s)</span>
+          </div>
+          <div className="admin-users-filters">
+            <label className="admin-sort">
+              <span>Ordenar</span>
+              <select
+                value={sort}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setSort(next);
+                  void load(search, next);
+                }}
+              >
+                <option value="activity_desc">Atividade recente</option>
+                <option value="runs_desc">Mais execuções</option>
+                <option value="requests_desc">Mais solicitações</option>
+                <option value="logins_desc">Mais logins</option>
+                <option value="created_desc">Cadastro recente</option>
+              </select>
+            </label>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void load(search, sort);
+              }}
+            >
+              <Search />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Buscar nome ou e-mail"
+              />
+              <button type="submit">Buscar</button>
+            </form>
+          </div>
+        </div>
+
         {error ? (
           <div className="admin-state error" data-admin-error data-tone="error" role="alert">
             <p className="admin-error-title">Falha ao carregar o painel</p>
             <p className="admin-error-detail">{error}</p>
-            <p className="admin-error-hint">Não foi possível buscar overview e contas. Tente de novo ou confira se o runtime está no ar.</p>
+            <p className="admin-error-hint">Não foi possível buscar overview, relatório e contas. Tente de novo.</p>
             <div className="admin-error-actions">
               <button
                 type="button"
@@ -94,16 +315,50 @@ export default function AdminPage() {
           </div>
         ) : (
           <div className="admin-table-wrap">
-            <table><thead><tr><th>Usuário</th><th>Papel</th><th>Cadastro</th><th>Última atividade</th><th>Logins</th><th>Solicitações</th><th>Ações</th><th>Execuções</th><th>Erros</th><th>Sessões</th></tr></thead>
-              <tbody>{users.map((user) => <tr key={user.id}><td><strong>{user.name}</strong><span>{user.email}</span></td><td><em data-role={user.role}>{user.role === 'admin' ? 'Admin' : 'Usuário'}</em></td><td>{formatDate(user.createdAt)}</td><td>{formatDate(user.lastSeenAt)}</td><td>{user.loginCount}</td><td>{user.requestCount}</td><td>{user.actionCount}</td><td>{user.runCount}</td><td>{user.errorCount}</td><td>{user.sessionCount}</td></tr>)}</tbody>
+            <table>
+              <thead>
+                <tr>
+                  <th>Usuário</th>
+                  <th>Papel</th>
+                  <th>Cadastro</th>
+                  <th>Última atividade</th>
+                  <th>Logins</th>
+                  <th>Solicitações</th>
+                  <th>Ações</th>
+                  <th>Execuções</th>
+                  <th>Erros</th>
+                  <th>Sessões</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((account) => (
+                  <tr key={account.id}>
+                    <td>
+                      <strong>{account.name}</strong>
+                      <span>{account.email}</span>
+                    </td>
+                    <td>
+                      <em data-role={account.role}>{account.role === 'admin' ? 'Admin' : 'Usuário'}</em>
+                    </td>
+                    <td>{formatDate(account.createdAt)}</td>
+                    <td title={formatDate(account.lastSeenAt)}>{formatRelative(account.lastSeenAt)}</td>
+                    <td>{account.loginCount}</td>
+                    <td>{account.requestCount}</td>
+                    <td>{account.actionCount}</td>
+                    <td>{account.runCount}</td>
+                    <td>{account.errorCount}</td>
+                    <td>{account.sessionCount}</td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
             {!loading && users.length === 0 && (
               <div className="admin-state" data-admin-empty data-tone="empty">
                 <p className="admin-empty-title">Nenhuma conta encontrada</p>
                 <p className="admin-empty-hint">
                   {search.trim()
-                    ? "Nenhuma conta corresponde à busca atual. Limpe o filtro ou tente de novo."
-                    : "Ainda não há contas cadastradas ou a lista não retornou resultados."}
+                    ? 'Nenhuma conta corresponde à busca atual. Limpe o filtro ou tente de novo.'
+                    : 'Ainda não há contas cadastradas ou a lista não retornou resultados.'}
                 </p>
                 <div className="admin-empty-actions">
                   {search.trim() ? (
@@ -112,8 +367,8 @@ export default function AdminPage() {
                       className="btn-primary"
                       data-admin-empty-clear
                       onClick={() => {
-                        setSearch("");
-                        void load("");
+                        setSearch('');
+                        void load('');
                       }}
                       disabled={loading}
                     >

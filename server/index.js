@@ -174,6 +174,7 @@ const authService = createAuthService({
   adminEmails,
   internalToken: internalAuthToken,
   dataPath: process.env.LUCA_AUTH_DATA_PATH,
+  workspaceCounter: () => listWorkspaceUserIds().length,
 });
 
 app.use('/api', rateLimitApi);

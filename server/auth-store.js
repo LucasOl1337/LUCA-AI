@@ -75,6 +75,7 @@ export class AuthStore {
     this.filePath = filePath;
     this.adminEmails = new Set(adminEmails.map(normalizeEmail).filter(Boolean));
     this.data = this.#load();
+    this.syncAdminRoles({ persist: true });
   }
 
   #load() {
@@ -95,6 +96,37 @@ export class AuthStore {
     const temporaryPath = `${this.filePath}.${process.pid}.tmp`;
     fs.writeFileSync(temporaryPath, JSON.stringify(this.data, null, 2), { encoding: 'utf8', mode: 0o600 });
     fs.renameSync(temporaryPath, this.filePath);
+  }
+
+  /**
+   * Promote allowlisted emails to admin at runtime (not only on register).
+   * Never demotes existing admins automatically.
+   */
+  syncAdminRoles({ persist = true } = {}) {
+    if (!this.adminEmails.size) return { changed: 0, admins: [] };
+    let changed = 0;
+    for (const user of this.data.users) {
+      const email = normalizeEmail(user.email);
+      if (!this.adminEmails.has(email)) continue;
+      if (user.role !== 'admin') {
+        user.role = 'admin';
+        changed += 1;
+      }
+    }
+    if (changed && persist) this.#persist();
+    return {
+      changed,
+      admins: this.data.users
+        .filter((user) => user.role === 'admin')
+        .map((user) => ({ id: user.id, email: user.email, name: user.name })),
+    };
+  }
+
+  ensureAdminEmails(emails = []) {
+    for (const email of emails.map(normalizeEmail).filter(Boolean)) {
+      this.adminEmails.add(email);
+    }
+    return this.syncAdminRoles({ persist: true });
   }
 
   #cleanupSessions() {
@@ -248,32 +280,92 @@ export class AuthStore {
     this.#persist();
   }
 
-  overview() {
+  overview(extra = {}) {
     this.#cleanupSessions();
+    this.syncAdminRoles({ persist: false });
     const now = Date.now();
     const activeSince = now - 24 * 60 * 60 * 1000;
+    const hourSince = now - 60 * 60 * 1000;
+    const usersWithRuns = this.data.users.filter((user) => usageSnapshot(user).runCount > 0).length;
+    const usersWithActions = this.data.users.filter((user) => usageSnapshot(user).actionCount > 0).length;
+    const totalErrors = this.data.users.reduce((sum, user) => sum + usageSnapshot(user).errorCount, 0);
     return {
       totalUsers: this.data.users.length,
       admins: this.data.users.filter((user) => user.role === 'admin').length,
       activeToday: this.data.users.filter((user) => Date.parse(user.lastSeenAt || 0) >= activeSince).length,
+      activeHour: this.data.users.filter((user) => Date.parse(user.lastSeenAt || 0) >= hourSince).length,
       activeSessions: this.data.sessions.filter((session) => Date.parse(session.expiresAt) > now).length,
+      usersWithRuns,
+      usersWithActions,
+      usersWithoutRuns: Math.max(0, this.data.users.length - usersWithRuns),
       totalLogins: this.data.users.reduce((sum, user) => sum + Number(user.loginCount || 0), 0),
       totalRequests: this.data.users.reduce((sum, user) => sum + usageSnapshot(user).requestCount, 0),
       totalActions: this.data.users.reduce((sum, user) => sum + usageSnapshot(user).actionCount, 0),
       totalRuns: this.data.users.reduce((sum, user) => sum + usageSnapshot(user).runCount, 0),
+      totalErrors,
+      totalWebsockets: this.data.users.reduce((sum, user) => sum + usageSnapshot(user).websocketCount, 0),
+      workspaces: Number(extra.workspaces || 0),
+      allowlistedAdmins: [...this.adminEmails],
       generatedAt: nowIso(),
     };
   }
 
-  listUsers({ search = '' } = {}) {
+  listUsers({ search = '', sort = 'created_desc' } = {}) {
+    this.syncAdminRoles({ persist: false });
     const query = String(search).trim().toLowerCase();
-    return this.data.users
+    const rows = this.data.users
       .filter((user) => !query || user.email.includes(query) || user.name.toLowerCase().includes(query))
       .map((user) => ({
         ...publicUser(user),
         sessionCount: this.data.sessions.filter((session) => session.userId === user.id).length,
-      }))
-      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+      }));
+
+    const sorter = {
+      created_desc: (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+      activity_desc: (a, b) => Date.parse(b.lastSeenAt || 0) - Date.parse(a.lastSeenAt || 0),
+      runs_desc: (a, b) => (b.runCount || 0) - (a.runCount || 0) || (b.actionCount || 0) - (a.actionCount || 0),
+      requests_desc: (a, b) => (b.requestCount || 0) - (a.requestCount || 0),
+      logins_desc: (a, b) => (b.loginCount || 0) - (a.loginCount || 0),
+    }[String(sort)] || null;
+
+    return rows.sort(sorter || ((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)));
+  }
+
+  report({ limit = 8 } = {}) {
+    this.syncAdminRoles({ persist: false });
+    const capped = Math.max(1, Math.min(30, Number(limit) || 8));
+    const users = this.listUsers({ sort: 'runs_desc' });
+    const byRuns = [...users].sort((a, b) => (b.runCount || 0) - (a.runCount || 0)).slice(0, capped);
+    const byActions = [...users].sort((a, b) => (b.actionCount || 0) - (a.actionCount || 0)).slice(0, capped);
+    const byRequests = [...users].sort((a, b) => (b.requestCount || 0) - (a.requestCount || 0)).slice(0, capped);
+    const byActivity = [...users].sort((a, b) => Date.parse(b.lastSeenAt || 0) - Date.parse(a.lastSeenAt || 0)).slice(0, capped);
+    const overview = this.overview();
+    const activationRate = overview.totalUsers
+      ? Number(((overview.usersWithRuns / overview.totalUsers) * 100).toFixed(1))
+      : 0;
+    const activeRate = overview.totalUsers
+      ? Number(((overview.activeToday / overview.totalUsers) * 100).toFixed(1))
+      : 0;
+
+    return {
+      overview,
+      funnel: {
+        registered: overview.totalUsers,
+        activeToday: overview.activeToday,
+        withActions: overview.usersWithActions,
+        withRuns: overview.usersWithRuns,
+        withoutRuns: overview.usersWithoutRuns,
+        activationRate,
+        activeRate,
+      },
+      rankings: {
+        byRuns: byRuns.map((user, index) => ({ rank: index + 1, ...user })),
+        byActions: byActions.map((user, index) => ({ rank: index + 1, ...user })),
+        byRequests: byRequests.map((user, index) => ({ rank: index + 1, ...user })),
+        byActivity: byActivity.map((user, index) => ({ rank: index + 1, ...user })),
+      },
+      generatedAt: nowIso(),
+    };
   }
 }
 
