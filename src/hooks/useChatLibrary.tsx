@@ -242,12 +242,22 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
         setSessions((prev) => mergeSessionSummary(prev, data.sessions));
       }
       if (Array.isArray(data.folders)) setFolders(data.folders);
-      // Only replace active body if we are still on this session and server returned it.
+      // Keep local body authoritative while editing; only merge server summary fields.
+      // Replacing transcript from server response can race with in-flight UI updates
+      // and wipe content on the next applySession pass.
       if (activeSessionIdRef.current === id && data.session) {
-        setActiveSession(data.session);
+        setActiveSession((prev) => {
+          if (!prev || prev.id !== id) return data.session!;
+          return {
+            ...data.session!,
+            transcript: Array.isArray(prev.transcript) ? prev.transcript : data.session!.transcript,
+            finalResult: prev.finalResult !== undefined ? prev.finalResult : data.session!.finalResult,
+            missionDraft: typeof prev.missionDraft === 'string' ? prev.missionDraft : data.session!.missionDraft,
+          };
+        });
       }
     } catch {
-      // best-effort
+      // best-effort — runMission also flushes; silent here keeps typing smooth.
     }
   }, []);
 

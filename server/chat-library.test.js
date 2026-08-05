@@ -77,3 +77,73 @@ test('CHAT_LIBRARY_V1 delete folder moves sessions to root by default', async ()
     assert.equal(reloaded.folderId, null);
   });
 });
+
+test('CHAT_LIBRARY_V1 first load materializes durable library file', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-first-'));
+  const { workspace, chatLibrary } = await loadChatLibrary(dataDir);
+
+  let sessionId;
+  workspace.runWithWorkspaceUser('user-first', () => {
+    const snap = chatLibrary.getChatLibrarySnapshot();
+    sessionId = snap.activeSessionId;
+    assert.ok(sessionId);
+    assert.equal(snap.activeSession.transcript.length, 0);
+  });
+
+  const workspacesRoot = path.join(dataDir, 'workspaces');
+  const dirs = fs.readdirSync(workspacesRoot);
+  assert.equal(dirs.length, 1);
+  const filePath = path.join(workspacesRoot, dirs[0], 'chat-library.json');
+  assert.ok(fs.existsSync(filePath));
+  const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  assert.equal(raw.activeSessionId, sessionId);
+  assert.equal(raw.sessions[0].id, sessionId);
+});
+
+test('CHAT_LIBRARY_V1 persists transcript and survives reload of module cache', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-persist-'));
+  const first = await loadChatLibrary(dataDir);
+  let sessionId;
+
+  first.workspace.runWithWorkspaceUser('user-persist', () => {
+    const snap = first.chatLibrary.getChatLibrarySnapshot();
+    sessionId = snap.activeSessionId;
+    first.chatLibrary.updateChatSession(sessionId, {
+      missionDraft: 'salvar no servidor',
+      transcript: [
+        { id: 'op1', role: 'operator', name: 'Operador', content: 'salvar no servidor', timestamp: new Date().toISOString() },
+        { id: 'p1', role: 'persona', name: 'Juiz', content: 'ok', timestamp: new Date().toISOString() },
+      ],
+      finalResult: { id: 'f1', role: 'persona', name: 'Juiz', content: 'veredito', timestamp: new Date().toISOString() },
+    });
+  });
+
+  // Fresh module import simulates process restart / F5 server path.
+  const second = await loadChatLibrary(dataDir);
+  second.workspace.runWithWorkspaceUser('user-persist', () => {
+    const session = second.chatLibrary.getChatSession(sessionId);
+    assert.equal(session.missionDraft, 'salvar no servidor');
+    assert.equal(session.transcript.length, 2);
+    assert.equal(session.transcript[0].content, 'salvar no servidor');
+    assert.equal(session.finalResult.content, 'veredito');
+  });
+});
+
+test('CHAT_LIBRARY_V1 appendTranscript extends without wiping existing messages', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-append-'));
+  const { workspace, chatLibrary } = await loadChatLibrary(dataDir);
+
+  workspace.runWithWorkspaceUser('user-append', () => {
+    const snap = chatLibrary.getChatLibrarySnapshot();
+    const sessionId = snap.activeSessionId;
+    chatLibrary.updateChatSession(sessionId, {
+      transcript: [{ id: '1', role: 'operator', name: 'Operador', content: 'q1', timestamp: new Date().toISOString() }],
+    });
+    chatLibrary.updateChatSession(sessionId, {
+      appendTranscript: [{ id: '2', role: 'persona', name: 'A', content: 'a1', timestamp: new Date().toISOString() }],
+    });
+    const session = chatLibrary.getChatSession(sessionId);
+    assert.equal(session.transcript.length, 2);
+    assert.equal(session.transcript[1].content, 'a1');
+  });
+});

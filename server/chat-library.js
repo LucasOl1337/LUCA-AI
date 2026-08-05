@@ -124,23 +124,27 @@ function loadLibrary(userId) {
   if (cache.has(id)) return cache.get(id);
   const filePath = libraryPathFor(id);
   let library;
+  let created = false;
   try {
     library = normalizeLibrary(JSON.parse(fs.readFileSync(filePath, 'utf8')));
   } catch {
+    // First touch: materialize a stable empty library so F5 keeps the same session id.
     library = emptyLibrary();
+    created = true;
   }
   cache.set(id, library);
+  if (created) persistLibrary(id, library);
   return library;
 }
 
 function persistLibrary(userId, library) {
-  try {
-    const dir = path.dirname(libraryPathFor(userId));
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(libraryPathFor(userId), JSON.stringify(library, null, 2));
-  } catch {
-    // best-effort persistence
-  }
+  const filePath = libraryPathFor(userId);
+  const dir = path.dirname(filePath);
+  fs.mkdirSync(dir, { recursive: true });
+  // Atomic replace — partial write + crash must not wipe chat-library.json.
+  const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(library, null, 2));
+  fs.renameSync(tmp, filePath);
 }
 
 function withLibrary(mutator) {
@@ -360,6 +364,10 @@ export function updateChatSession(sessionId, patch = {}) {
     }
     if (typeof patch.missionDraft === 'string') session.missionDraft = patch.missionDraft;
     if (Array.isArray(patch.transcript)) session.transcript = patch.transcript.slice(-MAX_TRANSCRIPT);
+    // Append-only path for operator bubbles / incremental replies without full rewrite races.
+    if (Array.isArray(patch.appendTranscript) && patch.appendTranscript.length) {
+      session.transcript = [...session.transcript, ...patch.appendTranscript].slice(-MAX_TRANSCRIPT);
+    }
     if (Object.prototype.hasOwnProperty.call(patch, 'finalResult')) session.finalResult = patch.finalResult ?? null;
     if (Object.prototype.hasOwnProperty.call(patch, 'activePersonaSlug')) {
       session.activePersonaSlug = patch.activePersonaSlug ? String(patch.activePersonaSlug) : null;
@@ -374,6 +382,7 @@ export function updateChatSession(sessionId, patch = {}) {
       || Object.prototype.hasOwnProperty.call(patch, 'folderId')
       || typeof patch.missionDraft === 'string'
       || Array.isArray(patch.transcript)
+      || Array.isArray(patch.appendTranscript)
       || Object.prototype.hasOwnProperty.call(patch, 'finalResult')
       || patch.operationMode === 'team'
       || patch.operationMode === 'individual'

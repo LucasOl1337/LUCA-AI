@@ -519,6 +519,10 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const transcriptRef = useRef<HTMLDivElement>(null);
   const skipNextPersistRef = useRef(false);
   const persistTimerRef = useRef<number | null>(null);
+  const latestPersistRef = useRef<{
+    sessionId: string | null;
+    payload: Record<string, unknown>;
+  }>({ sessionId: null, payload: {} });
 
   // O frontend publicado e o runtime Express compartilham a mesma origem
   // através do Cloudflare Tunnel. Nunca tente acessar o loopback do visitante.
@@ -609,43 +613,85 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       applySession(null);
       return;
     }
+    // Wait for full session body without wiping the canvas. Clearing here made
+    // F5 / session switch look like history vanished while the GET was in flight.
     if (!activeSession || activeSession.id !== activeSessionId) {
-      if (boundSessionIdRef.current !== activeSessionId) {
-        skipNextPersistRef.current = true;
-        setRunning(false);
-        setProcessEvents([]);
-        setActiveTraceId(null);
-        setTranscript([]);
-        setFinalResult(null);
-        setMission('');
-        boundSessionIdRef.current = null;
-      }
       return;
     }
     if (boundSessionIdRef.current === activeSession.id) return;
+    // Flush previous session before binding the next body (session switch).
+    const prev = latestPersistRef.current;
+    if (
+      boundSessionIdRef.current
+      && prev.sessionId
+      && prev.sessionId === boundSessionIdRef.current
+      && prev.sessionId !== activeSession.id
+    ) {
+      void persistSession(prev.sessionId, prev.payload);
+    }
     applySession(activeSession);
-  }, [activeSession, activeSessionId, applySession, libraryReady, setFinalResult, setMission, setTranscript]);
+  }, [activeSession, activeSessionId, applySession, libraryReady, persistSession]);
+
+  const buildPersistPayload = useCallback((overrides: Record<string, unknown> = {}) => ({
+    operationMode,
+    workflowAssignments: assignments,
+    individualAssignments,
+    missionDraft: mission,
+    transcript,
+    finalResult,
+    activePersonaSlug,
+    ...overrides,
+  }), [
+    activePersonaSlug,
+    assignments,
+    finalResult,
+    individualAssignments,
+    mission,
+    operationMode,
+    transcript,
+  ]);
+
+  const flushSessionNow = useCallback((
+    sessionId: string | null | undefined,
+    overrides: Record<string, unknown> = {},
+  ) => {
+    const id = String(sessionId || '').trim();
+    if (!id || boundSessionIdRef.current !== id) return;
+    if (persistTimerRef.current) {
+      window.clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = null;
+    }
+    const payload = buildPersistPayload(overrides);
+    latestPersistRef.current = { sessionId: id, payload };
+    void persistSession(id, payload);
+  }, [buildPersistPayload, persistSession]);
 
   useEffect(() => {
-    if (!libraryReady || !activeSessionId || running || sessionsBusy) return undefined;
+    if (!libraryReady || !activeSessionId) return;
+    if (boundSessionIdRef.current !== activeSessionId) return;
+    latestPersistRef.current = {
+      sessionId: activeSessionId,
+      payload: buildPersistPayload(),
+    };
+  }, [activeSessionId, buildPersistPayload, libraryReady]);
+
+  useEffect(() => {
+    if (!libraryReady || !activeSessionId || sessionsBusy) return undefined;
     if (boundSessionIdRef.current !== activeSessionId) return undefined;
     if (skipNextPersistRef.current) {
       skipNextPersistRef.current = false;
       return undefined;
     }
+    // Debounce while typing/configuring. Run path also flushes immediately.
+    // Do NOT gate on `running` — that blocked the only write path during long
+    // team/individual runs, so F5 mid-run or right after lost the transcript.
     const sessionId = activeSessionId;
     if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
     persistTimerRef.current = window.setTimeout(() => {
       if (boundSessionIdRef.current !== sessionId) return;
-      void persistSession(sessionId, {
-        operationMode,
-        workflowAssignments: assignments,
-        individualAssignments,
-        missionDraft: mission,
-        transcript,
-        finalResult,
-        activePersonaSlug,
-      });
+      const payload = buildPersistPayload();
+      latestPersistRef.current = { sessionId, payload };
+      void persistSession(sessionId, payload);
     }, 450);
     return () => {
       if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
@@ -654,28 +700,51 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     activePersonaSlug,
     activeSessionId,
     assignments,
+    buildPersistPayload,
     finalResult,
     individualAssignments,
     libraryReady,
     mission,
     operationMode,
     persistSession,
-    running,
     sessionsBusy,
     transcript,
   ]);
 
   useEffect(() => {
-      if (window.localStorage.getItem(LUCA_AI_CLEAN_UI_STORAGE_KEY) === LUCA_AI_CLEAN_UI_VERSION) return;
-      for (const key of LUCA_AI_LEGACY_LOCAL_KEYS) {
-        try { window.localStorage.removeItem(key); } catch { /* ignore */ }
+    function flushOnLeave() {
+      const { sessionId, payload } = latestPersistRef.current;
+      if (!sessionId || boundSessionIdRef.current !== sessionId) return;
+      // keepalive survives tab close better than a cancelled fetch.
+      try {
+        void fetch(`/api/luca-ai/chat/sessions/${encodeURIComponent(sessionId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          credentials: 'same-origin',
+          keepalive: true,
+        });
+      } catch {
+        // ignore — best effort on unload
       }
-      setTranscript([]);
-      setFinalResult(null);
-      setProcessEvents([]);
-      setActiveTraceId(null);
-      window.localStorage.setItem(LUCA_AI_CLEAN_UI_STORAGE_KEY, LUCA_AI_CLEAN_UI_VERSION);
-    }, []);
+    }
+    window.addEventListener('pagehide', flushOnLeave);
+    window.addEventListener('beforeunload', flushOnLeave);
+    return () => {
+      window.removeEventListener('pagehide', flushOnLeave);
+      window.removeEventListener('beforeunload', flushOnLeave);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (window.localStorage.getItem(LUCA_AI_CLEAN_UI_STORAGE_KEY) === LUCA_AI_CLEAN_UI_VERSION) return;
+    for (const key of LUCA_AI_LEGACY_LOCAL_KEYS) {
+      try { window.localStorage.removeItem(key); } catch { /* ignore */ }
+    }
+    // Only purge legacy localStorage keys. Never wipe React transcript here —
+    // that raced applySession on first paint after F5 and blanked recovered chat.
+    window.localStorage.setItem(LUCA_AI_CLEAN_UI_STORAGE_KEY, LUCA_AI_CLEAN_UI_VERSION);
+  }, []);
 
   useEffect(() => {
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight, behavior: 'smooth' });
@@ -930,6 +999,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setFinalResult(null);
     setProcessEvents([]);
     setActiveTraceId(null);
+    flushSessionNow(activeSessionId, { transcript: [], finalResult: null });
   }
 
   function switchOperationMode(next: OperationMode) {
@@ -984,7 +1054,14 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       status: 'info',
       timestamp: startedAt,
     };
-    setTranscript((prev) => [...prev, operatorEntry].slice(-100));
+    // Capture next transcript eagerly — setState is async and F5 must not lose the question.
+    const transcriptWithOperator = [...transcript, operatorEntry].slice(-100);
+    setTranscript(transcriptWithOperator);
+    flushSessionNow(ownerSessionId, {
+      missionDraft: trimmedMission,
+      transcript: transcriptWithOperator,
+      finalResult: null,
+    });
 
     const stillOwner = () => (
       runOwnerSessionIdRef.current === ownerSessionId
@@ -1022,10 +1099,12 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       const nextMessages = operationMode === 'individual'
         ? (data.replies ?? []).map((reply) => transcriptEntryFromReply(reply, data.generatedAt || new Date().toISOString(), 'Resposta individual'))
         : transcriptEntriesFromResponse(data);
-      setTranscript((prev) => [...prev, ...nextMessages].slice(-140));
+      const transcriptAfter = [...transcriptWithOperator, ...nextMessages].slice(-140);
+      setTranscript(transcriptAfter);
+      let nextFinal: TeamTranscriptEntry | null = null;
       const finalReply = operationMode === 'individual' ? data.judge : null;
       if (operationMode === 'individual' && finalReply?.content) {
-        setFinalResult({
+        nextFinal = {
           id: nowId('judge-verdict'),
           role: 'persona',
           name: finalReply.name || finalReply.slug,
@@ -1035,9 +1114,9 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           content: finalReply.content,
           status: finalReply.ok ? 'ok' : 'error',
           timestamp: data.generatedAt || new Date().toISOString(),
-        });
+        };
       } else if (data.finalDisplay?.content) {
-        setFinalResult({
+        nextFinal = {
           id: nowId('final-display'),
           role: 'persona',
           name: data.finalDisplay.name || data.finalDisplay.slug,
@@ -1047,8 +1126,14 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           content: data.finalDisplay.content,
           status: 'ok',
           timestamp: data.generatedAt || new Date().toISOString(),
-        });
+        };
       }
+      setFinalResult(nextFinal);
+      flushSessionNow(ownerSessionId, {
+        missionDraft: trimmedMission,
+        transcript: transcriptAfter,
+        finalResult: nextFinal,
+      });
       if (!data.ok) {
         setError(operationMode === 'individual'
           ? 'As respostas individuais foram acionadas, mas o juiz não concluiu um veredito útil.'
@@ -1072,7 +1157,13 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         status: 'error',
         timestamp: new Date().toISOString(),
       };
-      setTranscript((prev) => [...prev, errorEntry].slice(-140));
+      const transcriptAfterError = [...transcriptWithOperator, errorEntry].slice(-140);
+      setTranscript(transcriptAfterError);
+      flushSessionNow(ownerSessionId, {
+        missionDraft: trimmedMission,
+        transcript: transcriptAfterError,
+        finalResult: null,
+      });
     } finally {
       if (stillOwner()) {
         try {

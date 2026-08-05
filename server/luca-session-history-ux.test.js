@@ -63,3 +63,29 @@ test('canvas pins original mission question after responses', () => {
   assert.ok(source.includes('missionDraft={mission}'), 'passes draft into canvas');
   assert.ok(source.includes('missionDraft?: string'), 'canvas accepts missionDraft prop');
 });
+
+test('session history is API-backed and survives F5 paths', () => {
+  // Must flush immediately on run, not only after debounce when !running.
+  assert.ok(source.includes('flushSessionNow'), 'immediate flush helper');
+  assert.ok(source.includes('flushSessionNow(ownerSessionId'), 'runMission flushes to API');
+  assert.ok(source.includes('keepalive: true'), 'unload flush uses keepalive');
+  // Persist must not be gated on running (that blocked mid-run F5).
+  const persistSlice = source.slice(
+    source.indexOf('// Debounce while typing/configuring'),
+    source.indexOf('// Debounce while typing/configuring') + 900,
+  );
+  assert.ok(persistSlice.includes('Do NOT gate on `running`'), 'documents no running gate');
+  assert.equal(persistSlice.includes('|| running'), false, 'debounce path not blocked by running');
+  // Loading path must not wipe canvas while session body is in flight.
+  const applyEffect = source.slice(
+    source.indexOf('// Wait for full session body without wiping the canvas'),
+    source.indexOf('// Wait for full session body without wiping the canvas') + 500,
+  );
+  assert.equal(applyEffect.includes("setTranscript([])"), false, 'no wipe while waiting for session body');
+  // Legacy localStorage cleanup must not clear React transcript on mount.
+  const cleanSlice = source.slice(
+    source.indexOf('// Only purge legacy localStorage keys'),
+    source.indexOf('// Only purge legacy localStorage keys') + 350,
+  );
+  assert.equal(cleanSlice.includes('setTranscript([])'), false, 'clean-ui effect does not wipe transcript');
+});
