@@ -5,6 +5,8 @@ import test from 'node:test';
 const personasPage = readFileSync(new URL('../src/pages/PersonasPage.tsx', import.meta.url), 'utf8');
 const lucaAiPage = readFileSync(new URL('../src/pages/LucaAiPage.tsx', import.meta.url), 'utf8');
 const serverIndex = readFileSync(new URL('./index.js', import.meta.url), 'utf8');
+const configPage = readFileSync(new URL('../src/pages/ConfiguracaoPage.tsx', import.meta.url), 'utf8');
+const layout = readFileSync(new URL('../src/components/Layout.tsx', import.meta.url), 'utf8');
 
 test('tela de personas reflete o roster oficial do Yume sem mutação local', () => {
   assert.match(personasPage, /Roster principal/);
@@ -14,18 +16,28 @@ test('tela de personas reflete o roster oficial do Yume sem mutação local', ()
   assert.doesNotMatch(personasPage, /Adicionar ao LUCA|Remover do LUCA/);
 });
 
-test('picker mostra oficiais antes das secundárias e bloqueia promoção local', () => {
+test('picker mostra oficiais e secundárias selecionáveis via cache local', () => {
   assert.match(lucaAiPage, /luca-picker-roster-title/);
   assert.match(lucaAiPage, /luca-picker-secondary-panel/);
-  assert.match(lucaAiPage, /personas\.filter\(\(persona\) => persona\.imported\)\.map/);
-  assert.match(lucaAiPage, /await ensurePersonaOfficial\(slug\)/);
-  assert.match(lucaAiPage, /disabled=\{secondary \|\|/);
-  assert.doesNotMatch(lucaAiPage, /importYumePersona/);
+  assert.match(lucaAiPage, /persona\.is_official === true/);
+  assert.match(lucaAiPage, /await ensurePersonaAvailable\(slug\)/);
+  assert.match(lucaAiPage, /importYumePersona/);
+  assert.match(lucaAiPage, /disponíveis via cache local do LUCA/);
+  assert.doesNotMatch(lucaAiPage, /disabled=\{secondary \|\|/);
 });
 
-test('Express reconcilia pelo Kamui e identifica a fonte canônica', () => {
+test('Express reconcilia catálogo e permite secundárias no run', () => {
   assert.match(serverIndex, /syncOfficialPersonaRoster/);
   assert.match(serverIndex, /syncAllOfficialPersonaRosters/);
-  assert.match(serverIndex, /rosterSource: 'yume\.is_official'/);
-  assert.match(serverIndex, /error: 'persona_not_official'/);
+  assert.match(serverIndex, /ensureCatalogPersonaCached/);
+  assert.match(serverIndex, /rosterSource: 'yume\.catalog'/);
+  assert.match(serverIndex, /error: 'persona_not_found'/);
+  assert.match(serverIndex, /\/api\/luca-ai\/team-templates/);
+});
+
+test('aba Configuração existe na navegação e página', () => {
+  assert.match(layout, /configuracao/);
+  assert.match(layout, /Configuração/);
+  assert.match(configPage, /Novo template/);
+  assert.match(configPage, /createTeamTemplate|updateTeamTemplate/);
 });

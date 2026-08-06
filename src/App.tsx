@@ -3,12 +3,13 @@ import Layout, { type PageId } from '@/components/Layout';
 import LandingPage from '@/pages/LandingPage';
 import LucaAiPage from '@/pages/LucaAiPage';
 import PersonasPage from '@/pages/PersonasPage';
+import ConfiguracaoPage from '@/pages/ConfiguracaoPage';
 import AdminPage from '@/pages/AdminPage';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useAuth } from '@/hooks/useAuth';
 import { ChatLibraryProvider } from '@/hooks/useChatLibrary';
 
-const ACTIVE_PAGES: readonly PageId[] = ['inicio', 'luca-ai', 'personas', 'admin'];
+const ACTIVE_PAGES: readonly PageId[] = ['inicio', 'luca-ai', 'personas', 'configuracao', 'admin'];
 
 function isPageId(value: string): value is PageId {
   return ACTIVE_PAGES.includes(value as PageId);
@@ -33,6 +34,7 @@ export default function App() {
       case 'inicio':      return <LandingPage onNavigate={navigate} />;
       case 'luca-ai':     return <LucaAiPage onNavigate={navigate} />;
       case 'personas':    return <PersonasPage />;
+      case 'configuracao': return <ConfiguracaoPage />;
       case 'admin':       return <AdminPage />;
     }
   };

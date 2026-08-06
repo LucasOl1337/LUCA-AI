@@ -55,6 +55,7 @@ import {
   upsertDashboardItem,
   getPersonaAgents,
   replacePersonaAgents,
+  addPersonaAgent,
   updatePersonaAgent,
   ensureWorkspace,
   listWorkspaceUserIds,
@@ -150,6 +151,13 @@ import {
   runIndividualResolution,
 } from './persona-team.js';
 import { createPersonaRunJobStore } from './persona-run-jobs.js';
+import {
+  createTeamTemplate,
+  deleteTeamTemplate,
+  getTeamTemplatesSnapshot,
+  reorderTeamTemplates,
+  updateTeamTemplate,
+} from './team-templates.js';
 import { createAuthService } from './auth.js';
 
 const app = express();
@@ -2836,16 +2844,111 @@ app.delete('/api/luca-ai/chat/sessions/:sessionId/share', (req, res) => {
   }
 });
 
-async function executeLucaAiPersonaTeamRun(input) {
-  const { roster } = await syncOfficialPersonaRoster();
-  const officialSlugs = new Set(roster.map((agent) => agent.slug));
-  const requestedSlugs = [...new Set([...input.slugs, input.judgeSlug].filter(Boolean))];
-  const secondarySlugs = requestedSlugs.filter((slug) => !officialSlugs.has(slug));
-  if (secondarySlugs.length > 0) {
-    const error = new Error('Uma ou mais personas nao fazem parte do roster oficial.');
-    error.code = 'persona_not_official';
-    error.details = { secondarySlugs, rosterSource: 'yume.is_official' };
+function teamTemplatesError(res, error) {
+  const code = error?.code || error?.message || 'template_error';
+  const status = (
+    code === 'template_not_found' ? 404
+      : code === 'template_limit_reached' || code === 'template_order_mismatch'
+        || code === 'invalid_template_kind' || code === 'template_id_required' ? 400
+        : Number(error?.status) || 500
+  );
+  res.status(status).json({ ok: false, error: code, message: error?.message || String(error) });
+}
+
+app.get('/api/luca-ai/team-templates', (_req, res) => {
+  try {
+    res.json({ ok: true, ...getTeamTemplatesSnapshot() });
+  } catch (error) {
+    teamTemplatesError(res, error);
+  }
+});
+
+app.post('/api/luca-ai/team-templates', (req, res) => {
+  try {
+    const kind = String(req.body?.kind || '').trim();
+    const template = createTeamTemplate(kind, req.body?.template || req.body || {});
+    res.status(201).json({ ok: true, kind, template, ...getTeamTemplatesSnapshot() });
+  } catch (error) {
+    teamTemplatesError(res, error);
+  }
+});
+
+app.put('/api/luca-ai/team-templates/:kind/:id', (req, res) => {
+  try {
+    const kind = String(req.params.kind || '').trim();
+    const id = String(req.params.id || '').trim();
+    const template = updateTeamTemplate(kind, id, req.body?.template || req.body || {});
+    res.json({ ok: true, kind, template, ...getTeamTemplatesSnapshot() });
+  } catch (error) {
+    teamTemplatesError(res, error);
+  }
+});
+
+app.delete('/api/luca-ai/team-templates/:kind/:id', (req, res) => {
+  try {
+    const kind = String(req.params.kind || '').trim();
+    const id = String(req.params.id || '').trim();
+    const result = deleteTeamTemplate(kind, id);
+    res.json({ ok: true, kind, ...result, ...getTeamTemplatesSnapshot() });
+  } catch (error) {
+    teamTemplatesError(res, error);
+  }
+});
+
+app.put('/api/luca-ai/team-templates/:kind/order', (req, res) => {
+  try {
+    const kind = String(req.params.kind || '').trim();
+    const list = reorderTeamTemplates(kind, req.body?.ids);
+    res.json({ ok: true, kind, list, ...getTeamTemplatesSnapshot() });
+  } catch (error) {
+    teamTemplatesError(res, error);
+  }
+});
+
+async function ensureCatalogPersonaCached(slug, catalogBySlug) {
+  const clean = String(slug || '').trim();
+  if (!clean) return null;
+  const catalogPersona = catalogBySlug.get(clean);
+  if (!catalogPersona) {
+    const error = new Error(`persona_not_found:${clean}`);
+    error.code = 'persona_not_found';
+    error.details = { slug: clean };
     throw error;
+  }
+  const existing = getPersonaAgents().find((agent) => agent.slug === clean);
+  if (existing) {
+    if (catalogPersona.model && existing.yumeModel !== catalogPersona.model) {
+      updatePersonaAgent(clean, {
+        name: catalogPersona.name || existing.name,
+        yumeModel: String(catalogPersona.model || '').trim(),
+      });
+    }
+    return existing;
+  }
+  return addPersonaAgent({
+    slug: clean,
+    name: catalogPersona.name || clean,
+    yumeModel: String(catalogPersona.model || '').trim(),
+  });
+}
+
+async function executeLucaAiPersonaTeamRun(input) {
+  const { personas } = await syncOfficialPersonaRoster();
+  const catalogBySlug = new Map(
+    (Array.isArray(personas) ? personas : [])
+      .map((persona) => [String(persona?.slug || '').trim(), persona])
+      .filter(([slug]) => Boolean(slug)),
+  );
+  const requestedSlugs = [...new Set([...input.slugs, input.judgeSlug].filter(Boolean))];
+  const missingSlugs = requestedSlugs.filter((slug) => !catalogBySlug.has(slug));
+  if (missingSlugs.length > 0) {
+    const error = new Error('Uma ou mais personas nao existem no catalogo Yume.');
+    error.code = 'persona_not_found';
+    error.details = { missingSlugs, rosterSource: 'yume.catalog' };
+    throw error;
+  }
+  for (const slug of requestedSlugs) {
+    await ensureCatalogPersonaCached(slug, catalogBySlug);
   }
   const runStartedAt = new Date().toISOString();
   const runStartedMs = Date.now();
@@ -3106,14 +3209,26 @@ app.post('/api/agent/persona/add', async (req, res) => {
     return;
   }
   try {
-    const { roster } = await syncOfficialPersonaRoster();
-    const record = roster.find((agent) => agent.slug === slug) || null;
-    if (!record) {
-      res.status(409).json({ ok: false, error: 'persona_not_official', slug, rosterSource: 'yume.is_official' });
+    const { personas } = await syncOfficialPersonaRoster();
+    const catalogPersona = (Array.isArray(personas) ? personas : []).find((item) => item.slug === slug);
+    if (!catalogPersona) {
+      res.status(404).json({ ok: false, error: 'persona_not_found', slug, rosterSource: 'yume.catalog' });
       return;
     }
+    const record = addPersonaAgent({
+      slug,
+      name: catalogPersona.name || slug,
+      yumeModel: String(catalogPersona.model || '').trim(),
+    });
+    // Reconcile keeps official roster + retained secondaries (including this one).
+    applyOfficialPersonaRoster(personas);
     emitState();
-    res.json({ ok: true, agent: record, synchronized: true, rosterSource: 'yume.is_official' });
+    res.json({
+      ok: true,
+      agent: getPersonaAgents().find((agent) => agent.slug === slug) || record,
+      synchronized: true,
+      rosterSource: catalogPersona.is_official === true ? 'yume.is_official' : 'yume.secondary',
+    });
   } catch (error) {
     res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
   }
@@ -3123,14 +3238,21 @@ app.post('/api/agent/persona/remove', async (req, res) => {
   const slug = String(req.body?.slug ?? '').trim();
   try {
     const existed = getPersonaAgents().some((agent) => agent.slug === slug);
-    const { roster } = await syncOfficialPersonaRoster();
-    const remainsOfficial = roster.some((agent) => agent.slug === slug);
+    const { personas, roster } = await syncOfficialPersonaRoster();
+    const catalogPersona = (Array.isArray(personas) ? personas : []).find((item) => item.slug === slug);
+    // Official personas always return via reconcile; only secondaries can truly drop.
+    if (existed && catalogPersona && catalogPersona.is_official !== true) {
+      const next = getPersonaAgents().filter((agent) => agent.slug !== slug);
+      replacePersonaAgents(next);
+    }
+    const remains = getPersonaAgents().some((agent) => agent.slug === slug)
+      || roster.some((agent) => agent.slug === slug);
     emitState();
     res.json({
       ok: true,
-      removed: existed && !remainsOfficial,
+      removed: existed && !remains,
       synchronized: true,
-      rosterSource: 'yume.is_official',
+      rosterSource: 'yume.catalog',
     });
   } catch (error) {
     res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
@@ -3292,18 +3414,25 @@ app.post('/api/agent/run', async (req, res) => {
 
   if (requestedPersonaSlug) {
     try {
-      await syncOfficialPersonaRoster();
+      const { personas } = await syncOfficialPersonaRoster();
+      const catalogBySlug = new Map(
+        (Array.isArray(personas) ? personas : [])
+          .map((persona) => [String(persona?.slug || '').trim(), persona])
+          .filter(([slug]) => Boolean(slug)),
+      );
+      if (!catalogBySlug.has(requestedPersonaSlug)) {
+        res.status(404).json({
+          ok: false,
+          error: 'persona_not_found',
+          slug: requestedPersonaSlug,
+          rosterSource: 'yume.catalog',
+        });
+        return;
+      }
+      await ensureCatalogPersonaCached(requestedPersonaSlug, catalogBySlug);
     } catch (error) {
-      res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
-      return;
-    }
-    if (!getPersonaAgents().some((agent) => agent.slug === requestedPersonaSlug)) {
-      res.status(409).json({
-        ok: false,
-        error: 'persona_not_official',
-        slug: requestedPersonaSlug,
-        rosterSource: 'yume.is_official',
-      });
+      const status = error?.code === 'persona_not_found' ? 404 : 502;
+      res.status(status).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
       return;
     }
   }

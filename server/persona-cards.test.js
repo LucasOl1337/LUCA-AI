@@ -48,7 +48,7 @@ test('falha fechada quando o Yume nao declara a categoria editorial', () => {
   );
 });
 
-test('reconcilia o roster local exclusivamente pelas oficiais do Yume', () => {
+test('reconcilia oficiais do Yume e retém secundárias já cacheadas no catálogo', () => {
   const result = reconcileOfficialPersonaAgents(
     [
       { slug: 'aurora', name: 'Aurora', model: 'gcli/grok-4.5', is_official: true },
@@ -58,17 +58,34 @@ test('reconcilia o roster local exclusivamente pelas oficiais do Yume', () => {
     [
       { slug: 'aurora', name: 'Aurora antiga', model: 'kimi/k3', enabled: false, cachedVersion: 12, addedAt: 'antes' },
       { slug: 'jinx', name: 'Jinx', model: '', enabled: true, addedAt: 'antes' },
+      { slug: 'fantasma', name: 'Fora do catálogo', model: '', enabled: true, addedAt: 'antes' },
     ],
     'agora',
   );
 
   assert.equal(result.changed, true);
-  assert.deepEqual(result.roster.map((agent) => agent.slug), ['aurora', 'lucas']);
+  assert.deepEqual(result.roster.map((agent) => agent.slug), ['aurora', 'lucas', 'jinx']);
   assert.equal(result.roster[0].model, 'kimi/k3');
   assert.equal(result.roster[0].enabled, false);
   assert.equal(result.roster[0].cachedVersion, 12);
   assert.equal(result.roster[0].yumeModel, 'gcli/grok-4.5');
   assert.equal(result.roster[1].addedAt, 'agora');
+  assert.equal(result.roster[2].slug, 'jinx');
+  assert.equal(result.roster[2].addedAt, 'antes');
+});
+
+test('secundária cacheada aparece como imported no catálogo normalizado', () => {
+  const personas = normalizeYumePersonasForLuca(
+    [
+      { slug: 'aurora', name: 'Aurora', model: 'gcli/grok-4.5', is_official: true },
+      { slug: 'jinx', name: 'Jinx', model: 'cx/gpt-5.6-sol', is_official: false },
+    ],
+    [{ slug: 'jinx', model: 'kimi/k3' }],
+  );
+  assert.equal(personas[0].imported, true);
+  assert.equal(personas[1].imported, true);
+  assert.equal(personas[1].is_official, false);
+  assert.equal(personas[1].model, 'kimi/k3');
 });
 
 test('expoe modelo Yume valido no 9Router mesmo sem import, e marca motor efetivo', () => {

@@ -453,3 +453,43 @@ export interface LucaAiChatLibraryResponse {
   createdReplacement?: boolean;
   error?: string;
 }
+
+
+export interface LucaAiTeamTemplateAssignments {
+  supervisor: string[];
+  mission: string[];
+  execution: string[];
+  approval: string[];
+  display: string[];
+}
+
+export interface LucaAiTeamTemplate {
+  id: string;
+  label: string;
+  description: string;
+  icon: string;
+  assignments: LucaAiTeamTemplateAssignments;
+}
+
+export interface LucaAiIndividualTemplate {
+  id: string;
+  label: string;
+  description: string;
+  icon: string;
+  participants: string[];
+  judge: string | null;
+}
+
+export interface LucaAiTeamTemplatesResponse {
+  ok: boolean;
+  version?: number;
+  team: LucaAiTeamTemplate[];
+  individual: LucaAiIndividualTemplate[];
+  kind?: 'team' | 'individual';
+  template?: LucaAiTeamTemplate | LucaAiIndividualTemplate;
+  list?: Array<LucaAiTeamTemplate | LucaAiIndividualTemplate>;
+  deleted?: boolean;
+  id?: string;
+  message?: string;
+  error?: string;
+}

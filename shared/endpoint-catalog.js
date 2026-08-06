@@ -197,6 +197,7 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
                 endpoint('luca-ai-chat-session-get', 'GET', '/api/luca-ai/chat/sessions/:sessionId', 'carrega o conteúdo completo de uma sessão de chat do LUCA-AI', 'both'),
                 endpoint('luca-ai-chat-session-share-get', 'GET', '/api/luca-ai/chat/sessions/:sessionId/share', 'consulta o link público ativo de compartilhamento da sessão', 'both'),
                 endpoint('luca-ai-persona-run-status', 'GET', '/api/luca-ai/persona-team/runs/:runId', 'consulta o estado e o resultado de uma rodada assíncrona de personas', 'both'),
+                endpoint('luca-ai-team-templates', 'GET', '/api/luca-ai/team-templates', 'lista templates de equipe e individual da conta', 'both'),
               ],
               inbound: [
                 endpoint(
@@ -215,7 +216,35 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
                   'both',
                   '{\n  "mission": "Qual a melhor plataforma de vibe coding?",\n  "mode": "individual",\n  "slugs": ["aurora"],\n  "judgeSlug": "aurora",\n  "traceId": "trace_example"\n}',
                 ),
+
                 endpoint(
+                  'luca-ai-team-template-create',
+                  'POST',
+                  '/api/luca-ai/team-templates',
+                  'cria template de equipe ou individual no workspace da conta',
+                  'both',
+                ),
+                endpoint(
+                  'luca-ai-team-template-update',
+                  'PUT',
+                  '/api/luca-ai/team-templates/:kind/:id',
+                  'atualiza um template de equipe ou individual',
+                  'both',
+                ),
+                endpoint(
+                  'luca-ai-team-template-delete',
+                  'DELETE',
+                  '/api/luca-ai/team-templates/:kind/:id',
+                  'remove um template de equipe ou individual',
+                  'both',
+                ),
+                endpoint(
+                  'luca-ai-team-template-order',
+                  'PUT',
+                  '/api/luca-ai/team-templates/:kind/order',
+                  'reordena templates de um tipo',
+                  'both',
+                ),                endpoint(
                   'luca-ai-chat-folder-create',
                   'POST',
                   '/api/luca-ai/chat/folders',

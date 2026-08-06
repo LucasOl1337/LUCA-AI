@@ -5,6 +5,7 @@ import type {
   LucaAiPersonaTeamRunAccepted,
   LucaAiPersonaTeamRunResponse,
   LucaAiPersonaTeamRunStatus,
+  LucaAiTeamTemplatesResponse,
   LucaAiWorkflowAssignment,
   LucaState,
   PersonaAgentEntry,
@@ -78,6 +79,20 @@ export async function apiDelete<T = unknown>(
 ): Promise<T> {
   return requestJson(apiUrl(path, base), {
     method: 'DELETE',
+    timeoutMs,
+  });
+}
+
+export async function apiPut<T = unknown>(
+  path: string,
+  body: Record<string, unknown> = {},
+  base = apiBase,
+  timeoutMs = ACTION_REQUEST_TIMEOUT_MS,
+): Promise<T> {
+  return requestJson(apiUrl(path, base), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
     timeoutMs,
   });
 }
@@ -157,6 +172,16 @@ export const lucaApi = {
     apiPost<{ ok: boolean; agent: PersonaAgentEntry | Record<string, unknown> }>('/api/agent/config', { agentId, ...patch }, base),
   listRouterModels: (base?: string, timeoutMs = ACTION_REQUEST_TIMEOUT_MS) =>
     apiGet<RouterModelsResponse>('/api/router/models', timeoutMs, base),
+  listTeamTemplates: (base?: string, timeoutMs = ACTION_REQUEST_TIMEOUT_MS) =>
+    apiGet<LucaAiTeamTemplatesResponse>('/api/luca-ai/team-templates', timeoutMs, base),
+  createTeamTemplate: (kind: 'team' | 'individual', template: Record<string, unknown>, base?: string) =>
+    apiPost<LucaAiTeamTemplatesResponse>('/api/luca-ai/team-templates', { kind, template }, base),
+  updateTeamTemplate: (kind: 'team' | 'individual', id: string, template: Record<string, unknown>, base?: string) =>
+    apiPut<LucaAiTeamTemplatesResponse>(`/api/luca-ai/team-templates/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`, { template }, base),
+  deleteTeamTemplate: (kind: 'team' | 'individual', id: string, base?: string) =>
+    apiDelete<LucaAiTeamTemplatesResponse>(`/api/luca-ai/team-templates/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`, base),
+  reorderTeamTemplates: (kind: 'team' | 'individual', ids: string[], base?: string) =>
+    apiPut<LucaAiTeamTemplatesResponse>(`/api/luca-ai/team-templates/${encodeURIComponent(kind)}/order`, { ids }, base),
   runLucaAiPersonaTeam: (
     mission: string,
     slugs: string[],
