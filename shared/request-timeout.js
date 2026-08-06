@@ -88,6 +88,10 @@ export function buildApiErrorMessage(error, fallback = 'Falha ao falar com o run
     return `Tempo limite excedido (${seconds}s). O runtime nao respondeu a tempo.`;
   }
   if (error instanceof RequestHttpError) {
+    const looksLikeCloudflareHtml = /<!doctype\s+html|cloudflare|cf-error-details/i.test(error.bodyText);
+    if (error.status === 524 || looksLikeCloudflareHtml) {
+      return 'A execução demorou além do limite da conexão. Ela pode continuar em segundo plano; acompanhe o progresso e tente atualizar em instantes.';
+    }
     return error.bodyText
       ? `Runtime respondeu com erro (${error.status}): ${error.bodyText}`
       : `Runtime respondeu com erro HTTP ${error.status}.`;

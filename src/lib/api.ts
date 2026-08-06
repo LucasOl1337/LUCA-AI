@@ -2,7 +2,9 @@ import type {
   LucaAiChatLibraryResponse,
   LucaAiChatSession,
   LucaAiChatSessionShareResponse,
+  LucaAiPersonaTeamRunAccepted,
   LucaAiPersonaTeamRunResponse,
+  LucaAiPersonaTeamRunStatus,
   LucaAiWorkflowAssignment,
   LucaState,
   PersonaAgentEntry,
@@ -15,6 +17,8 @@ import { buildApiErrorMessage, requestJson } from './requestTimeout';
 const apiBase = typeof window !== 'undefined' ? window.location.origin : '';
 const STATE_REQUEST_TIMEOUT_MS = 8000;
 const ACTION_REQUEST_TIMEOUT_MS = 20000;
+const PERSONA_RUN_POLL_INTERVAL_MS = 1200;
+const PERSONA_RUN_MAX_WAIT_MS = 15 * 60 * 1000;
 
 function apiUrl(path: string, base = apiBase): string {
   return `${base.replace(/\/+$/, '')}${path}`;
@@ -88,6 +92,43 @@ function queryString(params: Record<string, string | number | null | undefined>)
   return value ? `?${value}` : '';
 }
 
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function waitForPersonaTeamRun(
+  accepted: LucaAiPersonaTeamRunAccepted,
+  base = apiBase,
+): Promise<LucaAiPersonaTeamRunResponse> {
+  const deadline = Date.now() + PERSONA_RUN_MAX_WAIT_MS;
+  while (Date.now() < deadline) {
+    const job = await apiGet<LucaAiPersonaTeamRunStatus>(
+      `/api/luca-ai/persona-team/runs/${encodeURIComponent(accepted.runId)}`,
+      ACTION_REQUEST_TIMEOUT_MS,
+      base,
+    );
+    if (job.status === 'complete' && job.result) return job.result;
+    if (job.status === 'failed') {
+      throw new Error(job.error?.message || 'A rodada de personas falhou durante a execução.');
+    }
+    await wait(PERSONA_RUN_POLL_INTERVAL_MS);
+  }
+  throw new Error('A rodada continua em segundo plano e excedeu o tempo de acompanhamento desta tela.');
+}
+
+async function startPersonaTeamRun(
+  body: Record<string, unknown>,
+  base = apiBase,
+): Promise<LucaAiPersonaTeamRunResponse> {
+  const accepted = await apiPost<LucaAiPersonaTeamRunAccepted>(
+    '/api/luca-ai/persona-team/run',
+    body,
+    base,
+    ACTION_REQUEST_TIMEOUT_MS,
+  );
+  return waitForPersonaTeamRun(accepted, base);
+}
+
 export { buildApiErrorMessage };
 
 // ─── Ações do contrato (server/index.js) ───
@@ -124,11 +165,9 @@ export const lucaApi = {
     base?: string,
     modelOverrides?: Record<string, string>,
   ) =>
-    apiPost<LucaAiPersonaTeamRunResponse>(
-      '/api/luca-ai/persona-team/run',
+    startPersonaTeamRun(
       { mission, slugs, workflow, traceId, modelOverrides },
       base,
-      180000,
     ),
   runLucaAiIndividualResolution: (
     mission: string,
@@ -138,11 +177,9 @@ export const lucaApi = {
     base?: string,
     modelOverrides?: Record<string, string>,
   ) =>
-    apiPost<LucaAiPersonaTeamRunResponse>(
-      '/api/luca-ai/persona-team/run',
+    startPersonaTeamRun(
       { mission, mode: 'individual', slugs, judgeSlug, traceId, modelOverrides },
       base,
-      180000,
     ),
   listEvents: (params: { traceId?: string; type?: string; limit?: number } = {}, base?: string) =>
     apiGet<{ ok: boolean; events: RuntimeEvent[] }>(`/api/events${queryString(params)}`, 8000, base),

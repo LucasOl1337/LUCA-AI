@@ -27,7 +27,7 @@ workspace. Assim, composição do roster não é duplicada no estado do LUCA.
 
 O Express é o único runtime de aplicação ativo da produção. O runtime em `worker/` permanece legado e não deve ser tratado como provider ou origem do frontend publicado. O script pequeno `deploy/luca-ai-vm-proxy.js` atua somente como proxy reverso de borda e não executa modelos, personas ou regras do produto.
 
-Todos os processos de aplicação vivem na VM `sennin-core-01`. O PC Windows é somente ambiente de desenvolvimento e não participa do tráfego de `luca-ai.com.br`. Na VM, `luca-ai.service` serve o Express em loopback e `cloudflared-bombapvp-lab.service` publica `luca-origin.bombapvp.com`; a Cloudflare encaminha o domínio público para essa origem.
+Todos os processos de aplicação vivem na VM `sennin-core-01`. O PC Windows é somente ambiente de desenvolvimento e não participa do tráfego de `luca-ai.com.br`. Na VM, `luca-ai.service` serve o Express em loopback e `cloudflared-luca-ai.service` publica `luca-origin.bombapvp.com`; a Cloudflare encaminha o domínio público para essa origem.
 
 ## Autenticação
 

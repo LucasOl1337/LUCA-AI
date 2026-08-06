@@ -196,6 +196,7 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
                 endpoint('luca-ai-chat-library', 'GET', '/api/luca-ai/chat/library', 'lista pastas e sessões de chat do LUCA-AI por conta', 'both'),
                 endpoint('luca-ai-chat-session-get', 'GET', '/api/luca-ai/chat/sessions/:sessionId', 'carrega o conteúdo completo de uma sessão de chat do LUCA-AI', 'both'),
                 endpoint('luca-ai-chat-session-share-get', 'GET', '/api/luca-ai/chat/sessions/:sessionId/share', 'consulta o link público ativo de compartilhamento da sessão', 'both'),
+                endpoint('luca-ai-persona-run-status', 'GET', '/api/luca-ai/persona-team/runs/:runId', 'consulta o estado e o resultado de uma rodada assíncrona de personas', 'both'),
               ],
               inbound: [
                 endpoint(
@@ -205,6 +206,14 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
                   'publica mensagem manual no chat global',
                   'local',
                   '{\n  "content": "Supervisor, revisar a lacuna financeira antes do fechamento."\n}',
+                ),
+                endpoint(
+                  'luca-ai-persona-run-start',
+                  'POST',
+                  '/api/luca-ai/persona-team/run',
+                  'inicia uma rodada assíncrona de personas e devolve runId para polling',
+                  'both',
+                  '{\n  "mission": "Qual a melhor plataforma de vibe coding?",\n  "mode": "individual",\n  "slugs": ["aurora"],\n  "judgeSlug": "aurora",\n  "traceId": "trace_example"\n}',
                 ),
                 endpoint(
                   'luca-ai-chat-folder-create',

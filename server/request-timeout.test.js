@@ -49,4 +49,11 @@ test('buildApiErrorMessage gera mensagens operacionais claras', () => {
     buildApiErrorMessage(new RequestHttpError('bad request', { status: 409, bodyText: 'mission lock active' })),
     /409.*mission lock active/i,
   );
+  assert.equal(
+    buildApiErrorMessage(new RequestHttpError('edge timeout', {
+      status: 524,
+      bodyText: '<!DOCTYPE html><html><title>Cloudflare</title></html>',
+    })),
+    'A execução demorou além do limite da conexão. Ela pode continuar em segundo plano; acompanhe o progresso e tente atualizar em instantes.',
+  );
 });

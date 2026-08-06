@@ -127,6 +127,29 @@ export interface LucaAiPersonaTeamRunResponse {
   generatedAt: string;
 }
 
+export interface LucaAiPersonaTeamRunAccepted {
+  ok: true;
+  runId: string;
+  traceId: string;
+  status: 'running';
+  startedAt: string;
+}
+
+export interface LucaAiPersonaTeamRunStatus {
+  ok: boolean;
+  runId: string;
+  traceId: string;
+  status: 'running' | 'complete' | 'failed';
+  startedAt: string;
+  completedAt?: string | null;
+  result?: LucaAiPersonaTeamRunResponse | null;
+  error?: {
+    code?: string;
+    message?: string;
+    [key: string]: unknown;
+  } | null;
+}
+
 export interface RuntimeEvent {
   id: string;
   type: string;

@@ -149,9 +149,11 @@ import {
   PERSONA_WORKFLOW_ROLES,
   runIndividualResolution,
 } from './persona-team.js';
+import { createPersonaRunJobStore } from './persona-run-jobs.js';
 import { createAuthService } from './auth.js';
 
 const app = express();
+const personaRunJobs = createPersonaRunJobStore();
 const PERSONA_ROSTER_SYNC_INTERVAL_MS = Math.max(
   15_000,
   Number(process.env.LUCA_PERSONA_ROSTER_SYNC_MS || 60_000) || 60_000,
@@ -2834,29 +2836,16 @@ app.delete('/api/luca-ai/chat/sessions/:sessionId/share', (req, res) => {
   }
 });
 
-app.post('/api/luca-ai/persona-team/run', async (req, res) => {
-  const input = normalizePersonaTeamRunInput(req.body);
-  if (!input.ok) {
-    res.status(400).json(input);
-    return;
-  }
-  try {
-    const { roster } = await syncOfficialPersonaRoster();
-    const officialSlugs = new Set(roster.map((agent) => agent.slug));
-    const requestedSlugs = [...new Set([...input.slugs, input.judgeSlug].filter(Boolean))];
-    const secondarySlugs = requestedSlugs.filter((slug) => !officialSlugs.has(slug));
-    if (secondarySlugs.length > 0) {
-      res.status(409).json({
-        ok: false,
-        error: 'persona_not_official',
-        secondarySlugs,
-        rosterSource: 'yume.is_official',
-      });
-      return;
-    }
-  } catch (error) {
-    res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
-    return;
+async function executeLucaAiPersonaTeamRun(input) {
+  const { roster } = await syncOfficialPersonaRoster();
+  const officialSlugs = new Set(roster.map((agent) => agent.slug));
+  const requestedSlugs = [...new Set([...input.slugs, input.judgeSlug].filter(Boolean))];
+  const secondarySlugs = requestedSlugs.filter((slug) => !officialSlugs.has(slug));
+  if (secondarySlugs.length > 0) {
+    const error = new Error('Uma ou mais personas nao fazem parte do roster oficial.');
+    error.code = 'persona_not_official';
+    error.details = { secondarySlugs, rosterSource: 'yume.is_official' };
+    throw error;
   }
   const runStartedAt = new Date().toISOString();
   const runStartedMs = Date.now();
@@ -3033,7 +3022,7 @@ app.post('/api/luca-ai/persona-team/run', async (req, res) => {
     finalDisplaySlug: finalDisplayReply?.slug || null,
   });
 
-  res.json({
+  return {
     ok: runOk,
     traceId: input.traceId,
     mission: input.mission,
@@ -3063,7 +3052,51 @@ app.post('/api/luca-ai/persona-team/run', async (req, res) => {
     startedAt: runStartedAt,
     durationMs,
     generatedAt,
+  };
+}
+
+app.post('/api/luca-ai/persona-team/run', (req, res) => {
+  const input = normalizePersonaTeamRunInput(req.body);
+  if (!input.ok) {
+    res.status(400).json(input);
+    return;
+  }
+
+  const ownerId = getWorkspaceUserId();
+  const job = personaRunJobs.start({
+    ownerId,
+    traceId: input.traceId,
+    execute: () => runWithWorkspaceUser(ownerId, async () => {
+      try {
+        return await executeLucaAiPersonaTeamRun(input);
+      } catch (error) {
+        appendLucaAiTraceEvent(input.traceId, 'luca_ai.workflow.failed', {
+          mode: input.mode,
+          error: error?.message || String(error),
+          code: error?.code || 'persona_run_failed',
+        });
+        console.error(`[persona-team] run ${input.traceId} falhou: ${error?.message || String(error)}`);
+        throw error;
+      }
+    }),
   });
+
+  res.status(202).json({
+    ok: true,
+    runId: job.runId,
+    traceId: job.traceId,
+    status: job.status,
+    startedAt: job.startedAt,
+  });
+});
+
+app.get('/api/luca-ai/persona-team/runs/:runId', (req, res) => {
+  const job = personaRunJobs.get(req.params.runId, getWorkspaceUserId());
+  if (!job) {
+    res.status(404).json({ ok: false, error: 'persona_run_not_found' });
+    return;
+  }
+  res.json({ ok: job.status !== 'failed', ...job });
 });
 
 app.post('/api/agent/persona/add', async (req, res) => {
