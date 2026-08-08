@@ -246,6 +246,7 @@ function formatAttachmentSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** Anexos preservados na bolha do operador, com miniatura para imagens. */
 function AttachmentList({ attachments }: { attachments?: LucaAiChatAttachment[] }) {
   if (!attachments?.length) return null;
   return (
@@ -598,7 +599,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const [shareError, setShareError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [hydratedSessionId, setHydratedSessionId] = useState<string | null>(null);
   const persistTimerRef = useRef<number | null>(null);
   const latestPersistRef = useRef<{
@@ -983,6 +984,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     });
   }, [loading, personas, setIndividualState]);
 
+  // Anexo sozinho ja e uma mensagem valida ("olha esse arquivo").
   const canRun = (mission.trim().length > 0 || draftAttachments.length > 0)
     && (operationMode === 'individual' ? isIndividualReady : isWorkflowReady)
     && !running
@@ -997,6 +999,10 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setErrorRetry(null);
       return;
     }
+    // Captura a sessão dona ANTES do await: trocar de sessão durante o upload
+    // não pode empurrar o anexo para dentro da conversa nova.
+    const ownerSessionId = activeSessionId;
+    const stillOwner = () => boundSessionIdRef.current === ownerSessionId;
     setUploadingAttachment(true);
     setError(null);
     setErrorRetry(null);
@@ -1004,32 +1010,47 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       const uploaded: LucaAiChatAttachment[] = [];
       for (const file of selected) {
         if (file.size > 10 * 1024 * 1024) throw new Error(`${file.name} ultrapassa o limite de 10 MB.`);
-        const data = await lucaApi.uploadChatAttachment(activeSessionId, file, bridgeBase);
+        const data = await lucaApi.uploadChatAttachment(ownerSessionId, file, bridgeBase);
+        if (!stillOwner()) {
+          // Usuário saiu da sessão: descarta o que já subiu para não virar órfão.
+          void lucaApi.deleteChatAttachment(ownerSessionId, data.attachment.id, bridgeBase).catch(() => {});
+          for (const item of uploaded) {
+            void lucaApi.deleteChatAttachment(ownerSessionId, item.id, bridgeBase).catch(() => {});
+          }
+          return;
+        }
         uploaded.push(data.attachment);
       }
       const next = [...draftAttachments, ...uploaded].slice(0, 4);
       setDraftAttachments(next);
-      flushSessionNow(activeSessionId, { draftAttachments: next });
+      flushSessionNow(ownerSessionId, { draftAttachments: next });
     } catch (err) {
-      setError(buildApiErrorMessage(err, 'Falha ao anexar arquivo.'));
-      setErrorRetry(null);
+      if (stillOwner()) {
+        setError(buildApiErrorMessage(err, 'Falha ao anexar arquivo.'));
+        setErrorRetry(null);
+      }
     } finally {
-      setUploadingAttachment(false);
+      if (stillOwner()) setUploadingAttachment(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }
 
   async function removeAttachment(attachment: LucaAiChatAttachment) {
     if (!activeSessionId || running || uploadingAttachment) return;
-    const next = draftAttachments.filter((item) => item.id !== attachment.id);
-    setDraftAttachments(next);
-    flushSessionNow(activeSessionId, { draftAttachments: next });
+    const ownerSessionId = activeSessionId;
     try {
-      await lucaApi.deleteChatAttachment(activeSessionId, attachment.id, bridgeBase);
+      // Apaga no servidor ANTES de soltar o handle: se o DELETE falhar, o chip
+      // continua na tela e o arquivo segue removível, em vez de virar órfão.
+      await lucaApi.deleteChatAttachment(ownerSessionId, attachment.id, bridgeBase);
     } catch (err) {
       setError(buildApiErrorMessage(err, 'Falha ao remover anexo.'));
       setErrorRetry(null);
+      return;
     }
+    if (boundSessionIdRef.current !== ownerSessionId) return;
+    const next = draftAttachments.filter((item) => item.id !== attachment.id);
+    setDraftAttachments(next);
+    flushSessionNow(ownerSessionId, { draftAttachments: next });
   }
 
   async function ensurePersonaAvailable(slug: string): Promise<boolean> {
@@ -1242,6 +1263,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
 
   async function runMission() {
     const attachmentsToRun = draftAttachments.slice(0, 4);
+    // Anexo sem texto ainda e uma missao valida para as personas.
     const trimmedMission = mission.trim() || (attachmentsToRun.length ? 'Analise os anexos enviados.' : '');
     const assignmentsToRun = normalizeWorkflowAssignments(assignments);
     const individualToRun = {
@@ -1367,6 +1389,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         };
       }
       setFinalResult(nextFinal);
+      // Anexos ja foram entregues as personas: limpam-se so quando a rodada deu certo,
+      // para uma falha permitir reenviar a mesma mensagem sem reanexar tudo.
       if (data.ok) setDraftAttachments([]);
       flushSessionNow(ownerSessionId, {
         missionDraft: trimmedMission,
@@ -2977,9 +3001,9 @@ function LucaMissionBar({
             ref={fileInputRef}
             type="file"
             multiple
-            accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/*,.md,.csv,.json,.xml,.yaml,.yml,.toml,.sql,.js,.jsx,.ts,.tsx,.css,.html,.py,.rb,.go,.rs,.java,.c,.h,.cpp,.hpp"
+            accept="image/png,image/jpeg,image/webp,image/gif,text/*,.md,.csv,.json,.xml,.yaml,.yml,.toml,.sql,.js,.jsx,.ts,.tsx,.css,.html,.py,.rb,.go,.rs,.java,.c,.h,.cpp,.hpp"
             className="sr-only"
-            aria-label="Selecionar fotos, PDF e arquivos de texto"
+            aria-label="Selecionar fotos e arquivos de texto"
             onChange={(event) => { void onFilesSelected(event.target.files); }}
             disabled={running || uploadingAttachment || attachments.length >= 4}
           />
@@ -2989,7 +3013,7 @@ function LucaMissionBar({
             onClick={() => fileInputRef.current?.click()}
             disabled={running || uploadingAttachment || attachments.length >= 4}
             aria-label="Anexar arquivos e fotos"
-            title="Fotos, PDF e arquivos de texto (até 10 MB)"
+            title="Fotos e arquivos de texto (até 10 MB). PDF ainda não é lido pelos modelos."
           >
             {uploadingAttachment ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
           </button>

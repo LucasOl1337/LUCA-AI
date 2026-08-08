@@ -11,6 +11,8 @@ const source = readFileSync(join(root, '../src/pages/LucaAiPage.tsx'), 'utf8');
 test('runMission keeps mission draft until successful completion', () => {
   const start = source.indexOf('async function runMission()');
   assert.ok(start >= 0, 'runMission present');
+  // Delimita pela proxima declaracao, nao por contagem de caracteres: a funcao
+  // cresce (anexos, etc.) e um slice fixo passa a cortar o bloco catch.
   const end = source.indexOf('const activeTeamPresetId', start);
   assert.ok(end > start, 'runMission end marker present');
   const slice = source.slice(start, end);

@@ -22,6 +22,14 @@ Ao importar uma persona, o LUCA preserva nome, prompt e versao lidos do Yume. O 
 
 `POST /api/luca-ai/persona-team/run` oferece dois modos visiveis. `workflow` encadeia os papeis da equipe; `individual` executa de uma a cinco personas em contextos isolados e chama depois uma persona juiza com todas as respostas. O juiz pode repetir uma persona participante, mas sempre usa uma chamada separada. O POST devolve `202` com `runId`, `traceId` e status `running`; a execucao segue no processo Express e a UI consulta `GET /api/luca-ai/persona-team/runs/:runId` ate `complete` ou `failed`. Assim, nenhuma conexao com a borda precisa permanecer aberta durante as chamadas LLM.
 
+Os dois modos aceitam anexos privados da sessao. A UI envia imagens ou arquivos de texto para `POST /api/luca-ai/chat/sessions/:sessionId/attachments`; o Express valida tamanho, tipo e assinatura real do arquivo, guarda por conta/sessao e resolve os anexos antes de acionar as personas. A rodada referencia apenas `sessionId` + `attachmentIds`, entao uma conta nunca le arquivo de outra. Limites: quatro anexos por mensagem, 10 MB por arquivo, 20 MB por rodada e 50 MB acumulados por sessao (uploads sao aceitos antes da rodada, entao a quota evita encher o disco).
+
+Imagens seguem como blocos `image_url` nativos. Arquivos de texto sao embutidos no prompt em vez de blocos de arquivo: no 9Router, o Claude ignora `input_file` em silencio e a persona responde como se nenhum arquivo existisse. Texto acima de 120.000 caracteres e cortado com aviso explicito no prompt, para a persona nao concluir sobre leitura parcial achando que leu tudo. Ver `buildUserContent` em `server/agent-loop.js`.
+
+PDF e recusado no upload (`attachment_pdf_not_supported`). Nenhum modelo do catalogo atual le PDF pelo 9Router: probes em `cx/gpt-5.6-sol`, `cc/claude-fable-5` e `gcli/grok-4.5`, tanto com `input_file` quanto com `file`/`file_data`, responderam sem enxergar o arquivo. Aceitar o upload produziria persona confiante sobre documento que nunca leu. Reavaliar quando o roteador ganhar extracao de PDF.
+
+Anexos ficam fora do snapshot publico de `/s/:token` e o download exige sessao autenticada.
+
 ## Deliberação para harnesses
 
 Claude Code, Codex, Hermes e outros executores consultam a mesma bancada por `POST /api/deliberations` e acompanham por `GET /api/deliberations/:id`. O harness continua dono do repositório, shell, worktree, testes e aprovações; o LUCA recebe um `luca.context-bundle.v1` e devolve um `luca.decision-package.v1` consultivo.

@@ -82,11 +82,12 @@ Regras:
 const MAX_INLINED_ATTACHMENT_CHARS = 120_000;
 
 /**
- * Attachment blocks are not portable across the 9Router catalog: Claude silently
- * ignores `input_file` (persona answers as if no file existed), while images via
- * `image_url` work everywhere. Text-like files are already plain text on our side,
- * so we inline them into the prompt — readable by every model — and keep only
- * images as native multimodal parts.
+ * Attachment blocks are NOT portable across the 9Router catalog: Claude silently
+ * ignores `input_file` (the persona answers as if no file existed — worst case,
+ * confident and wrong), while `image_url` works everywhere. Text-like files are
+ * already plain text on our side, so we inline them into the prompt where every
+ * model can read them, and keep only images as native multimodal parts.
+ * Verified against cx/gpt-5.6-sol, gcli/grok-4.5 and cc/claude-fable-5.
  */
 function buildUserContent(user, attachments = []) {
   const text = String(user || '');
@@ -111,11 +112,18 @@ function buildUserContent(user, attachments = []) {
       decoded = '';
     }
     if (!decoded.trim() || decoded.includes('\u0000')) {
-      // Binary we cannot read as text (e.g. PDF): say so instead of faking content.
-      inlined.push(`### Anexo: ${filename}\n[conteúdo binário não extraído; peça ao operador o texto se precisar]`);
+      // Binary we cannot read as text: say so instead of faking content.
+      inlined.push(`### Anexo: ${filename}\n[conteudo binario nao extraido; peca ao operador o texto se precisar]`);
       continue;
     }
-    inlined.push(`### Anexo: ${filename}\n${decoded.slice(0, MAX_INLINED_ATTACHMENT_CHARS)}`);
+    // Truncar em silencio faria a persona concluir sobre um arquivo pela metade
+    // achando que leu tudo. O corte precisa ser declarado no proprio prompt.
+    const clipped = decoded.length > MAX_INLINED_ATTACHMENT_CHARS;
+    const body = clipped ? decoded.slice(0, MAX_INLINED_ATTACHMENT_CHARS) : decoded;
+    const notice = clipped
+      ? `\n[TRUNCADO: exibindo ${MAX_INLINED_ATTACHMENT_CHARS} de ${decoded.length} caracteres. Diga que a leitura foi parcial ao concluir.]`
+      : '';
+    inlined.push(`### Anexo: ${filename}\n${body}${notice}`);
   }
 
   if (!nativeParts.length && !inlined.length) return text;

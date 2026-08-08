@@ -90,8 +90,8 @@ test('SHARE_LINKS_V1 public snapshot never carries private session attachments',
   });
 
   const resolved = shareLinks.resolvePublicShare(share.token);
-  // Snapshot keeps the message text but must drop every attachment handle:
-  // /s/:token is anonymous, while the download route sits behind requireUser.
+  // O texto continua público, mas nenhum handle de arquivo pode vazar:
+  // /s/:token é anônimo e o download vive atrás de requireUser.
   assert.equal(resolved.snapshot.transcript.length, 1);
   assert.equal(resolved.snapshot.transcript[0].attachments, undefined);
 

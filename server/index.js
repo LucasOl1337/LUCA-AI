@@ -1986,6 +1986,7 @@ async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, wo
       attachments,
       toolsEnabled,
       agentId: `luca-ai-team-${slug}`,
+      attachments,
       model,
       maxTokens,
       maxRounds: 3,
@@ -2172,6 +2173,7 @@ export async function runLucaAiIndividualJudge({ slug, mission, replies, origina
       attachments,
       toolsEnabled,
       agentId: `luca-ai-judge-${slug}`,
+      attachments,
       model,
       maxTokens,
       maxRounds: 3,
@@ -2927,6 +2929,8 @@ app.post('/api/luca-ai/chat/sessions/:sessionId/activate', (req, res) => {
 
 app.delete('/api/luca-ai/chat/sessions/:sessionId', (req, res) => {
   try {
+    // Files first: after deleteChatSession the session no longer resolves,
+    // so its directory would be unreachable and leak on disk.
     deleteAllChatAttachments(req.params.sessionId);
     const result = deleteChatSession(req.params.sessionId);
     res.json({ ok: true, ...result, ...getChatLibrarySnapshot() });
@@ -2935,6 +2939,9 @@ app.delete('/api/luca-ai/chat/sessions/:sessionId', (req, res) => {
   }
 });
 
+// CHAT_ATTACHMENTS_V1 — upload/serve/remove private files of a chat session.
+// Raw body (not multipart) keeps the parser trivial and the size cap enforced
+// by Express itself; the filename travels in a header.
 app.post(
   '/api/luca-ai/chat/sessions/:sessionId/attachments',
   express.raw({ type: 'application/octet-stream', limit: MAX_CHAT_ATTACHMENT_BYTES }),
@@ -2961,6 +2968,10 @@ app.get('/api/luca-ai/chat/sessions/:sessionId/attachments/:attachmentId', (req,
     const { meta, buffer } = getChatAttachment(req.params.sessionId, req.params.attachmentId);
     res.setHeader('Content-Type', meta.mimeType);
     res.setHeader('Content-Length', String(buffer.length));
+    // Never let an uploaded file execute in the app origin.
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(meta.name)}`);
     res.send(buffer);
   } catch (error) {

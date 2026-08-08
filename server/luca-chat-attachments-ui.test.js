@@ -8,10 +8,14 @@ const root = dirname(fileURLToPath(import.meta.url));
 const page = readFileSync(join(root, '../src/pages/LucaAiPage.tsx'), 'utf8');
 const api = readFileSync(join(root, '../src/lib/api.ts'), 'utf8');
 
-test('composer exposes an accessible multi-file picker for images, PDF and text files', () => {
+test('composer exposes an accessible multi-file picker for images and text files', () => {
   assert.match(page, /type="file"/);
   assert.match(page, /multiple/);
-  assert.match(page, /Fotos, PDF e arquivos de texto/);
+  // PDF saiu do rotulo de proposito: nenhum modelo do catalogo 9Router le PDF
+  // hoje, e o upload recusa com attachment_pdf_not_supported. Prometer PDF aqui
+  // faria a UI mentir sobre o que a persona consegue ler.
+  assert.match(page, /Fotos e arquivos de texto/);
+  assert.doesNotMatch(page, /Fotos, PDF e arquivos de texto/);
   assert.match(page, /aria-label="Anexar arquivos e fotos"/);
 });
 
