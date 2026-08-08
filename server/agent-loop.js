@@ -56,9 +56,58 @@ Regras:
 5. Depois das ferramentas, entregue a resposta final util ao operador.`;
 }
 
+const MAX_INLINED_ATTACHMENT_CHARS = 120_000;
+
+/**
+ * Attachment blocks are NOT portable across the 9Router catalog: Claude silently
+ * ignores `input_file` (the persona answers as if no file existed — worst case,
+ * confident and wrong), while `image_url` works everywhere. Text-like files are
+ * already plain text on our side, so we inline them into the prompt where every
+ * model can read them, and keep only images as native multimodal parts.
+ * Verified against cx/gpt-5.6-sol, gcli/grok-4.5 and cc/claude-fable-5.
+ */
+function buildUserContent(user, attachments = []) {
+  const text = String(user || '');
+  const list = Array.isArray(attachments) ? attachments : [];
+  if (!list.length) return text;
+
+  const nativeParts = [];
+  const inlined = [];
+  for (const part of list) {
+    if (part?.type === 'image_url') {
+      nativeParts.push(part);
+      continue;
+    }
+    const fileData = String(part?.file_data || part?.file?.file_data || '');
+    const filename = String(part?.filename || part?.file?.filename || 'arquivo');
+    const base64 = fileData.includes(',') ? fileData.slice(fileData.indexOf(',') + 1) : '';
+    if (!base64) continue;
+    let decoded = '';
+    try {
+      decoded = Buffer.from(base64, 'base64').toString('utf8');
+    } catch {
+      decoded = '';
+    }
+    if (!decoded.trim() || decoded.includes('\u0000')) {
+      // Binary we cannot read as text (e.g. PDF): say so instead of faking content.
+      inlined.push(`### Anexo: ${filename}\n[conteudo binario nao extraido; peca ao operador o texto se precisar]`);
+      continue;
+    }
+    inlined.push(`### Anexo: ${filename}\n${decoded.slice(0, MAX_INLINED_ATTACHMENT_CHARS)}`);
+  }
+
+  if (!nativeParts.length && !inlined.length) return text;
+  const merged = inlined.length
+    ? `${text}\n\n--- Arquivos anexados pelo operador ---\n${inlined.join('\n\n')}`
+    : text;
+  if (!nativeParts.length) return merged;
+  return [{ type: 'text', text: merged }, ...nativeParts];
+}
+
 export async function runAgentWithTools({
   system,
   user,
+  attachments = [],
   model,
   agentId,
   maxTokens = 1200,
@@ -69,7 +118,7 @@ export async function runAgentWithTools({
 } = {}) {
   const messages = [
     { role: 'system', content: `${String(system || '').trim()}${buildOperationalSystemAddon()}` },
-    { role: 'user', content: String(user || '') },
+    { role: 'user', content: buildUserContent(user, attachments) },
   ];
 
   const toolTrace = [];
