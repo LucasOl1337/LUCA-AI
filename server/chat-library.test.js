@@ -78,6 +78,31 @@ test('CHAT_LIBRARY_V1 delete folder moves sessions to root by default', async ()
   });
 });
 
+test('CHAT_LIBRARY_V1 seedFromActive does not inherit folder of active session', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-seed-folder-'));
+  const { workspace, chatLibrary } = await loadChatLibrary(dataDir);
+
+  workspace.runWithWorkspaceUser('user-seed-folder', () => {
+    const folder = chatLibrary.createChatFolder({ name: 'Vaga' });
+    const inside = chatLibrary.createChatSession({ title: 'Inside', folderId: folder.id });
+    assert.equal(inside.folderId, folder.id);
+
+    const rootNew = chatLibrary.createChatSession({
+      title: 'Nova sessão',
+      folderId: null,
+      seedFromActive: true,
+    });
+    assert.equal(rootNew.folderId, null, 'global/recent new chat must not inherit active folder');
+
+    const inFolder = chatLibrary.createChatSession({
+      title: 'Na pasta',
+      folderId: folder.id,
+      seedFromActive: true,
+    });
+    assert.equal(inFolder.folderId, folder.id);
+  });
+});
+
 test('CHAT_LIBRARY_V1 first load materializes durable library file', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-first-'));
   const { workspace, chatLibrary } = await loadChatLibrary(dataDir);
@@ -145,5 +170,28 @@ test('CHAT_LIBRARY_V1 appendTranscript extends without wiping existing messages'
     const session = chatLibrary.getChatSession(sessionId);
     assert.equal(session.transcript.length, 2);
     assert.equal(session.transcript[1].content, 'a1');
+  });
+});
+
+test('CHAT_LIBRARY_V1 persists pending attachment metadata for retry after reload', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-attachments-'));
+  const { workspace, chatLibrary } = await loadChatLibrary(dataDir);
+
+  workspace.runWithWorkspaceUser('user-attachments', () => {
+    const sessionId = chatLibrary.getChatLibrarySnapshot().activeSessionId;
+    chatLibrary.updateChatSession(sessionId, {
+      draftAttachments: [{
+        id: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+        name: 'quadro.png',
+        mimeType: 'image/png',
+        kind: 'image',
+        size: 68,
+        url: `/api/luca-ai/chat/sessions/${sessionId}/attachments/aaaaaaaaaaaaaaaaaaaaaaaa`,
+      }],
+    });
+
+    const session = chatLibrary.getChatSession(sessionId);
+    assert.equal(session.draftAttachments.length, 1);
+    assert.equal(session.draftAttachments[0].name, 'quadro.png');
   });
 });

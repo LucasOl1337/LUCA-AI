@@ -118,9 +118,11 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
     setBusy(true);
     setError(null);
     try {
+      // Always send explicit folderId (null = Recentes). Server must not inherit
+      // the active session's folder when creating a global/recent chat.
       const data = await lucaApi.createChatSession({
         title: 'Nova sessão',
-        folderId: folderId || null,
+        folderId: folderId ? String(folderId) : null,
         seedFromActive: true,
       });
       // New session is prepended; accept server order for this path.
@@ -275,6 +277,7 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
             transcript: Array.isArray(prev.transcript) ? prev.transcript : data.session!.transcript,
             finalResult: prev.finalResult !== undefined ? prev.finalResult : data.session!.finalResult,
             missionDraft: typeof prev.missionDraft === 'string' ? prev.missionDraft : data.session!.missionDraft,
+            draftAttachments: Array.isArray(prev.draftAttachments) ? prev.draftAttachments : data.session!.draftAttachments,
           };
         });
       }

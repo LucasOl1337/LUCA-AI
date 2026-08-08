@@ -8,6 +8,7 @@ const workspacesRoot = path.join(rootStateDir, 'workspaces');
 const MAX_SESSIONS = 100;
 const MAX_FOLDERS = 40;
 const MAX_TRANSCRIPT = 200;
+const MAX_DRAFT_ATTACHMENTS = 4;
 const TITLE_MAX = 80;
 
 function safeUserDir(userId) {
@@ -48,10 +49,34 @@ function emptyIndividual() {
   return { participants: [], judge: null };
 }
 
+function normalizeDraftAttachments(value, sessionId) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const result = [];
+  for (const item of value) {
+    const id = String(item?.id || '').trim();
+    if (!/^[a-f0-9]{24}$/.test(id) || seen.has(id)) continue;
+    seen.add(id);
+    const kind = item?.kind === 'image' || item?.kind === 'pdf' ? item.kind : 'text';
+    result.push({
+      id,
+      name: String(item?.name || 'arquivo').slice(0, 180),
+      mimeType: String(item?.mimeType || 'application/octet-stream').slice(0, 120),
+      kind,
+      size: Math.max(0, Number(item?.size) || 0),
+      createdAt: item?.createdAt ? String(item.createdAt) : undefined,
+      url: `/api/luca-ai/chat/sessions/${encodeURIComponent(sessionId)}/attachments/${id}`,
+    });
+    if (result.length >= MAX_DRAFT_ATTACHMENTS) break;
+  }
+  return result;
+}
+
 function makeSession(partial = {}) {
   const createdAt = partial.createdAt || nowIso();
+  const id = partial.id || makeId('sess');
   return {
-    id: partial.id || makeId('sess'),
+    id,
     title: clipTitle(partial.title, 'Nova sessão'),
     folderId: partial.folderId ? String(partial.folderId) : null,
     createdAt,
@@ -69,6 +94,7 @@ function makeSession(partial = {}) {
         }
       : emptyIndividual(),
     missionDraft: String(partial.missionDraft || ''),
+    draftAttachments: normalizeDraftAttachments(partial.draftAttachments, id),
     transcript: Array.isArray(partial.transcript) ? partial.transcript.slice(-MAX_TRANSCRIPT) : [],
     finalResult: partial.finalResult ?? null,
     activePersonaSlug: partial.activePersonaSlug ? String(partial.activePersonaSlug) : null,
@@ -294,18 +320,21 @@ export function createChatSession({ title, folderId, seedFromActive = false } = 
         .slice(0, MAX_SESSIONS - 1);
     }
     const active = library.sessions.find((item) => item.id === library.activeSessionId);
+    // Explicit folder only: never inherit active.folderId. Global / Recentes new chat
+    // must land at root (null); folder pencil passes folderId intentionally.
     const validFolderId = folderId && library.folders.some((item) => item.id === folderId)
-      ? folderId
+      ? String(folderId)
       : null;
     const session = makeSession(seedFromActive && active
       ? {
           title: title || 'Nova sessão',
-          folderId: validFolderId ?? active.folderId ?? null,
+          folderId: validFolderId,
           operationMode: active.operationMode,
           workflowAssignments: active.workflowAssignments,
           individualAssignments: active.individualAssignments,
           activePersonaSlug: active.activePersonaSlug,
           missionDraft: '',
+          draftAttachments: [],
           transcript: [],
           finalResult: null,
         }
@@ -363,6 +392,9 @@ export function updateChatSession(sessionId, patch = {}) {
       };
     }
     if (typeof patch.missionDraft === 'string') session.missionDraft = patch.missionDraft;
+    if (Array.isArray(patch.draftAttachments)) {
+      session.draftAttachments = normalizeDraftAttachments(patch.draftAttachments, session.id);
+    }
     if (Array.isArray(patch.transcript)) session.transcript = patch.transcript.slice(-MAX_TRANSCRIPT);
     // Append-only path for operator bubbles / incremental replies without full rewrite races.
     if (Array.isArray(patch.appendTranscript) && patch.appendTranscript.length) {
@@ -381,6 +413,7 @@ export function updateChatSession(sessionId, patch = {}) {
       typeof patch.title === 'string'
       || Object.prototype.hasOwnProperty.call(patch, 'folderId')
       || typeof patch.missionDraft === 'string'
+      || Array.isArray(patch.draftAttachments)
       || Array.isArray(patch.transcript)
       || Array.isArray(patch.appendTranscript)
       || Object.prototype.hasOwnProperty.call(patch, 'finalResult')
