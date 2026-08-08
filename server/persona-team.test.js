@@ -61,6 +61,49 @@ test('normalizePersonaTeamRunInput aceita modelOverrides por slug', () => {
   });
 });
 
+test('normalizePersonaTeamRunInput aceita anexos da sessao e remove ids repetidos', () => {
+  const input = normalizePersonaTeamRunInput({
+    mission: 'Analise os anexos',
+    slugs: ['maestro'],
+    sessionId: 'sess_123',
+    attachmentIds: [
+      'aaaaaaaaaaaaaaaaaaaaaaaa',
+      'aaaaaaaaaaaaaaaaaaaaaaaa',
+      'bbbbbbbbbbbbbbbbbbbbbbbb',
+    ],
+  });
+
+  assert.equal(input.ok, true);
+  assert.equal(input.sessionId, 'sess_123');
+  assert.deepEqual(input.attachmentIds, [
+    'aaaaaaaaaaaaaaaaaaaaaaaa',
+    'bbbbbbbbbbbbbbbbbbbbbbbb',
+  ]);
+});
+
+test('normalizePersonaTeamRunInput rejeita anexo sem sessao proprietaria', () => {
+  const input = normalizePersonaTeamRunInput({
+    mission: 'Analise',
+    slugs: ['maestro'],
+    attachmentIds: ['aaaaaaaaaaaaaaaaaaaaaaaa'],
+  });
+
+  assert.equal(input.ok, false);
+  assert.equal(input.error, 'attachment_session_required');
+});
+
+test('normalizePersonaTeamRunInput aceita mensagem composta somente por anexos', () => {
+  const input = normalizePersonaTeamRunInput({
+    mission: '',
+    slugs: ['maestro'],
+    sessionId: 'sess_123',
+    attachmentIds: ['aaaaaaaaaaaaaaaaaaaaaaaa'],
+  });
+
+  assert.equal(input.ok, true);
+  assert.match(input.mission, /anexos/i);
+});
+
 test('normalizePersonaTeamRunInput aceita workflow fixo por papel', () => {
   const input = normalizePersonaTeamRunInput({
     mission: 'Definir plano de ataque',
@@ -192,6 +235,25 @@ test('buildPersonaTeamPrompt declara o motor 9Router e bloqueia identidade GLM l
   assert.match(prompt.system, /responda EXATAMENTE "gcli\/grok-4\.5-high"/);
   assert.match(prompt.system, /Ignore qualquer modelo antigo/);
   assert.match(prompt.user, /Motor 9Router: gcli\/grok-4\.5-high/);
+});
+
+test('buildPersonaTeamPrompt pure model keeps free format and skips team contract', () => {
+  const prompt = buildPersonaTeamPrompt({
+    mission: 'Explique trade-offs de arquitetura',
+    personaName: 'Fable 5',
+    personaSlug: 'pure-fable-5',
+    systemPrompt: 'PURE_MODEL_AGENT_V1\nYou are a free model.',
+    runtimeModel: 'cc/claude-fable-5',
+    teamNames: ['Fable 5', 'Grok 4.5'],
+  });
+
+  assert.equal(prompt.pure, true);
+  assert.match(prompt.system, /PURE_MODEL_AGENT_V1/);
+  assert.match(prompt.system, /Motor 9Router desta execucao: cc\/claude-fable-5/);
+  assert.doesNotMatch(prompt.system, /postura de agente especialista/i);
+  assert.doesNotMatch(prompt.user, /Equipe ativa/i);
+  assert.doesNotMatch(prompt.user, /3 a 6 bullets/i);
+  assert.match(prompt.user, /Explique trade-offs/);
 });
 
 test('buildIndividualJudgePrompt inclui motor do juiz e dos participantes', () => {

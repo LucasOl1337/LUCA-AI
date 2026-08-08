@@ -2,6 +2,7 @@ const DEFAULT_MAX_TEAM_SIZE = 10;
 const DEFAULT_MAX_MISSION_CHARS = 6000;
 const DEFAULT_MAX_EXECUTION_SLUGS = 4;
 const DEFAULT_MAX_INDIVIDUAL_PARTICIPANTS = 5;
+const DEFAULT_MAX_ATTACHMENTS = 4;
 
 function normalizeModelOverrides(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
@@ -185,7 +186,14 @@ export function normalizePersonaTeamRunInput(body = {}, options = {}) {
     ? options.maxIndividualParticipants
     : DEFAULT_MAX_INDIVIDUAL_PARTICIPANTS;
   const maxMissionChars = Number.isInteger(options.maxMissionChars) ? options.maxMissionChars : DEFAULT_MAX_MISSION_CHARS;
-  const mission = String(body?.mission || body?.description || '').trim().slice(0, maxMissionChars);
+  const sessionId = String(body?.sessionId || '').trim();
+  const attachmentIds = [...new Set(
+    (Array.isArray(body?.attachmentIds) ? body.attachmentIds : [])
+      .map((value) => String(value || '').trim())
+      .filter(Boolean),
+  )].slice(0, DEFAULT_MAX_ATTACHMENTS);
+  const missionText = String(body?.mission || body?.description || '').trim().slice(0, maxMissionChars);
+  const mission = missionText || (attachmentIds.length ? 'Analise os anexos enviados.' : '');
   const traceId = normalizeTraceId(body?.traceId);
   const requestedMode = String(body?.mode || '').trim().toLowerCase();
   const individualMode = requestedMode === 'individual';
@@ -214,8 +222,11 @@ export function normalizePersonaTeamRunInput(body = {}, options = {}) {
     ? flattenPersonaTeamWorkflowSlugs(workflow, maxTeamSize)
     : baseSlugs;
 
-  if (!mission) {
+  if (!missionText && !attachmentIds.length) {
     return { ok: false, error: 'mission_required', mission: '', slugs: [] };
+  }
+  if (attachmentIds.length && !sessionId) {
+    return { ok: false, error: 'attachment_session_required', mission, slugs };
   }
   if (!slugs.length) {
     return { ok: false, error: 'team_required', mission, slugs: [] };
@@ -240,8 +251,42 @@ export function normalizePersonaTeamRunInput(body = {}, options = {}) {
     mode: individualMode ? 'individual' : workflow.length ? 'workflow' : 'parallel',
     judgeSlug: individualMode ? judgeSlug : undefined,
     modelOverrides: normalizeModelOverrides(body?.modelOverrides || body?.models),
+    sessionId: sessionId || undefined,
+    attachmentIds,
     traceId,
   };
+}
+
+/** Marker for Yume "pure model" personas: free agent, minimal orchestration wrap. */
+export const PURE_MODEL_AGENT_MARKER = 'PURE_MODEL_AGENT_V1';
+
+export function isPureModelAgent({ personaSlug = '', systemPrompt = '' } = {}) {
+  const slug = String(personaSlug || '').trim().toLowerCase();
+  const prompt = String(systemPrompt || '');
+  if (prompt.includes(PURE_MODEL_AGENT_MARKER)) return true;
+  if (slug.startsWith('pure-') || slug.startsWith('model-')) return true;
+  return false;
+}
+
+function modelTruthBlock(model, { pure = false } = {}) {
+  const id = String(model || '').trim();
+  if (!id) {
+    return pure
+      ? 'Motor LLM nao declarado. Nao invente o nome do modelo.'
+      : `Motor LLM desta execucao nao foi declarado explicitamente.
+- Nao invente nomes de modelo (GLM, gpt, grok, etc.).
+- Se perguntarem o modelo e voce nao tiver o ID, diga que o motor e o 9Router do LUCA e que o ID nao foi exposto neste turno.`;
+  }
+  if (pure) {
+    return `Motor 9Router desta execucao: ${id}
+- Se perguntarem qual modelo voce usa, responda EXATAMENTE "${id}".
+- Nao invente provider, familia ou versao fora desse ID.`;
+  }
+  return `Motor LLM desta execucao (fonte de verdade do LUCA-AI via 9Router): ${id}
+- Persona/slug e identidade operacional, NAO o nome do modelo.
+- Se perguntarem qual modelo voce usa, responda EXATAMENTE "${id}".
+- Ignore qualquer modelo antigo embutido no prompt da persona (ex.: GLM, glm-*, genericos).
+- Nao invente provider, familia ou versao fora desse ID.`;
 }
 
 export function buildPersonaTeamPrompt({
@@ -259,17 +304,33 @@ export function buildPersonaTeamPrompt({
   const slug = String(personaSlug || '').trim();
   const basePrompt = String(systemPrompt || '').trim() || `Voce e a persona ${name}.`;
   const model = String(runtimeModel || '').trim();
-  const modelBlock = model
-    ? `
-Motor LLM desta execucao (fonte de verdade do LUCA-AI via 9Router): ${model}
-- Persona/slug e identidade operacional, NAO o nome do modelo.
-- Se perguntarem qual modelo voce usa, responda EXATAMENTE "${model}".
-- Ignore qualquer modelo antigo embutido no prompt da persona (ex.: GLM, glm-*, genericos).
-- Nao invente provider, familia ou versao fora desse ID.`
-    : `
-Motor LLM desta execucao nao foi declarado explicitamente.
-- Nao invente nomes de modelo (GLM, gpt, grok, etc.).
-- Se perguntarem o modelo e voce nao tiver o ID, diga que o motor e o 9Router do LUCA e que o ID nao foi exposto neste turno.`;
+  const pure = isPureModelAgent({ personaSlug: slug, systemPrompt: basePrompt });
+  const modelBlock = modelTruthBlock(model, { pure });
+
+  // Pure model agents: keep the Yume system almost raw. Only add motor truth + mission.
+  if (pure) {
+    const role = workflowRole?.roleId ? ROLE_BY_ID.get(workflowRole.roleId) : null;
+    const roleLabel = workflowRole?.roleLabel || role?.label || '';
+    const roleInstruction = workflowRole?.instruction || role?.instruction || '';
+    const context = String(accumulatedContext || '').trim();
+    const extraUser = [
+      roleLabel ? `Etapa: ${roleLabel}. ${roleInstruction}` : '',
+      context ? `Contexto acumulado:\n${context}` : '',
+    ].filter(Boolean).join('\n\n');
+    return {
+      name,
+      pure: true,
+      system: `${basePrompt}
+
+---
+${modelBlock}
+Responda com liberdade de formato. Sem personagem fixo alem do que o system acima definir.`,
+      user: extraUser
+        ? `${String(mission || '').trim()}\n\n${extraUser}`
+        : String(mission || '').trim(),
+    };
+  }
+
   const teammates = teamNames.filter(Boolean).join(', ') || name;
   const role = workflowRole?.roleId ? ROLE_BY_ID.get(workflowRole.roleId) : null;
   const roleLabel = workflowRole?.roleLabel || role?.label || '';
@@ -295,6 +356,7 @@ Motor LLM desta execucao nao foi declarado explicitamente.
 
     return {
       name,
+      pure: false,
       system: `${basePrompt}
 
   ---
@@ -327,17 +389,20 @@ export function buildIndividualJudgePrompt({
   const slug = String(judgeSlug || '').trim();
   const basePrompt = String(systemPrompt || '').trim() || `Voce e a persona ${name}.`;
   const model = String(runtimeModel || '').trim();
-  const modelBlock = model
-    ? `
+  const pure = isPureModelAgent({ personaSlug: slug, systemPrompt: basePrompt });
+  const modelBlock = pure
+    ? modelTruthBlock(model, { pure: true })
+    : (model
+      ? `
 Motor LLM desta execucao (fonte de verdade do LUCA-AI via 9Router): ${model}
 - Voce e a persona "${name}"${slug ? ` (${slug})` : ''}; isso e identidade operacional, nao o modelo.
 - Se perguntarem qual modelo voce usa, responda EXATAMENTE "${model}".
 - Ignore modelos antigos no prompt da persona (GLM, glm-*, etc.).
 - Ao avaliar participantes, nao invente o modelo deles; use apenas o que o runtime declarar ou diga que o ID nao foi informado.`
-    : `
+      : `
 Motor LLM desta execucao nao foi declarado explicitamente.
 - Nao invente nomes de modelo.
-- Se perguntarem o modelo e voce nao tiver o ID, diga que o motor e o 9Router do LUCA e que o ID nao foi exposto neste turno.`;
+- Se perguntarem o modelo e voce nao tiver o ID, diga que o motor e o 9Router do LUCA e que o ID nao foi exposto neste turno.`);
   const contributions = replies.map((reply) => {
     const author = `${reply?.name || reply?.slug || 'Participante'}${reply?.slug ? ` (${reply.slug})` : ''}`;
     const motor = reply?.model ? ` | motor 9Router: ${reply.model}` : '';
@@ -347,8 +412,28 @@ Motor LLM desta execucao nao foi declarado explicitamente.
     return `${author}${motor}: ${content}`;
   }).join('\n\n');
 
+  if (pure) {
+    return {
+      name,
+      pure: true,
+      system: `${basePrompt}
+
+---
+${modelBlock}
+Voce avalia contribuicoes de outros agentes. Seja direto, livre de formato e sem personagem fixo.`,
+      user: `Missao:
+${mission}
+
+Contribuicoes:
+${contributions || 'Nenhuma contribuicao utilizavel.'}
+
+Entregue seu julgamento final com liberdade de forma.`,
+    };
+  }
+
   return {
       name,
+      pure: false,
       system: `${basePrompt}
 
   ---
