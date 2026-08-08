@@ -99,6 +99,16 @@ export interface LucaAiPersonaTeamStep {
   durationMs?: number;
 }
 
+export interface LucaAiChatAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  kind: 'image' | 'pdf' | 'text';
+  size: number;
+  createdAt?: string;
+  url: string;
+}
+
 export interface LucaAiPersonaTeamRunResponse {
   ok: boolean;
   traceId?: string;
@@ -124,6 +134,7 @@ export interface LucaAiPersonaTeamRunResponse {
     model?: string;
     content?: string;
   } | null;
+  attachments?: LucaAiChatAttachment[];
   generatedAt: string;
 }
 
@@ -437,6 +448,7 @@ export interface LucaAiChatSession extends LucaAiChatSessionSummary {
     judge?: string | null;
   };
   missionDraft?: string;
+  draftAttachments?: LucaAiChatAttachment[];
   transcript?: Array<Record<string, unknown>>;
   finalResult?: Record<string, unknown> | null;
   activePersonaSlug?: string | null;

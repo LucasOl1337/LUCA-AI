@@ -1,4 +1,5 @@
 import type {
+  LucaAiChatAttachment,
   LucaAiChatLibraryResponse,
   LucaAiChatSession,
   LucaAiChatSessionShareResponse,
@@ -189,9 +190,11 @@ export const lucaApi = {
     traceId?: string,
     base?: string,
     modelOverrides?: Record<string, string>,
+    sessionId?: string,
+    attachmentIds: string[] = [],
   ) =>
     startPersonaTeamRun(
-      { mission, slugs, workflow, traceId, modelOverrides },
+      { mission, slugs, workflow, traceId, modelOverrides, sessionId, attachmentIds },
       base,
     ),
   runLucaAiIndividualResolution: (
@@ -201,9 +204,11 @@ export const lucaApi = {
     traceId?: string,
     base?: string,
     modelOverrides?: Record<string, string>,
+    sessionId?: string,
+    attachmentIds: string[] = [],
   ) =>
     startPersonaTeamRun(
-      { mission, mode: 'individual', slugs, judgeSlug, traceId, modelOverrides },
+      { mission, mode: 'individual', slugs, judgeSlug, traceId, modelOverrides, sessionId, attachmentIds },
       base,
     ),
   listEvents: (params: { traceId?: string; type?: string; limit?: number } = {}, base?: string) =>
@@ -242,6 +247,22 @@ export const lucaApi = {
   deleteChatSession: (sessionId: string, base?: string) =>
     apiDelete<LucaAiChatLibraryResponse>(
       `/api/luca-ai/chat/sessions/${encodeURIComponent(sessionId)}`,
+      base,
+    ),
+  uploadChatAttachment: (sessionId: string, file: File, base = apiBase) =>
+    requestJson(apiUrl(`/api/luca-ai/chat/sessions/${encodeURIComponent(sessionId)}/attachments`, base), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'X-File-Name': encodeURIComponent(file.name),
+        'X-File-Type': file.type || 'application/octet-stream',
+      },
+      body: file,
+      timeoutMs: 60_000,
+    }) as Promise<{ ok: boolean; attachment: LucaAiChatAttachment }>,
+  deleteChatAttachment: (sessionId: string, attachmentId: string, base?: string) =>
+    apiDelete<{ ok: boolean; id: string }>(
+      `/api/luca-ai/chat/sessions/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(attachmentId)}`,
       base,
     ),
   getChatSessionShare: (sessionId: string, base?: string) =>

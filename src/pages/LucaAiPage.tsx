@@ -7,10 +7,12 @@ import {
   ChevronDown,
   ClipboardCheck,
   Eye,
+  FileText,
   GitBranch,
   Link2,
   Loader2,
   MessageSquareText,
+  Paperclip,
   Play,
   Plus,
   RefreshCw,
@@ -28,6 +30,7 @@ import {
 } from 'lucide-react';
 import { buildApiErrorMessage, lucaApi } from '@/lib/api';
 import type {
+  LucaAiChatAttachment,
   LucaAiChatSession,
   LucaAiChatSessionShare,
   LucaAiPersonaTeamReply,
@@ -105,6 +108,7 @@ interface TeamTranscriptEntry {
   content: string;
   status?: 'ok' | 'error' | 'info';
   timestamp: string;
+  attachments?: LucaAiChatAttachment[];
 }
 
 type MessageBlock =
@@ -208,6 +212,40 @@ function normalizePersonaAssetUrls(personas: YumePersonaSummary[], base: string 
 
 function nowId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function formatAttachmentSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Anexos preservados na bolha do operador, com miniatura para imagens. */
+function AttachmentList({ attachments }: { attachments?: LucaAiChatAttachment[] }) {
+  if (!attachments?.length) return null;
+  return (
+    <div className="luca-ai-message-attachments">
+      {attachments.map((attachment) => (
+        <a
+          key={attachment.id}
+          href={attachment.url}
+          target="_blank"
+          rel="noreferrer"
+          className="luca-ai-attachment"
+        >
+          {attachment.kind === 'image' ? (
+            <img src={attachment.url} alt={attachment.name} className="luca-ai-attachment-thumb" />
+          ) : (
+            <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
+          )}
+          <span className="min-w-0 flex-1">
+            <strong>{attachment.name}</strong>
+            <small>{formatAttachmentSize(attachment.size)}</small>
+          </span>
+        </a>
+      ))}
+    </div>
+  );
 }
 
 function transcriptEntryFromReply(
@@ -508,6 +546,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const [workflowState, setWorkflowState] = useState<WorkflowAssignments>(createEmptyWorkflowAssignments());
   const [individualState, setIndividualState] = useState<IndividualAssignments>(createEmptyIndividualAssignments());
   const [mission, setMission] = useState<string>('');
+  const [draftAttachments, setDraftAttachments] = useState<LucaAiChatAttachment[]>([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [transcript, setTranscript] = useState<TeamTranscriptEntry[]>([]);
   const [finalResult, setFinalResult] = useState<TeamTranscriptEntry | null>(null);
   const [query, setQuery] = useState('');
@@ -530,6 +570,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const [shareError, setShareError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [hydratedSessionId, setHydratedSessionId] = useState<string | null>(null);
   const persistTimerRef = useRef<number | null>(null);
   const latestPersistRef = useRef<{
@@ -615,6 +656,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       judge: session.individualAssignments?.judge ? String(session.individualAssignments.judge) : null,
     });
     setMission(String(session.missionDraft || ''));
+    setDraftAttachments(Array.isArray(session.draftAttachments) ? session.draftAttachments.slice(0, 4) : []);
     const nextTranscript = ((Array.isArray(session.transcript) ? session.transcript : []) as unknown[])
       .filter(isTeamTranscriptEntry);
     setTranscript(nextTranscript);
@@ -653,6 +695,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     workflowAssignments: assignments,
     individualAssignments,
     missionDraft: mission,
+    draftAttachments,
     transcript,
     finalResult,
     activePersonaSlug,
@@ -660,6 +703,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   }), [
     activePersonaSlug,
     assignments,
+    draftAttachments,
     finalResult,
     individualAssignments,
     mission,
@@ -909,9 +953,51 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     });
   }, [loading, personas, setIndividualState]);
 
-  const canRun = mission.trim().length > 0
+  // Anexo sozinho ja e uma mensagem valida ("olha esse arquivo").
+  const canRun = (mission.trim().length > 0 || draftAttachments.length > 0)
     && (operationMode === 'individual' ? isIndividualReady : isWorkflowReady)
-    && !running;
+    && !running
+    && !uploadingAttachment;
+
+  async function addAttachments(files: FileList | null) {
+    if (!files || !activeSessionId || running || uploadingAttachment) return;
+    const available = Math.max(0, 4 - draftAttachments.length);
+    const selected = Array.from(files).slice(0, available);
+    if (!selected.length) {
+      setError('Limite de 4 anexos por mensagem.');
+      return;
+    }
+    setUploadingAttachment(true);
+    setError(null);
+    try {
+      const uploaded: LucaAiChatAttachment[] = [];
+      for (const file of selected) {
+        if (file.size > 10 * 1024 * 1024) throw new Error(`${file.name} ultrapassa o limite de 10 MB.`);
+        const data = await lucaApi.uploadChatAttachment(activeSessionId, file, bridgeBase);
+        uploaded.push(data.attachment);
+      }
+      const next = [...draftAttachments, ...uploaded].slice(0, 4);
+      setDraftAttachments(next);
+      flushSessionNow(activeSessionId, { draftAttachments: next });
+    } catch (err) {
+      setError(buildApiErrorMessage(err, 'Falha ao anexar arquivo.'));
+    } finally {
+      setUploadingAttachment(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  async function removeAttachment(attachment: LucaAiChatAttachment) {
+    if (!activeSessionId || running || uploadingAttachment) return;
+    const next = draftAttachments.filter((item) => item.id !== attachment.id);
+    setDraftAttachments(next);
+    flushSessionNow(activeSessionId, { draftAttachments: next });
+    try {
+      await lucaApi.deleteChatAttachment(activeSessionId, attachment.id, bridgeBase);
+    } catch {
+      // A UI ja removeu o anexo; sobra apenas o arquivo, limpo junto com a sessao.
+    }
+  }
 
   async function ensurePersonaAvailable(slug: string): Promise<boolean> {
     const persona = personaBySlug.get(slug);
@@ -1122,7 +1208,9 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   }
 
   async function runMission() {
-    const trimmedMission = mission.trim();
+    const attachmentsToRun = draftAttachments.slice(0, 4);
+    // Anexo sem texto ainda e uma missao valida para as personas.
+    const trimmedMission = mission.trim() || (attachmentsToRun.length ? 'Analise os anexos enviados.' : '');
     const assignmentsToRun = normalizeWorkflowAssignments(assignments);
     const individualToRun = {
       participants: uniqueSlugs(individualAssignments.participants, 5),
@@ -1163,6 +1251,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       content: trimmedMission,
       status: 'info',
       timestamp: startedAt,
+      attachments: attachmentsToRun,
     };
     // Capture next transcript eagerly — setState is async and F5 must not lose the question.
     const transcriptWithOperator = [...transcript, operatorEntry].slice(-100);
@@ -1195,6 +1284,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           traceId,
           bridgeBase,
           modelOverrides,
+          ownerSessionId,
+          attachmentsToRun.map((attachment) => attachment.id),
         )
         : await lucaApi.runLucaAiPersonaTeam(
           trimmedMission,
@@ -1203,6 +1294,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           traceId,
           bridgeBase,
           modelOverrides,
+          ownerSessionId,
+          attachmentsToRun.map((attachment) => attachment.id),
         );
       if (!stillOwner()) return;
       if (data.traceId) setActiveTraceId(data.traceId);
@@ -1239,8 +1332,12 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         };
       }
       setFinalResult(nextFinal);
+      // Anexos ja foram entregues as personas: limpam-se so quando a rodada deu certo,
+      // para uma falha permitir reenviar a mesma mensagem sem reanexar tudo.
+      if (data.ok) setDraftAttachments([]);
       flushSessionNow(ownerSessionId, {
         missionDraft: trimmedMission,
+        draftAttachments: data.ok ? [] : attachmentsToRun,
         transcript: transcriptAfter,
         finalResult: nextFinal,
       });
@@ -1505,6 +1602,9 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         <div className="luca-ai-composer-dock">
           <LucaMissionBar
             mission={mission}
+            attachments={draftAttachments}
+            uploadingAttachment={uploadingAttachment}
+            fileInputRef={fileInputRef}
             running={running}
             canRun={canRun}
             operationMode={operationMode}
@@ -1513,6 +1613,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
             isIndividualReady={isIndividualReady}
             assignedCount={operationMode === 'individual' ? individualAssignments.participants.length : assignedSlugs.length}
             onMissionChange={setMission}
+            onFilesSelected={addAttachments}
+            onRemoveAttachment={removeAttachment}
             onRun={runMission}
             onClear={clearTranscript}
           />
@@ -2691,6 +2793,9 @@ function LucaMissionCanvas({
 
 function LucaMissionBar({
   mission,
+  attachments,
+  uploadingAttachment,
+  fileInputRef,
   running,
   canRun,
   operationMode,
@@ -2699,10 +2804,15 @@ function LucaMissionBar({
   isIndividualReady,
   assignedCount,
   onMissionChange,
+  onFilesSelected,
+  onRemoveAttachment,
   onRun,
   onClear,
 }: {
   mission: string;
+  attachments: LucaAiChatAttachment[];
+  uploadingAttachment: boolean;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
   running: boolean;
   canRun: boolean;
   operationMode: OperationMode;
@@ -2711,6 +2821,8 @@ function LucaMissionBar({
   isIndividualReady: boolean;
   assignedCount: number;
   onMissionChange: (value: string) => void;
+  onFilesSelected: (files: FileList | null) => void | Promise<void>;
+  onRemoveAttachment: (attachment: LucaAiChatAttachment) => void | Promise<void>;
   onRun: () => void | Promise<void>;
   onClear: () => void;
 }) {
@@ -2746,6 +2858,31 @@ function LucaMissionBar({
           {statusText}
         </div>
       )}
+      {attachments.length > 0 && (
+        <div className="luca-ai-attachment-list" aria-label="Anexos desta mensagem">
+          {attachments.map((attachment) => (
+            <div key={attachment.id} className="luca-ai-attachment">
+              {attachment.kind === 'image' ? (
+                <img src={attachment.url} alt="" className="luca-ai-attachment-thumb" />
+              ) : (
+                <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
+              )}
+              <span className="min-w-0 flex-1">
+                <strong>{attachment.name}</strong>
+                <small>{formatAttachmentSize(attachment.size)}</small>
+              </span>
+              <button
+                type="button"
+                onClick={() => { void onRemoveAttachment(attachment); }}
+                disabled={running || uploadingAttachment}
+                aria-label={`Remover ${attachment.name}`}
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="luca-ai-composer">
         <label className="sr-only" htmlFor="luca-ai-mission">Missão da bancada</label>
         <textarea
@@ -2759,6 +2896,26 @@ function LucaMissionBar({
           disabled={running}
         />
         <div className="luca-ai-composer-toolbar">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/*,.md,.csv,.json,.xml,.yaml,.yml,.toml,.sql,.js,.jsx,.ts,.tsx,.css,.html,.py,.rb,.go,.rs,.java,.c,.h,.cpp,.hpp"
+            className="sr-only"
+            aria-label="Selecionar fotos, PDF e arquivos de texto"
+            onChange={(event) => { void onFilesSelected(event.target.files); }}
+            disabled={running || uploadingAttachment || attachments.length >= 4}
+          />
+          <button
+            type="button"
+            className="luca-ai-composer-action"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={running || uploadingAttachment || attachments.length >= 4}
+            aria-label="Anexar arquivos e fotos"
+            title="Fotos, PDF e arquivos de texto (até 10 MB)"
+          >
+            {uploadingAttachment ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+          </button>
           <button type="button" className="luca-ai-composer-action" onClick={onClear} disabled={running} aria-label="Limpar conversa" title="Limpar conversa">
             <RotateCcw className="h-3.5 w-3.5" />
           </button>
@@ -2887,6 +3044,7 @@ function TranscriptEntry({ entry, persona }: { entry: TeamTranscriptEntry; perso
             style={{ background: 'rgba(255,255,255,0.06)', color: theme.text, border: '1px solid rgba(255,255,255,0.08)' }}
           >
             <RichMessageBody content={entry.content} compact />
+            <AttachmentList attachments={entry.attachments} />
           </article>
           <span className="luca-ai-message-copy luca-ai-message-copy-operator">
             <CopyLogButton text={entry.content} label="Copiar mensagem enviada" />
