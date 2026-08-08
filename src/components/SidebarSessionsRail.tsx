@@ -6,6 +6,7 @@ import {
   Loader2,
   MessageSquarePlus,
   Search,
+  SquarePen,
   Trash2,
 } from 'lucide-react';
 import { useChatLibrary } from '@/hooks/useChatLibrary';
@@ -32,7 +33,6 @@ export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: S
   const [query, setQuery] = useState('');
   const [folderName, setFolderName] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showFolderForm, setShowFolderForm] = useState(false);
 
   const filtered = useMemo(() => {
@@ -158,12 +158,12 @@ export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: S
                 <div className="luca-sidebar-folder-actions">
                   <button
                     type="button"
-                    className="luca-sidebar-mini-btn"
+                    className="luca-sidebar-mini-btn accent"
                     title="Nova sessão neste projeto"
                     disabled={busy}
                     onClick={() => void handleCreate(folder.id)}
                   >
-                    <MessageSquarePlus className="h-3.5 w-3.5" />
+                    <SquarePen className="h-3.5 w-3.5" />
                   </button>
                   <button
                     type="button"
@@ -186,14 +186,10 @@ export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: S
                       preview={session.preview}
                       messageCount={session.messageCount}
                       active={session.id === activeSessionId}
-                      confirmDelete={confirmDeleteId === session.id}
                       busy={busy}
                       onActivate={() => void handleActivate(session.id)}
-                      onAskDelete={() => setConfirmDeleteId(session.id)}
-                      onCancelDelete={() => setConfirmDeleteId(null)}
                       onDelete={() => {
                         void deleteSession(session.id);
-                        setConfirmDeleteId(null);
                       }}
                     />
                   ))
@@ -205,6 +201,17 @@ export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: S
         <section className="luca-sidebar-folder">
           <div className="luca-sidebar-folder-head">
             <strong style={{ color: theme.textGhost, paddingLeft: 8 }}>Sem pasta</strong>
+            <div className="luca-sidebar-folder-actions">
+              <button
+                type="button"
+                className="luca-sidebar-mini-btn accent"
+                title="Nova sessão sem pasta"
+                disabled={busy}
+                onClick={() => void handleCreate(null)}
+              >
+                <SquarePen className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
           {rootSessions.length === 0 ? (
             <p className="luca-sidebar-empty">Nenhuma sessão solta</p>
@@ -215,14 +222,10 @@ export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: S
               preview={session.preview}
               messageCount={session.messageCount}
               active={session.id === activeSessionId}
-              confirmDelete={confirmDeleteId === session.id}
               busy={busy}
               onActivate={() => void handleActivate(session.id)}
-              onAskDelete={() => setConfirmDeleteId(session.id)}
-              onCancelDelete={() => setConfirmDeleteId(null)}
               onDelete={() => {
                 void deleteSession(session.id);
-                setConfirmDeleteId(null);
               }}
             />
           ))}
@@ -237,22 +240,16 @@ function SessionItem({
   preview,
   messageCount,
   active,
-  confirmDelete,
   busy,
   onActivate,
-  onAskDelete,
-  onCancelDelete,
   onDelete,
 }: {
   title?: string;
   preview?: string;
   messageCount?: number;
   active: boolean;
-  confirmDelete: boolean;
   busy: boolean;
   onActivate: () => void;
-  onAskDelete: () => void;
-  onCancelDelete: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -267,20 +264,17 @@ function SessionItem({
           </small>
         </span>
       </button>
-      {confirmDelete ? (
-        <div className="luca-sidebar-session-tools">
-          <button type="button" className="luca-sidebar-mini-btn danger" disabled={busy} onClick={onDelete} title="Confirmar">
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-          <button type="button" className="luca-sidebar-mini-btn" disabled={busy} onClick={onCancelDelete} title="Cancelar">
-            ×
-          </button>
-        </div>
-      ) : (
-        <button type="button" className="luca-sidebar-mini-btn danger" disabled={busy} onClick={onAskDelete} title="Apagar">
+      <div className="luca-sidebar-session-tools">
+        <button
+          type="button"
+          className="luca-sidebar-mini-btn danger"
+          disabled={busy}
+          onClick={onDelete}
+          title="Apagar sessão"
+        >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
-      )}
+      </div>
     </div>
   );
 }

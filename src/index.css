@@ -579,6 +579,8 @@
   background: transparent;
 }
 .luca-sidebar-mini-btn:hover { background: rgba(255,255,255,.06); color: var(--l-text); }
+.luca-sidebar-mini-btn.accent { color: var(--l-gold-bright); }
+.luca-sidebar-mini-btn.accent:hover { background: var(--l-gold-soft); color: var(--l-gold-bright); }
 .luca-sidebar-mini-btn.danger { color: #ff8a83; }
 .luca-sidebar-folder-form {
   display: flex;
@@ -795,6 +797,13 @@
   color: var(--l-text-mute);
 }
 
+.luca-ai-sessions-icon-btn.accent {
+  color: var(--l-gold-bright);
+}
+.luca-ai-sessions-icon-btn.accent:hover {
+  background: var(--l-gold-soft);
+  color: var(--l-gold-bright);
+}
 .luca-ai-sessions-icon-btn.danger {
   color: var(--l-error, #ff7b7b);
 }

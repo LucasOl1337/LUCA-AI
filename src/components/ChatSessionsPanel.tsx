@@ -3,7 +3,7 @@ import {
   FolderPlus,
   Loader2,
   MessageSquarePlus,
-  Plus,
+  SquarePen,
   Trash2,
   X,
 } from 'lucide-react';
@@ -41,7 +41,6 @@ export default function ChatSessionsPanel({
 }: ChatSessionsPanelProps) {
   const theme = useTheme();
   const [folderName, setFolderName] = useState('');
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const rootSessions = useMemo(
     () => sessions.filter((session) => !session.folderId),
@@ -111,12 +110,12 @@ export default function ChatSessionsPanel({
                   <div className="luca-ai-sessions-group-actions">
                     <button
                       type="button"
-                      className="luca-ai-sessions-icon-btn"
+                      className="luca-ai-sessions-icon-btn accent"
                       title="Nova sessão nesta pasta"
                       disabled={busy}
                       onClick={() => onCreateSession(folder.id)}
                     >
-                      <Plus className="h-3.5 w-3.5" />
+                      <SquarePen className="h-3.5 w-3.5" />
                     </button>
                     <button
                       type="button"
@@ -139,14 +138,8 @@ export default function ChatSessionsPanel({
                       active={session.id === activeSessionId}
                       busy={busy}
                       folders={folders}
-                      confirmDelete={confirmDeleteId === session.id}
-                      onConfirmDelete={() => setConfirmDeleteId(session.id)}
-                      onCancelDelete={() => setConfirmDeleteId(null)}
                       onActivate={() => onActivateSession(session.id)}
-                      onDelete={() => {
-                        onDeleteSession(session.id);
-                        setConfirmDeleteId(null);
-                      }}
+                      onDelete={() => onDeleteSession(session.id)}
                       onMove={(folderId) => onMoveSession(session.id, folderId)}
                     />
                   ))
@@ -158,6 +151,17 @@ export default function ChatSessionsPanel({
           <section className="luca-ai-sessions-group">
             <div className="luca-ai-sessions-group-head">
               <strong style={{ color: theme.textSoft }}>Sem pasta</strong>
+              <div className="luca-ai-sessions-group-actions">
+                <button
+                  type="button"
+                  className="luca-ai-sessions-icon-btn accent"
+                  title="Nova sessão sem pasta"
+                  disabled={busy}
+                  onClick={() => onCreateSession(null)}
+                >
+                  <SquarePen className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
             {rootSessions.length === 0 ? (
               <p className="luca-ai-sessions-empty">Nenhuma sessão solta</p>
@@ -169,14 +173,8 @@ export default function ChatSessionsPanel({
                   active={session.id === activeSessionId}
                   busy={busy}
                   folders={folders}
-                  confirmDelete={confirmDeleteId === session.id}
-                  onConfirmDelete={() => setConfirmDeleteId(session.id)}
-                  onCancelDelete={() => setConfirmDeleteId(null)}
                   onActivate={() => onActivateSession(session.id)}
-                  onDelete={() => {
-                    onDeleteSession(session.id);
-                    setConfirmDeleteId(null);
-                  }}
+                  onDelete={() => onDeleteSession(session.id)}
                   onMove={(folderId) => onMoveSession(session.id, folderId)}
                 />
               ))
@@ -193,9 +191,6 @@ function SessionRow({
   active,
   busy,
   folders,
-  confirmDelete,
-  onConfirmDelete,
-  onCancelDelete,
   onActivate,
   onDelete,
   onMove,
@@ -204,9 +199,6 @@ function SessionRow({
   active: boolean;
   busy: boolean;
   folders: LucaAiChatFolder[];
-  confirmDelete: boolean;
-  onConfirmDelete: () => void;
-  onCancelDelete: () => void;
   onActivate: () => void;
   onDelete: () => void;
   onMove: (folderId: string | null) => void;
@@ -237,20 +229,15 @@ function SessionRow({
             ))}
           </select>
         )}
-        {confirmDelete ? (
-          <>
-            <button type="button" className="luca-ai-sessions-icon-btn danger" disabled={busy} onClick={onDelete} title="Confirmar exclusão">
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-            <button type="button" className="luca-ai-sessions-icon-btn" disabled={busy} onClick={onCancelDelete} title="Cancelar">
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </>
-        ) : (
-          <button type="button" className="luca-ai-sessions-icon-btn danger" disabled={busy} onClick={onConfirmDelete} title="Apagar sessão">
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        )}
+        <button
+          type="button"
+          className="luca-ai-sessions-icon-btn danger"
+          disabled={busy}
+          onClick={onDelete}
+          title="Apagar sessão"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
       </div>
     </div>
   );
