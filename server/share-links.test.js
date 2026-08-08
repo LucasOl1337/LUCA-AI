@@ -62,6 +62,44 @@ test('SHARE_LINKS_V1 creates public snapshot link and resolves without auth cont
   assert.doesNotMatch(html, /<script/i);
 });
 
+test('SHARE_LINKS_V1 public snapshot never carries private session attachments', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-share-attachments-'));
+  const { workspace, chatLibrary, shareLinks } = await loadModules(dataDir);
+
+  let share;
+  workspace.runWithWorkspaceUser('owner-attachments', () => {
+    const session = chatLibrary.createChatSession({ title: 'Sessão com anexo' });
+    chatLibrary.updateChatSession(session.id, {
+      transcript: [{
+        id: 'op1',
+        role: 'operator',
+        name: 'Operador',
+        content: 'Veja o arquivo em anexo.',
+        timestamp: new Date().toISOString(),
+        attachments: [{
+          id: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+          name: 'sigiloso.txt',
+          mimeType: 'text/plain',
+          kind: 'text',
+          size: 22,
+          url: `/api/luca-ai/chat/sessions/${session.id}/attachments/aaaaaaaaaaaaaaaaaaaaaaaa`,
+        }],
+      }],
+    });
+    share = shareLinks.createShareLink(session.id);
+  });
+
+  const resolved = shareLinks.resolvePublicShare(share.token);
+  // O texto continua público, mas nenhum handle de arquivo pode vazar:
+  // /s/:token é anônimo e o download vive atrás de requireUser.
+  assert.equal(resolved.snapshot.transcript.length, 1);
+  assert.equal(resolved.snapshot.transcript[0].attachments, undefined);
+
+  const html = shareLinks.renderShareHtml(resolved);
+  assert.doesNotMatch(html, /sigiloso\.txt/);
+  assert.doesNotMatch(html, /\/attachments\//);
+});
+
 test('SHARE_LINKS_V1 snapshot is immutable until refreshed and revoke kills the link', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-share-immutable-'));
   const { workspace, chatLibrary, shareLinks } = await loadModules(dataDir);

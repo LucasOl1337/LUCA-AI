@@ -22,6 +22,10 @@ Ao importar uma persona, o LUCA preserva nome, prompt e versao lidos do Yume. O 
 
 `POST /api/luca-ai/persona-team/run` oferece dois modos visiveis. `workflow` encadeia os papeis da equipe; `individual` executa de uma a cinco personas em contextos isolados e chama depois uma persona juiza com todas as respostas. O juiz pode repetir uma persona participante, mas sempre usa uma chamada separada. O POST devolve `202` com `runId`, `traceId` e status `running`; a execucao segue no processo Express e a UI consulta `GET /api/luca-ai/persona-team/runs/:runId` ate `complete` ou `failed`. Assim, nenhuma conexao com a borda precisa permanecer aberta durante as chamadas LLM.
 
+Os dois modos aceitam anexos privados da sessao. A UI envia imagens, PDF ou texto para `POST /api/luca-ai/chat/sessions/:sessionId/attachments`; o Express valida tamanho, tipo e assinatura real do arquivo, guarda por conta/sessao e resolve os anexos antes de acionar as personas. A rodada referencia apenas `sessionId` + `attachmentIds`, entao uma conta nunca le arquivo de outra. Limites: quatro anexos por mensagem, 10 MB por arquivo e 20 MB por rodada.
+
+Imagens seguem como blocos `image_url` nativos. Arquivos de texto sao embutidos no prompt em vez de blocos de arquivo: no 9Router, o Claude ignora `input_file` em silencio e a persona responde como se nenhum arquivo existisse. Ver `buildUserContent` em `server/agent-loop.js`. Anexos ficam fora do snapshot publico de `/s/:token` e o download exige sessao autenticada.
+
 ## Kamui e Yume
 
 `server/kamui-client.js` acessa Yume somente por GET via `{KAMUI_BASE}/kamui/yume/...`. O padrao de `KAMUI_BASE` e `http://127.0.0.1:1338`; `KAMUI_TIMEOUT_MS` controla o timeout.
