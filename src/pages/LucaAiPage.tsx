@@ -57,6 +57,8 @@ import { useTheme } from '@/hooks/useTheme';
 const MAX_EXECUTORS = 4;
 const LUCA_AI_CLEAN_UI_VERSION = 'session-isolation-v2';
 const LUCA_AI_CLEAN_UI_STORAGE_KEY = 'luca.lucaAi.cleanUiVersion';
+const LUCA_AI_ENTRY_MODE_STORAGE_KEY = 'luca.lucaAi.entryMode';
+
 const LUCA_AI_LEGACY_LOCAL_KEYS = [
   'luca.lucaAi.operationMode',
   'luca.lucaAi.workflowAssignments',
@@ -73,6 +75,18 @@ interface LucaAiPageProps {
 
 type TranscriptRole = 'operator' | 'persona' | 'system';
 type OperationMode = 'team' | 'individual';
+
+function consumeEntryMode(): OperationMode | null {
+  try {
+    const value = window.sessionStorage.getItem(LUCA_AI_ENTRY_MODE_STORAGE_KEY);
+    window.sessionStorage.removeItem(LUCA_AI_ENTRY_MODE_STORAGE_KEY);
+    return value === 'individual' || value === 'team' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+
 type WorkflowRoleId = 'supervisor' | 'mission' | 'execution' | 'approval' | 'display';
 type WorkflowAssignments = Record<WorkflowRoleId, string[]>;
 type IndividualPickerId = 'participants' | 'judge';
@@ -608,7 +622,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       return;
     }
     boundSessionIdRef.current = session.id;
-    setOperationMode(session.operationMode === 'individual' ? 'individual' : 'team');
+    setOperationMode(consumeEntryMode() || (session.operationMode === 'individual' ? 'individual' : 'team'));
     setWorkflowState(normalizeWorkflowAssignments(session.workflowAssignments || createEmptyWorkflowAssignments()));
     setIndividualState({
       participants: uniqueSlugs(session.individualAssignments?.participants || [], 5),

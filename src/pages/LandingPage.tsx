@@ -1,19 +1,70 @@
-import { motion } from 'framer-motion';
-import { useTheme } from '@/hooks/useTheme';
+import { motion, useReducedMotion } from 'framer-motion';
+import {
+  ArrowRight,
+  Check,
+  GitBranch,
+  RefreshCw,
+  Scale,
+  UserRound,
+  UsersRound,
+} from 'lucide-react';
 import { useLuca } from '@/hooks/useLucaState';
-import LucaOwl from '@/components/LucaOwl';
 import type { PageId } from '@/components/Layout';
+import '@/home-page.css';
+
+export type HomeEntryMode = 'individual' | 'team';
+
+const AGENTS = [
+  {
+    name: 'Supervisor',
+    role: 'Mantém a missão no rumo e coordena os papéis.',
+    image: '/home/agent-supervisor.jpg',
+  },
+  {
+    name: 'Planejador',
+    role: 'Transforma o pedido em uma rota de execução.',
+    image: '/home/agent-planner.jpg',
+  },
+  {
+    name: 'Pesquisador',
+    role: 'Busca contexto e testa as premissas da resposta.',
+    image: '/home/agent-researcher.jpg',
+  },
+  {
+    name: 'Designer',
+    role: 'Organiza a entrega para ficar clara e acionável.',
+    image: '/home/agent-designer.jpg',
+  },
+] as const;
 
 interface LandingPageProps {
   onNavigate: (page: PageId) => void;
 }
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 6 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] as const } },
-};
+function AgentPortrait({ agent, className = '' }: { agent: (typeof AGENTS)[number]; className?: string }) {
+  return (
+    <figure className={className}>
+      <img src={agent.image} alt="" loading="lazy" />
+      <figcaption>
+        <strong>{agent.name}</strong>
+        <span>{agent.role}</span>
+      </figcaption>
+    </figure>
+  );
+}
+
+function ModeArtwork({ mode }: { mode: HomeEntryMode }) {
+  const portraits = mode === 'individual' ? AGENTS.slice(1, 4) : AGENTS;
+  return (
+    <div className={`home-mode-art home-mode-art-${mode}`} aria-hidden="true">
+      {portraits.map((agent) => <img key={agent.name} src={agent.image} alt="" />)}
+      {mode === 'individual' ? <Scale /> : <GitBranch />}
+    </div>
+  );
+}
+
 export default function LandingPage({ onNavigate }: LandingPageProps) {
-  const theme = useTheme();
+  const reduceMotion = useReducedMotion();
   const {
     backendReady,
     connectionState,
@@ -27,7 +78,6 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
   const runtimeOnline = cloudRuntime ? connectionState !== 'offline' : backendReady;
   const checking = connectionState === 'checking';
   const systemBadge = checking ? 'conectando' : runtimeOnline ? 'online' : 'offline';
-  const systemBadgeClass = checking ? 'warning' : runtimeOnline ? 'ok' : 'error';
   const needsRecovery = Boolean(operationError) || (!checking && !runtimeOnline);
   const statusTone = operationError || !runtimeOnline
     ? 'error'
@@ -41,8 +91,13 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
       : cloudRuntime
         ? 'Modo público online. O runtime da VM está conectado ao 9Router e pronto para atender o LUCA-AI.'
         : backendReady
-          ? 'Sistema online. Abra o LUCA-AI para iniciar uma missão ou Personas para montar o catálogo.'
+          ? 'Sistema online. Escolha Individual ou Equipe para começar, ou abra Personas para montar o catálogo.'
           : 'Sem conexão com o backend. Verifique se o servidor está em 127.0.0.1:4242.';
+
+  function startMode(mode: HomeEntryMode) {
+    window.sessionStorage.setItem('luca.lucaAi.entryMode', mode);
+    onNavigate('luca-ai');
+  }
 
   async function retryConnection() {
     clearOperationError();
@@ -50,103 +105,113 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="luca-page-shell mx-auto flex min-h-full max-w-[1180px] flex-col gap-3 p-6">
-        <motion.section
-          variants={fadeUp}
-          initial="hidden"
-          animate="show"
-          className="luca-hero void-panel grid rounded-[22px] lg:grid-cols-[minmax(0,1fr)_220px]"
-        >
-          <div className="flex flex-col justify-center p-5 sm:p-6">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: theme.goldBright }}>LUCA-AI</span>
-              <span className="h-1 w-1 rounded-full" style={{ background: theme.textGhost }} />
-              <span className="text-[10px] uppercase tracking-[0.12em]" style={{ color: theme.textGhost }}>equipe de personas</span>
-            </div>
-            <h1 className="void-title">LUCA</h1>
-            <p className="mt-2 max-w-[620px] text-[13px] leading-relaxed" style={{ color: theme.textMute }}>
-              Monte uma equipe de personas, envie uma missão e acompanhe a entrega em uma conversa única com status do runtime ao vivo.
-            </p>
-            <ul
-              className="landing-hero-proof mt-4 flex flex-wrap gap-2"
-              data-landing-proof
-              aria-label="Prova de valor do LUCA-AI"
-            >
-              <li className="landing-hero-proof-item" data-landing-proof-item="personas">
-                Equipe de personas
-              </li>
-              <li className="landing-hero-proof-item" data-landing-proof-item="missao">
-                Missão em conversa única
-              </li>
-              <li className="landing-hero-proof-item" data-landing-proof-item="runtime">
-                Runtime com status ao vivo
-              </li>
-            </ul>
-            <div className="mt-5 flex flex-wrap items-center gap-2" data-landing-cta-row>
-              <button type="button" onClick={() => onNavigate('luca-ai')} className="btn-primary" data-landing-cta="open">
-                Abrir LUCA-AI
-              </button>
-              <button
-                type="button"
-                onClick={() => onNavigate('personas')}
-                className="btn-fleet"
-                data-landing-cta="personas"
-              >
-                Ver personas
-              </button>
-            </div>
-          </div>
-          <div className="luca-hero-art relative grid place-items-center overflow-hidden p-3">
-            <div className="absolute inset-5 rounded-full" style={{ background: `radial-gradient(circle, ${theme.goldSoft}, transparent 68%)` }} />
-            <LucaOwl size={176} alive={runtimeOnline} />
-          </div>
-        </motion.section>
+    <div className="home-page-scroll">
+      <main className="home-page home-page-a">
+        <section className="home-a-hero">
+          <motion.header
+            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <span>Escolha seu modo</span>
+            <h1>Como você quer chegar à resposta?</h1>
+            <p>Comece por uma comparação independente ou por uma equipe coordenada.</p>
+          </motion.header>
 
-        <motion.section
-          variants={fadeUp}
-          initial="hidden"
-          animate="show"
-          className="void-panel flex flex-col gap-3 rounded-[18px] p-4 sm:flex-row sm:items-center"
-          aria-label="Estado do sistema"
+          <div className="home-a-modes" data-landing-cta-row>
+            <motion.article
+              initial={reduceMotion ? false : { opacity: 0, x: -16 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.45, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <ModeArtwork mode="individual" />
+              <div className="home-a-mode-copy">
+                <div className="home-mode-icon"><UserRound aria-hidden="true" /></div>
+                <div>
+                  <h2>Individual</h2>
+                  <p>Perspectivas independentes. Um juiz compara tudo e entrega o veredito.</p>
+                </div>
+              </div>
+              <ul>
+                <li><Check aria-hidden="true" /> Faça uma pergunta uma vez</li>
+                <li><Check aria-hidden="true" /> Compare até cinco respostas</li>
+                <li><Check aria-hidden="true" /> Receba uma decisão final</li>
+              </ul>
+              <button type="button" data-landing-cta="individual" onClick={() => startMode('individual')}>
+                Usar modo individual <ArrowRight aria-hidden="true" />
+              </button>
+            </motion.article>
+
+            <motion.article
+              initial={reduceMotion ? false : { opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.45, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <ModeArtwork mode="team" />
+              <div className="home-a-mode-copy">
+                <div className="home-mode-icon"><UsersRound aria-hidden="true" /></div>
+                <div>
+                  <h2>Equipe</h2>
+                  <p>Personas em papéis definidos executam, revisam e sintetizam a missão.</p>
+                </div>
+              </div>
+              <ul>
+                <li><Check aria-hidden="true" /> Defina uma missão</li>
+                <li><Check aria-hidden="true" /> Distribua os papéis</li>
+                <li><Check aria-hidden="true" /> Acompanhe uma entrega única</li>
+              </ul>
+              <button type="button" data-landing-cta="team" onClick={() => startMode('team')}>
+                Usar modo equipe <ArrowRight aria-hidden="true" />
+              </button>
+            </motion.article>
+          </div>
+        </section>
+
+        <section className="home-a-agents" data-landing-proof aria-label="Personas especializadas do LUCA-AI">
+          <div className="home-agents-heading">
+            <div>
+              <h2>Personas especializadas. Uma entrega só.</h2>
+              <p>Você escolhe quem pensa. O LUCA organiza como cada persona participa.</p>
+            </div>
+            <button type="button" data-landing-cta="personas" onClick={() => onNavigate('personas')}>
+              Ver catálogo de personas <ArrowRight aria-hidden="true" />
+            </button>
+          </div>
+          <div className="home-a-agent-grid">
+            <AgentPortrait agent={AGENTS[0]} className="home-a-agent-lead" />
+            {AGENTS.slice(1).map((agent) => <AgentPortrait key={agent.name} agent={agent} />)}
+          </div>
+          <ul className="home-proof-strip" data-landing-proof-list>
+            <li data-landing-proof-item="personas">Equipe de personas</li>
+            <li data-landing-proof-item="missao">Missão em conversa única</li>
+            <li data-landing-proof-item="runtime">Runtime com status ao vivo</li>
+          </ul>
+        </section>
+
+        <aside
+          className="home-page-status"
           data-landing-system-status
           data-tone={statusTone}
-          data-landing-system-error={needsRecovery ? '' : undefined}
-          role={needsRecovery ? 'alert' : undefined}
+          role={needsRecovery ? 'alert' : 'status'}
+          {...(needsRecovery ? { 'data-landing-system-error': true } : {})}
         >
-          <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
-            <span className="mt-1 h-2 w-2 shrink-0 rounded-full sm:mt-0" style={{ background: checking ? theme.warning : runtimeOnline ? theme.alive : theme.error }} />
-            <p className="min-w-0 flex-1 text-[13px] leading-relaxed" style={{ color: theme.textMute }}>
-              {statusCopy}
-            </p>
-            <div className={`state-badge ${systemBadgeClass} shrink-0`}>
-              {systemBadge}
-            </div>
-          </div>
+          <span className="home-page-status-mark" aria-hidden="true" />
+          <p>{statusCopy}</p>
+          <strong>{systemBadge}</strong>
           {needsRecovery && (
-            <div className="flex shrink-0 flex-wrap items-center gap-2" data-landing-system-actions>
-              <button
-                type="button"
-                className="btn-primary"
-                data-landing-system-retry
-                onClick={() => void retryConnection()}
-              >
-                Tentar novamente
+            <div data-landing-system-actions>
+              <button type="button" className="btn-primary" data-landing-system-retry onClick={() => void retryConnection()}>
+                <RefreshCw aria-hidden="true" /> Tentar novamente
               </button>
               {operationError && (
-                <button
-                  type="button"
-                  className="btn-fleet"
-                  data-landing-system-dismiss
-                  onClick={clearOperationError}
-                >
+                <button type="button" data-landing-system-dismiss onClick={clearOperationError}>
                   Dispensar
                 </button>
               )}
             </div>
           )}
-        </motion.section>
-      </div>
+        </aside>
+      </main>
     </div>
   );
 }

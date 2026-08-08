@@ -13,7 +13,7 @@ test('landing system status has recovery markers', () => {
   assert.ok(source.includes('data-landing-system-error'), 'error shell marker');
   assert.ok(source.includes('data-landing-system-retry'), 'retry marker');
   assert.ok(source.includes('Tentar novamente'), 'retry label');
-  assert.ok(source.includes("role={needsRecovery ? 'alert' : undefined}"), 'alert role when recovery');
+  assert.ok(source.includes("role={needsRecovery ? 'alert' : 'status'}"), 'alert role when recovery');
   assert.ok(source.includes('data-tone={statusTone}'), 'tone on status');
   assert.ok(source.includes('refresh'), 'uses refresh');
   assert.ok(source.includes('clearOperationError'), 'can clear operation error');
