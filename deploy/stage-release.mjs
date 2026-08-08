@@ -125,9 +125,28 @@ function ensureDist(skipBuild) {
   return { built: true, indexHtml };
 }
 
+function tarSupportsForceLocal() {
+  const result = spawnSync('tar', ['--version'], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const banner = `${result.stdout || ''}${result.stderr || ''}`;
+  return /GNU tar/i.test(banner);
+}
+
 function tarCreate(archivePath, cwd, paths, extraArgs = []) {
-  // --force-local: Windows drive letters (C:) look like remote hosts to GNU tar
-  const args = ['--force-local', '-cf', archivePath, ...extraArgs, ...paths];
+  // Absolute Windows paths (C:\...) look like remote hosts to GNU tar; --force-local
+  // fixes that, but Windows bsdtar does not support the flag. Prefer a path relative
+  // to cwd when possible so both GNU tar and bsdtar work on Windows.
+  const absOut = path.resolve(archivePath);
+  fs.mkdirSync(path.dirname(absOut), { recursive: true });
+  const relOut = path.relative(cwd, absOut);
+  const outArg = relOut && !relOut.startsWith('..') && !path.isAbsolute(relOut)
+    ? relOut
+    : absOut;
+  const args = [];
+  if (tarSupportsForceLocal()) args.push('--force-local');
+  args.push('-cf', outArg, ...extraArgs, ...paths);
   const result = spawnSync('tar', args, {
     cwd,
     encoding: 'utf8',
