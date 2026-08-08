@@ -1,16 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ChevronDown,
-  ChevronRight,
+  Folder,
   FolderPlus,
   Loader2,
   MessageSquarePlus,
+  MoreHorizontal,
+  Pencil,
   Search,
   SquarePen,
   Trash2,
 } from 'lucide-react';
 import { useChatLibrary } from '@/hooks/useChatLibrary';
-import { useTheme } from '@/hooks/useTheme';
 
 interface SidebarSessionsRailProps {
   compact?: boolean;
@@ -18,7 +18,6 @@ interface SidebarSessionsRailProps {
 }
 
 export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: SidebarSessionsRailProps) {
-  const theme = useTheme();
   const {
     busy,
     folders,
@@ -28,12 +27,16 @@ export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: S
     activateSession,
     deleteSession,
     createFolder,
+    renameFolder,
     deleteFolder,
   } = useChatLibrary();
   const [query, setQuery] = useState('');
   const [folderName, setFolderName] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [showFolderForm, setShowFolderForm] = useState(false);
+  const [menuFolderId, setMenuFolderId] = useState<string | null>(null);
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -66,6 +69,21 @@ export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: S
       setFolderName('');
       setShowFolderForm(false);
     });
+  }
+
+  function startRename(folderId: string, currentName: string) {
+    setMenuFolderId(null);
+    setRenamingFolderId(folderId);
+    setRenameValue(currentName);
+  }
+
+  function commitRename() {
+    const id = renamingFolderId;
+    const name = renameValue.trim();
+    if (!id) return;
+    setRenamingFolderId(null);
+    if (!name) return;
+    void renameFolder(id, name);
   }
 
   if (compact) {
@@ -142,37 +160,59 @@ export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: S
         {folders.map((folder) => {
           const children = filtered.filter((session) => session.folderId === folder.id);
           const isCollapsed = Boolean(collapsed[folder.id]);
+          const isRenaming = renamingFolderId === folder.id;
           return (
             <section key={folder.id} className="luca-sidebar-folder">
-              <div className="luca-sidebar-folder-head">
-                <button
-                  type="button"
-                  className="luca-sidebar-folder-toggle"
-                  onClick={() => setCollapsed((prev) => ({ ...prev, [folder.id]: !prev[folder.id] }))}
-                >
-                  {isCollapsed
-                    ? <ChevronRight className="h-3.5 w-3.5" />
-                    : <ChevronDown className="h-3.5 w-3.5" />}
-                  <strong>{folder.name}</strong>
-                </button>
-                <div className="luca-sidebar-folder-actions">
+              <div className={`luca-sidebar-folder-head ${menuFolderId === folder.id ? 'menu-open' : ''}`}>
+                {isRenaming ? (
+                  <input
+                    className="luca-sidebar-folder-rename"
+                    value={renameValue}
+                    onChange={(event) => setRenameValue(event.target.value)}
+                    onBlur={commitRename}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        commitRename();
+                      }
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        setRenamingFolderId(null);
+                      }
+                    }}
+                    disabled={busy}
+                    autoFocus
+                  />
+                ) : (
                   <button
                     type="button"
-                    className="luca-sidebar-mini-btn accent"
+                    className="luca-sidebar-folder-toggle"
+                    onClick={() => setCollapsed((prev) => ({ ...prev, [folder.id]: !prev[folder.id] }))}
+                  >
+                    <Folder className="h-3.5 w-3.5 luca-sidebar-folder-icon" />
+                    <strong>{folder.name}</strong>
+                  </button>
+                )}
+                <div className="luca-sidebar-folder-actions">
+                  <FolderMenu
+                    open={menuFolderId === folder.id}
+                    busy={busy}
+                    onToggle={() => setMenuFolderId((prev) => (prev === folder.id ? null : folder.id))}
+                    onClose={() => setMenuFolderId(null)}
+                    onRename={() => startRename(folder.id, folder.name)}
+                    onRemove={() => {
+                      setMenuFolderId(null);
+                      void deleteFolder(folder.id);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="luca-sidebar-mini-btn"
                     title="Nova sessão neste projeto"
                     disabled={busy}
                     onClick={() => void handleCreate(folder.id)}
                   >
                     <SquarePen className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    className="luca-sidebar-mini-btn danger"
-                    title="Apagar pasta"
-                    disabled={busy}
-                    onClick={() => void deleteFolder(folder.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
@@ -200,12 +240,14 @@ export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: S
 
         <section className="luca-sidebar-folder">
           <div className="luca-sidebar-folder-head">
-            <strong style={{ color: theme.textGhost, paddingLeft: 8 }}>Sem pasta</strong>
+            <div className="luca-sidebar-folder-toggle static">
+              <strong className="luca-sidebar-root-label">Recentes</strong>
+            </div>
             <div className="luca-sidebar-folder-actions">
               <button
                 type="button"
-                className="luca-sidebar-mini-btn accent"
-                title="Nova sessão sem pasta"
+                className="luca-sidebar-mini-btn"
+                title="Nova sessão"
                 disabled={busy}
                 onClick={() => void handleCreate(null)}
               >
@@ -214,7 +256,7 @@ export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: S
             </div>
           </div>
           {rootSessions.length === 0 ? (
-            <p className="luca-sidebar-empty">Nenhuma sessão solta</p>
+            <p className="luca-sidebar-empty">Nenhum chat</p>
           ) : rootSessions.map((session) => (
             <SessionItem
               key={session.id}
@@ -231,6 +273,68 @@ export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: S
           ))}
         </section>
       </div>
+    </div>
+  );
+}
+
+function FolderMenu({
+  open,
+  busy,
+  onToggle,
+  onClose,
+  onRename,
+  onRemove,
+}: {
+  open: boolean;
+  busy: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  onRename: () => void;
+  onRemove: () => void;
+}) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    function onDoc(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) onClose();
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') onClose();
+    }
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open, onClose]);
+
+  return (
+    <div className="luca-sidebar-folder-menu" ref={rootRef}>
+      <button
+        type="button"
+        className="luca-sidebar-mini-btn"
+        title="Mais opções"
+        disabled={busy}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        <MoreHorizontal className="h-3.5 w-3.5" />
+      </button>
+      {open && (
+        <div className="luca-sidebar-folder-dropdown" role="menu">
+          <button type="button" role="menuitem" disabled={busy} onClick={onRename}>
+            <Pencil className="h-3.5 w-3.5" />
+            Editar projeto
+          </button>
+          <button type="button" role="menuitem" className="danger" disabled={busy} onClick={onRemove}>
+            <Trash2 className="h-3.5 w-3.5" />
+            Remover
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -255,7 +359,6 @@ function SessionItem({
   return (
     <div className={`luca-sidebar-session ${active ? 'active' : ''}`}>
       <button type="button" className="luca-sidebar-session-main" disabled={busy} onClick={onActivate}>
-        <span className="luca-sidebar-session-dot" aria-hidden />
         <span className="min-w-0 flex-1 text-left">
           <strong className="block truncate">{title || 'Sem título'}</strong>
           <small className="block truncate">

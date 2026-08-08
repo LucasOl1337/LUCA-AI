@@ -617,38 +617,122 @@
 .luca-sidebar-folder {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 .luca-sidebar-folder-head {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 4px;
+  min-height: 30px;
+  padding: 2px 2px 2px 4px;
+  border-radius: 8px;
+}
+.luca-sidebar-folder-head:hover,
+.luca-sidebar-folder-head.menu-open {
+  background: rgba(255,255,255,.04);
 }
 .luca-sidebar-folder-toggle {
   min-width: 0;
   flex: 1;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   color: var(--l-text);
   text-align: left;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 2px;
 }
-.luca-sidebar-folder-toggle strong {
+.luca-sidebar-folder-toggle.static {
+  cursor: default;
+  pointer-events: none;
+}
+.luca-sidebar-folder-toggle strong,
+.luca-sidebar-root-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 600;
+}
+.luca-sidebar-root-label {
+  color: var(--l-text-ghost);
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.luca-sidebar-folder-icon {
+  flex: 0 0 auto;
+  color: var(--l-text-mute);
+}
+.luca-sidebar-folder-rename {
+  min-width: 0;
+  flex: 1;
+  min-height: 28px;
+  border: 1px solid var(--l-border);
+  border-radius: 8px;
+  background: var(--l-input);
+  color: var(--l-text);
+  padding: 0 8px;
+  font-size: 12px;
 }
 .luca-sidebar-folder-actions {
   display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s ease;
+}
+.luca-sidebar-folder-head:hover .luca-sidebar-folder-actions,
+.luca-sidebar-folder-head.menu-open .luca-sidebar-folder-actions,
+.luca-sidebar-folder-head:focus-within .luca-sidebar-folder-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.luca-sidebar-folder-menu {
+  position: relative;
+}
+.luca-sidebar-folder-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 40;
+  min-width: 168px;
+  padding: 6px;
+  border: 1px solid var(--l-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--l-panel) 96%, #000 4%);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
   gap: 2px;
+}
+.luca-sidebar-folder-dropdown button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--l-text);
+  font-size: 12px;
+  text-align: left;
+}
+.luca-sidebar-folder-dropdown button:hover {
+  background: rgba(255,255,255,.06);
+}
+.luca-sidebar-folder-dropdown button.danger {
+  color: #ff8a83;
 }
 .luca-sidebar-empty {
   margin: 0;
-  padding: 4px 8px 6px;
+  padding: 4px 10px 6px 28px;
   color: var(--l-text-ghost);
   font-size: 11px;
 }
@@ -660,6 +744,9 @@
   border-radius: 10px;
   background: transparent;
 }
+.luca-sidebar-session:hover {
+  background: rgba(255,255,255,.04);
+}
 .luca-sidebar-session.active {
   border-color: color-mix(in srgb, var(--l-gold) 35%, transparent);
   background: var(--l-gold-soft);
@@ -670,34 +757,33 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 8px;
+  padding: 7px 8px 7px 28px;
   color: var(--l-text);
   text-align: left;
 }
 .luca-sidebar-session-main strong {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
 }
 .luca-sidebar-session-main small {
   margin-top: 1px;
   color: var(--l-text-mute);
   font-size: 10px;
 }
-.luca-sidebar-session-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--l-text-ghost);
-  box-shadow: 0 0 0 1px rgba(255,255,255,.12);
-}
-.luca-sidebar-session.active .luca-sidebar-session-dot {
-  background: var(--l-gold-bright);
-}
 .luca-sidebar-session-tools {
   display: inline-flex;
   align-items: center;
   gap: 2px;
   padding-right: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s ease;
+}
+.luca-sidebar-session:hover .luca-sidebar-session-tools,
+.luca-sidebar-session:focus-within .luca-sidebar-session-tools,
+.luca-sidebar-session.active .luca-sidebar-session-tools {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .luca-ai-sessions-layer {
@@ -825,29 +911,113 @@
 }
 
 .luca-ai-sessions-group-head {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 0 2px;
+  min-height: 34px;
+  padding: 2px 4px;
+  border-radius: 10px;
 }
 
-.luca-ai-sessions-group-head strong {
+.luca-ai-sessions-group-head:hover,
+.luca-ai-sessions-group-head.menu-open {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.luca-ai-sessions-folder-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
   color: var(--l-text);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.luca-ai-sessions-folder-label.mute {
+  color: var(--l-text-soft, var(--l-text-ghost));
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.luca-ai-sessions-folder-rename {
+  min-width: 0;
+  flex: 1;
+  min-height: 30px;
+  border: 1px solid var(--l-border);
+  border-radius: 8px;
+  background: var(--l-input);
+  color: var(--l-text);
+  padding: 0 8px;
+  font-size: 12px;
 }
 
 .luca-ai-sessions-group-actions {
   display: inline-flex;
   gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s ease;
+}
+
+.luca-ai-sessions-group-head:hover .luca-ai-sessions-group-actions,
+.luca-ai-sessions-group-head.menu-open .luca-ai-sessions-group-actions,
+.luca-ai-sessions-group-head:focus-within .luca-ai-sessions-group-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.luca-ai-sessions-folder-menu {
+  position: relative;
+}
+
+.luca-ai-sessions-folder-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 50;
+  min-width: 168px;
+  padding: 6px;
+  border: 1px solid var(--l-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--l-panel) 96%, #000 4%);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.luca-ai-sessions-folder-dropdown button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--l-text);
+  font-size: 12px;
+  text-align: left;
+}
+
+.luca-ai-sessions-folder-dropdown button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.luca-ai-sessions-folder-dropdown button.danger {
+  color: var(--l-error, #ff7b7b);
 }
 
 .luca-ai-sessions-empty {
   margin: 0;
-  padding: 8px 10px;
+  padding: 8px 10px 8px 28px;
   color: var(--l-text-ghost);
   font-size: 12px;
 }
@@ -858,13 +1028,33 @@
   gap: 6px;
   border: 1px solid transparent;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
+  background: transparent;
   padding: 4px;
+}
+
+.luca-ai-session-row:hover {
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .luca-ai-session-row.active {
   border-color: color-mix(in srgb, var(--l-gold) 45%, transparent);
   background: var(--l-gold-soft);
+}
+
+.luca-ai-session-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s ease;
+}
+
+.luca-ai-session-row:hover .luca-ai-session-tools,
+.luca-ai-session-row:focus-within .luca-ai-session-tools,
+.luca-ai-session-row.active .luca-ai-session-tools {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .luca-ai-session-main {
@@ -899,12 +1089,6 @@
 
 .luca-ai-session-row.active .luca-ai-session-dot {
   background: var(--l-gold-bright);
-}
-
-.luca-ai-session-tools {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
 }
 
 .luca-ai-session-tools select {

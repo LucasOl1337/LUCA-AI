@@ -1,14 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Folder,
   FolderPlus,
   Loader2,
   MessageSquarePlus,
+  MoreHorizontal,
+  Pencil,
   SquarePen,
   Trash2,
   X,
 } from 'lucide-react';
 import type { LucaAiChatFolder, LucaAiChatSessionSummary } from '@/lib/types';
-import { useTheme } from '@/hooks/useTheme';
 
 interface ChatSessionsPanelProps {
   open: boolean;
@@ -21,6 +23,7 @@ interface ChatSessionsPanelProps {
   onActivateSession: (sessionId: string) => void;
   onDeleteSession: (sessionId: string) => void;
   onCreateFolder: (name: string) => void;
+  onRenameFolder?: (folderId: string, name: string) => void;
   onDeleteFolder: (folderId: string) => void;
   onMoveSession: (sessionId: string, folderId: string | null) => void;
 }
@@ -36,11 +39,14 @@ export default function ChatSessionsPanel({
   onActivateSession,
   onDeleteSession,
   onCreateFolder,
+  onRenameFolder,
   onDeleteFolder,
   onMoveSession,
 }: ChatSessionsPanelProps) {
-  const theme = useTheme();
   const [folderName, setFolderName] = useState('');
+  const [menuFolderId, setMenuFolderId] = useState<string | null>(null);
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   const rootSessions = useMemo(
     () => sessions.filter((session) => !session.folderId),
@@ -54,6 +60,20 @@ export default function ChatSessionsPanel({
     if (!name || busy) return;
     onCreateFolder(name);
     setFolderName('');
+  }
+
+  function startRename(folderId: string, currentName: string) {
+    setMenuFolderId(null);
+    setRenamingFolderId(folderId);
+    setRenameValue(currentName);
+  }
+
+  function commitRename() {
+    const id = renamingFolderId;
+    const name = renameValue.trim();
+    setRenamingFolderId(null);
+    if (!id || !name || !onRenameFolder) return;
+    onRenameFolder(id, name);
   }
 
   return (
@@ -103,28 +123,56 @@ export default function ChatSessionsPanel({
         <div className="luca-ai-sessions-scroll">
           {folders.map((folder) => {
             const children = sessions.filter((session) => session.folderId === folder.id);
+            const isRenaming = renamingFolderId === folder.id;
             return (
               <section key={folder.id} className="luca-ai-sessions-group">
-                <div className="luca-ai-sessions-group-head">
-                  <strong>{folder.name}</strong>
+                <div className={`luca-ai-sessions-group-head ${menuFolderId === folder.id ? 'menu-open' : ''}`}>
+                  {isRenaming ? (
+                    <input
+                      className="luca-ai-sessions-folder-rename"
+                      value={renameValue}
+                      onChange={(event) => setRenameValue(event.target.value)}
+                      onBlur={commitRename}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          commitRename();
+                        }
+                        if (event.key === 'Escape') {
+                          event.preventDefault();
+                          setRenamingFolderId(null);
+                        }
+                      }}
+                      disabled={busy}
+                      autoFocus
+                    />
+                  ) : (
+                    <strong className="luca-ai-sessions-folder-label">
+                      <Folder className="h-3.5 w-3.5" />
+                      {folder.name}
+                    </strong>
+                  )}
                   <div className="luca-ai-sessions-group-actions">
+                    <PanelFolderMenu
+                      open={menuFolderId === folder.id}
+                      busy={busy}
+                      canRename={Boolean(onRenameFolder)}
+                      onToggle={() => setMenuFolderId((prev) => (prev === folder.id ? null : folder.id))}
+                      onClose={() => setMenuFolderId(null)}
+                      onRename={() => startRename(folder.id, folder.name)}
+                      onRemove={() => {
+                        setMenuFolderId(null);
+                        onDeleteFolder(folder.id);
+                      }}
+                    />
                     <button
                       type="button"
-                      className="luca-ai-sessions-icon-btn accent"
+                      className="luca-ai-sessions-icon-btn"
                       title="Nova sessão nesta pasta"
                       disabled={busy}
                       onClick={() => onCreateSession(folder.id)}
                     >
                       <SquarePen className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      className="luca-ai-sessions-icon-btn danger"
-                      title="Apagar pasta"
-                      disabled={busy}
-                      onClick={() => onDeleteFolder(folder.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
@@ -150,12 +198,12 @@ export default function ChatSessionsPanel({
 
           <section className="luca-ai-sessions-group">
             <div className="luca-ai-sessions-group-head">
-              <strong style={{ color: theme.textSoft }}>Sem pasta</strong>
+              <strong className="luca-ai-sessions-folder-label mute">Recentes</strong>
               <div className="luca-ai-sessions-group-actions">
                 <button
                   type="button"
-                  className="luca-ai-sessions-icon-btn accent"
-                  title="Nova sessão sem pasta"
+                  className="luca-ai-sessions-icon-btn"
+                  title="Nova sessão"
                   disabled={busy}
                   onClick={() => onCreateSession(null)}
                 >
@@ -164,7 +212,7 @@ export default function ChatSessionsPanel({
               </div>
             </div>
             {rootSessions.length === 0 ? (
-              <p className="luca-ai-sessions-empty">Nenhuma sessão solta</p>
+              <p className="luca-ai-sessions-empty">Nenhum chat</p>
             ) : (
               rootSessions.map((session) => (
                 <SessionRow
@@ -182,6 +230,72 @@ export default function ChatSessionsPanel({
           </section>
         </div>
       </aside>
+    </div>
+  );
+}
+
+function PanelFolderMenu({
+  open,
+  busy,
+  canRename,
+  onToggle,
+  onClose,
+  onRename,
+  onRemove,
+}: {
+  open: boolean;
+  busy: boolean;
+  canRename: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  onRename: () => void;
+  onRemove: () => void;
+}) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    function onDoc(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) onClose();
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') onClose();
+    }
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open, onClose]);
+
+  return (
+    <div className="luca-ai-sessions-folder-menu" ref={rootRef}>
+      <button
+        type="button"
+        className="luca-ai-sessions-icon-btn"
+        title="Mais opções"
+        disabled={busy}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        <MoreHorizontal className="h-3.5 w-3.5" />
+      </button>
+      {open && (
+        <div className="luca-ai-sessions-folder-dropdown" role="menu">
+          {canRename && (
+            <button type="button" role="menuitem" disabled={busy} onClick={onRename}>
+              <Pencil className="h-3.5 w-3.5" />
+              Editar projeto
+            </button>
+          )}
+          <button type="button" role="menuitem" className="danger" disabled={busy} onClick={onRemove}>
+            <Trash2 className="h-3.5 w-3.5" />
+            Remover
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -206,7 +320,6 @@ function SessionRow({
   return (
     <div className={`luca-ai-session-row ${active ? 'active' : ''}`}>
       <button type="button" className="luca-ai-session-main" disabled={busy} onClick={onActivate}>
-        <span className="luca-ai-session-dot" aria-hidden />
         <span className="min-w-0 flex-1 text-left">
           <strong className="block truncate">{session.title || 'Sem título'}</strong>
           <small className="block truncate">
@@ -223,7 +336,7 @@ function SessionRow({
             value={session.folderId || ''}
             onChange={(event) => onMove(event.target.value || null)}
           >
-            <option value="">Sem pasta</option>
+            <option value="">Recentes</option>
             {folders.map((folder) => (
               <option key={folder.id} value={folder.id}>{folder.name}</option>
             ))}

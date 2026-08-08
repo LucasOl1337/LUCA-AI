@@ -28,6 +28,7 @@ interface ChatLibraryContextValue {
   activateSession: (sessionId: string) => Promise<LucaAiChatSession | null>;
   deleteSession: (sessionId: string) => Promise<LucaAiChatSession | null>;
   createFolder: (name: string) => Promise<void>;
+  renameFolder: (folderId: string, name: string) => Promise<void>;
   deleteFolder: (folderId: string) => Promise<void>;
   moveSession: (sessionId: string, folderId: string | null) => Promise<void>;
   persistSession: (sessionId: string, patch: Record<string, unknown>) => Promise<void>;
@@ -204,6 +205,22 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
     }
   }, [applySnapshot]);
 
+  const renameFolder = useCallback(async (folderId: string, name: string) => {
+    const id = String(folderId || '').trim();
+    const nextName = String(name || '').trim();
+    if (!id || !nextName || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const data = await lucaApi.renameChatFolder(id, nextName);
+      applySnapshot(data, { replaceSessionOrder: false, setActive: false });
+    } catch (err) {
+      setError(buildApiErrorMessage(err, 'Falha ao renomear pasta.'));
+    } finally {
+      setBusy(false);
+    }
+  }, [applySnapshot, busy]);
+
   const deleteFolder = useCallback(async (folderId: string) => {
     if (!folderId || busy) return;
     setBusy(true);
@@ -279,6 +296,7 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
     activateSession,
     deleteSession,
     createFolder,
+    renameFolder,
     deleteFolder,
     moveSession,
     persistSession,
@@ -298,6 +316,7 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
     persistSession,
     ready,
     refresh,
+    renameFolder,
     sessions,
   ]);
 
