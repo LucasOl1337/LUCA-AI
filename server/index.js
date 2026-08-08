@@ -152,6 +152,14 @@ import {
 } from './persona-team.js';
 import { createPersonaRunJobStore } from './persona-run-jobs.js';
 import {
+  MAX_CHAT_ATTACHMENT_BYTES,
+  deleteAllChatAttachments,
+  deleteChatAttachment,
+  getChatAttachment,
+  resolveChatAttachmentsForModel,
+  storeChatAttachment,
+} from './chat-attachments.js';
+import {
   createTeamTemplate,
   deleteTeamTemplate,
   getTeamTemplatesSnapshot,
@@ -1927,7 +1935,7 @@ function appendLucaAiTraceEvent(traceId, type, payload = {}) {
   }
 }
 
-async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, workflowRole = null, accumulatedContext = '', independent = false, traceId = null }) {
+async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, workflowRole = null, accumulatedContext = '', independent = false, attachments = [], traceId = null }) {
   const name = loaded.name || slug;
   const model = loaded.model || ROUTER_MODEL;
   const prompt = buildPersonaTeamPrompt({
@@ -1962,6 +1970,7 @@ async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, wo
       system: prompt.system,
       user: prompt.user,
       agentId: `luca-ai-team-${slug}`,
+      attachments,
       model,
       maxTokens: 900,
       maxRounds: 3,
@@ -2025,7 +2034,7 @@ async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, wo
   }
 }
 
-export async function runLucaAiIndividualJudge({ slug, mission, replies, loaded, traceId = null }) {
+export async function runLucaAiIndividualJudge({ slug, mission, replies, loaded, attachments = [], traceId = null }) {
   const name = loaded.name || slug;
   const model = loaded.model || ROUTER_MODEL;
   const prompt = buildIndividualJudgePrompt({
@@ -2056,6 +2065,7 @@ export async function runLucaAiIndividualJudge({ slug, mission, replies, loaded,
       system: prompt.system,
       user: prompt.user,
       agentId: `luca-ai-judge-${slug}`,
+      attachments,
       model,
       maxTokens: 1400,
       maxRounds: 3,
@@ -2119,7 +2129,7 @@ export async function runLucaAiIndividualJudge({ slug, mission, replies, loaded,
   }
 }
 
-async function runLucaAiPersonaWorkflow({ mission, workflow, teamNames, loadedBySlug, traceId = null }) {
+async function runLucaAiPersonaWorkflow({ mission, workflow, teamNames, loadedBySlug, attachments = [], traceId = null }) {
   const steps = [];
   const contextSections = [];
 
@@ -2170,6 +2180,7 @@ async function runLucaAiPersonaWorkflow({ mission, workflow, teamNames, loadedBy
         loaded: entry.loaded,
         workflowRole: role,
         accumulatedContext,
+        attachments,
         traceId,
       });
     }));
@@ -2809,8 +2820,59 @@ app.post('/api/luca-ai/chat/sessions/:sessionId/activate', (req, res) => {
 
 app.delete('/api/luca-ai/chat/sessions/:sessionId', (req, res) => {
   try {
+    // Files first: after deleteChatSession the session no longer resolves,
+    // so its directory would be unreachable and leak on disk.
+    deleteAllChatAttachments(req.params.sessionId);
     const result = deleteChatSession(req.params.sessionId);
     res.json({ ok: true, ...result, ...getChatLibrarySnapshot() });
+  } catch (error) {
+    chatLibraryError(res, error);
+  }
+});
+
+// CHAT_ATTACHMENTS_V1 — upload/serve/remove private files of a chat session.
+// Raw body (not multipart) keeps the parser trivial and the size cap enforced
+// by Express itself; the filename travels in a header.
+app.post(
+  '/api/luca-ai/chat/sessions/:sessionId/attachments',
+  express.raw({ type: 'application/octet-stream', limit: MAX_CHAT_ATTACHMENT_BYTES }),
+  (req, res) => {
+    try {
+      const encodedName = String(req.headers['x-file-name'] || 'arquivo');
+      let name = encodedName;
+      try { name = decodeURIComponent(encodedName); } catch { /* keep the raw value */ }
+      const attachment = storeChatAttachment({
+        sessionId: req.params.sessionId,
+        name,
+        mimeType: req.headers['x-file-type'],
+        buffer: req.body,
+      });
+      res.status(201).json({ ok: true, attachment });
+    } catch (error) {
+      chatLibraryError(res, error);
+    }
+  },
+);
+
+app.get('/api/luca-ai/chat/sessions/:sessionId/attachments/:attachmentId', (req, res) => {
+  try {
+    const { meta, buffer } = getChatAttachment(req.params.sessionId, req.params.attachmentId);
+    res.setHeader('Content-Type', meta.mimeType);
+    res.setHeader('Content-Length', String(buffer.length));
+    // Never let an uploaded file execute in the app origin.
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(meta.name)}`);
+    res.send(buffer);
+  } catch (error) {
+    chatLibraryError(res, error);
+  }
+});
+
+app.delete('/api/luca-ai/chat/sessions/:sessionId/attachments/:attachmentId', (req, res) => {
+  try {
+    res.json(deleteChatAttachment(req.params.sessionId, req.params.attachmentId));
   } catch (error) {
     chatLibraryError(res, error);
   }
@@ -2933,6 +2995,13 @@ async function ensureCatalogPersonaCached(slug, catalogBySlug) {
 }
 
 async function executeLucaAiPersonaTeamRun(input) {
+  // Resolve BEFORE any model call: an unreadable/foreign attachment must fail the
+  // run instead of silently letting personas answer without the file.
+  const resolvedAttachments = input.attachmentIds?.length
+    ? resolveChatAttachmentsForModel(input.sessionId, input.attachmentIds)
+    : [];
+  const attachmentParts = resolvedAttachments.map((attachment) => attachment.part);
+  const attachmentMetadata = resolvedAttachments.map((attachment) => attachment.meta);
   const { personas } = await syncOfficialPersonaRoster();
   const catalogBySlug = new Map(
     (Array.isArray(personas) ? personas : [])
@@ -2990,6 +3059,7 @@ async function executeLucaAiPersonaTeamRun(input) {
       workflow: input.workflow,
       teamNames,
       loadedBySlug,
+      attachments: attachmentParts,
       traceId: input.traceId,
     });
     replies = steps.flatMap((step) => step.replies.map((reply) => ({
@@ -3023,6 +3093,7 @@ async function executeLucaAiPersonaTeamRun(input) {
           teamNames,
           loaded: entry.loaded,
           independent: true,
+          attachments: attachmentParts,
           traceId: input.traceId,
         });
       },
@@ -3045,6 +3116,7 @@ async function executeLucaAiPersonaTeamRun(input) {
           mission: input.mission,
           replies: participantReplies,
           loaded: entry.loaded,
+          attachments: attachmentParts,
           traceId: input.traceId,
         });
       },
@@ -3102,6 +3174,7 @@ async function executeLucaAiPersonaTeamRun(input) {
         mission: input.mission,
         teamNames,
         loaded: entry.loaded,
+        attachments: attachmentParts,
         traceId: input.traceId,
       });
     }));
@@ -3152,6 +3225,7 @@ async function executeLucaAiPersonaTeamRun(input) {
       model: finalDisplayReply.model,
       content: finalDisplayReply.content,
     } : null,
+    attachments: attachmentMetadata,
     startedAt: runStartedAt,
     durationMs,
     generatedAt,
