@@ -126,3 +126,18 @@ test('parseChatCompletionPayload SSE com texto delta continua concatenando conte
   assert.equal(result.toolCalls.length, 0);
   assert.equal(result.finishReason, 'stop');
 });
+
+test('parseChatCompletionPayload SSE valido sem texto degrada em vez de estourar', () => {
+  // Claude pode gastar o orcamento no bloco de raciocinio e fechar com
+  // finish_reason=length sem nenhum delta de conteudo. Antes isso vazava um
+  // "Unexpected token 'd'" — erro de JSON enganoso para quem le o log.
+  const sse = [
+    'data: {"choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}',
+    'data: {"choices":[{"index":0,"delta":{},"finish_reason":"length"}],"usage":{"total_tokens":3278}}',
+  ].join('\n\n');
+
+  const result = parseChatCompletionPayload(sse);
+  assert.equal(result.content, '');
+  assert.equal(result.toolCalls.length, 0);
+  assert.equal(result.finishReason, 'length');
+});
