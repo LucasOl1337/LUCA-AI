@@ -35,6 +35,25 @@ function summarizeToolResult(result) {
       result.data ? `data=${JSON.stringify(result.data).slice(0, 1600)}` : `raw=${result.rawPreview || ''}`,
     ].filter(Boolean).join('\n');
   }
+  if (result.tool === 'web_search') {
+    const results = Array.isArray(result.results) ? result.results : [];
+    return [
+      `query=${result.query || ''}`,
+      `provider=${result.provider || 'unknown'}`,
+      result.ok === false ? `error=${result.error || 'search_failed'}` : null,
+      ...results.map((item, index) => [
+        `${index + 1}. ${String(item?.title || '').slice(0, 240)}`,
+        `url=${String(item?.url || '').slice(0, 500)}`,
+        `snippet=${String(item?.snippet || '').slice(0, 500)}`,
+      ].join('\n')),
+    ].filter(Boolean).join('\n').slice(0, 3600);
+  }
+  if (result.tool === 'calc') {
+    return [
+      `expression=${result.expression || ''}`,
+      result.ok === false ? `error=${result.error || 'calc_failed'}` : `value=${result.value}`,
+    ].join('\n').slice(0, 1800);
+  }
   return JSON.stringify(result).slice(0, 1800);
 }
 
@@ -47,33 +66,92 @@ Voce pode e deve usar ferramentas quando a missao depender de fato externo (site
 Ferramentas disponiveis:
 - fetch_url: abre uma URL publica e devolve texto legivel
 - http_get_json: GET JSON publico
+- web_search: pesquisa a web e devolve titulo, URL e trecho dos melhores resultados
+- calc: calcula expressoes aritmeticas com seguranca
 
 Regras:
 1. Se houver URL na missao, use fetch_url antes de concluir.
-2. Nao diga que "nao consegue abrir o site" sem tentar a ferramenta.
-3. Nao invente conteudo de pagina que voce nao leu.
-4. Se a ferramenta falhar, diga o erro real e o que ainda e possivel fazer.
-5. Depois das ferramentas, entregue a resposta final util ao operador.`;
+2. Se a missao depender de fato externo SEM URL conhecida, use web_search primeiro e depois abra as 1-2 melhores fontes com fetch_url.
+3. Para aritmetica nao trivial use calc em vez de calcular de cabeca.
+4. Nao diga que "nao consegue abrir o site" sem tentar a ferramenta.
+5. Nao invente conteudo de pagina que voce nao leu.
+6. Se a ferramenta falhar, diga o erro real e o que ainda e possivel fazer.
+7. Depois das ferramentas, entregue a resposta final util ao operador.`;
+}
+
+const MAX_INLINED_ATTACHMENT_CHARS = 120_000;
+
+/**
+ * Attachment blocks are not portable across the 9Router catalog: Claude silently
+ * ignores `input_file` (persona answers as if no file existed), while images via
+ * `image_url` work everywhere. Text-like files are already plain text on our side,
+ * so we inline them into the prompt — readable by every model — and keep only
+ * images as native multimodal parts.
+ */
+function buildUserContent(user, attachments = []) {
+  const text = String(user || '');
+  const list = Array.isArray(attachments) ? attachments : [];
+  if (!list.length) return text;
+
+  const nativeParts = [];
+  const inlined = [];
+  for (const part of list) {
+    if (part?.type === 'image_url') {
+      nativeParts.push(part);
+      continue;
+    }
+    const fileData = String(part?.file_data || part?.file?.file_data || '');
+    const filename = String(part?.filename || part?.file?.filename || 'arquivo');
+    const base64 = fileData.includes(',') ? fileData.slice(fileData.indexOf(',') + 1) : '';
+    if (!base64) continue;
+    let decoded = '';
+    try {
+      decoded = Buffer.from(base64, 'base64').toString('utf8');
+    } catch {
+      decoded = '';
+    }
+    if (!decoded.trim() || decoded.includes('\u0000')) {
+      // Binary we cannot read as text (e.g. PDF): say so instead of faking content.
+      inlined.push(`### Anexo: ${filename}\n[conteúdo binário não extraído; peça ao operador o texto se precisar]`);
+      continue;
+    }
+    inlined.push(`### Anexo: ${filename}\n${decoded.slice(0, MAX_INLINED_ATTACHMENT_CHARS)}`);
+  }
+
+  if (!nativeParts.length && !inlined.length) return text;
+  const merged = inlined.length
+    ? `${text}\n\n--- Arquivos anexados pelo operador ---\n${inlined.join('\n\n')}`
+    : text;
+  if (!nativeParts.length) return merged;
+  return [{ type: 'text', text: merged }, ...nativeParts];
 }
 
 export async function runAgentWithTools({
   system,
   user,
+  attachments = [],
   model,
   agentId,
   maxTokens = 1200,
   maxRounds = DEFAULT_MAX_ROUNDS,
+  toolsEnabled = true,
   tools = AGENT_TOOL_SPECS,
   executeTool = executeAgentTool,
   callChat = call9RouterChat,
 } = {}) {
   const messages = [
-    { role: 'system', content: `${String(system || '').trim()}${buildOperationalSystemAddon()}` },
-    { role: 'user', content: String(user || '') },
+    {
+      role: 'system',
+      content: `${String(system || '').trim()}${toolsEnabled ? buildOperationalSystemAddon() : ''}`,
+    },
+    {
+      role: 'user',
+      content: buildUserContent(user, attachments),
+    },
   ];
 
   const toolTrace = [];
-  const urlsInMission = extractUrlsFromText(user);
+  const urlsInMission = toolsEnabled ? extractUrlsFromText(user) : [];
   let forcedBootstrap = false;
   let continuationUsed = false;
 
@@ -82,13 +160,12 @@ export async function runAgentWithTools({
       model,
       agentId: `${agentId}:r${round}`,
       messages,
-      tools,
-      toolChoice: 'auto',
       maxTokens,
       temperature: 0.2,
+      ...(toolsEnabled ? { tools, toolChoice: 'auto' } : {}),
     });
 
-    const toolCalls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
+    const toolCalls = toolsEnabled && Array.isArray(response.toolCalls) ? response.toolCalls : [];
     if (toolCalls.length) {
       messages.push({
         role: 'assistant',

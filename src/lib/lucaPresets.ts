@@ -25,6 +25,7 @@ export interface LucaTeamPreset {
   icon: LucideIcon;
   iconId?: LucaPresetIconId | string;
   assignments: Record<LucaTeamPresetRoleId, string[]>;
+  models?: Record<string, string>;
 }
 
 export interface LucaIndividualPreset {
@@ -35,6 +36,7 @@ export interface LucaIndividualPreset {
   iconId?: LucaPresetIconId | string;
   participants: string[];
   judge: string;
+  models?: Record<string, string>;
 }
 
 export const PRESET_ICON_MAP: Record<string, LucideIcon> = {
@@ -61,6 +63,7 @@ function hydrateTeam(seed: (typeof LUCA_TEAM_PRESET_SEED)[number]): LucaTeamPres
     iconId: seed.icon,
     icon: resolvePresetIcon(seed.icon),
     assignments: seed.assignments as Record<LucaTeamPresetRoleId, string[]>,
+    models: seed.models,
   };
 }
 
@@ -73,6 +76,7 @@ function hydrateIndividual(seed: (typeof LUCA_INDIVIDUAL_PRESET_SEED)[number]): 
     icon: resolvePresetIcon(seed.icon),
     participants: seed.participants,
     judge: seed.judge,
+    models: seed.models,
   };
 }
 
@@ -86,6 +90,7 @@ export function hydrateTeamTemplate(raw: {
   description?: string;
   icon?: string;
   assignments: Partial<Record<LucaTeamPresetRoleId, string[]>> | Record<string, string[]>;
+  models?: Record<string, string>;
 }): LucaTeamPreset {
   return {
     id: raw.id,
@@ -100,6 +105,7 @@ export function hydrateTeamTemplate(raw: {
       approval: raw.assignments?.approval ?? [],
       display: raw.assignments?.display ?? [],
     },
+    models: raw.models,
   };
 }
 
@@ -110,6 +116,7 @@ export function hydrateIndividualTemplate(raw: {
   icon?: string;
   participants: string[];
   judge: string | null;
+  models?: Record<string, string>;
 }): LucaIndividualPreset {
   return {
     id: raw.id,
@@ -119,6 +126,7 @@ export function hydrateIndividualTemplate(raw: {
     icon: resolvePresetIcon(raw.icon),
     participants: Array.isArray(raw.participants) ? raw.participants : [],
     judge: String(raw.judge || ''),
+    models: raw.models,
   };
 }
 

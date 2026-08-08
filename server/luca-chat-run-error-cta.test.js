@@ -11,7 +11,9 @@ const source = readFileSync(join(root, '../src/pages/LucaAiPage.tsx'), 'utf8');
 test('runMission keeps mission draft until successful completion', () => {
   const start = source.indexOf('async function runMission()');
   assert.ok(start >= 0, 'runMission present');
-  const slice = source.slice(start, start + 5200);
+  const end = source.indexOf('const activeTeamPresetId', start);
+  assert.ok(end > start, 'runMission end marker present');
+  const slice = source.slice(start, end);
   assert.ok(slice.includes("setErrorRetry('run')") || slice.includes('setErrorRetry("run")'), 'run failure marks retry kind');
   assert.ok(slice.includes('if (!data.ok)'), 'errors only when run is not ok');
   // Mission draft must survive success so the original question stays visible in session.

@@ -1,0 +1,79 @@
+{
+  "product": "LUCA-AI",
+  "slug": "LUCA-AI",
+  "ts": "20260801T212326Z",
+  "status": "draft_only_keyframes_no_mp4",
+  "version": "0.2.0",
+  "duration_per_shot_s": 6,
+  "shot_count": 5,
+  "video_tool": null,
+  "image_backend": "xai/grok-imagine-image via 9Router :20129",
+  "medium": "desktop_saas_agent_mission_panel",
+  "tagline": "Sua missão. Uma equipe inteira.",
+  "domain": "app.luca-ai.com.br",
+  "palette": {
+    "void": "#090c11",
+    "action": "#0a84ff",
+    "highlight": "#64d2ff",
+    "alive": "#30d158"
+  },
+  "beats": [
+    {
+      "id": "shot-01",
+      "beat": "HOOK — uma missão · cinco conversas · zero fim",
+      "aspect": "16:9",
+      "duration_s": 6,
+      "keyframe": "keyframes/shot-01-keyframe.jpg",
+      "ref_truth": ["refs/00-auth.png", "refs/01-home.png"],
+      "on_screen_pt": "UMA MISSÃO · cinco conversas · zero fim",
+      "narration_pt": "Uma missão. Cinco conversas. Nenhuma conclusão.",
+      "motion_prompt_file": "motion-prompts.md#shot-01"
+    },
+    {
+      "id": "shot-02",
+      "beat": "PROOF — expertise = persona (grade Yume)",
+      "aspect": "9:16",
+      "duration_s": 6,
+      "keyframe": "keyframes/shot-02-keyframe.jpg",
+      "ref_truth": ["refs/02-personas.png"],
+      "on_screen_pt": "Expertise não é aba",
+      "narration_pt": "No chat genérico você escolhe modelo. No LUCA você escolhe quem pensa.",
+      "motion_prompt_file": "motion-prompts.md#shot-02"
+    },
+    {
+      "id": "shot-03",
+      "beat": "VALUE — Fluxo 5/5 cada etapa tem dono",
+      "aspect": "16:9",
+      "duration_s": 6,
+      "keyframe": "keyframes/shot-03-keyframe.jpg",
+      "ref_truth": ["refs/03-team-flow.png"],
+      "on_screen_pt": "5/5 · cada etapa tem dono",
+      "narration_pt": "Supervisor, Decisor, Executores, Aprovação, Exibição — cada etapa com dono.",
+      "motion_prompt_file": "motion-prompts.md#shot-03"
+    },
+    {
+      "id": "shot-04",
+      "beat": "REVEAL — missão entra → entrega sai",
+      "aspect": "16:9",
+      "duration_s": 6,
+      "keyframe": "keyframes/shot-04-keyframe.jpg",
+      "ref_truth": ["refs/04-mission-ready.png", "refs/05-delivery.png"],
+      "on_screen_pt": "UMA MISSÃO ENTRA → UMA ENTREGA SAI",
+      "narration_pt": "Uma missão entra. A equipe trabalha. A decisão chega em uma conversa só.",
+      "motion_prompt_file": "motion-prompts.md#shot-04"
+    },
+    {
+      "id": "shot-05",
+      "beat": "CLOSE — tagline + coruja",
+      "aspect": "16:9",
+      "duration_s": 6,
+      "keyframe": "keyframes/shot-05-keyframe.jpg",
+      "ref_truth": ["refs/cyber-owl.jpg", "refs/icon-512.png"],
+      "on_screen_pt": "Sua missão. Uma equipe inteira.",
+      "narration_pt": "LUCA-AI. Sua missão. Uma equipe inteira.",
+      "motion_prompt_file": "motion-prompts.md#shot-05"
+    }
+  ],
+  "concat_target": "concat.txt",
+  "note": "Sem mp4 neste tick. Após gerar clips no Grok Imagine Video, renomear para shot-01.mp4… e montar com ffmpeg -f concat."
+}

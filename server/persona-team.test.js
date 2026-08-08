@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 
 import {
   buildIndividualJudgePrompt,
+  buildIndividualRevisionPrompt,
   buildPersonaTeamPrompt,
   cleanPersonaTeamOutput,
+  DEPTH_BUDGETS,
   normalizePersonaTeamRunInput,
   normalizePersonaTeamSlug,
   runIndividualResolution,
@@ -160,6 +162,27 @@ test('normalizePersonaTeamRunInput aceita resolucao individual com ate cinco par
   assert.deepEqual(input.slugs, ['aurora', 'maestro', 'designer', 'qa', 'pesquisador']);
   assert.equal(input.judgeSlug, 'aurora');
   assert.deepEqual(input.workflow, []);
+  assert.equal(input.depth, 1);
+});
+
+test('normalizePersonaTeamRunInput aceita somente profundidades 1, 2 e 3', () => {
+  const base = {
+    mission: 'Comparar propostas',
+    mode: 'individual',
+    slugs: ['aurora'],
+    judgeSlug: 'maestro',
+  };
+
+  assert.equal(normalizePersonaTeamRunInput({ ...base, depth: 2 }).depth, 2);
+  assert.equal(normalizePersonaTeamRunInput({ ...base, depth: 3 }).depth, 3);
+  for (const depth of [0, 4, 2.5, '2', null, undefined]) {
+    assert.equal(normalizePersonaTeamRunInput({ ...base, depth }).depth, 1);
+  }
+  assert.deepEqual(DEPTH_BUDGETS, {
+    1: { participant: 1100, judge: 1600 },
+    2: { participant: 3000, judge: 4000 },
+    3: { participant: 20000, judge: 20000 },
+  });
 });
 
 test('normalizePersonaTeamRunInput exige juiz na resolucao individual', () => {
@@ -291,6 +314,27 @@ test('buildIndividualJudgePrompt pede resposta livre antes da estrutura final', 
   );
 });
 
+test('buildIndividualRevisionPrompt pede replica objetiva sem expor identidades alheias', () => {
+  const prompt = buildIndividualRevisionPrompt({
+    mission: 'Escolher a melhor estrategia',
+    personaName: 'Aurora',
+    personaSlug: 'aurora',
+    systemPrompt: 'Voce questiona premissas.',
+    runtimeModel: 'cx/gpt-5.6-sol-high',
+    originalReply: { ok: true, content: 'Minha proposta original.' },
+    contributions: [
+      { label: 'Contribuicao B', ok: true, content: 'Evidencia contraria.' },
+    ],
+  });
+
+  assert.match(prompt.system, /Voce recebera contribuicoes anonimas/i);
+  assert.match(prompt.system, /Nao presuma autoridade por estilo/i);
+  assert.match(prompt.user, /Minha proposta original/);
+  assert.match(prompt.user, /Contribuicao B/);
+  assert.match(prompt.user, /o que mantem, o que muda/i);
+  assert.doesNotMatch(prompt.user, /maestro|grok/i);
+});
+
 test('runIndividualResolution isola participantes e chama o juiz depois de reunir todas as respostas', async () => {
   const participantInputs = [];
   const result = await runIndividualResolution({
@@ -311,6 +355,58 @@ test('runIndividualResolution isola participantes e chama o juiz depois de reuni
   assert.deepEqual(participantInputs, [{ slug: 'aurora' }, { slug: 'maestro' }]);
   assert.equal(result.replies.length, 2);
   assert.equal(result.judge.content, 'veredito consolidado');
+  assert.equal(result.blindReplies, undefined);
+});
+
+test('runIndividualResolution no nivel 2 anonimiza replicas e entrega revisoes ao juiz', async () => {
+  const revisions = [];
+  const originalBySlug = {
+    aurora: { ok: true, slug: 'aurora', name: 'Aurora', model: 'cx/gpt-5.6-sol-high', content: 'Resposta da Aurora.' },
+    maestro: { ok: true, slug: 'maestro', name: 'Maestro', model: 'gcli/grok-4.5', content: 'Eu, Maestro, prefiro o motor gcli/grok-4.5.' },
+    qa: { ok: true, slug: 'qa', name: 'QA', model: 'cx/gpt-5.5-xhigh', content: 'Resposta de QA.' },
+  };
+  const result = await runIndividualResolution({
+    depth: 2,
+    participantSlugs: ['aurora', 'maestro', 'qa'],
+    judgeSlug: 'juiz',
+    runParticipant: async ({ slug }) => originalBySlug[slug],
+    runRevision: async (input) => {
+      revisions.push(input);
+      return { ...input.originalReply, content: `Revisao de ${input.slug}` };
+    },
+    runJudge: async ({ replies }) => {
+      assert.deepEqual(replies.map((reply) => reply.content), [
+        'Revisao de aurora',
+        'Revisao de maestro',
+        'Revisao de qa',
+      ]);
+      return { ok: true, slug: 'juiz', content: 'Veredito' };
+    },
+  });
+
+  assert.deepEqual(revisions.map(({ slug, contributions }) => ({
+    slug,
+    labels: contributions.map((item) => item.label),
+  })), [
+    { slug: 'aurora', labels: ['Contribuicao B', 'Contribuicao C'] },
+    { slug: 'maestro', labels: ['Contribuicao A', 'Contribuicao C'] },
+    { slug: 'qa', labels: ['Contribuicao A', 'Contribuicao B'] },
+  ]);
+  for (const revision of revisions) {
+    const serialized = JSON.stringify(revision.contributions).toLowerCase();
+    for (const otherSlug of Object.keys(originalBySlug).filter((slug) => slug !== revision.slug)) {
+      const other = originalBySlug[otherSlug];
+      assert.equal(serialized.includes(other.slug.toLowerCase()), false);
+      assert.equal(serialized.includes(other.name.toLowerCase()), false);
+      assert.equal(serialized.includes(other.model.toLowerCase()), false);
+    }
+  }
+  assert.deepEqual(result.blindReplies, Object.values(originalBySlug));
+  assert.deepEqual(result.replies.map((reply) => reply.content), [
+    'Revisao de aurora',
+    'Revisao de maestro',
+    'Revisao de qa',
+  ]);
 });
 
 test('cleanPersonaTeamOutput remove tags de chat herdadas do runtime antigo', () => {

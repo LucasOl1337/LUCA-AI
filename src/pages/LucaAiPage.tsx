@@ -7,10 +7,12 @@ import {
   ChevronDown,
   ClipboardCheck,
   Eye,
+  FileText,
   GitBranch,
   Link2,
   Loader2,
   MessageSquareText,
+  Paperclip,
   Play,
   Plus,
   RefreshCw,
@@ -28,9 +30,12 @@ import {
 } from 'lucide-react';
 import { buildApiErrorMessage, lucaApi } from '@/lib/api';
 import type {
+  LucaAiChatAttachment,
   LucaAiChatSession,
   LucaAiChatSessionShare,
+  LucaAiIndividualDepth,
   LucaAiPersonaTeamReply,
+  LucaAiPersonaTeamPhase,
   LucaAiPersonaTeamRunResponse,
   LucaAiWorkflowAssignment,
   RouterModelProfile,
@@ -58,7 +63,6 @@ const MAX_EXECUTORS = 4;
 const LUCA_AI_CLEAN_UI_VERSION = 'session-isolation-v2';
 const LUCA_AI_CLEAN_UI_STORAGE_KEY = 'luca.lucaAi.cleanUiVersion';
 const LUCA_AI_ENTRY_MODE_STORAGE_KEY = 'luca.lucaAi.entryMode';
-
 const LUCA_AI_LEGACY_LOCAL_KEYS = [
   'luca.lucaAi.operationMode',
   'luca.lucaAi.workflowAssignments',
@@ -75,6 +79,10 @@ interface LucaAiPageProps {
 
 type TranscriptRole = 'operator' | 'persona' | 'system';
 type OperationMode = 'team' | 'individual';
+type WorkflowRoleId = 'supervisor' | 'mission' | 'execution' | 'approval' | 'display';
+type WorkflowAssignments = Record<WorkflowRoleId, string[]>;
+type IndividualPickerId = 'participants' | 'judge';
+type PickerTarget = { mode: 'team'; id: WorkflowRoleId } | { mode: 'individual'; id: IndividualPickerId };
 
 function consumeEntryMode(): OperationMode | null {
   try {
@@ -85,12 +93,6 @@ function consumeEntryMode(): OperationMode | null {
     return null;
   }
 }
-
-
-type WorkflowRoleId = 'supervisor' | 'mission' | 'execution' | 'approval' | 'display';
-type WorkflowAssignments = Record<WorkflowRoleId, string[]>;
-type IndividualPickerId = 'participants' | 'judge';
-type PickerTarget = { mode: 'team'; id: WorkflowRoleId } | { mode: 'individual'; id: IndividualPickerId };
 
 interface IndividualAssignments {
   participants: string[];
@@ -116,9 +118,11 @@ interface TeamTranscriptEntry {
   slug?: string;
   model?: string;
   stage?: string;
+  phase?: LucaAiPersonaTeamPhase;
   content: string;
   status?: 'ok' | 'error' | 'info';
   timestamp: string;
+  attachments?: LucaAiChatAttachment[];
 }
 
 type MessageBlock =
@@ -145,6 +149,18 @@ const WORKFLOW_ROLES: WorkflowRoleConfig[] = [
 const INDIVIDUAL_PICKER_CONFIGS: Record<IndividualPickerId, PersonaPickerConfig> = {
   participants: { id: 'participants', label: 'Participantes', icon: Users, multiple: true, maxSlugs: 5 },
   judge: { id: 'judge', label: 'Juiz', icon: Scale, multiple: false, maxSlugs: 1 },
+};
+
+const INDIVIDUAL_DEPTH_OPTIONS: Array<{ value: LucaAiIndividualDepth; label: string; description: string }> = [
+  { value: 1, label: '1 Padrão', description: 'Respostas cegas e decisão do juiz.' },
+  { value: 2, label: '2 Deliberação', description: 'Inclui revisão anônima antes do juiz.' },
+  { value: 3, label: '3 Máx.', description: 'Mesmo protocolo, com orçamento máximo.' },
+];
+
+const INDIVIDUAL_PHASE_LABELS: Record<LucaAiPersonaTeamPhase, string> = {
+  blind: 'Cega',
+  revision: 'Revisão',
+  judge: 'Juiz',
 };
 
 const ROLE_LABEL_BY_ID = new Map(WORKFLOW_ROLES.map((role) => [role.id, role.label]));
@@ -224,10 +240,44 @@ function nowId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function formatAttachmentSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function AttachmentList({ attachments }: { attachments?: LucaAiChatAttachment[] }) {
+  if (!attachments?.length) return null;
+  return (
+    <div className="luca-ai-message-attachments">
+      {attachments.map((attachment) => (
+        <a
+          key={attachment.id}
+          href={attachment.url}
+          target="_blank"
+          rel="noreferrer"
+          className="luca-ai-attachment"
+        >
+          {attachment.kind === 'image' ? (
+            <img src={attachment.url} alt={attachment.name} className="luca-ai-attachment-thumb" />
+          ) : (
+            <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
+          )}
+          <span className="min-w-0 flex-1">
+            <strong>{attachment.name}</strong>
+            <small>{formatAttachmentSize(attachment.size)}</small>
+          </span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
 function transcriptEntryFromReply(
   reply: LucaAiPersonaTeamReply,
   timestamp: string,
   stage?: string,
+  phase: LucaAiPersonaTeamPhase | undefined = reply.phase,
 ): TeamTranscriptEntry {
   return {
     id: nowId(`persona-${reply.slug}`),
@@ -236,6 +286,7 @@ function transcriptEntryFromReply(
     slug: reply.slug,
     model: reply.model,
     stage,
+    phase,
     content: reply.ok
       ? reply.content || 'Sem resposta textual da persona.'
       : `Falha ao rodar esta persona: ${reply.error || 'erro desconhecido'}`,
@@ -248,7 +299,7 @@ function transcriptEntriesFromResponse(data: LucaAiPersonaTeamRunResponse): Team
   const timestamp = data.generatedAt || new Date().toISOString();
   if (data.steps?.length) {
     return data.steps.flatMap((step) => (
-      step.replies.map((reply) => transcriptEntryFromReply(reply, timestamp, step.roleLabel))
+      step.replies.map((reply) => transcriptEntryFromReply(reply, timestamp, step.roleLabel, reply.phase || step.phase))
     ));
   }
   return (data.replies ?? []).map((reply) => transcriptEntryFromReply(reply, timestamp, reply.workflowRoleLabel));
@@ -521,7 +572,10 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const [operationMode, setOperationMode] = useState<OperationMode>('team');
   const [workflowState, setWorkflowState] = useState<WorkflowAssignments>(createEmptyWorkflowAssignments());
   const [individualState, setIndividualState] = useState<IndividualAssignments>(createEmptyIndividualAssignments());
+  const [individualDepth, setIndividualDepth] = useState<LucaAiIndividualDepth>(1);
   const [mission, setMission] = useState<string>('');
+  const [draftAttachments, setDraftAttachments] = useState<LucaAiChatAttachment[]>([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [transcript, setTranscript] = useState<TeamTranscriptEntry[]>([]);
   const [finalResult, setFinalResult] = useState<TeamTranscriptEntry | null>(null);
   const [query, setQuery] = useState('');
@@ -544,6 +598,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const [shareError, setShareError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [hydratedSessionId, setHydratedSessionId] = useState<string | null>(null);
   const persistTimerRef = useRef<number | null>(null);
   const latestPersistRef = useRef<{
@@ -617,6 +672,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       boundSessionIdRef.current = null;
       setHydratedSessionId(null);
       setMission('');
+      setDraftAttachments([]);
       setTranscript([]);
       setFinalResult(null);
       return;
@@ -629,6 +685,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       judge: session.individualAssignments?.judge ? String(session.individualAssignments.judge) : null,
     });
     setMission(String(session.missionDraft || ''));
+    setDraftAttachments(Array.isArray(session.draftAttachments) ? session.draftAttachments.slice(0, 4) : []);
     const nextTranscript = ((Array.isArray(session.transcript) ? session.transcript : []) as unknown[])
       .filter(isTeamTranscriptEntry);
     setTranscript(nextTranscript);
@@ -667,6 +724,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     workflowAssignments: assignments,
     individualAssignments,
     missionDraft: mission,
+    draftAttachments,
     transcript,
     finalResult,
     activePersonaSlug,
@@ -674,6 +732,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   }), [
     activePersonaSlug,
     assignments,
+    draftAttachments,
     finalResult,
     individualAssignments,
     mission,
@@ -809,6 +868,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     activeSessionId,
     assignments,
     buildPersistPayload,
+    draftAttachments,
     finalResult,
     hydratedSessionId,
     individualAssignments,
@@ -923,9 +983,54 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     });
   }, [loading, personas, setIndividualState]);
 
-  const canRun = mission.trim().length > 0
+  const canRun = (mission.trim().length > 0 || draftAttachments.length > 0)
     && (operationMode === 'individual' ? isIndividualReady : isWorkflowReady)
-    && !running;
+    && !running
+    && !uploadingAttachment;
+
+  async function addAttachments(files: FileList | null) {
+    if (!files || !activeSessionId || running || uploadingAttachment) return;
+    const available = Math.max(0, 4 - draftAttachments.length);
+    const selected = Array.from(files).slice(0, available);
+    if (!selected.length) {
+      setError('Você pode anexar até 4 arquivos por mensagem.');
+      setErrorRetry(null);
+      return;
+    }
+    setUploadingAttachment(true);
+    setError(null);
+    setErrorRetry(null);
+    try {
+      const uploaded: LucaAiChatAttachment[] = [];
+      for (const file of selected) {
+        if (file.size > 10 * 1024 * 1024) throw new Error(`${file.name} ultrapassa o limite de 10 MB.`);
+        const data = await lucaApi.uploadChatAttachment(activeSessionId, file, bridgeBase);
+        uploaded.push(data.attachment);
+      }
+      const next = [...draftAttachments, ...uploaded].slice(0, 4);
+      setDraftAttachments(next);
+      flushSessionNow(activeSessionId, { draftAttachments: next });
+    } catch (err) {
+      setError(buildApiErrorMessage(err, 'Falha ao anexar arquivo.'));
+      setErrorRetry(null);
+    } finally {
+      setUploadingAttachment(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  async function removeAttachment(attachment: LucaAiChatAttachment) {
+    if (!activeSessionId || running || uploadingAttachment) return;
+    const next = draftAttachments.filter((item) => item.id !== attachment.id);
+    setDraftAttachments(next);
+    flushSessionNow(activeSessionId, { draftAttachments: next });
+    try {
+      await lucaApi.deleteChatAttachment(activeSessionId, attachment.id, bridgeBase);
+    } catch (err) {
+      setError(buildApiErrorMessage(err, 'Falha ao remover anexo.'));
+      setErrorRetry(null);
+    }
+  }
 
   async function ensurePersonaAvailable(slug: string): Promise<boolean> {
     const persona = personaBySlug.get(slug);
@@ -1136,7 +1241,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   }
 
   async function runMission() {
-    const trimmedMission = mission.trim();
+    const attachmentsToRun = draftAttachments.slice(0, 4);
+    const trimmedMission = mission.trim() || (attachmentsToRun.length ? 'Analise os anexos enviados.' : '');
     const assignmentsToRun = normalizeWorkflowAssignments(assignments);
     const individualToRun = {
       participants: uniqueSlugs(individualAssignments.participants, 5),
@@ -1177,6 +1283,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       content: trimmedMission,
       status: 'info',
       timestamp: startedAt,
+      attachments: attachmentsToRun,
     };
     // Capture next transcript eagerly — setState is async and F5 must not lose the question.
     const transcriptWithOperator = [...transcript, operatorEntry].slice(-100);
@@ -1193,10 +1300,13 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     );
 
     try {
+      const presetModels = operationMode === 'individual'
+        ? individualPresets.find((preset) => individualPresetMatches(individualToRun, preset))?.models
+        : teamPresets.find((preset) => teamPresetMatches(assignmentsToRun, preset))?.models;
       const modelOverrides = Object.fromEntries(
         runPersonas
           .map((slug) => {
-            const model = String(personaBySlug.get(slug)?.model || '').trim();
+            const model = String(presetModels?.[slug] || personaBySlug.get(slug)?.model || '').trim();
             return model ? [slug, model] : null;
           })
           .filter(Boolean) as Array<[string, string]>,
@@ -1209,6 +1319,9 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           traceId,
           bridgeBase,
           modelOverrides,
+          ownerSessionId,
+          attachmentsToRun.map((attachment) => attachment.id),
+          individualDepth,
         )
         : await lucaApi.runLucaAiPersonaTeam(
           trimmedMission,
@@ -1217,12 +1330,12 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           traceId,
           bridgeBase,
           modelOverrides,
+          ownerSessionId,
+          attachmentsToRun.map((attachment) => attachment.id),
         );
       if (!stillOwner()) return;
       if (data.traceId) setActiveTraceId(data.traceId);
-      const nextMessages = operationMode === 'individual'
-        ? (data.replies ?? []).map((reply) => transcriptEntryFromReply(reply, data.generatedAt || new Date().toISOString(), 'Resposta individual'))
-        : transcriptEntriesFromResponse(data);
+      const nextMessages = transcriptEntriesFromResponse(data);
       const transcriptAfter = [...transcriptWithOperator, ...nextMessages].slice(-140);
       setTranscript(transcriptAfter);
       let nextFinal: TeamTranscriptEntry | null = null;
@@ -1234,6 +1347,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           name: finalReply.name || finalReply.slug,
           slug: finalReply.slug,
           model: finalReply.model,
+          phase: finalReply.phase,
           stage: 'Juiz',
           content: finalReply.content,
           status: finalReply.ok ? 'ok' : 'error',
@@ -1253,8 +1367,10 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         };
       }
       setFinalResult(nextFinal);
+      if (data.ok) setDraftAttachments([]);
       flushSessionNow(ownerSessionId, {
         missionDraft: trimmedMission,
+        draftAttachments: data.ok ? [] : attachmentsToRun,
         transcript: transcriptAfter,
         finalResult: nextFinal,
       });
@@ -1519,6 +1635,9 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         <div className="luca-ai-composer-dock">
           <LucaMissionBar
             mission={mission}
+            attachments={draftAttachments}
+            uploadingAttachment={uploadingAttachment}
+            fileInputRef={fileInputRef}
             running={running}
             canRun={canRun}
             operationMode={operationMode}
@@ -1527,6 +1646,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
             isIndividualReady={isIndividualReady}
             assignedCount={operationMode === 'individual' ? individualAssignments.participants.length : assignedSlugs.length}
             onMissionChange={setMission}
+            onFilesSelected={addAttachments}
+            onRemoveAttachment={removeAttachment}
             onRun={runMission}
             onClear={clearTranscript}
           />
@@ -1548,6 +1669,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
                 personaBySlug={personaBySlug}
                 routerProfiles={routerProfiles}
                 assignments={individualAssignments}
+                depth={individualDepth}
                 presets={individualPresets}
                 activeSlug={activePersonaSlug}
                 loading={loading}
@@ -1562,6 +1684,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
                 onInspect={setActivePersonaSlug}
                 onOpenPicker={(id) => setPickerTarget({ mode: 'individual', id })}
                 onSetModel={setPersonaModel}
+                onDepthChange={setIndividualDepth}
                 onApplyPreset={(preset) => void applyIndividualPreset(preset)}
                 onOpenPersonas={() => onNavigate('personas')}
                 onClose={() => setTeamPanelOpen(false)}
@@ -1789,6 +1912,7 @@ function LucaIndividualPanel({
   personaBySlug,
   routerProfiles,
   assignments,
+  depth,
   presets: individualPresets,
   activeSlug,
   loading,
@@ -1801,6 +1925,7 @@ function LucaIndividualPanel({
   onInspect,
   onOpenPicker,
   onSetModel,
+  onDepthChange,
   onOpenPersonas,
   onClose,
   activePresetId,
@@ -1811,6 +1936,7 @@ function LucaIndividualPanel({
   personaBySlug: Map<string, YumePersonaSummary>;
   routerProfiles: RouterModelProfile[];
   assignments: IndividualAssignments;
+  depth: LucaAiIndividualDepth;
   presets: LucaIndividualPreset[];
   activeSlug: string | null;
   loading: boolean;
@@ -1823,6 +1949,7 @@ function LucaIndividualPanel({
   onInspect: (slug: string | null) => void;
   onOpenPicker: (id: IndividualPickerId) => void;
   onSetModel: (slug: string, model: string) => void | Promise<void>;
+  onDepthChange: (depth: LucaAiIndividualDepth) => void;
   onOpenPersonas: () => void;
   onClose: () => void;
   activePresetId: string | null;
@@ -1891,8 +2018,46 @@ function LucaIndividualPanel({
             onInspect={onInspect}
             onSetModel={onSetModel}
           />
+          <fieldset
+            className="rounded-xl border p-3"
+            data-luca-individual-depth
+            disabled={running}
+            style={{ borderColor: theme.border }}
+          >
+            <legend className="px-1 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: theme.textGhost }}>
+              Profundidade
+            </legend>
+            <div className="grid grid-cols-3 gap-1" role="radiogroup" aria-label="Profundidade da resolução individual">
+              {INDIVIDUAL_DEPTH_OPTIONS.map((option) => {
+                const selected = depth === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    className="rounded-lg border px-2 py-2 text-[10px] font-semibold transition"
+                    onClick={() => onDepthChange(option.value)}
+                    title={option.description}
+                    style={{
+                      background: selected ? theme.goldSoft : theme.input,
+                      borderColor: selected ? theme.borderActive : theme.border,
+                      color: selected ? theme.goldDeep : theme.textMute,
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-[10px] leading-relaxed" style={{ color: theme.textGhost }}>
+              {INDIVIDUAL_DEPTH_OPTIONS.find((option) => option.value === depth)?.description}
+            </p>
+          </fieldset>
           <div className="rounded-xl px-3 py-3 text-[11px] leading-relaxed" style={{ background: theme.surfaceHi, color: theme.textMute }}>
-            Cada participante recebe somente a missão original. Depois, a chamada separada do juiz recebe todas as respostas para comparar, corrigir e decidir.
+            {depth === 1
+              ? 'Cada participante responde às cegas; depois, o juiz compara e decide.'
+              : 'Cada participante responde às cegas, revisa com contribuições anônimas e então o juiz decide.'}
           </div>
         </div>
         <div className="mt-3">
@@ -2642,7 +2807,7 @@ function LucaMissionCanvas({
             <div key={entry.id} className="block w-full min-w-0">
               <TranscriptEntry entry={entry} persona={undefined} />
             </div>
-          ) : entry.stage === 'Resposta individual' ? (
+          ) : entry.phase === 'blind' || entry.phase === 'revision' ? (
             <IndividualResponseCard
               key={entry.id}
               entry={entry}
@@ -2705,6 +2870,9 @@ function LucaMissionCanvas({
 
 function LucaMissionBar({
   mission,
+  attachments,
+  uploadingAttachment,
+  fileInputRef,
   running,
   canRun,
   operationMode,
@@ -2713,10 +2881,15 @@ function LucaMissionBar({
   isIndividualReady,
   assignedCount,
   onMissionChange,
+  onFilesSelected,
+  onRemoveAttachment,
   onRun,
   onClear,
 }: {
   mission: string;
+  attachments: LucaAiChatAttachment[];
+  uploadingAttachment: boolean;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
   running: boolean;
   canRun: boolean;
   operationMode: OperationMode;
@@ -2725,6 +2898,8 @@ function LucaMissionBar({
   isIndividualReady: boolean;
   assignedCount: number;
   onMissionChange: (value: string) => void;
+  onFilesSelected: (files: FileList | null) => void | Promise<void>;
+  onRemoveAttachment: (attachment: LucaAiChatAttachment) => void | Promise<void>;
   onRun: () => void | Promise<void>;
   onClear: () => void;
 }) {
@@ -2760,6 +2935,31 @@ function LucaMissionBar({
           {statusText}
         </div>
       )}
+      {attachments.length > 0 && (
+        <div className="luca-ai-attachment-list" aria-label="Anexos desta mensagem">
+          {attachments.map((attachment) => (
+            <div key={attachment.id} className="luca-ai-attachment">
+              {attachment.kind === 'image' ? (
+                <img src={attachment.url} alt="" className="luca-ai-attachment-thumb" />
+              ) : (
+                <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
+              )}
+              <span className="min-w-0 flex-1">
+                <strong>{attachment.name}</strong>
+                <small>{formatAttachmentSize(attachment.size)}</small>
+              </span>
+              <button
+                type="button"
+                onClick={() => { void onRemoveAttachment(attachment); }}
+                disabled={running || uploadingAttachment}
+                aria-label={`Remover ${attachment.name}`}
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="luca-ai-composer">
         <label className="sr-only" htmlFor="luca-ai-mission">Missão da bancada</label>
         <textarea
@@ -2773,6 +2973,26 @@ function LucaMissionBar({
           disabled={running}
         />
         <div className="luca-ai-composer-toolbar">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/*,.md,.csv,.json,.xml,.yaml,.yml,.toml,.sql,.js,.jsx,.ts,.tsx,.css,.html,.py,.rb,.go,.rs,.java,.c,.h,.cpp,.hpp"
+            className="sr-only"
+            aria-label="Selecionar fotos, PDF e arquivos de texto"
+            onChange={(event) => { void onFilesSelected(event.target.files); }}
+            disabled={running || uploadingAttachment || attachments.length >= 4}
+          />
+          <button
+            type="button"
+            className="luca-ai-composer-action"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={running || uploadingAttachment || attachments.length >= 4}
+            aria-label="Anexar arquivos e fotos"
+            title="Fotos, PDF e arquivos de texto (até 10 MB)"
+          >
+            {uploadingAttachment ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+          </button>
           <button type="button" className="luca-ai-composer-action" onClick={onClear} disabled={running} aria-label="Limpar conversa" title="Limpar conversa">
             <RotateCcw className="h-3.5 w-3.5" />
           </button>
@@ -2821,10 +3041,12 @@ function FinalDisplayCard({ entry, persona }: { entry: TeamTranscriptEntry; pers
       <div className="luca-ai-message-meta">
         <SpeakerAvatar entry={entry} persona={persona} compact />
         <h3 className="truncate text-[13px] font-semibold" style={{ color: theme.text }}>{entry.name}</h3>
-        <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ color: theme.textMute }}>
-          {isJudge ? <Scale className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-          {isJudge ? 'Veredito do juiz' : 'Entrega final'}
-        </span>
+        {entry.phase && <PhaseBadge phase={entry.phase} />}
+        {!isJudge && (
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ color: theme.textMute }}>
+            <Eye className="h-3 w-3" /> Entrega final
+          </span>
+        )}
         {entry.model ? (
           <span className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px]" style={{ background: 'rgba(255,255,255,0.05)', color: theme.textGhost }} title="Motor 9Router">
             {entry.model}
@@ -2866,6 +3088,7 @@ function IndividualResponseCard({
                   <span className="block truncate text-[13px] font-semibold" style={{ color: entry.status === 'error' ? theme.error : theme.text }}>{entry.name}</span>
                   <span className="block text-[11px]" style={{ color: theme.textGhost }}>{entry.status === 'error' ? 'Falha individual' : 'Resposta individual · expandir'}</span>
                 </span>
+                {entry.phase && <PhaseBadge phase={entry.phase} />}
                 {entry.model ? (
                   <span className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px]" style={{ background: 'rgba(255,255,255,0.05)', color: theme.textGhost }} title="Motor 9Router">
                     {entry.model}
@@ -2901,6 +3124,7 @@ function TranscriptEntry({ entry, persona }: { entry: TeamTranscriptEntry; perso
             style={{ background: 'rgba(255,255,255,0.06)', color: theme.text, border: '1px solid rgba(255,255,255,0.08)' }}
           >
             <RichMessageBody content={entry.content} compact />
+            <AttachmentList attachments={entry.attachments} />
           </article>
           <span className="luca-ai-message-copy luca-ai-message-copy-operator">
             <CopyLogButton text={entry.content} label="Copiar mensagem enviada" />
@@ -2919,7 +3143,7 @@ function TranscriptEntry({ entry, persona }: { entry: TeamTranscriptEntry; perso
       <div className="luca-ai-message-meta">
         <SpeakerAvatar entry={entry} persona={persona} compact />
         <span className="min-w-0 text-[13px] font-semibold luca-wrap" style={{ color: toneColor }}>{entry.name}</span>
-        {entry.stage && <StageBadge stage={entry.stage} />}
+        {entry.phase ? <PhaseBadge phase={entry.phase} /> : entry.stage && <StageBadge stage={entry.stage} />}
         {entry.model ? (
           <span className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px]" style={{ background: 'rgba(255,255,255,0.05)', color: theme.textGhost }} title="Motor 9Router">
             {entry.model}
@@ -2948,6 +3172,19 @@ function StageBadge({ stage }: { stage: string }) {
     <span className="inline-flex max-w-full items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium tracking-wide" style={{ color: theme.textMute }}>
       <Icon className="h-3 w-3 shrink-0 opacity-70" />
       <span className="truncate">{stage}</span>
+    </span>
+  );
+}
+
+function PhaseBadge({ phase }: { phase: LucaAiPersonaTeamPhase }) {
+  const theme = useTheme();
+  return (
+    <span
+      className="shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
+      data-luca-individual-phase={phase}
+      style={{ background: theme.goldSoft, borderColor: theme.border, color: theme.goldDeep }}
+    >
+      {INDIVIDUAL_PHASE_LABELS[phase]}
     </span>
   );
 }

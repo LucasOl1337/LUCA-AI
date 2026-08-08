@@ -1,0 +1,48 @@
+{
+  "product": "LUCA-AI",
+  "feature": "Catálogo de Personas (Yume no LUCA)",
+  "duration_s": 8.2,
+  "fps": 30,
+  "resolution": "1280x720",
+  "status": "draft_slideshow",
+  "note": "Não é o comercial Remotion 42s. Slideshow de keyframes reais+Grok Imagine.",
+  "canonical_commercial": "C:/Projetos/LUCA-AI/promo/dist/luca-ai-commercial.mp4",
+  "output_mp4": "C:/Projetos/_content-factory/kits/LUCA-AI/20260801-211820/video/feature-personas-8s-draft.mp4",
+  "shots": [
+    {
+      "id": "A",
+      "t": [0.0, 1.6],
+      "beat": "open_pain_gen",
+      "file": "K1-open-gen.jpg",
+      "source": "grok-imagine-image"
+    },
+    {
+      "id": "B",
+      "t": [1.6, 3.2],
+      "beat": "pain_real",
+      "file": "K1-before-real.png",
+      "source": "promo/dist/preview-pain.png"
+    },
+    {
+      "id": "C",
+      "t": [3.2, 5.0],
+      "beat": "personas_catalog_real",
+      "file": "K2-personas-real.png",
+      "source": "promo/public/captures/02-personas.png"
+    },
+    {
+      "id": "D",
+      "t": [5.0, 6.6],
+      "beat": "select_persona_gen",
+      "file": "K2-mid-personas-gen.jpg",
+      "source": "grok-imagine-image"
+    },
+    {
+      "id": "E",
+      "t": [6.6, 8.2],
+      "beat": "close_promise_gen",
+      "file": "K5-close-gen.jpg",
+      "source": "grok-imagine-image"
+    }
+  ]
+}

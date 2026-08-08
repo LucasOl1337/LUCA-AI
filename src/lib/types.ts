@@ -62,6 +62,9 @@ export interface RouterModelsResponse {
   capabilities?: Record<string, unknown>;
 }
 
+export type LucaAiIndividualDepth = 1 | 2 | 3;
+export type LucaAiPersonaTeamPhase = 'blind' | 'revision' | 'judge';
+
 export interface LucaAiPersonaTeamReply {
   ok: boolean;
   slug: string;
@@ -74,6 +77,7 @@ export interface LucaAiPersonaTeamReply {
   error?: string;
   workflowRoleId?: string;
   workflowRoleLabel?: string;
+  phase?: LucaAiPersonaTeamPhase;
   startedAt?: string;
   completedAt?: string;
   durationMs?: number;
@@ -88,6 +92,7 @@ export interface LucaAiPersonaTeamStep {
   id: string;
   roleId: string;
   roleLabel: string;
+  phase?: LucaAiPersonaTeamPhase;
   participants: Array<{
     slug: string;
     name: string;
@@ -97,6 +102,16 @@ export interface LucaAiPersonaTeamStep {
   startedAt?: string;
   completedAt?: string;
   durationMs?: number;
+}
+
+export interface LucaAiChatAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  kind: 'image' | 'pdf' | 'text';
+  size: number;
+  createdAt?: string;
+  url: string;
 }
 
 export interface LucaAiPersonaTeamRunResponse {
@@ -124,6 +139,7 @@ export interface LucaAiPersonaTeamRunResponse {
     model?: string;
     content?: string;
   } | null;
+  attachments?: LucaAiChatAttachment[];
   generatedAt: string;
 }
 
@@ -437,6 +453,7 @@ export interface LucaAiChatSession extends LucaAiChatSessionSummary {
     judge?: string | null;
   };
   missionDraft?: string;
+  draftAttachments?: LucaAiChatAttachment[];
   transcript?: Array<Record<string, unknown>>;
   finalResult?: Record<string, unknown> | null;
   activePersonaSlug?: string | null;
@@ -469,6 +486,7 @@ export interface LucaAiTeamTemplate {
   description: string;
   icon: string;
   assignments: LucaAiTeamTemplateAssignments;
+  models?: Record<string, string>;
 }
 
 export interface LucaAiIndividualTemplate {
@@ -478,6 +496,7 @@ export interface LucaAiIndividualTemplate {
   icon: string;
   participants: string[];
   judge: string | null;
+  models?: Record<string, string>;
 }
 
 export interface LucaAiTeamTemplatesResponse {

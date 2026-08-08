@@ -22,6 +22,12 @@ Ao importar uma persona, o LUCA preserva nome, prompt e versao lidos do Yume. O 
 
 `POST /api/luca-ai/persona-team/run` oferece dois modos visiveis. `workflow` encadeia os papeis da equipe; `individual` executa de uma a cinco personas em contextos isolados e chama depois uma persona juiza com todas as respostas. O juiz pode repetir uma persona participante, mas sempre usa uma chamada separada. O POST devolve `202` com `runId`, `traceId` e status `running`; a execucao segue no processo Express e a UI consulta `GET /api/luca-ai/persona-team/runs/:runId` ate `complete` ou `failed`. Assim, nenhuma conexao com a borda precisa permanecer aberta durante as chamadas LLM.
 
+## Deliberação para harnesses
+
+Claude Code, Codex, Hermes e outros executores consultam a mesma bancada por `POST /api/deliberations` e acompanham por `GET /api/deliberations/:id`. O harness continua dono do repositório, shell, worktree, testes e aprovações; o LUCA recebe um `luca.context-bundle.v1` e devolve um `luca.decision-package.v1` consultivo.
+
+Navegadores reutilizam a sessão LUCA. Integrações usam `Authorization: Bearer` somente quando `LUCA_MACHINE_TOKEN` possui pelo menos 32 caracteres. Deliberações executam sem tools ou egress e tratam artifacts como dados externos não confiáveis. O contrato completo, limites e roadmap ficam em `server/deliberations/README.md`.
+
 ## Kamui e Yume
 
 `server/kamui-client.js` acessa Yume somente por GET via `{KAMUI_BASE}/kamui/yume/...`. O padrao de `KAMUI_BASE` e `http://127.0.0.1:1338`; `KAMUI_TIMEOUT_MS` controla o timeout.

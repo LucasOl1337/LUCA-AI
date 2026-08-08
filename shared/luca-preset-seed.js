@@ -6,6 +6,30 @@ export const MAX_EXECUTORS = 4;
 export const MAX_PARTICIPANTS = 5;
 export const PRESET_ICON_IDS = ['sprout', 'hardhat', 'briefcase', 'swords', 'crown', 'stethoscope', 'users'];
 
+// Alterna famílias e rotas do catálogo fechado; até oito participantes recebem
+// motores distintos para reduzir erro correlacionado e falso consenso.
+const DIVERSE_MODELS = [
+  'cc/claude-opus-4-8(max)',
+  'gcli/grok-4.5-high',
+  'kimi/k3',
+  'cx/gpt-5.6-luna-xhigh',
+  'cc/claude-fable-5',
+  'cx/gpt-5.5-xhigh',
+  'kimi/kimi-k3',
+  'cx/gpt-5.6-sol-xhigh',
+];
+// Sol xhigh é a rota de maior esforço da família GPT 5.6 mais nova; o perfil
+// Ultra aponta para o mesmo ID, portanto não oferece capacidade adicional.
+const STRONGEST_JUDGE_MODEL = 'cx/gpt-5.6-sol-xhigh';
+
+function modelsFor(slugs) {
+  return Object.fromEntries(slugs.map((slug, index) => [slug, DIVERSE_MODELS[index % DIVERSE_MODELS.length]]));
+}
+
+function individualModels(participants, judge) {
+  return { ...modelsFor(participants), [judge]: STRONGEST_JUDGE_MODEL };
+}
+
 export const LUCA_TEAM_PRESET_SEED = [
   {
     id: 'risco-agro',
@@ -19,6 +43,15 @@ export const LUCA_TEAM_PRESET_SEED = [
       approval: ['curador-personas'],
       display: ['relator-executivo-risco'],
     },
+    models: modelsFor([
+      'supervisor-agentes-ia',
+      'planejador-missao',
+      'estrategista-risco-agro',
+      'especialista-zarc-seguro-rural',
+      'engenheiro-agricola',
+      'curador-personas',
+      'relator-executivo-risco',
+    ]),
   },
   {
     id: 'engenharia-projetos',
@@ -32,6 +65,15 @@ export const LUCA_TEAM_PRESET_SEED = [
       approval: ['curador-personas'],
       display: ['relator-executivo-risco'],
     },
+    models: modelsFor([
+      'supervisor-agentes-ia',
+      'roteador-missoes',
+      'engenheiro-civil',
+      'arquiteto',
+      'lucas',
+      'curador-personas',
+      'relator-executivo-risco',
+    ]),
   },
   {
     id: 'conselho-estrategia',
@@ -45,6 +87,15 @@ export const LUCA_TEAM_PRESET_SEED = [
       approval: ['curador-personas'],
       display: ['relator-executivo-risco'],
     },
+    models: modelsFor([
+      'supervisor-agentes-ia',
+      'lucas',
+      'elon-musk',
+      'aurora',
+      'tars',
+      'curador-personas',
+      'relator-executivo-risco',
+    ]),
   },
   {
     id: 'squad-summoners-rift',
@@ -58,6 +109,7 @@ export const LUCA_TEAM_PRESET_SEED = [
       approval: ['garen'],
       display: ['lux'],
     },
+    models: modelsFor(['darius', 'ezreal', 'jinx', 'zed', 'katarina', 'ahri', 'garen', 'lux']),
   },
 ];
 
@@ -69,6 +121,10 @@ export const LUCA_INDIVIDUAL_PRESET_SEED = [
     icon: 'sprout',
     participants: ['estrategista-risco-agro', 'especialista-zarc-seguro-rural', 'engenheiro-agricola'],
     judge: 'relator-executivo-risco',
+    models: individualModels(
+      ['estrategista-risco-agro', 'especialista-zarc-seguro-rural', 'engenheiro-agricola'],
+      'relator-executivo-risco',
+    ),
   },
   {
     id: 'conselho-de-ceos',
@@ -77,6 +133,7 @@ export const LUCA_INDIVIDUAL_PRESET_SEED = [
     icon: 'crown',
     participants: ['elon-musk', 'lucas', 'aurora'],
     judge: 'supervisor-agentes-ia',
+    models: individualModels(['elon-musk', 'lucas', 'aurora'], 'supervisor-agentes-ia'),
   },
   {
     id: 'mesa-tecnica',
@@ -85,6 +142,7 @@ export const LUCA_INDIVIDUAL_PRESET_SEED = [
     icon: 'hardhat',
     participants: ['engenheiro-civil', 'arquiteto'],
     judge: 'curador-personas',
+    models: individualModels(['engenheiro-civil', 'arquiteto'], 'curador-personas'),
   },
   {
     id: 'plantao-de-saude',
@@ -93,6 +151,7 @@ export const LUCA_INDIVIDUAL_PRESET_SEED = [
     icon: 'stethoscope',
     participants: ['medico'],
     judge: 'supervisor-agentes-ia',
+    models: individualModels(['medico'], 'supervisor-agentes-ia'),
   },
   {
     id: 'duelo-noxus-demacia',
@@ -101,5 +160,6 @@ export const LUCA_INDIVIDUAL_PRESET_SEED = [
     icon: 'swords',
     participants: ['darius', 'katarina', 'garen', 'lux'],
     judge: 'supervisor-agentes-ia',
+    models: individualModels(['darius', 'katarina', 'garen', 'lux'], 'supervisor-agentes-ia'),
   },
 ];

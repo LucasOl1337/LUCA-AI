@@ -219,6 +219,12 @@ export function parseChatCompletionPayload(payloadText) {
         raw,
       };
     }
+    // Valid SSE that carried no text (e.g. budget spent on a reasoning block and
+    // finish_reason=length). Degrade to an empty answer — re-parsing the raw
+    // stream here used to throw a misleading "Unexpected token 'd'" JSON error.
+    if (raw) {
+      return { content: '', toolCalls: [], finishReason, raw };
+    }
     return {
       content: extractChatCompletionContent(text),
       toolCalls: [],

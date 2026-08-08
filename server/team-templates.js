@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { getWorkspaceUserId, requireWorkspaceUserId } from './workspace-context.js';
+import { isAllowed9RouterModel, sanitizeAgentModel } from './config.js';
 import {
   LUCA_INDIVIDUAL_PRESET_SEED,
   LUCA_TEAM_PRESET_SEED,
@@ -64,6 +65,19 @@ function clipText(value, max, fallback = '') {
   return text.length > max ? text.slice(0, max) : text;
 }
 
+function sanitizeTemplateModels(rawModels, slugs) {
+  if (!rawModels || typeof rawModels !== 'object' || Array.isArray(rawModels)) return {};
+  const allowedSlugs = new Set(slugs.filter(Boolean));
+  const models = {};
+  for (const [rawSlug, rawModel] of Object.entries(rawModels)) {
+    const slug = String(rawSlug || '').trim();
+    const model = String(rawModel || '').trim();
+    if (!allowedSlugs.has(slug) || !isAllowed9RouterModel(model)) continue;
+    models[slug] = sanitizeAgentModel(model);
+  }
+  return models;
+}
+
 function sanitizeTeamTemplate(raw = {}, { requireId = false } = {}) {
   const id = clipText(raw.id, 64, '').toLowerCase().replace(/[^a-z0-9-]/g, '');
   if (requireId && !id) {
@@ -78,12 +92,14 @@ function sanitizeTeamTemplate(raw = {}, { requireId = false } = {}) {
     const list = Array.isArray(rawList) ? rawList : rawList ? [rawList] : [];
     assignments[roleId] = uniqueSlugs(list, limit);
   }
+  const models = sanitizeTemplateModels(raw.models, TEAM_ROLE_ORDER.flatMap((roleId) => assignments[roleId]));
   return {
     id: id || slugifyId(raw.label),
     label: clipText(raw.label, 80, 'Equipe'),
     description: clipText(raw.description, 280, ''),
     icon: sanitizeIcon(raw.icon),
     assignments,
+    ...(Object.keys(models).length ? { models } : {}),
   };
 }
 
@@ -99,6 +115,7 @@ function sanitizeIndividualTemplate(raw = {}, { requireId = false } = {}) {
     MAX_PARTICIPANTS,
   );
   const judge = String(raw.judge || '').trim() || null;
+  const models = sanitizeTemplateModels(raw.models, [...participants, judge]);
   return {
     id: id || slugifyId(raw.label),
     label: clipText(raw.label, 80, 'Seleção'),
@@ -106,6 +123,7 @@ function sanitizeIndividualTemplate(raw = {}, { requireId = false } = {}) {
     icon: sanitizeIcon(raw.icon),
     participants,
     judge,
+    ...(Object.keys(models).length ? { models } : {}),
   };
 }
 
@@ -211,9 +229,12 @@ export function updateTeamTemplate(kind, id, template) {
       error.code = 'template_not_found';
       throw error;
     }
+    const raw = template?.models === undefined
+      ? { ...template, models: list[index].models }
+      : template;
     const sanitized = kind === 'team'
-      ? sanitizeTeamTemplate({ ...template, id: cleanId }, { requireId: true })
-      : sanitizeIndividualTemplate({ ...template, id: cleanId }, { requireId: true });
+      ? sanitizeTeamTemplate({ ...raw, id: cleanId }, { requireId: true })
+      : sanitizeIndividualTemplate({ ...raw, id: cleanId }, { requireId: true });
     list[index] = sanitized;
     return sanitized;
   });

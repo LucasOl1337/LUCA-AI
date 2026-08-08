@@ -4,6 +4,12 @@ const DEFAULT_MAX_EXECUTION_SLUGS = 4;
 const DEFAULT_MAX_INDIVIDUAL_PARTICIPANTS = 5;
 const DEFAULT_MAX_ATTACHMENTS = 4;
 
+export const DEPTH_BUDGETS = Object.freeze({
+  1: Object.freeze({ participant: 1100, judge: 1600 }),
+  2: Object.freeze({ participant: 3000, judge: 4000 }),
+  3: Object.freeze({ participant: 20000, judge: 20000 }),
+});
+
 function normalizeModelOverrides(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   const overrides = {};
@@ -197,6 +203,7 @@ export function normalizePersonaTeamRunInput(body = {}, options = {}) {
   const traceId = normalizeTraceId(body?.traceId);
   const requestedMode = String(body?.mode || '').trim().toLowerCase();
   const individualMode = requestedMode === 'individual';
+  const depth = Number.isInteger(body?.depth) && DEPTH_BUDGETS[body.depth] ? body.depth : 1;
   const judgeSlug = individualMode
     ? normalizePersonaTeamSlug(body?.judgeSlug || body?.judge || body?.judgePersona)
     : '';
@@ -249,12 +256,28 @@ export function normalizePersonaTeamRunInput(body = {}, options = {}) {
     slugs,
     workflow,
     mode: individualMode ? 'individual' : workflow.length ? 'workflow' : 'parallel',
+    depth,
     judgeSlug: individualMode ? judgeSlug : undefined,
     modelOverrides: normalizeModelOverrides(body?.modelOverrides || body?.models),
     sessionId: sessionId || undefined,
     attachmentIds,
     traceId,
   };
+}
+
+function redactAnonymousContribution(reply) {
+  const secrets = [reply?.model, reply?.name, reply?.slug]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length);
+  let content = reply?.ok
+    ? cleanPersonaTeamOutput(reply.content)
+    : `FALHA: ${String(reply?.error || 'sem resposta').trim()}`;
+  for (const secret of secrets) {
+    const escaped = secret.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    content = content.replace(new RegExp(escaped, 'gi'), '[identidade removida]');
+  }
+  return { ok: Boolean(reply?.ok), content };
 }
 
 /** Marker for Yume "pure model" personas: free agent, minimal orchestration wrap. */
@@ -384,6 +407,7 @@ export function buildIndividualJudgePrompt({
   systemPrompt,
   runtimeModel = '',
   replies = [],
+  originalReplies = [],
 }) {
   const name = String(judgeName || judgeSlug || 'Juiz').trim();
   const slug = String(judgeSlug || '').trim();
@@ -403,7 +427,7 @@ Motor LLM desta execucao (fonte de verdade do LUCA-AI via 9Router): ${model}
 Motor LLM desta execucao nao foi declarado explicitamente.
 - Nao invente nomes de modelo.
 - Se perguntarem o modelo e voce nao tiver o ID, diga que o motor e o 9Router do LUCA e que o ID nao foi exposto neste turno.`);
-  const contributions = replies.map((reply) => {
+  const formatReplies = (items) => items.map((reply) => {
     const author = `${reply?.name || reply?.slug || 'Participante'}${reply?.slug ? ` (${reply.slug})` : ''}`;
     const motor = reply?.model ? ` | motor 9Router: ${reply.model}` : '';
     const content = reply?.ok
@@ -411,6 +435,11 @@ Motor LLM desta execucao nao foi declarado explicitamente.
       : `FALHA: ${String(reply?.error || 'sem resposta').trim()}`;
     return `${author}${motor}: ${content}`;
   }).join('\n\n');
+  const contributions = formatReplies(replies);
+  const originals = formatReplies(originalReplies);
+  const originalsAppendix = originals
+    ? `\n\nRespostas cegas originais (anexo contextual; priorize as revisoes):\n${originals}`
+    : '';
 
   if (pure) {
     return {
@@ -425,7 +454,7 @@ Voce avalia contribuicoes de outros agentes. Seja direto, livre de formato e sem
 ${mission}
 
 Contribuicoes:
-${contributions || 'Nenhuma contribuicao utilizavel.'}
+${contributions || 'Nenhuma contribuicao utilizavel.'}${originalsAppendix}
 
 Entregue seu julgamento final com liberdade de forma.`,
     };
@@ -450,7 +479,7 @@ Entregue seu julgamento final com liberdade de forma.`,
   ${model ? `Motor 9Router do juiz: ${model}` : ''}
 
   Contribuicoes individuais:
-  ${contributions || 'Nenhuma contribuicao utilizavel foi recebida.'}
+  ${contributions || 'Nenhuma contribuicao utilizavel foi recebida.'}${originalsAppendix}
 
   Produza obrigatoriamente estas partes, nesta ordem:
   0. Resposta livre — comece com sua leitura espontanea da missao e das contribuicoes, no formato que preferir (paragrafos, raciocinio aberto, observacoes soltas). Use este espaco para pensar em voz alta como juiz, sem obrigacao de estrutura.
@@ -462,17 +491,83 @@ Entregue seu julgamento final com liberdade de forma.`,
     };
   }
 
+export function buildIndividualRevisionPrompt({
+  mission,
+  personaName,
+  personaSlug,
+  systemPrompt,
+  runtimeModel = '',
+  originalReply,
+  contributions = [],
+}) {
+  const name = String(personaName || personaSlug || 'Participante').trim();
+  const slug = String(personaSlug || '').trim();
+  const basePrompt = String(systemPrompt || '').trim() || `Voce e a persona ${name}.`;
+  const model = String(runtimeModel || '').trim();
+  const original = originalReply?.ok
+    ? cleanPersonaTeamOutput(originalReply.content)
+    : `FALHA: ${String(originalReply?.error || 'sem resposta original').trim()}`;
+  const anonymous = contributions.map((contribution) => (
+    `${String(contribution?.label || 'Contribuicao anonima')}: ${contribution?.ok
+      ? cleanPersonaTeamOutput(contribution.content)
+      : `FALHA: ${String(contribution?.error || contribution?.content || 'sem resposta').trim()}`}`
+  )).join('\n\n');
+
+  return {
+    name,
+    system: `${basePrompt}
+
+---
+${modelTruthBlock(model, { pure: isPureModelAgent({ personaSlug: slug, systemPrompt: basePrompt }) })}
+Voce recebera contribuicoes anonimas de outros participantes sobre a mesma missao. Revise sua resposta: mantenha o que sustenta, corrija o que os outros refutaram com evidencia melhor, aponte erros alheios objetivamente. Nao presuma autoridade por estilo — avalie evidencia.
+Nao tente identificar os autores das contribuicoes. Responda em pt-BR.`,
+    user: `Missao original:
+${mission}
+
+Sua resposta original:
+${original}
+
+Contribuicoes anonimas:
+${anonymous || 'Nenhuma contribuicao anonima utilizavel foi recebida.'}
+
+Entregue uma revisao objetiva em 3 a 6 bullets: o que mantem, o que muda e onde as outras contribuicoes erraram. Inclua a decisao revisada e a proxima acao.`,
+  };
+}
+
 export async function runIndividualResolution({
   participantSlugs = [],
   judgeSlug,
+  depth = 1,
   runParticipant,
+  runRevision,
   runJudge,
 }) {
-  const replies = await Promise.all(
+  const blindReplies = await Promise.all(
     participantSlugs.map((slug) => runParticipant({ slug })),
   );
-  const judge = await runJudge({ slug: judgeSlug, replies });
-  return { replies, judge };
+  if (depth < 2 || typeof runRevision !== 'function') {
+    const judge = await runJudge({ slug: judgeSlug, replies: blindReplies });
+    return { replies: blindReplies, judge };
+  }
+
+  // TODO(depth-3): substituir esta replica unica pelo consenso round-robin na proxima onda.
+  const replies = await Promise.all(participantSlugs.map((slug, participantIndex) => {
+    const contributions = blindReplies.flatMap((reply, replyIndex) => (
+      replyIndex === participantIndex
+        ? []
+        : [{
+            label: `Contribuicao ${String.fromCharCode(65 + replyIndex)}`,
+            ...redactAnonymousContribution(reply),
+          }]
+    ));
+    return runRevision({
+      slug,
+      originalReply: blindReplies[participantIndex],
+      contributions,
+    });
+  }));
+  const judge = await runJudge({ slug: judgeSlug, replies, originalReplies: blindReplies });
+  return { replies, blindReplies, judge };
 }
 
 export function cleanPersonaTeamOutput(value) {

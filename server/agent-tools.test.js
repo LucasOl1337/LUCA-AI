@@ -83,6 +83,30 @@ test('runAgentWithTools executa tool_calls e devolve resposta final', async () =
   assert.equal(calls.length, 2);
 });
 
+test('runAgentWithTools envia imagens e arquivos junto da mensagem do usuario', async () => {
+  let receivedContent;
+  const result = await runAgentWithTools({
+    system: 'Voce analisa anexos.',
+    user: 'Compare os materiais.',
+    attachments: [
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,AAAA' } },
+      { type: 'input_file', filename: 'briefing.pdf', file_data: 'data:application/pdf;base64,JVBERg==' },
+    ],
+    model: 'cx/test',
+    agentId: 'attachment-agent',
+    callChat: async ({ messages }) => {
+      receivedContent = messages[1].content;
+      return { content: 'Materiais comparados.', toolCalls: [], finishReason: 'stop' };
+    },
+  });
+
+  assert.equal(result.content, 'Materiais comparados.');
+  assert.equal(receivedContent[0].type, 'text');
+  assert.match(receivedContent[0].text, /Compare os materiais\.[\s\S]*briefing\.pdf[\s\S]*%PDF/);
+  assert.equal(receivedContent[1].type, 'image_url');
+  assert.equal(receivedContent.length, 2);
+});
+
 test('runAgentWithTools forca fetch quando ha URL e o modelo ignora tools', async () => {
   let round = 0;
   const result = await runAgentWithTools({

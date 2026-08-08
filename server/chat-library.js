@@ -144,6 +144,29 @@ function normalizeLibrary(raw) {
 /** @type {Map<string, any>} */
 const cache = new Map();
 
+// Sessions own side data outside this module (private chat attachments on disk).
+// Owners register a cleanup hook here so a cascade delete cannot leave orphans
+// behind. Kept as a hook to avoid a circular import with chat-attachments.js.
+const sessionRemovalHooks = new Set();
+
+export function onChatSessionsRemoved(hook) {
+  if (typeof hook === 'function') sessionRemovalHooks.add(hook);
+  return () => sessionRemovalHooks.delete(hook);
+}
+
+function notifySessionsRemoved(sessionIds) {
+  const ids = (Array.isArray(sessionIds) ? sessionIds : []).filter(Boolean);
+  if (!ids.length) return;
+  for (const hook of sessionRemovalHooks) {
+    try {
+      hook(ids);
+    } catch (error) {
+      // Cleanup is best-effort: never fail the user's delete because of side data.
+      console.error(`[chat-library] session cleanup hook falhou: ${error?.message || String(error)}`);
+    }
+  }
+}
+
 function loadLibrary(userId) {
   const id = String(userId || '').trim();
   if (!id) throw new Error('workspace_user_required');
@@ -284,7 +307,7 @@ export function renameChatFolder(folderId, { name } = {}) {
 }
 
 export function deleteChatFolder(folderId, { cascadeSessions = false } = {}) {
-  return withLibrary((library) => {
+  const result = withLibrary((library) => {
     const before = library.folders.length;
     library.folders = library.folders.filter((item) => item.id !== folderId);
     if (library.folders.length === before) {
@@ -292,7 +315,11 @@ export function deleteChatFolder(folderId, { cascadeSessions = false } = {}) {
       error.status = 404;
       throw error;
     }
+    const removedSessionIds = [];
     if (cascadeSessions) {
+      for (const item of library.sessions) {
+        if (item.folderId === folderId) removedSessionIds.push(item.id);
+      }
       library.sessions = library.sessions.filter((item) => item.folderId !== folderId);
       if (!library.sessions.length) {
         const session = makeSession({ title: 'Nova sessão' });
@@ -306,8 +333,10 @@ export function deleteChatFolder(folderId, { cascadeSessions = false } = {}) {
         if (session.folderId === folderId) session.folderId = null;
       }
     }
-    return { ok: true, activeSessionId: library.activeSessionId };
+    return { ok: true, activeSessionId: library.activeSessionId, removedSessionIds };
   });
+  notifySessionsRemoved(result.removedSessionIds);
+  return result;
 }
 
 export function createChatSession({ title, folderId, seedFromActive = false } = {}) {

@@ -25,6 +25,8 @@ test('seed no primeiro toque e isolamento por conta', async () => {
   });
   assert.ok(snapA.team.length >= 1);
   assert.ok(snapA.individual.length >= 1);
+  assert.ok(Object.keys(snapA.team[0].models).length >= 1);
+  assert.ok(Object.keys(snapA.individual[0].models).length >= 1);
 
   workspace.runWithWorkspaceUser('user-a', () => {
     templates.createTeamTemplate('team', {
@@ -49,6 +51,50 @@ test('seed no primeiro toque e isolamento por conta', async () => {
   workspace.runWithWorkspaceUser('user-a', () => {
     const snap = templates.getTeamTemplatesSnapshot();
     assert.equal(snap.team.some((item) => item.label === 'Só A'), true);
+  });
+});
+
+test('modelos do template são sanitizados e formato legado continua válido', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-templates-models-'));
+  const { workspace, templates } = await loadModule(dataDir);
+
+  workspace.runWithWorkspaceUser('models', () => {
+    const created = templates.createTeamTemplate('individual', {
+      label: 'Motores seguros',
+      participants: ['aurora', 'lucas'],
+      judge: 'supervisor-agentes-ia',
+      models: {
+        aurora: 'gcli/grok-4.5-high',
+        lucas: 'rota/inventada',
+        'supervisor-agentes-ia': 'cx/gpt-5.6-sol-xhigh',
+        intruso: 'cc/claude-fable-5',
+      },
+    });
+    assert.deepEqual(created.models, {
+      aurora: 'gcli/grok-4.5-high',
+      'supervisor-agentes-ia': 'cx/gpt-5.6-sol-xhigh',
+    });
+
+    const legacy = templates.createTeamTemplate('individual', {
+      label: 'Legado sem motor',
+      participants: ['medico'],
+      judge: 'supervisor-agentes-ia',
+    });
+    assert.deepEqual(legacy.participants, ['medico']);
+    assert.equal(legacy.judge, 'supervisor-agentes-ia');
+    assert.equal(legacy.models, undefined);
+    templates._resetTeamTemplatesCacheForTests();
+    const reloadedLegacy = templates.getTeamTemplatesSnapshot().individual.find((item) => item.id === legacy.id);
+    assert.deepEqual(reloadedLegacy?.participants, ['medico']);
+    assert.equal(reloadedLegacy?.models, undefined, 'template salvo sem models recarrega normalmente');
+
+    const seeded = templates.getTeamTemplatesSnapshot().individual[0];
+    const updated = templates.updateTeamTemplate('individual', seeded.id, {
+      ...seeded,
+      models: undefined,
+      label: `${seeded.label} editado`,
+    });
+    assert.deepEqual(updated.models, seeded.models, 'editor legado não apaga hints existentes');
   });
 });
 

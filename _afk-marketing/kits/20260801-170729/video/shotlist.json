@@ -1,0 +1,15 @@
+{
+  "product": "LUCA-AI",
+  "feature": "Fluxo de personas 5/5",
+  "duration_s": 8,
+  "fps": 30,
+  "source_feature": "C:/Projetos/LUCA-AI/promo/roteiro.md",
+  "finished_mp4": false,
+  "canonical_product_mp4": "C:/Projetos/LUCA-AI/promo/dist/luca-ai-commercial.mp4",
+  "shots": [
+    {"id": 1, "t": "0-2", "label": "before-pain", "asset": "stills/01-before.png"},
+    {"id": 2, "t": "2-5", "label": "flow-fill", "asset": "stills/02-after.png"},
+    {"id": 3, "t": "5-7", "label": "mission-ready", "asset": "video/keyframe-01-mission-ready.png"},
+    {"id": 4, "t": "7-8", "label": "delivery", "asset": "video/keyframe-03-delivery.png"}
+  ]
+}

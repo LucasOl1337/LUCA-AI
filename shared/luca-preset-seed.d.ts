@@ -15,6 +15,7 @@ export interface LucaTeamPresetSeed {
     approval: string[];
     display: string[];
   };
+  models?: Record<string, string>;
 }
 
 export interface LucaIndividualPresetSeed {
@@ -24,6 +25,7 @@ export interface LucaIndividualPresetSeed {
   icon: string;
   participants: string[];
   judge: string;
+  models?: Record<string, string>;
 }
 
 export const LUCA_TEAM_PRESET_SEED: LucaTeamPresetSeed[];

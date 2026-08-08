@@ -6,6 +6,7 @@
 | --- | --- |
 | `src/` | SOMENTE ao alterar a interface React ou o cliente HTTP/WebSocket. |
 | `server/` | SOMENTE ao alterar o runtime Express, estado local, agentes ou APIs. |
+| `server/deliberations/` | SOMENTE ao alterar a API de deliberação para harnesses, ContextBundle, DecisionPackage ou o futuro adapter MCP. |
 | `shared/` | SOMENTE ao alterar contratos usados por mais de um runtime. |
 | `deploy/` | SOMENTE ao alterar publicacao na VM (service, Tunnel, proxy de borda `luca-ai-vm-proxy.js`) ou scripts de instalacao. |
 | `worker/` e `wrangler.jsonc` | SOMENTE ao inspecionar ou manter o runtime Cloudflare legado (Durable Object / `app.luca-ai.com.br`); nao e o caminho de producao atual. |
