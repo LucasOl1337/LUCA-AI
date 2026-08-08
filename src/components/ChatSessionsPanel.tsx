@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Folder,
   FolderPlus,
@@ -251,12 +252,39 @@ function PanelFolderMenu({
   onRename: () => void;
   onRemove: () => void;
 }) {
-  const rootRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !buttonRef.current) {
+      setCoords(null);
+      return undefined;
+    }
+    const place = () => {
+      const rect = buttonRef.current!.getBoundingClientRect();
+      const menuWidth = 176;
+      const left = Math.min(
+        Math.max(8, rect.right - menuWidth),
+        window.innerWidth - menuWidth - 8,
+      );
+      setCoords({ top: rect.bottom + 6, left });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
     function onDoc(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) onClose();
+      const target = event.target as Node;
+      if (buttonRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      onClose();
     }
     function onKey(event: KeyboardEvent) {
       if (event.key === 'Escape') onClose();
@@ -270,31 +298,58 @@ function PanelFolderMenu({
   }, [open, onClose]);
 
   return (
-    <div className="luca-ai-sessions-folder-menu" ref={rootRef}>
+    <div className="luca-ai-sessions-folder-menu">
       <button
+        ref={buttonRef}
         type="button"
         className="luca-ai-sessions-icon-btn"
         title="Mais opções"
         disabled={busy}
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={onToggle}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggle();
+        }}
       >
         <MoreHorizontal className="h-3.5 w-3.5" />
       </button>
-      {open && (
-        <div className="luca-ai-sessions-folder-dropdown" role="menu">
+      {open && coords && createPortal(
+        <div
+          ref={menuRef}
+          className="luca-ai-sessions-folder-dropdown"
+          role="menu"
+          style={{ top: coords.top, left: coords.left }}
+        >
           {canRename && (
-            <button type="button" role="menuitem" disabled={busy} onClick={onRename}>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={busy}
+              onClick={(event) => {
+                event.stopPropagation();
+                onRename();
+              }}
+            >
               <Pencil className="h-3.5 w-3.5" />
               Editar projeto
             </button>
           )}
-          <button type="button" role="menuitem" className="danger" disabled={busy} onClick={onRemove}>
+          <button
+            type="button"
+            role="menuitem"
+            className="danger"
+            disabled={busy}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRemove();
+            }}
+          >
             <Trash2 className="h-3.5 w-3.5" />
             Remover
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

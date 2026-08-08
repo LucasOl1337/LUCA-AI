@@ -694,38 +694,41 @@
 }
 .luca-sidebar-folder-menu {
   position: relative;
+  flex: 0 0 auto;
+}
+.luca-sidebar-folder-head.menu-open {
+  z-index: 5;
 }
 .luca-sidebar-folder-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: 40;
-  min-width: 168px;
+  position: fixed;
+  z-index: 10050;
+  min-width: 176px;
   padding: 6px;
-  border: 1px solid var(--l-border);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--l-panel) 96%, #000 4%);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  background: #101820;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
   display: flex;
   flex-direction: column;
   gap: 2px;
+  isolation: isolate;
 }
 .luca-sidebar-folder-dropdown button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 32px;
+  min-height: 34px;
   padding: 0 10px;
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--l-text);
+  color: #e8eef6;
   font-size: 12px;
   text-align: left;
 }
 .luca-sidebar-folder-dropdown button:hover {
-  background: rgba(255,255,255,.06);
+  background: rgba(255,255,255,.08);
 }
 .luca-sidebar-folder-dropdown button.danger {
   color: #ff8a83;
@@ -974,22 +977,26 @@
 
 .luca-ai-sessions-folder-menu {
   position: relative;
+  flex: 0 0 auto;
+}
+
+.luca-ai-sessions-group-head.menu-open {
+  z-index: 5;
 }
 
 .luca-ai-sessions-folder-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: 50;
-  min-width: 168px;
+  position: fixed;
+  z-index: 10050;
+  min-width: 176px;
   padding: 6px;
-  border: 1px solid var(--l-border);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--l-panel) 96%, #000 4%);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  background: #101820;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
   display: flex;
   flex-direction: column;
   gap: 2px;
+  isolation: isolate;
 }
 
 .luca-ai-sessions-folder-dropdown button {
@@ -997,18 +1004,18 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 32px;
+  min-height: 34px;
   padding: 0 10px;
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--l-text);
+  color: #e8eef6;
   font-size: 12px;
   text-align: left;
 }
 
 .luca-ai-sessions-folder-dropdown button:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .luca-ai-sessions-folder-dropdown button.danger {
@@ -1314,6 +1321,89 @@
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+
+.luca-ai-attachment-list,
+.luca-ai-message-attachments {
+  width: min(100%, 640px);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.luca-ai-message-attachments {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.luca-ai-attachment {
+  min-width: 0;
+  max-width: min(100%, 250px);
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 12px;
+  color: var(--l-text-soft);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+a.luca-ai-attachment:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.luca-ai-attachment-thumb {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 8px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.luca-ai-attachment strong,
+.luca-ai-attachment small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.luca-ai-attachment strong {
+  color: var(--l-text);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.luca-ai-attachment small {
+  margin-top: 1px;
+  color: var(--l-text-ghost);
+  font-size: 10px;
+}
+
+.luca-ai-attachment button {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--l-text-mute);
+}
+
+.luca-ai-attachment button:hover {
+  color: var(--l-text);
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.luca-ai-attachment button:focus-visible,
+a.luca-ai-attachment:focus-visible {
+  outline: 2px solid var(--l-gold);
+  outline-offset: 2px;
 }
 
 /* Composer compacto centralizado (inspiração Codex + vidro LUCA) */
