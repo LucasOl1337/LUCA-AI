@@ -967,36 +967,53 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setError('Limite de 4 anexos por mensagem.');
       return;
     }
+    // Captura a sessão dona ANTES do await: trocar de sessão durante o upload
+    // não pode empurrar o anexo para dentro da conversa nova.
+    const ownerSessionId = activeSessionId;
+    const stillOwner = () => boundSessionIdRef.current === ownerSessionId;
     setUploadingAttachment(true);
     setError(null);
     try {
       const uploaded: LucaAiChatAttachment[] = [];
       for (const file of selected) {
         if (file.size > 10 * 1024 * 1024) throw new Error(`${file.name} ultrapassa o limite de 10 MB.`);
-        const data = await lucaApi.uploadChatAttachment(activeSessionId, file, bridgeBase);
+        const data = await lucaApi.uploadChatAttachment(ownerSessionId, file, bridgeBase);
+        if (!stillOwner()) {
+          // Usuário saiu da sessão: descarta o que já subiu para não virar órfão.
+          void lucaApi.deleteChatAttachment(ownerSessionId, data.attachment.id, bridgeBase).catch(() => {});
+          for (const item of uploaded) {
+            void lucaApi.deleteChatAttachment(ownerSessionId, item.id, bridgeBase).catch(() => {});
+          }
+          return;
+        }
         uploaded.push(data.attachment);
       }
       const next = [...draftAttachments, ...uploaded].slice(0, 4);
       setDraftAttachments(next);
-      flushSessionNow(activeSessionId, { draftAttachments: next });
+      flushSessionNow(ownerSessionId, { draftAttachments: next });
     } catch (err) {
-      setError(buildApiErrorMessage(err, 'Falha ao anexar arquivo.'));
+      if (stillOwner()) setError(buildApiErrorMessage(err, 'Falha ao anexar arquivo.'));
     } finally {
-      setUploadingAttachment(false);
+      if (stillOwner()) setUploadingAttachment(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }
 
   async function removeAttachment(attachment: LucaAiChatAttachment) {
     if (!activeSessionId || running || uploadingAttachment) return;
+    const ownerSessionId = activeSessionId;
+    try {
+      // Apaga no servidor ANTES de soltar o handle: se o DELETE falhar, o chip
+      // continua na tela e o arquivo segue removível, em vez de virar órfão.
+      await lucaApi.deleteChatAttachment(ownerSessionId, attachment.id, bridgeBase);
+    } catch (err) {
+      setError(buildApiErrorMessage(err, 'Falha ao remover anexo.'));
+      return;
+    }
+    if (boundSessionIdRef.current !== ownerSessionId) return;
     const next = draftAttachments.filter((item) => item.id !== attachment.id);
     setDraftAttachments(next);
-    flushSessionNow(activeSessionId, { draftAttachments: next });
-    try {
-      await lucaApi.deleteChatAttachment(activeSessionId, attachment.id, bridgeBase);
-    } catch {
-      // A UI ja removeu o anexo; sobra apenas o arquivo, limpo junto com a sessao.
-    }
+    flushSessionNow(ownerSessionId, { draftAttachments: next });
   }
 
   async function ensurePersonaAvailable(slug: string): Promise<boolean> {
@@ -2900,9 +2917,9 @@ function LucaMissionBar({
             ref={fileInputRef}
             type="file"
             multiple
-            accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/*,.md,.csv,.json,.xml,.yaml,.yml,.toml,.sql,.js,.jsx,.ts,.tsx,.css,.html,.py,.rb,.go,.rs,.java,.c,.h,.cpp,.hpp"
+            accept="image/png,image/jpeg,image/webp,image/gif,text/*,.md,.csv,.json,.xml,.yaml,.yml,.toml,.sql,.js,.jsx,.ts,.tsx,.css,.html,.py,.rb,.go,.rs,.java,.c,.h,.cpp,.hpp"
             className="sr-only"
-            aria-label="Selecionar fotos, PDF e arquivos de texto"
+            aria-label="Selecionar fotos e arquivos de texto"
             onChange={(event) => { void onFilesSelected(event.target.files); }}
             disabled={running || uploadingAttachment || attachments.length >= 4}
           />
@@ -2912,7 +2929,7 @@ function LucaMissionBar({
             onClick={() => fileInputRef.current?.click()}
             disabled={running || uploadingAttachment || attachments.length >= 4}
             aria-label="Anexar arquivos e fotos"
-            title="Fotos, PDF e arquivos de texto (até 10 MB)"
+            title="Fotos e arquivos de texto (até 10 MB). PDF ainda não é lido pelos modelos."
           >
             {uploadingAttachment ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
           </button>

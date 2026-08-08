@@ -13,6 +13,9 @@ import { requireWorkspaceUserId } from './workspace-context.js';
 export const MAX_CHAT_ATTACHMENTS = 4;
 export const MAX_CHAT_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 export const MAX_CHAT_ATTACHMENTS_TOTAL_BYTES = 20 * 1024 * 1024;
+// Uploads sao aceitos antes de qualquer rodada, entao o limite de 4 anexos nao
+// segura o disco: sem esta quota da para acumular arquivos nunca referenciados.
+export const MAX_CHAT_SESSION_STORAGE_BYTES = 50 * 1024 * 1024;
 
 const rootStateDir = path.resolve(process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'));
 const workspacesRoot = path.join(rootStateDir, 'workspaces');
@@ -114,7 +117,11 @@ function normalizeAttachmentType(name, requestedMimeType, buffer) {
     if (buffer.length < 5 || buffer.toString('ascii', 0, 5) !== '%PDF-') {
       throw attachmentError('attachment_signature_mismatch');
     }
-    return { kind: 'pdf', mimeType: 'application/pdf' };
+    // Nenhum modelo do catalogo 9Router le PDF hoje (probes em gpt-5.6-sol,
+    // claude-fable-5 e grok-4.5, com input_file e file/file_data: todos
+    // respondem sem enxergar o arquivo). Aceitar aqui produziria persona
+    // confiante sobre documento que nunca leu — recusamos na porta.
+    throw attachmentError('attachment_pdf_not_supported', 415);
   }
 
   if (TEXT_MIME_TYPES.has(requested) || TEXT_EXTENSIONS.has(extension)) {
@@ -157,12 +164,35 @@ function readStored(userId, sessionId, attachmentId) {
   }
 }
 
+function usedSessionBytes(userId, sessionId) {
+  const dir = attachmentDir(userId, sessionId);
+  let total = 0;
+  let entries;
+  try {
+    entries = fs.readdirSync(dir);
+  } catch {
+    return 0;
+  }
+  for (const entry of entries) {
+    if (!entry.endsWith('.bin')) continue;
+    try {
+      total += fs.statSync(path.join(dir, entry)).size;
+    } catch {
+      // Arquivo sumiu no meio da contagem: ignorar e seguir.
+    }
+  }
+  return total;
+}
+
 export function storeChatAttachment({ sessionId, name, mimeType, buffer }) {
   const userId = requireWorkspaceUserId();
   const session = getChatSession(String(sessionId || '').trim());
   const bytes = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || []);
   if (!bytes.length) throw attachmentError('attachment_empty');
   if (bytes.length > MAX_CHAT_ATTACHMENT_BYTES) throw attachmentError('attachment_too_large', 413);
+  if (usedSessionBytes(userId, session.id) + bytes.length > MAX_CHAT_SESSION_STORAGE_BYTES) {
+    throw attachmentError('attachment_session_quota_exceeded', 413);
+  }
 
   const clean = cleanName(name);
   const type = normalizeAttachmentType(clean, mimeType, bytes);

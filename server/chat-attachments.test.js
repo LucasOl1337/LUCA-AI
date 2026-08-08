@@ -71,6 +71,25 @@ test('CHAT_ATTACHMENTS_V1 keeps text files readable as an input_file part', asyn
   });
 });
 
+test('CHAT_ATTACHMENTS_V1 recusa PDF enquanto nenhum modelo do catalogo souber ler', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-attachments-pdf-'));
+  const { workspace, chatLibrary, attachments } = await loadModules(dataDir);
+
+  workspace.runWithWorkspaceUser('owner-pdf', () => {
+    const session = chatLibrary.createChatSession({ title: 'PDF' });
+    // Probes contra o 9Router local: gpt-5.6-sol, claude-fable-5 e grok-4.5
+    // respondem sem enxergar o PDF, em input_file e em file/file_data.
+    // Aceitar o upload faria a persona responder com confianca sobre um arquivo
+    // que nunca leu — pior que recusar na porta.
+    assert.throws(() => attachments.storeChatAttachment({
+      sessionId: session.id,
+      name: 'relatorio.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4\nconteudo'),
+    }), /attachment_pdf_not_supported/);
+  });
+});
+
 test('CHAT_ATTACHMENTS_V1 rejects spoofed image content and cross-account reads', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-attachments-security-'));
   const { workspace, chatLibrary, attachments } = await loadModules(dataDir);
@@ -148,6 +167,36 @@ test('CHAT_ATTACHMENTS_V1 deleting a session removes its files from disk', async
 
     attachments.deleteAllChatAttachments(session.id);
     assert.deepEqual(attachments.listStoredAttachmentSessionIds([session.id]), []);
+  });
+});
+
+test('CHAT_ATTACHMENTS_V1 limita bytes acumulados por sessao para evitar exaustao de disco', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-attachments-quota-'));
+  const { workspace, chatLibrary, attachments } = await loadModules(dataDir);
+
+  workspace.runWithWorkspaceUser('owner-quota', () => {
+    const session = chatLibrary.createChatSession({ title: 'Quota' });
+    // O limite de 4 anexos so valia na hora de rodar; o upload em si era ilimitado,
+    // entao dava para acumular arquivos nunca referenciados ate encher o disco.
+    const blob = Buffer.alloc(2 * 1024 * 1024, 0x41);
+    let stored = 0;
+    let blocked = null;
+    for (let i = 0; i < 60 && !blocked; i += 1) {
+      try {
+        attachments.storeChatAttachment({
+          sessionId: session.id,
+          name: `nota-${i}.txt`,
+          mimeType: 'text/plain',
+          buffer: blob,
+        });
+        stored += 1;
+      } catch (error) {
+        blocked = error;
+      }
+    }
+    assert.ok(blocked, 'upload ilimitado deveria ser barrado por quota');
+    assert.match(String(blocked.message), /attachment_session_quota_exceeded/);
+    assert.ok(stored * blob.length <= attachments.MAX_CHAT_SESSION_STORAGE_BYTES);
   });
 });
 

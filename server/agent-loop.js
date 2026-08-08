@@ -89,11 +89,18 @@ function buildUserContent(user, attachments = []) {
       decoded = '';
     }
     if (!decoded.trim() || decoded.includes('\u0000')) {
-      // Binary we cannot read as text (e.g. PDF): say so instead of faking content.
+      // Binary we cannot read as text: say so instead of faking content.
       inlined.push(`### Anexo: ${filename}\n[conteudo binario nao extraido; peca ao operador o texto se precisar]`);
       continue;
     }
-    inlined.push(`### Anexo: ${filename}\n${decoded.slice(0, MAX_INLINED_ATTACHMENT_CHARS)}`);
+    // Truncar em silencio faria a persona concluir sobre um arquivo pela metade
+    // achando que leu tudo. O corte precisa ser declarado no proprio prompt.
+    const clipped = decoded.length > MAX_INLINED_ATTACHMENT_CHARS;
+    const body = clipped ? decoded.slice(0, MAX_INLINED_ATTACHMENT_CHARS) : decoded;
+    const notice = clipped
+      ? `\n[TRUNCADO: exibindo ${MAX_INLINED_ATTACHMENT_CHARS} de ${decoded.length} caracteres. Diga que a leitura foi parcial ao concluir.]`
+      : '';
+    inlined.push(`### Anexo: ${filename}\n${body}${notice}`);
   }
 
   if (!nativeParts.length && !inlined.length) return text;

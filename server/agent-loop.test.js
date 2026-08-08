@@ -64,6 +64,34 @@ test('anexo binario ilegivel nao vira conteudo inventado', async () => {
   assert.match(textBlob, /binario nao extraido/, 'declara que não leu, em vez de alucinar');
 });
 
+test('anexo de texto grande declara o corte em vez de truncar em silencio', async () => {
+  const requests = [];
+  const huge = 'x'.repeat(130_000) + 'FIM-DO-ARQUIVO';
+  await runAgentWithTools({
+    system: 'Analista.',
+    user: 'Resuma o arquivo.',
+    attachments: [{
+      type: 'input_file',
+      filename: 'grande.txt',
+      file_data: `data:text/plain;base64,${Buffer.from(huge).toString('base64')}`,
+    }],
+    model: 'cx/gpt-5.6-sol',
+    agentId: 'anexo-grande',
+    maxRounds: 1,
+    tools: [],
+    callChat: async (request) => {
+      requests.push(request);
+      return { content: 'ok', toolCalls: [], finishReason: 'stop' };
+    },
+  });
+
+  const content = requests[0].messages[1].content;
+  const textBlob = typeof content === 'string' ? content : content.map((p) => p.text || '').join('\n');
+  assert.match(textBlob, /TRUNCADO/, 'o corte precisa ser declarado ao modelo');
+  assert.match(textBlob, /130014 caracteres/, 'informa o tamanho real do arquivo');
+  assert.equal(textBlob.includes('FIM-DO-ARQUIVO'), false, 'o final cortado nao aparece');
+});
+
 test('sem anexos o conteudo do usuario continua string simples', async () => {
   const requests = [];
   await runAgentWithTools({
