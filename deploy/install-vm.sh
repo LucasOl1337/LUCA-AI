@@ -99,9 +99,14 @@ if (!body.version || String(body.version).trim() !== expected) {
 private_status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:4242/api/state)"
 test "$private_status" = 401
 
-tunnel_config=/etc/cloudflared/bombapvp-lab.yml
+# sennin-core-01 usa luca-ai.yml + cloudflared-luca-ai.service (nao bombapvp-lab).
+tunnel_config=/etc/cloudflared/luca-ai.yml
+if [[ ! -f "$tunnel_config" ]]; then
+  echo "tunnel config ausente: $tunnel_config" >&2
+  exit 1
+fi
 if ! grep -q 'hostname: luca-ai.com.br' "$tunnel_config"; then
-  config_tmp="$(mktemp /etc/cloudflared/bombapvp-lab.yml.XXXXXX)"
+  config_tmp="$(mktemp /etc/cloudflared/luca-ai.yml.XXXXXX)"
   awk '
     /  - service: http_status:404/ {
       print "  - hostname: luca-ai.com.br"
@@ -120,7 +125,7 @@ if ! grep -q 'hostname: luca-ai.com.br' "$tunnel_config"; then
 fi
 
 if ! grep -q 'hostname: luca-origin.bombapvp.com' "$tunnel_config"; then
-  config_tmp="$(mktemp /etc/cloudflared/bombapvp-lab.yml.XXXXXX)"
+  config_tmp="$(mktemp /etc/cloudflared/luca-ai.yml.XXXXXX)"
   awk '
     /  - service: http_status:404/ {
       print "  - hostname: luca-origin.bombapvp.com"
@@ -138,10 +143,15 @@ if ! grep -q 'hostname: luca-origin.bombapvp.com' "$tunnel_config"; then
   mv "$config_tmp" "$tunnel_config"
 fi
 
-cloudflared tunnel --config "$tunnel_config" ingress validate
-systemctl restart cloudflared-bombapvp-lab.service
+# cloudflared bin: unit da sennin aponta para /opt/9router; fallback no PATH.
+if command -v cloudflared >/dev/null 2>&1; then
+  cloudflared tunnel --config "$tunnel_config" ingress validate
+elif [[ -x /opt/9router/data/bin/cloudflared ]]; then
+  /opt/9router/data/bin/cloudflared tunnel --config "$tunnel_config" ingress validate
+fi
+systemctl restart cloudflared-luca-ai.service
 systemctl is-active --quiet luca-ai.service
-systemctl is-active --quiet cloudflared-bombapvp-lab.service
+systemctl is-active --quiet cloudflared-luca-ai.service
 
 printf 'DEPLOYED_COMMIT=%s\n' "$commit"
 printf 'PRIVATE_STATUS=%s\n' "$private_status"
