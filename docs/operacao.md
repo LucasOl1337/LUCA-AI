@@ -31,7 +31,7 @@ O runtime grava estado em `.luca/system-state.json` e eventos em `.luca/runtime-
 
 ## Produção
 
-Em produção, `luca-ai.service` inicia o Express em loopback na VM `sennin-core-01`, usando o 9Router, o Kamui e o Yume da mesma VM. O `cloudflared-luca-ai.service` publica a origem `luca-origin.bombapvp.com`; o proxy de borda `luca-ai-vm-proxy`, versionado em `deploy/luca-ai-vm-proxy.js`, encaminha `luca-ai.com.br/*` para essa origem. Nenhuma tarefa, Tunnel ou processo do PC Windows participa da produção. `deploy/run-luca-ai.ps1` existe apenas para desenvolvimento local.
+Em produção, `luca-ai.service` inicia o Express em loopback na VM `sennin-core-01`, usando o 9Router, o Kamui e o Yume da mesma VM. O `cloudflared-luca-ai.service` mantém o Tunnel `luca-ai-production` até o Express em `127.0.0.1:4242`. O proxy de borda `luca-ai-vm-proxy` (Worker em `deploy/luca-ai-vm-proxy.js`) recebe `luca-ai.com.br/*` e alcança o Express via Workers VPC ligado a esse Tunnel — sem hostname de outro projeto. Nenhuma tarefa, Tunnel ou processo do PC Windows participa da produção. `deploy/run-luca-ai.ps1` existe apenas para desenvolvimento local.
 
 O produto possui autenticação própria por e-mail e senha. Contas listadas em `LUCA_ADMIN_EMAILS` visualizam o item `Admin` no menu. Somente quando essa variável não está configurada, a primeira conta criada se torna administradora para permitir o bootstrap.
 

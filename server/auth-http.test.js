@@ -40,7 +40,7 @@ test('fluxo HTTP protege API e libera painel para a primeira conta admin', async
     headers: {
       'content-type': 'application/json',
       origin: 'https://luca-ai.com.br',
-      host: 'luca-origin.bombapvp.com',
+      host: 'luca-ai.internal',
       'cf-ray': 'test-ray',
       'x-forwarded-host': 'luca-ai.com.br',
     },

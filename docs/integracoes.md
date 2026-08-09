@@ -55,7 +55,7 @@ antes de listar ou executar equipes. `LUCA_PERSONA_ROSTER_SYNC_MS` ajusta o inte
 reconciliam com o Yume: não criam uma decisão editorial local. A promoção ou remoção do
 roster é feita no editor do Yume e se propaga pelo Kamui para todos os consumidores.
 
-No domínio público, as telas de Personas e LUCA-AI usam `/api` na mesma origem. O proxy de borda encaminha o tráfego para `luca-origin.bombapvp.com`; o Cloudflare Tunnel executado na VM entrega as chamadas ao Express em `127.0.0.1:4242`. O navegador do visitante e o PC de desenvolvimento nunca participam do caminho interno.
+No domínio público, as telas de Personas e LUCA-AI usam `/api` na mesma origem. O proxy de borda (`luca-ai-vm-proxy`) encaminha o tráfego ao Express via Workers VPC + Tunnel `luca-ai-production` na VM (`127.0.0.1:4242`). O navegador do visitante e o PC de desenvolvimento nunca participam do caminho interno.
 
 ## Publicação atual
 

@@ -18,7 +18,7 @@ src -> /api e /ws -> server -> shared -> .luca
 Fluxo de produção:
 
 ```text
-navegador -> cadastro/login LUCA -> cookie HttpOnly -> proxy de borda (deploy/luca-ai-vm-proxy.js) -> Tunnel da VM -> server (VM) -> 9Router/Kamui/Yume
+navegador -> cadastro/login LUCA -> cookie HttpOnly -> proxy de borda (deploy/luca-ai-vm-proxy.js) + Workers VPC -> Tunnel luca-ai-production -> Express (VM) -> 9Router/Kamui/Yume
 ```
 
 Para personas, o seam editorial fica no Yume (`is_official`). O Kamui oferece a
@@ -27,7 +27,7 @@ workspace. Assim, composição do roster não é duplicada no estado do LUCA.
 
 O Express é o único runtime de aplicação ativo da produção. O runtime em `worker/` permanece legado e não deve ser tratado como provider ou origem do frontend publicado. O script pequeno `deploy/luca-ai-vm-proxy.js` atua somente como proxy reverso de borda e não executa modelos, personas ou regras do produto.
 
-Todos os processos de aplicação vivem na VM `sennin-core-01`. O PC Windows é somente ambiente de desenvolvimento e não participa do tráfego de `luca-ai.com.br`. Na VM, `luca-ai.service` serve o Express em loopback e `cloudflared-luca-ai.service` publica `luca-origin.bombapvp.com`; a Cloudflare encaminha o domínio público para essa origem.
+Todos os processos de aplicação vivem na VM `sennin-core-01`. O PC Windows é somente ambiente de desenvolvimento e não participa do tráfego de `luca-ai.com.br`. Na VM, `luca-ai.service` serve o Express em loopback e `cloudflared-luca-ai.service` mantém o Tunnel; o domínio público chega pelo proxy de borda (Workers VPC → Tunnel → Express).
 
 ## Autenticação
 

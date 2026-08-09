@@ -12,8 +12,6 @@ test -f "$staging/dist.tar"
 test -f "$staging/state.tar"
 
 install -d -m 750 "$backup"
-# Legado: o yml do bombapvp-lab só existe na VM antiga; na sennin-core-01 o túnel é luca-ai.yml.
-[[ ! -f /etc/cloudflared/bombapvp-lab.yml ]] || cp -a /etc/cloudflared/bombapvp-lab.yml "$backup/bombapvp-lab.yml.before-luca"
 [[ ! -f /etc/cloudflared/luca-ai.yml ]] || cp -a /etc/cloudflared/luca-ai.yml "$backup/luca-ai.yml.before-luca"
 [[ ! -f /etc/systemd/system/luca-ai.service ]] || cp -a /etc/systemd/system/luca-ai.service "$backup/luca-ai.service"
 
@@ -99,7 +97,7 @@ if (!body.version || String(body.version).trim() !== expected) {
 private_status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:4242/api/state)"
 test "$private_status" = 401
 
-# sennin-core-01 usa luca-ai.yml + cloudflared-luca-ai.service (nao bombapvp-lab).
+# Tunnel oficial do LUCA (somente hostnames luca-ai.com.br).
 tunnel_config=/etc/cloudflared/luca-ai.yml
 if [[ ! -f "$tunnel_config" ]]; then
   echo "tunnel config ausente: $tunnel_config" >&2
@@ -110,25 +108,6 @@ if ! grep -q 'hostname: luca-ai.com.br' "$tunnel_config"; then
   awk '
     /  - service: http_status:404/ {
       print "  - hostname: luca-ai.com.br"
-      print "    service: http://127.0.0.1:4242"
-      print "    originRequest:"
-      print "      connectTimeout: 10s"
-      print "      tcpKeepAlive: 30s"
-      print "      keepAliveTimeout: 90s"
-      print "      keepAliveConnections: 100"
-    }
-    { print }
-  ' "$tunnel_config" > "$config_tmp"
-  chmod --reference="$tunnel_config" "$config_tmp"
-  chown --reference="$tunnel_config" "$config_tmp"
-  mv "$config_tmp" "$tunnel_config"
-fi
-
-if ! grep -q 'hostname: luca-origin.bombapvp.com' "$tunnel_config"; then
-  config_tmp="$(mktemp /etc/cloudflared/luca-ai.yml.XXXXXX)"
-  awk '
-    /  - service: http_status:404/ {
-      print "  - hostname: luca-origin.bombapvp.com"
       print "    service: http://127.0.0.1:4242"
       print "    originRequest:"
       print "      connectTimeout: 10s"

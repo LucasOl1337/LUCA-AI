@@ -1,5 +1,5 @@
 tunnel: LUCA_AI_TUNNEL_ID
-credentials-file: C:\Users\user\.cloudflared\LUCA_AI_TUNNEL_ID.json
+credentials-file: /etc/cloudflared/LUCA_AI_TUNNEL_ID.json
 
 ingress:
   - hostname: luca-ai.com.br

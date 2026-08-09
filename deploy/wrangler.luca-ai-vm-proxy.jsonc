@@ -1,0 +1,20 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "luca-ai-vm-proxy",
+  "main": "luca-ai-vm-proxy.js",
+  "compatibility_date": "2026-06-10",
+  "account_id": "f838f7d26348a09f88fb38ea03272857",
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "luca-ai.com.br/*",
+      "zone_name": "luca-ai.com.br"
+    }
+  ],
+  "vpc_services": [
+    {
+      "binding": "LUCA_EXPRESS",
+      "service_id": "019fe7df-ffaa-71a3-86eb-2473bbc9f83b"
+    }
+  ]
+}
