@@ -246,6 +246,37 @@ function formatAttachmentSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** Coleta arquivos de clipboard ou drag-and-drop (imagem do print, etc.). */
+function filesFromDataTransfer(data: DataTransfer | null | undefined): File[] {
+  if (!data) return [];
+  const fromList = Array.from(data.files || []).filter((file) => file && file.size > 0);
+  if (fromList.length) return fromList;
+  const fromItems: File[] = [];
+  for (const item of Array.from(data.items || [])) {
+    if (item.kind !== 'file') continue;
+    const file = item.getAsFile();
+    if (file && file.size > 0) fromItems.push(file);
+  }
+  return fromItems;
+}
+
+/** Clipboard/OS às vezes entrega blob sem nome útil; normaliza para o upload. */
+function nameClipboardFile(file: File, index: number): File {
+  const rawName = String(file.name || '').trim();
+  if (rawName && rawName !== 'blob') return file;
+  const mime = String(file.type || '').toLowerCase();
+  const ext = mime === 'image/jpeg' ? 'jpg'
+    : mime === 'image/webp' ? 'webp'
+      : mime === 'image/gif' ? 'gif'
+        : mime.startsWith('image/') ? 'png'
+          : 'bin';
+  const base = mime.startsWith('image/') ? 'clipboard' : 'anexo';
+  return new File([file], `${base}-${Date.now()}-${index + 1}.${ext}`, {
+    type: file.type || (ext === 'png' ? 'image/png' : 'application/octet-stream'),
+    lastModified: file.lastModified || Date.now(),
+  });
+}
+
 /** Anexos preservados na bolha do operador, com miniatura para imagens. */
 function AttachmentList({ attachments }: { attachments?: LucaAiChatAttachment[] }) {
   if (!attachments?.length) return null;
@@ -990,12 +1021,17 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     && !running
     && !uploadingAttachment;
 
-  async function addAttachments(files: FileList | null) {
+  async function addAttachments(files: FileList | File[] | null) {
     if (!files || !activeSessionId || running || uploadingAttachment) return;
     const available = Math.max(0, 4 - draftAttachments.length);
-    const selected = Array.from(files).slice(0, available);
+    const selected = Array.from(files)
+      .filter((file) => file && file.size > 0)
+      .slice(0, available)
+      .map((file, index) => nameClipboardFile(file, index));
     if (!selected.length) {
-      setError('Você pode anexar até 4 arquivos por mensagem.');
+      setError(Array.from(files || []).length
+        ? 'Você pode anexar até 4 arquivos por mensagem.'
+        : 'Nenhum arquivo válido para anexar.');
       setErrorRetry(null);
       return;
     }
@@ -2922,12 +2958,14 @@ function LucaMissionBar({
   isIndividualReady: boolean;
   assignedCount: number;
   onMissionChange: (value: string) => void;
-  onFilesSelected: (files: FileList | null) => void | Promise<void>;
+  onFilesSelected: (files: FileList | File[] | null) => void | Promise<void>;
   onRemoveAttachment: (attachment: LucaAiChatAttachment) => void | Promise<void>;
   onRun: () => void | Promise<void>;
   onClear: () => void;
 }) {
   const theme = useTheme();
+  const [dragOver, setDragOver] = useState(false);
+  const canAttach = !running && !uploadingAttachment && attachments.length < 4;
 
   function submit() {
     if (canRun) void onRun();
@@ -2938,6 +2976,45 @@ function LucaMissionBar({
       event.preventDefault();
       submit();
     }
+  }
+
+  /** Ctrl+V / Cmd+V com imagem no clipboard (print, copiar imagem no browser). */
+  function onPaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
+    if (!canAttach) return;
+    const files = filesFromDataTransfer(event.clipboardData);
+    if (!files.length) return;
+    event.preventDefault();
+    void onFilesSelected(files);
+  }
+
+  function onDragEnter(event: React.DragEvent<HTMLDivElement>) {
+    if (!canAttach) return;
+    if (![...event.dataTransfer.types].includes('Files')) return;
+    event.preventDefault();
+    setDragOver(true);
+  }
+
+  function onDragOver(event: React.DragEvent<HTMLDivElement>) {
+    if (!canAttach) return;
+    if (![...event.dataTransfer.types].includes('Files')) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    setDragOver(true);
+  }
+
+  function onDragLeave(event: React.DragEvent<HTMLDivElement>) {
+    // Só some o highlight ao sair do container (não ao entrar em filhos).
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    setDragOver(false);
+  }
+
+  function onDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDragOver(false);
+    if (!canAttach) return;
+    const files = filesFromDataTransfer(event.dataTransfer);
+    if (!files.length) return;
+    void onFilesSelected(files);
   }
 
   const isReady = operationMode === 'individual' ? isIndividualReady : isWorkflowReady;
@@ -2984,13 +3061,20 @@ function LucaMissionBar({
           ))}
         </div>
       )}
-      <div className="luca-ai-composer">
+      <div
+        className={`luca-ai-composer${dragOver ? ' is-drag-over' : ''}`}
+        onDragEnter={onDragEnter}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+      >
         <label className="sr-only" htmlFor="luca-ai-mission">Missão da bancada</label>
         <textarea
           id="luca-ai-mission"
           value={mission}
           onChange={(event) => onMissionChange(event.target.value)}
           onKeyDown={onKeyDown}
+          onPaste={onPaste}
           rows={1}
           className="luca-ai-composer-input"
           placeholder={operationMode === 'individual' ? 'Faça o que quiser' : 'Envie uma missão para a equipe...'}
@@ -3005,15 +3089,15 @@ function LucaMissionBar({
             className="sr-only"
             aria-label="Selecionar fotos e arquivos de texto"
             onChange={(event) => { void onFilesSelected(event.target.files); }}
-            disabled={running || uploadingAttachment || attachments.length >= 4}
+            disabled={!canAttach}
           />
           <button
             type="button"
             className="luca-ai-composer-action"
             onClick={() => fileInputRef.current?.click()}
-            disabled={running || uploadingAttachment || attachments.length >= 4}
+            disabled={!canAttach}
             aria-label="Anexar arquivos e fotos"
-            title="Fotos e arquivos de texto (até 10 MB). PDF ainda não é lido pelos modelos."
+            title="Fotos e arquivos de texto (até 10 MB). Cole com Ctrl+V ou arraste. PDF ainda não é lido pelos modelos."
           >
             {uploadingAttachment ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
           </button>

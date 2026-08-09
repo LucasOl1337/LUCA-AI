@@ -1427,6 +1427,12 @@ a.luca-ai-attachment:focus-visible {
   box-shadow: 0 14px 40px rgba(0, 8, 20, 0.34), inset 0 0.5px 0 rgba(255, 255, 255, 0.16);
 }
 
+.luca-ai-composer.is-drag-over {
+  border-color: rgba(212, 175, 55, 0.55);
+  box-shadow: 0 14px 40px rgba(0, 8, 20, 0.34), 0 0 0 1px rgba(212, 175, 55, 0.35), inset 0 0.5px 0 rgba(255, 255, 255, 0.16);
+  background: rgba(212, 175, 55, 0.06);
+}
+
 .luca-ai-composer-input {
   flex: 1 1 auto;
   width: auto;
