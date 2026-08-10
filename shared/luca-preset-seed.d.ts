@@ -1,4 +1,5 @@
-export const TEAM_ROLE_ORDER: readonly ['supervisor', 'mission', 'execution', 'approval', 'display'];
+export const TEAM_ROLE_ORDER: readonly ['supervisor', 'mission', 'execution', 'approval', 'display', 'visual'];
+export const VISUAL_PERSONA_SLUG: string;
 export const MAX_EXECUTORS: number;
 export const MAX_PARTICIPANTS: number;
 export const PRESET_ICON_IDS: readonly string[];
@@ -14,6 +15,7 @@ export interface LucaTeamPresetSeed {
     execution: string[];
     approval: string[];
     display: string[];
+    visual: string[];
   };
   models?: Record<string, string>;
 }

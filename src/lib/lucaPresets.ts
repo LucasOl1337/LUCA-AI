@@ -15,7 +15,7 @@ import {
   TEAM_ROLE_ORDER,
 } from '../../shared/luca-preset-seed.js';
 
-export type LucaTeamPresetRoleId = 'supervisor' | 'mission' | 'execution' | 'approval' | 'display';
+export type LucaTeamPresetRoleId = 'supervisor' | 'mission' | 'execution' | 'approval' | 'display' | 'visual';
 export type LucaPresetIconId = 'sprout' | 'hardhat' | 'briefcase' | 'swords' | 'crown' | 'stethoscope' | 'users';
 
 export interface LucaTeamPreset {
@@ -104,6 +104,7 @@ export function hydrateTeamTemplate(raw: {
       execution: raw.assignments?.execution ?? [],
       approval: raw.assignments?.approval ?? [],
       display: raw.assignments?.display ?? [],
+      visual: raw.assignments?.visual ?? [],
     },
     models: raw.models,
   };

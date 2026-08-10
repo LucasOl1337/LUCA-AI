@@ -19,12 +19,17 @@ import {
   NINE_ROUTER_CAPABILITIES,
   NINE_ROUTER_MODEL_PROFILES,
   NINE_ROUTER_ROUTE_IDS,
+  IMAGE_GENERATION_MODEL,
+  IMAGE_GENERATION_PROFILES,
+  IMAGE_GENERATION_ROUTE_IDS,
+  IMAGE_GENERATION_CAPABILITIES,
   MAX_CLOSURE_ATTEMPTS,
   CONVERSATION_PARTNER_AGENT_ID,
   isAllowed9RouterModel,
   resolvePersonaRuntimeModel,
 } from './config.js';
-import { call9Router, check9RouterHealth } from './router-client.js';
+import { call9Router, call9RouterImageGeneration, check9RouterHealth } from './router-client.js';
+import { materializeVisualPack, readVisualArtifactFile } from './visual-stage.js';
 import { runAgentWithTools } from './agent-loop.js';
 import {
   addHeartbeat,
@@ -2289,7 +2294,8 @@ async function runLucaAiPersonaWorkflow({ mission, workflow, teamNames, loadedBy
         workflowRole: role,
         accumulatedContext,
         attachments,
-        toolsEnabled,
+        toolsEnabled: role.roleId === 'visual' ? false : toolsEnabled,
+        maxTokens: role.roleId === 'visual' ? 2200 : 900,
         traceId,
       });
     }));
@@ -2632,7 +2638,24 @@ app.get('/api/router/models', (_req, res) => {
     profiles: NINE_ROUTER_MODEL_PROFILES,
     routeIds: NINE_ROUTER_ROUTE_IDS,
     capabilities: NINE_ROUTER_CAPABILITIES,
+    imageProfiles: IMAGE_GENERATION_PROFILES,
+    imageRouteIds: IMAGE_GENERATION_ROUTE_IDS,
+    imageCapabilities: IMAGE_GENERATION_CAPABILITIES,
+    defaultImageModel: IMAGE_GENERATION_MODEL,
   });
+});
+
+app.get('/api/luca-ai/visual-artifacts/:traceId/:artifactId', (req, res) => {
+  const ownerId = getWorkspaceUserId();
+  const file = readVisualArtifactFile(ownerId, req.params.traceId, req.params.artifactId);
+  if (!file?.buffer) {
+    res.status(404).json({ ok: false, error: 'visual_artifact_not_found' });
+    return;
+  }
+  res.setHeader('Content-Type', file.mimeType || 'image/png');
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  res.setHeader('Content-Length', String(file.buffer.length));
+  res.send(file.buffer);
 });
 
 app.get('/api/catalog/audit', (_req, res) => {
@@ -3354,6 +3377,64 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
   const finalDisplayReply = input.mode === 'individual'
     ? judgeReply?.ok ? judgeReply : null
     : finalDisplayStep?.replies.find((reply) => reply.ok) || null;
+
+  let visualPack = null;
+  if (input.mode === 'workflow') {
+    const visualStep = steps.find((step) => step.roleId === 'visual') || null;
+    const visualReply = visualStep?.replies?.find((reply) => reply.ok) || null;
+    if (visualReply?.content) {
+      appendLucaAiTraceEvent(input.traceId, 'luca_ai.visual.started', {
+        slug: visualReply.slug,
+        model: visualReply.model,
+      });
+      try {
+        visualPack = await materializeVisualPack({
+          mission: input.mission,
+          personaOutput: visualReply.content,
+          ownerId: getWorkspaceUserId(),
+          traceId: input.traceId,
+          imageModel: IMAGE_GENERATION_MODEL,
+          callImage: call9RouterImageGeneration,
+          generateImages: true,
+        });
+        appendLucaAiTraceEvent(input.traceId, 'luca_ai.visual.completed', {
+          status: visualPack.status,
+          chartCount: visualPack.charts?.length || 0,
+          imageOkCount: (visualPack.images || []).filter((item) => item.status === 'ok').length,
+          imageEngine: visualPack.imageEngine || null,
+        });
+      } catch (error) {
+        visualPack = {
+          status: 'failed',
+          summary: '',
+          report: null,
+          charts: [],
+          images: [],
+          imageEngine: IMAGE_GENERATION_MODEL,
+          errors: [{ error: error?.message || String(error) }],
+          generatedAt: new Date().toISOString(),
+        };
+        appendLucaAiTraceEvent(input.traceId, 'luca_ai.visual.failed', {
+          error: summarizeLucaAiTraceText(error?.message || String(error), 240),
+        });
+      }
+    } else if (visualStep) {
+      visualPack = {
+        status: 'skipped',
+        reason: 'visual_persona_failed',
+        summary: '',
+        report: null,
+        charts: [],
+        images: [],
+        imageEngine: null,
+        errors: (visualStep.replies || [])
+          .filter((reply) => !reply.ok)
+          .map((reply) => ({ id: reply.slug, error: reply.error || 'persona_failed' })),
+        generatedAt: new Date().toISOString(),
+      };
+    }
+  }
+
   const generatedAt = new Date().toISOString();
   const durationMs = Date.now() - runStartedMs;
   const runOk = input.mode === 'individual'
@@ -3367,6 +3448,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
     okCount: replies.filter((reply) => reply.ok).length,
     errorCount: replies.filter((reply) => !reply.ok).length,
     finalDisplaySlug: finalDisplayReply?.slug || null,
+    visualStatus: visualPack?.status || null,
   });
 
   return {
@@ -3396,6 +3478,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
       model: finalDisplayReply.model,
       content: finalDisplayReply.content,
     } : null,
+    visualPack,
     attachments: attachmentMetadata,
     startedAt: runStartedAt,
     durationMs,

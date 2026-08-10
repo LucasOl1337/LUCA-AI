@@ -1,7 +1,8 @@
 // Seed puro (sem React) — templates de equipe/individual embutidos.
 // Frontend mapeia `icon` → Lucide; server grava no workspace no primeiro GET.
 
-export const TEAM_ROLE_ORDER = ['supervisor', 'mission', 'execution', 'approval', 'display'];
+export const TEAM_ROLE_ORDER = ['supervisor', 'mission', 'execution', 'approval', 'display', 'visual'];
+export const VISUAL_PERSONA_SLUG = 'especialista-visual';
 export const MAX_EXECUTORS = 4;
 export const MAX_PARTICIPANTS = 5;
 export const PRESET_ICON_IDS = ['sprout', 'hardhat', 'briefcase', 'swords', 'crown', 'stethoscope', 'users'];
@@ -17,6 +18,8 @@ const DIVERSE_MODELS = [
   'cx/gpt-5.5-xhigh',
   'kimi/kimi-k3',
   'cx/gpt-5.6-sol-xhigh',
+  'cx/gpt-5.6-sol-high',
+  'gcli/grok-4.5',
 ];
 // Sol xhigh é a rota de maior esforço da família GPT 5.6 mais nova; o perfil
 // Ultra aponta para o mesmo ID, portanto não oferece capacidade adicional.
@@ -34,7 +37,7 @@ export const LUCA_TEAM_PRESET_SEED = [
   {
     id: 'risco-agro',
     label: 'Equipe Risco Agro',
-    description: 'ZARC, campo e indenização da safrinha, com dossiê executivo na entrega.',
+    description: 'ZARC, campo e indenização da safrinha, com dossiê e artefatos visuais na entrega.',
     icon: 'sprout',
     assignments: {
       supervisor: ['supervisor-agentes-ia'],
@@ -42,6 +45,7 @@ export const LUCA_TEAM_PRESET_SEED = [
       execution: ['estrategista-risco-agro', 'especialista-zarc-seguro-rural', 'engenheiro-agricola'],
       approval: ['curador-personas'],
       display: ['relator-executivo-risco'],
+      visual: [VISUAL_PERSONA_SLUG],
     },
     models: modelsFor([
       'supervisor-agentes-ia',
@@ -51,12 +55,13 @@ export const LUCA_TEAM_PRESET_SEED = [
       'engenheiro-agricola',
       'curador-personas',
       'relator-executivo-risco',
+      VISUAL_PERSONA_SLUG,
     ]),
   },
   {
     id: 'engenharia-projetos',
     label: 'Equipe Engenharia & Projetos',
-    description: 'Cálculo estrutural, arquitetura e revisão técnica de ponta a ponta.',
+    description: 'Cálculo estrutural, arquitetura e revisão técnica, com pack visual na ponta.',
     icon: 'hardhat',
     assignments: {
       supervisor: ['supervisor-agentes-ia'],
@@ -64,6 +69,7 @@ export const LUCA_TEAM_PRESET_SEED = [
       execution: ['engenheiro-civil', 'arquiteto', 'lucas'],
       approval: ['curador-personas'],
       display: ['relator-executivo-risco'],
+      visual: [VISUAL_PERSONA_SLUG],
     },
     models: modelsFor([
       'supervisor-agentes-ia',
@@ -73,12 +79,13 @@ export const LUCA_TEAM_PRESET_SEED = [
       'lucas',
       'curador-personas',
       'relator-executivo-risco',
+      VISUAL_PERSONA_SLUG,
     ]),
   },
   {
     id: 'conselho-estrategia',
     label: 'Conselho de Estratégia',
-    description: 'Primeiros princípios e execução pragmática, com síntese para decisão.',
+    description: 'Primeiros princípios e execução pragmática, com síntese e visuais para decisão.',
     icon: 'briefcase',
     assignments: {
       supervisor: ['supervisor-agentes-ia'],
@@ -86,6 +93,7 @@ export const LUCA_TEAM_PRESET_SEED = [
       execution: ['elon-musk', 'aurora', 'tars'],
       approval: ['curador-personas'],
       display: ['relator-executivo-risco'],
+      visual: [VISUAL_PERSONA_SLUG],
     },
     models: modelsFor([
       'supervisor-agentes-ia',
@@ -95,12 +103,13 @@ export const LUCA_TEAM_PRESET_SEED = [
       'tars',
       'curador-personas',
       'relator-executivo-risco',
+      VISUAL_PERSONA_SLUG,
     ]),
   },
   {
     id: 'squad-summoners-rift',
     label: "Squad Summoner's Rift",
-    description: 'Noxus, Demacia e Vazio executando a missão com estilo.',
+    description: 'Noxus, Demacia e Vazio executando a missão com estilo e stills cinematográficos.',
     icon: 'swords',
     assignments: {
       supervisor: ['darius'],
@@ -108,8 +117,9 @@ export const LUCA_TEAM_PRESET_SEED = [
       execution: ['jinx', 'zed', 'katarina', 'ahri'],
       approval: ['garen'],
       display: ['lux'],
+      visual: [VISUAL_PERSONA_SLUG],
     },
-    models: modelsFor(['darius', 'ezreal', 'jinx', 'zed', 'katarina', 'ahri', 'garen', 'lux']),
+    models: modelsFor(['darius', 'ezreal', 'jinx', 'zed', 'katarina', 'ahri', 'garen', 'lux', VISUAL_PERSONA_SLUG]),
   },
 ];
 

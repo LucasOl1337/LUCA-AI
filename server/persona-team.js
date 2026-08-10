@@ -53,6 +53,12 @@ export const PERSONA_WORKFLOW_ROLES = [
     maxSlugs: 1,
     instruction: 'Transforme o resultado aprovado em uma exibicao final clara para o operador: resumo, decisoes, riscos e proximas acoes.',
   },
+  {
+    id: 'visual',
+    label: 'Especialista visual',
+    maxSlugs: 1,
+    instruction: 'Com base no resultado aprovado e na entrega final, selecione o conteudo mais relevante e produza um plano de artefatos: graficos com dados, relatorio executivo e prompts de imagens cinematograficas de exemplo. Nao invente metricas sem base no contexto.',
+  },
 ];
 
 const ROLE_BY_ID = new Map(PERSONA_WORKFLOW_ROLES.map((role) => [role.id, role]));
@@ -77,6 +83,15 @@ const ROLE_ALIASES = new Map([
   ['exibicao', 'display'],
   ['final', 'display'],
   ['final_display', 'display'],
+  ['visual', 'visual'],
+  ['visuals', 'visual'],
+  ['imagem', 'visual'],
+  ['imagens', 'visual'],
+  ['image', 'visual'],
+  ['images', 'visual'],
+  ['designer_visual', 'visual'],
+  ['especialista_visual', 'visual'],
+  ['especialista-visual', 'visual'],
 ]);
 
 export function normalizePersonaTeamSlug(value) {
@@ -160,6 +175,7 @@ function normalizePersonaTeamWorkflow(body = {}, fallbackSlugs = []) {
     byRole.set('execution', fallbackSlugs.slice(0, DEFAULT_MAX_EXECUTION_SLUGS));
     byRole.set('approval', [first]);
     byRole.set('display', [last]);
+    byRole.set('visual', [last]);
   }
 
   return PERSONA_WORKFLOW_ROLES.map((role) => ({
@@ -336,8 +352,12 @@ export function buildPersonaTeamPrompt({
     const roleLabel = workflowRole?.roleLabel || role?.label || '';
     const roleInstruction = workflowRole?.instruction || role?.instruction || '';
     const context = String(accumulatedContext || '').trim();
+    const visualJsonHint = role?.id === 'visual'
+      ? 'Responda SOMENTE com JSON valido contendo summary, report, charts (ate 3, pie|tower), images (ate 2 prompts em ingles) e imageEngine (grok-imagine|gpt-image).'
+      : '';
     const extraUser = [
       roleLabel ? `Etapa: ${roleLabel}. ${roleInstruction}` : '',
+      visualJsonHint,
       context ? `Contexto acumulado:\n${context}` : '',
     ].filter(Boolean).join('\n\n');
     return {
@@ -347,7 +367,9 @@ export function buildPersonaTeamPrompt({
 
 ---
 ${modelBlock}
-Responda com liberdade de formato. Sem personagem fixo alem do que o system acima definir.`,
+${role?.id === 'visual'
+    ? 'Nesta etapa o formato de saida e JSON de artefatos visuais (sem markdown fora do JSON).'
+    : 'Responda com liberdade de formato. Sem personagem fixo alem do que o system acima definir.'}`,
       user: extraUser
         ? `${String(mission || '').trim()}\n\n${extraUser}`
         : String(mission || '').trim(),
@@ -375,7 +397,41 @@ Responda com liberdade de formato. Sem personagem fixo alem do que o system acim
       : '';
     const outputContract = role?.id === 'display'
       ? 'Entregue a exibicao final em secoes curtas: Resumo, Decisao, Evidencias, Riscos, Proximas acoes.'
-      : 'Entregue uma contribuicao objetiva em 3 a 6 bullets. Inclua uma decisao, uma acao imediata e um risco/observacao quando fizer sentido.';
+      : role?.id === 'visual'
+        ? `Voce e a etapa final de artefatos da bancada. Com base no contexto acumulado (especialmente Aprovacao e Exibicao final), produza SOMENTE JSON valido — sem markdown fora do JSON — neste formato:
+{
+  "summary": "1-2 frases sobre o que sera visualizado",
+  "report": {
+    "title": "titulo do relatorio",
+    "markdown": "relatorio executivo em markdown (pt-BR), curto e acionavel"
+  },
+  "charts": [
+    {
+      "id": "c1",
+      "title": "titulo",
+      "type": "pie|tower",
+      "items": [{ "label": "nome", "value": 1 }],
+      "rationale": "por que este grafico"
+    }
+  ],
+  "images": [
+    {
+      "id": "i1",
+      "title": "titulo",
+      "prompt": "English cinematic prompt grounded in the findings (no illegible text, photoreal or film still)",
+      "aspect_ratio": "16:9",
+      "style": "cinematic"
+    }
+  ],
+  "imageEngine": "grok-imagine"
+}
+Regras:
+- Ate 3 charts, 1 report, ate 2 images.
+- So use numeros/labels sustentados pelo contexto; se faltar dado, omita o chart ou use ranking qualitativo com valores relativos honestos.
+- Prompts de imagem em ingles, cinematograficos, fiéis aos achados (cenas de exemplo, nao screenshots de UI).
+- imageEngine pode ser "grok-imagine" ou "gpt-image".
+- Nao mencione runtime interno, 9router, agents nem logs.`
+        : 'Entregue uma contribuicao objetiva em 3 a 6 bullets. Inclua uma decisao, uma acao imediata e um risco/observacao quando fizer sentido.';
 
     return {
       name,

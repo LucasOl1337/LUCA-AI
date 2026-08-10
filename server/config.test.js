@@ -5,12 +5,18 @@ import {
   NINE_ROUTER_CAPABILITIES,
   NINE_ROUTER_MODEL_PROFILES,
   NINE_ROUTER_ROUTE_IDS,
+  IMAGE_GENERATION_MODEL,
+  IMAGE_GENERATION_ROUTE_IDS,
   ROUTER_BASE_URL,
   ROUTER_MODEL,
   ROUTER_TIMEOUT_MS,
   assertAllowed9RouterModel,
+  assertAllowedImageGenerationModel,
   isAllowed9RouterModel,
+  isAllowedImageGenerationModel,
   sanitize9RouterModel,
+  sanitizeImageGenerationModel,
+  VISUAL_PERSONA_SLUG,
 } from './config.js';
 
 const EXPECTED_ROUTE_IDS = [
@@ -73,4 +79,15 @@ test('sanitizacao e fronteira do cliente bloqueiam rotas externas', () => {
     () => assertAllowed9RouterModel('cx/gpt-5.4-mini-xhigh'),
     /9router_model_not_allowed/,
   );
+});
+
+test('catalogo de imagem e separado do chat e aceita aliases', () => {
+  assert.ok(IMAGE_GENERATION_ROUTE_IDS.includes('xai/grok-imagine-image'));
+  assert.ok(IMAGE_GENERATION_ROUTE_IDS.includes('cx/gpt-image-1'));
+  assert.equal(isAllowedImageGenerationModel(IMAGE_GENERATION_MODEL), true);
+  assert.equal(sanitizeImageGenerationModel('grok-imagine-2'), 'xai/grok-imagine-image');
+  assert.equal(sanitizeImageGenerationModel('gpt-image'), 'cx/gpt-image-1');
+  assert.equal(assertAllowedImageGenerationModel('xai/grok-imagine-image-quality'), 'xai/grok-imagine-image-quality');
+  assert.equal(isAllowed9RouterModel('xai/grok-imagine-image'), false);
+  assert.equal(VISUAL_PERSONA_SLUG, 'especialista-visual');
 });

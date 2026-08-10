@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { call9Router, extractChatCompletionContent, parseChatCompletionPayload } from './router-client.js';
+import { call9Router, call9RouterImageGeneration, extractChatCompletionContent, parseChatCompletionPayload } from './router-client.js';
 
 test('extractChatCompletionContent le JSON OpenAI compativel', () => {
   const payload = JSON.stringify({
@@ -73,6 +73,33 @@ test('call9Router envia somente a rota pronta, sem controles de esforco', async 
       Object.keys(requestBody).some((key) => /reason|thinking|effort/i.test(key)),
       false,
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('call9RouterImageGeneration usa /images/generations com modelo da whitelist', async () => {
+  const originalFetch = globalThis.fetch;
+  let requestUrl;
+  let requestBody;
+  globalThis.fetch = async (url, init) => {
+    requestUrl = String(url);
+    requestBody = JSON.parse(init.body);
+    return new Response(JSON.stringify({
+      data: [{ b64_json: Buffer.from('fake-image-bytes-here').toString('base64') }],
+    }), { status: 200 });
+  };
+
+  try {
+    const result = await call9RouterImageGeneration({
+      prompt: 'A cinematic wheat field at golden hour',
+      model: 'xai/grok-imagine-image',
+      aspectRatio: '16:9',
+    });
+    assert.match(requestUrl, /\/images\/generations$/);
+    assert.equal(requestBody.model, 'xai/grok-imagine-image');
+    assert.equal(requestBody.response_format, 'b64_json');
+    assert.equal(result.images[0].b64Json.length > 8, true);
   } finally {
     globalThis.fetch = originalFetch;
   }

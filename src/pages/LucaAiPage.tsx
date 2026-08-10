@@ -9,6 +9,7 @@ import {
   Eye,
   FileText,
   GitBranch,
+  Image as ImageIcon,
   Link2,
   Loader2,
   MessageSquareText,
@@ -37,12 +38,14 @@ import type {
   LucaAiPersonaTeamReply,
   LucaAiPersonaTeamPhase,
   LucaAiPersonaTeamRunResponse,
+  LucaAiVisualPack,
   LucaAiWorkflowAssignment,
   RouterModelProfile,
   RuntimeEvent,
   YumePersonaSummary,
 } from '@/lib/types';
 import CopyLogButton from '@/components/CopyLogButton';
+import DashboardBlock from '@/components/DashboardBlock';
 import { useLuca } from '@/hooks/useLucaState';
 import {
   LUCA_INDIVIDUAL_PRESETS,
@@ -83,7 +86,7 @@ interface LucaAiPageProps {
 
 type TranscriptRole = 'operator' | 'persona' | 'system';
 type OperationMode = 'team' | 'individual';
-type WorkflowRoleId = 'supervisor' | 'mission' | 'execution' | 'approval' | 'display';
+type WorkflowRoleId = 'supervisor' | 'mission' | 'execution' | 'approval' | 'display' | 'visual';
 type WorkflowAssignments = Record<WorkflowRoleId, string[]>;
 type IndividualPickerId = 'participants' | 'judge';
 type PickerTarget = { mode: 'team'; id: WorkflowRoleId } | { mode: 'individual'; id: IndividualPickerId };
@@ -148,6 +151,7 @@ const WORKFLOW_ROLES: WorkflowRoleConfig[] = [
   { id: 'execution', label: 'Executores', icon: BrainCircuit, multiple: true, maxSlugs: MAX_EXECUTORS },
   { id: 'approval', label: 'Aprovacao', icon: ClipboardCheck, multiple: false, maxSlugs: 1 },
   { id: 'display', label: 'Exibicao final', icon: Eye, multiple: false, maxSlugs: 1 },
+  { id: 'visual', label: 'Especialista visual', icon: ImageIcon, multiple: false, maxSlugs: 1 },
 ];
 
 const INDIVIDUAL_PICKER_CONFIGS: Record<IndividualPickerId, PersonaPickerConfig> = {
@@ -176,6 +180,7 @@ function createEmptyWorkflowAssignments(): WorkflowAssignments {
     execution: [],
     approval: [],
     display: [],
+    visual: [],
   };
 }
 
@@ -335,7 +340,19 @@ function transcriptEntriesFromResponse(data: LucaAiPersonaTeamRunResponse): Team
   const timestamp = data.generatedAt || new Date().toISOString();
   if (data.steps?.length) {
     return data.steps.flatMap((step) => (
-      step.replies.map((reply) => transcriptEntryFromReply(reply, timestamp, step.roleLabel, reply.phase || step.phase))
+      step.replies.map((reply) => {
+        if (step.roleId === 'visual' && reply.ok) {
+          const summary = data.visualPack?.summary
+            || 'Plano de artefatos enviado para materialização (gráficos, relatório e imagens).';
+          return transcriptEntryFromReply(
+            { ...reply, content: summary },
+            timestamp,
+            step.roleLabel,
+            reply.phase || step.phase,
+          );
+        }
+        return transcriptEntryFromReply(reply, timestamp, step.roleLabel, reply.phase || step.phase);
+      })
     ));
   }
   return (data.replies ?? []).map((reply) => transcriptEntryFromReply(reply, timestamp, reply.workflowRoleLabel));
@@ -614,6 +631,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [transcript, setTranscript] = useState<TeamTranscriptEntry[]>([]);
   const [finalResult, setFinalResult] = useState<TeamTranscriptEntry | null>(null);
+  const [visualPack, setVisualPack] = useState<LucaAiVisualPack | null>(null);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
@@ -718,6 +736,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setDraftAttachments([]);
       setTranscript([]);
       setFinalResult(null);
+      setVisualPack(null);
       pendingSompoLaunchRef.current = launch;
       sompoAutoRunArmedRef.current = Boolean(launch?.autoRun);
       return;
@@ -738,6 +757,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setDraftAttachments(Array.isArray(session.draftAttachments) ? session.draftAttachments.slice(0, 4) : []);
     setTranscript(nextTranscript);
     setFinalResult(isTeamTranscriptEntry(session.finalResult) ? session.finalResult : null);
+    setVisualPack(session.visualPack && typeof session.visualPack === 'object' ? session.visualPack as LucaAiVisualPack : null);
     setActivePersonaSlug(session.activePersonaSlug ? String(session.activePersonaSlug) : null);
     setHydratedSessionId(session.id);
     pendingSompoLaunchRef.current = launch;
@@ -1362,9 +1382,10 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   function clearTranscript() {
     setTranscript([]);
     setFinalResult(null);
+    setVisualPack(null);
     setProcessEvents([]);
     setActiveTraceId(null);
-    flushSessionNow(activeSessionId, { transcript: [], finalResult: null });
+    flushSessionNow(activeSessionId, { transcript: [], finalResult: null, visualPack: null });
   }
 
   function switchOperationMode(next: OperationMode) {
@@ -1403,6 +1424,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setError(null);
     setErrorRetry(null);
     setFinalResult(null);
+    setVisualPack(null);
     setActiveTraceId(traceId);
     setProcessEvents(operationMode === 'team'
       ? plannedRuntimeEvents(traceId, trimmedMission, assignmentsToRun, personaBySlug)
@@ -1429,6 +1451,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       missionDraft: trimmedMission,
       transcript: transcriptWithOperator,
       finalResult: null,
+      visualPack: null,
     });
 
     const stillOwner = () => (
@@ -1504,6 +1527,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         };
       }
       setFinalResult(nextFinal);
+      const nextVisual = data.visualPack && typeof data.visualPack === 'object' ? data.visualPack : null;
+      setVisualPack(nextVisual);
       // Anexos ja foram entregues as personas: limpam-se so quando a rodada deu certo,
       // para uma falha permitir reenviar a mesma mensagem sem reanexar tudo.
       if (data.ok) setDraftAttachments([]);
@@ -1512,6 +1537,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         draftAttachments: data.ok ? [] : attachmentsToRun,
         transcript: transcriptAfter,
         finalResult: nextFinal,
+        visualPack: nextVisual,
       });
       if (!data.ok) {
         setError(operationMode === 'individual'
@@ -1757,6 +1783,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
             <LucaMissionCanvas
               transcript={transcript}
               finalResult={finalResult}
+              visualPack={visualPack}
               personaBySlug={personaBySlug}
               running={running}
               transcriptRef={transcriptRef}
@@ -2885,6 +2912,7 @@ function lastOperatorMission(transcript: TeamTranscriptEntry[]): string {
 function LucaMissionCanvas({
   transcript,
   finalResult,
+  visualPack,
   personaBySlug,
   running,
   transcriptRef,
@@ -2894,6 +2922,7 @@ function LucaMissionCanvas({
 }: {
   transcript: TeamTranscriptEntry[];
   finalResult: TeamTranscriptEntry | null;
+  visualPack: LucaAiVisualPack | null;
   personaBySlug: Map<string, YumePersonaSummary>;
   running: boolean;
   transcriptRef: React.RefObject<HTMLDivElement | null>;
@@ -2905,7 +2934,11 @@ function LucaMissionCanvas({
   const headerStatus = running
     ? operationMode === 'individual' ? 'respostas individuais em andamento' : 'workflow em andamento'
     : finalResult
-      ? operationMode === 'individual' ? 'veredito do juiz pronto' : 'exibicao final pronta'
+      ? operationMode === 'individual'
+        ? 'veredito do juiz pronto'
+        : visualPack && visualPack.status !== 'skipped'
+          ? 'entrega final e artefatos visuais prontos'
+          : 'exibicao final pronta'
       : transcript.length ? 'rodada registrada' : 'aguardando missao';
   const originalMission = lastOperatorMission(transcript) || String(missionDraft || '').trim();
   const supportingTranscript = finalResult
@@ -2996,6 +3029,10 @@ function LucaMissionCanvas({
           <FinalDisplayCard entry={finalResult} persona={finalResult.slug ? personaBySlug.get(finalResult.slug) : undefined} />
         )}
 
+        {visualPack && visualPack.status !== 'skipped' && (
+          <VisualPackCard pack={visualPack} />
+        )}
+
         {running && (
           <div className="mt-6 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs" style={{ background: theme.goldSoft, color: theme.goldDeep }}>
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -3004,6 +3041,116 @@ function LucaMissionCanvas({
         )}
       </div>
     </div>
+  );
+}
+
+function VisualPackCard({ pack }: { pack: LucaAiVisualPack }) {
+  const theme = useTheme();
+  const charts = Array.isArray(pack.charts) ? pack.charts : [];
+  const images = Array.isArray(pack.images) ? pack.images : [];
+  const report = pack.report || null;
+  const statusLabel = pack.status === 'complete'
+    ? 'completo'
+    : pack.status === 'partial'
+      ? 'parcial'
+      : pack.status === 'failed'
+        ? 'falhou'
+        : String(pack.status || 'artefatos');
+
+  return (
+    <article className="luca-ai-message mt-4">
+      <div className="luca-ai-message-meta">
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full" style={{ background: theme.goldSoft, color: theme.gold }}>
+          <ImageIcon className="h-4 w-4" />
+        </span>
+        <h3 className="truncate text-[13px] font-semibold" style={{ color: theme.text }}>Artefatos visuais</h3>
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ color: theme.textMute }}>
+          {statusLabel}
+        </span>
+        {pack.imageEngine ? (
+          <span className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px]" style={{ background: 'rgba(255,255,255,0.05)', color: theme.textGhost }} title="Motor de imagem 9Router">
+            {pack.imageEngine}
+          </span>
+        ) : null}
+        {report?.markdown ? (
+          <span className="luca-ai-message-copy ml-auto">
+            <CopyLogButton text={report.markdown} label="Copiar relatório" />
+          </span>
+        ) : null}
+      </div>
+      <div className="luca-ai-message-body space-y-4">
+        {pack.summary ? (
+          <p className="text-sm leading-relaxed" style={{ color: theme.textSoft }}>{pack.summary}</p>
+        ) : null}
+
+        {report?.markdown ? (
+          <section className="rounded-xl border p-3" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
+            <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-wide" style={{ color: theme.textGhost }}>
+              <FileText className="h-3.5 w-3.5" />
+              {report.title || 'Relatório'}
+            </div>
+            <div className="luca-ai-selectable">
+              <RichMessageBody content={report.markdown} />
+            </div>
+          </section>
+        ) : null}
+
+        {charts.length > 0 ? (
+          <section className="grid gap-3 sm:grid-cols-2">
+            {charts.map((chart) => (
+              <DashboardBlock
+                key={chart.id}
+                block={{
+                  type: chart.type === 'pie' ? 'pie' : 'tower',
+                  title: chart.title,
+                  items: chart.items,
+                  body: chart.rationale,
+                }}
+              />
+            ))}
+          </section>
+        ) : null}
+
+        {images.length > 0 ? (
+          <section className="grid gap-3 sm:grid-cols-2">
+            {images.map((image) => (
+              <figure
+                key={image.id}
+                className="overflow-hidden rounded-xl border"
+                style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}
+              >
+                {image.status === 'ok' && image.url ? (
+                  <img
+                    src={image.url}
+                    alt={image.title || 'Artefato visual'}
+                    className="max-h-72 w-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="flex min-h-32 items-center justify-center px-3 py-6 text-center text-xs" style={{ color: theme.textMute }}>
+                    {image.status === 'failed'
+                      ? (image.error || 'Falha ao gerar imagem')
+                      : 'Imagem não gerada'}
+                  </div>
+                )}
+                <figcaption className="space-y-1 px-3 py-2">
+                  <strong className="block text-xs" style={{ color: theme.text }}>{image.title || image.id}</strong>
+                  {image.prompt ? (
+                    <p className="text-[11px] leading-snug" style={{ color: theme.textGhost }}>{image.prompt}</p>
+                  ) : null}
+                </figcaption>
+              </figure>
+            ))}
+          </section>
+        ) : null}
+
+        {Array.isArray(pack.errors) && pack.errors.length > 0 ? (
+          <p className="text-[11px]" style={{ color: theme.error || theme.textMute }}>
+            {pack.errors.map((item) => item.error).filter(Boolean).join(' · ')}
+          </p>
+        ) : null}
+      </div>
+    </article>
   );
 }
 

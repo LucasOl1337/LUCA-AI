@@ -101,6 +101,79 @@ export const MISSION_TRANSFORMER_MODEL = sanitize9RouterModel(process.env.MISSIO
 export const DESIGNER_MODEL = sanitize9RouterModel(process.env.DESIGNER_MODEL, DEFAULT_SPECIALIST_MODEL);
 export const MAESTRO_MODEL = sanitize9RouterModel(process.env.MAESTRO_MODEL, DEFAULT_SPECIALIST_MODEL);
 
+// Geracao de imagem e endpoint separado (/images/generations), fora do catalogo de chat.
+// IDs confirmados no skill 9Router + GPT Image sob o prefixo cx (OpenAI via 9Router).
+const IMAGE_GENERATION_PROFILE_DEFINITIONS = [
+  ['grok-imagine', 'Grok Imagine', 'xai/grok-imagine-image'],
+  ['grok-imagine-quality', 'Grok Imagine Quality', 'xai/grok-imagine-image-quality'],
+  ['gpt-image', 'GPT Image', 'cx/gpt-image-1'],
+];
+
+export const IMAGE_GENERATION_CAPABILITIES = Object.freeze({
+  api: 'openai-images-generations',
+  inputModalities: Object.freeze(['text']),
+  outputModalities: Object.freeze(['image']),
+  responseFormats: Object.freeze(['b64_json', 'url']),
+  aspectRatios: Object.freeze(['1:1', '16:9', '9:16', '4:3', '3:4']),
+});
+
+export const IMAGE_GENERATION_PROFILES = Object.freeze(
+  IMAGE_GENERATION_PROFILE_DEFINITIONS.map(([id, name, model]) => Object.freeze({
+    id,
+    name,
+    model,
+    capabilities: IMAGE_GENERATION_CAPABILITIES,
+  })),
+);
+
+export const IMAGE_GENERATION_ROUTE_IDS = Object.freeze([
+  ...new Set(IMAGE_GENERATION_PROFILES.map((profile) => profile.model)),
+]);
+
+const IMAGE_GENERATION_ROUTE_ID_SET = new Set(IMAGE_GENERATION_ROUTE_IDS);
+const IMAGE_ENGINE_ALIASES = Object.freeze({
+  'grok-imagine': 'xai/grok-imagine-image',
+  'grok-imagine-2': 'xai/grok-imagine-image',
+  'grok-imagine-image': 'xai/grok-imagine-image',
+  'imagine': 'xai/grok-imagine-image',
+  'imagine-2': 'xai/grok-imagine-image',
+  'grok': 'xai/grok-imagine-image',
+  'grok-imagine-quality': 'xai/grok-imagine-image-quality',
+  'gpt-image': 'cx/gpt-image-1',
+  'gpt-image-1': 'cx/gpt-image-1',
+  'gpt': 'cx/gpt-image-1',
+});
+const DEFAULT_IMAGE_GENERATION_MODEL = 'xai/grok-imagine-image';
+
+export function isAllowedImageGenerationModel(value) {
+  return IMAGE_GENERATION_ROUTE_ID_SET.has(String(value || '').trim());
+}
+
+export function sanitizeImageGenerationModel(value, fallback = DEFAULT_IMAGE_GENERATION_MODEL) {
+  const raw = String(value || '').trim();
+  const aliased = IMAGE_ENGINE_ALIASES[raw.toLowerCase()] || raw;
+  const safeFallback = isAllowedImageGenerationModel(fallback)
+    ? String(fallback).trim()
+    : DEFAULT_IMAGE_GENERATION_MODEL;
+  return isAllowedImageGenerationModel(aliased) ? aliased : safeFallback;
+}
+
+export function assertAllowedImageGenerationModel(value) {
+  const model = sanitizeImageGenerationModel(value, '');
+  if (!isAllowedImageGenerationModel(model)) {
+    throw new Error(`9router_image_model_not_allowed: ${String(value || '').trim() || '(vazio)'}`);
+  }
+  return model;
+}
+
+export const IMAGE_GENERATION_MODEL = sanitizeImageGenerationModel(
+  process.env.IMAGE_GENERATION_MODEL,
+  DEFAULT_IMAGE_GENERATION_MODEL,
+);
+export const ROUTER_IMAGE_TIMEOUT_MS = Number(process.env.ROUTER_IMAGE_TIMEOUT_MS ?? 180000);
+export const VISUAL_PERSONA_SLUG = String(process.env.VISUAL_PERSONA_SLUG || 'especialista-visual').trim()
+  || 'especialista-visual';
+
 export const AGENTS = [
   { id: 'maestro', role: 'router', name: 'Maestro', model: MAESTRO_MODEL },
   { id: 'transformador-missao', role: 'mission-transformer', name: 'Transformador de Missao', model: MISSION_TRANSFORMER_MODEL },

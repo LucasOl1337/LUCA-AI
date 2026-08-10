@@ -23,6 +23,7 @@
 | [`docs/operacao.md`](./docs/operacao.md) | SOMENTE ao instalar, executar, testar, diagnosticar estado local ou preparar release. |
 | [`docs/arquitetura.md`](./docs/arquitetura.md) | SOMENTE ao mudar um fluxo que cruza frontend, Express, contratos compartilhados ou borda Cloudflare. |
 | [`docs/integracoes.md`](./docs/integracoes.md) | SOMENTE ao mudar roteador LLM, Kamui, personas Yume ou a publicacao pela VM. |
+| [`docs/yume-personas/`](./docs/yume-personas/) | SOMENTE ao criar/atualizar definicoes de personas oficiais para o Yume (o LUCA nao escreve no Yume). |
 | `praisonai-tests/README.md` | SOMENTE ao executar os exemplos Python desse diretorio. |
 | `grokimaginevideos/README.md` | SOMENTE ao trabalhar nesse checkout co-locado. |
 | `DocsDev/` | SOMENTE ao buscar contexto historico que o codigo e os documentos oficiais nao resolvem; nao trate como fonte de verdade. `DocsDev/codegraph/` e snapshot pre-VM (Worker DO) — leia o README SUPERSEDED antes. |

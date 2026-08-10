@@ -197,6 +197,7 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
                 endpoint('luca-ai-chat-session-get', 'GET', '/api/luca-ai/chat/sessions/:sessionId', 'carrega o conteúdo completo de uma sessão de chat do LUCA-AI', 'both'),
                 endpoint('luca-ai-chat-session-share-get', 'GET', '/api/luca-ai/chat/sessions/:sessionId/share', 'consulta o link público ativo de compartilhamento da sessão', 'both'),
                 endpoint('luca-ai-persona-run-status', 'GET', '/api/luca-ai/persona-team/runs/:runId', 'consulta o estado e o resultado de uma rodada assíncrona de personas', 'both'),
+                endpoint('luca-ai-visual-artifact', 'GET', '/api/luca-ai/visual-artifacts/:traceId/:artifactId', 'baixa imagem gerada na etapa visual da equipe (por conta e trace)', 'both'),
                 endpoint('luca-ai-team-templates', 'GET', '/api/luca-ai/team-templates', 'lista templates de equipe e individual da conta', 'both'),
               ],
               inbound: [

@@ -3,7 +3,10 @@ import {
   ROUTER_BASE_URL,
   ROUTER_MODEL,
   ROUTER_TIMEOUT_MS,
+  ROUTER_IMAGE_TIMEOUT_MS,
+  IMAGE_GENERATION_MODEL,
   assertAllowed9RouterModel,
+  assertAllowedImageGenerationModel,
 } from './config.js';
 
 function extractChoiceContent(data) {
@@ -325,6 +328,77 @@ export async function call9Router({
     messages,
   });
   return result.content || 'Sem resposta textual do modelo.';
+}
+
+/**
+ * Text-to-image via 9Router OpenAI-compatible images API.
+ * Models live in a separate whitelist from chat completions.
+ */
+export async function call9RouterImageGeneration({
+  prompt,
+  model = IMAGE_GENERATION_MODEL,
+  n = 1,
+  responseFormat = 'b64_json',
+  aspectRatio = '16:9',
+  resolution = '1k',
+  timeoutMs = ROUTER_IMAGE_TIMEOUT_MS,
+} = {}) {
+  const route = assertAllowedImageGenerationModel(model);
+  const text = String(prompt || '').trim();
+  if (!text) throw new Error('image_prompt_required');
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (ROUTER_API_KEY) headers.Authorization = `Bearer ${ROUTER_API_KEY}`;
+  const url = `${ROUTER_BASE_URL}/images/generations`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Number(timeoutMs) || ROUTER_IMAGE_TIMEOUT_MS);
+
+  const body = {
+    model: route,
+    prompt: text,
+    n: Math.max(1, Math.min(4, Number(n) || 1)),
+    response_format: responseFormat === 'url' ? 'url' : 'b64_json',
+    aspect_ratio: String(aspectRatio || '16:9'),
+    resolution: String(resolution || '1k'),
+  };
+
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers,
+      signal: controller.signal,
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    const aborted = error instanceof Error && error.name === 'AbortError';
+    const detail = aborted
+      ? `timeout de ${Math.round((Number(timeoutMs) || ROUTER_IMAGE_TIMEOUT_MS) / 1000)}s`
+      : (error instanceof Error ? error.message : String(error));
+    throw new Error(`9router_image_unreachable ${url}: ${detail}`);
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`9router_image ${response.status}: ${errText}`);
+  }
+
+  const payload = await response.json();
+  const items = Array.isArray(payload?.data) ? payload.data : [];
+  if (!items.length) throw new Error('9router_image_empty_response');
+
+  return {
+    model: route,
+    images: items.map((item, index) => ({
+      index,
+      b64Json: typeof item?.b64_json === 'string' ? item.b64_json : null,
+      url: typeof item?.url === 'string' ? item.url : null,
+      revisedPrompt: typeof item?.revised_prompt === 'string' ? item.revised_prompt : null,
+    })),
+    raw: payload,
+  };
 }
 
 export async function check9RouterHealth(timeoutMs = 1500) {

@@ -39,6 +39,7 @@ test('seed no primeiro toque e isolamento por conta', async () => {
         execution: ['tars'],
         approval: ['curador-personas'],
         display: ['relator-executivo-risco'],
+        visual: ['especialista-visual'],
       },
     });
   });

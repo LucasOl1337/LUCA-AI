@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Etapa visual no modo equipe
+
+### Novidades
+- Workflow de equipe ganha sexta etapa `visual` (Especialista visual) após a exibição final.
+- Pack de artefatos: relatório markdown, gráficos pie/tower e imagens via 9Router `/images/generations`.
+- Persona Yume canônica `especialista-visual` documentada em `docs/yume-personas/` (criar na VM; LUCA só lê).
+- Templates seed de equipe já preenchem o slot visual.
+
 ## v0.2.0 — Consolidação canônica (2026-08-05)
 
 ### Novidades

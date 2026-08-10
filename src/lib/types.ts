@@ -139,6 +139,7 @@ export interface LucaAiPersonaTeamRunResponse {
     model?: string;
     content?: string;
   } | null;
+  visualPack?: LucaAiVisualPack | null;
   attachments?: LucaAiChatAttachment[];
   generatedAt: string;
 }
@@ -456,6 +457,7 @@ export interface LucaAiChatSession extends LucaAiChatSessionSummary {
   draftAttachments?: LucaAiChatAttachment[];
   transcript?: Array<Record<string, unknown>>;
   finalResult?: Record<string, unknown> | null;
+  visualPack?: LucaAiVisualPack | null;
   activePersonaSlug?: string | null;
 }
 
@@ -478,6 +480,53 @@ export interface LucaAiTeamTemplateAssignments {
   execution: string[];
   approval: string[];
   display: string[];
+  visual: string[];
+}
+
+export interface LucaAiVisualChartArtifact {
+  id: string;
+  kind: 'chart';
+  title: string;
+  type: 'pie' | 'tower' | string;
+  items: Array<{ label: string; value: number }>;
+  rationale?: string;
+  status?: string;
+}
+
+export interface LucaAiVisualReportArtifact {
+  id: string;
+  kind: 'report';
+  title: string;
+  markdown: string;
+  status?: string;
+}
+
+export interface LucaAiVisualImageArtifact {
+  id: string;
+  kind: 'image';
+  title: string;
+  prompt?: string;
+  aspectRatio?: string;
+  style?: string;
+  mimeType?: string;
+  size?: number;
+  url?: string;
+  model?: string;
+  status?: string;
+  error?: string;
+}
+
+export interface LucaAiVisualPack {
+  status: 'skipped' | 'complete' | 'partial' | 'failed' | string;
+  summary?: string;
+  report?: LucaAiVisualReportArtifact | null;
+  charts?: LucaAiVisualChartArtifact[];
+  images?: LucaAiVisualImageArtifact[];
+  imageEngine?: string | null;
+  planSource?: string;
+  errors?: Array<{ id?: string; error?: string }>;
+  generatedAt?: string;
+  reason?: string;
 }
 
 export interface LucaAiTeamTemplate {

@@ -22,7 +22,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { PRESET_ICON_IDS, TEAM_ROLE_ORDER } from '../../shared/luca-preset-seed.js';
 
 type Kind = 'team' | 'individual';
-type RoleId = 'supervisor' | 'mission' | 'execution' | 'approval' | 'display';
+type RoleId = 'supervisor' | 'mission' | 'execution' | 'approval' | 'display' | 'visual';
 const ROLE_ORDER = TEAM_ROLE_ORDER as readonly RoleId[];
 
 const ROLE_LABELS: Record<RoleId, string> = {
@@ -31,6 +31,7 @@ const ROLE_LABELS: Record<RoleId, string> = {
   execution: 'Executores',
   approval: 'Aprovação',
   display: 'Exibição final',
+  visual: 'Especialista visual',
 };
 
 const ROLE_LIMITS: Record<RoleId, number> = {
@@ -39,6 +40,7 @@ const ROLE_LIMITS: Record<RoleId, number> = {
   execution: 4,
   approval: 1,
   display: 1,
+  visual: 1,
 };
 
 const ICON_OPTIONS = PRESET_ICON_IDS as LucaPresetIconId[];
@@ -55,6 +57,7 @@ function emptyTeam(): LucaAiTeamTemplate {
       execution: [],
       approval: [],
       display: [],
+      visual: [],
     },
   };
 }

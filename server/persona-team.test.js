@@ -116,13 +116,14 @@ test('normalizePersonaTeamRunInput aceita workflow fixo por papel', () => {
       execution: ['pesquisador', 'designer', 'pesquisador'],
       approval: ['qa'],
       display: ['narrador'],
+      visual: ['especialista-visual'],
     },
   });
 
   assert.equal(input.ok, true);
   assert.equal(input.mode, 'workflow');
   assert.equal(input.traceId, 'trace-atual-01');
-  assert.deepEqual(input.slugs, ['maestro', 'planejador', 'pesquisador', 'designer', 'qa', 'narrador']);
+  assert.deepEqual(input.slugs, ['maestro', 'planejador', 'pesquisador', 'designer', 'qa', 'narrador', 'especialista-visual']);
   assert.deepEqual(
     input.workflow.map((role) => [role.roleId, role.slugs]),
     [
@@ -131,6 +132,7 @@ test('normalizePersonaTeamRunInput aceita workflow fixo por papel', () => {
       ['execution', ['pesquisador', 'designer']],
       ['approval', ['qa']],
       ['display', ['narrador']],
+      ['visual', ['especialista-visual']],
     ],
   );
 });
@@ -146,7 +148,7 @@ test('normalizePersonaTeamRunInput bloqueia workflow explicito incompleto', () =
 
   assert.equal(input.ok, false);
   assert.equal(input.error, 'workflow_role_required');
-  assert.deepEqual(input.missingRoles.sort(), ['approval', 'display', 'mission']);
+  assert.deepEqual(input.missingRoles.sort(), ['approval', 'display', 'mission', 'visual']);
 });
 
 test('normalizePersonaTeamRunInput aceita resolucao individual com ate cinco participantes e juiz livre', () => {
@@ -242,6 +244,26 @@ test('buildPersonaTeamPrompt inclui papel e contexto do workflow', () => {
   assert.match(prompt.system, /Papel nesta rodada: Exibicao final/i);
   assert.match(prompt.user, /Supervisor: priorizar risco operacional/i);
   assert.match(prompt.user, /Resumo, Decisao, Evidencias, Riscos, Proximas acoes/i);
+});
+
+test('buildPersonaTeamPrompt da etapa visual exige JSON de artefatos', () => {
+  const prompt = buildPersonaTeamPrompt({
+    mission: 'Mapear risco da safrinha',
+    personaName: 'Especialista Visual',
+    personaSlug: 'especialista-visual',
+    teamNames: ['Relator', 'Especialista Visual'],
+    workflowRole: {
+      roleId: 'visual',
+      roleLabel: 'Especialista visual',
+      instruction: 'Produza graficos e imagens.',
+    },
+    accumulatedContext: 'Exibicao final: priorizar Oeste do PR.',
+  });
+
+  assert.match(prompt.system, /Papel nesta rodada: Especialista visual/i);
+  assert.match(prompt.user, /SOMENTE JSON valido/i);
+  assert.match(prompt.user, /imageEngine/i);
+  assert.match(prompt.user, /charts/i);
 });
 
 test('buildPersonaTeamPrompt declara o motor 9Router e bloqueia identidade GLM legada', () => {

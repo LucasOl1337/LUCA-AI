@@ -42,6 +42,7 @@ function emptyAssignments() {
     execution: [],
     approval: [],
     display: [],
+    visual: [],
   };
 }
 
@@ -97,6 +98,7 @@ function makeSession(partial = {}) {
     draftAttachments: normalizeDraftAttachments(partial.draftAttachments, id),
     transcript: Array.isArray(partial.transcript) ? partial.transcript.slice(-MAX_TRANSCRIPT) : [],
     finalResult: partial.finalResult ?? null,
+    visualPack: partial.visualPack ?? null,
     activePersonaSlug: partial.activePersonaSlug ? String(partial.activePersonaSlug) : null,
   };
 }
@@ -366,6 +368,7 @@ export function createChatSession({ title, folderId, seedFromActive = false } = 
           draftAttachments: [],
           transcript: [],
           finalResult: null,
+          visualPack: null,
         }
       : {
           title: title || 'Nova sessão',
@@ -430,6 +433,7 @@ export function updateChatSession(sessionId, patch = {}) {
       session.transcript = [...session.transcript, ...patch.appendTranscript].slice(-MAX_TRANSCRIPT);
     }
     if (Object.prototype.hasOwnProperty.call(patch, 'finalResult')) session.finalResult = patch.finalResult ?? null;
+    if (Object.prototype.hasOwnProperty.call(patch, 'visualPack')) session.visualPack = patch.visualPack ?? null;
     if (Object.prototype.hasOwnProperty.call(patch, 'activePersonaSlug')) {
       session.activePersonaSlug = patch.activePersonaSlug ? String(patch.activePersonaSlug) : null;
     }
@@ -446,6 +450,7 @@ export function updateChatSession(sessionId, patch = {}) {
       || Array.isArray(patch.transcript)
       || Array.isArray(patch.appendTranscript)
       || Object.prototype.hasOwnProperty.call(patch, 'finalResult')
+      || Object.prototype.hasOwnProperty.call(patch, 'visualPack')
       || patch.operationMode === 'team'
       || patch.operationMode === 'individual'
       || patch.workflowAssignments

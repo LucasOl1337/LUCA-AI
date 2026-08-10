@@ -14,13 +14,18 @@ Leia SOMENTE ao mudar roteador LLM, Kamui, personas Yume ou a publicação pela 
 | `ROUTER_API_KEY` ou `NINE_ROUTER_API_KEY` | Credencial enviada como Bearer quando definida. |
 | `ROUTER_MODEL` | Modelo dos agentes comuns. |
 | `MISSION_TRANSFORMER_MODEL`, `DESIGNER_MODEL`, `MAESTRO_MODEL` | Modelos dos papeis especializados. |
-| `ROUTER_TIMEOUT_MS` | Timeout das chamadas. |
+| `ROUTER_TIMEOUT_MS` | Timeout das chamadas de chat. |
+| `ROUTER_IMAGE_TIMEOUT_MS` | Timeout das geracoes de imagem (padrao 180s). |
+| `IMAGE_GENERATION_MODEL` | Motor default de imagem (`xai/grok-imagine-image`, etc.). |
+| `VISUAL_PERSONA_SLUG` | Slug Yume da etapa visual (padrao `especialista-visual`). |
 
 Valores de modelo vindos do ambiente, do estado local ou de personas Yume sao aceitos somente quando correspondem a um dos 16 IDs do catalogo 9Router. Uma rota externa nunca e encaminhada ao provider.
 
 Ao importar uma persona, o LUCA preserva nome, prompt e versao lidos do Yume. O estado local `personaAgents.model` guarda somente override explicito (vazio = seguir Yume). O motor efetivo no 9Router e resolvido assim: override local do LUCA > model do Yume se estiver no catalogo fechado > `ROUTER_MODEL`. O prompt de execucao declara explicitamente o motor 9Router da rodada para a persona nao inventar IDs legados (ex. GLM). `POST /api/agent/config` com `agentId: "yume:<slug>"` grava override; `POST /api/luca-ai/persona-team/run` aceita `modelOverrides` por slug so para aquela missao.
 
 `POST /api/luca-ai/persona-team/run` oferece dois modos visiveis. `workflow` encadeia os papeis da equipe; `individual` executa de uma a cinco personas em contextos isolados e chama depois uma persona juiza com todas as respostas. O juiz pode repetir uma persona participante, mas sempre usa uma chamada separada. O POST devolve `202` com `runId`, `traceId` e status `running`; a execucao segue no processo Express e a UI consulta `GET /api/luca-ai/persona-team/runs/:runId` ate `complete` ou `failed`. Assim, nenhuma conexao com a borda precisa permanecer aberta durante as chamadas LLM.
+
+No modo `workflow`, a sexta etapa e **`visual` (Especialista visual)**. A persona planeja em JSON (relatorio, charts, prompts de imagem); o runtime materializa o pack em `visualPack` e gera imagens via `POST {ROUTER_BASE_URL}/images/generations`. Motores de imagem ficam em catalogo separado do chat (`IMAGE_GENERATION_*` em `server/config.js`): `xai/grok-imagine-image`, `xai/grok-imagine-image-quality` e `cx/gpt-image-1` (alias `gpt-image` / `grok-imagine-2`). Default: `IMAGE_GENERATION_MODEL` (padrao Grok Imagine). Artefatos de imagem ficam em `.luca/workspaces/<hash>/visual-artifacts/<trace>/` e sao servidos por `GET /api/luca-ai/visual-artifacts/:traceId/:artifactId` (autenticado). A persona canonica e `especialista-visual` no Yume (`docs/yume-personas/especialista-visual.md`); o LUCA so le via Kamui.
 
 Os dois modos aceitam anexos privados da sessao. A UI envia imagens ou arquivos de texto para `POST /api/luca-ai/chat/sessions/:sessionId/attachments`; o Express valida tamanho, tipo e assinatura real do arquivo, guarda por conta/sessao e resolve os anexos antes de acionar as personas. A rodada referencia apenas `sessionId` + `attachmentIds`, entao uma conta nunca le arquivo de outra. Limites: quatro anexos por mensagem, 10 MB por arquivo, 20 MB por rodada e 50 MB acumulados por sessao (uploads sao aceitos antes da rodada, entao a quota evita encher o disco).
 
