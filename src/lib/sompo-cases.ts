@@ -464,15 +464,32 @@ export const SOMPO_SEVERITY_LABELS: Record<SompoCaseSeverity, string> = {
 };
 
 /** Chaves de handoff SOMPO → bancada LUCA-AI. */
+export const SOMPO_LAUNCH_KEY = 'luca.lucaAi.sompoLaunch';
 export const SOMPO_PENDING_MISSION_KEY = 'luca.lucaAi.pendingMission';
 export const SOMPO_PENDING_PRESET_KEY = 'luca.lucaAi.pendingTeamPresetId';
 export const SOMPO_ENTRY_MODE_KEY = 'luca.lucaAi.entryMode';
 
-export function buildSompoCaseMission(caseItem: SompoExampleCase): string {
+export type SompoLaunchMode = 'team' | 'individual';
+
+/** Pacote completo: caso + equipe escolhida + auto-run. */
+export interface SompoLaunchPayload {
+  caseId: string;
+  mission: string;
+  mode: SompoLaunchMode;
+  presetId: string;
+  presetLabel: string;
+  autoRun: boolean;
+}
+
+export function buildSompoCaseMission(caseItem: SompoExampleCase, teamLabel?: string): string {
+  const teamLine = teamLabel
+    ? `Equipe selecionada para avaliar: ${teamLabel}`
+    : null;
   return [
     `Caso SOMPO: ${caseItem.title}`,
     `Cultura/região: ${caseItem.culture} — ${caseItem.region}`,
     `Produto: ${caseItem.productLabel} | Estágio: ${caseItem.stageLabel} | Evento: ${caseItem.riskEvent}`,
+    teamLine,
     '',
     'Situação:',
     caseItem.situation,
@@ -494,20 +511,56 @@ export function buildSompoCaseMission(caseItem: SompoExampleCase): string {
     '',
     'Regras: não invente dados financeiros; marque como pendente quando faltar. Não use linguagem de material fictício. Trate como caso operacional realista de seguro agrícola/rural.',
     `Nota de padrão setorial: ${caseItem.patternNote}`,
-  ].join('\n');
+  ].filter((line) => line !== null).join('\n');
 }
 
-export function queueSompoCaseForLuca(caseItem: SompoExampleCase): void {
+export function queueSompoLaunch(payload: SompoLaunchPayload): void {
   try {
-    window.sessionStorage.setItem(SOMPO_PENDING_MISSION_KEY, buildSompoCaseMission(caseItem));
-    window.sessionStorage.setItem(SOMPO_ENTRY_MODE_KEY, caseItem.suggestedMode);
-    if (caseItem.suggestedMode === 'team') {
-      window.sessionStorage.setItem(SOMPO_PENDING_PRESET_KEY, caseItem.suggestedPresetId);
-    } else {
-      window.sessionStorage.removeItem(SOMPO_PENDING_PRESET_KEY);
-    }
+    window.sessionStorage.setItem(SOMPO_LAUNCH_KEY, JSON.stringify(payload));
+    window.sessionStorage.setItem(SOMPO_ENTRY_MODE_KEY, payload.mode);
+    // Compat com leitores legados da bancada.
+    window.sessionStorage.setItem(SOMPO_PENDING_MISSION_KEY, payload.mission);
+    window.sessionStorage.setItem(SOMPO_PENDING_PRESET_KEY, payload.presetId);
   } catch {
-    // sessionStorage pode falhar em modo restrito; a página ainda mostra o caso.
+    // sessionStorage pode falhar em modo restrito.
+  }
+}
+
+/** @deprecated Prefira queueSompoLaunch com equipe escolhida pelo usuário. */
+export function queueSompoCaseForLuca(caseItem: SompoExampleCase): void {
+  queueSompoLaunch({
+    caseId: caseItem.id,
+    mission: buildSompoCaseMission(caseItem),
+    mode: caseItem.suggestedMode,
+    presetId: caseItem.suggestedPresetId,
+    presetLabel: caseItem.suggestedPresetId,
+    autoRun: false,
+  });
+}
+
+export function consumeSompoLaunch(): SompoLaunchPayload | null {
+  try {
+    const raw = window.sessionStorage.getItem(SOMPO_LAUNCH_KEY);
+    window.sessionStorage.removeItem(SOMPO_LAUNCH_KEY);
+    // Limpa espelhos legados para não reaplicar em outra sessão.
+    window.sessionStorage.removeItem(SOMPO_PENDING_MISSION_KEY);
+    window.sessionStorage.removeItem(SOMPO_PENDING_PRESET_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<SompoLaunchPayload>;
+    const mission = String(parsed.mission || '').trim();
+    const mode = parsed.mode === 'individual' ? 'individual' : parsed.mode === 'team' ? 'team' : null;
+    const presetId = String(parsed.presetId || '').trim();
+    if (!mission || !mode || !presetId) return null;
+    return {
+      caseId: String(parsed.caseId || '').trim(),
+      mission,
+      mode,
+      presetId,
+      presetLabel: String(parsed.presetLabel || presetId).trim(),
+      autoRun: parsed.autoRun !== false,
+    };
+  } catch {
+    return null;
   }
 }
 

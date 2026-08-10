@@ -6,12 +6,17 @@ export {
   SOMPO_INDUSTRY_CONTEXT,
   buildSompoCaseMission,
   queueSompoCaseForLuca,
+  queueSompoLaunch,
+  consumeSompoLaunch,
   consumePendingSompoMission,
   consumePendingSompoPresetId,
+  SOMPO_LAUNCH_KEY,
   SOMPO_PENDING_MISSION_KEY,
   SOMPO_PENDING_PRESET_KEY,
   SOMPO_ENTRY_MODE_KEY,
   type SompoExampleCase,
+  type SompoLaunchPayload,
+  type SompoLaunchMode,
 } from './sompo-cases';
 
 export const SOMPO_CASE_PROMPT =

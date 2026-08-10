@@ -17,12 +17,16 @@ test('SOMPO aparece na navegação e no App', () => {
   assert.match(app, /'sompo'/);
 });
 
-test('página SOMPO lista casos agrícolas com handoff para a bancada', () => {
-  assert.match(sompoPage, /SOMPO · casos de exemplo/);
-  assert.match(sompoPage, /queueSompoCaseForLuca/);
-  assert.match(sompoPage, /Abrir na bancada LUCA-AI/);
+test('página SOMPO escolhe caso + equipe e dispara run', () => {
+  assert.match(sompoPage, /SOMPO · casos \+ equipe/);
+  assert.match(sompoPage, /queueSompoLaunch/);
+  assert.match(sompoPage, /Rodar avaliação na bancada/);
+  assert.match(sompoPage, /teamMode/);
+  assert.match(sompoPage, /listTeamTemplates/);
+  assert.match(sompoPage, /createSession/);
   assert.match(sompoPage, /SOMPO_EXAMPLE_CASES/);
-  assert.match(sompoPage, /SOMPO_INDUSTRY_CONTEXT/);
+  assert.match(sompoPage, /Equipe/);
+  assert.match(sompoPage, /Individual/);
 });
 
 test('catálogo de casos cobre clima, ZARC, penhor e renovação', () => {
@@ -34,11 +38,15 @@ test('catálogo de casos cobre clima, ZARC, penhor e renovação', () => {
   assert.match(sompoCases, /penhor-trator-incendio/);
   assert.match(sompoCases, /carteira-renovacao-cooperativa/);
   assert.match(sompoCases, /buildSompoCaseMission/);
-  assert.match(sompoCases, /queueSompoCaseForLuca/);
+  assert.match(sompoCases, /queueSompoLaunch/);
+  assert.match(sompoCases, /consumeSompoLaunch/);
+  assert.match(sompoCases, /autoRun/);
 });
 
-test('bancada consome briefing SOMPO pendente', () => {
-  assert.match(lucaAiPage, /consumePendingSompoMission/);
-  assert.match(lucaAiPage, /consumePendingSompoPresetId/);
-  assert.match(lucaAiPage, /pendingSompoPresetRef/);
+test('bancada consome launch SOMPO e auto-run', () => {
+  assert.match(lucaAiPage, /consumeSompoLaunch/);
+  assert.match(lucaAiPage, /pendingSompoLaunchRef/);
+  assert.match(lucaAiPage, /sompoAutoRunArmedRef/);
+  assert.match(lucaAiPage, /applyIndividualPreset/);
+  assert.match(lucaAiPage, /applyTeamPreset/);
 });
