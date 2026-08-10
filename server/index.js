@@ -3044,6 +3044,18 @@ app.post('/api/luca-ai/team-templates', (req, res) => {
   }
 });
 
+// /order must be registered before /:id — otherwise Express binds id="order"
+// and updateTeamTemplate throws template_not_found (404) on every reorder.
+app.put('/api/luca-ai/team-templates/:kind/order', (req, res) => {
+  try {
+    const kind = String(req.params.kind || '').trim();
+    const list = reorderTeamTemplates(kind, req.body?.ids);
+    res.json({ ok: true, kind, list, ...getTeamTemplatesSnapshot() });
+  } catch (error) {
+    teamTemplatesError(res, error);
+  }
+});
+
 app.put('/api/luca-ai/team-templates/:kind/:id', (req, res) => {
   try {
     const kind = String(req.params.kind || '').trim();
@@ -3061,16 +3073,6 @@ app.delete('/api/luca-ai/team-templates/:kind/:id', (req, res) => {
     const id = String(req.params.id || '').trim();
     const result = deleteTeamTemplate(kind, id);
     res.json({ ok: true, kind, ...result, ...getTeamTemplatesSnapshot() });
-  } catch (error) {
-    teamTemplatesError(res, error);
-  }
-});
-
-app.put('/api/luca-ai/team-templates/:kind/order', (req, res) => {
-  try {
-    const kind = String(req.params.kind || '').trim();
-    const list = reorderTeamTemplates(kind, req.body?.ids);
-    res.json({ ok: true, kind, list, ...getTeamTemplatesSnapshot() });
   } catch (error) {
     teamTemplatesError(res, error);
   }
