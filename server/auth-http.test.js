@@ -65,6 +65,47 @@ test('fluxo HTTP protege API e libera painel para a primeira conta admin', async
   assert.equal(usersPayload.users.length, 1);
   assert.equal(usersPayload.users.find((user) => user.email === 'admin@luca.test').requestCount, 1);
 
-  const logout = await fetch(`${baseUrl}/api/auth/logout`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: '{}' });
+  // Cria segunda conta e admin entra nela (suporte).
+  const second = await fetch(`${baseUrl}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'Cliente', email: 'cliente@luca.test', password: 'senha-segura-456' }),
+  });
+  assert.equal(second.status, 201);
+  const clientId = (await second.json()).user.id;
+
+  const enter = await fetch(`${baseUrl}/api/admin/users/${clientId}/impersonate`, {
+    method: 'POST',
+    headers: { cookie, 'content-type': 'application/json' },
+    body: '{}',
+  });
+  assert.equal(enter.status, 200);
+  const enterBody = await enter.json();
+  assert.equal(enterBody.user.email, 'cliente@luca.test');
+  assert.equal(enterBody.impersonation.active, true);
+  const supportCookie = enter.headers.get('set-cookie').split(';')[0];
+
+  const supportSession = await fetch(`${baseUrl}/api/auth/session`, { headers: { cookie: supportCookie } });
+  const supportPayload = await supportSession.json();
+  assert.equal(supportPayload.user.email, 'cliente@luca.test');
+  assert.equal(supportPayload.impersonation.actor.email, 'admin@luca.test');
+
+  // Conta de usuário não acessa admin enquanto em suporte.
+  const adminWhileSupport = await fetch(`${baseUrl}/api/admin/users`, { headers: { cookie: supportCookie } });
+  assert.equal(adminWhileSupport.status, 403);
+
+  const stop = await fetch(`${baseUrl}/api/auth/stop-impersonation`, {
+    method: 'POST',
+    headers: { cookie: supportCookie, 'content-type': 'application/json' },
+    body: '{}',
+  });
+  assert.equal(stop.status, 200);
+  const adminCookie = stop.headers.get('set-cookie').split(';')[0];
+  const back = await fetch(`${baseUrl}/api/auth/session`, { headers: { cookie: adminCookie } });
+  const backPayload = await back.json();
+  assert.equal(backPayload.user.email, 'admin@luca.test');
+  assert.equal(backPayload.impersonation, null);
+
+  const logout = await fetch(`${baseUrl}/api/auth/logout`, { method: 'POST', headers: { cookie: adminCookie, 'content-type': 'application/json' }, body: '{}' });
   assert.equal(logout.status, 200);
 });

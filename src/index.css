@@ -266,6 +266,8 @@
 .luca-shell {
   position: relative;
   isolation: isolate;
+  display: flex;
+  flex-direction: column;
   width: 100vw;
   height: 100vh;
   height: 100dvh;
@@ -300,7 +302,8 @@
   display: flex;
   gap: 14px;
   width: 100%;
-  height: 100%;
+  flex: 1 1 auto;
+  height: auto;
   min-height: 0;
   padding: 12px 12px var(--l-dock-clearance);
 }
@@ -2012,6 +2015,75 @@ a.luca-ai-attachment:focus-visible {
 .admin-table-wrap td:first-child span { margin-top: 3px; color: var(--l-text-ghost); font-size: 9px; }
 .admin-table-wrap em { display: inline-flex; padding: 4px 7px; border-radius: 999px; color: var(--l-text-mute); background: rgba(255,255,255,.06); font-size: 9px; font-style: normal; }
 .admin-table-wrap em[data-role='admin'] { color: var(--l-navy-deep); background: var(--l-navy-soft); }
+.luca-support-banner {
+  position: relative;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(255, 159, 10, 0.35);
+  background: linear-gradient(90deg, rgba(255, 159, 10, 0.18), rgba(10, 132, 255, 0.12));
+  color: var(--l-text);
+  font-size: 12px;
+}
+
+.luca-support-banner-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  min-width: 0;
+}
+
+.luca-support-banner-copy strong {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--l-warning);
+}
+
+.luca-support-banner-copy em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--l-text);
+}
+
+.luca-support-banner-exit {
+  flex: none;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--l-text);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.luca-support-banner-exit:hover:not(:disabled) {
+  background: rgba(10, 132, 255, 0.28);
+  border-color: rgba(100, 210, 255, 0.4);
+}
+
+.luca-support-banner-exit:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.admin-enter-btn {
+  background: rgba(10, 132, 255, 0.14) !important;
+  border-color: rgba(100, 210, 255, 0.28) !important;
+  color: var(--l-gold-bright) !important;
+}
+
+.admin-enter-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .admin-inspect-btn {
   min-height: 32px;
   display: inline-flex;

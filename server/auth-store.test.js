@@ -75,6 +75,58 @@ test('allowlist promove conta existente no syncAdminRoles sem demover admins', (
   assert.equal(users.find((user) => user.email === 'first@example.com')?.role, 'admin');
 });
 
+test('admin impersona conta e volta sem senha', () => {
+  const { store, directory } = temporaryStore();
+  try {
+    const admin = store.register({ email: 'admin@example.com', password: 'senha-forte-123', name: 'Admin' });
+    const user = store.register({ email: 'user@example.com', password: 'senha-forte-456', name: 'Cliente' });
+    const loginsBefore = store.listUsers().find((row) => row.id === user.user.id)?.loginCount;
+
+    const entered = store.impersonate({
+      actorAdminId: admin.user.id,
+      targetUserId: user.user.id,
+      ip: '127.0.0.1',
+      userAgent: 'test',
+    });
+    assert.equal(entered.user.id, user.user.id);
+    assert.equal(entered.impersonation.active, true);
+    assert.equal(entered.impersonation.actorAdminId, admin.user.id);
+
+    const resolved = store.resolveSession(entered.token);
+    assert.equal(resolved.user.id, user.user.id);
+    assert.equal(resolved.impersonation.actor.email, 'admin@example.com');
+
+    // Suporte não conta como login do cliente.
+    const loginsAfter = store.listUsers().find((row) => row.id === user.user.id)?.loginCount;
+    assert.equal(loginsAfter, loginsBefore);
+
+    const restored = store.stopImpersonation(entered.token, { ip: '127.0.0.1' });
+    assert.equal(restored.user.id, admin.user.id);
+    assert.equal(restored.impersonation, null);
+    assert.equal(store.resolveSession(entered.token), null);
+    assert.equal(store.resolveSession(restored.token).user.role, 'admin');
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('impersonate recusa self e conta inexistente', () => {
+  const { store, directory } = temporaryStore();
+  try {
+    const admin = store.register({ email: 'admin@example.com', password: 'senha-forte-123' });
+    assert.throws(
+      () => store.impersonate({ actorAdminId: admin.user.id, targetUserId: admin.user.id }),
+      /cannot_impersonate_self/,
+    );
+    assert.throws(
+      () => store.impersonate({ actorAdminId: admin.user.id, targetUserId: 'missing' }),
+      /user_not_found/,
+    );
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('report de admin monta funil e rankings de uso', () => {
   const { store } = temporaryStore();
   const a = store.register({ email: 'a@example.com', password: 'senha-forte-123' });

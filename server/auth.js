@@ -97,7 +97,11 @@ export function createAuthService({ rootDir = process.cwd(), dataPath = '', admi
     app.get('/api/auth/session', (req, res) => {
       store.syncAdminRoles({ persist: true });
       const session = sessionFromRequest(req, { touch: true });
-      res.json({ ok: true, user: session?.user ?? null });
+      res.json({
+        ok: true,
+        user: session?.user ?? null,
+        impersonation: session?.impersonation ?? null,
+      });
     });
 
     app.post('/api/auth/register', protectAuthAttempt, (req, res) => {
@@ -138,6 +142,24 @@ export function createAuthService({ rootDir = process.cwd(), dataPath = '', admi
       store.logout(tokenFromRequest(req));
       res.setHeader('Set-Cookie', cookieHeader('', req, 0));
       res.json({ ok: true });
+    });
+
+    // Sai do modo suporte e volta à conta admin (sem senha).
+    app.post('/api/auth/stop-impersonation', (req, res) => {
+      if (!sameOriginRequest(req)) {
+        res.status(403).json({ ok: false, error: 'invalid_origin' });
+        return;
+      }
+      try {
+        const result = store.stopImpersonation(tokenFromRequest(req), {
+          ip: requestIp(req),
+          userAgent: req.headers['user-agent'],
+        });
+        res.setHeader('Set-Cookie', cookieHeader(result.token, req, 30 * 24 * 60 * 60));
+        res.json({ ok: true, user: result.user, impersonation: null });
+      } catch (error) {
+        sendAuthError(res, error);
+      }
     });
   }
 
@@ -273,6 +295,27 @@ export function createAuthService({ rootDir = process.cwd(), dataPath = '', admi
         });
       } catch (error) {
         res.status(Number(error?.status) || 500).json({ ok: false, error: error?.message || String(error) });
+      }
+    });
+
+    // Suporte: admin assume a sessão da conta (cookie) para reproduzir o produto.
+    app.post('/api/admin/users/:userId/impersonate', requireAdmin, (req, res) => {
+      try {
+        const targetUserId = String(req.params.userId || '').trim();
+        const result = store.impersonate({
+          actorAdminId: req.auth.user.id,
+          targetUserId,
+          ip: requestIp(req),
+          userAgent: req.headers['user-agent'],
+        });
+        res.setHeader('Set-Cookie', cookieHeader(result.token, req, 30 * 24 * 60 * 60));
+        res.json({
+          ok: true,
+          user: result.user,
+          impersonation: result.impersonation,
+        });
+      } catch (error) {
+        sendAuthError(res, error);
       }
     });
   }

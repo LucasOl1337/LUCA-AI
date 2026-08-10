@@ -38,3 +38,14 @@ test('ADMIN_CONSOLE_V1 backend exposes readonly chat inspect per user', () => {
   assert.match(page, /Ver chats/);
   assert.match(page, /data-admin-chat-inspect/);
 });
+
+test('ADMIN_CONSOLE_V1 support impersonation enter + exit', () => {
+  assert.match(auth, /\/api\/admin\/users\/:userId\/impersonate/);
+  assert.match(auth, /\/api\/auth\/stop-impersonation/);
+  assert.match(store, /impersonate\(/);
+  assert.match(store, /stopImpersonation\(/);
+  assert.match(store, /actorAdminId/);
+  assert.match(page, /data-admin-impersonate/);
+  assert.match(page, /Entrar/);
+  assert.match(page, /impersonateUser/);
+});

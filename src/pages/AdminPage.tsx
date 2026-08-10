@@ -4,6 +4,7 @@ import {
   Eye,
   Gauge,
   Loader2,
+  LogIn,
   MessageSquareText,
   MousePointerClick,
   Play,
@@ -187,7 +188,7 @@ function RankList({
 }
 
 export default function AdminPage() {
-  const { user } = useAuth();
+  const { user, impersonateUser } = useAuth();
   const [overview, setOverview] = useState<Overview | null>(null);
   const [report, setReport] = useState<AdminReport | null>(null);
   const [users, setUsers] = useState<TrackedUser[]>([]);
@@ -200,6 +201,8 @@ export default function AdminPage() {
   const [chatSession, setChatSession] = useState<ChatSessionDetail | null>(null);
   const [chatBusy, setChatBusy] = useState(false);
   const [chatError, setChatError] = useState('');
+  const [enterBusyId, setEnterBusyId] = useState<string | null>(null);
+  const [enterError, setEnterError] = useState('');
 
   const load = useCallback(async (query = search, nextSort = sort) => {
     setLoading(true);
@@ -274,6 +277,18 @@ export default function AdminPage() {
     setChatLibrary(null);
     setChatSession(null);
     setChatError('');
+  }
+
+  async function enterAsUser(account: TrackedUser) {
+    if (!account?.id || account.id === user?.id || enterBusyId) return;
+    setEnterBusyId(account.id);
+    setEnterError('');
+    try {
+      await impersonateUser(account.id);
+    } catch (cause) {
+      setEnterError(cause instanceof Error ? cause.message : 'Falha ao entrar na conta.');
+      setEnterBusyId(null);
+    }
   }
 
   return (
@@ -430,10 +445,14 @@ export default function AdminPage() {
                   <th>Erros</th>
                   <th>Sessões</th>
                   <th>Chats</th>
+                  <th>Suporte</th>
                 </tr>
               </thead>
               <tbody>
-                {users.map((account) => (
+                {users.map((account) => {
+                  const isSelf = account.id === user?.id;
+                  const entering = enterBusyId === account.id;
+                  return (
                   <tr key={account.id}>
                     <td>
                       <strong>{account.name}</strong>
@@ -461,10 +480,31 @@ export default function AdminPage() {
                         Ver chats
                       </button>
                     </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="admin-inspect-btn admin-enter-btn"
+                        data-admin-impersonate
+                        data-admin-impersonate-user={account.id}
+                        disabled={isSelf || Boolean(enterBusyId)}
+                        title={isSelf ? 'Você já está nesta conta' : `Entrar como ${account.name} (suporte)`}
+                        onClick={() => void enterAsUser(account)}
+                      >
+                        {entering ? <Loader2 className="animate-spin" /> : <LogIn />}
+                        {entering ? 'Entrando…' : 'Entrar'}
+                      </button>
+                    </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
+            {enterError ? (
+              <div className="admin-state error" data-admin-impersonate-error role="alert" style={{ margin: '12px 16px 16px' }}>
+                <p className="admin-error-title">Não foi possível entrar na conta</p>
+                <p className="admin-error-detail">{enterError}</p>
+              </div>
+            ) : null}
             {!loading && users.length === 0 && (
               <div className="admin-state" data-admin-empty data-tone="empty">
                 <p className="admin-empty-title">Nenhuma conta encontrada</p>

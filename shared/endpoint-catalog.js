@@ -17,6 +17,8 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
           endpoint('auth-session', 'GET', '/api/auth/session', 'retorna a sessão atual sem expor o token', 'both'),
           endpoint('admin-overview', 'GET', '/api/admin/overview', 'métricas agregadas de cadastros, sessões e logins para administradores', 'local'),
           endpoint('admin-users', 'GET', '/api/admin/users', 'lista rastreável de usuários cadastrados para administradores', 'local'),
+          endpoint('admin-impersonate', 'POST', '/api/admin/users/:userId/impersonate', 'admin entra na conta do usuário para suporte (emite cookie de sessão)', 'local'),
+          endpoint('auth-stop-impersonation', 'POST', '/api/auth/stop-impersonation', 'encerra modo suporte e restaura a sessão do admin', 'local'),
         ],
         inbound: [
           endpoint('auth-register', 'POST', '/api/auth/register', 'cria conta por e-mail e senha e inicia a sessão sem confirmação de e-mail', 'both'),

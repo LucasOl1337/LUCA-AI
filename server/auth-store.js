@@ -194,10 +194,11 @@ export class AuthStore {
     return { user: publicUser(user), ...session };
   }
 
-  #createSession(user, { ip, userAgent, persist = true }) {
+  #createSession(user, { ip, userAgent, persist = true, actorAdminId = '' } = {}) {
     this.#cleanupSessions();
     const token = crypto.randomBytes(32).toString('base64url');
     const createdAt = nowIso();
+    const actor = String(actorAdminId || '').trim();
     const session = {
       id: crypto.randomUUID(),
       userId: user.id,
@@ -207,6 +208,8 @@ export class AuthStore {
       createdAt,
       lastSeenAt: createdAt,
       expiresAt: new Date(Date.now() + SESSION_TTL_MS).toISOString(),
+      // Sessão de suporte: cookie age como o usuário, mas carrega o admin que entrou.
+      ...(actor ? { actorAdminId: actor } : {}),
     };
     this.data.sessions.push(session);
     const ownSessions = this.data.sessions.filter((item) => item.userId === user.id)
@@ -216,7 +219,24 @@ export class AuthStore {
       this.data.sessions = this.data.sessions.filter((item) => item.userId !== user.id || keep.has(item.id));
     }
     if (persist) this.#persist();
-    return { token, expiresAt: session.expiresAt };
+    return { token, expiresAt: session.expiresAt, sessionId: session.id, actorAdminId: actor || undefined };
+  }
+
+  #impersonationPayload(session) {
+    const actorId = String(session?.actorAdminId || '').trim();
+    if (!actorId) return null;
+    const actor = this.data.users.find((candidate) => candidate.id === actorId);
+    if (!actor) return { active: true, actorAdminId: actorId, actor: null };
+    return {
+      active: true,
+      actorAdminId: actor.id,
+      actor: {
+        id: actor.id,
+        name: actor.name,
+        email: actor.email,
+        role: actor.role,
+      },
+    };
   }
 
   resolveSession(token, { touch = false } = {}) {
@@ -236,7 +256,80 @@ export class AuthStore {
     } else if (changed) {
       this.#persist();
     }
-    return { user: publicUser(user), session: { id: session.id, expiresAt: session.expiresAt } };
+    return {
+      user: publicUser(user),
+      session: { id: session.id, expiresAt: session.expiresAt },
+      impersonation: this.#impersonationPayload(session),
+    };
+  }
+
+  /**
+   * Admin entra na conta de outro usuário (suporte). Não incrementa loginCount.
+   * Emite sessão com actorAdminId para permitir "voltar" sem senha.
+   */
+  impersonate({ actorAdminId, targetUserId, ip = '', userAgent = '' }) {
+    const actorId = String(actorAdminId || '').trim();
+    const targetId = String(targetUserId || '').trim();
+    if (!actorId || !targetId) throw new AuthError('user_not_found', 404);
+
+    this.syncAdminRoles({ persist: false });
+    const actor = this.data.users.find((candidate) => candidate.id === actorId);
+    if (!actor || actor.role !== 'admin' || actor.status !== 'active') {
+      throw new AuthError('admin_required', 403);
+    }
+    if (actorId === targetId) throw new AuthError('cannot_impersonate_self', 400);
+
+    const target = this.data.users.find((candidate) => candidate.id === targetId);
+    if (!target) throw new AuthError('user_not_found', 404);
+    if (target.status !== 'active') throw new AuthError('account_disabled', 403);
+
+    // Atualiza lastSeen do alvo (atividade de suporte), sem contar login real.
+    target.lastSeenAt = nowIso();
+    const session = this.#createSession(target, {
+      ip,
+      userAgent,
+      actorAdminId: actor.id,
+      persist: false,
+    });
+    this.#persist();
+    return {
+      user: publicUser(target),
+      ...session,
+      impersonation: {
+        active: true,
+        actorAdminId: actor.id,
+        actor: {
+          id: actor.id,
+          name: actor.name,
+          email: actor.email,
+          role: actor.role,
+        },
+      },
+    };
+  }
+
+  /**
+   * Encerra a sessão de suporte e reabre sessão do admin original.
+   */
+  stopImpersonation(token, { ip = '', userAgent = '' } = {}) {
+    if (!token) throw new AuthError('authentication_required', 401);
+    const current = this.resolveSession(token, { touch: false });
+    if (!current?.impersonation?.active || !current.impersonation.actorAdminId) {
+      throw new AuthError('not_impersonating', 400);
+    }
+    const actorId = current.impersonation.actorAdminId;
+    this.logout(token);
+
+    this.syncAdminRoles({ persist: false });
+    const actor = this.data.users.find((candidate) => candidate.id === actorId);
+    if (!actor || actor.role !== 'admin' || actor.status !== 'active') {
+      throw new AuthError('admin_required', 403);
+    }
+    const timestamp = nowIso();
+    actor.lastSeenAt = timestamp;
+    const session = this.#createSession(actor, { ip, userAgent, persist: false });
+    this.#persist();
+    return { user: publicUser(actor), ...session, impersonation: null };
   }
 
   logout(token) {

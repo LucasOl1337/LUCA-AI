@@ -48,8 +48,9 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
   const [collapsed, setCollapsed] = useState(false);
   const [isNarrow, setIsNarrow] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [stopSupportBusy, setStopSupportBusy] = useState(false);
   const theme = useTheme();
-  const { user, logout } = useAuth();
+  const { user, logout, impersonation, stopImpersonation } = useAuth();
   const { backendReady, connectionState, runtimeMode, state, refresh } = useLuca();
 
   useEffect(() => {
@@ -208,8 +209,38 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
     );
   }
 
+  async function leaveSupportMode() {
+    if (stopSupportBusy) return;
+    setStopSupportBusy(true);
+    try {
+      await stopImpersonation();
+    } catch {
+      setStopSupportBusy(false);
+    }
+  }
+
   return (
     <div className="luca-shell">
+      {impersonation?.active && user ? (
+        <div className="luca-support-banner" data-luca-support-banner role="status">
+          <div className="luca-support-banner-copy">
+            <strong>Modo suporte</strong>
+            <span>
+              Você está na conta de <em>{user.name}</em> ({user.email})
+              {impersonation.actor?.email ? ` · admin: ${impersonation.actor.email}` : ''}.
+            </span>
+          </div>
+          <button
+            type="button"
+            className="luca-support-banner-exit"
+            data-luca-support-exit
+            disabled={stopSupportBusy}
+            onClick={() => void leaveSupportMode()}
+          >
+            {stopSupportBusy ? 'Voltando…' : 'Voltar à conta admin'}
+          </button>
+        </div>
+      ) : null}
       <header className="luca-mobile-header" aria-hidden={mobileNavOpen ? true : undefined}>
         <button
           type="button"
