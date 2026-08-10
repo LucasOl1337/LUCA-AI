@@ -1816,6 +1816,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
             onRemoveAttachment={removeAttachment}
             onRun={runMission}
             onClear={clearTranscript}
+            onConfigureTeam={() => setTeamPanelOpen(true)}
           />
         </div>
       </div>
@@ -2941,6 +2942,7 @@ function LucaMissionCanvas({
           : 'exibicao final pronta'
       : transcript.length ? 'rodada registrada' : 'aguardando missao';
   const originalMission = lastOperatorMission(transcript) || String(missionDraft || '').trim();
+  const hasDraftOnlyMission = Boolean(String(missionDraft || '').trim()) && !lastOperatorMission(transcript);
   const supportingTranscript = finalResult
     ? transcript.filter((entry) => !(
       entry.slug === finalResult.slug
@@ -2959,16 +2961,18 @@ function LucaMissionCanvas({
           </div>
         )}
 
-        {originalMission && (supportingTranscript.length > 0 || finalResult) && (
+        {/* Missão legível no canvas: rascunho SOMPO/composer ou pergunta da rodada. */}
+        {originalMission && (
           <div
             className="luca-ai-mission-pin mb-4 rounded-2xl border px-4 py-3"
             data-luca-mission-pin
+            data-luca-mission-pin-kind={hasDraftOnlyMission ? 'draft' : 'question'}
             style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)' }}
           >
             <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: theme.textGhost }}>
-              Pergunta original
+              {hasDraftOnlyMission ? 'Missão no compositor' : 'Pergunta original'}
             </p>
-            <p className="text-sm leading-relaxed luca-wrap luca-ai-selectable" style={{ color: theme.text }}>
+            <p className="text-[15px] leading-relaxed luca-wrap luca-ai-selectable" style={{ color: theme.text }}>
               {originalMission}
             </p>
           </div>
@@ -2993,15 +2997,19 @@ function LucaMissionCanvas({
           )
         )) : !finalResult && (
           <div
-            className="flex min-h-[48vh] flex-col items-center justify-center gap-3 px-4 text-center sm:px-6"
+            className={`flex flex-col items-center justify-center gap-3 px-4 text-center sm:px-6 ${originalMission ? 'min-h-[28vh] py-8' : 'min-h-[48vh]'}`}
             data-luca-canvas-empty
             data-tone="empty"
           >
-            <div className="mb-2 grid h-14 w-14 place-items-center overflow-hidden rounded-2xl border" style={{ borderColor: theme.border, background: theme.goldSoft }}>
-              <img src="/icon-512.png" alt="" className="h-full w-full object-cover object-[center_28%]" />
-            </div>
+            {!originalMission && (
+              <div className="mb-2 grid h-14 w-14 place-items-center overflow-hidden rounded-2xl border" style={{ borderColor: theme.border, background: theme.goldSoft }}>
+                <img src="/icon-512.png" alt="" className="h-full w-full object-cover object-[center_28%]" />
+              </div>
+            )}
             <h1 className="text-xl font-semibold tracking-[-0.025em]" style={{ color: theme.text }}>
-              {operationMode === 'individual' ? 'Qual problema deve ser julgado?' : 'O que a equipe deve entregar?'}
+              {originalMission
+                ? (operationMode === 'individual' ? 'Configure a seleção e envie' : 'Configure a equipe e envie')
+                : (operationMode === 'individual' ? 'Qual problema deve ser julgado?' : 'O que a equipe deve entregar?')}
             </h1>
             <p className="mt-0 max-w-[46ch] text-sm leading-relaxed luca-wrap" style={{ color: theme.textMute }}>
               {operationMode === 'individual'
@@ -3019,7 +3027,7 @@ function LucaMissionCanvas({
                   el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                 }}
               >
-                Escrever missão
+                {originalMission ? 'Editar missão' : 'Escrever missão'}
               </button>
             </div>
           </div>
@@ -3171,6 +3179,7 @@ function LucaMissionBar({
   onRemoveAttachment,
   onRun,
   onClear,
+  onConfigureTeam,
 }: {
   mission: string;
   attachments: LucaAiChatAttachment[];
@@ -3188,25 +3197,50 @@ function LucaMissionBar({
   onRemoveAttachment: (attachment: LucaAiChatAttachment) => void | Promise<void>;
   onRun: () => void | Promise<void>;
   onClear: () => void;
+  onConfigureTeam?: () => void;
 }) {
   const theme = useTheme();
   const [dragOver, setDragOver] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const canAttach = !running && !uploadingAttachment && attachments.length < 4;
 
+  // Composer cresce com o texto — missões longas (SOMPO) não cabem em 1 linha.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = '0px';
+    const next = Math.max(40, Math.min(el.scrollHeight, 240));
+    el.style.height = `${next}px`;
+  }, [mission]);
+
   function submit() {
-    if (canRun) void onRun();
+    if (canRun) {
+      void onRun();
+      return;
+    }
+    // Play / Enter sem equipe pronta: abre o painel em vez de engolir a ação.
+    onConfigureTeam?.();
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      submit();
-    }
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
+    // Enter só envia quando a rodada pode rodar. Sem equipe pronta, deixa
+    // quebrar linha — senão o usuário “não consegue escrever”.
+    if (!canRun) return;
+    event.preventDefault();
+    submit();
   }
 
-  /** Ctrl+V / Cmd+V com imagem no clipboard (print, copiar imagem no browser). */
+  /**
+   * Ctrl+V / Cmd+V:
+   * - texto puro (ou texto + HTML) → cola no composer (nunca bloquear)
+   * - imagem/arquivo puro (print, copiar imagem) → anexa
+   * Antes, qualquer item `file` no clipboard fazia preventDefault e matava colar texto.
+   */
   function onPaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
     if (!canAttach) return;
+    const plain = String(event.clipboardData?.getData('text/plain') || '');
+    if (plain.trim()) return;
     const files = filesFromDataTransfer(event.clipboardData);
     if (!files.length) return;
     event.preventDefault();
@@ -3252,15 +3286,32 @@ function LucaMissionBar({
     ? operationMode === 'individual' ? '9Router executa as respostas; o juiz entra em seguida' : '9Router está executando o fluxo'
     : operationMode === 'individual'
       ? 'Escolha participantes e uma persona juíza'
-      : `${readyRoles} de ${WORKFLOW_ROLES.length} etapas configuradas`;
+      : `${readyRoles} de ${WORKFLOW_ROLES.length} etapas configuradas — clique para montar a equipe`;
   const statusColor = running ? theme.goldDeep : theme.textMute;
+  const sendTitle = canRun
+    ? 'Enviar missão'
+    : operationMode === 'individual'
+      ? 'Escolha participantes e juiz (abre a seleção)'
+      : 'Configure a equipe primeiro (abre o painel)';
 
   return (
     <>
       {showStatus && (
-        <div className="luca-ai-composer-status" style={{ color: statusColor }}>
-          {statusText}
-        </div>
+        running ? (
+          <div className="luca-ai-composer-status" style={{ color: statusColor }}>
+            {statusText}
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="luca-ai-composer-status is-action"
+            style={{ color: statusColor }}
+            onClick={() => onConfigureTeam?.()}
+            data-luca-composer-configure
+          >
+            {statusText}
+          </button>
+        )
       )}
       {attachments.length > 0 && (
         <div className="luca-ai-attachment-list" aria-label="Anexos desta mensagem">
@@ -3297,14 +3348,16 @@ function LucaMissionBar({
         <label className="sr-only" htmlFor="luca-ai-mission">Missão da bancada</label>
         <textarea
           id="luca-ai-mission"
+          ref={inputRef}
           value={mission}
           onChange={(event) => onMissionChange(event.target.value)}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
-          rows={1}
+          rows={2}
           className="luca-ai-composer-input"
           placeholder={operationMode === 'individual' ? 'Faça o que quiser' : 'Envie uma missão para a equipe...'}
           disabled={running}
+          spellCheck
         />
         <div className="luca-ai-composer-toolbar">
           <input
@@ -3330,8 +3383,16 @@ function LucaMissionBar({
           <button type="button" className="luca-ai-composer-action" onClick={onClear} disabled={running} aria-label="Limpar conversa" title="Limpar conversa">
             <RotateCcw className="h-3.5 w-3.5" />
           </button>
-          <motion.button whileTap={{ scale: 0.94 }} type="button" onClick={submit} disabled={!canRun} className="luca-ai-send-button" aria-label="Enviar missão" title={(operationMode === 'individual' ? isIndividualReady : isWorkflowReady) ? 'Enviar missão' : operationMode === 'individual' ? 'Escolha participantes e juiz' : 'Configure a equipe primeiro'}>
-            {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+          <motion.button
+            whileTap={{ scale: 0.94 }}
+            type="button"
+            onClick={submit}
+            disabled={running}
+            className={`luca-ai-send-button${canRun ? '' : ' is-needs-team'}`}
+            aria-label={canRun ? 'Enviar missão' : 'Configurar equipe para enviar'}
+            title={sendTitle}
+          >
+            {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : canRun ? <Play className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />}
           </motion.button>
         </div>
       </div>

@@ -1323,6 +1323,25 @@
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
 }
 
+button.luca-ai-composer-status.is-action {
+  cursor: pointer;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+button.luca-ai-composer-status.is-action:hover {
+  border-color: rgba(100, 210, 255, 0.34);
+  background: rgba(10, 132, 255, 0.12);
+  color: var(--l-text);
+}
+
+button.luca-ai-composer-status.is-action:focus-visible {
+  outline: 2px solid var(--l-gold);
+  outline-offset: 2px;
+}
+
 .luca-ai-attachment-list,
 .luca-ai-message-attachments {
   width: min(100%, 640px);
@@ -1437,20 +1456,24 @@ a.luca-ai-attachment:focus-visible {
   flex: 1 1 auto;
   width: auto;
   min-width: 0;
-  min-height: 28px;
-  max-height: 120px;
+  min-height: 44px;
+  max-height: 240px;
   resize: none;
   border: 0 !important;
   outline: none !important;
   box-shadow: none !important;
   caret-color: var(--l-text);
-  padding: 6px 4px;
+  padding: 8px 6px;
   color: var(--l-text);
   background: transparent;
-  font-size: 14px;
-  line-height: 1.45;
+  font-size: 15px;
+  line-height: 1.5;
+  overflow-x: hidden;
+  overflow-y: auto;
   overflow-wrap: anywhere;
   word-break: normal;
+  white-space: pre-wrap;
+  field-sizing: content;
 }
 
 .luca-ai-composer-input:focus,
@@ -1499,6 +1522,15 @@ a.luca-ai-attachment:focus-visible {
 .luca-ai-composer-action:hover { color: var(--l-text); background: rgba(255, 255, 255, 0.08); }
 .luca-ai-send-button { color: #fff; background: var(--l-gold); }
 .luca-ai-send-button:disabled { color: var(--l-text-ghost); background: rgba(255, 255, 255, 0.08); }
+/* Sem equipe pronta: botão vira atalho para abrir o painel (não parece morto). */
+.luca-ai-send-button.is-needs-team {
+  color: var(--l-gold-bright);
+  background: rgba(10, 132, 255, 0.16);
+  border: 1px solid rgba(100, 210, 255, 0.28);
+}
+.luca-ai-send-button.is-needs-team:hover {
+  background: rgba(10, 132, 255, 0.28);
+}
 
 .luca-ai-individual-response > summary::-webkit-details-marker { display: none; }
 .luca-ai-individual-response > summary { transition: background 160ms ease; }
@@ -1690,7 +1722,7 @@ a.luca-ai-attachment:focus-visible {
   .luca-ai-chat-notice { width: 100%; padding: 6px 16px 0; }
   .luca-ai-composer-dock { padding: 4px 12px 14px; }
   .luca-ai-composer { width: 100%; max-width: 100%; border-radius: 18px; }
-  .luca-ai-composer-input { min-height: 28px; }
+  .luca-ai-composer-input { min-height: 40px; font-size: 16px; }
   /* No mobile, equipe vira overlay embaixo da toolbar (não rouba largura do chat) */
   .luca-ai-team-side {
     position: absolute;
