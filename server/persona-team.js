@@ -27,39 +27,48 @@ export const PERSONA_WORKFLOW_ROLES = [
     id: 'supervisor',
     label: 'Supervisor',
     maxSlugs: 1,
+    optional: false,
     instruction: 'Defina o enquadramento da bancada: objetivo real, limites, criterio de sucesso e risco principal.',
   },
   {
     id: 'mission',
     label: 'Decisor da missao',
     maxSlugs: 1,
+    optional: false,
     instruction: 'Converta o enquadramento em uma missao executavel, com prioridade, escopo e dependencias.',
   },
   {
     id: 'execution',
     label: 'Execucao',
     maxSlugs: DEFAULT_MAX_EXECUTION_SLUGS,
+    optional: false,
     instruction: 'Execute a parte pratica da missao. Entregue achados, decisoes tecnicas e proximas acoes verificaveis.',
   },
   {
     id: 'approval',
     label: 'Aprovacao',
     maxSlugs: 2,
+    optional: false,
     instruction: 'Revise o resultado dos executores. Aprove, bloqueie ou aprove com condicoes, citando lacunas criticas.',
   },
   {
     id: 'display',
     label: 'Exibicao final',
     maxSlugs: 1,
+    optional: false,
     instruction: 'Transforme o resultado aprovado em uma exibicao final clara para o operador: resumo, decisoes, riscos e proximas acoes.',
   },
   {
     id: 'visual',
     label: 'Especialista visual',
     maxSlugs: 1,
+    // Etapa opcional: vazio = pula artefatos; preenchido = roda o pack visual.
+    optional: true,
     instruction: 'Com base no resultado aprovado e na entrega final, selecione o conteudo mais relevante e produza um plano de artefatos: graficos com dados, relatorio executivo e prompts de imagens cinematograficas de exemplo. Nao invente metricas sem base no contexto.',
   },
 ];
+
+export const REQUIRED_PERSONA_WORKFLOW_ROLES = PERSONA_WORKFLOW_ROLES.filter((role) => !role.optional);
 
 const ROLE_BY_ID = new Map(PERSONA_WORKFLOW_ROLES.map((role) => [role.id, role]));
 
@@ -175,7 +184,7 @@ function normalizePersonaTeamWorkflow(body = {}, fallbackSlugs = []) {
     byRole.set('execution', fallbackSlugs.slice(0, DEFAULT_MAX_EXECUTION_SLUGS));
     byRole.set('approval', [first]);
     byRole.set('display', [last]);
-    byRole.set('visual', [last]);
+    // visual permanece vazio no fallback — etapa opcional
   }
 
   return PERSONA_WORKFLOW_ROLES.map((role) => ({
@@ -259,7 +268,11 @@ export function normalizePersonaTeamRunInput(body = {}, options = {}) {
   }
   if (explicitWorkflow) {
     const missingRoles = workflow
-      .filter((role) => !role.slugs.length)
+      .filter((role) => {
+        if (role.slugs.length) return false;
+        const def = ROLE_BY_ID.get(role.roleId);
+        return !def?.optional;
+      })
       .map((role) => role.roleId);
     if (missingRoles.length) {
       return { ok: false, error: 'workflow_role_required', mission, slugs, workflow, missingRoles };

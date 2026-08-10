@@ -148,7 +148,29 @@ test('normalizePersonaTeamRunInput bloqueia workflow explicito incompleto', () =
 
   assert.equal(input.ok, false);
   assert.equal(input.error, 'workflow_role_required');
-  assert.deepEqual(input.missingRoles.sort(), ['approval', 'display', 'mission', 'visual']);
+  // visual e opcional — nao entra em missingRoles
+  assert.deepEqual(input.missingRoles.sort(), ['approval', 'display', 'mission']);
+});
+
+test('normalizePersonaTeamRunInput aceita workflow sem especialista visual', () => {
+  const input = normalizePersonaTeamRunInput({
+    mission: 'Rodar sem pack visual',
+    workflow: {
+      supervisor: 'maestro',
+      mission: ['planejador'],
+      execution: ['pesquisador'],
+      approval: ['qa'],
+      display: ['narrador'],
+      visual: [],
+    },
+  });
+
+  assert.equal(input.ok, true);
+  assert.equal(input.mode, 'workflow');
+  assert.deepEqual(input.slugs, ['maestro', 'planejador', 'pesquisador', 'qa', 'narrador']);
+  const visual = input.workflow.find((role) => role.roleId === 'visual');
+  assert.ok(visual);
+  assert.deepEqual(visual.slugs, []);
 });
 
 test('normalizePersonaTeamRunInput aceita resolucao individual com ate cinco participantes e juiz livre', () => {

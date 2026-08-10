@@ -2256,6 +2256,10 @@ async function runLucaAiPersonaWorkflow({ mission, workflow, teamNames, loadedBy
       instruction: roleConfig.instruction,
       slugs: [],
     };
+    // Etapas opcionais (ex.: visual) sem persona: pula sem bloquear a rodada.
+    if (roleConfig.optional && !(role.slugs || []).length) {
+      continue;
+    }
     appendLucaAiTraceEvent(traceId, 'luca_ai.workflow.step_started', {
       roleId: role.roleId,
       roleLabel: role.roleLabel || roleConfig.label,

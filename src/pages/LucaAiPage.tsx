@@ -112,10 +112,13 @@ interface PersonaPickerConfig {
   icon: LucideIcon;
   multiple: boolean;
   maxSlugs: number;
+  optional?: boolean;
 }
 
 interface WorkflowRoleConfig extends PersonaPickerConfig {
   id: WorkflowRoleId;
+  /** Se true, vazio nao bloqueia canRun — etapa so roda quando preenchida. */
+  optional?: boolean;
 }
 
 interface TeamTranscriptEntry {
@@ -151,8 +154,10 @@ const WORKFLOW_ROLES: WorkflowRoleConfig[] = [
   { id: 'execution', label: 'Executores', icon: BrainCircuit, multiple: true, maxSlugs: MAX_EXECUTORS },
   { id: 'approval', label: 'Aprovacao', icon: ClipboardCheck, multiple: false, maxSlugs: 1 },
   { id: 'display', label: 'Exibicao final', icon: Eye, multiple: false, maxSlugs: 1 },
-  { id: 'visual', label: 'Especialista visual', icon: ImageIcon, multiple: false, maxSlugs: 1 },
+  { id: 'visual', label: 'Especialista visual', icon: ImageIcon, multiple: false, maxSlugs: 1, optional: true },
 ];
+
+const REQUIRED_WORKFLOW_ROLES = WORKFLOW_ROLES.filter((role) => !role.optional);
 
 const INDIVIDUAL_PICKER_CONFIGS: Record<IndividualPickerId, PersonaPickerConfig> = {
   participants: { id: 'participants', label: 'Participantes', icon: Users, multiple: true, maxSlugs: 5 },
@@ -220,7 +225,8 @@ function flattenWorkflowAssignments(assignments: WorkflowAssignments): string[] 
 }
 
 function workflowReady(assignments: WorkflowAssignments): boolean {
-  return WORKFLOW_ROLES.every((role) => assignments[role.id].length > 0);
+  // visual e opcional: so as etapas obrigatorias precisam de persona
+  return REQUIRED_WORKFLOW_ROLES.every((role) => assignments[role.id].length > 0);
 }
 
 function workflowPayload(assignments: WorkflowAssignments): LucaAiWorkflowAssignment[] {
@@ -686,7 +692,11 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     individualAssignments.judge,
   ]), [individualAssignments]);
   const configuredSlugs = operationMode === 'individual' ? individualConfiguredSlugs : assignedSlugs;
-  const readyRoles = useMemo(() => WORKFLOW_ROLES.filter((role) => assignments[role.id].length > 0).length, [assignments]);
+  const readyRoles = useMemo(
+    () => REQUIRED_WORKFLOW_ROLES.filter((role) => assignments[role.id].length > 0).length,
+    [assignments],
+  );
+  const requiredRoleCount = REQUIRED_WORKFLOW_ROLES.length;
   const isWorkflowReady = useMemo(() => workflowReady(assignments), [assignments]);
   const isIndividualReady = individualAssignments.participants.length > 0 && Boolean(individualAssignments.judge);
 
@@ -1748,7 +1758,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
             >
               <BrainCircuit className="h-4 w-4" />
               <span>{operationMode === 'individual' ? 'Seleção' : 'Equipe'}</span>
-              <span className="font-mono text-[10px]">{operationMode === 'individual' ? `${individualAssignments.participants.length}/5` : `${readyRoles}/${WORKFLOW_ROLES.length}`}</span>
+              <span className="font-mono text-[10px]">{operationMode === 'individual' ? `${individualAssignments.participants.length}/5` : `${readyRoles}/${requiredRoleCount}`}</span>
             </button>
           </div>
         </header>
@@ -1808,6 +1818,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
             canRun={canRun}
             operationMode={operationMode}
             readyRoles={readyRoles}
+            requiredRoleCount={requiredRoleCount}
             isWorkflowReady={isWorkflowReady}
             isIndividualReady={isIndividualReady}
             assignedCount={operationMode === 'individual' ? individualAssignments.participants.length : assignedSlugs.length}
@@ -1867,6 +1878,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
                 loading={loading}
                 running={running}
                 readyRoles={readyRoles}
+                requiredRoleCount={requiredRoleCount}
                 busySlug={busyPersonaSlug}
                 activePresetId={activeTeamPresetId}
                 applyingPresetId={applyingPresetId}
@@ -2263,6 +2275,7 @@ function LucaWorkflowPanel({
   loading,
   running,
   readyRoles,
+  requiredRoleCount,
   busySlug,
   onReload,
   onClearWorkflow,
@@ -2285,6 +2298,7 @@ function LucaWorkflowPanel({
   loading: boolean;
   running: boolean;
   readyRoles: number;
+  requiredRoleCount: number;
   busySlug: string | null;
   onReload: () => void | Promise<void>;
   onClearWorkflow: () => void;
@@ -2299,8 +2313,10 @@ function LucaWorkflowPanel({
   onApplyPreset: (preset: LucaTeamPreset) => void;
 }) {
   const theme = useTheme();
-  const ready = readyRoles === WORKFLOW_ROLES.length;
+  const denom = Math.max(1, requiredRoleCount);
+  const ready = readyRoles >= denom;
   const assignedCount = flattenWorkflowAssignments(assignments).length;
+  const visualFilled = assignments.visual.length > 0;
 
   return (
     <aside className="luca-ai-flow-panel min-h-0 overflow-hidden">
@@ -2312,7 +2328,7 @@ function LucaWorkflowPanel({
           </div>
           <div className="flex items-center gap-2">
             <span className="rounded-lg px-2.5 py-1 font-mono text-[10px]" style={{ background: ready ? theme.aliveSoft : theme.goldSoft, color: ready ? theme.alive : theme.goldDeep }}>
-              {readyRoles}/{WORKFLOW_ROLES.length}
+              {readyRoles}/{requiredRoleCount}
             </span>
             <button type="button" className="grid h-8 w-8 place-items-center rounded-lg transition" onClick={onClose} aria-label="Fechar equipe" style={{ color: theme.textMute }}>
               <X className="h-4 w-4" />
@@ -2320,10 +2336,14 @@ function LucaWorkflowPanel({
           </div>
         </div>
         <div className="mt-4 h-1.5 overflow-hidden rounded-full" style={{ background: theme.surfaceHi }}>
-          <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${(readyRoles / WORKFLOW_ROLES.length) * 100}%`, background: ready ? theme.alive : theme.gold }} />
+          <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${(readyRoles / denom) * 100}%`, background: ready ? theme.alive : theme.gold }} />
         </div>
         <p className="mt-2 text-[11px] leading-relaxed" style={{ color: theme.textMute }}>
-          {running ? 'A equipe está executando a missão.' : ready ? `${assignedCount} persona${assignedCount === 1 ? '' : 's'} pronta${assignedCount === 1 ? '' : 's'} para executar.` : 'Escolha uma persona para cada etapa. A conexão ao LUCA acontece automaticamente.'}
+          {running
+            ? 'A equipe está executando a missão.'
+            : ready
+              ? `${assignedCount} persona${assignedCount === 1 ? '' : 's'} pronta${assignedCount === 1 ? '' : 's'} para executar.${visualFilled ? '' : ' Especialista visual opcional.'}`
+              : 'Preencha as etapas obrigatórias. Especialista visual é opcional e só roda se você adicionar.'}
         </p>
       </header>
 
@@ -2509,8 +2529,19 @@ function WorkflowRoleRow({
           <Icon className="h-3.5 w-3.5" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-xs font-semibold" style={{ color: active ? theme.goldDeep : theme.textSoft }}>{role.label}</span>
-          <span className="block truncate text-[10px]" style={{ color: theme.textGhost }}>{role.multiple ? `até ${role.maxSlugs} personas` : 'uma persona'}</span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="block truncate text-xs font-semibold" style={{ color: active ? theme.goldDeep : theme.textSoft }}>{role.label}</span>
+            {role.optional ? (
+              <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide" style={{ background: 'rgba(255,255,255,0.06)', color: theme.textGhost }}>
+                opcional
+              </span>
+            ) : null}
+          </span>
+          <span className="block truncate text-[10px]" style={{ color: theme.textGhost }}>
+            {role.optional
+              ? 'opcional — roda só se preenchido'
+              : role.multiple ? `até ${role.maxSlugs} personas` : 'uma persona'}
+          </span>
         </span>
         <button type="button" className="rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition" onClick={onOpen} disabled={disabled} style={{ background: theme.goldSoft, borderColor: theme.border, color: theme.goldDeep }}>
           {selectedSlugs.length ? role.multiple ? 'Adicionar' : 'Trocar' : 'Escolher'}
@@ -3171,6 +3202,7 @@ function LucaMissionBar({
   canRun,
   operationMode,
   readyRoles,
+  requiredRoleCount,
   isWorkflowReady,
   isIndividualReady,
   assignedCount,
@@ -3189,6 +3221,7 @@ function LucaMissionBar({
   canRun: boolean;
   operationMode: OperationMode;
   readyRoles: number;
+  requiredRoleCount: number;
   isWorkflowReady: boolean;
   isIndividualReady: boolean;
   assignedCount: number;
@@ -3286,7 +3319,7 @@ function LucaMissionBar({
     ? operationMode === 'individual' ? '9Router executa as respostas; o juiz entra em seguida' : '9Router está executando o fluxo'
     : operationMode === 'individual'
       ? 'Escolha participantes e uma persona juíza'
-      : `${readyRoles} de ${WORKFLOW_ROLES.length} etapas configuradas — clique para montar a equipe`;
+      : `${readyRoles} de ${requiredRoleCount} etapas obrigatórias — clique para montar a equipe`;
   const statusColor = running ? theme.goldDeep : theme.textMute;
   const sendTitle = canRun
     ? 'Enviar missão'
