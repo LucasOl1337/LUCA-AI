@@ -5,7 +5,10 @@ import { getWorkspaceUserId, requireWorkspaceUserId } from './workspace-context.
 
 const rootStateDir = path.resolve(process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'));
 const workspacesRoot = path.join(rootStateDir, 'workspaces');
+/** Sessões visíveis/ativas do usuário. */
 const MAX_SESSIONS = 100;
+/** Sessões retidas no library (ativas + soft-deleted) para o admin. */
+const MAX_RETAINED_SESSIONS = 400;
 const MAX_FOLDERS = 40;
 const MAX_TRANSCRIPT = 200;
 const MAX_DRAFT_ATTACHMENTS = 4;
@@ -19,6 +22,10 @@ function safeUserDir(userId) {
 
 function libraryPathFor(userId) {
   return path.join(workspacesRoot, safeUserDir(userId), 'chat-library.json');
+}
+
+function archivePathFor(userId) {
+  return path.join(workspacesRoot, safeUserDir(userId), 'chat-history-archive.jsonl');
 }
 
 function nowIso() {
@@ -76,12 +83,14 @@ function normalizeDraftAttachments(value, sessionId) {
 function makeSession(partial = {}) {
   const createdAt = partial.createdAt || nowIso();
   const id = partial.id || makeId('sess');
+  const deletedAt = partial.deletedAt ? String(partial.deletedAt) : null;
   return {
     id,
     title: clipTitle(partial.title, 'Nova sessão'),
     folderId: partial.folderId ? String(partial.folderId) : null,
     createdAt,
     updatedAt: partial.updatedAt || createdAt,
+    deletedAt,
     operationMode: partial.operationMode === 'individual' ? 'individual' : 'team',
     workflowAssignments: partial.workflowAssignments && typeof partial.workflowAssignments === 'object'
       ? partial.workflowAssignments
@@ -101,6 +110,14 @@ function makeSession(partial = {}) {
     visualPack: partial.visualPack ?? null,
     activePersonaSlug: partial.activePersonaSlug ? String(partial.activePersonaSlug) : null,
   };
+}
+
+function isSessionLive(session) {
+  return !session?.deletedAt;
+}
+
+function liveSessions(library) {
+  return (library?.sessions || []).filter(isSessionLive);
 }
 
 function makeFolder(partial = {}) {
@@ -135,12 +152,97 @@ function normalizeLibrary(raw) {
         const session = makeSession(item);
         if (session.folderId && !folderIds.has(session.folderId)) session.folderId = null;
         return session;
-      }).slice(0, MAX_SESSIONS)
+      }).slice(0, MAX_RETAINED_SESSIONS)
     : [];
-  if (!sessions.length) sessions = [makeSession({ title: 'Nova sessão' })];
-  let activeSessionId = raw.activeSessionId ? String(raw.activeSessionId) : sessions[0].id;
-  if (!sessions.some((item) => item.id === activeSessionId)) activeSessionId = sessions[0].id;
-  return { version: 1, folders, sessions, activeSessionId };
+  // Garantir ao menos uma sessão viva para a UI do usuário.
+  if (!liveSessions({ sessions }).length) {
+    sessions = [makeSession({ title: 'Nova sessão' }), ...sessions].slice(0, MAX_RETAINED_SESSIONS);
+  }
+  let activeSessionId = raw.activeSessionId ? String(raw.activeSessionId) : '';
+  const live = liveSessions({ sessions });
+  if (!live.some((item) => item.id === activeSessionId)) activeSessionId = live[0].id;
+  return { version: 2, folders, sessions, activeSessionId };
+}
+
+/** Snapshot imutável em JSONL — sobrevive a soft-delete e limpeza da library. */
+function archiveSessionSnapshot(userId, session, reason = 'snapshot') {
+  const id = String(userId || '').trim();
+  if (!id || !session?.id) return;
+  try {
+    const filePath = archivePathFor(id);
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    const record = {
+      archivedAt: nowIso(),
+      reason: String(reason || 'snapshot').slice(0, 80),
+      ownerUserId: id,
+      session: {
+        id: session.id,
+        title: session.title,
+        folderId: session.folderId,
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt,
+        deletedAt: session.deletedAt || null,
+        operationMode: session.operationMode,
+        missionDraft: session.missionDraft,
+        transcript: Array.isArray(session.transcript) ? session.transcript.slice(-MAX_TRANSCRIPT) : [],
+        finalResult: session.finalResult ?? null,
+        visualPack: session.visualPack ?? null,
+        activePersonaSlug: session.activePersonaSlug || null,
+        workflowAssignments: session.workflowAssignments || null,
+        individualAssignments: session.individualAssignments || null,
+      },
+    };
+    fs.appendFileSync(filePath, `${JSON.stringify(record)}\n`, { encoding: 'utf8', mode: 0o600 });
+  } catch (error) {
+    console.error(`[chat-library] archive falhou: ${error?.message || String(error)}`);
+  }
+}
+
+function loadArchiveRecords(userId, { limit = 200 } = {}) {
+  const id = String(userId || '').trim();
+  if (!id) return [];
+  const filePath = archivePathFor(id);
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const lines = raw.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+    const capped = lines.slice(-Math.max(1, Math.min(2000, Number(limit) || 200)));
+    const records = [];
+    for (const line of capped) {
+      try {
+        const parsed = JSON.parse(line);
+        if (parsed?.session?.id) records.push(parsed);
+      } catch {
+        // skip corrupt line
+      }
+    }
+    return records;
+  } catch {
+    return [];
+  }
+}
+
+function pruneRetainedSessions(library, userId) {
+  if (!library?.sessions || library.sessions.length <= MAX_RETAINED_SESSIONS) return;
+  // Remove preferencialmente soft-deleted mais antigos (já estão no archive).
+  const sorted = library.sessions.slice().sort((a, b) => {
+    const aDel = a.deletedAt ? 0 : 1;
+    const bDel = b.deletedAt ? 0 : 1;
+    if (aDel !== bDel) return aDel - bDel;
+    return String(a.updatedAt || a.createdAt || '').localeCompare(String(b.updatedAt || b.createdAt || ''));
+  });
+  const keepIds = new Set(sorted.slice(-MAX_RETAINED_SESSIONS).map((item) => item.id));
+  const dropped = library.sessions.filter((item) => !keepIds.has(item.id));
+  for (const session of dropped) {
+    archiveSessionSnapshot(userId, session, 'retention_prune');
+  }
+  library.sessions = library.sessions.filter((item) => keepIds.has(item.id));
+  if (!liveSessions(library).length) {
+    const fresh = makeSession({ title: 'Nova sessão' });
+    library.sessions.push(fresh);
+    library.activeSessionId = fresh.id;
+  } else if (!liveSessions(library).some((item) => item.id === library.activeSessionId)) {
+    library.activeSessionId = liveSessions(library)[0].id;
+  }
 }
 
 /** @type {Map<string, any>} */
@@ -201,42 +303,53 @@ function persistLibrary(userId, library) {
 function withLibrary(mutator) {
   const userId = requireWorkspaceUserId();
   const library = loadLibrary(userId);
-  const result = mutator(library);
+  const result = mutator(library, userId);
+  pruneRetainedSessions(library, userId);
   persistLibrary(userId, library);
   return result;
 }
 
 function summarizeSession(session) {
+  const deleted = Boolean(session.deletedAt);
   return {
     id: session.id,
     title: session.title,
     folderId: session.folderId,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
+    deletedAt: session.deletedAt || null,
+    deleted,
     operationMode: session.operationMode,
     messageCount: Array.isArray(session.transcript) ? session.transcript.length : 0,
     preview: String(session.missionDraft || session.transcript?.at?.(-1)?.content || '').slice(0, 120),
   };
 }
 
-function snapshotFromLibrary(library, userId = null) {
-  const active = library.sessions.find((item) => item.id === library.activeSessionId) || library.sessions[0];
+function snapshotFromLibrary(library, userId = null, { includeDeleted = false } = {}) {
+  const sessions = includeDeleted
+    ? library.sessions
+    : liveSessions(library);
+  const activeLive = liveSessions(library).find((item) => item.id === library.activeSessionId)
+    || liveSessions(library)[0]
+    || null;
   return {
     ownerUserId: userId || null,
     folders: library.folders
       .slice()
       .sort((a, b) => String(b.createdAt || b.updatedAt).localeCompare(String(a.createdAt || a.updatedAt))),
     // Stable list order: newest created first. Activate/update must not reshuffle.
-    sessions: library.sessions
+    sessions: sessions
       .slice()
       .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
       .map(summarizeSession),
-    activeSessionId: active?.id || null,
-    activeSession: active || null,
+    activeSessionId: activeLive?.id || null,
+    activeSession: activeLive || null,
     stats: {
       folderCount: library.folders.length,
-      sessionCount: library.sessions.length,
-      messageCount: library.sessions.reduce(
+      sessionCount: sessions.length,
+      liveSessionCount: liveSessions(library).length,
+      deletedSessionCount: library.sessions.filter((item) => item.deletedAt).length,
+      messageCount: sessions.reduce(
         (sum, session) => sum + (Array.isArray(session.transcript) ? session.transcript.length : 0),
         0,
       ),
@@ -247,12 +360,12 @@ function snapshotFromLibrary(library, userId = null) {
 export function getChatLibrarySnapshot() {
   const userId = getWorkspaceUserId();
   if (!userId) {
-    return snapshotFromLibrary(emptyLibrary(), null);
+    return snapshotFromLibrary(emptyLibrary(), null, { includeDeleted: false });
   }
-  return snapshotFromLibrary(loadLibrary(userId), userId);
+  return snapshotFromLibrary(loadLibrary(userId), userId, { includeDeleted: false });
 }
 
-/** Admin/read-only: load another account's chat library without switching request workspace. */
+/** Admin/read-only: library + soft-deleted + índices do archive. */
 export function getChatLibrarySnapshotForUser(userId) {
   const id = String(userId || '').trim();
   if (!id) {
@@ -260,7 +373,36 @@ export function getChatLibrarySnapshotForUser(userId) {
     error.status = 400;
     throw error;
   }
-  return snapshotFromLibrary(loadLibrary(id), id);
+  const library = loadLibrary(id);
+  const snap = snapshotFromLibrary(library, id, { includeDeleted: true });
+  const archive = loadArchiveRecords(id, { limit: 300 });
+  // Último snapshot por sessionId (mais recente no arquivo).
+  const latestById = new Map();
+  for (const record of archive) {
+    latestById.set(record.session.id, record);
+  }
+  const libraryIds = new Set(library.sessions.map((item) => item.id));
+  const archiveOnly = [];
+  for (const [sessionId, record] of latestById.entries()) {
+    if (libraryIds.has(sessionId)) continue;
+    archiveOnly.push({
+      ...summarizeSession(makeSession(record.session)),
+      archivedOnly: true,
+      archivedAt: record.archivedAt,
+      archiveReason: record.reason,
+    });
+  }
+  archiveOnly.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  return {
+    ...snap,
+    sessions: [...snap.sessions, ...archiveOnly],
+    stats: {
+      ...snap.stats,
+      sessionCount: snap.sessions.length + archiveOnly.length,
+      archivedOnlyCount: archiveOnly.length,
+      archiveRecordCount: archive.length,
+    },
+  };
 }
 
 export function getChatSessionForUser(userId, sessionId) {
@@ -273,12 +415,19 @@ export function getChatSessionForUser(userId, sessionId) {
   }
   const library = loadLibrary(id);
   const session = library.sessions.find((item) => item.id === sid);
-  if (!session) {
-    const error = new Error('session_not_found');
-    error.status = 404;
-    throw error;
+  if (session) {
+    return session;
   }
-  return session;
+  // Fallback: último snapshot no archive (suporte mesmo após prune).
+  const archive = loadArchiveRecords(id, { limit: 2000 });
+  for (let i = archive.length - 1; i >= 0; i -= 1) {
+    if (archive[i].session?.id === sid) {
+      return makeSession({ ...archive[i].session, deletedAt: archive[i].session.deletedAt || archive[i].archivedAt });
+    }
+  }
+  const error = new Error('session_not_found');
+  error.status = 404;
+  throw error;
 }
 
 export function createChatFolder({ name } = {}) {
@@ -309,7 +458,7 @@ export function renameChatFolder(folderId, { name } = {}) {
 }
 
 export function deleteChatFolder(folderId, { cascadeSessions = false } = {}) {
-  const result = withLibrary((library) => {
+  return withLibrary((library, userId) => {
     const before = library.folders.length;
     library.folders = library.folders.filter((item) => item.id !== folderId);
     if (library.folders.length === before) {
@@ -317,40 +466,51 @@ export function deleteChatFolder(folderId, { cascadeSessions = false } = {}) {
       error.status = 404;
       throw error;
     }
-    const removedSessionIds = [];
     if (cascadeSessions) {
+      const stamp = nowIso();
       for (const item of library.sessions) {
-        if (item.folderId === folderId) removedSessionIds.push(item.id);
+        if (item.folderId === folderId && isSessionLive(item)) {
+          item.deletedAt = stamp;
+          item.updatedAt = stamp;
+          archiveSessionSnapshot(userId, item, 'folder_cascade_delete');
+        }
       }
-      library.sessions = library.sessions.filter((item) => item.folderId !== folderId);
-      if (!library.sessions.length) {
+      if (!liveSessions(library).length) {
         const session = makeSession({ title: 'Nova sessão' });
-        library.sessions = [session];
+        library.sessions.push(session);
         library.activeSessionId = session.id;
-      } else if (!library.sessions.some((item) => item.id === library.activeSessionId)) {
-        library.activeSessionId = library.sessions[0].id;
+      } else if (!liveSessions(library).some((item) => item.id === library.activeSessionId)) {
+        library.activeSessionId = liveSessions(library)[0].id;
       }
     } else {
       for (const session of library.sessions) {
         if (session.folderId === folderId) session.folderId = null;
       }
     }
-    return { ok: true, activeSessionId: library.activeSessionId, removedSessionIds };
+    return { ok: true, activeSessionId: library.activeSessionId, removedSessionIds: [] };
   });
-  notifySessionsRemoved(result.removedSessionIds);
-  return result;
 }
 
 export function createChatSession({ title, folderId, seedFromActive = false } = {}) {
-  return withLibrary((library) => {
-    if (library.sessions.length >= MAX_SESSIONS) {
-      // Drop oldest by createdAt, not "least recently updated".
-      library.sessions = library.sessions
+  return withLibrary((library, userId) => {
+    const live = liveSessions(library);
+    if (live.length >= MAX_SESSIONS) {
+      // Soft-delete sessões vivas mais antigas (sem transcript) para liberar slot; conteúdo fica no archive.
+      const sortedLive = live
         .slice()
-        .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
-        .slice(0, MAX_SESSIONS - 1);
+        .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+      let freed = 0;
+      for (const item of sortedLive) {
+        if (live.length - freed <= MAX_SESSIONS - 1) break;
+        if ((item.transcript || []).length > 0 || item.finalResult) {
+          archiveSessionSnapshot(userId, item, 'capacity_soft_delete');
+        }
+        item.deletedAt = nowIso();
+        freed += 1;
+      }
     }
-    const active = library.sessions.find((item) => item.id === library.activeSessionId);
+    const active = liveSessions(library).find((item) => item.id === library.activeSessionId)
+      || liveSessions(library)[0];
     // Explicit folder only: never inherit active.folderId. Global / Recentes new chat
     // must land at root (null); folder pencil passes folderId intentionally.
     const validFolderId = folderId && library.folders.some((item) => item.id === folderId)
@@ -374,7 +534,7 @@ export function createChatSession({ title, folderId, seedFromActive = false } = 
           title: title || 'Nova sessão',
           folderId: validFolderId,
         });
-    library.sessions = [session, ...library.sessions].slice(0, MAX_SESSIONS);
+    library.sessions = [session, ...library.sessions];
     library.activeSessionId = session.id;
     return session;
   });
@@ -383,7 +543,7 @@ export function createChatSession({ title, folderId, seedFromActive = false } = 
 export function getChatSession(sessionId) {
   const userId = requireWorkspaceUserId();
   const library = loadLibrary(userId);
-  const session = library.sessions.find((item) => item.id === sessionId);
+  const session = library.sessions.find((item) => item.id === sessionId && isSessionLive(item));
   if (!session) {
     const error = new Error('session_not_found');
     error.status = 404;
@@ -393,13 +553,16 @@ export function getChatSession(sessionId) {
 }
 
 export function updateChatSession(sessionId, patch = {}) {
-  return withLibrary((library) => {
-    const session = library.sessions.find((item) => item.id === sessionId);
+  return withLibrary((library, userId) => {
+    const session = library.sessions.find((item) => item.id === sessionId && isSessionLive(item));
     if (!session) {
       const error = new Error('session_not_found');
       error.status = 404;
       throw error;
     }
+    const prevTranscriptLen = Array.isArray(session.transcript) ? session.transcript.length : 0;
+    const prevHadFinal = Boolean(session.finalResult);
+
     if (typeof patch.title === 'string') session.title = clipTitle(patch.title, session.title);
     if (Object.prototype.hasOwnProperty.call(patch, 'folderId')) {
       const nextFolder = patch.folderId ? String(patch.folderId) : null;
@@ -427,10 +590,16 @@ export function updateChatSession(sessionId, patch = {}) {
     if (Array.isArray(patch.draftAttachments)) {
       session.draftAttachments = normalizeDraftAttachments(patch.draftAttachments, session.id);
     }
-    if (Array.isArray(patch.transcript)) session.transcript = patch.transcript.slice(-MAX_TRANSCRIPT);
+    if (Array.isArray(patch.transcript)) {
+      // Limpar transcript: arquiva o estado anterior para o admin.
+      if (prevTranscriptLen > 0 && patch.transcript.length === 0) {
+        archiveSessionSnapshot(userId, session, 'transcript_clear');
+      }
+      session.transcript = patch.transcript.slice(-MAX_TRANSCRIPT);
+    }
     // Append-only path for operator bubbles / incremental replies without full rewrite races.
     if (Array.isArray(patch.appendTranscript) && patch.appendTranscript.length) {
-      session.transcript = [...session.transcript, ...patch.appendTranscript].slice(-MAX_TRANSCRIPT);
+      session.transcript = [...(session.transcript || []), ...patch.appendTranscript].slice(-MAX_TRANSCRIPT);
     }
     if (Object.prototype.hasOwnProperty.call(patch, 'finalResult')) session.finalResult = patch.finalResult ?? null;
     if (Object.prototype.hasOwnProperty.call(patch, 'visualPack')) session.visualPack = patch.visualPack ?? null;
@@ -457,13 +626,134 @@ export function updateChatSession(sessionId, patch = {}) {
       || patch.individualAssignments
     );
     if (contentful) session.updatedAt = nowIso();
+
+    const nextTranscriptLen = Array.isArray(session.transcript) ? session.transcript.length : 0;
+    const grew = nextTranscriptLen > prevTranscriptLen || (session.finalResult && !prevHadFinal);
+    if (grew || (nextTranscriptLen > 0 && Array.isArray(patch.transcript))) {
+      archiveSessionSnapshot(userId, session, 'content_update');
+    }
+    return session;
+  });
+}
+
+/**
+ * Grava a rodada no chat-library no servidor (fonte de verdade).
+ * Independente do flush do browser — falha de juíz/F5 não apaga o histórico.
+ */
+export function recordPersonaRunOnSession(sessionId, run = {}) {
+  const sid = String(sessionId || '').trim();
+  if (!sid) return null;
+  return withLibrary((library, userId) => {
+    const session = library.sessions.find((item) => item.id === sid && isSessionLive(item));
+    if (!session) return null;
+
+    const timestamp = String(run.generatedAt || nowIso());
+    const mission = String(run.mission || session.missionDraft || '').trim();
+    const mode = run.mode === 'individual' ? 'individual' : 'team';
+    const existing = Array.isArray(session.transcript) ? session.transcript.slice() : [];
+
+    // Operator bubble: só acrescenta se a última missão for diferente.
+    const lastOperator = [...existing].reverse().find((entry) => entry.role === 'operator');
+    if (mission && (!lastOperator || String(lastOperator.content || '').trim() !== mission)) {
+      existing.push({
+        id: `op_${String(run.traceId || Date.now()).replace(/[^\w-]+/g, '').slice(0, 40)}`,
+        role: 'operator',
+        name: 'Operador',
+        content: mission,
+        status: 'info',
+        timestamp,
+      });
+    }
+
+    const replyEntries = [];
+    const steps = Array.isArray(run.steps) ? run.steps : [];
+    if (steps.length) {
+      for (const step of steps) {
+        const stage = step.roleLabel || step.roleId || '';
+        for (const reply of (step.replies || [])) {
+          if (!reply) continue;
+          const content = String(reply.content || reply.error || '').trim();
+          if (!content && reply.ok) continue;
+          replyEntries.push({
+            id: `r_${String(reply.slug || 'persona')}_${String(step.roleId || 'step')}_${replyEntries.length}`,
+            role: 'persona',
+            name: reply.name || reply.slug || 'Persona',
+            slug: reply.slug || undefined,
+            model: reply.model || undefined,
+            stage,
+            phase: reply.phase || step.phase || undefined,
+            content: content || (reply.ok ? '' : `Falha: ${reply.error || 'erro'}`),
+            status: reply.ok ? 'ok' : 'error',
+            timestamp: reply.completedAt || timestamp,
+          });
+        }
+      }
+    } else {
+      for (const reply of (run.replies || [])) {
+        if (!reply) continue;
+        const content = String(reply.content || reply.error || '').trim();
+        if (!content && reply.ok) continue;
+        replyEntries.push({
+          id: `r_${String(reply.slug || 'persona')}_${replyEntries.length}`,
+          role: 'persona',
+          name: reply.name || reply.slug || 'Persona',
+          slug: reply.slug || undefined,
+          model: reply.model || undefined,
+          stage: reply.workflowRoleLabel || undefined,
+          phase: reply.phase || undefined,
+          content: content || (reply.ok ? '' : `Falha: ${reply.error || 'erro'}`),
+          status: reply.ok ? 'ok' : 'error',
+          timestamp: reply.completedAt || timestamp,
+        });
+      }
+    }
+
+    session.transcript = [...existing, ...replyEntries].slice(-MAX_TRANSCRIPT);
+    if (mission) session.missionDraft = mission;
+    session.operationMode = mode;
+
+    let nextFinal = null;
+    if (mode === 'individual' && run.judge?.content) {
+      nextFinal = {
+        id: `judge_${String(run.traceId || Date.now()).slice(0, 40)}`,
+        role: 'persona',
+        name: run.judge.name || run.judge.slug,
+        slug: run.judge.slug,
+        model: run.judge.model,
+        phase: run.judge.phase || 'judge',
+        stage: 'Juiz',
+        content: run.judge.content,
+        status: run.judge.ok ? 'ok' : 'error',
+        timestamp,
+      };
+    } else if (run.finalDisplay?.content) {
+      nextFinal = {
+        id: `final_${String(run.traceId || Date.now()).slice(0, 40)}`,
+        role: 'persona',
+        name: run.finalDisplay.name || run.finalDisplay.slug,
+        slug: run.finalDisplay.slug,
+        model: run.finalDisplay.model,
+        stage: run.finalDisplay.roleLabel || 'Exibição final',
+        content: run.finalDisplay.content,
+        status: 'ok',
+        timestamp,
+      };
+    }
+    if (nextFinal) session.finalResult = nextFinal;
+    if (run.visualPack && typeof run.visualPack === 'object') session.visualPack = run.visualPack;
+
+    if (!String(session.title || '').trim() || session.title === 'Nova sessão') {
+      if (mission) session.title = clipTitle(mission);
+    }
+    session.updatedAt = nowIso();
+    archiveSessionSnapshot(userId, session, 'persona_run');
     return session;
   });
 }
 
 export function activateChatSession(sessionId) {
   return withLibrary((library) => {
-    const session = library.sessions.find((item) => item.id === sessionId);
+    const session = library.sessions.find((item) => item.id === sessionId && isSessionLive(item));
     if (!session) {
       const error = new Error('session_not_found');
       error.status = 404;
@@ -476,24 +766,29 @@ export function activateChatSession(sessionId) {
 }
 
 export function deleteChatSession(sessionId) {
-  return withLibrary((library) => {
-    const before = library.sessions.length;
-    library.sessions = library.sessions.filter((item) => item.id !== sessionId);
-    if (library.sessions.length === before) {
+  return withLibrary((library, userId) => {
+    const session = library.sessions.find((item) => item.id === sessionId && isSessionLive(item));
+    if (!session) {
       const error = new Error('session_not_found');
       error.status = 404;
       throw error;
     }
-    if (!library.sessions.length) {
-      const session = makeSession({ title: 'Nova sessão' });
-      library.sessions = [session];
-      library.activeSessionId = session.id;
-      return { ok: true, activeSession: session, createdReplacement: true };
+    // Soft-delete: some da lista do usuário, permanece para o admin + archive.
+    session.deletedAt = nowIso();
+    session.updatedAt = session.deletedAt;
+    archiveSessionSnapshot(userId, session, 'user_delete');
+
+    const live = liveSessions(library);
+    if (!live.length) {
+      const fresh = makeSession({ title: 'Nova sessão' });
+      library.sessions.push(fresh);
+      library.activeSessionId = fresh.id;
+      return { ok: true, activeSession: fresh, createdReplacement: true, softDeleted: true };
     }
     if (library.activeSessionId === sessionId) {
-      library.activeSessionId = library.sessions[0].id;
+      library.activeSessionId = live[0].id;
     }
-    const active = library.sessions.find((item) => item.id === library.activeSessionId) || library.sessions[0];
-    return { ok: true, activeSession: active, createdReplacement: false };
+    const active = live.find((item) => item.id === library.activeSessionId) || live[0];
+    return { ok: true, activeSession: active, createdReplacement: false, softDeleted: true };
   });
 }

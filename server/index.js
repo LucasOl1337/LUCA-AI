@@ -76,6 +76,7 @@ import {
   getChatLibrarySnapshotForUser,
   getChatSession,
   getChatSessionForUser,
+  recordPersonaRunOnSession,
   renameChatFolder,
   updateChatSession,
 } from './chat-library.js';
@@ -2956,9 +2957,8 @@ app.post('/api/luca-ai/chat/sessions/:sessionId/activate', (req, res) => {
 
 app.delete('/api/luca-ai/chat/sessions/:sessionId', (req, res) => {
   try {
-    // Files first: after deleteChatSession the session no longer resolves,
-    // so its directory would be unreachable and leak on disk.
-    deleteAllChatAttachments(req.params.sessionId);
+    // Soft-delete: mantém transcript/anexos para o admin (suporte).
+    // Não remove arquivos — o usuário só deixa de ver a sessão.
     const result = deleteChatSession(req.params.sessionId);
     res.json({ ok: true, ...result, ...getChatLibrarySnapshot() });
   } catch (error) {
@@ -3455,7 +3455,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
     visualStatus: visualPack?.status || null,
   });
 
-  return {
+  const runPayload = {
     ok: runOk,
     traceId: input.traceId,
     mission: input.mission,
@@ -3488,6 +3488,17 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
     durationMs,
     generatedAt,
   };
+
+  // Persistência server-side: histórico sobrevive a F5, falha de flush do browser e soft-delete.
+  if (input.sessionId) {
+    try {
+      recordPersonaRunOnSession(input.sessionId, runPayload);
+    } catch (error) {
+      console.error(`[chat-library] recordPersonaRunOnSession falhou: ${error?.message || String(error)}`);
+    }
+  }
+
+  return runPayload;
 }
 
 app.post('/api/luca-ai/persona-team/run', (req, res) => {

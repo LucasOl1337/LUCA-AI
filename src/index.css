@@ -2228,6 +2228,11 @@ a.luca-ai-attachment:focus-visible {
   border-color: color-mix(in srgb, var(--l-gold) 45%, transparent);
   background: var(--l-gold-soft);
 }
+.admin-chat-session.is-deleted {
+  border-style: dashed;
+  opacity: 0.9;
+}
+.admin-chat-session.is-deleted span { color: var(--l-warning); }
 .admin-chat-session span { font-size: 12px; font-weight: 600; }
 .admin-chat-session small { color: var(--l-text-mute); font-size: 10px; }
 .admin-chat-empty { margin: 0; color: var(--l-text-ghost); font-size: 12px; }

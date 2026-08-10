@@ -37,6 +37,7 @@ test('ADMIN_CONSOLE_V1 backend exposes readonly chat inspect per user', () => {
   assert.match(auth, /admin_readonly/);
   assert.match(page, /Ver chats/);
   assert.match(page, /data-admin-chat-inspect/);
+  assert.match(page, /inclui apagadas/);
 });
 
 test('ADMIN_CONSOLE_V1 support impersonation enter + exit', () => {

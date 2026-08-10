@@ -46,10 +46,19 @@ test('CHAT_LIBRARY_V1 creates sessions and folders per account', async () => {
   workspace.runWithWorkspaceUser('user-a', () => {
     const deleted = chatLibrary.deleteChatSession(sessionA.id);
     assert.equal(deleted.ok, true);
+    assert.equal(deleted.softDeleted, true);
     const snap = chatLibrary.getChatLibrarySnapshot();
+    // Usuário não vê sessão soft-deleted.
     assert.ok(!snap.sessions.some((item) => item.id === sessionA.id));
     assert.ok(snap.activeSessionId);
   });
+
+  // Admin ainda vê a sessão apagada (soft-delete + archive).
+  const adminA = chatLibrary.getChatLibrarySnapshotForUser('user-a');
+  assert.ok(adminA.sessions.some((item) => item.id === sessionA.id && item.deleted));
+  const adminSession = chatLibrary.getChatSessionForUser('user-a', sessionA.id);
+  assert.equal(adminSession.transcript.length, 1);
+  assert.ok(adminSession.deletedAt);
 
   // Admin-style read without switching request context still sees owner library.
   const adminSnap = chatLibrary.getChatLibrarySnapshotForUser('user-b');
@@ -171,6 +180,45 @@ test('CHAT_LIBRARY_V1 appendTranscript extends without wiping existing messages'
     assert.equal(session.transcript.length, 2);
     assert.equal(session.transcript[1].content, 'a1');
   });
+});
+
+test('CHAT_LIBRARY_V1 recordPersonaRunOnSession grava transcript no servidor', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-run-'));
+  const { workspace, chatLibrary } = await loadChatLibrary(dataDir);
+
+  workspace.runWithWorkspaceUser('user-run', () => {
+    const sessionId = chatLibrary.getChatLibrarySnapshot().activeSessionId;
+    chatLibrary.recordPersonaRunOnSession(sessionId, {
+      mission: 'Hospital com filas',
+      mode: 'individual',
+      traceId: 'trace-1',
+      generatedAt: new Date().toISOString(),
+      replies: [
+        { ok: true, slug: 'aurora', name: 'Aurora', content: 'proposta A', completedAt: new Date().toISOString() },
+      ],
+      steps: [{
+        roleId: 'blind',
+        roleLabel: 'Cega',
+        replies: [
+          { ok: true, slug: 'aurora', name: 'Aurora', content: 'proposta A', phase: 'blind', completedAt: new Date().toISOString() },
+        ],
+      }],
+      judge: { ok: false, slug: 'juiz', name: 'Juiz', content: '', error: 'timeout' },
+      finalDisplay: null,
+    });
+    const session = chatLibrary.getChatSession(sessionId);
+    assert.ok(session.transcript.length >= 2, 'operator + reply');
+    assert.equal(session.missionDraft, 'Hospital com filas');
+    assert.equal(session.operationMode, 'individual');
+  });
+
+  const workspacesRoot = path.join(dataDir, 'workspaces');
+  const dirs = fs.readdirSync(workspacesRoot);
+  const archivePath = path.join(workspacesRoot, dirs[0], 'chat-history-archive.jsonl');
+  assert.ok(fs.existsSync(archivePath));
+  const archive = fs.readFileSync(archivePath, 'utf8');
+  assert.match(archive, /Hospital com filas/);
+  assert.match(archive, /persona_run/);
 });
 
 test('CHAT_LIBRARY_V1 persists pending attachment metadata for retry after reload', async () => {

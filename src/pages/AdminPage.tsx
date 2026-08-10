@@ -78,6 +78,10 @@ interface ChatSessionSummary {
   operationMode?: string;
   messageCount?: number;
   preview?: string;
+  deleted?: boolean;
+  deletedAt?: string | null;
+  archivedOnly?: boolean;
+  archivedAt?: string;
 }
 
 interface ChatTranscriptEntry {
@@ -107,7 +111,14 @@ interface UserChatLibrary {
   folders: ChatFolder[];
   sessions: ChatSessionSummary[];
   activeSessionId?: string | null;
-  stats?: { folderCount: number; sessionCount: number; messageCount: number };
+  stats?: {
+    folderCount: number;
+    sessionCount: number;
+    messageCount: number;
+    liveSessionCount?: number;
+    deletedSessionCount?: number;
+    archivedOnlyCount?: number;
+  };
 }
 
 function formatDate(value: string) {
@@ -551,7 +562,7 @@ export default function AdminPage() {
           <aside className="admin-chat-panel">
             <header className="admin-chat-header">
               <div>
-                <span>VISÃO SOMENTE LEITURA</span>
+                <span>VISÃO SOMENTE LEITURA · inclui apagadas</span>
                 <h2>{inspectUser.name}</h2>
                 <p>{inspectUser.email}</p>
               </div>
@@ -566,8 +577,15 @@ export default function AdminPage() {
                 <strong>{chatLibrary?.stats?.folderCount ?? '—'}</strong>
               </article>
               <article>
-                <span>Sessões de chat</span>
+                <span>Sessões (todas)</span>
                 <strong>{chatLibrary?.stats?.sessionCount ?? '—'}</strong>
+              </article>
+              <article>
+                <span>Apagadas / arquivo</span>
+                <strong>
+                  {(chatLibrary?.stats?.deletedSessionCount || 0)
+                    + (chatLibrary?.stats?.archivedOnlyCount || 0)}
+                </strong>
               </article>
               <article>
                 <span>Mensagens</span>
@@ -599,11 +617,18 @@ export default function AdminPage() {
                           <button
                             key={session.id}
                             type="button"
-                            className={`admin-chat-session ${chatSession?.id === session.id ? 'active' : ''}`}
+                            className={`admin-chat-session ${chatSession?.id === session.id ? 'active' : ''} ${session.deleted || session.archivedOnly ? 'is-deleted' : ''}`}
                             onClick={() => void openChatSession(session.id)}
                           >
-                            <span>{session.title || 'Sem título'}</span>
-                            <small>{session.messageCount || 0} msg · {session.operationMode || 'team'}</small>
+                            <span>
+                              {session.title || 'Sem título'}
+                              {session.deleted || session.archivedOnly ? ' · apagada' : ''}
+                            </span>
+                            <small>
+                              {session.messageCount || 0} msg · {session.operationMode || 'team'}
+                              {session.deleted ? ' · soft-delete' : ''}
+                              {session.archivedOnly ? ' · arquivo' : ''}
+                            </small>
                           </button>
                         ))}
                       </div>
@@ -615,11 +640,18 @@ export default function AdminPage() {
                       <button
                         key={session.id}
                         type="button"
-                        className={`admin-chat-session ${chatSession?.id === session.id ? 'active' : ''}`}
+                        className={`admin-chat-session ${chatSession?.id === session.id ? 'active' : ''} ${session.deleted || session.archivedOnly ? 'is-deleted' : ''}`}
                         onClick={() => void openChatSession(session.id)}
                       >
-                        <span>{session.title || 'Sem título'}</span>
-                        <small>{session.messageCount || 0} msg · {session.operationMode || 'team'}</small>
+                        <span>
+                          {session.title || 'Sem título'}
+                          {session.deleted || session.archivedOnly ? ' · apagada' : ''}
+                        </span>
+                        <small>
+                          {session.messageCount || 0} msg · {session.operationMode || 'team'}
+                          {session.deleted ? ' · soft-delete' : ''}
+                          {session.archivedOnly ? ' · arquivo' : ''}
+                        </small>
                       </button>
                     ))}
                     {!chatBusy && (chatLibrary?.sessions || []).length === 0 ? (
