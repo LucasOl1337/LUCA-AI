@@ -1,2 +1,18 @@
+/**
+ * Compat: briefing legado Santa Aurora + reexport do catálogo de casos SOMPO.
+ */
+export {
+  SOMPO_EXAMPLE_CASES,
+  SOMPO_INDUSTRY_CONTEXT,
+  buildSompoCaseMission,
+  queueSompoCaseForLuca,
+  consumePendingSompoMission,
+  consumePendingSompoPresetId,
+  SOMPO_PENDING_MISSION_KEY,
+  SOMPO_PENDING_PRESET_KEY,
+  SOMPO_ENTRY_MODE_KEY,
+  type SompoExampleCase,
+} from './sompo-cases';
+
 export const SOMPO_CASE_PROMPT =
   'Caso Sompo Sprint 2 - Fazenda Santa Aurora. CSV de sinistros fornecido no briefing: alagamento 12 eventos, falha de irrigacao 7 eventos, pragas 5 eventos. Telemetria atual: talhao norte com umidade acima do limite operacional; previsao de chuva 42mm nas proximas 24h; sensor de vazao da irrigacao leste oscilando. Gere um canvas executivo para a Sompo com riscos priorizados, premissas explicitas, lacunas de dados, plano preventivo, valor para seguradora e criterio de sucesso. Nao invente dados financeiros; marque como pendente quando faltar. Nao use linguagem de material ficticio.';

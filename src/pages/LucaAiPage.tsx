@@ -58,6 +58,10 @@ import {
 } from '@/lib/lucaPresets';
 import { useChatLibrary } from '@/hooks/useChatLibrary';
 import { useTheme } from '@/hooks/useTheme';
+import {
+  consumePendingSompoMission,
+  consumePendingSompoPresetId,
+} from '@/lib/sompo-cases';
 
 const MAX_EXECUTORS = 4;
 const LUCA_AI_CLEAN_UI_VERSION = 'session-isolation-v2';
@@ -74,7 +78,7 @@ const LUCA_AI_LEGACY_LOCAL_KEYS = [
 ];
 
 interface LucaAiPageProps {
-  onNavigate: (page: 'personas') => void;
+  onNavigate: (page: 'personas' | 'sompo') => void;
 }
 
 type TranscriptRole = 'operator' | 'persona' | 'system';
@@ -631,6 +635,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const [shareCopied, setShareCopied] = useState(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingSompoPresetRef = useRef<string | null>(null);
   const [hydratedSessionId, setHydratedSessionId] = useState<string | null>(null);
   const persistTimerRef = useRef<number | null>(null);
   const latestPersistRef = useRef<{
@@ -703,10 +708,14 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     if (!session) {
       boundSessionIdRef.current = null;
       setHydratedSessionId(null);
-      setMission('');
+      setOperationMode(consumeEntryMode() || 'team');
+      const pendingSompoMission = consumePendingSompoMission();
+      const pendingPresetId = consumePendingSompoPresetId();
+      setMission(pendingSompoMission || '');
       setDraftAttachments([]);
       setTranscript([]);
       setFinalResult(null);
+      if (pendingPresetId) pendingSompoPresetRef.current = pendingPresetId;
       return;
     }
     boundSessionIdRef.current = session.id;
@@ -716,14 +725,19 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       participants: uniqueSlugs(session.individualAssignments?.participants || [], 5),
       judge: session.individualAssignments?.judge ? String(session.individualAssignments.judge) : null,
     });
-    setMission(String(session.missionDraft || ''));
-    setDraftAttachments(Array.isArray(session.draftAttachments) ? session.draftAttachments.slice(0, 4) : []);
+    const sessionMission = String(session.missionDraft || '').trim();
     const nextTranscript = ((Array.isArray(session.transcript) ? session.transcript : []) as unknown[])
       .filter(isTeamTranscriptEntry);
+    const workspaceEmpty = !sessionMission && nextTranscript.length === 0;
+    const pendingSompoMission = workspaceEmpty ? consumePendingSompoMission() : null;
+    const pendingPresetId = workspaceEmpty ? consumePendingSompoPresetId() : null;
+    setMission(sessionMission || pendingSompoMission || '');
+    setDraftAttachments(Array.isArray(session.draftAttachments) ? session.draftAttachments.slice(0, 4) : []);
     setTranscript(nextTranscript);
     setFinalResult(isTeamTranscriptEntry(session.finalResult) ? session.finalResult : null);
     setActivePersonaSlug(session.activePersonaSlug ? String(session.activePersonaSlug) : null);
     setHydratedSessionId(session.id);
+    if (pendingPresetId) pendingSompoPresetRef.current = pendingPresetId;
   }, [setActivePersonaSlug, setFinalResult, setIndividualState, setMission, setOperationMode, setTranscript, setWorkflowState]);
 
   useEffect(() => {
@@ -1239,6 +1253,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         next[role.id] = uniqueSlugs((preset.assignments[role.id] ?? []).filter((slug) => ok.has(slug)), role.maxSlugs);
       }
       setWorkflowState(next);
+      setOperationMode('team');
       const first = flattenWorkflowAssignments(next)[0];
       if (first) setActivePersonaSlug(first);
       const message = presetApplyError(preset.label, [], failed);
@@ -1250,6 +1265,22 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setApplyingPresetId(null);
     }
   }
+
+  // Handoff SOMPO → bancada: aplica preset de risco agro quando o dossiê chega vazio.
+  useEffect(() => {
+    const presetId = pendingSompoPresetRef.current;
+    if (!presetId || loading || running || applyingPresetId) return;
+    if (!personas.length) return;
+    const preset = teamPresets.find((item) => item.id === presetId);
+    if (!preset) {
+      pendingSompoPresetRef.current = null;
+      return;
+    }
+    pendingSompoPresetRef.current = null;
+    void applyTeamPreset(preset);
+  // applyTeamPreset is stable enough via closure for this one-shot handoff
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applyingPresetId, loading, personas.length, running, teamPresets]);
 
   async function applyIndividualPreset(preset: LucaIndividualPreset) {
     if (running || applyingPresetId) return;

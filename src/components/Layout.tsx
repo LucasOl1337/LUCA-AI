@@ -10,6 +10,7 @@ import {
   Settings2,
   ShieldCheck,
   StickyNote,
+  Wheat,
   X,
 } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
@@ -17,7 +18,7 @@ import { useLuca } from '@/hooks/useLucaState';
 import { useAuth } from '@/hooks/useAuth';
 import SidebarSessionsRail from '@/components/SidebarSessionsRail';
 
-export type PageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'admin';
+export type PageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'admin';
 
 interface LayoutProps {
   activePage: PageId;
@@ -37,10 +38,11 @@ const navItems: NavItem[] = [
   { id: 'luca-ai', label: 'LUCA-AI', icon: BrainCircuit, hint: 'bancada isolada com equipe de personas' },
   { id: 'personas', label: 'Personas', icon: StickyNote, hint: 'personas do Yume disponíveis no LUCA' },
   { id: 'configuracao', label: 'Configuração', icon: Settings2, hint: 'templates de equipe e individual' },
+  { id: 'sompo', label: 'SOMPO', icon: Wheat, hint: 'casos de exemplo agrícolas e rurais' },
   { id: 'admin', label: 'Admin', icon: ShieldCheck, hint: 'usuários e atividade da plataforma' },
 ];
 
-const dockIds: PageId[] = ['inicio', 'luca-ai', 'personas', 'configuracao'];
+const dockIds: PageId[] = ['inicio', 'luca-ai', 'personas', 'configuracao', 'sompo'];
 
 export default function Layout({ activePage, onPageChange, children }: LayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
