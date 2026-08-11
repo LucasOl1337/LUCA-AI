@@ -16,7 +16,8 @@ export const PACKAGE_VERSION = readProjectVersion();
 export const HOST = process.env.HOST ?? '127.0.0.1';
 export const PORT = Number(process.env.PORT ?? 4242);
 export const ROUTER_API_KEY = process.env.ROUTER_API_KEY ?? process.env.NINE_ROUTER_API_KEY ?? '';
-export const ROUTER_BASE_URL = process.env.ROUTER_BASE_URL ?? 'http://127.0.0.1:20128/v1';
+// Producao/Maestro na sennin: 20129. 20128 e nginx e devolve 403.
+export const ROUTER_BASE_URL = process.env.ROUTER_BASE_URL ?? 'http://127.0.0.1:20129/v1';
 export const ROUTER_TIMEOUT_MS = Number(process.env.ROUTER_TIMEOUT_MS ?? 120000);
 export const REQUIRE_CLOUDFLARE_ACCESS = process.env.REQUIRE_CLOUDFLARE_ACCESS === 'true';
 export const CLOUDFLARE_ACCESS_EMAILS = Object.freeze(

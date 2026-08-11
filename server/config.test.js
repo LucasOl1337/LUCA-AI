@@ -61,7 +61,7 @@ test('configuracao 9Router declara capacidades maximas sem controles de esforco'
 });
 
 test('defaults usam a base local e uma rota da whitelist', () => {
-  assert.equal(ROUTER_BASE_URL, 'http://127.0.0.1:20128/v1');
+  assert.equal(ROUTER_BASE_URL, 'http://127.0.0.1:20129/v1');
   assert.equal(isAllowed9RouterModel(ROUTER_MODEL), true);
 });
 
