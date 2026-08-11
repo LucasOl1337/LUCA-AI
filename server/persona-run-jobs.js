@@ -58,7 +58,7 @@ export function createPersonaRunJobStore({
 
     schedule(() => {
       Promise.resolve()
-        .then(execute)
+        .then(() => execute(publicJob(job)))
         .then((result) => {
           job.status = 'complete';
           job.result = result;
@@ -80,5 +80,17 @@ export function createPersonaRunJobStore({
     return publicJob(job);
   }
 
-  return { start, get };
+  function findByTraceId(traceId, ownerId) {
+    const cleanTraceId = String(traceId || '').trim();
+    const cleanOwnerId = String(ownerId || '').trim();
+    if (!cleanTraceId || !cleanOwnerId) return null;
+    for (const job of jobs.values()) {
+      if (job.ownerId === cleanOwnerId && job.traceId === cleanTraceId) {
+        return publicJob(job);
+      }
+    }
+    return null;
+  }
+
+  return { start, get, findByTraceId };
 }

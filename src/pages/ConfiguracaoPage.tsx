@@ -19,29 +19,16 @@ import {
   type LucaPresetIconId,
 } from '@/lib/lucaPresets';
 import { useTheme } from '@/hooks/useTheme';
-import { PRESET_ICON_IDS, TEAM_ROLE_ORDER } from '../../shared/luca-preset-seed.js';
+import { PRESET_ICON_IDS } from '../../shared/luca-preset-seed.js';
+import {
+  PERSONA_WORKFLOW_ROLES,
+  resolvePersonaWorkflow,
+  type PersonaWorkflowRoleId,
+} from '../../shared/persona-workflow.js';
 
 type Kind = 'team' | 'individual';
-type RoleId = 'supervisor' | 'mission' | 'execution' | 'approval' | 'display' | 'visual';
-const ROLE_ORDER = TEAM_ROLE_ORDER as readonly RoleId[];
-
-const ROLE_LABELS: Record<RoleId, string> = {
-  supervisor: 'Supervisor',
-  mission: 'Decisor da missão',
-  execution: 'Executores',
-  approval: 'Aprovação',
-  display: 'Exibição final',
-  visual: 'Especialista visual',
-};
-
-const ROLE_LIMITS: Record<RoleId, number> = {
-  supervisor: 1,
-  mission: 1,
-  execution: 4,
-  approval: 1,
-  display: 1,
-  visual: 1,
-};
+type RoleId = PersonaWorkflowRoleId;
+const ROLE_ORDER = PERSONA_WORKFLOW_ROLES.map((role) => role.id);
 
 const ICON_OPTIONS = PRESET_ICON_IDS as LucaPresetIconId[];
 
@@ -51,14 +38,7 @@ function emptyTeam(): LucaAiTeamTemplate {
     label: '',
     description: '',
     icon: 'users',
-    assignments: {
-      supervisor: [],
-      mission: [],
-      execution: [],
-      approval: [],
-      display: [],
-      visual: [],
-    },
+    assignments: resolvePersonaWorkflow({}).assignments,
   };
 }
 
@@ -106,7 +86,7 @@ export default function ConfiguracaoPage() {
     try {
       const [templates, catalog] = await Promise.all([
         lucaApi.listTeamTemplates(),
-        lucaApi.listYumePersonas(undefined, 15000),
+        lucaApi.listPersonas(undefined, 15000),
       ]);
       setTeam(templates.team || []);
       setIndividual(templates.individual || []);
@@ -225,14 +205,16 @@ export default function ConfiguracaoPage() {
   function toggleTeamRole(roleId: RoleId, slug: string) {
     setDraftTeam((prev) => {
       const current = prev.assignments[roleId] || [];
-      const limit = ROLE_LIMITS[roleId];
       const has = current.includes(slug);
-      const next = has
+      const requested = has
         ? current.filter((item) => item !== slug)
-        : unique([...current, slug], limit);
+        : [...current, slug];
       return {
         ...prev,
-        assignments: { ...prev.assignments, [roleId]: next },
+        assignments: resolvePersonaWorkflow({
+          ...prev.assignments,
+          [roleId]: requested,
+        }).assignments,
       };
     });
   }
@@ -444,14 +426,14 @@ export default function ConfiguracaoPage() {
               </Field>
 
               {kind === 'team' ? (
-                ROLE_ORDER.map((roleId) => (
+                PERSONA_WORKFLOW_ROLES.map((role) => (
                   <RolePicker
-                    key={roleId}
-                    label={ROLE_LABELS[roleId]}
-                    limit={ROLE_LIMITS[roleId]}
-                    selected={draftTeam.assignments[roleId] || []}
+                    key={role.id}
+                    label={role.label}
+                    limit={role.maxSlugs}
+                    selected={draftTeam.assignments[role.id] || []}
                     personas={personas}
-                    onToggle={(slug) => toggleTeamRole(roleId, slug)}
+                    onToggle={(slug) => toggleTeamRole(role.id, slug)}
                   />
                 ))
               ) : (

@@ -59,3 +59,15 @@ test('persona run job termina failed sem expor o job para outro workspace', asyn
     message: 'Kamui indisponivel',
   });
 });
+
+test('persona run job encontra aceite existente por owner e trace', () => {
+  const store = createPersonaRunJobStore({ idFactory: () => 'run-trace' });
+  const started = store.start({
+    ownerId: 'user-1',
+    traceId: 'trace-idempotente',
+    execute: async () => ({ ok: true }),
+  });
+
+  assert.equal(store.findByTraceId('trace-idempotente', 'user-1')?.runId, started.runId);
+  assert.equal(store.findByTraceId('trace-idempotente', 'user-2'), null);
+});

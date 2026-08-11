@@ -57,27 +57,3 @@ export function getBuiltinSystemPrompt(slug) {
 export function isLucaBuiltinPersona(slug) {
   return Boolean(getBuiltinPersona(slug));
 }
-
-/**
- * Acrescenta builtins ausentes no catálogo Yume. Nunca sobrescreve slug já presente.
- */
-export function mergeBuiltinPersonas(yumePersonas = []) {
-  const list = Array.isArray(yumePersonas) ? yumePersonas.slice() : [];
-  const present = new Set(
-    list.map((persona) => String(persona?.slug || '').trim()).filter(Boolean),
-  );
-  for (const builtin of BUILTIN_PERSONAS) {
-    if (present.has(builtin.slug)) continue;
-    list.push({
-      slug: builtin.slug,
-      name: builtin.name,
-      is_official: true,
-      model: builtin.model,
-      purpose: builtin.purpose,
-      description: builtin.description,
-      luca_builtin: true,
-      version: 'luca-builtin',
-    });
-  }
-  return list;
-}

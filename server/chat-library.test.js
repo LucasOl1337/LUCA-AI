@@ -550,6 +550,11 @@ test('CHAT_LIBRARY_V1 activePersonaRun marca e limpa rodada em andamento', async
     session = chatLibrary.getChatSession(sessionId);
     assert.equal(session.activePersonaRun, null, 'record limpa marcador ativo');
     assert.ok(session.finalResult);
+    assert.equal(session.lastPersonaRun.runId, 'run-xyz');
+    const recovered = chatLibrary.findPersonaRunOnSession('run-xyz');
+    assert.equal(recovered.status, 'complete');
+    assert.equal(recovered.result.recoveredFromSession, true);
+    assert.equal(recovered.result.traceId, 'trace-xyz');
 
     chatLibrary.markPersonaRunStartedOnSession(sessionId, { runId: 'run-fail', traceId: 'trace-fail' });
     chatLibrary.markPersonaRunFailedOnSession(sessionId, {
@@ -560,6 +565,7 @@ test('CHAT_LIBRARY_V1 activePersonaRun marca e limpa rodada em andamento', async
     session = chatLibrary.getChatSession(sessionId);
     assert.equal(session.activePersonaRun.status, 'failed');
     assert.match(String(session.activePersonaRun.errorMessage), /boom/);
+    assert.equal(chatLibrary.findPersonaRunOnSession('run-fail').status, 'failed');
     chatLibrary.clearPersonaRunOnSession(sessionId);
     session = chatLibrary.getChatSession(sessionId);
     assert.equal(session.activePersonaRun, null);

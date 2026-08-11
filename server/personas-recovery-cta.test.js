@@ -1,4 +1,4 @@
-// Source lock: Personas Yume error + empty expose recoverable CTAs.
+// Source lock: falha das fontes de personas + vazio expõem CTAs recuperáveis.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -18,12 +18,12 @@ test('personas error state has recoverable CTA', () => {
   assert.ok(source.includes('data-personas-retry'), 'retry button marker');
   assert.ok(source.includes('Tentar novamente'), 'retry label');
   assert.ok(source.includes('onClick={() => void load()}'), 'retry calls load');
-  assert.ok(source.includes('title="Yume indisponivel"'), 'Yume error title');
+  assert.ok(source.includes('title="Fontes de personas indisponíveis"'), 'persona sources error title');
   // retry is passed as Notice actions (call site), not inside Notice function body
-  const titleAt = source.indexOf('title="Yume indisponivel"');
+  const titleAt = source.indexOf('title="Fontes de personas indisponíveis"');
   assert.ok(titleAt >= 0, 'error title present');
   const callSite = source.slice(titleAt, titleAt + 500);
-  assert.ok(callSite.includes('data-personas-retry'), 'retry next to Yume error title');
+  assert.ok(callSite.includes('data-personas-retry'), 'retry next to persona sources error title');
   assert.ok(callSite.includes('btn-primary'), 'primary action chrome');
 });
 

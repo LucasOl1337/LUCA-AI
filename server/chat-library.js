@@ -137,6 +137,7 @@ function makeSession(partial = {}, { forceVisualDefaults = false } = {}) {
     visualPack: partial.visualPack ?? null,
     activePersonaSlug: partial.activePersonaSlug ? String(partial.activePersonaSlug) : null,
     activePersonaRun: normalizeActivePersonaRun(partial.activePersonaRun),
+    lastPersonaRun: normalizePersonaRunReceipt(partial.lastPersonaRun),
   };
 }
 
@@ -151,6 +152,21 @@ function normalizeActivePersonaRun(value) {
     status,
     startedAt: String(value.startedAt || nowIso()),
     errorMessage: value.errorMessage ? String(value.errorMessage).slice(0, 400) : null,
+    errorCode: value.errorCode ? String(value.errorCode).slice(0, 120) : null,
+  };
+}
+
+function normalizePersonaRunReceipt(value) {
+  if (!value || typeof value !== 'object') return null;
+  const runId = String(value.runId || '').trim();
+  if (!runId) return null;
+  return {
+    runId,
+    traceId: String(value.traceId || runId).trim(),
+    status: 'complete',
+    startedAt: String(value.startedAt || value.completedAt || nowIso()),
+    completedAt: String(value.completedAt || nowIso()),
+    ok: value.ok !== false,
   };
 }
 
@@ -303,6 +319,7 @@ function archiveSessionSnapshot(userId, session, reason = 'snapshot') {
       visualPack: session.visualPack ?? null,
       activePersonaSlug: session.activePersonaSlug || null,
       activePersonaRun: session.activePersonaRun || null,
+      lastPersonaRun: session.lastPersonaRun || null,
       workflowAssignments: session.workflowAssignments || null,
       individualAssignments: session.individualAssignments || null,
     },
@@ -887,6 +904,7 @@ export function markPersonaRunStartedOnSession(sessionId, meta = {}) {
       status: 'running',
       startedAt: meta.startedAt || nowIso(),
       errorMessage: null,
+      errorCode: null,
     });
     session.updatedAt = nowIso();
     return session;
@@ -910,6 +928,7 @@ export function markPersonaRunFailedOnSession(sessionId, meta = {}) {
       status: 'failed',
       startedAt: prev?.startedAt || nowIso(),
       errorMessage: meta.errorMessage || meta.message || 'persona_run_failed',
+      errorCode: meta.errorCode || meta.code || 'persona_run_failed',
     });
     session.updatedAt = nowIso();
     return session;
@@ -932,7 +951,7 @@ export function clearPersonaRunOnSession(sessionId) {
  * Grava a rodada no chat-library no servidor (fonte de verdade).
  * Independente do flush do browser — falha de juíz/F5 não apaga o histórico.
  */
-export function recordPersonaRunOnSession(sessionId, run = {}) {
+export function recordPersonaRunOnSession(sessionId, run = {}, meta = {}) {
   const sid = String(sessionId || '').trim();
   if (!sid) return null;
   return withLibrary((library, userId) => {
@@ -940,6 +959,7 @@ export function recordPersonaRunOnSession(sessionId, run = {}) {
     if (!session) return null;
 
     const timestamp = String(run.generatedAt || nowIso());
+    const activeRun = normalizeActivePersonaRun(session.activePersonaRun);
     const mission = String(run.mission || session.missionDraft || '').trim();
     const mode = run.mode === 'individual' ? 'individual' : 'team';
     const existing = Array.isArray(session.transcript) ? session.transcript.slice() : [];
@@ -967,6 +987,16 @@ export function recordPersonaRunOnSession(sessionId, run = {}) {
     session.finalResult = finalEntryFromPersonaRun(run);
     session.visualPack = run.visualPack && typeof run.visualPack === 'object' ? run.visualPack : null;
     if (run.ok) session.draftAttachments = [];
+    const runId = String(meta.runId || activeRun?.runId || '').trim();
+    if (runId) {
+      session.lastPersonaRun = normalizePersonaRunReceipt({
+        runId,
+        traceId: meta.traceId || run.traceId || activeRun?.traceId || runId,
+        startedAt: meta.startedAt || activeRun?.startedAt || timestamp,
+        completedAt: meta.completedAt || timestamp,
+        ok: run.ok,
+      });
+    }
     // Job terminou — limpa marcador de rodada em andamento.
     session.activePersonaRun = null;
 
@@ -976,6 +1006,71 @@ export function recordPersonaRunOnSession(sessionId, run = {}) {
     session.updatedAt = nowIso();
     return session;
   });
+}
+
+/** Adapter duravel do lifecycle: encontra uma rodada pela sessao, inclusive apos restart. */
+export function findPersonaRunOnSession(runId) {
+  const cleanRunId = String(runId || '').trim();
+  if (!cleanRunId) return null;
+  const userId = requireWorkspaceUserId();
+  const library = loadLibrary(userId);
+  for (const session of library.sessions) {
+    const active = normalizeActivePersonaRun(session.activePersonaRun);
+    if (active?.runId === cleanRunId) {
+      return {
+        sessionId: session.id,
+        runId: active.runId,
+        traceId: active.traceId,
+        status: active.status,
+        startedAt: active.startedAt,
+        completedAt: active.status === 'failed' ? session.updatedAt : null,
+        result: null,
+        error: active.status === 'failed'
+          ? {
+              code: active.errorCode || 'persona_run_failed',
+              message: active.errorMessage || 'Falha ao executar a rodada de personas.',
+            }
+          : null,
+      };
+    }
+
+    const receipt = normalizePersonaRunReceipt(session.lastPersonaRun);
+    if (receipt?.runId !== cleanRunId) continue;
+    const operatorId = personaRunOperatorEntryId({ traceId: receipt.traceId });
+    const operator = (session.transcript || []).find((entry) => entry?.id === operatorId);
+    const finalResult = session.finalResult && typeof session.finalResult === 'object'
+      ? session.finalResult
+      : null;
+    return {
+      sessionId: session.id,
+      runId: receipt.runId,
+      traceId: receipt.traceId,
+      status: 'complete',
+      startedAt: receipt.startedAt,
+      completedAt: receipt.completedAt,
+      error: null,
+      result: {
+        ok: receipt.ok,
+        recoveredFromSession: true,
+        traceId: receipt.traceId,
+        mission: String(operator?.content || ''),
+        mode: session.operationMode === 'individual' ? 'individual' : 'workflow',
+        team: [],
+        replies: [],
+        finalDisplay: finalResult ? {
+          roleId: 'recovered',
+          roleLabel: String(finalResult.stage || 'Recuperado'),
+          slug: String(finalResult.slug || 'session'),
+          name: String(finalResult.name || 'Sessao'),
+          model: finalResult.model ? String(finalResult.model) : undefined,
+          content: String(finalResult.content || ''),
+        } : null,
+        visualPack: session.visualPack ?? null,
+        generatedAt: receipt.completedAt,
+      },
+    };
+  }
+  return null;
 }
 
 export function activateChatSession(sessionId) {

@@ -1,6 +1,11 @@
+import {
+  getPersonaWorkflowRole,
+  normalizePersonaSlug,
+  resolvePersonaWorkflow,
+} from '../shared/persona-workflow.js';
+
 const DEFAULT_MAX_TEAM_SIZE = 10;
 const DEFAULT_MAX_MISSION_CHARS = 6000;
-const DEFAULT_MAX_EXECUTION_SLUGS = 4;
 const DEFAULT_MAX_INDIVIDUAL_PARTICIPANTS = 5;
 const DEFAULT_MAX_ATTACHMENTS = 4;
 /** Compact prior-turn context injected into persona prompts on follow-up. */
@@ -17,7 +22,7 @@ function normalizeModelOverrides(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   const overrides = {};
   for (const [rawKey, rawModel] of Object.entries(value)) {
-    const slug = normalizePersonaTeamSlug(rawKey);
+    const slug = normalizePersonaSlug(rawKey);
     const model = String(rawModel || '').trim();
     if (!slug || !model) continue;
     overrides[slug] = model;
@@ -25,193 +30,10 @@ function normalizeModelOverrides(value) {
   return overrides;
 }
 
-export const PERSONA_WORKFLOW_ROLES = [
-  {
-    id: 'supervisor',
-    label: 'Supervisor',
-    maxSlugs: 1,
-    optional: false,
-    instruction: 'Defina o enquadramento da bancada: objetivo real, limites, criterio de sucesso e risco principal.',
-  },
-  {
-    id: 'mission',
-    label: 'Decisor da missao',
-    maxSlugs: 1,
-    optional: false,
-    instruction: 'Converta o enquadramento em uma missao executavel, com prioridade, escopo e dependencias.',
-  },
-  {
-    id: 'execution',
-    label: 'Execucao',
-    maxSlugs: DEFAULT_MAX_EXECUTION_SLUGS,
-    optional: false,
-    instruction: 'Execute a parte pratica da missao. Entregue achados, decisoes tecnicas e proximas acoes verificaveis.',
-  },
-  {
-    id: 'approval',
-    label: 'Aprovacao',
-    maxSlugs: 2,
-    optional: false,
-    instruction: 'Revise o resultado dos executores. Aprove, bloqueie ou aprove com condicoes, citando lacunas criticas.',
-  },
-  {
-    id: 'display',
-    label: 'Exibicao final',
-    maxSlugs: 1,
-    optional: false,
-    instruction: 'Transforme o resultado aprovado em uma exibicao final clara para o operador: resumo, decisoes, riscos e proximas acoes.',
-  },
-  {
-    id: 'visual',
-    label: 'Especialista visual',
-    maxSlugs: 1,
-    // Etapa opcional: vazio = pula artefatos; preenchido = roda o pack visual.
-    optional: true,
-    instruction: 'Com base no resultado aprovado e na entrega final, selecione o conteudo mais relevante e produza um plano de artefatos: graficos com dados, relatorio executivo e prompts de imagens cinematograficas de exemplo. Nao invente metricas sem base no contexto.',
-  },
-];
-
-export const REQUIRED_PERSONA_WORKFLOW_ROLES = PERSONA_WORKFLOW_ROLES.filter((role) => !role.optional);
-
-const ROLE_BY_ID = new Map(PERSONA_WORKFLOW_ROLES.map((role) => [role.id, role]));
-
-const ROLE_ALIASES = new Map([
-  ['supervisor', 'supervisor'],
-  ['coordination', 'supervisor'],
-  ['coordenacao', 'supervisor'],
-  ['mission', 'mission'],
-  ['missao', 'mission'],
-  ['mission_decider', 'mission'],
-  ['decider', 'mission'],
-  ['execution', 'execution'],
-  ['execucao', 'execution'],
-  ['executor', 'execution'],
-  ['executors', 'execution'],
-  ['approval', 'approval'],
-  ['aprovacao', 'approval'],
-  ['approver', 'approval'],
-  ['approvers', 'approval'],
-  ['display', 'display'],
-  ['exibicao', 'display'],
-  ['final', 'display'],
-  ['final_display', 'display'],
-  ['visual', 'visual'],
-  ['visuals', 'visual'],
-  ['imagem', 'visual'],
-  ['imagens', 'visual'],
-  ['image', 'visual'],
-  ['images', 'visual'],
-  ['designer_visual', 'visual'],
-  ['especialista_visual', 'visual'],
-  ['especialista-visual', 'visual'],
-]);
-
-export function normalizePersonaTeamSlug(value) {
-  const raw = String(value || '').trim();
-  const slug = raw.startsWith('yume:') ? raw.slice('yume:'.length) : raw;
-  return slug.replace(/^\/+|\/+$/g, '');
-}
-
-function normalizeWorkflowRoleId(value) {
-  const raw = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
-  return ROLE_ALIASES.get(raw) || '';
-}
-
 function normalizeTraceId(value) {
   const raw = String(value || '').trim();
   if (raw) return raw.replace(/[^\w:.-]+/g, '-').slice(0, 120);
   return `luca-ai-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function roleSlugList(value, maxSlugs) {
-  const values = Array.isArray(value)
-    ? value
-    : value && typeof value === 'object' && Array.isArray(value.slugs)
-      ? value.slugs
-      : value && typeof value === 'object' && value.slug
-        ? [value.slug]
-        : value
-          ? [value]
-          : [];
-  const seen = new Set();
-  const slugs = [];
-
-  for (const item of values) {
-    const slug = normalizePersonaTeamSlug(item);
-    if (!slug || seen.has(slug)) continue;
-    seen.add(slug);
-    slugs.push(slug);
-    if (slugs.length >= maxSlugs) break;
-  }
-
-  return slugs;
-}
-
-function hasExplicitWorkflow(body = {}) {
-  return Boolean(body?.workflow || body?.roles || body?.assignments);
-}
-
-function readWorkflowSource(body = {}) {
-  return body?.workflow || body?.roles || body?.assignments || null;
-}
-
-function normalizePersonaTeamWorkflow(body = {}, fallbackSlugs = []) {
-  const source = readWorkflowSource(body);
-  if (!source) return [];
-
-  const byRole = new Map(PERSONA_WORKFLOW_ROLES.map((role) => [role.id, []]));
-
-  if (Array.isArray(source)) {
-    for (const entry of source) {
-      const roleId = normalizeWorkflowRoleId(entry?.roleId || entry?.id || entry?.role);
-      const role = ROLE_BY_ID.get(roleId);
-      if (!role) continue;
-      byRole.set(roleId, roleSlugList(entry, role.maxSlugs));
-    }
-  } else if (source && typeof source === 'object') {
-    for (const [key, value] of Object.entries(source)) {
-      const roleId = normalizeWorkflowRoleId(key);
-      const role = ROLE_BY_ID.get(roleId);
-      if (!role) continue;
-      byRole.set(roleId, roleSlugList(value, role.maxSlugs));
-    }
-  }
-
-  const hasAnyRole = [...byRole.values()].some((slugs) => slugs.length > 0);
-  if (!hasAnyRole && fallbackSlugs.length) {
-    const first = fallbackSlugs[0];
-    const second = fallbackSlugs[1] || first;
-    const last = fallbackSlugs[fallbackSlugs.length - 1] || first;
-    byRole.set('supervisor', [first]);
-    byRole.set('mission', [second]);
-    byRole.set('execution', fallbackSlugs.slice(0, DEFAULT_MAX_EXECUTION_SLUGS));
-    byRole.set('approval', [first]);
-    byRole.set('display', [last]);
-    // visual permanece vazio no fallback — etapa opcional
-  }
-
-  return PERSONA_WORKFLOW_ROLES.map((role) => ({
-    roleId: role.id,
-    roleLabel: role.label,
-    instruction: role.instruction,
-    slugs: byRole.get(role.id) || [],
-  }));
-}
-
-function flattenPersonaTeamWorkflowSlugs(workflow = [], maxTeamSize = DEFAULT_MAX_TEAM_SIZE) {
-  const seen = new Set();
-  const slugs = [];
-
-  for (const role of workflow) {
-    for (const slug of role.slugs || []) {
-      if (!slug || seen.has(slug)) continue;
-      seen.add(slug);
-      slugs.push(slug);
-      if (slugs.length >= maxTeamSize) return slugs;
-    }
-  }
-
-  return slugs;
 }
 
 export function normalizePersonaTeamRunInput(body = {}, options = {}) {
@@ -233,11 +55,11 @@ export function normalizePersonaTeamRunInput(body = {}, options = {}) {
   const individualMode = requestedMode === 'individual';
   const depth = Number.isInteger(body?.depth) && DEPTH_BUDGETS[body.depth] ? body.depth : 1;
   const judgeSlug = individualMode
-    ? normalizePersonaTeamSlug(body?.judgeSlug || body?.judge || body?.judgePersona)
+    ? normalizePersonaSlug(body?.judgeSlug || body?.judge || body?.judgePersona)
     : '';
   // Etapa visual opcional no modo individual: roda depois do juiz quando preenchida.
   const visualSlug = individualMode
-    ? normalizePersonaTeamSlug(body?.visualSlug || body?.visual)
+    ? normalizePersonaSlug(body?.visualSlug || body?.visual)
     : '';
   const participantLimit = individualMode ? maxIndividualParticipants : maxTeamSize;
   const sourceSlugs = Array.isArray(body?.slugs)
@@ -245,21 +67,16 @@ export function normalizePersonaTeamRunInput(body = {}, options = {}) {
     : Array.isArray(body?.teamSlugs)
       ? body.teamSlugs
       : [];
-  const seen = new Set();
-  const baseSlugs = [];
-
-  for (const value of sourceSlugs) {
-    const slug = normalizePersonaTeamSlug(value);
-    if (!slug || seen.has(slug)) continue;
-    seen.add(slug);
-    baseSlugs.push(slug);
-    if (baseSlugs.length >= participantLimit) break;
-  }
-  const workflow = individualMode ? [] : normalizePersonaTeamWorkflow(body, baseSlugs);
-  const explicitWorkflow = !individualMode && hasExplicitWorkflow(body);
-  const slugs = workflow.length
-    ? flattenPersonaTeamWorkflowSlugs(workflow, maxTeamSize)
-    : baseSlugs;
+  const baseSlugs = resolvePersonaWorkflow(null, {
+    fallbackSlugs: sourceSlugs,
+    maxTeamSize: participantLimit,
+  }).slugs;
+  const workflowSource = body?.workflow || body?.roles || body?.assignments || null;
+  const workflowConfig = individualMode
+    ? null
+    : resolvePersonaWorkflow(workflowSource, { fallbackSlugs: baseSlugs, maxTeamSize });
+  const workflow = workflowConfig?.workflow || [];
+  const slugs = workflowConfig?.configured ? workflowConfig.slugs : baseSlugs;
 
   if (!missionText && !attachmentIds.length) {
     return { ok: false, error: 'mission_required', mission: '', slugs: [] };
@@ -273,14 +90,8 @@ export function normalizePersonaTeamRunInput(body = {}, options = {}) {
   if (individualMode && !judgeSlug) {
     return { ok: false, error: 'judge_required', mission, slugs, workflow: [] };
   }
-  if (explicitWorkflow) {
-    const missingRoles = workflow
-      .filter((role) => {
-        if (role.slugs.length) return false;
-        const def = ROLE_BY_ID.get(role.roleId);
-        return !def?.optional;
-      })
-      .map((role) => role.roleId);
+  if (workflowConfig?.configured) {
+    const missingRoles = workflowConfig.missingRoleIds;
     if (missingRoles.length) {
       return { ok: false, error: 'workflow_role_required', mission, slugs, workflow, missingRoles };
     }
@@ -477,7 +288,7 @@ export function buildPersonaTeamPrompt({
 
   // Pure model agents: keep the Yume system almost raw. Only add motor truth + mission.
   if (pure) {
-    const role = workflowRole?.roleId ? ROLE_BY_ID.get(workflowRole.roleId) : null;
+    const role = workflowRole?.roleId ? getPersonaWorkflowRole(workflowRole.roleId) : null;
     const roleLabel = workflowRole?.roleLabel || role?.label || '';
     const roleInstruction = workflowRole?.instruction || role?.instruction || '';
     const context = String(accumulatedContext || '').trim();
@@ -507,7 +318,7 @@ ${role?.id === 'visual'
   }
 
   const teammates = teamNames.filter(Boolean).join(', ') || name;
-  const role = workflowRole?.roleId ? ROLE_BY_ID.get(workflowRole.roleId) : null;
+  const role = workflowRole?.roleId ? getPersonaWorkflowRole(workflowRole.roleId) : null;
   const roleLabel = workflowRole?.roleLabel || role?.label || '';
   const roleInstruction = workflowRole?.instruction || role?.instruction || '';
   const context = String(accumulatedContext || '').trim();

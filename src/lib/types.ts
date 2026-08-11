@@ -1,3 +1,8 @@
+import type {
+  PersonaWorkflowAssignments,
+  PersonaWorkflowRoleId,
+} from '../../shared/persona-workflow.js';
+
 // Tipos do contrato do backend LUCA-AI (server/state.js getState()).
 // Mantidos propositalmente permissivos: o backend evolui e o front degrada com
 // segurança via defaults.
@@ -15,7 +20,7 @@ export interface AgentEntry {
 export interface PersonaAgentEntry {
   id: string;
   slug: string;
-  source: 'yume' | string;
+  source: 'yume' | 'luca-builtin' | string;
   name: string;
   model?: string;
   enabled?: boolean;
@@ -23,6 +28,7 @@ export interface PersonaAgentEntry {
   cachedSystemPrompt?: string | null;
   cachedAt?: string | null;
   lastError?: string | null;
+  isOfficial?: boolean;
   addedAt?: string;
 }
 
@@ -44,6 +50,7 @@ export interface YumePersonaSummary {
   version?: number | null;
   updated_at?: string | null;
   imported: boolean;
+  source?: 'yume' | 'luca-builtin' | 'cache' | string;
 }
 
 export interface RouterModelProfile {
@@ -84,7 +91,7 @@ export interface LucaAiPersonaTeamReply {
 }
 
 export interface LucaAiWorkflowAssignment {
-  roleId: string;
+  roleId: PersonaWorkflowRoleId;
   slugs: string[];
 }
 
@@ -142,7 +149,7 @@ export interface LucaAiPersonaTeamRunResponse {
   visualPack?: LucaAiVisualPack | null;
   attachments?: LucaAiChatAttachment[];
   generatedAt: string;
-  /** Cliente recuperou resultado via sessão após falha de borda (524/timeout). */
+  /** Servidor recuperou o resultado da sessão após perder a memória do job. */
   recoveredFromSession?: boolean;
 }
 
@@ -152,14 +159,25 @@ export interface LucaAiActivePersonaRun {
   status: 'running' | 'failed' | string;
   startedAt: string;
   errorMessage?: string | null;
+  errorCode?: string | null;
+}
+
+export interface LucaAiPersonaRunReceipt {
+  runId: string;
+  traceId: string;
+  status: 'complete';
+  startedAt: string;
+  completedAt: string;
+  ok: boolean;
 }
 
 export interface LucaAiPersonaTeamRunAccepted {
   ok: true;
   runId: string;
   traceId: string;
-  status: 'running';
+  status: 'running' | 'complete' | 'failed';
   startedAt: string;
+  reused?: boolean;
 }
 
 export interface LucaAiPersonaTeamRunStatus {
@@ -479,6 +497,8 @@ export interface LucaAiChatSession extends LucaAiChatSessionSummary {
   activePersonaSlug?: string | null;
   /** Rodada assíncrona em andamento (sobrevive a 524/F5). */
   activePersonaRun?: LucaAiActivePersonaRun | null;
+  /** Recibo durável da última rodada, usado pelo lifecycle após restart. */
+  lastPersonaRun?: LucaAiPersonaRunReceipt | null;
 }
 
 export interface LucaAiChatLibraryResponse {
@@ -505,14 +525,7 @@ export interface LucaAiChatLibraryStats {
 }
 
 
-export interface LucaAiTeamTemplateAssignments {
-  supervisor: string[];
-  mission: string[];
-  execution: string[];
-  approval: string[];
-  display: string[];
-  visual: string[];
-}
+export type LucaAiTeamTemplateAssignments = PersonaWorkflowAssignments;
 
 export interface LucaAiVisualChartArtifact {
   id: string;

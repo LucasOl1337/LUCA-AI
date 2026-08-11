@@ -21,11 +21,11 @@ Leia SOMENTE ao mudar roteador LLM, Kamui, personas Yume ou a publicação pela 
 
 Valores de modelo vindos do ambiente, do estado local ou de personas Yume sao aceitos somente quando correspondem a um dos 16 IDs do catalogo 9Router. Uma rota externa nunca e encaminhada ao provider.
 
-Ao importar uma persona, o LUCA preserva nome, prompt e versao lidos do Yume. O estado local `personaAgents.model` guarda somente override explicito (vazio = seguir Yume). O motor efetivo no 9Router e resolvido assim: override local do LUCA > model do Yume se estiver no catalogo fechado > `ROUTER_MODEL`. O prompt de execucao declara explicitamente o motor 9Router da rodada para a persona nao inventar IDs legados (ex. GLM). `POST /api/agent/config` com `agentId: "yume:<slug>"` grava override; `POST /api/luca-ai/persona-team/run` aceita `modelOverrides` por slug so para aquela missao.
+Ao importar uma persona, o módulo `server/persona-source.js` preserva nome, prompt, versão e provenance. O estado local `personaAgents.model` guarda somente override explícito (vazio = seguir Yume/builtin). O motor efetivo no 9Router é resolvido uma vez nessa interface: override da rodada > override local do LUCA > model da fonte se estiver no catálogo fechado > `ROUTER_MODEL`. O prompt de execução declara explicitamente o motor 9Router da rodada para a persona não inventar IDs legados (ex. GLM). `POST /api/agent/config` com `agentId: "yume:<slug>"` grava override; `POST /api/luca-ai/persona-team/run` aceita `modelOverrides` por slug só para aquela missão.
 
-`POST /api/luca-ai/persona-team/run` oferece dois modos visiveis. `workflow` encadeia os papeis da equipe; `individual` executa de uma a cinco personas em contextos isolados e chama depois uma persona juiza com todas as respostas. O juiz pode repetir uma persona participante, mas sempre usa uma chamada separada. O POST devolve `202` com `runId`, `traceId` e status `running`; a execucao segue no processo Express e a UI consulta `GET /api/luca-ai/persona-team/runs/:runId` ate `complete` ou `failed`. Assim, nenhuma conexao com a borda precisa permanecer aberta durante as chamadas LLM.
+`POST /api/luca-ai/persona-team/run` oferece dois modos visíveis. `workflow` encadeia os papéis da equipe; `individual` executa de uma a cinco personas em contextos isolados e chama depois uma persona juíza com todas as respostas. O juiz pode repetir uma persona participante, mas sempre usa uma chamada separada. O POST devolve `202` com `runId`, `traceId` e status; retries com o mesmo `traceId` reutilizam a rodada já aceita. `server/persona-run-lifecycle.js` possui as transições `running/complete/failed`, persiste a sessão antes de publicar `complete` e recupera o status pelo recibo durável se a memória do job tiver sido perdida. A UI só observa `GET /api/luca-ai/persona-team/runs/:runId`; nenhuma conexão com a borda precisa permanecer aberta durante as chamadas LLM.
 
-No modo `workflow`, a sexta etapa e **`visual` (Especialista visual)**. A persona planeja em JSON (relatorio, charts, prompts de imagem); o runtime materializa o pack em `visualPack` e gera imagens via `POST {ROUTER_BASE_URL}/images/generations` — o mesmo contrato OpenAI-compatible do Maestro (`size` + `b64_json`). Motores em catalogo separado do chat (`IMAGE_GENERATION_*` em `server/config.js`): primario `cx/gpt-5.5-image` (alias `gpt-image`), fallbacks `cx/gpt-5.4-image`, `cx/gpt-image-1`, `xai/grok-imagine-image` (+ quality). Default: `IMAGE_GENERATION_MODEL=cx/gpt-5.5-image`. Artefatos em `.luca/workspaces/<hash>/visual-artifacts/<trace>/`, servidos por `GET /api/luca-ai/visual-artifacts/:traceId/:artifactId` (autenticado). Persona canonica `especialista-visual` no Yume; o LUCA so le via Kamui.
+No modo `workflow`, a sexta etapa é **`visual` (Especialista visual)** e continua opcional. A persona planeja em JSON (relatório, charts, prompts de imagem); o runtime materializa o pack em `visualPack` e gera imagens via `POST {ROUTER_BASE_URL}/images/generations` — o mesmo contrato OpenAI-compatible do Maestro (`size` + `b64_json`). Motores em catálogo separado do chat (`IMAGE_GENERATION_*` em `server/config.js`): primário `cx/gpt-5.5-image` (alias `gpt-image`), fallbacks `cx/gpt-5.4-image`, `cx/gpt-image-1`, `xai/grok-imagine-image` (+ quality). Default: `IMAGE_GENERATION_MODEL=cx/gpt-5.5-image`. Artefatos em `.luca/workspaces/<hash>/visual-artifacts/<trace>/`, servidos por `GET /api/luca-ai/visual-artifacts/:traceId/:artifactId` (autenticado). A slug canônica é `especialista-visual`: a definição do Yume vence quando existe; o builtin LUCA cobre sua ausência sem escrever no Yume.
 
 Os dois modos aceitam anexos privados da sessao. A UI envia imagens ou arquivos de texto para `POST /api/luca-ai/chat/sessions/:sessionId/attachments`; o Express valida tamanho, tipo e assinatura real do arquivo, guarda por conta/sessao e resolve os anexos antes de acionar as personas. A rodada referencia apenas `sessionId` + `attachmentIds`, entao uma conta nunca le arquivo de outra. Limites: quatro anexos por mensagem, 10 MB por arquivo, 20 MB por rodada e 50 MB acumulados por sessao (uploads sao aceitos antes da rodada, entao a quota evita encher o disco).
 
@@ -45,20 +45,22 @@ Navegadores reutilizam a sessão LUCA. Integrações usam `Authorization: Bearer
 
 `server/kamui-client.js` acessa Yume somente por GET via `{KAMUI_BASE}/kamui/yume/...`. O padrao de `KAMUI_BASE` e `http://127.0.0.1:1338`; `KAMUI_TIMEOUT_MS` controla o timeout.
 
-O LUCA lista personas, le prompt e versao e guarda o cache no estado local. Nao adicione escrita no Yume a esse cliente.
+`server/kamui-client.js` é somente o adapter GET do Yume; não adicione escrita. O módulo
+`server/persona-source.js` é o único caller que combina catálogo, prompts, versões,
+builtins e cache operacional `personaAgents`.
 
-O roster principal tem uma única fonte editorial: `is_official === true` no Yume.
-`GET /api/personas/available` consulta esse catálogo via Kamui, reconcilia o cache
-operacional `personaAgents` e devolve `imported: true` somente para personas oficiais.
-Nome, modelo Yume e composição do roster vêm do Yume; o estado local preserva apenas
-override de modelo, habilitação e cache de prompt das oficiais. Personas secundárias
-continuam visíveis em uma seção recolhida, mas não podem ser atribuídas nem executadas.
+O roster principal tem uma única fonte **editorial**: `is_official === true` no Yume.
+Isso não significa uma única fonte de disponibilidade. `GET /api/personas/available`
+aplica a precedência `Yume por slug > builtin canônico ausente > cache em outage` e
+expõe `source`/`rosterSource`. Uma falha de catálogo não impede o merge de builtins nem
+remove personas Yume já cacheadas. Contrato editorial inválido (sem `is_official`)
+continua falhando alto em vez de virar fallback silencioso.
 
 O Express sincroniza os workspaces na inicialização, a cada 60 segundos por padrão e
 antes de listar ou executar equipes. `LUCA_PERSONA_ROSTER_SYNC_MS` ajusta o intervalo
-(mínimo de 15 segundos). Os endpoints legados de adicionar/remover agora apenas
-reconciliam com o Yume: não criam uma decisão editorial local. A promoção ou remoção do
-roster é feita no editor do Yume e se propaga pelo Kamui para todos os consumidores.
+(mínimo de 15 segundos). Endpoints de adicionar/remover também cruzam Persona Source:
+oficiais e builtins retornam pela reconciliação; somente secundárias podem ser removidas
+localmente. Promoção ou remoção editorial continua sendo feita no Yume.
 
 No domínio público, as telas de Personas e LUCA-AI usam `/api` na mesma origem. O proxy de borda (`luca-ai-vm-proxy`) encaminha o tráfego ao Express via Workers VPC + Tunnel `luca-ai-production` na VM (`127.0.0.1:4242`). O navegador do visitante e o PC de desenvolvimento nunca participam do caminho interno.
 

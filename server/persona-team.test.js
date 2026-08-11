@@ -12,9 +12,9 @@ import {
   DEPTH_BUDGETS,
   formatConversationContextForPrompt,
   normalizePersonaTeamRunInput,
-  normalizePersonaTeamSlug,
   runIndividualResolution,
 } from './persona-team.js';
+import { normalizePersonaSlug } from '../shared/persona-workflow.js';
 
 test('normalizePersonaTeamRunInput exige missao e equipe de personas', () => {
   assert.deepEqual(normalizePersonaTeamRunInput({ mission: '', slugs: ['maestro'] }), {
@@ -46,7 +46,7 @@ test('normalizePersonaTeamRunInput normaliza yume prefix, remove duplicatas e li
   assert.deepEqual(input.slugs, ['maestro', 'designer', 'pesquisador']);
   assert.equal(input.mode, 'parallel');
   assert.deepEqual(input.modelOverrides, {});
-  assert.equal(normalizePersonaTeamSlug('yume:/planner/'), 'planner');
+  assert.equal(normalizePersonaSlug('yume:/planner/'), 'planner');
 });
 
 test('normalizePersonaTeamRunInput aceita modelOverrides por slug', () => {

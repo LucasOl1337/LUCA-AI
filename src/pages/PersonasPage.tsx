@@ -41,10 +41,10 @@ export default function PersonasPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined);
+      const data = await lucaApi.listPersonas(bridgeBase, bridgeBase ? 15000 : undefined);
       setPersonas(normalizePersonaAssetUrls(data.personas ?? [], bridgeBase));
     } catch (err) {
-      const fallback = 'Falha ao carregar personas do Yume.';
+      const fallback = 'Falha ao carregar as fontes de personas.';
       setError(buildApiErrorMessage(err, fallback));
     } finally {
       setLoading(false);
@@ -86,17 +86,17 @@ export default function PersonasPage() {
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ background: theme.goldSoft, color: theme.goldDeep }}>
               <UsersRound className="h-3.5 w-3.5" />
-              Yume embedded
+              Persona Source
             </div>
             <h1 className="void-title text-3xl">Persona Cards</h1>
             <p className="mt-2 text-sm" style={{ color: theme.textMute }}>
-              O roster principal é sincronizado pelo Kamui com o catálogo oficial do Yume.
+              Yume define o roster editorial; cache e builtins canônicos mantêm a execução disponível.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <Metric label="catalogo" value={personas.length} />
-            <Metric label="oficiais" value={importedCount} />
+            <Metric label="ativas" value={importedCount} />
             <Metric label="secundarias" value={availableCount} />
             <button type="button" className="btn-fleet inline-flex items-center gap-2" onClick={load} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
@@ -145,7 +145,7 @@ export default function PersonasPage() {
         {error && (
           <Notice
             tone="error"
-            title="Yume indisponivel"
+            title="Fontes de personas indisponíveis"
             body={error}
             actions={(
               <button
@@ -183,7 +183,7 @@ export default function PersonasPage() {
                       </span>
                     </div>
                     <p className="mt-1 text-xs" style={{ color: theme.textMute }}>
-                      Fonte única: personas oficiais do Yume, sincronizadas via Kamui e habilitadas para execuções reais.
+                      Fonte editorial: oficiais do Yume via Kamui. Builtins LUCA cobrem slugs canônicos ausentes e o cache sustenta outages.
                     </p>
                   </div>
                 </div>
@@ -204,7 +204,7 @@ export default function PersonasPage() {
                   </motion.div>
                 ) : (
                   <div className="rounded-xl border px-5 py-6 text-sm" style={{ borderColor: theme.border, color: theme.textMute }}>
-                    Nenhuma persona está marcada como oficial no Yume.
+                    Nenhuma persona ativa está disponível nas fontes configuradas.
                   </div>
                 )}
               </section>
@@ -272,12 +272,12 @@ export default function PersonasPage() {
             <div>
               <p className="text-sm font-semibold" style={{ color: theme.textSoft }}>
                 {personas.length === 0
-                  ? 'Nenhuma persona no catálogo Yume.'
+                  ? 'Nenhuma persona disponível.'
                   : 'Nenhuma persona corresponde à busca ou filtro.'}
               </p>
               <p className="mt-2 max-w-[48ch] text-xs leading-relaxed" style={{ color: theme.textGhost }}>
                 {personas.length === 0
-                  ? 'Abra o Yume para criar personas ou recarregue o catálogo quando o bridge estiver no ar.'
+                  ? 'Recarregue as fontes; novas personas editoriais continuam sendo criadas no Yume.'
                   : 'Limpe a busca e o filtro, ou recarregue o catálogo se o Yume acabou de sincronizar.'}
               </p>
             </div>

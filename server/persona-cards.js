@@ -76,68 +76,10 @@ export function normalizeYumePersonaForLuca(persona = {}, importedAgents = new M
     is_official: isOfficial,
     version: persona.version ?? null,
     updated_at: persona.updated_at ?? null,
+    source: String(persona.source || (persona.luca_builtin ? 'luca-builtin' : 'yume')),
     // imported = disponível no runtime local (oficial do Yume OU secundária cacheada).
     // A categoria editorial continua em is_official (fonte Yume, GET only).
     imported: Boolean(slug && (isOfficial || importedAgent)),
-  };
-}
-
-function buildPersonaAgentRecord(persona, existing, now) {
-  const slug = String(persona.slug || existing?.slug || '').trim();
-  if (!slug) return null;
-  return {
-    ...(existing || {}),
-    id: `yume:${slug}`,
-    slug,
-    source: 'yume',
-    name: String(persona.name || existing?.name || slug).trim(),
-    model: String(existing?.model || '').trim(),
-    yumeModel: String(persona.model || existing?.yumeModel || '').trim(),
-    enabled: existing?.enabled !== false,
-    cachedVersion: existing?.cachedVersion ?? null,
-    cachedSystemPrompt: existing?.cachedSystemPrompt ?? null,
-    cachedAt: existing?.cachedAt ?? null,
-    lastError: existing?.lastError ?? null,
-    addedAt: existing?.addedAt || now,
-  };
-}
-
-export function reconcileOfficialPersonaAgents(personas = [], personaAgents = [], now = new Date().toISOString()) {
-  const catalog = Array.isArray(personas) ? personas : [];
-  if (catalog.some((persona) => typeof persona?.is_official !== 'boolean')) {
-    throw new Error('yume_official_roster_contract_invalid');
-  }
-  const catalogBySlug = new Map(
-    catalog
-      .map((persona) => [String(persona?.slug || '').trim(), persona])
-      .filter(([slug]) => Boolean(slug)),
-  );
-  const existingBySlug = new Map(
-    (Array.isArray(personaAgents) ? personaAgents : [])
-      .map((agent) => [String(agent?.slug || '').trim(), agent])
-      .filter(([slug]) => Boolean(slug)),
-  );
-
-  const official = catalog
-    .filter((persona) => persona?.is_official === true)
-    .map((persona) => buildPersonaAgentRecord(persona, existingBySlug.get(String(persona.slug || '').trim()), now))
-    .filter(Boolean);
-
-  const officialSlugs = new Set(official.map((agent) => agent.slug));
-  // Keep secondary agents already cached locally while they still exist in Yume.
-  const retainedSecondaries = [];
-  for (const [slug, existing] of existingBySlug) {
-    if (officialSlugs.has(slug)) continue;
-    const persona = catalogBySlug.get(slug);
-    if (!persona || persona.is_official === true) continue;
-    retainedSecondaries.push(buildPersonaAgentRecord(persona, existing, now));
-  }
-
-  const roster = [...official, ...retainedSecondaries];
-
-  return {
-    roster,
-    changed: JSON.stringify(roster) !== JSON.stringify(Array.isArray(personaAgents) ? personaAgents : []),
   };
 }
 

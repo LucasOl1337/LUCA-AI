@@ -1,10 +1,8 @@
 // Seed puro (sem React) — templates de equipe/individual embutidos.
 // Frontend mapeia `icon` → Lucide; server grava no workspace no primeiro GET.
 
-export const TEAM_ROLE_ORDER = ['supervisor', 'mission', 'execution', 'approval', 'display', 'visual'];
 export const VISUAL_PERSONA_SLUG = 'especialista-visual';
 export const VISUAL_PERSONA_MODEL = 'gcli/grok-4.5-high';
-export const MAX_EXECUTORS = 4;
 export const MAX_PARTICIPANTS = 5;
 export const PRESET_ICON_IDS = ['sprout', 'hardhat', 'briefcase', 'swords', 'crown', 'stethoscope', 'users'];
 

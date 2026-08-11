@@ -6,13 +6,15 @@ import { isAllowed9RouterModel, sanitizeAgentModel } from './config.js';
 import {
   LUCA_INDIVIDUAL_PRESET_SEED,
   LUCA_TEAM_PRESET_SEED,
-  MAX_EXECUTORS,
   MAX_PARTICIPANTS,
   PRESET_ICON_IDS,
-  TEAM_ROLE_ORDER,
   VISUAL_PERSONA_MODEL,
   VISUAL_PERSONA_SLUG,
 } from '../shared/luca-preset-seed.js';
+import {
+  PERSONA_WORKFLOW_ROLE_IDS,
+  resolvePersonaWorkflow,
+} from '../shared/persona-workflow.js';
 
 const rootStateDir = path.resolve(process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'));
 const workspacesRoot = path.join(rootStateDir, 'workspaces');
@@ -88,15 +90,17 @@ function sanitizeTeamTemplate(raw = {}, { requireId = false, forceVisualModel = 
     error.code = 'template_id_required';
     throw error;
   }
-  const assignments = {};
-  for (const roleId of TEAM_ROLE_ORDER) {
-    const limit = roleId === 'execution' ? MAX_EXECUTORS : 1;
-    const rawList = raw.assignments?.[roleId];
-    const list = Array.isArray(rawList) ? rawList : rawList ? [rawList] : [];
-    assignments[roleId] = uniqueSlugs(list, limit);
+  const requestedAssignments = raw.assignments && typeof raw.assignments === 'object'
+    ? { ...raw.assignments }
+    : {};
+  if (!requestedAssignments.visual?.length) {
+    requestedAssignments.visual = [VISUAL_PERSONA_SLUG];
   }
-  if (!assignments.visual.length) assignments.visual = [VISUAL_PERSONA_SLUG];
-  const models = sanitizeTemplateModels(raw.models, TEAM_ROLE_ORDER.flatMap((roleId) => assignments[roleId]));
+  const assignments = resolvePersonaWorkflow(requestedAssignments).assignments;
+  const models = sanitizeTemplateModels(
+    raw.models,
+    PERSONA_WORKFLOW_ROLE_IDS.flatMap((roleId) => assignments[roleId]),
+  );
   if (
     assignments.visual.includes(VISUAL_PERSONA_SLUG)
     && (forceVisualModel || !models[VISUAL_PERSONA_SLUG])

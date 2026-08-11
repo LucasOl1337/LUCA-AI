@@ -8,9 +8,10 @@ const serverIndex = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
 const configPage = readFileSync(new URL('../src/pages/ConfiguracaoPage.tsx', import.meta.url), 'utf8');
 const layout = readFileSync(new URL('../src/components/Layout.tsx', import.meta.url), 'utf8');
 
-test('tela de personas reflete o roster oficial do Yume sem mutação local', () => {
+test('tela de personas explica Yume autoritativo e fallback do Persona Source', () => {
   assert.match(personasPage, /Roster principal/);
-  assert.match(personasPage, /Fonte única: personas oficiais do Yume/);
+  assert.match(personasPage, /Fonte editorial: oficiais do Yume/);
+  assert.match(personasPage, /Builtins LUCA/);
   assert.match(personasPage, /aria-expanded=\{secondaryExpanded\}/);
   assert.match(personasPage, /Gerenciar categoria no Yume/);
   assert.doesNotMatch(personasPage, /Adicionar ao LUCA|Remover do LUCA/);
@@ -26,12 +27,11 @@ test('picker mostra oficiais e secundárias selecionáveis via cache local', () 
   assert.doesNotMatch(lucaAiPage, /disabled=\{secondary \|\|/);
 });
 
-test('Express reconcilia catálogo e permite secundárias no run', () => {
-  assert.match(serverIndex, /syncOfficialPersonaRoster/);
-  assert.match(serverIndex, /syncAllOfficialPersonaRosters/);
-  assert.match(serverIndex, /ensureCatalogPersonaCached/);
-  assert.match(serverIndex, /rosterSource: 'yume\.catalog'/);
-  assert.match(serverIndex, /error: 'persona_not_found'/);
+test('Express usa a interface profunda de Persona Source', () => {
+  assert.match(serverIndex, /personaSource\.listAvailable/);
+  assert.match(serverIndex, /personaSource\.loadMany/);
+  assert.match(serverIndex, /personaSource\.syncAllRosters/);
+  assert.match(serverIndex, /personaSource\.importPersona/);
   assert.match(serverIndex, /\/api\/luca-ai\/team-templates/);
 });
 

@@ -21,9 +21,23 @@ Fluxo de produção:
 navegador -> cadastro/login LUCA -> cookie HttpOnly -> proxy de borda (deploy/luca-ai-vm-proxy.js) + Workers VPC -> Tunnel luca-ai-production -> Express (VM) -> 9Router/Kamui/Yume
 ```
 
-Para personas, o seam editorial fica no Yume (`is_official`). O Kamui oferece a
-interface de leitura e o LUCA materializa apenas cache/configuração operacional por
-workspace. Assim, composição do roster não é duplicada no estado do LUCA.
+Para personas, o seam editorial continua no Yume (`is_official`) e o Kamui oferece o
+adapter de leitura. O módulo profundo `server/persona-source.js` concentra precedência,
+provenance, modelo efetivo, prompt e cache: Yume é autoritativo quando possui a slug;
+builtins LUCA preenchem somente slugs canônicos ausentes; em outage, cache + builtins
+mantêm as personas já conhecidas executáveis. O LUCA continua GET-only no Yume.
+
+As regras do fluxo vivem uma vez no módulo in-process
+`shared/persona-workflow.js`: identidade e ordem dos papéis, aliases, limites,
+optionality, normalização e readiness. React e Express são callers dessa interface;
+ícones e renderização permanecem locais ao adapter React.
+
+Cada rodada assíncrona tem um owner em `server/persona-run-lifecycle.js`. Sua interface
+é `start/get`; memória de jobs e chat-library durável são adapters internos, e as rotas
+Express apenas traduzem HTTP. A persistência da sessão ocorre antes de `complete`, o
+`traceId` torna retries de aceite idempotentes e o recibo durável permite recovery após
+restart. `shared/persona-run-watch.js` é o observer HTTP usado pelo browser, não outro
+owner do estado.
 
 O Express é o único runtime de aplicação ativo da produção. O runtime em `worker/` permanece legado e não deve ser tratado como provider ou origem do frontend publicado. O script pequeno `deploy/luca-ai-vm-proxy.js` atua somente como proxy reverso de borda e não executa modelos, personas ou regras do produto.
 

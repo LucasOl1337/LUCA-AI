@@ -41,7 +41,6 @@ import type {
   LucaAiPersonaTeamRunResponse,
   LucaAiVisualImageArtifact,
   LucaAiVisualPack,
-  LucaAiWorkflowAssignment,
   RouterModelProfile,
   RuntimeEvent,
   YumePersonaSummary,
@@ -76,8 +75,14 @@ import {
   VISUAL_PERSONA_MODEL,
   VISUAL_PERSONA_SLUG,
 } from '../../shared/luca-preset-seed.js';
+import {
+  PERSONA_WORKFLOW_ROLES,
+  resolvePersonaWorkflow,
+  samePersonaWorkflow,
+  type PersonaWorkflowAssignments,
+  type PersonaWorkflowRoleId,
+} from '../../shared/persona-workflow.js';
 
-const MAX_EXECUTORS = 4;
 const LUCA_AI_CLEAN_UI_VERSION = 'session-isolation-v2';
 const LUCA_AI_CLEAN_UI_STORAGE_KEY = 'luca.lucaAi.cleanUiVersion';
 const LUCA_AI_ENTRY_MODE_STORAGE_KEY = 'luca.lucaAi.entryMode';
@@ -97,8 +102,8 @@ interface LucaAiPageProps {
 
 type TranscriptRole = 'operator' | 'persona' | 'system';
 type OperationMode = 'team' | 'individual';
-type WorkflowRoleId = 'supervisor' | 'mission' | 'execution' | 'approval' | 'display' | 'visual';
-type WorkflowAssignments = Record<WorkflowRoleId, string[]>;
+type WorkflowRoleId = PersonaWorkflowRoleId;
+type WorkflowAssignments = PersonaWorkflowAssignments;
 type IndividualPickerId = 'participants' | 'judge' | 'visual';
 type PickerTarget = { mode: 'team'; id: WorkflowRoleId } | { mode: 'individual'; id: IndividualPickerId };
 
@@ -163,14 +168,20 @@ interface InlineTextPart {
   strong: boolean;
 }
 
-const WORKFLOW_ROLES: WorkflowRoleConfig[] = [
-  { id: 'supervisor', label: 'Supervisor', icon: ShieldCheck, multiple: false, maxSlugs: 1 },
-  { id: 'mission', label: 'Decisor da missao', icon: Target, multiple: false, maxSlugs: 1 },
-  { id: 'execution', label: 'Executores', icon: BrainCircuit, multiple: true, maxSlugs: MAX_EXECUTORS },
-  { id: 'approval', label: 'Aprovacao', icon: ClipboardCheck, multiple: false, maxSlugs: 1 },
-  { id: 'display', label: 'Exibicao final', icon: Eye, multiple: false, maxSlugs: 1 },
-  { id: 'visual', label: 'Especialista visual', icon: ImageIcon, multiple: false, maxSlugs: 1, optional: true },
-];
+const WORKFLOW_ROLE_ICONS: Record<WorkflowRoleId, LucideIcon> = {
+  supervisor: ShieldCheck,
+  mission: Target,
+  execution: BrainCircuit,
+  approval: ClipboardCheck,
+  display: Eye,
+  visual: ImageIcon,
+};
+
+const WORKFLOW_ROLES: WorkflowRoleConfig[] = PERSONA_WORKFLOW_ROLES.map((role) => ({
+  ...role,
+  icon: WORKFLOW_ROLE_ICONS[role.id],
+  multiple: role.maxSlugs > 1,
+}));
 
 const REQUIRED_WORKFLOW_ROLES = WORKFLOW_ROLES.filter((role) => !role.optional);
 
@@ -194,24 +205,9 @@ const INDIVIDUAL_PHASE_LABELS: Record<LucaAiPersonaTeamPhase, string> = {
 
 const ROLE_LABEL_BY_ID = new Map(WORKFLOW_ROLES.map((role) => [role.id, role.label]));
 
-function createEmptyWorkflowAssignments(): WorkflowAssignments {
-  return {
-    supervisor: [],
-    mission: [],
-    execution: [],
-    approval: [],
-    display: [],
-    visual: [],
-  };
-}
-
 function createDefaultWorkflowAssignments(): WorkflowAssignments {
-  return {
-    ...createEmptyWorkflowAssignments(),
-    visual: [VISUAL_PERSONA_SLUG],
-  };
+  return resolvePersonaWorkflow({ visual: [VISUAL_PERSONA_SLUG] }).assignments;
 }
-
 function uniqueSlugs(values: unknown[], limit = Number.POSITIVE_INFINITY): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -225,39 +221,6 @@ function uniqueSlugs(values: unknown[], limit = Number.POSITIVE_INFINITY): strin
   return result;
 }
 
-function normalizeWorkflowAssignments(value: Partial<Record<WorkflowRoleId, unknown>> | null | undefined): WorkflowAssignments {
-  const next = createEmptyWorkflowAssignments();
-  for (const role of WORKFLOW_ROLES) {
-    const raw = value?.[role.id];
-    const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
-    next[role.id] = uniqueSlugs(list, role.maxSlugs);
-  }
-  return next;
-}
-
-function workflowAssignmentsEqual(a: WorkflowAssignments, b: WorkflowAssignments): boolean {
-  return WORKFLOW_ROLES.every((role) => {
-    const left = a[role.id];
-    const right = b[role.id];
-    return left.length === right.length && left.every((slug, index) => slug === right[index]);
-  });
-}
-
-function flattenWorkflowAssignments(assignments: WorkflowAssignments): string[] {
-  return uniqueSlugs(WORKFLOW_ROLES.flatMap((role) => assignments[role.id]));
-}
-
-function workflowReady(assignments: WorkflowAssignments): boolean {
-  // visual e opcional: so as etapas obrigatorias precisam de persona
-  return REQUIRED_WORKFLOW_ROLES.every((role) => assignments[role.id].length > 0);
-}
-
-function workflowPayload(assignments: WorkflowAssignments): LucaAiWorkflowAssignment[] {
-  return WORKFLOW_ROLES.map((role) => ({
-    roleId: role.id,
-    slugs: assignments[role.id],
-  }));
-}
 
 function withBaseUrl(value: string | undefined, base: string | undefined): string | undefined {
   const raw = String(value || '').trim();
@@ -582,7 +545,7 @@ function plannedRuntimeEvents(traceId: string, mission: string, assignments: Wor
       payload: {
         mode: 'workflow',
         missionSummary: compactText(mission, 260),
-        teamSize: flattenWorkflowAssignments(assignments).length,
+        teamSize: resolvePersonaWorkflow(assignments).slugs.length,
       },
     },
   ];
@@ -676,8 +639,12 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const runOwnerSessionIdRef = useRef<string | null>(null);
   /** Evita retomar o mesmo job mais de uma vez (F5 / rehydrate). */
   const resumedRunKeyRef = useRef<string | null>(null);
-  const assignments = useMemo(() => normalizeWorkflowAssignments(workflowState), [workflowState]);
-  const assignedSlugs = useMemo(() => flattenWorkflowAssignments(assignments), [assignments]);
+  const workflowConfiguration = useMemo(
+    () => resolvePersonaWorkflow(workflowState),
+    [workflowState],
+  );
+  const assignments = workflowConfiguration.assignments;
+  const assignedSlugs = workflowConfiguration.slugs;
   const individualAssignments = useMemo<IndividualAssignments>(() => ({
     participants: uniqueSlugs(Array.isArray(individualState?.participants) ? individualState.participants : [], 5),
     judge: String(individualState?.judge || '').trim() || null,
@@ -690,12 +657,9 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     individualAssignments.visualEnabled ? individualAssignments.visual : null,
   ]), [individualAssignments]);
   const configuredSlugs = operationMode === 'individual' ? individualConfiguredSlugs : assignedSlugs;
-  const readyRoles = useMemo(
-    () => REQUIRED_WORKFLOW_ROLES.filter((role) => assignments[role.id].length > 0).length,
-    [assignments],
-  );
   const requiredRoleCount = REQUIRED_WORKFLOW_ROLES.length;
-  const isWorkflowReady = useMemo(() => workflowReady(assignments), [assignments]);
+  const readyRoles = requiredRoleCount - workflowConfiguration.missingRoleIds.length;
+  const isWorkflowReady = workflowConfiguration.ready;
   const isIndividualReady = individualAssignments.participants.length > 0 && Boolean(individualAssignments.judge);
 
   const loadPersonas = useCallback(async () => {
@@ -704,7 +668,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setErrorRetry(null);
     try {
       const [data, models, templates] = await Promise.all([
-        lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined),
+        lucaApi.listPersonas(bridgeBase, bridgeBase ? 15000 : undefined),
         lucaApi.listRouterModels(bridgeBase, bridgeBase ? 15000 : undefined).catch(() => null),
         lucaApi.listTeamTemplates(bridgeBase, bridgeBase ? 15000 : undefined).catch(() => null),
       ]);
@@ -759,7 +723,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     const launch = workspaceEmpty ? consumeSompoLaunch() : null;
     setOperationMode(launch?.mode || consumeEntryMode() || (session.operationMode === 'individual' ? 'individual' : 'team'));
     setWorkflowState(session.workflowAssignments
-      ? normalizeWorkflowAssignments(session.workflowAssignments)
+      ? resolvePersonaWorkflow(session.workflowAssignments).assignments
       : createDefaultWorkflowAssignments());
     setIndividualState(session.individualAssignments
       ? {
@@ -836,7 +800,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
 
     void (async () => {
       try {
-        const data = await lucaApi.resumePersonaTeamRun(runId, traceId, ownerSessionId, bridgeBase);
+        const data = await lucaApi.resumePersonaTeamRun(runId, traceId, bridgeBase);
         if (!stillOwner()) return;
         if (data.traceId) setActiveTraceId(data.traceId);
         if (data.recoveredFromSession) {
@@ -1112,14 +1076,13 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     if (loading || !personas.length) return;
     const rosterSet = new Set(personas.filter((persona) => persona.imported).map((persona) => persona.slug));
     setWorkflowState((prev) => {
-      const normalized = normalizeWorkflowAssignments(prev);
-      const next = createEmptyWorkflowAssignments();
+      const normalized = resolvePersonaWorkflow(prev).assignments;
+      const requested: Partial<WorkflowAssignments> = {};
       for (const role of WORKFLOW_ROLES) {
-        next[role.id] = normalized[role.id]
-          .filter((slug) => rosterSet.has(slug))
-          .slice(0, role.maxSlugs);
+        requested[role.id] = normalized[role.id].filter((slug) => rosterSet.has(slug));
       }
-      return workflowAssignmentsEqual(normalized, next) ? prev : next;
+      const next = resolvePersonaWorkflow(requested).assignments;
+      return samePersonaWorkflow(normalized, next) ? prev : next;
     });
   }, [loading, personas, setWorkflowState]);
 
@@ -1228,7 +1191,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setBusyPersonaSlug(slug);
     try {
       await lucaApi.importYumePersona(slug, bridgeBase);
-      const data = await lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined);
+      const data = await lucaApi.listPersonas(bridgeBase, bridgeBase ? 15000 : undefined);
       setPersonas(normalizePersonaAssetUrls(data.personas ?? [], bridgeBase));
       if (runtimeMode === 'backend') await refresh();
       return true;
@@ -1249,7 +1212,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setErrorRetry(null);
     try {
       await lucaApi.setAgentConfig(`yume:${slug}`, { model }, bridgeBase);
-      const data = await lucaApi.listYumePersonas(bridgeBase, bridgeBase ? 15000 : undefined);
+      const data = await lucaApi.listPersonas(bridgeBase, bridgeBase ? 15000 : undefined);
       setPersonas(normalizePersonaAssetUrls(data.personas ?? [], bridgeBase));
       if (runtimeMode === 'backend') await refresh();
     } catch (err) {
@@ -1262,11 +1225,10 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
 
   async function setSingleRole(roleId: WorkflowRoleId, slug: string) {
     if (slug && !(await ensurePersonaAvailable(slug))) return;
-    setWorkflowState((prev) => {
-      const next = normalizeWorkflowAssignments(prev);
-      next[roleId] = slug ? [slug] : [];
-      return next;
-    });
+    setWorkflowState((prev) => resolvePersonaWorkflow({
+      ...prev,
+      [roleId]: slug ? [slug] : [],
+    }).assignments);
     if (slug) setActivePersonaSlug(slug);
   }
 
@@ -1274,24 +1236,22 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     const role = WORKFLOW_ROLES.find((item) => item.id === roleId);
     if (!role || !slug) return;
     if (!(await ensurePersonaAvailable(slug))) return;
-    setWorkflowState((prev) => {
-      const next = normalizeWorkflowAssignments(prev);
-      next[roleId] = uniqueSlugs([...next[roleId], slug], role.maxSlugs);
-      return next;
-    });
+    setWorkflowState((prev) => resolvePersonaWorkflow({
+      ...prev,
+      [roleId]: [...prev[roleId], slug],
+    }).assignments);
     setActivePersonaSlug(slug);
   }
 
   function removeRoleSlug(roleId: WorkflowRoleId, slug: string) {
-    setWorkflowState((prev) => {
-      const next = normalizeWorkflowAssignments(prev);
-      next[roleId] = next[roleId].filter((item) => item !== slug);
-      return next;
-    });
+    setWorkflowState((prev) => resolvePersonaWorkflow({
+      ...prev,
+      [roleId]: prev[roleId].filter((item) => item !== slug),
+    }).assignments);
   }
 
   function clearWorkflow() {
-    setWorkflowState(createEmptyWorkflowAssignments());
+    setWorkflowState(resolvePersonaWorkflow({}).assignments);
   }
 
   async function addIndividualParticipant(slug: string) {
@@ -1393,16 +1353,17 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         return;
       }
       const { ok, failed } = await resolveCatalogPresetSlugs(wanted);
-      const next = createEmptyWorkflowAssignments();
+      const requested: Partial<WorkflowAssignments> = {};
       for (const role of WORKFLOW_ROLES) {
         const configured = role.id === 'visual' && !(preset.assignments.visual ?? []).length
           ? [VISUAL_PERSONA_SLUG]
           : (preset.assignments[role.id] ?? []);
-        next[role.id] = uniqueSlugs(configured.filter((slug) => ok.has(slug)), role.maxSlugs);
+        requested[role.id] = configured.filter((slug) => ok.has(slug));
       }
+      const next = resolvePersonaWorkflow(requested).assignments;
       setWorkflowState(next);
       setOperationMode('team');
-      const first = flattenWorkflowAssignments(next)[0];
+      const first = resolvePersonaWorkflow(next).slugs[0];
       if (first) setActivePersonaSlug(first);
       const message = presetApplyError(preset.label, [], failed);
       if (message) {
@@ -1530,7 +1491,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     const attachmentsToRun = draftAttachments.slice(0, 4);
     // Anexo sem texto ainda e uma missao valida para as personas.
     const trimmedMission = mission.trim() || (attachmentsToRun.length ? 'Analise os anexos enviados.' : '');
-    const assignmentsToRun = normalizeWorkflowAssignments(assignments);
+    const workflowToRun = resolvePersonaWorkflow(assignments);
+    const assignmentsToRun = workflowToRun.assignments;
     const individualToRun = {
       participants: uniqueSlugs(individualAssignments.participants, 5),
       judge: individualAssignments.judge,
@@ -1539,10 +1501,10 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     };
     const slugsToRun = operationMode === 'individual'
       ? individualToRun.participants
-      : flattenWorkflowAssignments(assignmentsToRun);
+      : workflowToRun.slugs;
     const readyToRun = operationMode === 'individual'
       ? slugsToRun.length > 0 && Boolean(individualToRun.judge)
-      : workflowReady(assignmentsToRun);
+      : workflowToRun.ready;
     if (!trimmedMission || !slugsToRun.length || !readyToRun || running) return;
 
     const ownerSessionId = activeSessionId;
@@ -1636,7 +1598,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         : await lucaApi.runLucaAiPersonaTeam(
           trimmedMission,
           slugsToRun,
-          workflowPayload(assignmentsToRun),
+          workflowToRun.workflow.map((role) => ({ roleId: role.roleId, slugs: role.slugs })),
           traceId,
           bridgeBase,
           modelOverrides,
@@ -2539,7 +2501,7 @@ function LucaWorkflowPanel({
   const theme = useTheme();
   const denom = Math.max(1, requiredRoleCount);
   const ready = readyRoles >= denom;
-  const assignedCount = flattenWorkflowAssignments(assignments).length;
+  const assignedCount = resolvePersonaWorkflow(assignments).slugs.length;
   const visualFilled = assignments.visual.length > 0;
 
   return (

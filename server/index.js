@@ -25,8 +25,6 @@ import {
   IMAGE_GENERATION_CAPABILITIES,
   MAX_CLOSURE_ATTEMPTS,
   CONVERSATION_PARTNER_AGENT_ID,
-  isAllowed9RouterModel,
-  resolvePersonaRuntimeModel,
 } from './config.js';
 import { call9Router, call9RouterImageGeneration, check9RouterHealth } from './router-client.js';
 import {
@@ -66,7 +64,6 @@ import {
   upsertDashboardItem,
   getPersonaAgents,
   replacePersonaAgents,
-  addPersonaAgent,
   updatePersonaAgent,
   ensureWorkspace,
   listWorkspaceUserIds,
@@ -74,7 +71,6 @@ import {
 import { runWithWorkspaceUser, getWorkspaceUserId } from './workspace-context.js';
 import {
   activateChatSession,
-  clearPersonaRunOnSession,
   createChatFolder,
   createChatSession,
   deleteChatFolder,
@@ -84,6 +80,7 @@ import {
   getChatSession,
   getChatSessionForUser,
   getProductUsageSummaryForUser,
+  findPersonaRunOnSession,
   markPersonaRunFailedOnSession,
   markPersonaRunStartedOnSession,
   recordPersonaRunOnSession,
@@ -155,14 +152,9 @@ import { runRuntimeReadinessChecks } from './runtime-readiness.js';
 import {
   buildKamuiYumeAvatarUrl,
   normalizeYumeAvatarPath,
-  normalizeYumePersonasForLuca,
-  reconcileOfficialPersonaAgents,
 } from './persona-cards.js';
-import {
-  getBuiltinPersona,
-  getBuiltinSystemPrompt,
-  mergeBuiltinPersonas,
-} from './builtin-personas.js';
+import { listBuiltinPersonas } from './builtin-personas.js';
+import { createPersonaSource } from './persona-source.js';
 import {
   buildConversationContextFromTranscript,
   buildIndividualJudgePrompt,
@@ -172,11 +164,12 @@ import {
   collectPriorAttachmentIds,
   DEPTH_BUDGETS,
   normalizePersonaTeamRunInput,
-  PERSONA_WORKFLOW_ROLES,
   runIndividualResolution,
 } from './persona-team.js';
+import { PERSONA_WORKFLOW_ROLES } from '../shared/persona-workflow.js';
 import { personaRunOperatorEntryId } from '../shared/persona-run-transcript.js';
 import { createPersonaRunJobStore } from './persona-run-jobs.js';
+import { createPersonaRunLifecycle } from './persona-run-lifecycle.js';
 import { createDeliberations } from './deliberations/index.js';
 import {
   MAX_CHAT_ATTACHMENT_BYTES,
@@ -198,6 +191,34 @@ import { createAuthService } from './auth.js';
 const app = express();
 const personaRunJobs = createPersonaRunJobStore();
 const deliberationJobs = createPersonaRunJobStore();
+const personaSource = createPersonaSource({
+  yume: {
+    list: listYumePersonas,
+    fetchPrompt: fetchYumePersonaSystemPrompt,
+    fetchVersion: getYumePersonaVersion,
+  },
+  builtin: { list: listBuiltinPersonas },
+  cache: {
+    list: getPersonaAgents,
+    replace: replacePersonaAgents,
+  },
+  workspaces: {
+    list: listWorkspaceUserIds,
+    run: runWithWorkspaceUser,
+    changed: () => emitState(),
+  },
+});
+const personaRunLifecycle = createPersonaRunLifecycle({
+  jobs: personaRunJobs,
+  sessions: {
+    get: getChatSession,
+    markRunning: markPersonaRunStartedOnSession,
+    complete: recordPersonaRunOnSession,
+    fail: markPersonaRunFailedOnSession,
+    find: findPersonaRunOnSession,
+  },
+  runInOwnerContext: runWithWorkspaceUser,
+});
 const PERSONA_ROSTER_SYNC_INTERVAL_MS = Math.max(
   15_000,
   Number(process.env.LUCA_PERSONA_ROSTER_SYNC_MS || 60_000) || 60_000,
@@ -1760,124 +1781,6 @@ Responda como ${def.name}, em 1 a 4 linhas. Use [chat:tipo] para o que deve apar
 // especialista. Nunca escreve no Yume.
 // ---------------------------------------------------------------------------
 
-function seedBuiltinPersonaCaches(personas = []) {
-  const now = new Date().toISOString();
-  for (const persona of Array.isArray(personas) ? personas : []) {
-    if (!persona?.luca_builtin) continue;
-    const slug = String(persona.slug || '').trim();
-    const systemPrompt = getBuiltinSystemPrompt(slug);
-    if (!slug || !systemPrompt) continue;
-    const existing = getPersonaAgents().find((agent) => agent.slug === slug);
-    if (!existing) continue;
-    // Builtin injetado: cacheia prompt local para a etapa visual não depender do Kamui.
-    if (existing.source === 'luca-builtin' && existing.cachedSystemPrompt === systemPrompt) continue;
-    updatePersonaAgent(slug, {
-      source: 'luca-builtin',
-      name: persona.name || existing.name,
-      yumeModel: String(persona.model || existing.yumeModel || '').trim(),
-      cachedSystemPrompt: systemPrompt,
-      cachedVersion: 'luca-builtin',
-      cachedAt: now,
-      lastError: null,
-    });
-  }
-}
-
-function applyOfficialPersonaRoster(personas) {
-  const reconciled = reconcileOfficialPersonaAgents(personas, getPersonaAgents());
-  if (reconciled.changed) replacePersonaAgents(reconciled.roster);
-  seedBuiltinPersonaCaches(personas);
-  return reconciled;
-}
-
-async function syncOfficialPersonaRoster() {
-  // Builtins preenchem slugs canônicos ausentes no Yume (ex.: especialista-visual).
-  const personas = mergeBuiltinPersonas(await listYumePersonas());
-  const reconciled = applyOfficialPersonaRoster(personas);
-  return { personas, ...reconciled };
-}
-
-async function syncAllOfficialPersonaRosters() {
-  const personas = mergeBuiltinPersonas(await listYumePersonas());
-  let changedWorkspaces = 0;
-  for (const userId of listWorkspaceUserIds()) {
-    runWithWorkspaceUser(userId, () => {
-      const reconciled = applyOfficialPersonaRoster(personas);
-      if (reconciled.changed) {
-        changedWorkspaces += 1;
-        emitState();
-      }
-    });
-  }
-  return { personas, changedWorkspaces };
-}
-
-function resolveBuiltinPromptPayload(slug, persona, { stale = false, warning = '' } = {}) {
-  const builtin = getBuiltinPersona(slug);
-  const systemPrompt = getBuiltinSystemPrompt(slug) || persona?.cachedSystemPrompt || '';
-  if (!builtin || !systemPrompt) return null;
-  return {
-    systemPrompt,
-    model: builtin.model || persona?.yumeModel || '',
-    version: 'luca-builtin',
-    cached: true,
-    builtin: true,
-    ...(stale ? { stale: true } : {}),
-    ...(warning ? { warning } : {}),
-  };
-}
-
-async function resolvePersonaSystemPrompt(slug) {
-  const persona = getPersonaAgents().find((p) => p.slug === slug);
-  if (persona?.source === 'luca-builtin') {
-    const builtinPayload = resolveBuiltinPromptPayload(slug, persona);
-    if (builtinPayload) return builtinPayload;
-  }
-  try {
-    const versionInfo = await getYumePersonaVersion(slug);
-    const currentVersion = versionInfo?.version ?? null;
-    if (persona?.cachedSystemPrompt && persona.cachedVersion === currentVersion) {
-      // model no cache = motor do Yume (não o override local).
-      return {
-        systemPrompt: persona.cachedSystemPrompt,
-        model: persona.yumeModel || '',
-        version: currentVersion,
-        cached: true,
-      };
-    }
-    const data = await fetchYumePersonaSystemPrompt(slug);
-    const systemPrompt = data?.system_prompt || '';
-    const model = data?.model || '';
-    // yumeModel no cache; model local só via override explícito.
-    updatePersonaAgent(slug, {
-      cachedSystemPrompt: systemPrompt,
-      cachedVersion: currentVersion,
-      cachedAt: new Date().toISOString(),
-      name: data?.name || persona?.name,
-      yumeModel: model,
-      lastError: null,
-    });
-    return { systemPrompt, model, version: currentVersion, cached: false };
-  } catch (error) {
-    const builtinPayload = resolveBuiltinPromptPayload(slug, persona, {
-      stale: true,
-      warning: error?.message || String(error),
-    });
-    if (builtinPayload) return builtinPayload;
-    if (persona?.cachedSystemPrompt) {
-      updatePersonaAgent(slug, { lastError: error?.message || String(error) });
-      return {
-        systemPrompt: persona.cachedSystemPrompt,
-        model: persona.yumeModel || '',
-        version: persona.cachedVersion,
-        cached: true,
-        stale: true,
-      };
-    }
-    throw error;
-  }
-}
-
 async function runPersonaAgentChat(slug, { mode = 'chat_only', reason = '', chatContext = null } = {}) {
   const persona = getPersonaAgents().find((p) => p.slug === slug);
   if (!persona) return { ok: false, error: 'persona_not_found' };
@@ -1890,19 +1793,15 @@ async function runPersonaAgentChat(slug, { mode = 'chat_only', reason = '', chat
   const context = chatContext || recentChatContext(12);
   let resolved;
   try {
-    resolved = await resolvePersonaSystemPrompt(slug);
+    resolved = await personaSource.resolve(slug);
   } catch (error) {
     const msg = error?.message || String(error);
     publishChatMessage({ agentId, type: 'alerta', content: `Nao consegui carregar a persona ${persona.name} do Yume via Kamui: ${msg}` });
     return { ok: false, error: msg };
   }
   const personaPrompt = resolved.systemPrompt || `Voce e a persona ${persona.name}.`;
-    const model = resolvePersonaRuntimeModel({
-      localModel: persona.model,
-      yumeModel: resolved.model,
-      fallback: ROUTER_MODEL,
-    });
-    const system = `${personaPrompt}
+  const model = resolved.model;
+  const system = `${personaPrompt}
 
   ---
   Voce esta atuando como agente especialista dentro do LUCA-AI (orquestrador de missoes). Mantenha sua personalidade e expertise da persona acima.
@@ -1913,7 +1812,7 @@ async function runPersonaAgentChat(slug, { mode = 'chat_only', reason = '', chat
   ${mode === 'conversation'
       ? 'Voce esta numa conversa entre agentes: reaja ao que foi dito e traga contribuicao concreta.'
       : 'Cumpra o pedido da missao no chat global.'} Para publicar no chat global, escreva uma linha [chat:tipo] mensagem (tipos: info, resultado, decisao, pergunta, alerta, acao).`;
-    const user = `Missao ativa
+  const user = `Missao ativa
   Descricao: ${mission?.description ?? ''}
   Criterios de conclusao: ${mission?.success ?? ''}
 
@@ -1938,116 +1837,6 @@ async function runPersonaAgentChat(slug, { mode = 'chat_only', reason = '', chat
     const msg = error?.message || String(error);
     publishChatMessage({ agentId, type: 'alerta', content: `Erro ao executar a persona ${persona.name}: ${msg}` });
     return { ok: false, error: msg, routerDown: isRouterUnavailable(error) };
-  }
-}
-
-function buildLoadedPersonaPrompt(slug, {
-  name,
-  systemPrompt,
-  yumeModel = '',
-  localModel = '',
-  modelOverride = '',
-  version = null,
-  cached = false,
-  stale = false,
-  builtin = false,
-  warning = '',
-} = {}) {
-  const model = resolvePersonaRuntimeModel({
-    localModel,
-    yumeModel,
-    overrideModel: modelOverride,
-    fallback: ROUTER_MODEL,
-  });
-  return {
-    name: name || slug,
-    model,
-    yumeModel,
-    localModel: isAllowed9RouterModel(localModel) ? localModel : '',
-    modelOverridden: Boolean(
-      (isAllowed9RouterModel(modelOverride) && modelOverride !== yumeModel)
-      || (isAllowed9RouterModel(localModel) && yumeModel && localModel !== yumeModel),
-    ),
-    systemPrompt,
-    version,
-    cached,
-    ...(stale ? { stale: true } : {}),
-    ...(builtin ? { builtin: true } : {}),
-    ...(warning ? { warning } : {}),
-  };
-}
-
-async function loadPersonaTeamPrompt(slug, { modelOverride = '' } = {}) {
-  const persona = getPersonaAgents().find((p) => p.slug === slug);
-  const builtin = getBuiltinPersona(slug);
-  const localModel = String(persona?.model || '').trim();
-
-  // Persona injetada pelo LUCA: prompt local, sem round-trip no Kamui.
-  if (persona?.source === 'luca-builtin' || (builtin && persona?.cachedVersion === 'luca-builtin')) {
-    const systemPrompt = getBuiltinSystemPrompt(slug) || persona?.cachedSystemPrompt || '';
-    if (systemPrompt) {
-      return buildLoadedPersonaPrompt(slug, {
-        name: builtin?.name || persona?.name || slug,
-        systemPrompt,
-        yumeModel: String(builtin?.model || persona?.yumeModel || '').trim(),
-        localModel,
-        modelOverride,
-        version: 'luca-builtin',
-        cached: true,
-        builtin: true,
-      });
-    }
-  }
-
-  try {
-    const data = await fetchYumePersonaSystemPrompt(slug);
-    let version = null;
-    try {
-      const versionInfo = await getYumePersonaVersion(slug);
-      version = versionInfo?.version ?? null;
-    } catch {
-      version = data?.version ?? null;
-    }
-    const yumeModel = String(data?.model || '').trim();
-    return buildLoadedPersonaPrompt(slug, {
-      name: data?.name || persona?.name || slug,
-      systemPrompt: data?.system_prompt || '',
-      yumeModel,
-      localModel,
-      modelOverride,
-      version,
-      cached: false,
-    });
-  } catch (error) {
-    const builtinPrompt = getBuiltinSystemPrompt(slug);
-    if (builtin && builtinPrompt) {
-      return buildLoadedPersonaPrompt(slug, {
-        name: builtin.name || persona?.name || slug,
-        systemPrompt: builtinPrompt,
-        yumeModel: String(builtin.model || '').trim(),
-        localModel,
-        modelOverride,
-        version: 'luca-builtin',
-        cached: true,
-        stale: true,
-        builtin: true,
-        warning: error?.message || String(error),
-      });
-    }
-    if (persona?.cachedSystemPrompt) {
-      return buildLoadedPersonaPrompt(slug, {
-        name: persona.name || slug,
-        systemPrompt: persona.cachedSystemPrompt,
-        yumeModel: '',
-        localModel,
-        modelOverride,
-        version: persona.cachedVersion ?? null,
-        cached: true,
-        stale: true,
-        warning: error?.message || String(error),
-      });
-    }
-    throw error;
   }
 }
 
@@ -3117,12 +2906,7 @@ app.get('/api/personas/avatar', async (req, res) => {
 
 app.get('/api/personas/available', async (_req, res) => {
   try {
-    const { personas, roster } = await syncOfficialPersonaRoster();
-    res.json({
-      ok: true,
-      personas: normalizeYumePersonasForLuca(personas, roster),
-      rosterSource: 'yume.is_official+luca.builtin',
-    });
+    res.json({ ok: true, ...await personaSource.listAvailable() });
   } catch (error) {
     res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
   }
@@ -3360,33 +3144,6 @@ app.delete('/api/luca-ai/team-templates/:kind/:id', (req, res) => {
   }
 });
 
-async function ensureCatalogPersonaCached(slug, catalogBySlug) {
-  const clean = String(slug || '').trim();
-  if (!clean) return null;
-  const catalogPersona = catalogBySlug.get(clean);
-  if (!catalogPersona) {
-    const error = new Error(`persona_not_found:${clean}`);
-    error.code = 'persona_not_found';
-    error.details = { slug: clean };
-    throw error;
-  }
-  const existing = getPersonaAgents().find((agent) => agent.slug === clean);
-  if (existing) {
-    if (catalogPersona.model && existing.yumeModel !== catalogPersona.model) {
-      updatePersonaAgent(clean, {
-        name: catalogPersona.name || existing.name,
-        yumeModel: String(catalogPersona.model || '').trim(),
-      });
-    }
-    return existing;
-  }
-  return addPersonaAgent({
-    slug: clean,
-    name: catalogPersona.name || clean,
-    yumeModel: String(catalogPersona.model || '').trim(),
-  });
-}
-
 async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) {
   // Follow-up continuity: compact prior operator + final bubbles from the same session.
   // Current operator bubble (already the mission field) is excluded by trace-derived id.
@@ -3437,23 +3194,15 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
   }
   const attachmentParts = resolvedAttachments.map((attachment) => attachment.part);
   const attachmentMetadata = resolvedAttachments.map((attachment) => attachment.meta);
-  const { personas } = await syncOfficialPersonaRoster();
-  const catalogBySlug = new Map(
-    (Array.isArray(personas) ? personas : [])
-      .map((persona) => [String(persona?.slug || '').trim(), persona])
-      .filter(([slug]) => Boolean(slug)),
-  );
-  const requestedSlugs = [...new Set([...input.slugs, input.judgeSlug, input.visualSlug].filter(Boolean))];
-  const missingSlugs = requestedSlugs.filter((slug) => !catalogBySlug.has(slug));
-  if (missingSlugs.length > 0) {
-    const error = new Error('Uma ou mais personas nao existem no catalogo Yume.');
-    error.code = 'persona_not_found';
-    error.details = { missingSlugs, rosterSource: 'yume.catalog' };
-    throw error;
-  }
-  for (const slug of requestedSlugs) {
-    await ensureCatalogPersonaCached(slug, catalogBySlug);
-  }
+  const slugsToLoad = input.mode === 'individual'
+    ? [...new Set([...input.slugs, input.judgeSlug, input.visualSlug].filter(Boolean))]
+    : input.slugs;
+  const modelOverrides = input.modelOverrides || {};
+  const {
+    entries: loaded,
+    rosterSource,
+    warning: personaSourceWarning,
+  } = await personaSource.loadMany(slugsToLoad, { modelOverrides });
   const runStartedAt = new Date().toISOString();
   const runStartedMs = Date.now();
 
@@ -3471,22 +3220,9 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
     contextChars: conversationContextNamed.length,
     contextAnonChars: conversationContextAnon.length,
     priorAttachmentCount: Math.max(0, effectiveAttachmentIds.length - (input.attachmentIds?.length || 0)),
+    rosterSource,
+    personaSourceWarning: personaSourceWarning || null,
   });
-
-  const slugsToLoad = input.mode === 'individual'
-    ? [...new Set([...input.slugs, input.judgeSlug, input.visualSlug].filter(Boolean))]
-    : input.slugs;
-  const modelOverrides = input.modelOverrides || {};
-  const loaded = await Promise.all(slugsToLoad.map(async (slug) => {
-    try {
-      return {
-        slug,
-        loaded: await loadPersonaTeamPrompt(slug, { modelOverride: modelOverrides[slug] || '' }),
-      };
-    } catch (error) {
-      return { slug, error: error?.message || String(error) };
-    }
-  }));
   const teamNames = loaded.map((entry) => entry.loaded?.name || entry.slug);
   const loadedBySlug = new Map(loaded.map((entry) => [entry.slug, entry]));
   let steps = [];
@@ -3847,15 +3583,6 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
     generatedAt,
   };
 
-  // Persistência server-side: histórico sobrevive a F5, falha de flush do browser e soft-delete.
-  if (input.sessionId) {
-    try {
-      recordPersonaRunOnSession(input.sessionId, runPayload);
-    } catch (error) {
-      console.error(`[chat-library] recordPersonaRunOnSession falhou: ${error?.message || String(error)}`);
-    }
-  }
-
   return runPayload;
 }
 
@@ -3867,48 +3594,33 @@ app.post('/api/luca-ai/persona-team/run', (req, res) => {
   }
 
   const ownerId = getWorkspaceUserId();
-  const job = personaRunJobs.start({
-    ownerId,
-    traceId: input.traceId,
-    execute: () => runWithWorkspaceUser(ownerId, async () => {
-      try {
-        const result = await executeLucaAiPersonaTeamRun(input);
-        // recordPersonaRunOnSession já limpa activePersonaRun; reforça se sessionId ausente no payload.
-        if (input.sessionId) {
-          try { clearPersonaRunOnSession(input.sessionId); } catch { /* best-effort */ }
+  let job;
+  try {
+    job = personaRunLifecycle.start({
+      ownerId,
+      input,
+      execute: async () => {
+        try {
+          return await executeLucaAiPersonaTeamRun(input);
+        } catch (error) {
+          appendLucaAiTraceEvent(input.traceId, 'luca_ai.workflow.failed', {
+            mode: input.mode,
+            error: error?.message || String(error),
+            code: error?.code || 'persona_run_failed',
+          });
+          console.error(`[persona-team] run ${input.traceId} falhou: ${error?.message || String(error)}`);
+          throw error;
         }
-        return result;
-      } catch (error) {
-        appendLucaAiTraceEvent(input.traceId, 'luca_ai.workflow.failed', {
-          mode: input.mode,
-          error: error?.message || String(error),
-          code: error?.code || 'persona_run_failed',
-        });
-        console.error(`[persona-team] run ${input.traceId} falhou: ${error?.message || String(error)}`);
-        if (input.sessionId) {
-          try {
-            markPersonaRunFailedOnSession(input.sessionId, {
-              runId: job.runId,
-              traceId: job.traceId || input.traceId,
-              errorMessage: error?.message || String(error),
-            });
-          } catch { /* best-effort */ }
-        }
-        throw error;
-      }
-    }),
-  });
-
-  if (input.sessionId) {
-    try {
-      markPersonaRunStartedOnSession(input.sessionId, {
-        runId: job.runId,
-        traceId: job.traceId || input.traceId,
-        startedAt: job.startedAt,
-      });
-    } catch (error) {
-      console.error(`[chat-library] markPersonaRunStartedOnSession falhou: ${error?.message || String(error)}`);
-    }
+      },
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    res.status(status).json({
+      ok: false,
+      error: error?.code || error?.message || String(error),
+      ...(error?.details && typeof error.details === 'object' ? error.details : {}),
+    });
+    return;
   }
 
   // 202 imediato — a borda Cloudflare (~100s) não espera a rodada multi-agente.
@@ -3918,11 +3630,12 @@ app.post('/api/luca-ai/persona-team/run', (req, res) => {
     traceId: job.traceId,
     status: job.status,
     startedAt: job.startedAt,
+    reused: Boolean(job.reused),
   });
 });
 
 app.get('/api/luca-ai/persona-team/runs/:runId', (req, res) => {
-  const job = personaRunJobs.get(req.params.runId, getWorkspaceUserId());
+  const job = personaRunLifecycle.get(req.params.runId, getWorkspaceUserId());
   if (!job) {
     res.status(404).json({ ok: false, error: 'persona_run_not_found' });
     return;
@@ -3937,51 +3650,21 @@ app.post('/api/agent/persona/add', async (req, res) => {
     return;
   }
   try {
-    const { personas } = await syncOfficialPersonaRoster();
-    const catalogPersona = (Array.isArray(personas) ? personas : []).find((item) => item.slug === slug);
-    if (!catalogPersona) {
-      res.status(404).json({ ok: false, error: 'persona_not_found', slug, rosterSource: 'yume.catalog' });
-      return;
-    }
-    const record = addPersonaAgent({
-      slug,
-      name: catalogPersona.name || slug,
-      yumeModel: String(catalogPersona.model || '').trim(),
-    });
-    // Reconcile keeps official roster + retained secondaries (including this one).
-    applyOfficialPersonaRoster(personas);
+    const result = await personaSource.importPersona(slug);
     emitState();
-    res.json({
-      ok: true,
-      agent: getPersonaAgents().find((agent) => agent.slug === slug) || record,
-      synchronized: true,
-      rosterSource: catalogPersona.is_official === true ? 'yume.is_official' : 'yume.secondary',
-    });
+    res.json({ ok: true, ...result });
   } catch (error) {
-    res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
+    const status = Number(error?.status) || (error?.code === 'persona_not_found' ? 404 : 502);
+    res.status(status).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
   }
 });
 
 app.post('/api/agent/persona/remove', async (req, res) => {
   const slug = String(req.body?.slug ?? '').trim();
   try {
-    const existed = getPersonaAgents().some((agent) => agent.slug === slug);
-    const { personas, roster } = await syncOfficialPersonaRoster();
-    const catalogPersona = (Array.isArray(personas) ? personas : []).find((item) => item.slug === slug);
-    // Official personas always return via reconcile; only secondaries can truly drop.
-    if (existed && catalogPersona && catalogPersona.is_official !== true) {
-      const next = getPersonaAgents().filter((agent) => agent.slug !== slug);
-      replacePersonaAgents(next);
-    }
-    const remains = getPersonaAgents().some((agent) => agent.slug === slug)
-      || roster.some((agent) => agent.slug === slug);
+    const result = await personaSource.removePersona(slug);
     emitState();
-    res.json({
-      ok: true,
-      removed: existed && !remains,
-      synchronized: true,
-      rosterSource: 'yume.catalog',
-    });
+    res.json({ ok: true, ...result });
   } catch (error) {
     res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
   }
@@ -4142,22 +3825,7 @@ app.post('/api/agent/run', async (req, res) => {
 
   if (requestedPersonaSlug) {
     try {
-      const { personas } = await syncOfficialPersonaRoster();
-      const catalogBySlug = new Map(
-        (Array.isArray(personas) ? personas : [])
-          .map((persona) => [String(persona?.slug || '').trim(), persona])
-          .filter(([slug]) => Boolean(slug)),
-      );
-      if (!catalogBySlug.has(requestedPersonaSlug)) {
-        res.status(404).json({
-          ok: false,
-          error: 'persona_not_found',
-          slug: requestedPersonaSlug,
-          rosterSource: 'yume.catalog',
-        });
-        return;
-      }
-      await ensureCatalogPersonaCached(requestedPersonaSlug, catalogBySlug);
+      await personaSource.importPersona(requestedPersonaSlug);
     } catch (error) {
       const status = error?.code === 'persona_not_found' ? 404 : 502;
       res.status(status).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
@@ -4251,11 +3919,11 @@ wss.on('connection', (socket, req) => {
 httpServer.listen(PORT, HOST, () => {
   startHeartbeatMonitor();
   startScheduler();
-  void syncAllOfficialPersonaRosters().catch((error) => {
+  void personaSource.syncAllRosters().catch((error) => {
     console.warn(`[persona-roster] falha na sincronizacao inicial: ${error?.message || String(error)}`);
   });
   const personaRosterTimer = setInterval(() => {
-    void syncAllOfficialPersonaRosters().catch((error) => {
+    void personaSource.syncAllRosters().catch((error) => {
       console.warn(`[persona-roster] falha na sincronizacao: ${error?.message || String(error)}`);
     });
   }, PERSONA_ROSTER_SYNC_INTERVAL_MS);

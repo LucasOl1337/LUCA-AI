@@ -120,3 +120,55 @@ export async function watchPersonaTeamRun({
     },
   );
 }
+
+/**
+ * Interface do observer HTTP: aceita (com retry idempotente por trace) e acompanha
+ * a rodada. O servidor continua sendo o owner das transicoes e da persistencia.
+ */
+export async function startAndWatchPersonaTeamRun({
+  startRun,
+  traceId = '',
+  maxStartAttempts = 2,
+  isTransient = isTransientRequestError,
+  ...watchOptions
+} = {}) {
+  if (typeof startRun !== 'function') {
+    throw new PersonaRunWatchError('startRun é obrigatório.', {
+      traceId,
+      code: 'persona_run_start_required',
+    });
+  }
+
+  let accepted = null;
+  let lastError = null;
+  const attempts = Math.max(1, Number(maxStartAttempts) || 1);
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      accepted = await startRun();
+      break;
+    } catch (error) {
+      if (!isTransient(error)) throw error;
+      lastError = error;
+    }
+  }
+
+  if (!accepted?.runId) {
+    throw new PersonaRunWatchError(
+      lastError
+        ? 'A borda não confirmou o aceite, mas a rodada pode ter iniciado. Atualize a sessão antes de reenviar.'
+        : 'Runtime aceitou a rodada sem runId.',
+      {
+        traceId,
+        code: lastError ? 'persona_run_acceptance_unknown' : 'persona_run_id_required',
+        cause: lastError,
+      },
+    );
+  }
+
+  return watchPersonaTeamRun({
+    ...watchOptions,
+    runId: accepted.runId,
+    traceId: String(accepted.traceId || traceId || accepted.runId),
+    isTransient,
+  });
+}

@@ -6,7 +6,6 @@ import {
   buildYumeAvatarProxyUrl,
   normalizeYumeAvatarPath,
   normalizeYumePersonasForLuca,
-  reconcileOfficialPersonaAgents,
 } from './persona-cards.js';
 import { ROUTER_MODEL, resolvePersonaRuntimeModel } from './config.js';
 
@@ -36,42 +35,6 @@ test('normaliza personas do Yume com flag de importacao e avatar proxy local', (
   assert.equal(personas[0].avatarUrl, '/api/personas/avatar?src=%2Fapi%2Favatars%2Fmaestro.png');
   assert.equal(personas[0].is_official, true);
   assert.equal(personas[0].version, 4);
-});
-
-test('falha fechada quando o Yume nao declara a categoria editorial', () => {
-  const [persona] = normalizeYumePersonasForLuca([{ slug: 'legada', name: 'Legada' }]);
-  assert.equal(persona.is_official, false);
-  assert.equal(persona.imported, false);
-  assert.throws(
-    () => reconcileOfficialPersonaAgents([{ slug: 'legada', name: 'Legada' }], []),
-    /yume_official_roster_contract_invalid/,
-  );
-});
-
-test('reconcilia oficiais do Yume e retém secundárias já cacheadas no catálogo', () => {
-  const result = reconcileOfficialPersonaAgents(
-    [
-      { slug: 'aurora', name: 'Aurora', model: 'gcli/grok-4.5', is_official: true },
-      { slug: 'jinx', name: 'Jinx', model: 'cx/gpt-5.6-sol', is_official: false },
-      { slug: 'lucas', name: 'Lucas', model: 'cx/gpt-5.6-sol', is_official: true },
-    ],
-    [
-      { slug: 'aurora', name: 'Aurora antiga', model: 'kimi/k3', enabled: false, cachedVersion: 12, addedAt: 'antes' },
-      { slug: 'jinx', name: 'Jinx', model: '', enabled: true, addedAt: 'antes' },
-      { slug: 'fantasma', name: 'Fora do catálogo', model: '', enabled: true, addedAt: 'antes' },
-    ],
-    'agora',
-  );
-
-  assert.equal(result.changed, true);
-  assert.deepEqual(result.roster.map((agent) => agent.slug), ['aurora', 'lucas', 'jinx']);
-  assert.equal(result.roster[0].model, 'kimi/k3');
-  assert.equal(result.roster[0].enabled, false);
-  assert.equal(result.roster[0].cachedVersion, 12);
-  assert.equal(result.roster[0].yumeModel, 'gcli/grok-4.5');
-  assert.equal(result.roster[1].addedAt, 'agora');
-  assert.equal(result.roster[2].slug, 'jinx');
-  assert.equal(result.roster[2].addedAt, 'antes');
 });
 
 test('secundária cacheada aparece como imported no catálogo normalizado', () => {

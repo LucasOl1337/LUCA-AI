@@ -12,10 +12,14 @@ import {
 import {
   LUCA_INDIVIDUAL_PRESET_SEED,
   LUCA_TEAM_PRESET_SEED,
-  TEAM_ROLE_ORDER,
 } from '../../shared/luca-preset-seed.js';
+import {
+  PERSONA_WORKFLOW_ROLE_IDS,
+  resolvePersonaWorkflow,
+  type PersonaWorkflowRoleId,
+} from '../../shared/persona-workflow.js';
 
-export type LucaTeamPresetRoleId = 'supervisor' | 'mission' | 'execution' | 'approval' | 'display' | 'visual';
+export type LucaTeamPresetRoleId = PersonaWorkflowRoleId;
 export type LucaPresetIconId = 'sprout' | 'hardhat' | 'briefcase' | 'swords' | 'crown' | 'stethoscope' | 'users';
 
 export interface LucaTeamPreset {
@@ -53,7 +57,7 @@ export function resolvePresetIcon(iconId?: string | null): LucideIcon {
   return PRESET_ICON_MAP[String(iconId || '').trim()] || Users;
 }
 
-export const LUCA_TEAM_PRESET_ROLE_ORDER: LucaTeamPresetRoleId[] = [...TEAM_ROLE_ORDER] as LucaTeamPresetRoleId[];
+export const LUCA_TEAM_PRESET_ROLE_ORDER: LucaTeamPresetRoleId[] = [...PERSONA_WORKFLOW_ROLE_IDS];
 
 function hydrateTeam(seed: (typeof LUCA_TEAM_PRESET_SEED)[number]): LucaTeamPreset {
   return {
@@ -62,7 +66,7 @@ function hydrateTeam(seed: (typeof LUCA_TEAM_PRESET_SEED)[number]): LucaTeamPres
     description: seed.description,
     iconId: seed.icon,
     icon: resolvePresetIcon(seed.icon),
-    assignments: seed.assignments as Record<LucaTeamPresetRoleId, string[]>,
+    assignments: resolvePersonaWorkflow(seed.assignments).assignments,
     models: seed.models,
   };
 }
@@ -98,14 +102,7 @@ export function hydrateTeamTemplate(raw: {
     description: String(raw.description || ''),
     iconId: raw.icon,
     icon: resolvePresetIcon(raw.icon),
-    assignments: {
-      supervisor: raw.assignments?.supervisor ?? [],
-      mission: raw.assignments?.mission ?? [],
-      execution: raw.assignments?.execution ?? [],
-      approval: raw.assignments?.approval ?? [],
-      display: raw.assignments?.display ?? [],
-      visual: raw.assignments?.visual ?? [],
-    },
+    assignments: resolvePersonaWorkflow(raw.assignments || {}).assignments,
     models: raw.models,
   };
 }
