@@ -14,20 +14,19 @@ function sliceFn(name) {
   return source.slice(start, start + 7000);
 }
 
-test('runMission keeps mission draft after successful completion', () => {
+test('runMission clears composer after send and restores only on failure', () => {
   const slice = sliceFn('async function runMission()');
   assert.ok(slice.includes('if (!data.ok)'), 'errors only on !data.ok');
   assert.ok(slice.includes("role: 'operator'") || slice.includes('role: "operator"'), 'operator transcript entry kept');
-  // Success path must not wipe the draft (composer + missionDraft persist).
-  const successRegion = slice.slice(
-    slice.indexOf('if (!data.ok)'),
-    slice.indexOf('} catch (err)'),
+  // Codex-style: clear draft when the operator bubble is committed.
+  assert.ok(
+    slice.includes("setMission('')") || slice.includes('setMission("")'),
+    'clears composer after send',
   );
-  assert.equal(
-    successRegion.includes("setMission('')") || successRegion.includes('setMission("")'),
-    false,
-    'no setMission clear on success path',
-  );
+  assert.ok(slice.includes("missionDraft: ''") || slice.includes('missionDraft: ""'), 'persists empty draft after send');
+  // Soft/hard failure must put the text back for "Reenviar missão".
+  const failRegion = slice.slice(slice.indexOf('if (!data.ok)'), slice.indexOf('} finally {'));
+  assert.ok(failRegion.includes('setMission(trimmedMission)'), 'restores mission on failure');
 });
 
 test('mode switch does not call clearTranscript', () => {

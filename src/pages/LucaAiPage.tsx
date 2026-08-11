@@ -1416,14 +1416,21 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     // Capture next transcript eagerly — setState is async and F5 must not lose the question.
     const transcriptWithOperator = [...transcript, operatorEntry].slice(-100);
     setTranscript(transcriptWithOperator);
+    // Codex-style send: message is committed to the thread; composer leaves empty.
+    // Restore mission + attachments only if pre-run flush or the round fails.
+    setMission('');
+    setDraftAttachments([]);
     try {
       await flushSessionNow(ownerSessionId, {
-        missionDraft: trimmedMission,
+        missionDraft: '',
+        draftAttachments: [],
         transcript: transcriptWithOperator,
         finalResult: null,
         visualPack: null,
       });
     } catch (err) {
+      setMission(trimmedMission);
+      setDraftAttachments(attachmentsToRun);
       setError(buildApiErrorMessage(err, 'Falha ao salvar a missão antes de iniciar.'));
       setErrorRetry('run');
       setRunning(false);
@@ -1479,19 +1486,18 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setFinalResult(nextFinal);
       const nextVisual = data.visualPack && typeof data.visualPack === 'object' ? data.visualPack : null;
       setVisualPack(nextVisual);
-      // Anexos ja foram entregues as personas: limpam-se so quando a rodada deu certo,
-      // para uma falha permitir reenviar a mesma mensagem sem reanexar tudo.
-      if (data.ok) setDraftAttachments([]);
       // O servidor é o escritor canônico da rodada: recarrega em vez de reenviar.
       if (stillOwner()) await refreshChatLibrary();
       if (!data.ok) {
+        // Soft failure: put the message back so "Reenviar missão" works.
+        setMission(trimmedMission);
+        setDraftAttachments(attachmentsToRun);
         setError(operationMode === 'individual'
           ? 'As respostas individuais foram acionadas, mas o juiz não concluiu um veredito útil.'
           : 'A equipe foi acionada, mas nenhuma persona retornou resposta util.');
         setErrorRetry('run');
       }
-      // Keep mission draft after success so the original question stays visible
-      // (composer + missionDraft in session). Operator bubble also remains in transcript.
+      // Success: composer stays empty; original question lives on the operator bubble.
     } catch (err) {
       if (!stillOwner()) return;
       const message = buildApiErrorMessage(err, operationMode === 'individual'
@@ -1499,6 +1505,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         : 'Falha ao rodar fluxo de personas.');
       setError(message);
       setErrorRetry('run');
+      setMission(trimmedMission);
+      setDraftAttachments(attachmentsToRun);
       const errorEntry: TeamTranscriptEntry = {
         id: nowId('system-error'),
         role: 'system',
@@ -1511,6 +1519,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setTranscript(transcriptAfterError);
       void flushSessionNow(ownerSessionId, {
         missionDraft: trimmedMission,
+        draftAttachments: attachmentsToRun,
         transcript: transcriptAfterError,
         finalResult: null,
       });

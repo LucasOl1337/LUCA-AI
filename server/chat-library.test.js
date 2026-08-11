@@ -208,8 +208,12 @@ test('CHAT_LIBRARY_V1 recordPersonaRunOnSession grava transcript no servidor', a
     });
     const session = chatLibrary.getChatSession(sessionId);
     assert.ok(session.transcript.length >= 2, 'operator + reply');
-    assert.equal(session.missionDraft, 'Hospital com filas');
+    assert.equal(session.missionDraft, '', 'draft clears after run; mission lives on operator bubble');
     assert.equal(session.operationMode, 'individual');
+    assert.ok(
+      session.transcript.some((entry) => entry.role === 'operator' && entry.content === 'Hospital com filas'),
+      'operator bubble keeps the sent mission',
+    );
   });
 
   const workspacesRoot = path.join(dataDir, 'workspaces');

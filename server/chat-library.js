@@ -758,7 +758,8 @@ export function recordPersonaRunOnSession(sessionId, run = {}) {
     const replyEntries = transcriptEntriesFromPersonaRun(run);
 
     session.transcript = mergeTranscript(existing, replyEntries);
-    if (mission) session.missionDraft = mission;
+    // Message is committed on the operator bubble — draft leaves empty (Codex-style send).
+    session.missionDraft = '';
     session.operationMode = mode;
 
     session.finalResult = finalEntryFromPersonaRun(run);

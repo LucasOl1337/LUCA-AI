@@ -1,4 +1,4 @@
-// Source lock: mid-session LUCA-AI run failure keeps mission draft and re-runs, not personas reload.
+// Source lock: mid-session LUCA-AI run failure restores mission draft and re-runs, not personas reload.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 const root = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(join(root, '../src/pages/LucaAiPage.tsx'), 'utf8');
 
-test('runMission keeps mission draft until successful completion', () => {
+test('runMission clears composer on send and restores mission for re-run on failure', () => {
   const start = source.indexOf('async function runMission()');
   assert.ok(start >= 0, 'runMission present');
   // Delimita pela proxima declaracao, nao por contagem de caracteres: a funcao
@@ -18,11 +18,10 @@ test('runMission keeps mission draft until successful completion', () => {
   const slice = source.slice(start, end);
   assert.ok(slice.includes("setErrorRetry('run')") || slice.includes('setErrorRetry("run")'), 'run failure marks retry kind');
   assert.ok(slice.includes('if (!data.ok)'), 'errors only when run is not ok');
-  // Mission draft must survive success so the original question stays visible in session.
-  assert.equal(slice.includes("setMission('')") || slice.includes('setMission("")'), false, 'never clears mission draft in runMission');
-  // Early wipe before await must not exist
-  const beforeAwait = slice.slice(0, slice.indexOf('await lucaApi.runLucaAi'));
-  assert.equal(beforeAwait.includes("setMission('')") || beforeAwait.includes('setMission("")'), false, 'no early mission wipe before API');
+  // Sent message lives on the operator bubble; composer empties immediately after commit.
+  assert.ok(slice.includes("setMission('')") || slice.includes('setMission("")'), 'clears composer after send');
+  assert.ok(slice.includes("missionDraft: ''") || slice.includes('missionDraft: ""'), 'persists empty draft after send');
+  assert.ok(slice.includes('setMission(trimmedMission)'), 'restores mission so Reenviar missão works');
 });
 
 test('chat notice run failure re-sends mission instead of only reloading personas', () => {
