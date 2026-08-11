@@ -151,7 +151,7 @@ test('CHAT_ATTACHMENTS_V1 path traversal ids never escape the session directory'
   });
 });
 
-test('CHAT_ATTACHMENTS_V1 deleting a session removes its files from disk', async () => {
+test('CHAT_ATTACHMENTS_V1 soft-deleting a session removes its files from disk', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-attachments-delete-'));
   const { workspace, chatLibrary, attachments } = await loadModules(dataDir);
 
@@ -165,7 +165,7 @@ test('CHAT_ATTACHMENTS_V1 deleting a session removes its files from disk', async
     });
     assert.deepEqual(attachments.listStoredAttachmentSessionIds([session.id]), [session.id]);
 
-    attachments.deleteAllChatAttachments(session.id);
+    chatLibrary.deleteChatSession(session.id);
     assert.deepEqual(attachments.listStoredAttachmentSessionIds([session.id]), []);
   });
 });
@@ -220,5 +220,24 @@ test('CHAT_ATTACHMENTS_V1 cascade folder delete leaves no orphan attachment on d
 
     const leftovers = attachments.listStoredAttachmentSessionIds([session.id]);
     assert.equal(leftovers.includes(session.id), false, 'attachment directory outlived its session');
+  });
+});
+
+test('CHAT_ATTACHMENTS_V1 session capacity eviction removes private files', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-attachments-capacity-'));
+  const { workspace, chatLibrary, attachments } = await loadModules(dataDir);
+
+  workspace.runWithWorkspaceUser('owner-capacity', () => {
+    const oldestId = chatLibrary.getChatLibrarySnapshot().activeSessionId;
+    attachments.storeChatAttachment({
+      sessionId: oldestId,
+      name: 'antigo.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('privado'),
+    });
+    for (let i = 0; i < 100; i += 1) {
+      chatLibrary.createChatSession({ title: `Sessão ${i}` });
+    }
+    assert.deepEqual(attachments.listStoredAttachmentSessionIds([oldestId]), []);
   });
 });

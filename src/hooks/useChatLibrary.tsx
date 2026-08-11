@@ -31,7 +31,11 @@ interface ChatLibraryContextValue {
   renameFolder: (folderId: string, name: string) => Promise<void>;
   deleteFolder: (folderId: string) => Promise<void>;
   moveSession: (sessionId: string, folderId: string | null) => Promise<void>;
-  persistSession: (sessionId: string, patch: Record<string, unknown>) => Promise<void>;
+  persistSession: (
+    sessionId: string,
+    patch: Record<string, unknown>,
+    options?: { throwOnError?: boolean },
+  ) => Promise<void>;
   clearError: () => void;
 }
 
@@ -251,7 +255,11 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
     }
   }, [applySnapshot, busy]);
 
-  const persistSession = useCallback(async (sessionId: string, patch: Record<string, unknown>) => {
+  const persistSession = useCallback(async (
+    sessionId: string,
+    patch: Record<string, unknown>,
+    options: { throwOnError?: boolean } = {},
+  ) => {
     const id = String(sessionId || '').trim();
     if (!id) return;
     // The provider survives SPA route changes. Mirror the patch synchronously so
@@ -281,7 +289,8 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
           };
         });
       }
-    } catch {
+    } catch (err) {
+      if (options.throwOnError) throw err;
       // best-effort — runMission also flushes; silent here keeps typing smooth.
     }
   }, []);

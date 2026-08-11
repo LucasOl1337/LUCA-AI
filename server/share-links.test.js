@@ -139,6 +139,20 @@ test('SHARE_LINKS_V1 snapshot is immutable until refreshed and revoke kills the 
   assert.equal(shareLinks.resolvePublicShare(share.token), null);
 });
 
+test('SHARE_LINKS_V1 deleting the owner session revokes its public link', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-share-delete-'));
+  const { workspace, chatLibrary, shareLinks } = await loadModules(dataDir);
+  let share;
+
+  workspace.runWithWorkspaceUser('owner-delete-share', () => {
+    const session = seedSession(chatLibrary, 'Apagar link');
+    share = shareLinks.createShareLink(session.id);
+    chatLibrary.deleteChatSession(session.id);
+  });
+
+  assert.equal(shareLinks.resolvePublicShare(share.token), null);
+});
+
 test('SHARE_LINKS_V1 cannot share or revoke another account session', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-share-isolation-'));
   const { workspace, chatLibrary, shareLinks } = await loadModules(dataDir);

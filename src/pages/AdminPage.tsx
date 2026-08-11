@@ -19,6 +19,11 @@ import {
 } from 'lucide-react';
 import type { AuthUser } from '@/hooks/useAuth';
 import { useAuth } from '@/hooks/useAuth';
+import type {
+  LucaAiChatFolder as ChatFolder,
+  LucaAiChatLibraryStats,
+  LucaAiChatSessionSummary as ChatSessionSummary,
+} from '@/lib/types';
 
 interface Overview {
   totalUsers: number;
@@ -64,26 +69,6 @@ interface AdminReport {
   generatedAt: string;
 }
 
-interface ChatFolder {
-  id: string;
-  name: string;
-  updatedAt?: string;
-}
-
-interface ChatSessionSummary {
-  id: string;
-  title: string;
-  folderId?: string | null;
-  updatedAt?: string;
-  operationMode?: string;
-  messageCount?: number;
-  preview?: string;
-  deleted?: boolean;
-  deletedAt?: string | null;
-  archivedOnly?: boolean;
-  archivedAt?: string;
-}
-
 interface ChatTranscriptEntry {
   id?: string;
   role?: string;
@@ -111,14 +96,7 @@ interface UserChatLibrary {
   folders: ChatFolder[];
   sessions: ChatSessionSummary[];
   activeSessionId?: string | null;
-  stats?: {
-    folderCount: number;
-    sessionCount: number;
-    messageCount: number;
-    liveSessionCount?: number;
-    deletedSessionCount?: number;
-    archivedOnlyCount?: number;
-  };
+  stats?: LucaAiChatLibraryStats;
 }
 
 function formatDate(value: string) {
@@ -195,6 +173,35 @@ function RankList({
         </ol>
       )}
     </div>
+  );
+}
+
+function AdminChatSessionButton({
+  session,
+  active,
+  onOpen,
+}: {
+  session: ChatSessionSummary;
+  active: boolean;
+  onOpen: () => void;
+}) {
+  const archived = Boolean(session.deleted || session.archivedOnly);
+  return (
+    <button
+      type="button"
+      className={`admin-chat-session ${active ? 'active' : ''} ${archived ? 'is-deleted' : ''}`}
+      onClick={onOpen}
+    >
+      <span>
+        {session.title || 'Sem título'}
+        {archived ? ` · ${session.archiveReason === 'transcript_clear' ? 'antes da limpeza' : 'apagada'}` : ''}
+      </span>
+      <small>
+        {session.messageCount || 0} msg · {session.operationMode || 'team'}
+        {session.deleted ? ' · soft-delete' : ''}
+        {session.archivedOnly ? ' · arquivo' : ''}
+      </small>
+    </button>
   );
 }
 
@@ -614,22 +621,12 @@ export default function AdminPage() {
                         {children.length === 0 ? (
                           <p className="admin-chat-empty">Sem sessões nesta pasta</p>
                         ) : children.map((session) => (
-                          <button
+                          <AdminChatSessionButton
                             key={session.id}
-                            type="button"
-                            className={`admin-chat-session ${chatSession?.id === session.id ? 'active' : ''} ${session.deleted || session.archivedOnly ? 'is-deleted' : ''}`}
-                            onClick={() => void openChatSession(session.id)}
-                          >
-                            <span>
-                              {session.title || 'Sem título'}
-                              {session.deleted || session.archivedOnly ? ' · apagada' : ''}
-                            </span>
-                            <small>
-                              {session.messageCount || 0} msg · {session.operationMode || 'team'}
-                              {session.deleted ? ' · soft-delete' : ''}
-                              {session.archivedOnly ? ' · arquivo' : ''}
-                            </small>
-                          </button>
+                            session={session}
+                            active={chatSession?.id === session.id}
+                            onOpen={() => void openChatSession(session.id)}
+                          />
                         ))}
                       </div>
                     );
@@ -637,22 +634,12 @@ export default function AdminPage() {
                   <div className="admin-chat-group">
                     <strong>Sem pasta</strong>
                     {(chatLibrary?.sessions || []).filter((session) => !session.folderId).map((session) => (
-                      <button
+                      <AdminChatSessionButton
                         key={session.id}
-                        type="button"
-                        className={`admin-chat-session ${chatSession?.id === session.id ? 'active' : ''} ${session.deleted || session.archivedOnly ? 'is-deleted' : ''}`}
-                        onClick={() => void openChatSession(session.id)}
-                      >
-                        <span>
-                          {session.title || 'Sem título'}
-                          {session.deleted || session.archivedOnly ? ' · apagada' : ''}
-                        </span>
-                        <small>
-                          {session.messageCount || 0} msg · {session.operationMode || 'team'}
-                          {session.deleted ? ' · soft-delete' : ''}
-                          {session.archivedOnly ? ' · arquivo' : ''}
-                        </small>
-                      </button>
+                        session={session}
+                        active={chatSession?.id === session.id}
+                        onOpen={() => void openChatSession(session.id)}
+                      />
                     ))}
                     {!chatBusy && (chatLibrary?.sessions || []).length === 0 ? (
                       <p className="admin-chat-empty">Esta conta ainda não tem sessões de chat.</p>

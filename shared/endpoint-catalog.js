@@ -296,7 +296,7 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
                   'luca-ai-chat-session-delete',
                   'DELETE',
                   '/api/luca-ai/chat/sessions/:sessionId',
-                  'apaga permanentemente uma sessão de chat do LUCA-AI',
+                  'remove a sessão da interface e retém o transcript para suporte',
                   'both',
                 ),
                 endpoint(

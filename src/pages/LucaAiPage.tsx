@@ -35,7 +35,6 @@ import type {
   LucaAiChatSession,
   LucaAiChatSessionShare,
   LucaAiIndividualDepth,
-  LucaAiPersonaTeamReply,
   LucaAiPersonaTeamPhase,
   LucaAiPersonaTeamRunResponse,
   LucaAiVisualPack,
@@ -44,6 +43,11 @@ import type {
   RuntimeEvent,
   YumePersonaSummary,
 } from '@/lib/types';
+import {
+  finalEntryFromPersonaRun,
+  personaRunOperatorEntryId,
+  transcriptEntriesFromPersonaRun,
+} from '../../shared/persona-run-transcript.js';
 import CopyLogButton from '@/components/CopyLogButton';
 import DashboardBlock from '@/components/DashboardBlock';
 import { useLuca } from '@/hooks/useLucaState';
@@ -320,48 +324,8 @@ function AttachmentList({ attachments }: { attachments?: LucaAiChatAttachment[] 
   );
 }
 
-function transcriptEntryFromReply(
-  reply: LucaAiPersonaTeamReply,
-  timestamp: string,
-  stage?: string,
-  phase: LucaAiPersonaTeamPhase | undefined = reply.phase,
-): TeamTranscriptEntry {
-  return {
-    id: nowId(`persona-${reply.slug}`),
-    role: 'persona',
-    name: reply.name || reply.slug,
-    slug: reply.slug,
-    model: reply.model,
-    stage,
-    phase,
-    content: reply.ok
-      ? reply.content || 'Sem resposta textual da persona.'
-      : `Falha ao rodar esta persona: ${reply.error || 'erro desconhecido'}`,
-    status: reply.ok ? 'ok' : 'error',
-    timestamp,
-  };
-}
-
 function transcriptEntriesFromResponse(data: LucaAiPersonaTeamRunResponse): TeamTranscriptEntry[] {
-  const timestamp = data.generatedAt || new Date().toISOString();
-  if (data.steps?.length) {
-    return data.steps.flatMap((step) => (
-      step.replies.map((reply) => {
-        if (step.roleId === 'visual' && reply.ok) {
-          const summary = data.visualPack?.summary
-            || 'Plano de artefatos enviado para materialização (gráficos, relatório e imagens).';
-          return transcriptEntryFromReply(
-            { ...reply, content: summary },
-            timestamp,
-            step.roleLabel,
-            reply.phase || step.phase,
-          );
-        }
-        return transcriptEntryFromReply(reply, timestamp, step.roleLabel, reply.phase || step.phase);
-      })
-    ));
-  }
-  return (data.replies ?? []).map((reply) => transcriptEntryFromReply(reply, timestamp, reply.workflowRoleLabel));
+  return transcriptEntriesFromPersonaRun(data) as TeamTranscriptEntry[];
 }
 
 function stripOuterMarkdown(value: string): string {
@@ -678,6 +642,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     activeSessionId,
     activeSession,
     persistSession,
+    refresh: refreshChatLibrary,
   } = useChatLibrary();
   const boundSessionIdRef = useRef<string | null>(null);
   const runOwnerSessionIdRef = useRef<string | null>(null);
@@ -805,22 +770,18 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     individualAssignments,
     missionDraft: mission,
     draftAttachments,
-    transcript,
-    finalResult,
     activePersonaSlug,
     ...overrides,
   }), [
     activePersonaSlug,
     assignments,
     draftAttachments,
-    finalResult,
     individualAssignments,
     mission,
     operationMode,
-    transcript,
   ]);
 
-  const flushSessionNow = useCallback((
+  const flushSessionNow = useCallback(async (
     sessionId: string | null | undefined,
     overrides: Record<string, unknown> = {},
   ) => {
@@ -832,7 +793,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     }
     const payload = buildPersistPayload(overrides);
     latestPersistRef.current = { sessionId: id, payload };
-    void persistSession(id, payload);
+    await persistSession(id, payload, { throwOnError: true });
   }, [buildPersistPayload, persistSession]);
 
   // SHARE_LINKS_V1 — reset panel when switching sessions.
@@ -890,7 +851,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setShareError(null);
     try {
       // Snapshot must include everything on screen: flush pending edits first.
-      flushSessionNow(activeSessionId);
+      await flushSessionNow(activeSessionId);
       const data = await lucaApi.createChatSessionShare(activeSessionId, bridgeBase);
       setShareInfo(data.share ?? null);
       if (data.share) void copyShareUrl(data.share);
@@ -949,7 +910,6 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     assignments,
     buildPersistPayload,
     draftAttachments,
-    finalResult,
     hydratedSessionId,
     individualAssignments,
     libraryReady,
@@ -957,7 +917,6 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     operationMode,
     persistSession,
     sessionsBusy,
-    transcript,
   ]);
 
   useEffect(() => {
@@ -1107,7 +1066,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       }
       const next = [...draftAttachments, ...uploaded].slice(0, 4);
       setDraftAttachments(next);
-      flushSessionNow(ownerSessionId, { draftAttachments: next });
+      await flushSessionNow(ownerSessionId, { draftAttachments: next });
     } catch (err) {
       if (stillOwner()) {
         setError(buildApiErrorMessage(err, 'Falha ao anexar arquivo.'));
@@ -1134,7 +1093,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     if (boundSessionIdRef.current !== ownerSessionId) return;
     const next = draftAttachments.filter((item) => item.id !== attachment.id);
     setDraftAttachments(next);
-    flushSessionNow(ownerSessionId, { draftAttachments: next });
+    await flushSessionNow(ownerSessionId, { draftAttachments: next });
   }
 
   async function ensurePersonaAvailable(slug: string): Promise<boolean> {
@@ -1395,7 +1354,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setVisualPack(null);
     setProcessEvents([]);
     setActiveTraceId(null);
-    flushSessionNow(activeSessionId, { transcript: [], finalResult: null, visualPack: null });
+    void flushSessionNow(activeSessionId, { transcript: [], finalResult: null, visualPack: null });
   }
 
   function switchOperationMode(next: OperationMode) {
@@ -1446,7 +1405,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setActivePersonaSlug(runPersonas[0] ?? null);
     }
     const operatorEntry: TeamTranscriptEntry = {
-      id: nowId('operator'),
+      id: personaRunOperatorEntryId({ traceId }),
       role: 'operator',
       name: 'Operador',
       content: trimmedMission,
@@ -1457,12 +1416,20 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     // Capture next transcript eagerly — setState is async and F5 must not lose the question.
     const transcriptWithOperator = [...transcript, operatorEntry].slice(-100);
     setTranscript(transcriptWithOperator);
-    flushSessionNow(ownerSessionId, {
-      missionDraft: trimmedMission,
-      transcript: transcriptWithOperator,
-      finalResult: null,
-      visualPack: null,
-    });
+    try {
+      await flushSessionNow(ownerSessionId, {
+        missionDraft: trimmedMission,
+        transcript: transcriptWithOperator,
+        finalResult: null,
+        visualPack: null,
+      });
+    } catch (err) {
+      setError(buildApiErrorMessage(err, 'Falha ao salvar a missão antes de iniciar.'));
+      setErrorRetry('run');
+      setRunning(false);
+      runOwnerSessionIdRef.current = null;
+      return;
+    }
 
     const stillOwner = () => (
       runOwnerSessionIdRef.current === ownerSessionId
@@ -1508,47 +1475,15 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       const nextMessages = transcriptEntriesFromResponse(data);
       const transcriptAfter = [...transcriptWithOperator, ...nextMessages].slice(-140);
       setTranscript(transcriptAfter);
-      let nextFinal: TeamTranscriptEntry | null = null;
-      const finalReply = operationMode === 'individual' ? data.judge : null;
-      if (operationMode === 'individual' && finalReply?.content) {
-        nextFinal = {
-          id: nowId('judge-verdict'),
-          role: 'persona',
-          name: finalReply.name || finalReply.slug,
-          slug: finalReply.slug,
-          model: finalReply.model,
-          phase: finalReply.phase,
-          stage: 'Juiz',
-          content: finalReply.content,
-          status: finalReply.ok ? 'ok' : 'error',
-          timestamp: data.generatedAt || new Date().toISOString(),
-        };
-      } else if (data.finalDisplay?.content) {
-        nextFinal = {
-          id: nowId('final-display'),
-          role: 'persona',
-          name: data.finalDisplay.name || data.finalDisplay.slug,
-          slug: data.finalDisplay.slug,
-          model: data.finalDisplay.model,
-          stage: data.finalDisplay.roleLabel,
-          content: data.finalDisplay.content,
-          status: 'ok',
-          timestamp: data.generatedAt || new Date().toISOString(),
-        };
-      }
+      const nextFinal = finalEntryFromPersonaRun(data) as TeamTranscriptEntry | null;
       setFinalResult(nextFinal);
       const nextVisual = data.visualPack && typeof data.visualPack === 'object' ? data.visualPack : null;
       setVisualPack(nextVisual);
       // Anexos ja foram entregues as personas: limpam-se so quando a rodada deu certo,
       // para uma falha permitir reenviar a mesma mensagem sem reanexar tudo.
       if (data.ok) setDraftAttachments([]);
-      flushSessionNow(ownerSessionId, {
-        missionDraft: trimmedMission,
-        draftAttachments: data.ok ? [] : attachmentsToRun,
-        transcript: transcriptAfter,
-        finalResult: nextFinal,
-        visualPack: nextVisual,
-      });
+      // O servidor é o escritor canônico da rodada: recarrega em vez de reenviar.
+      if (stillOwner()) await refreshChatLibrary();
       if (!data.ok) {
         setError(operationMode === 'individual'
           ? 'As respostas individuais foram acionadas, mas o juiz não concluiu um veredito útil.'
@@ -1574,7 +1509,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       };
       const transcriptAfterError = [...transcriptWithOperator, errorEntry].slice(-140);
       setTranscript(transcriptAfterError);
-      flushSessionNow(ownerSessionId, {
+      void flushSessionNow(ownerSessionId, {
         missionDraft: trimmedMission,
         transcript: transcriptAfterError,
         finalResult: null,

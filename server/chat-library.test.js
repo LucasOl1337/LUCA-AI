@@ -214,11 +214,174 @@ test('CHAT_LIBRARY_V1 recordPersonaRunOnSession grava transcript no servidor', a
 
   const workspacesRoot = path.join(dataDir, 'workspaces');
   const dirs = fs.readdirSync(workspacesRoot);
-  const archivePath = path.join(workspacesRoot, dirs[0], 'chat-history-archive.jsonl');
-  assert.ok(fs.existsSync(archivePath));
-  const archive = fs.readFileSync(archivePath, 'utf8');
-  assert.match(archive, /Hospital com filas/);
-  assert.match(archive, /persona_run/);
+  const libraryPath = path.join(workspacesRoot, dirs[0], 'chat-library.json');
+  assert.match(fs.readFileSync(libraryPath, 'utf8'), /Hospital com filas/);
+});
+
+test('CHAT_LIBRARY_V1 stale browser snapshot cannot erase a server-recorded run', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-race-'));
+  const { workspace, chatLibrary } = await loadChatLibrary(dataDir);
+
+  workspace.runWithWorkspaceUser('user-race', () => {
+    const sessionId = chatLibrary.getChatLibrarySnapshot().activeSessionId;
+    // O browser grava a bolha com o id derivado do trace da rodada.
+    const operatorOnly = [
+      { id: 'op_trace-race', role: 'operator', name: 'Operador', content: 'Missão durável', timestamp: new Date().toISOString() },
+    ];
+    chatLibrary.updateChatSession(sessionId, { transcript: operatorOnly });
+    chatLibrary.recordPersonaRunOnSession(sessionId, {
+      mission: 'Missão durável',
+      mode: 'team',
+      traceId: 'trace-race',
+      generatedAt: new Date().toISOString(),
+      replies: [{ ok: true, slug: 'aurora', name: 'Aurora', content: 'Resposta preservada' }],
+    });
+
+    chatLibrary.updateChatSession(sessionId, { transcript: operatorOnly });
+
+    const session = chatLibrary.getChatSession(sessionId);
+    assert.deepEqual(
+      session.transcript.map((entry) => entry.content),
+      ['Missão durável', 'Resposta preservada'],
+    );
+  });
+});
+
+test('CHAT_LIBRARY_V1 autosave does not archive identical transcript snapshots', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-autosave-'));
+  const { workspace, chatLibrary } = await loadChatLibrary(dataDir);
+
+  workspace.runWithWorkspaceUser('user-autosave', () => {
+    const sessionId = chatLibrary.getChatLibrarySnapshot().activeSessionId;
+    const transcript = [
+      { id: 'operator-1', role: 'operator', name: 'Operador', content: 'Texto estável', timestamp: new Date().toISOString() },
+    ];
+    for (let i = 0; i < 5; i += 1) {
+      chatLibrary.updateChatSession(sessionId, { missionDraft: `Edição ${i}`, transcript });
+    }
+  });
+
+  const workspaceDir = fs.readdirSync(path.join(dataDir, 'workspaces'))[0];
+  const archivePath = path.join(dataDir, 'workspaces', workspaceDir, 'chat-history-archive.jsonl');
+  assert.equal(fs.existsSync(archivePath), false);
+});
+
+test('CHAT_LIBRARY_V1 delete stays live when durable archive write fails', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-archive-fail-'));
+  const { workspace, chatLibrary } = await loadChatLibrary(dataDir);
+  let sessionId;
+
+  workspace.runWithWorkspaceUser('user-archive-fail', () => {
+    sessionId = chatLibrary.getChatLibrarySnapshot().activeSessionId;
+    chatLibrary.updateChatSession(sessionId, {
+      transcript: [{ id: 'operator-1', role: 'operator', content: 'Não perder', timestamp: new Date().toISOString() }],
+    });
+  });
+
+  const workspaceDir = fs.readdirSync(path.join(dataDir, 'workspaces'))[0];
+  fs.mkdirSync(path.join(dataDir, 'workspaces', workspaceDir, 'chat-history-archive.jsonl'));
+
+  workspace.runWithWorkspaceUser('user-archive-fail', () => {
+    assert.throws(() => chatLibrary.deleteChatSession(sessionId));
+    assert.equal(chatLibrary.getChatSession(sessionId).transcript[0].content, 'Não perder');
+  });
+});
+
+test('CHAT_LIBRARY_V1 admin can inspect content archived before an explicit clear', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-clear-admin-'));
+  const { workspace, chatLibrary } = await loadChatLibrary(dataDir);
+  let sessionId;
+
+  workspace.runWithWorkspaceUser('user-clear-admin', () => {
+    sessionId = chatLibrary.getChatLibrarySnapshot().activeSessionId;
+    chatLibrary.updateChatSession(sessionId, {
+      transcript: [{ id: 'operator-1', role: 'operator', content: 'Conteúdo anterior', timestamp: new Date().toISOString() }],
+    });
+    chatLibrary.updateChatSession(sessionId, { transcript: [], finalResult: null });
+  });
+
+  const admin = chatLibrary.getChatLibrarySnapshotForUser('user-clear-admin');
+  const revision = admin.sessions.find((session) => session.id !== sessionId && session.sourceSessionId === sessionId);
+  assert.ok(revision, 'cleared revision is listed separately for support');
+  assert.equal(chatLibrary.getChatSessionForUser('user-clear-admin', revision.id).transcript[0].content, 'Conteúdo anterior');
+});
+
+test('CHAT_LIBRARY_V1 records a run that finishes after soft-delete without stale results or duplicate ids', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-deleted-run-'));
+  const { workspace, chatLibrary } = await loadChatLibrary(dataDir);
+
+  workspace.runWithWorkspaceUser('user-deleted-run', () => {
+    const sessionId = chatLibrary.getChatLibrarySnapshot().activeSessionId;
+    chatLibrary.updateChatSession(sessionId, {
+      finalResult: { id: 'old-final', content: 'Resultado antigo' },
+      visualPack: { status: 'ok', summary: 'Visual antigo' },
+    });
+    chatLibrary.deleteChatSession(sessionId);
+    const run = {
+      mission: 'Nova missão',
+      mode: 'team',
+      traceId: 'trace-late',
+      generatedAt: new Date().toISOString(),
+      replies: [{ ok: true, slug: 'aurora', name: 'Aurora', content: 'Resultado tardio' }],
+    };
+    assert.ok(chatLibrary.recordPersonaRunOnSession(sessionId, run));
+    assert.ok(chatLibrary.recordPersonaRunOnSession(sessionId, run));
+
+    const retained = chatLibrary.getChatSessionForUser('user-deleted-run', sessionId);
+    const ids = retained.transcript.map((entry) => entry.id);
+    assert.ok(retained.transcript.some((entry) => entry.content === 'Resultado tardio'));
+    assert.equal(new Set(ids).size, ids.length);
+    assert.equal(retained.finalResult, null);
+    assert.equal(retained.visualPack, null);
+  });
+});
+
+test('CHAT_LIBRARY_V1 repeated mission in distinct runs remains two conversation turns', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-repeat-mission-'));
+  const { workspace, chatLibrary } = await loadChatLibrary(dataDir);
+
+  workspace.runWithWorkspaceUser('user-repeat-mission', () => {
+    const sessionId = chatLibrary.getChatLibrarySnapshot().activeSessionId;
+    for (const traceId of ['trace-first', 'trace-second']) {
+      chatLibrary.recordPersonaRunOnSession(sessionId, {
+        ok: true,
+        mission: 'Mesma missão',
+        mode: 'team',
+        traceId,
+        generatedAt: new Date().toISOString(),
+        replies: [{ ok: true, slug: 'aurora', name: 'Aurora', content: `Resposta ${traceId}` }],
+      });
+    }
+    const session = chatLibrary.getChatSession(sessionId);
+    assert.equal(session.transcript.filter((entry) => entry.role === 'operator').length, 2);
+    assert.equal(new Set(session.transcript.map((entry) => entry.id)).size, session.transcript.length);
+  });
+});
+
+test('CHAT_LIBRARY_V1 admin keeps pruned sessions discoverable beyond the old 300-record window', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-archive-window-'));
+  const { workspace, chatLibrary } = await loadChatLibrary(dataDir);
+  let oldestId;
+
+  workspace.runWithWorkspaceUser('user-archive-window', () => {
+    oldestId = chatLibrary.getChatLibrarySnapshot().activeSessionId;
+    chatLibrary.updateChatSession(oldestId, {
+      transcript: [{ id: 'old', role: 'operator', content: 'Histórico mais antigo', timestamp: new Date().toISOString() }],
+    });
+    chatLibrary.deleteChatSession(oldestId);
+    for (let i = 0; i < 405; i += 1) {
+      const sessionId = chatLibrary.getChatLibrarySnapshot().activeSessionId;
+      chatLibrary.deleteChatSession(sessionId);
+    }
+  });
+
+  const admin = chatLibrary.getChatLibrarySnapshotForUser('user-archive-window');
+  assert.ok(admin.sessions.some((session) => session.id === oldestId));
+  assert.equal(chatLibrary.getChatSessionForUser('user-archive-window', oldestId).transcript[0].content, 'Histórico mais antigo');
+
+  const workspaceDir = fs.readdirSync(path.join(dataDir, 'workspaces'))[0];
+  const archivePath = path.join(dataDir, 'workspaces', workspaceDir, 'chat-history-archive.jsonl');
+  assert.ok(fs.readFileSync(archivePath, 'utf8').trim().split(/\n/).length <= 2000);
 });
 
 test('CHAT_LIBRARY_V1 persists pending attachment metadata for retry after reload', async () => {

@@ -1,6 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
+import {
+  finalEntryFromPersonaRun,
+  personaRunOperatorEntryId,
+  transcriptEntriesFromPersonaRun,
+} from '../shared/persona-run-transcript.js';
 import { getWorkspaceUserId, requireWorkspaceUserId } from './workspace-context.js';
 
 const rootStateDir = path.resolve(process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'));
@@ -9,6 +14,9 @@ const workspacesRoot = path.join(rootStateDir, 'workspaces');
 const MAX_SESSIONS = 100;
 /** Sessões retidas no library (ativas + soft-deleted) para o admin. */
 const MAX_RETAINED_SESSIONS = 400;
+const MAX_ARCHIVE_RECORDS = 2000;
+const MAX_ARCHIVE_REVISIONS_PER_SESSION = 10;
+const MAX_ARCHIVE_BYTES = 64 * 1024 * 1024;
 const MAX_FOLDERS = 40;
 const MAX_TRANSCRIPT = 200;
 const MAX_DRAFT_ATTACHMENTS = 4;
@@ -120,6 +128,25 @@ function liveSessions(library) {
   return (library?.sessions || []).filter(isSessionLive);
 }
 
+function mergeTranscript(existing, incoming) {
+  if (!incoming.length) return [];
+  const merged = Array.isArray(existing) ? existing.slice() : [];
+  const indexById = new Map(
+    merged.map((entry, index) => [String(entry?.id || '').trim(), index]).filter(([id]) => id),
+  );
+  for (const entry of incoming) {
+    const id = String(entry?.id || '').trim();
+    const index = id ? indexById.get(id) : undefined;
+    if (index === undefined) {
+      if (id) indexById.set(id, merged.length);
+      merged.push(entry);
+    } else {
+      merged[index] = entry;
+    }
+  }
+  return merged.slice(-MAX_TRANSCRIPT);
+}
+
 function makeFolder(partial = {}) {
   const createdAt = partial.createdAt || nowIso();
   return {
@@ -133,7 +160,7 @@ function makeFolder(partial = {}) {
 function emptyLibrary() {
   const session = makeSession({ title: 'Nova sessão' });
   return {
-    version: 1,
+    version: 2,
     folders: [],
     sessions: [session],
     activeSessionId: session.id,
@@ -164,50 +191,15 @@ function normalizeLibrary(raw) {
   return { version: 2, folders, sessions, activeSessionId };
 }
 
-/** Snapshot imutável em JSONL — sobrevive a soft-delete e limpeza da library. */
-function archiveSessionSnapshot(userId, session, reason = 'snapshot') {
-  const id = String(userId || '').trim();
-  if (!id || !session?.id) return;
-  try {
-    const filePath = archivePathFor(id);
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    const record = {
-      archivedAt: nowIso(),
-      reason: String(reason || 'snapshot').slice(0, 80),
-      ownerUserId: id,
-      session: {
-        id: session.id,
-        title: session.title,
-        folderId: session.folderId,
-        createdAt: session.createdAt,
-        updatedAt: session.updatedAt,
-        deletedAt: session.deletedAt || null,
-        operationMode: session.operationMode,
-        missionDraft: session.missionDraft,
-        transcript: Array.isArray(session.transcript) ? session.transcript.slice(-MAX_TRANSCRIPT) : [],
-        finalResult: session.finalResult ?? null,
-        visualPack: session.visualPack ?? null,
-        activePersonaSlug: session.activePersonaSlug || null,
-        workflowAssignments: session.workflowAssignments || null,
-        individualAssignments: session.individualAssignments || null,
-      },
-    };
-    fs.appendFileSync(filePath, `${JSON.stringify(record)}\n`, { encoding: 'utf8', mode: 0o600 });
-  } catch (error) {
-    console.error(`[chat-library] archive falhou: ${error?.message || String(error)}`);
-  }
-}
-
-function loadArchiveRecords(userId, { limit = 200 } = {}) {
+function loadArchiveRecords(userId, { limit = Infinity } = {}) {
   const id = String(userId || '').trim();
   if (!id) return [];
   const filePath = archivePathFor(id);
   try {
     const raw = fs.readFileSync(filePath, 'utf8');
     const lines = raw.split(/\n+/).map((line) => line.trim()).filter(Boolean);
-    const capped = lines.slice(-Math.max(1, Math.min(2000, Number(limit) || 200)));
     const records = [];
-    for (const line of capped) {
+    for (const line of lines) {
       try {
         const parsed = JSON.parse(line);
         if (parsed?.session?.id) records.push(parsed);
@@ -215,14 +207,90 @@ function loadArchiveRecords(userId, { limit = 200 } = {}) {
         // skip corrupt line
       }
     }
-    return records;
-  } catch {
-    return [];
+    const cap = Number(limit);
+    return Number.isFinite(cap) ? records.slice(-Math.max(1, cap)) : records;
+  } catch (error) {
+    if (error?.code === 'ENOENT') return [];
+    throw error;
   }
 }
 
+function compactArchiveRecords(records) {
+  const groups = new Map();
+  for (const record of records) {
+    const sessionId = String(record?.session?.id || '').trim();
+    if (!sessionId) continue;
+    if (!groups.has(sessionId)) groups.set(sessionId, []);
+    groups.get(sessionId).push(record);
+  }
+  const orderedGroups = [...groups.values()]
+    .map((items) => items.sort((a, b) => String(b.archivedAt || '').localeCompare(String(a.archivedAt || ''))))
+    .sort((a, b) => String(b[0]?.archivedAt || '').localeCompare(String(a[0]?.archivedAt || '')));
+  const selected = [];
+  let bytes = 0;
+  for (let revision = 0; revision < MAX_ARCHIVE_REVISIONS_PER_SESSION; revision += 1) {
+    for (const items of orderedGroups) {
+      if (selected.length >= MAX_ARCHIVE_RECORDS) break;
+      const record = items[revision];
+      if (!record) continue;
+      const recordBytes = Buffer.byteLength(`${JSON.stringify(record)}\n`);
+      if (recordBytes > MAX_ARCHIVE_BYTES) throw new Error('chat_archive_record_too_large');
+      if (bytes + recordBytes > MAX_ARCHIVE_BYTES) continue;
+      selected.push(record);
+      bytes += recordBytes;
+    }
+    if (selected.length >= MAX_ARCHIVE_RECORDS) break;
+  }
+  return selected.sort((a, b) => String(a.archivedAt || '').localeCompare(String(b.archivedAt || '')));
+}
+
+/** Snapshot imutável, compactado e publicado por replace atômico. */
+function archiveSessionSnapshot(userId, session, reason = 'snapshot') {
+  const id = String(userId || '').trim();
+  if (!id || !session?.id) return;
+  const filePath = archivePathFor(id);
+  const record = {
+    archivedAt: nowIso(),
+    reason: String(reason || 'snapshot').slice(0, 80),
+    ownerUserId: id,
+    session: {
+      id: session.id,
+      title: session.title,
+      folderId: session.folderId,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+      deletedAt: session.deletedAt || null,
+      operationMode: session.operationMode,
+      missionDraft: session.missionDraft,
+      draftAttachments: session.draftAttachments || [],
+      transcript: Array.isArray(session.transcript) ? session.transcript.slice(-MAX_TRANSCRIPT) : [],
+      finalResult: session.finalResult ?? null,
+      visualPack: session.visualPack ?? null,
+      activePersonaSlug: session.activePersonaSlug || null,
+      workflowAssignments: session.workflowAssignments || null,
+      individualAssignments: session.individualAssignments || null,
+    },
+  };
+  const records = compactArchiveRecords([...loadArchiveRecords(id), record]);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    fs.writeFileSync(tmp, records.map((item) => JSON.stringify(item)).join('\n') + '\n', { encoding: 'utf8', mode: 0o600 });
+    fs.renameSync(tmp, filePath);
+  } finally {
+    fs.rmSync(tmp, { force: true });
+  }
+}
+
+function archiveRevisionId(record) {
+  return `archive_${createHash('sha256')
+    .update(`${record?.session?.id || ''}\0${record?.archivedAt || ''}\0${record?.reason || ''}`)
+    .digest('hex')
+    .slice(0, 24)}`;
+}
+
 function pruneRetainedSessions(library, userId) {
-  if (!library?.sessions || library.sessions.length <= MAX_RETAINED_SESSIONS) return;
+  if (!library?.sessions || library.sessions.length <= MAX_RETAINED_SESSIONS) return [];
   // Remove preferencialmente soft-deleted mais antigos (já estão no archive).
   const sorted = library.sessions.slice().sort((a, b) => {
     const aDel = a.deletedAt ? 0 : 1;
@@ -243,6 +311,7 @@ function pruneRetainedSessions(library, userId) {
   } else if (!liveSessions(library).some((item) => item.id === library.activeSessionId)) {
     library.activeSessionId = liveSessions(library)[0].id;
   }
+  return dropped.map((session) => session.id);
 }
 
 /** @type {Map<string, any>} */
@@ -302,10 +371,13 @@ function persistLibrary(userId, library) {
 
 function withLibrary(mutator) {
   const userId = requireWorkspaceUserId();
-  const library = loadLibrary(userId);
-  const result = mutator(library, userId);
-  pruneRetainedSessions(library, userId);
+  const library = structuredClone(loadLibrary(userId));
+  const removedSessionIds = [];
+  const result = mutator(library, userId, removedSessionIds);
+  const hardRemovedSessionIds = pruneRetainedSessions(library, userId);
   persistLibrary(userId, library);
+  cache.set(userId, library);
+  notifySessionsRemoved([...removedSessionIds, ...hardRemovedSessionIds]);
   return result;
 }
 
@@ -375,8 +447,8 @@ export function getChatLibrarySnapshotForUser(userId) {
   }
   const library = loadLibrary(id);
   const snap = snapshotFromLibrary(library, id, { includeDeleted: true });
-  const archive = loadArchiveRecords(id, { limit: 300 });
-  // Último snapshot por sessionId (mais recente no arquivo).
+  const archive = loadArchiveRecords(id);
+  // Último snapshot por sessionId (mais recente no arquivo) para sessões já podadas.
   const latestById = new Map();
   for (const record of archive) {
     latestById.set(record.session.id, record);
@@ -392,14 +464,25 @@ export function getChatLibrarySnapshotForUser(userId) {
       archiveReason: record.reason,
     });
   }
-  archiveOnly.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  const revisions = archive
+    .filter((record) => record.reason === 'transcript_clear')
+    .map((record) => ({
+      ...summarizeSession(makeSession(record.session)),
+      id: archiveRevisionId(record),
+      sourceSessionId: record.session.id,
+      archivedOnly: true,
+      archivedAt: record.archivedAt,
+      archiveReason: record.reason,
+    }));
+  const archivedSessions = [...archiveOnly, ...revisions]
+    .sort((a, b) => String(b.archivedAt || b.createdAt || '').localeCompare(String(a.archivedAt || a.createdAt || '')));
   return {
     ...snap,
-    sessions: [...snap.sessions, ...archiveOnly],
+    sessions: [...snap.sessions, ...archivedSessions],
     stats: {
       ...snap.stats,
-      sessionCount: snap.sessions.length + archiveOnly.length,
-      archivedOnlyCount: archiveOnly.length,
+      sessionCount: snap.sessions.length + archivedSessions.length,
+      archivedOnlyCount: archivedSessions.length,
       archiveRecordCount: archive.length,
     },
   };
@@ -418,8 +501,19 @@ export function getChatSessionForUser(userId, sessionId) {
   if (session) {
     return session;
   }
+  const archive = loadArchiveRecords(id);
+  const revision = archive.find((record) => archiveRevisionId(record) === sid);
+  if (revision) {
+    return {
+      ...makeSession(revision.session),
+      id: sid,
+      sourceSessionId: revision.session.id,
+      archivedOnly: true,
+      archivedAt: revision.archivedAt,
+      archiveReason: revision.reason,
+    };
+  }
   // Fallback: último snapshot no archive (suporte mesmo após prune).
-  const archive = loadArchiveRecords(id, { limit: 2000 });
   for (let i = archive.length - 1; i >= 0; i -= 1) {
     if (archive[i].session?.id === sid) {
       return makeSession({ ...archive[i].session, deletedAt: archive[i].session.deletedAt || archive[i].archivedAt });
@@ -458,7 +552,7 @@ export function renameChatFolder(folderId, { name } = {}) {
 }
 
 export function deleteChatFolder(folderId, { cascadeSessions = false } = {}) {
-  return withLibrary((library, userId) => {
+  return withLibrary((library, userId, removedSessionIds) => {
     const before = library.folders.length;
     library.folders = library.folders.filter((item) => item.id !== folderId);
     if (library.folders.length === before) {
@@ -470,9 +564,11 @@ export function deleteChatFolder(folderId, { cascadeSessions = false } = {}) {
       const stamp = nowIso();
       for (const item of library.sessions) {
         if (item.folderId === folderId && isSessionLive(item)) {
+          item.folderId = null;
           item.deletedAt = stamp;
           item.updatedAt = stamp;
           archiveSessionSnapshot(userId, item, 'folder_cascade_delete');
+          removedSessionIds.push(item.id);
         }
       }
       if (!liveSessions(library).length) {
@@ -487,12 +583,12 @@ export function deleteChatFolder(folderId, { cascadeSessions = false } = {}) {
         if (session.folderId === folderId) session.folderId = null;
       }
     }
-    return { ok: true, activeSessionId: library.activeSessionId, removedSessionIds: [] };
+    return { ok: true, activeSessionId: library.activeSessionId };
   });
 }
 
 export function createChatSession({ title, folderId, seedFromActive = false } = {}) {
-  return withLibrary((library, userId) => {
+  return withLibrary((library, userId, removedSessionIds) => {
     const live = liveSessions(library);
     if (live.length >= MAX_SESSIONS) {
       // Soft-delete sessões vivas mais antigas (sem transcript) para liberar slot; conteúdo fica no archive.
@@ -506,6 +602,7 @@ export function createChatSession({ title, folderId, seedFromActive = false } = 
           archiveSessionSnapshot(userId, item, 'capacity_soft_delete');
         }
         item.deletedAt = nowIso();
+        removedSessionIds.push(item.id);
         freed += 1;
       }
     }
@@ -561,8 +658,6 @@ export function updateChatSession(sessionId, patch = {}) {
       throw error;
     }
     const prevTranscriptLen = Array.isArray(session.transcript) ? session.transcript.length : 0;
-    const prevHadFinal = Boolean(session.finalResult);
-
     if (typeof patch.title === 'string') session.title = clipTitle(patch.title, session.title);
     if (Object.prototype.hasOwnProperty.call(patch, 'folderId')) {
       const nextFolder = patch.folderId ? String(patch.folderId) : null;
@@ -595,7 +690,7 @@ export function updateChatSession(sessionId, patch = {}) {
       if (prevTranscriptLen > 0 && patch.transcript.length === 0) {
         archiveSessionSnapshot(userId, session, 'transcript_clear');
       }
-      session.transcript = patch.transcript.slice(-MAX_TRANSCRIPT);
+      session.transcript = mergeTranscript(session.transcript, patch.transcript);
     }
     // Append-only path for operator bubbles / incremental replies without full rewrite races.
     if (Array.isArray(patch.appendTranscript) && patch.appendTranscript.length) {
@@ -627,11 +722,6 @@ export function updateChatSession(sessionId, patch = {}) {
     );
     if (contentful) session.updatedAt = nowIso();
 
-    const nextTranscriptLen = Array.isArray(session.transcript) ? session.transcript.length : 0;
-    const grew = nextTranscriptLen > prevTranscriptLen || (session.finalResult && !prevHadFinal);
-    if (grew || (nextTranscriptLen > 0 && Array.isArray(patch.transcript))) {
-      archiveSessionSnapshot(userId, session, 'content_update');
-    }
     return session;
   });
 }
@@ -644,109 +734,41 @@ export function recordPersonaRunOnSession(sessionId, run = {}) {
   const sid = String(sessionId || '').trim();
   if (!sid) return null;
   return withLibrary((library, userId) => {
-    const session = library.sessions.find((item) => item.id === sid && isSessionLive(item));
+    const session = library.sessions.find((item) => item.id === sid);
     if (!session) return null;
 
     const timestamp = String(run.generatedAt || nowIso());
     const mission = String(run.mission || session.missionDraft || '').trim();
     const mode = run.mode === 'individual' ? 'individual' : 'team';
     const existing = Array.isArray(session.transcript) ? session.transcript.slice() : [];
-
-    // Operator bubble: só acrescenta se a última missão for diferente.
-    const lastOperator = [...existing].reverse().find((entry) => entry.role === 'operator');
-    if (mission && (!lastOperator || String(lastOperator.content || '').trim() !== mission)) {
+    // O browser já gravou a bolha do operador com este mesmo id derivado do trace.
+    const operatorId = personaRunOperatorEntryId(run);
+    if (mission && !existing.some((entry) => entry.id === operatorId)) {
       existing.push({
-        id: `op_${String(run.traceId || Date.now()).replace(/[^\w-]+/g, '').slice(0, 40)}`,
+        id: operatorId,
         role: 'operator',
         name: 'Operador',
         content: mission,
         status: 'info',
         timestamp,
+        attachments: Array.isArray(run.attachments) ? run.attachments : [],
       });
     }
 
-    const replyEntries = [];
-    const steps = Array.isArray(run.steps) ? run.steps : [];
-    if (steps.length) {
-      for (const step of steps) {
-        const stage = step.roleLabel || step.roleId || '';
-        for (const reply of (step.replies || [])) {
-          if (!reply) continue;
-          const content = String(reply.content || reply.error || '').trim();
-          if (!content && reply.ok) continue;
-          replyEntries.push({
-            id: `r_${String(reply.slug || 'persona')}_${String(step.roleId || 'step')}_${replyEntries.length}`,
-            role: 'persona',
-            name: reply.name || reply.slug || 'Persona',
-            slug: reply.slug || undefined,
-            model: reply.model || undefined,
-            stage,
-            phase: reply.phase || step.phase || undefined,
-            content: content || (reply.ok ? '' : `Falha: ${reply.error || 'erro'}`),
-            status: reply.ok ? 'ok' : 'error',
-            timestamp: reply.completedAt || timestamp,
-          });
-        }
-      }
-    } else {
-      for (const reply of (run.replies || [])) {
-        if (!reply) continue;
-        const content = String(reply.content || reply.error || '').trim();
-        if (!content && reply.ok) continue;
-        replyEntries.push({
-          id: `r_${String(reply.slug || 'persona')}_${replyEntries.length}`,
-          role: 'persona',
-          name: reply.name || reply.slug || 'Persona',
-          slug: reply.slug || undefined,
-          model: reply.model || undefined,
-          stage: reply.workflowRoleLabel || undefined,
-          phase: reply.phase || undefined,
-          content: content || (reply.ok ? '' : `Falha: ${reply.error || 'erro'}`),
-          status: reply.ok ? 'ok' : 'error',
-          timestamp: reply.completedAt || timestamp,
-        });
-      }
-    }
+    const replyEntries = transcriptEntriesFromPersonaRun(run);
 
-    session.transcript = [...existing, ...replyEntries].slice(-MAX_TRANSCRIPT);
+    session.transcript = mergeTranscript(existing, replyEntries);
     if (mission) session.missionDraft = mission;
     session.operationMode = mode;
 
-    let nextFinal = null;
-    if (mode === 'individual' && run.judge?.content) {
-      nextFinal = {
-        id: `judge_${String(run.traceId || Date.now()).slice(0, 40)}`,
-        role: 'persona',
-        name: run.judge.name || run.judge.slug,
-        slug: run.judge.slug,
-        model: run.judge.model,
-        phase: run.judge.phase || 'judge',
-        stage: 'Juiz',
-        content: run.judge.content,
-        status: run.judge.ok ? 'ok' : 'error',
-        timestamp,
-      };
-    } else if (run.finalDisplay?.content) {
-      nextFinal = {
-        id: `final_${String(run.traceId || Date.now()).slice(0, 40)}`,
-        role: 'persona',
-        name: run.finalDisplay.name || run.finalDisplay.slug,
-        slug: run.finalDisplay.slug,
-        model: run.finalDisplay.model,
-        stage: run.finalDisplay.roleLabel || 'Exibição final',
-        content: run.finalDisplay.content,
-        status: 'ok',
-        timestamp,
-      };
-    }
-    if (nextFinal) session.finalResult = nextFinal;
-    if (run.visualPack && typeof run.visualPack === 'object') session.visualPack = run.visualPack;
+    session.finalResult = finalEntryFromPersonaRun(run);
+    session.visualPack = run.visualPack && typeof run.visualPack === 'object' ? run.visualPack : null;
+    if (run.ok) session.draftAttachments = [];
 
     if (!String(session.title || '').trim() || session.title === 'Nova sessão') {
       if (mission) session.title = clipTitle(mission);
     }
     session.updatedAt = nowIso();
-    archiveSessionSnapshot(userId, session, 'persona_run');
     return session;
   });
 }
@@ -766,7 +788,7 @@ export function activateChatSession(sessionId) {
 }
 
 export function deleteChatSession(sessionId) {
-  return withLibrary((library, userId) => {
+  return withLibrary((library, userId, removedSessionIds) => {
     const session = library.sessions.find((item) => item.id === sessionId && isSessionLive(item));
     if (!session) {
       const error = new Error('session_not_found');
@@ -777,6 +799,7 @@ export function deleteChatSession(sessionId) {
     session.deletedAt = nowIso();
     session.updatedAt = session.deletedAt;
     archiveSessionSnapshot(userId, session, 'user_delete');
+    removedSessionIds.push(sessionId);
 
     const live = liveSessions(library);
     if (!live.length) {

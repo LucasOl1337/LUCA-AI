@@ -115,3 +115,23 @@ test('Strict Mode cannot persist blank initial state before session hydration co
     'one-shot ref is unsafe because Strict Mode runs effects twice',
   );
 });
+
+test('browser autosave leaves run result fields to the canonical server writer', () => {
+  const payloadStart = source.indexOf('const buildPersistPayload = useCallback');
+  const payloadEnd = source.indexOf('const flushSessionNow', payloadStart);
+  assert.ok(payloadStart >= 0 && payloadEnd > payloadStart, 'autosave payload region present');
+  const payload = source.slice(payloadStart, payloadEnd);
+  assert.equal(payload.includes('transcript,'), false, 'autosave does not rewrite transcript snapshots');
+  assert.equal(payload.includes('finalResult,'), false, 'autosave does not rewrite final result');
+  assert.equal(payload.includes('visualPack,'), false, 'autosave does not rewrite visual artifacts');
+
+  const runStart = source.indexOf('async function runMission()');
+  const runEnd = source.indexOf('const activeTeamPresetId', runStart);
+  const run = source.slice(runStart, runEnd);
+  assert.ok(run.includes('await flushSessionNow(ownerSessionId'), 'operator question is durable before starting the job');
+  assert.equal(
+    run.includes('flushSessionNow(ownerSessionId, {\n        missionDraft: trimmedMission,\n        draftAttachments:'),
+    false,
+    'success path does not compete with server run persistence',
+  );
+});

@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { requireWorkspaceUserId } from './workspace-context.js';
-import { getChatSession } from './chat-library.js';
+import { getChatSession, onChatSessionsRemoved } from './chat-library.js';
 
 const rootStateDir = path.resolve(process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'));
 const shareFilePath = path.join(rootStateDir, 'share-links.json');
@@ -144,6 +144,21 @@ export function revokeShareLink(sessionId) {
   persistStore(store);
   return { ok: true };
 }
+
+onChatSessionsRemoved((sessionIds) => {
+  const ownerUserId = requireWorkspaceUserId();
+  const ids = new Set((Array.isArray(sessionIds) ? sessionIds : []).map(String));
+  if (!ids.size) return;
+  const store = loadStore();
+  let changed = false;
+  for (const link of store.links) {
+    if (link.ownerUserId !== ownerUserId || !ids.has(String(link.sessionId)) || link.revokedAt) continue;
+    link.revokedAt = nowIso();
+    link.snapshot = null;
+    changed = true;
+  }
+  if (changed) persistStore(store);
+});
 
 /** Public resolution — no auth. Returns snapshot payload or null. */
 export function resolvePublicShare(token) {

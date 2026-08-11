@@ -445,6 +445,12 @@ export interface LucaAiChatSessionSummary {
   operationMode?: 'team' | 'individual' | string;
   messageCount?: number;
   preview?: string;
+  deleted?: boolean;
+  deletedAt?: string | null;
+  archivedOnly?: boolean;
+  archivedAt?: string;
+  archiveReason?: string;
+  sourceSessionId?: string;
 }
 
 export interface LucaAiChatSession extends LucaAiChatSessionSummary {
@@ -470,7 +476,18 @@ export interface LucaAiChatLibraryResponse {
   session?: LucaAiChatSession | null;
   folder?: LucaAiChatFolder | null;
   createdReplacement?: boolean;
+  stats?: LucaAiChatLibraryStats;
   error?: string;
+}
+
+export interface LucaAiChatLibraryStats {
+  folderCount: number;
+  sessionCount: number;
+  messageCount: number;
+  liveSessionCount?: number;
+  deletedSessionCount?: number;
+  archivedOnlyCount?: number;
+  archiveRecordCount?: number;
 }
 
 
