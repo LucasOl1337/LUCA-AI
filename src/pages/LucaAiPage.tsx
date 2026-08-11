@@ -69,6 +69,7 @@ import {
   consumeSompoLaunch,
   type SompoLaunchPayload,
 } from '@/lib/sompo-cases';
+import { VISUAL_PERSONA_SLUG } from '../../shared/luca-preset-seed.js';
 
 const MAX_EXECUTORS = 4;
 const LUCA_AI_CLEAN_UI_VERSION = 'session-isolation-v2';
@@ -108,8 +109,10 @@ function consumeEntryMode(): OperationMode | null {
 interface IndividualAssignments {
   participants: string[];
   judge: string | null;
-  /** Etapa opcional de artefatos (gráficos/relatório/imagens) após o juiz. */
+  /** Persona da etapa opcional de artefatos (gráficos/relatório/imagens) após o juiz. */
   visual: string | null;
+  /** Módulo ligado/desligado: só roda a etapa visual quando true. */
+  visualEnabled: boolean;
 }
 
 interface PersonaPickerConfig {
@@ -445,7 +448,7 @@ function parseMessageBlocks(value: string): MessageBlock[] {
 }
 
 function createEmptyIndividualAssignments(): IndividualAssignments {
-  return { participants: [], judge: null, visual: null };
+  return { participants: [], judge: null, visual: null, visualEnabled: false };
 }
 
 
@@ -657,11 +660,12 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     participants: uniqueSlugs(Array.isArray(individualState?.participants) ? individualState.participants : [], 5),
     judge: String(individualState?.judge || '').trim() || null,
     visual: String(individualState?.visual || '').trim() || null,
+    visualEnabled: Boolean(individualState?.visualEnabled),
   }), [individualState]);
   const individualConfiguredSlugs = useMemo(() => uniqueSlugs([
     ...individualAssignments.participants,
     individualAssignments.judge,
-    individualAssignments.visual,
+    individualAssignments.visualEnabled ? individualAssignments.visual : null,
   ]), [individualAssignments]);
   const configuredSlugs = operationMode === 'individual' ? individualConfiguredSlugs : assignedSlugs;
   const readyRoles = useMemo(
@@ -735,6 +739,10 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       participants: uniqueSlugs(session.individualAssignments?.participants || [], 5),
       judge: session.individualAssignments?.judge ? String(session.individualAssignments.judge) : null,
       visual: session.individualAssignments?.visual ? String(session.individualAssignments.visual) : null,
+      // Sessões salvas antes do toggle: persona escolhida implica módulo ligado.
+      visualEnabled: session.individualAssignments?.visualEnabled !== undefined
+        ? Boolean(session.individualAssignments.visualEnabled)
+        : Boolean(session.individualAssignments?.visual),
     });
     setMission(sessionMission || launch?.mission || '');
     setDraftAttachments(Array.isArray(session.draftAttachments) ? session.draftAttachments.slice(0, 4) : []);
@@ -1102,7 +1110,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         && judge === (prev?.judge || null)
         && visual === (prev?.visual || null)
       ) return prev;
-      return { participants, judge, visual };
+      return { participants, judge, visual, visualEnabled: Boolean(prev?.visualEnabled) };
     });
   }, [loading, personas, setIndividualState]);
 
@@ -1264,6 +1272,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       participants: uniqueSlugs([...(prev?.participants || []), slug], 5),
       judge: prev?.judge || null,
       visual: prev?.visual || null,
+      visualEnabled: Boolean(prev?.visualEnabled),
     }));
     setActivePersonaSlug(slug);
   }
@@ -1274,6 +1283,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       participants: uniqueSlugs(prev?.participants || [], 5),
       judge: slug || null,
       visual: prev?.visual || null,
+      visualEnabled: Boolean(prev?.visualEnabled),
     }));
     if (slug) setActivePersonaSlug(slug);
   }
@@ -1284,8 +1294,24 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       participants: uniqueSlugs(prev?.participants || [], 5),
       judge: prev?.judge || null,
       visual: slug || null,
+      // Escolher persona com o módulo desligado liga na hora — intenção óbvia.
+      visualEnabled: slug ? true : Boolean(prev?.visualEnabled),
     }));
     if (slug) setActivePersonaSlug(slug);
+  }
+
+  /** Liga/desliga o módulo de artefatos; ao ligar sem persona, tenta a padrão. */
+  async function setIndividualVisualEnabled(enabled: boolean) {
+    let autoSlug: string | null = null;
+    if (enabled && !individualAssignments.visual && personaBySlug.has(VISUAL_PERSONA_SLUG)) {
+      if (await ensurePersonaAvailable(VISUAL_PERSONA_SLUG)) autoSlug = VISUAL_PERSONA_SLUG;
+    }
+    setIndividualState((prev) => ({
+      participants: uniqueSlugs(prev?.participants || [], 5),
+      judge: prev?.judge || null,
+      visual: prev?.visual || autoSlug,
+      visualEnabled: enabled,
+    }));
   }
 
   function removeIndividualParticipant(slug: string) {
@@ -1293,6 +1319,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       participants: uniqueSlugs(prev?.participants || [], 5).filter((item) => item !== slug),
       judge: prev?.judge || null,
       visual: prev?.visual || null,
+      visualEnabled: Boolean(prev?.visualEnabled),
     }));
   }
 
@@ -1432,7 +1459,12 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       const participants = uniqueSlugs(preset.participants.filter((slug) => ok.has(slug)), 5);
       const judge = ok.has(preset.judge) ? preset.judge : null;
       // Preset não define especialista visual: preserva a escolha atual do operador.
-      setIndividualState((prev) => ({ participants, judge, visual: prev?.visual || null }));
+      setIndividualState((prev) => ({
+        participants,
+        judge,
+        visual: prev?.visual || null,
+        visualEnabled: Boolean(prev?.visualEnabled),
+      }));
       setOperationMode('individual');
       const first = participants[0] ?? judge;
       if (first) setActivePersonaSlug(first);
@@ -1472,7 +1504,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     const individualToRun = {
       participants: uniqueSlugs(individualAssignments.participants, 5),
       judge: individualAssignments.judge,
-      visual: individualAssignments.visual,
+      // Módulo desligado = etapa visual não roda, mesmo com persona salva.
+      visual: individualAssignments.visualEnabled ? individualAssignments.visual : null,
     };
     const slugsToRun = operationMode === 'individual'
       ? individualToRun.participants
@@ -1941,6 +1974,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
                 onRemoveParticipant={removeIndividualParticipant}
                 onClearJudge={() => void setIndividualJudge('')}
                 onClearVisual={() => void setIndividualVisual('')}
+                onToggleVisual={(enabled) => void setIndividualVisualEnabled(enabled)}
                 onInspect={setActivePersonaSlug}
                 onOpenPicker={(id) => setPickerTarget({ mode: 'individual', id })}
                 onSetModel={setPersonaModel}
@@ -2189,6 +2223,7 @@ function LucaIndividualPanel({
   onRemoveParticipant,
   onClearJudge,
   onClearVisual,
+  onToggleVisual,
   onInspect,
   onOpenPicker,
   onSetModel,
@@ -2214,6 +2249,7 @@ function LucaIndividualPanel({
   onRemoveParticipant: (slug: string) => void;
   onClearJudge: () => void;
   onClearVisual: () => void;
+  onToggleVisual: (enabled: boolean) => void;
   onInspect: (slug: string | null) => void;
   onOpenPicker: (id: IndividualPickerId) => void;
   onSetModel: (slug: string, model: string) => void | Promise<void>;
@@ -2227,7 +2263,11 @@ function LucaIndividualPanel({
   const theme = useTheme();
   const readyCount = Number(assignments.participants.length > 0) + Number(Boolean(assignments.judge));
   const ready = readyCount === 2;
-  const configuredCount = uniqueSlugs([...assignments.participants, assignments.judge, assignments.visual]).length;
+  const configuredCount = uniqueSlugs([
+    ...assignments.participants,
+    assignments.judge,
+    assignments.visualEnabled ? assignments.visual : null,
+  ]).length;
 
   return (
     <aside className="luca-ai-flow-panel min-h-0 overflow-hidden">
@@ -2253,8 +2293,8 @@ function LucaIndividualPanel({
           {running
             ? 'As personas respondem isoladamente; o juiz entra depois.'
             : ready
-              ? `${assignments.participants.length} participante${assignments.participants.length === 1 ? '' : 's'} e um juiz prontos.`
-              : 'Escolha de 1 a 5 participantes e uma persona juíza. O especialista visual é opcional e gera gráficos, relatório e imagens após o veredito.'}
+              ? `${assignments.participants.length} participante${assignments.participants.length === 1 ? '' : 's'} e um juiz prontos.${assignments.visualEnabled ? ' Artefatos visuais ligados.' : ''}`
+              : 'Escolha de 1 a 5 participantes e uma persona juíza. Ative o módulo de artefatos visuais para gerar gráficos, relatório e imagens após o veredito.'}
         </p>
       </header>
 
@@ -2286,19 +2326,68 @@ function LucaIndividualPanel({
             onInspect={onInspect}
             onSetModel={onSetModel}
           />
-          <WorkflowRoleRow
-            role={INDIVIDUAL_PICKER_CONFIGS.visual}
-            personaBySlug={personaBySlug}
-            routerProfiles={routerProfiles}
-            selectedSlugs={assignments.visual ? [assignments.visual] : []}
-            activeSlug={activeSlug}
-            disabled={running}
-            busySlug={busySlug}
-            onOpen={() => onOpenPicker('visual')}
-            onRemove={onClearVisual}
-            onInspect={onInspect}
-            onSetModel={onSetModel}
-          />
+          <section
+            className="rounded-xl border p-3"
+            data-luca-individual-visual-module
+            style={{ borderColor: assignments.visualEnabled ? theme.borderHover : theme.border }}
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border" style={{ background: theme.goldSoft, borderColor: theme.border, color: theme.goldDeep }}>
+                <ImageIcon className="h-3.5 w-3.5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="block truncate text-xs font-semibold" style={{ color: assignments.visualEnabled ? theme.goldDeep : theme.textSoft }}>
+                    Artefatos visuais
+                  </span>
+                  <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide" style={{ background: 'rgba(255,255,255,0.06)', color: theme.textGhost }}>
+                    módulo extra
+                  </span>
+                </span>
+                <span className="block truncate text-[10px]" style={{ color: theme.textGhost }}>
+                  {assignments.visualEnabled
+                    ? 'relatório, gráficos e imagens após o veredito'
+                    : 'desligado — a rodada termina no juiz'}
+                </span>
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={assignments.visualEnabled}
+                aria-label="Ativar artefatos visuais"
+                data-luca-individual-visual-switch
+                className="relative h-5 w-9 shrink-0 rounded-full transition-colors"
+                onClick={() => onToggleVisual(!assignments.visualEnabled)}
+                disabled={running}
+                style={{ background: assignments.visualEnabled ? theme.gold : theme.input, border: `1px solid ${assignments.visualEnabled ? theme.borderActive : theme.border}` }}
+              >
+                <span
+                  className="absolute top-0.5 h-3.5 w-3.5 rounded-full transition-all"
+                  style={{
+                    left: assignments.visualEnabled ? 'calc(100% - 1.125rem)' : '0.125rem',
+                    background: assignments.visualEnabled ? theme.void : theme.textMute,
+                  }}
+                />
+              </button>
+            </div>
+            {assignments.visualEnabled && (
+              <div className="mt-2">
+                <WorkflowRoleRow
+                  role={INDIVIDUAL_PICKER_CONFIGS.visual}
+                  personaBySlug={personaBySlug}
+                  routerProfiles={routerProfiles}
+                  selectedSlugs={assignments.visual ? [assignments.visual] : []}
+                  activeSlug={activeSlug}
+                  disabled={running}
+                  busySlug={busySlug}
+                  onOpen={() => onOpenPicker('visual')}
+                  onRemove={onClearVisual}
+                  onInspect={onInspect}
+                  onSetModel={onSetModel}
+                />
+              </div>
+            )}
+          </section>
           <fieldset
             className="rounded-xl border p-3"
             data-luca-individual-depth

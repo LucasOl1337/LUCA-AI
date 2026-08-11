@@ -62,7 +62,7 @@ function emptyAssignments() {
 }
 
 function emptyIndividual() {
-  return { participants: [], judge: null, visual: null };
+  return { participants: [], judge: null, visual: null, visualEnabled: false };
 }
 
 function normalizeDraftAttachments(value, sessionId) {
@@ -110,6 +110,10 @@ function makeSession(partial = {}) {
             : [],
           judge: partial.individualAssignments.judge ? String(partial.individualAssignments.judge) : null,
           visual: partial.individualAssignments.visual ? String(partial.individualAssignments.visual) : null,
+          // Sessões antigas sem o flag: persona salva implica módulo ligado.
+          visualEnabled: partial.individualAssignments.visualEnabled !== undefined
+            ? Boolean(partial.individualAssignments.visualEnabled)
+            : Boolean(partial.individualAssignments.visual),
         }
       : emptyIndividual(),
     missionDraft: String(partial.missionDraft || ''),
@@ -788,6 +792,9 @@ export function updateChatSession(sessionId, patch = {}) {
         visual: Object.prototype.hasOwnProperty.call(patch.individualAssignments, 'visual')
           ? (patch.individualAssignments.visual ? String(patch.individualAssignments.visual) : null)
           : (session.individualAssignments.visual ?? null),
+        visualEnabled: Object.prototype.hasOwnProperty.call(patch.individualAssignments, 'visualEnabled')
+          ? Boolean(patch.individualAssignments.visualEnabled)
+          : Boolean(session.individualAssignments.visualEnabled ?? session.individualAssignments.visual),
       };
     }
     if (typeof patch.missionDraft === 'string') session.missionDraft = patch.missionDraft;

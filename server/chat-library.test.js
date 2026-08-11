@@ -74,6 +74,39 @@ test('CHAT_LIBRARY_V1 creates sessions and folders per account', async () => {
   }
 });
 
+test('CHAT_LIBRARY_V1 persiste visualEnabled do modo individual e infere legado', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-visual-'));
+  const { workspace, chatLibrary } = await loadChatLibrary(dataDir);
+
+  workspace.runWithWorkspaceUser('user-a', () => {
+    const session = chatLibrary.createChatSession({ title: 'Visual toggle' });
+    assert.equal(session.individualAssignments.visualEnabled, false);
+
+    // Ligar o módulo persiste o flag junto da persona.
+    chatLibrary.updateChatSession(session.id, {
+      individualAssignments: { participants: ['p1'], judge: 'juiz', visual: 'especialista-visual', visualEnabled: true },
+    });
+    let snap = chatLibrary.getChatLibrarySnapshot();
+    assert.equal(snap.activeSession.individualAssignments.visualEnabled, true);
+    assert.equal(snap.activeSession.individualAssignments.visual, 'especialista-visual');
+
+    // Desligar mantém a persona salva mas marca o módulo como off.
+    chatLibrary.updateChatSession(session.id, {
+      individualAssignments: { visualEnabled: false },
+    });
+    snap = chatLibrary.getChatLibrarySnapshot();
+    assert.equal(snap.activeSession.individualAssignments.visualEnabled, false);
+    assert.equal(snap.activeSession.individualAssignments.visual, 'especialista-visual');
+
+    // Patch sem o flag preserva o estado atual do módulo (não religa sozinho).
+    chatLibrary.updateChatSession(session.id, {
+      individualAssignments: { participants: ['p1'], judge: 'juiz', visual: 'especialista-visual' },
+    });
+    snap = chatLibrary.getChatLibrarySnapshot();
+    assert.equal(snap.activeSession.individualAssignments.visualEnabled, false);
+  });
+});
+
 test('CHAT_LIBRARY_V1 delete folder moves sessions to root by default', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-folder-'));
   const { workspace, chatLibrary } = await loadChatLibrary(dataDir);

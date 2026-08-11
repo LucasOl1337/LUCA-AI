@@ -469,6 +469,7 @@ export interface LucaAiChatSession extends LucaAiChatSessionSummary {
     participants?: string[];
     judge?: string | null;
     visual?: string | null;
+    visualEnabled?: boolean;
   };
   missionDraft?: string;
   draftAttachments?: LucaAiChatAttachment[];

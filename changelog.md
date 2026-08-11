@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Melhorias
+- Módulo "Artefatos visuais" com toggle liga/desliga no painel de Seleção do modo individual: ligar auto-preenche a persona padrão; desligado, a rodada termina no juiz mesmo com persona salva (`visualEnabled` persistido na sessão).
+
 ## v0.4.0 — Artefatos visuais, suporte e histórico retido (2026-08-11)
 
 ### Novidades
