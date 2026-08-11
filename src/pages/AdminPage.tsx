@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Activity,
   Eye,
@@ -297,6 +298,21 @@ export default function AdminPage() {
     setChatError('');
   }
 
+  // Overlay de inspeção: portal no body + trava scroll + Esc.
+  useEffect(() => {
+    if (!inspectUser || typeof document === 'undefined') return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeChatInspect();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [inspectUser]);
+
   async function enterAsUser(account: TrackedUser) {
     if (!account?.id || account.id === user?.id || enterBusyId) return;
     setEnterBusyId(account.id);
@@ -336,7 +352,7 @@ export default function AdminPage() {
         <MetricCard icon={Workflow} label="Workspaces" value={overview?.workspaces ?? '—'} />
         <MetricCard icon={Play} label="Execuções" value={overview?.totalRuns ?? '—'} />
         <MetricCard icon={MousePointerClick} label="Ações" value={overview?.totalActions ?? '—'} />
-        <MetricCard icon={Gauge} label="Solicitações" value={overview?.totalRequests ?? '—'} />
+        <MetricCard icon={Gauge} label="Solicitações" value={overview?.totalRequests ?? '—'} hint="uso de produto (sem polling)" />
         <MetricCard icon={AlertTriangle} label="Erros" value={overview?.totalErrors ?? '—'} />
       </section>
 
@@ -461,7 +477,7 @@ export default function AdminPage() {
                   <th>Ações</th>
                   <th>Execuções</th>
                   <th>Erros</th>
-                  <th>Sessões</th>
+                  <th title="Sessões de login ativas (cookie)">Sessões login</th>
                   <th>Chats</th>
                   <th>Suporte</th>
                 </tr>
@@ -563,145 +579,148 @@ export default function AdminPage() {
         )}
       </section>
 
-      {inspectUser && (
-        <div className="admin-chat-layer" data-admin-chat-inspect-layer role="dialog" aria-modal="true" aria-label="Histórico de chats da conta">
-          <button type="button" className="admin-chat-backdrop" aria-label="Fechar" onClick={closeChatInspect} />
-          <aside className="admin-chat-panel">
-            <header className="admin-chat-header">
-              <div>
-                <span>VISÃO SOMENTE LEITURA · inclui apagadas</span>
-                <h2>{inspectUser.name}</h2>
-                <p>{inspectUser.email}</p>
+      {inspectUser && typeof document !== 'undefined'
+        ? createPortal(
+          <div className="admin-chat-layer" data-admin-chat-inspect-layer role="dialog" aria-modal="true" aria-label="Histórico de chats da conta">
+            <button type="button" className="admin-chat-backdrop" aria-label="Fechar" onClick={closeChatInspect} />
+            <aside className="admin-chat-panel">
+              <header className="admin-chat-header">
+                <div>
+                  <span>VISÃO SOMENTE LEITURA · inclui apagadas</span>
+                  <h2>{inspectUser.name}</h2>
+                  <p>{inspectUser.email}</p>
+                </div>
+                <button type="button" className="admin-chat-close" onClick={closeChatInspect} aria-label="Fechar painel">
+                  <X />
+                </button>
+              </header>
+
+              <div className="admin-chat-stats">
+                <article>
+                  <span>Pastas</span>
+                  <strong>{chatLibrary?.stats?.folderCount ?? '—'}</strong>
+                </article>
+                <article>
+                  <span>Sessões (todas)</span>
+                  <strong>{chatLibrary?.stats?.sessionCount ?? '—'}</strong>
+                </article>
+                <article>
+                  <span>Apagadas / arquivo</span>
+                  <strong>
+                    {(chatLibrary?.stats?.deletedSessionCount || 0)
+                      + (chatLibrary?.stats?.archivedOnlyCount || 0)}
+                  </strong>
+                </article>
+                <article>
+                  <span>Mensagens</span>
+                  <strong>{chatLibrary?.stats?.messageCount ?? '—'}</strong>
+                </article>
               </div>
-              <button type="button" className="admin-chat-close" onClick={closeChatInspect} aria-label="Fechar painel">
-                <X />
-              </button>
-            </header>
 
-            <div className="admin-chat-stats">
-              <article>
-                <span>Pastas</span>
-                <strong>{chatLibrary?.stats?.folderCount ?? '—'}</strong>
-              </article>
-              <article>
-                <span>Sessões (todas)</span>
-                <strong>{chatLibrary?.stats?.sessionCount ?? '—'}</strong>
-              </article>
-              <article>
-                <span>Apagadas / arquivo</span>
-                <strong>
-                  {(chatLibrary?.stats?.deletedSessionCount || 0)
-                    + (chatLibrary?.stats?.archivedOnlyCount || 0)}
-                </strong>
-              </article>
-              <article>
-                <span>Mensagens</span>
-                <strong>{chatLibrary?.stats?.messageCount ?? '—'}</strong>
-              </article>
-            </div>
-
-            {chatError ? (
-              <div className="admin-state error" role="alert">
-                <p className="admin-error-title">Não foi possível inspecionar</p>
-                <p className="admin-error-detail">{chatError}</p>
-              </div>
-            ) : (
-              <div className="admin-chat-body">
-                <section className="admin-chat-list" aria-label="Sessões do usuário">
-                  <div className="admin-chat-list-head">
-                    <MessageSquareText />
-                    <h3>Sessões</h3>
-                    {chatBusy ? <Loader2 className="animate-spin" /> : null}
-                  </div>
-                  {(chatLibrary?.folders || []).map((folder) => {
-                    const children = (chatLibrary?.sessions || []).filter((session) => session.folderId === folder.id);
-                    return (
-                      <div key={folder.id} className="admin-chat-group">
-                        <strong>{folder.name}</strong>
-                        {children.length === 0 ? (
-                          <p className="admin-chat-empty">Sem sessões nesta pasta</p>
-                        ) : children.map((session) => (
-                          <AdminChatSessionButton
-                            key={session.id}
-                            session={session}
-                            active={chatSession?.id === session.id}
-                            onOpen={() => void openChatSession(session.id)}
-                          />
-                        ))}
-                      </div>
-                    );
-                  })}
-                  <div className="admin-chat-group">
-                    <strong>Sem pasta</strong>
-                    {(chatLibrary?.sessions || []).filter((session) => !session.folderId).map((session) => (
-                      <AdminChatSessionButton
-                        key={session.id}
-                        session={session}
-                        active={chatSession?.id === session.id}
-                        onOpen={() => void openChatSession(session.id)}
-                      />
-                    ))}
-                    {!chatBusy && (chatLibrary?.sessions || []).length === 0 ? (
-                      <p className="admin-chat-empty">Esta conta ainda não tem sessões de chat.</p>
-                    ) : null}
-                  </div>
-                </section>
-
-                <section className="admin-chat-transcript" aria-label="Transcript da sessão">
-                  {!chatSession ? (
-                    <div className="admin-state">
-                      <p>Selecione uma sessão para ver o histórico como o usuário viu.</p>
+              {chatError ? (
+                <div className="admin-state error" role="alert">
+                  <p className="admin-error-title">Não foi possível inspecionar</p>
+                  <p className="admin-error-detail">{chatError}</p>
+                </div>
+              ) : (
+                <div className="admin-chat-body">
+                  <section className="admin-chat-list" aria-label="Sessões do usuário">
+                    <div className="admin-chat-list-head">
+                      <MessageSquareText />
+                      <h3>Sessões de chat</h3>
+                      {chatBusy ? <Loader2 className="animate-spin" /> : null}
                     </div>
-                  ) : (
-                    <>
-                      <header>
-                        <div>
-                          <h3>{chatSession.title || 'Sessão'}</h3>
-                          <p>
-                            {chatSession.operationMode === 'individual' ? 'Modo individual' : 'Modo equipe'}
-                            {chatSession.updatedAt ? ` · atualizada ${formatRelative(chatSession.updatedAt)}` : ''}
-                          </p>
+                    {(chatLibrary?.folders || []).map((folder) => {
+                      const children = (chatLibrary?.sessions || []).filter((session) => session.folderId === folder.id);
+                      return (
+                        <div key={folder.id} className="admin-chat-group">
+                          <strong>{folder.name}</strong>
+                          {children.length === 0 ? (
+                            <p className="admin-chat-empty">Sem sessões nesta pasta</p>
+                          ) : children.map((session) => (
+                            <AdminChatSessionButton
+                              key={session.id}
+                              session={session}
+                              active={chatSession?.id === session.id}
+                              onOpen={() => void openChatSession(session.id)}
+                            />
+                          ))}
                         </div>
-                        <em>somente leitura</em>
-                      </header>
-                      {chatSession.missionDraft ? (
-                        <div className="admin-chat-draft">
-                          <span>Rascunho / última missão</span>
-                          <p>{chatSession.missionDraft}</p>
-                        </div>
+                      );
+                    })}
+                    <div className="admin-chat-group">
+                      <strong>Sem pasta</strong>
+                      {(chatLibrary?.sessions || []).filter((session) => !session.folderId).map((session) => (
+                        <AdminChatSessionButton
+                          key={session.id}
+                          session={session}
+                          active={chatSession?.id === session.id}
+                          onOpen={() => void openChatSession(session.id)}
+                        />
+                      ))}
+                      {!chatBusy && (chatLibrary?.sessions || []).length === 0 ? (
+                        <p className="admin-chat-empty">Esta conta ainda não tem sessões de chat.</p>
                       ) : null}
-                      <div className="admin-chat-messages">
-                        {(chatSession.transcript || []).length === 0 ? (
-                          <p className="admin-chat-empty">Transcript vazio nesta sessão.</p>
-                        ) : (chatSession.transcript || []).map((entry, index) => (
-                          <article key={entry.id || `${index}`} data-role={entry.role || 'system'}>
-                            <div>
-                              <strong>{entry.name || entry.role || 'mensagem'}</strong>
-                              {entry.stage ? <span>{entry.stage}</span> : null}
-                              {entry.model ? <span className="font-mono">{entry.model}</span> : null}
-                              {entry.timestamp ? <time>{formatRelative(entry.timestamp)}</time> : null}
-                            </div>
-                            <p>{entry.content || '—'}</p>
-                          </article>
-                        ))}
-                        {chatSession.finalResult?.content ? (
-                          <article data-role="final">
-                            <div>
-                              <strong>{chatSession.finalResult.name || 'Resultado final'}</strong>
-                              <span>{chatSession.finalResult.stage || 'final'}</span>
-                            </div>
-                            <p>{chatSession.finalResult.content}</p>
-                          </article>
-                        ) : null}
+                    </div>
+                  </section>
+
+                  <section className="admin-chat-transcript" aria-label="Transcript da sessão">
+                    {!chatSession ? (
+                      <div className="admin-state">
+                        <p>Selecione uma sessão para ver o histórico como o usuário viu.</p>
                       </div>
-                    </>
-                  )}
-                </section>
-              </div>
-            )}
-          </aside>
-        </div>
-      )}
+                    ) : (
+                      <>
+                        <header>
+                          <div>
+                            <h3>{chatSession.title || 'Sessão'}</h3>
+                            <p>
+                              {chatSession.operationMode === 'individual' ? 'Modo individual' : 'Modo equipe'}
+                              {chatSession.updatedAt ? ` · atualizada ${formatRelative(chatSession.updatedAt)}` : ''}
+                            </p>
+                          </div>
+                          <em>somente leitura</em>
+                        </header>
+                        {chatSession.missionDraft ? (
+                          <div className="admin-chat-draft">
+                            <span>Rascunho / última missão</span>
+                            <p>{chatSession.missionDraft}</p>
+                          </div>
+                        ) : null}
+                        <div className="admin-chat-messages">
+                          {(chatSession.transcript || []).length === 0 ? (
+                            <p className="admin-chat-empty">Transcript vazio nesta sessão.</p>
+                          ) : (chatSession.transcript || []).map((entry, index) => (
+                            <article key={entry.id || `${index}`} data-role={entry.role || 'system'}>
+                              <div>
+                                <strong>{entry.name || entry.role || 'mensagem'}</strong>
+                                {entry.stage ? <span>{entry.stage}</span> : null}
+                                {entry.model ? <span className="font-mono">{entry.model}</span> : null}
+                                {entry.timestamp ? <time>{formatRelative(entry.timestamp)}</time> : null}
+                              </div>
+                              <p>{entry.content || '—'}</p>
+                            </article>
+                          ))}
+                          {chatSession.finalResult?.content ? (
+                            <article data-role="final">
+                              <div>
+                                <strong>{chatSession.finalResult.name || 'Resultado final'}</strong>
+                                <span>{chatSession.finalResult.stage || 'final'}</span>
+                              </div>
+                              <p>{chatSession.finalResult.content}</p>
+                            </article>
+                          ) : null}
+                        </div>
+                      </>
+                    )}
+                  </section>
+                </div>
+              )}
+            </aside>
+          </div>,
+          document.body,
+        )
+        : null}
     </div>
   );
 }

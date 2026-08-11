@@ -55,6 +55,29 @@ function usageSnapshot(user) {
   };
 }
 
+/**
+ * Solicitações de produto (painel admin): ignora ruído de polling/infra.
+ * Contadores antigos inflavam com /api/state, /api/events, session touch e WS.
+ */
+export function isProductRequest(method = 'GET', requestPath = '', { websocket = false } = {}) {
+  if (websocket) return false;
+  const normalizedMethod = String(method || 'GET').toUpperCase();
+  if (normalizedMethod === 'HEAD' || normalizedMethod === 'OPTIONS') return false;
+
+  const normalizedPath = String(requestPath || '').split('?')[0].replace(/\/+$/, '') || '/';
+  if (normalizedPath === '/api/state') return false;
+  if (normalizedPath === '/api/auth/session') return false;
+  if (normalizedPath === '/api/events' || normalizedPath.startsWith('/api/events/')) return false;
+  if (normalizedPath === '/api/health' || normalizedPath.startsWith('/api/health/')) return false;
+  if (normalizedPath === '/api/version' || normalizedPath === '/api/preflight') return false;
+  if (normalizedPath.startsWith('/api/admin/')) return false;
+  // Poll de status de job em andamento (a cada ~1s durante run).
+  if (/^\/api\/luca-ai\/persona-team\/runs\/[^/]+$/.test(normalizedPath) && normalizedMethod === 'GET') {
+    return false;
+  }
+  return true;
+}
+
 function publicUser(user) {
   return {
     id: user.id,
@@ -75,6 +98,7 @@ export class AuthStore {
     this.filePath = filePath;
     this.adminEmails = new Set(adminEmails.map(normalizeEmail).filter(Boolean));
     this.data = this.#load();
+    this.#rebaselineUsageMetricsV2();
     this.syncAdminRoles({ persist: true });
   }
 
@@ -85,10 +109,31 @@ export class AuthStore {
         version: 1,
         users: Array.isArray(parsed.users) ? parsed.users : [],
         sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
+        meta: parsed.meta && typeof parsed.meta === 'object' ? parsed.meta : {},
       };
     } catch {
-      return { version: 1, users: [], sessions: [] };
+      return { version: 1, users: [], sessions: [], meta: {} };
     }
+  }
+
+  /**
+   * One-shot: contadores requestCount legados incluíam polling e ficaram
+   * irreais (ex.: 8k+). Só rebaixa quando claramente inflado vs ações.
+   */
+  #rebaselineUsageMetricsV2() {
+    if (!this.data.meta || typeof this.data.meta !== 'object') this.data.meta = {};
+    if (this.data.meta.usageMetricsV2) return;
+    for (const user of this.data.users) {
+      const current = usageSnapshot(user);
+      const floor = Math.max(current.actionCount, current.runCount);
+      const inflated = current.requestCount > Math.max(current.actionCount * 3, current.actionCount + 50, 100);
+      user.usage = {
+        ...current,
+        requestCount: inflated ? floor : current.requestCount,
+      };
+    }
+    this.data.meta.usageMetricsV2 = true;
+    this.#persist();
   }
 
   #persist() {
@@ -352,6 +397,7 @@ export class AuthStore {
     const current = usageSnapshot(user);
     const normalizedMethod = String(method || 'GET').toUpperCase();
     const normalizedPath = String(requestPath || '').split('?')[0];
+    const productRequest = isProductRequest(normalizedMethod, normalizedPath, { websocket });
     const isAction = !websocket && !['GET', 'HEAD', 'OPTIONS'].includes(normalizedMethod);
     const isRun = normalizedMethod === 'POST' && (
       normalizedPath === '/api/luca-ai/persona-team/run'
@@ -360,6 +406,35 @@ export class AuthStore {
       || normalizedPath === '/api/supervisor/start'
     );
     const timestamp = nowIso();
+    const previousSeenMs = Date.parse(user.lastSeenAt || 0) || 0;
+    const shouldTouchPresence = !previousSeenMs || (Date.now() - previousSeenMs) >= TOUCH_INTERVAL_MS;
+
+    // lastSeenAt acompanha batidas autenticadas (presença), com throttle de escrita.
+    if (shouldTouchPresence || productRequest || websocket || Number(statusCode) >= 400) {
+      user.lastSeenAt = timestamp;
+    }
+
+    // WS e polling: presença + contadores dedicados; não infla "solicitações".
+    if (!productRequest) {
+      if (websocket) {
+        user.usage = {
+          ...current,
+          websocketCount: current.websocketCount + 1,
+          lastRequestAt: timestamp,
+        };
+        this.#persist();
+      } else if (Number(statusCode) >= 400) {
+        user.usage = {
+          ...current,
+          errorCount: current.errorCount + 1,
+          lastRequestAt: timestamp,
+        };
+        this.#persist();
+      } else if (shouldTouchPresence) {
+        this.#persist();
+      }
+      return;
+    }
 
     user.usage = {
       requestCount: current.requestCount + 1,
@@ -369,7 +444,6 @@ export class AuthStore {
       websocketCount: current.websocketCount + (websocket ? 1 : 0),
       lastRequestAt: timestamp,
     };
-    user.lastSeenAt = timestamp;
     this.#persist();
   }
 

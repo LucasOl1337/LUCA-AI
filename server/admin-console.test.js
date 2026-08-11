@@ -38,6 +38,20 @@ test('ADMIN_CONSOLE_V1 backend exposes readonly chat inspect per user', () => {
   assert.match(page, /Ver chats/);
   assert.match(page, /data-admin-chat-inspect/);
   assert.match(page, /inclui apagadas/);
+  assert.match(page, /createPortal/, 'chat inspect portal escapa do shell com isolation');
+});
+
+test('ADMIN_CONSOLE_V1 chat overlay is opaque and high z-index', () => {
+  assert.match(css, /--l-panel:\s*#0c1219/);
+  assert.match(css, /\.admin-chat-layer\s*\{[^}]*z-index:\s*20000/s);
+  assert.match(css, /\.admin-chat-panel\s*\{[^}]*background:\s*var\(--l-panel\)/s);
+});
+
+test('ADMIN_CONSOLE_V1 product request tracking excludes polling noise', () => {
+  assert.match(store, /isProductRequest/);
+  assert.match(store, /usageMetricsV2/);
+  assert.match(store, /\/api\/state/);
+  assert.match(store, /\/api\/events/);
 });
 
 test('ADMIN_CONSOLE_V1 support impersonation enter + exit', () => {

@@ -49,6 +49,8 @@
     --l-console: rgba(5, 8, 13, 0.88);
     --l-console-2: rgba(3, 5, 9, 0.96);
     --l-console-text: rgba(214, 233, 255, 0.82);
+    /* Painéis laterais / sheets opacos (overlays de admin e sessões). */
+    --l-panel: #0c1219;
 
     --l-glass-blur: 40px;
     --l-glass-saturate: 170%;
@@ -817,7 +819,7 @@
   gap: 10px;
   padding: 14px 12px 16px;
   border-right: 1px solid var(--l-border);
-  background: color-mix(in srgb, var(--l-panel) 96%, #000 4%);
+  background: var(--l-panel);
   box-shadow: 18px 0 48px rgba(0, 8, 20, 0.35);
 }
 
@@ -2102,28 +2104,33 @@ a.luca-ai-attachment:focus-visible {
 .admin-chat-layer {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 20000;
   display: flex;
   justify-content: flex-end;
+  isolation: isolate;
 }
 .admin-chat-backdrop {
   position: absolute;
   inset: 0;
   border: 0;
-  background: rgba(2, 8, 18, 0.55);
+  background: rgba(2, 6, 12, 0.78);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 .admin-chat-panel {
   position: relative;
   z-index: 1;
   width: min(1080px, 100vw);
   height: 100%;
+  max-height: 100dvh;
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 18px;
-  border-left: 1px solid var(--l-border);
-  background: color-mix(in srgb, var(--l-panel) 96%, #000 4%);
-  box-shadow: -24px 0 60px rgba(0, 8, 20, 0.45);
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--l-panel);
+  box-shadow: -24px 0 60px rgba(0, 8, 20, 0.65);
+  overflow: hidden;
 }
 .admin-chat-header {
   display: flex;
@@ -2159,14 +2166,15 @@ a.luca-ai-attachment:focus-visible {
 }
 .admin-chat-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+  flex: none;
 }
 .admin-chat-stats article {
   padding: 12px 14px;
   border: 1px solid var(--l-border);
   border-radius: 12px;
-  background: rgba(255,255,255,.03);
+  background: rgba(255,255,255,.05);
 }
 .admin-chat-stats span {
   display: block;
@@ -2183,10 +2191,11 @@ a.luca-ai-attachment:focus-visible {
 }
 .admin-chat-body {
   min-height: 0;
-  flex: 1;
+  flex: 1 1 auto;
   display: grid;
   grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
   gap: 12px;
+  overflow: hidden;
 }
 .admin-chat-list,
 .admin-chat-transcript {
@@ -2194,7 +2203,7 @@ a.luca-ai-attachment:focus-visible {
   overflow: auto;
   border: 1px solid var(--l-border);
   border-radius: 14px;
-  background: rgba(255,255,255,.02);
+  background: rgba(8, 12, 18, 0.92);
 }
 .admin-chat-list { padding: 12px; }
 .admin-chat-list-head {
@@ -2326,6 +2335,9 @@ a.luca-ai-attachment:focus-visible {
   .admin-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-users-toolbar { align-items: stretch; flex-direction: column; }
   .admin-users-toolbar form, .admin-users-toolbar input { width: 100%; }
+  .admin-chat-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-chat-body { grid-template-columns: 1fr; }
+  .admin-chat-list { max-height: 32vh; }
 }
 
 @media (max-width: 520px) {
