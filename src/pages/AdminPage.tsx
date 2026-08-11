@@ -6,7 +6,7 @@ import {
   Gauge,
   Loader2,
   LogIn,
-  MousePointerClick,
+  MessageSquareText,
   Play,
   RefreshCw,
   Search,
@@ -47,6 +47,10 @@ interface Overview {
 
 interface TrackedUser extends AuthUser {
   sessionCount: number;
+  promptCount?: number;
+  chatSessionCount?: number;
+  workSessionCount?: number;
+  messageCount?: number;
 }
 
 interface AdminReport {
@@ -320,9 +324,9 @@ export default function AdminPage() {
         <MetricCard icon={Activity} label="Ativos 24h" value={overview?.activeToday ?? '—'} hint={overview?.activeHour != null ? `${overview.activeHour} na última hora` : undefined} />
         <MetricCard icon={ShieldCheck} label="Sessões ativas" value={overview?.activeSessions ?? '—'} />
         <MetricCard icon={Workflow} label="Workspaces" value={overview?.workspaces ?? '—'} />
-        <MetricCard icon={Play} label="Execuções" value={overview?.totalRuns ?? '—'} />
-        <MetricCard icon={MousePointerClick} label="Ações" value={overview?.totalActions ?? '—'} />
-        <MetricCard icon={Gauge} label="Solicitações" value={overview?.totalRequests ?? '—'} hint="uso de produto (sem polling)" />
+        <MetricCard icon={Play} label="Rodadas" value={overview?.totalRuns ?? '—'} hint="envios na bancada" />
+        <MetricCard icon={MessageSquareText} label="Sessões com chat" value={overview?.totalActions ?? '—'} hint="sessões com conteúdo" />
+        <MetricCard icon={Gauge} label="Prompts" value={overview?.totalRequests ?? '—'} hint="1 prompt = 1 envio do operador" />
         <MetricCard icon={AlertTriangle} label="Erros" value={overview?.totalErrors ?? '—'} />
       </section>
 
@@ -330,7 +334,7 @@ export default function AdminPage() {
         <div className="admin-section-header">
           <div>
             <h2>Visão de produto</h2>
-            <p>Funil de ativação por conta autenticada: cadastrou → ficou ativo → rodou missão/persona.</p>
+            <p>Funil de ativação: cadastrou → ficou ativo → enviou pelo menos 1 prompt na bancada.</p>
           </div>
         </div>
         <div className="admin-funnel" aria-label="Funil de ativação">
@@ -344,16 +348,16 @@ export default function AdminPage() {
             <small>{funnel ? `${funnel.activeRate}%` : ''}</small>
           </article>
           <article>
-            <span>Com ações</span>
+            <span>Com sessões de chat</span>
             <strong>{funnel?.withActions ?? overview?.usersWithActions ?? '—'}</strong>
           </article>
           <article>
-            <span>Com execuções</span>
+            <span>Com prompts</span>
             <strong>{funnel?.withRuns ?? overview?.usersWithRuns ?? '—'}</strong>
             <small>{funnel ? `${funnel.activationRate}% ativação` : ''}</small>
           </article>
           <article>
-            <span>Sem execuções</span>
+            <span>Sem prompts</span>
             <strong>{funnel?.withoutRuns ?? overview?.usersWithoutRuns ?? '—'}</strong>
           </article>
         </div>
@@ -363,14 +367,14 @@ export default function AdminPage() {
         <div className="admin-section-header">
           <div>
             <h2>Ranking de uso</h2>
-            <p>Contas que mais operam a bancada — execuções, ações e presença.</p>
+            <p>Contas que mais operam a bancada — prompts enviados, sessões de chat e presença.</p>
           </div>
           <Trophy className="admin-section-icon" />
         </div>
         <div className="admin-rank-grid">
-          <RankList title="Por execuções" rows={report?.rankings.byRuns || []} metric={(u) => `${u.runCount || 0} runs`} />
-          <RankList title="Por ações" rows={report?.rankings.byActions || []} metric={(u) => `${u.actionCount || 0} ações`} />
-          <RankList title="Por solicitações" rows={report?.rankings.byRequests || []} metric={(u) => `${u.requestCount || 0} req`} />
+          <RankList title="Por prompts" rows={report?.rankings.byRuns || []} metric={(u) => `${u.promptCount ?? u.runCount ?? 0} prompts`} />
+          <RankList title="Por sessões de chat" rows={report?.rankings.byActions || []} metric={(u) => `${u.chatSessionCount ?? 0} sessões`} />
+          <RankList title="Por rodadas" rows={report?.rankings.byRequests || []} metric={(u) => `${u.promptCount ?? u.requestCount ?? 0} rodadas`} />
           <RankList title="Por atividade" rows={report?.rankings.byActivity || []} metric={(u) => formatRelative(u.lastSeenAt)} />
         </div>
       </section>
@@ -393,8 +397,8 @@ export default function AdminPage() {
                 }}
               >
                 <option value="activity_desc">Atividade recente</option>
-                <option value="runs_desc">Mais execuções</option>
-                <option value="requests_desc">Mais solicitações</option>
+                <option value="runs_desc">Mais prompts</option>
+                <option value="requests_desc">Mais rodadas</option>
                 <option value="logins_desc">Mais logins</option>
                 <option value="created_desc">Cadastro recente</option>
               </select>
@@ -443,9 +447,9 @@ export default function AdminPage() {
                   <th>Cadastro</th>
                   <th>Última atividade</th>
                   <th>Logins</th>
-                  <th>Solicitações</th>
-                  <th>Ações</th>
-                  <th>Execuções</th>
+                  <th title="Mensagens do operador na bancada">Prompts</th>
+                  <th title="Sessões de chat com conteúdo">Sessões chat</th>
+                  <th title="Mesmo que prompts: 1 envio = 1 rodada">Rodadas</th>
                   <th>Erros</th>
                   <th title="Sessões de login ativas (cookie)">Sessões login</th>
                   <th>Chats</th>
@@ -468,9 +472,9 @@ export default function AdminPage() {
                     <td>{formatDate(account.createdAt)}</td>
                     <td title={formatDate(account.lastSeenAt)}>{formatRelative(account.lastSeenAt)}</td>
                     <td>{account.loginCount}</td>
-                    <td>{account.requestCount}</td>
-                    <td>{account.actionCount}</td>
-                    <td>{account.runCount}</td>
+                    <td>{account.promptCount ?? account.requestCount ?? 0}</td>
+                    <td>{account.chatSessionCount ?? 0}</td>
+                    <td>{account.promptCount ?? account.runCount ?? 0}</td>
                     <td>{account.errorCount}</td>
                     <td>{account.sessionCount}</td>
                     <td>

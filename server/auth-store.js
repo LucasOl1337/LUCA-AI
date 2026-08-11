@@ -45,10 +45,14 @@ function safeEqualHex(left, right) {
 
 function usageSnapshot(user) {
   const usage = user.usage && typeof user.usage === 'object' ? user.usage : {};
+  const promptCount = Number(usage.promptCount ?? usage.requestCount ?? 0);
+  const runCount = Number(usage.runCount ?? promptCount);
   return {
-    requestCount: Number(usage.requestCount || 0),
+    // requestCount legado = alias de promptCount (1 envio na bancada).
+    requestCount: promptCount,
+    promptCount,
     actionCount: Number(usage.actionCount || 0),
-    runCount: Number(usage.runCount || 0),
+    runCount,
     errorCount: Number(usage.errorCount || 0),
     websocketCount: Number(usage.websocketCount || 0),
     lastRequestAt: String(usage.lastRequestAt || ''),
@@ -56,26 +60,58 @@ function usageSnapshot(user) {
 }
 
 /**
- * Solicitações de produto (painel admin): ignora ruído de polling/infra.
- * Contadores antigos inflavam com /api/state, /api/events, session touch e WS.
+ * Classifica batida HTTP para métricas de produto.
+ * Prompt/rodada = só POST /api/luca-ai/persona-team/run (enviar na bancada).
+ * Autosave PATCH de sessão e polling não contam.
  */
-export function isProductRequest(method = 'GET', requestPath = '', { websocket = false } = {}) {
-  if (websocket) return false;
-  const normalizedMethod = String(method || 'GET').toUpperCase();
-  if (normalizedMethod === 'HEAD' || normalizedMethod === 'OPTIONS') return false;
-
-  const normalizedPath = String(requestPath || '').split('?')[0].replace(/\/+$/, '') || '/';
-  if (normalizedPath === '/api/state') return false;
-  if (normalizedPath === '/api/auth/session') return false;
-  if (normalizedPath === '/api/events' || normalizedPath.startsWith('/api/events/')) return false;
-  if (normalizedPath === '/api/health' || normalizedPath.startsWith('/api/health/')) return false;
-  if (normalizedPath === '/api/version' || normalizedPath === '/api/preflight') return false;
-  if (normalizedPath.startsWith('/api/admin/')) return false;
-  // Poll de status de job em andamento (a cada ~1s durante run).
-  if (/^\/api\/luca-ai\/persona-team\/runs\/[^/]+$/.test(normalizedPath) && normalizedMethod === 'GET') {
-    return false;
+export function classifyProductUsage(method = 'GET', requestPath = '', { websocket = false } = {}) {
+  if (websocket) {
+    return { kind: 'websocket', isPrompt: false, isRun: false, isAction: false, countsRequest: false };
   }
-  return true;
+  const normalizedMethod = String(method || 'GET').toUpperCase();
+  const normalizedPath = String(requestPath || '').split('?')[0].replace(/\/+$/, '') || '/';
+
+  if (normalizedMethod === 'HEAD' || normalizedMethod === 'OPTIONS') {
+    return { kind: 'noise', isPrompt: false, isRun: false, isAction: false, countsRequest: false };
+  }
+  if (
+    normalizedPath === '/api/state'
+    || normalizedPath === '/api/auth/session'
+    || normalizedPath === '/api/events'
+    || normalizedPath.startsWith('/api/events/')
+    || normalizedPath === '/api/health'
+    || normalizedPath.startsWith('/api/health/')
+    || normalizedPath === '/api/version'
+    || normalizedPath === '/api/preflight'
+    || normalizedPath.startsWith('/api/admin/')
+    || (/^\/api\/luca-ai\/persona-team\/runs\/[^/]+$/.test(normalizedPath) && normalizedMethod === 'GET')
+  ) {
+    return { kind: 'noise', isPrompt: false, isRun: false, isAction: false, countsRequest: false };
+  }
+
+  // Autosave de rascunho/atribuições (debounced a cada ~450ms na bancada).
+  if (normalizedMethod === 'PATCH' && /^\/api\/luca-ai\/chat\/sessions\/[^/]+$/.test(normalizedPath)) {
+    return { kind: 'autosave', isPrompt: false, isRun: false, isAction: false, countsRequest: false };
+  }
+
+  const isPrompt = normalizedMethod === 'POST' && normalizedPath === '/api/luca-ai/persona-team/run';
+  // Produto LUCA-AI: 1 prompt = 1 rodada. Legado fleet (agent/run, supervisor) não entra.
+  const isRun = isPrompt;
+  const isWrite = !['GET', 'HEAD', 'OPTIONS'].includes(normalizedMethod);
+
+  return {
+    kind: isPrompt ? 'prompt' : (isWrite ? 'write' : 'read'),
+    isPrompt,
+    isRun,
+    isAction: isWrite,
+    countsRequest: isPrompt,
+  };
+}
+
+/** @deprecated use classifyProductUsage */
+export function isProductRequest(method = 'GET', requestPath = '', opts = {}) {
+  const classified = classifyProductUsage(method, requestPath, opts);
+  return classified.kind !== 'noise' && classified.kind !== 'websocket' && classified.kind !== 'autosave';
 }
 
 function publicUser(user) {
@@ -117,12 +153,11 @@ export class AuthStore {
   }
 
   /**
-   * One-shot: contadores requestCount legados incluíam polling e ficaram
-   * irreais (ex.: 8k+). Só rebaixa quando claramente inflado vs ações.
+   * One-shot legado V2 (polling). Pula se V3 já aplicou a semântica de prompts.
    */
   #rebaselineUsageMetricsV2() {
     if (!this.data.meta || typeof this.data.meta !== 'object') this.data.meta = {};
-    if (this.data.meta.usageMetricsV2) return;
+    if (this.data.meta.usageMetricsV2 || this.data.meta.usageMetricsV3) return;
     for (const user of this.data.users) {
       const current = usageSnapshot(user);
       const floor = Math.max(current.actionCount, current.runCount);
@@ -134,6 +169,40 @@ export class AuthStore {
     }
     this.data.meta.usageMetricsV2 = true;
     this.#persist();
+  }
+
+  /**
+   * V3: prompt/rodada = uso real da bancada (fonte: chat-library).
+   * getProductUsage(userId) -> { promptCount }
+   */
+  rebaselineProductUsageV3(getProductUsage) {
+    if (!this.data.meta || typeof this.data.meta !== 'object') this.data.meta = {};
+    if (this.data.meta.usageMetricsV3) return { changed: 0, already: true };
+    if (typeof getProductUsage !== 'function') return { changed: 0, already: false, skipped: true };
+
+    let changed = 0;
+    for (const user of this.data.users) {
+      const current = usageSnapshot(user);
+      let promptCount = 0;
+      try {
+        const product = getProductUsage(user.id) || {};
+        promptCount = Math.max(0, Number(product.promptCount) || 0);
+      } catch {
+        promptCount = 0;
+      }
+      user.usage = {
+        ...current,
+        promptCount,
+        requestCount: promptCount,
+        runCount: promptCount,
+        actionCount: 0,
+      };
+      changed += 1;
+    }
+    this.data.meta.usageMetricsV2 = true;
+    this.data.meta.usageMetricsV3 = true;
+    this.#persist();
+    return { changed, already: false };
   }
 
   #persist() {
@@ -208,6 +277,7 @@ export class AuthStore {
       lastSeenAt: timestamp,
       loginCount: 1,
       usage: {
+        promptCount: 0,
         requestCount: 0,
         actionCount: 0,
         runCount: 0,
@@ -395,56 +465,65 @@ export class AuthStore {
     if (!user) return;
 
     const current = usageSnapshot(user);
-    const normalizedMethod = String(method || 'GET').toUpperCase();
-    const normalizedPath = String(requestPath || '').split('?')[0];
-    const productRequest = isProductRequest(normalizedMethod, normalizedPath, { websocket });
-    const isAction = !websocket && !['GET', 'HEAD', 'OPTIONS'].includes(normalizedMethod);
-    const isRun = normalizedMethod === 'POST' && (
-      normalizedPath === '/api/luca-ai/persona-team/run'
-      || normalizedPath === '/api/mission/activate'
-      || normalizedPath === '/api/agent/run'
-      || normalizedPath === '/api/supervisor/start'
-    );
+    const classified = classifyProductUsage(method, requestPath, { websocket });
     const timestamp = nowIso();
     const previousSeenMs = Date.parse(user.lastSeenAt || 0) || 0;
     const shouldTouchPresence = !previousSeenMs || (Date.now() - previousSeenMs) >= TOUCH_INTERVAL_MS;
+    const isError = Number(statusCode) >= 400;
 
-    // lastSeenAt acompanha batidas autenticadas (presença), com throttle de escrita.
-    if (shouldTouchPresence || productRequest || websocket || Number(statusCode) >= 400) {
+    // Presença: qualquer batida autenticada (com throttle de escrita em disco).
+    if (shouldTouchPresence || classified.isPrompt || websocket || isError) {
       user.lastSeenAt = timestamp;
     }
 
-    // WS e polling: presença + contadores dedicados; não infla "solicitações".
-    if (!productRequest) {
-      if (websocket) {
-        user.usage = {
-          ...current,
-          websocketCount: current.websocketCount + 1,
-          lastRequestAt: timestamp,
-        };
-        this.#persist();
-      } else if (Number(statusCode) >= 400) {
-        user.usage = {
-          ...current,
-          errorCount: current.errorCount + 1,
-          lastRequestAt: timestamp,
-        };
-        this.#persist();
-      } else if (shouldTouchPresence) {
-        this.#persist();
-      }
+    // Prompt/rodada de produto: só envio na bancada (persona-team/run).
+    if (classified.isPrompt) {
+      const nextPrompt = current.promptCount + 1;
+      user.usage = {
+        ...current,
+        promptCount: nextPrompt,
+        requestCount: nextPrompt,
+        runCount: current.runCount + (classified.isRun ? 1 : 0),
+        actionCount: current.actionCount + 1,
+        errorCount: current.errorCount + (isError ? 1 : 0),
+        lastRequestAt: timestamp,
+      };
+      this.#persist();
       return;
     }
 
-    user.usage = {
-      requestCount: current.requestCount + 1,
-      actionCount: current.actionCount + (isAction ? 1 : 0),
-      runCount: current.runCount + (isRun ? 1 : 0),
-      errorCount: current.errorCount + (Number(statusCode) >= 400 ? 1 : 0),
-      websocketCount: current.websocketCount + (websocket ? 1 : 0),
-      lastRequestAt: timestamp,
-    };
-    this.#persist();
+    if (websocket) {
+      user.usage = {
+        ...current,
+        websocketCount: current.websocketCount + 1,
+        lastRequestAt: timestamp,
+      };
+      this.#persist();
+      return;
+    }
+
+    if (isError) {
+      user.usage = {
+        ...current,
+        errorCount: current.errorCount + 1,
+        lastRequestAt: timestamp,
+      };
+      this.#persist();
+      return;
+    }
+
+    // Writes intencionais (criar pasta, etc.) — não viram "prompt".
+    if (classified.isAction) {
+      user.usage = {
+        ...current,
+        actionCount: current.actionCount + 1,
+        lastRequestAt: timestamp,
+      };
+      this.#persist();
+      return;
+    }
+
+    if (shouldTouchPresence) this.#persist();
   }
 
   overview(extra = {}) {

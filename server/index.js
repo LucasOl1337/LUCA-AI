@@ -76,6 +76,7 @@ import {
   getChatLibrarySnapshotForUser,
   getChatSession,
   getChatSessionForUser,
+  getProductUsageSummaryForUser,
   recordPersonaRunOnSession,
   renameChatFolder,
   updateChatSession,
@@ -288,6 +289,7 @@ app.use('/api', (req, res, next) => {
 authService.registerAdminRoutes(app, {
   getUserChatLibrary: getChatLibrarySnapshotForUser,
   getUserChatSession: getChatSessionForUser,
+  getProductUsage: getProductUsageSummaryForUser,
 });
 
 const httpServer = createServer(app);

@@ -11,8 +11,12 @@ export interface AuthUser {
   lastSeenAt: string;
   loginCount: number;
   requestCount: number;
+  promptCount?: number;
   actionCount: number;
   runCount: number;
+  chatSessionCount?: number;
+  workSessionCount?: number;
+  messageCount?: number;
   errorCount: number;
   websocketCount: number;
   lastRequestAt: string;

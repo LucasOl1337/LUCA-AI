@@ -207,34 +207,137 @@ export function createAuthService({ rootDir = process.cwd(), dataPath = '', admi
     next();
   }
 
-  function registerAdminRoutes(app, { getUserChatLibrary = null, getUserChatSession = null } = {}) {
+  function ensureProductUsageBaseline() {
+    if (typeof getProductUsageSummary !== 'function') return;
+    try {
+      store.rebaselineProductUsageV3((userId) => getProductUsageSummary(userId));
+    } catch (error) {
+      console.error('[auth] rebaselineProductUsageV3 failed', error?.message || error);
+    }
+  }
+
+  function enrichUserWithProductUsage(user) {
+    if (!user?.id || typeof getProductUsageSummary !== 'function') {
+      return {
+        ...user,
+        promptCount: Number(user?.promptCount ?? user?.requestCount ?? 0),
+        chatSessionCount: Number(user?.chatSessionCount || 0),
+        workSessionCount: Number(user?.workSessionCount || 0),
+      };
+    }
+    try {
+      const product = getProductUsageSummary(user.id) || {};
+      const promptCount = Math.max(0, Number(product.promptCount) || 0);
+      return {
+        ...user,
+        promptCount,
+        // Compat: rankings/UI antigos que leem requestCount/runCount.
+        requestCount: promptCount,
+        runCount: promptCount,
+        chatSessionCount: Math.max(0, Number(product.chatSessionCount) || 0),
+        workSessionCount: Math.max(0, Number(product.workSessionCount) || 0),
+        messageCount: Math.max(0, Number(product.messageCount) || 0),
+      };
+    } catch {
+      return {
+        ...user,
+        promptCount: Number(user?.promptCount ?? user?.requestCount ?? 0),
+        chatSessionCount: 0,
+        workSessionCount: 0,
+      };
+    }
+  }
+
+  let getProductUsageSummary = null;
+
+  function registerAdminRoutes(app, {
+    getUserChatLibrary = null,
+    getUserChatSession = null,
+    getProductUsage = null,
+  } = {}) {
+    if (typeof getProductUsage === 'function') {
+      getProductUsageSummary = getProductUsage;
+      ensureProductUsageBaseline();
+    }
+
     app.get('/api/admin/overview', requireAdmin, (_req, res) => {
-      res.json({ ok: true, overview: store.overview({ workspaces: workspaceCount() }) });
+      ensureProductUsageBaseline();
+      const users = store.listUsers().map(enrichUserWithProductUsage);
+      const totalPrompts = users.reduce((sum, user) => sum + Number(user.promptCount || 0), 0);
+      const usersWithPrompts = users.filter((user) => Number(user.promptCount || 0) > 0).length;
+      const overview = {
+        ...store.overview({ workspaces: workspaceCount() }),
+        totalRequests: totalPrompts,
+        totalPrompts,
+        totalRuns: totalPrompts,
+        totalActions: users.reduce((sum, user) => sum + Number(user.chatSessionCount || 0), 0),
+        usersWithRuns: usersWithPrompts,
+        usersWithActions: users.filter((user) => Number(user.chatSessionCount || 0) > 0).length,
+        usersWithoutRuns: Math.max(0, users.length - usersWithPrompts),
+      };
+      res.json({ ok: true, overview });
     });
     app.get('/api/admin/users', requireAdmin, (req, res) => {
-      res.json({
-        ok: true,
-        users: store.listUsers({
-          search: req.query.search,
-          sort: req.query.sort,
-        }),
-      });
+      ensureProductUsageBaseline();
+      const users = store.listUsers({
+        search: req.query.search,
+        sort: req.query.sort,
+      }).map(enrichUserWithProductUsage);
+      // Re-sort after enrichment when ranking by product fields.
+      const sort = String(req.query.sort || '');
+      if (sort === 'runs_desc' || sort === 'requests_desc') {
+        users.sort((a, b) => (b.promptCount || 0) - (a.promptCount || 0));
+      }
+      res.json({ ok: true, users });
     });
     app.get('/api/admin/report', requireAdmin, (req, res) => {
-      const report = store.report({ limit: req.query.limit });
-      report.overview = store.overview({ workspaces: workspaceCount() });
-      report.funnel.registered = report.overview.totalUsers;
-      report.funnel.activeToday = report.overview.activeToday;
-      report.funnel.withActions = report.overview.usersWithActions;
-      report.funnel.withRuns = report.overview.usersWithRuns;
-      report.funnel.withoutRuns = report.overview.usersWithoutRuns;
-      report.funnel.activationRate = report.overview.totalUsers
-        ? Number(((report.overview.usersWithRuns / report.overview.totalUsers) * 100).toFixed(1))
+      ensureProductUsageBaseline();
+      const limit = Math.max(1, Math.min(30, Number(req.query.limit) || 8));
+      const users = store.listUsers().map(enrichUserWithProductUsage);
+      const totalPrompts = users.reduce((sum, user) => sum + Number(user.promptCount || 0), 0);
+      const usersWithPrompts = users.filter((user) => Number(user.promptCount || 0) > 0).length;
+      const usersWithSessions = users.filter((user) => Number(user.chatSessionCount || 0) > 0).length;
+      const overview = {
+        ...store.overview({ workspaces: workspaceCount() }),
+        totalRequests: totalPrompts,
+        totalPrompts,
+        totalRuns: totalPrompts,
+        totalActions: users.reduce((sum, user) => sum + Number(user.chatSessionCount || 0), 0),
+        usersWithRuns: usersWithPrompts,
+        usersWithActions: usersWithSessions,
+        usersWithoutRuns: Math.max(0, users.length - usersWithPrompts),
+      };
+      const byPrompts = [...users].sort((a, b) => (b.promptCount || 0) - (a.promptCount || 0)).slice(0, limit);
+      const bySessions = [...users].sort((a, b) => (b.chatSessionCount || 0) - (a.chatSessionCount || 0)).slice(0, limit);
+      const byActivity = [...users].sort((a, b) => Date.parse(b.lastSeenAt || 0) - Date.parse(a.lastSeenAt || 0)).slice(0, limit);
+      const activationRate = overview.totalUsers
+        ? Number(((usersWithPrompts / overview.totalUsers) * 100).toFixed(1))
         : 0;
-      report.funnel.activeRate = report.overview.totalUsers
-        ? Number(((report.overview.activeToday / report.overview.totalUsers) * 100).toFixed(1))
+      const activeRate = overview.totalUsers
+        ? Number(((overview.activeToday / overview.totalUsers) * 100).toFixed(1))
         : 0;
-      res.json({ ok: true, report });
+      res.json({
+        ok: true,
+        report: {
+          overview,
+          funnel: {
+            registered: overview.totalUsers,
+            activeToday: overview.activeToday,
+            withActions: usersWithSessions,
+            withRuns: usersWithPrompts,
+            withoutRuns: Math.max(0, overview.totalUsers - usersWithPrompts),
+            activationRate,
+            activeRate,
+          },
+          rankings: {
+            byRuns: byPrompts.map((user, index) => ({ rank: index + 1, ...user })),
+            byActions: bySessions.map((user, index) => ({ rank: index + 1, ...user })),
+            byRequests: byPrompts.map((user, index) => ({ rank: index + 1, ...user })),
+            byActivity: byActivity.map((user, index) => ({ rank: index + 1, ...user })),
+          },
+          generatedAt: overview.generatedAt,
+        },
+      });
     });
 
     // Read-only inspect of another account's LUCA-AI chat library (no write / no session hijack).

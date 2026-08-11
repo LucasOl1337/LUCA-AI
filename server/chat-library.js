@@ -437,6 +437,95 @@ export function getChatLibrarySnapshot() {
   return snapshotFromLibrary(loadLibrary(userId), userId, { includeDeleted: false });
 }
 
+function isOperatorEntry(entry) {
+  const role = String(entry?.role || '').toLowerCase();
+  return role === 'operator' || role === 'user';
+}
+
+function emptyProductUsage() {
+  return {
+    promptCount: 0,
+    runCount: 0,
+    chatSessionCount: 0,
+    workSessionCount: 0,
+    messageCount: 0,
+    folderCount: 0,
+  };
+}
+
+/**
+ * Fonte de verdade de uso de produto (admin): prompts do operador na bancada,
+ * não batidas HTTP. 1 bolha operator/user = 1 prompt = 1 rodada de produto.
+ */
+export function getProductUsageSummaryForUser(userId) {
+  const id = String(userId || '').trim();
+  if (!id) return emptyProductUsage();
+
+  let library;
+  try {
+    library = loadLibrary(id);
+  } catch {
+    return emptyProductUsage();
+  }
+
+  const seenOperatorIds = new Set();
+  let promptCount = 0;
+  let messageCount = 0;
+  const workSessionIds = new Set();
+
+  function absorbSession(session) {
+    if (!session?.id) return;
+    const transcript = Array.isArray(session.transcript) ? session.transcript : [];
+    messageCount += transcript.length;
+    let localPrompts = 0;
+    for (const entry of transcript) {
+      if (!isOperatorEntry(entry)) continue;
+      const entryId = String(entry.id || '').trim()
+        || `${session.id}:${entry.timestamp || ''}:${String(entry.content || '').slice(0, 48)}`;
+      if (seenOperatorIds.has(entryId)) continue;
+      seenOperatorIds.add(entryId);
+      localPrompts += 1;
+      promptCount += 1;
+    }
+    if (localPrompts > 0 || session.finalResult) {
+      workSessionIds.add(String(session.sourceSessionId || session.id));
+    }
+  }
+
+  for (const session of library.sessions || []) {
+    absorbSession(session);
+  }
+
+  // Sessões só no archive (prune) + revisões de limpeza com prompts antigos.
+  let archive = [];
+  try {
+    archive = loadArchiveRecords(id);
+  } catch {
+    archive = [];
+  }
+  const libraryIds = new Set((library.sessions || []).map((item) => item.id));
+  for (const record of archive) {
+    const session = record?.session;
+    if (!session?.id) continue;
+    if (libraryIds.has(session.id) && record.reason !== 'transcript_clear') continue;
+    absorbSession(session);
+  }
+
+  const chatSessionCount = (library.sessions || []).filter((session) => {
+    const msgs = Array.isArray(session.transcript) ? session.transcript.length : 0;
+    return msgs > 0 || Boolean(session.finalResult) || Boolean(String(session.missionDraft || '').trim());
+  }).length;
+
+  return {
+    promptCount,
+    runCount: promptCount,
+    chatSessionCount,
+    workSessionCount: workSessionIds.size,
+    messageCount,
+    folderCount: Array.isArray(library.folders) ? library.folders.length : 0,
+  };
+}
+
 /** Admin/read-only: library + soft-deleted + índices do archive. */
 export function getChatLibrarySnapshotForUser(userId) {
   const id = String(userId || '').trim();

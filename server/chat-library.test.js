@@ -410,3 +410,38 @@ test('CHAT_LIBRARY_V1 persists pending attachment metadata for retry after reloa
     assert.equal(session.draftAttachments[0].name, 'quadro.png');
   });
 });
+
+test('CHAT_LIBRARY_V1 product usage counts operator prompts not agent replies', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-product-'));
+  const { workspace, chatLibrary } = await loadChatLibrary(dataDir);
+
+  workspace.runWithWorkspaceUser('user-product', () => {
+    const sessionId = chatLibrary.getChatLibrarySnapshot().activeSessionId;
+    chatLibrary.recordPersonaRunOnSession(sessionId, {
+      mission: 'Primeiro prompt',
+      mode: 'team',
+      traceId: 'trace-p1',
+      generatedAt: new Date().toISOString(),
+      replies: [{ ok: true, slug: 'a', name: 'A', content: 'resposta 1', completedAt: new Date().toISOString() }],
+      steps: [],
+      judge: null,
+      finalDisplay: { name: 'Final', content: 'ok 1' },
+    });
+    chatLibrary.recordPersonaRunOnSession(sessionId, {
+      mission: 'Segundo prompt',
+      mode: 'team',
+      traceId: 'trace-p2',
+      generatedAt: new Date().toISOString(),
+      replies: [{ ok: true, slug: 'a', name: 'A', content: 'resposta 2', completedAt: new Date().toISOString() }],
+      steps: [],
+      judge: null,
+      finalDisplay: { name: 'Final', content: 'ok 2' },
+    });
+  });
+
+  const usage = chatLibrary.getProductUsageSummaryForUser('user-product');
+  assert.equal(usage.promptCount, 2, 'dois envios do operador');
+  assert.equal(usage.runCount, 2, 'rodada = prompt');
+  assert.ok(usage.chatSessionCount >= 1);
+  assert.ok(usage.messageCount > 2, 'inclui respostas dos agentes além dos prompts');
+});

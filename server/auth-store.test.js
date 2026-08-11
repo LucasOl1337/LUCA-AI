@@ -32,33 +32,34 @@ test('contas seguintes são usuários e login incrementa tracking', () => {
   assert.equal(store.listUsers()[0].email, 'user@example.com');
 });
 
-test('tracking contabiliza solicitações, ações, execuções e erros por conta', () => {
+test('tracking conta prompt/rodada só no envio da bancada', () => {
   const { store } = temporaryStore();
   const account = store.register({ email: 'user@example.com', password: 'senha-forte-456' });
-  // Ruído de polling/infra: NÃO deve inflar solicitações de produto.
+  // Ruído: NÃO vira prompt.
   store.recordUsage(account.user.id, { method: 'GET', path: '/api/state', statusCode: 200 });
   store.recordUsage(account.user.id, { method: 'GET', path: '/api/events?limit=120', statusCode: 200 });
-  store.recordUsage(account.user.id, { method: 'GET', path: '/api/auth/session', statusCode: 200 });
-  store.recordUsage(account.user.id, { method: 'GET', path: '/api/admin/overview', statusCode: 200 });
-  store.recordUsage(account.user.id, { method: 'GET', path: '/api/luca-ai/persona-team/runs/run_abc', statusCode: 200 });
-  // Uso real de produto.
-  store.recordUsage(account.user.id, { method: 'GET', path: '/api/personas/available', statusCode: 200 });
-  store.recordUsage(account.user.id, { method: 'POST', path: '/api/luca-ai/persona-team/run', statusCode: 200 });
-  store.recordUsage(account.user.id, { method: 'POST', path: '/api/mission/context', statusCode: 422 });
+  store.recordUsage(account.user.id, { method: 'PATCH', path: '/api/luca-ai/chat/sessions/sess_1', statusCode: 200 });
+  store.recordUsage(account.user.id, { method: 'POST', path: '/api/agent/run', statusCode: 200 });
+  store.recordUsage(account.user.id, { method: 'POST', path: '/api/supervisor/start', statusCode: 200 });
   store.recordUsage(account.user.id, { method: 'WS', path: '/ws', statusCode: 101, websocket: true });
+  // 2 envios reais na bancada.
+  store.recordUsage(account.user.id, { method: 'POST', path: '/api/luca-ai/persona-team/run', statusCode: 202 });
+  store.recordUsage(account.user.id, { method: 'POST', path: '/api/luca-ai/persona-team/run', statusCode: 202 });
+  // Write com erro (não é prompt).
+  store.recordUsage(account.user.id, { method: 'POST', path: '/api/mission/context', statusCode: 422 });
 
   const tracked = store.listUsers()[0];
-  assert.equal(tracked.requestCount, 3, 'só product requests contam (GET personas + 2 POSTs)');
-  assert.equal(tracked.actionCount, 2);
-  assert.equal(tracked.runCount, 1);
+  assert.equal(tracked.promptCount, 2, 'só persona-team/run conta como prompt');
+  assert.equal(tracked.requestCount, 2, 'requestCount é alias de prompt');
+  assert.equal(tracked.runCount, 2, '1 prompt = 1 rodada');
+  assert.equal(tracked.actionCount, 4, '2 prompts + agent/run + supervisor (erro 422 não soma ação)');
   assert.equal(tracked.errorCount, 1);
   assert.equal(tracked.websocketCount, 1);
-  assert.equal(store.overview().totalRequests, 3);
-  assert.equal(store.overview().totalActions, 2);
-  assert.equal(store.overview().totalRuns, 1);
+  assert.equal(store.overview().totalRequests, 2);
+  assert.equal(store.overview().totalRuns, 2);
 });
 
-test('rebaseline usageMetricsV2 reduz requestCount legado inflado por polling', () => {
+test('rebaseline V3 alinha contadores ao product usage (chat-library)', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-auth-'));
   const pathAuth = path.join(directory, 'auth.json');
   try {
@@ -88,13 +89,16 @@ test('rebaseline usageMetricsV2 reduz requestCount legado inflado por polling', 
     }, null, 2));
 
     const store = new AuthStore(pathAuth);
+    const result = store.rebaselineProductUsageV3(() => ({ promptCount: 4 }));
+    assert.equal(result.already, false);
     const user = store.listUsers()[0];
-    assert.equal(user.requestCount, 820, 'rebaixa para actionCount quando legado está inflado');
-    assert.equal(user.actionCount, 820);
-    assert.equal(user.runCount, 34);
-    // Segunda carga não re-rebaixa.
-    const again = new AuthStore(pathAuth);
-    assert.equal(again.listUsers()[0].requestCount, 820);
+    assert.equal(user.promptCount, 4);
+    assert.equal(user.requestCount, 4);
+    assert.equal(user.runCount, 4);
+    assert.equal(user.actionCount, 0);
+    // Idempotente.
+    assert.equal(store.rebaselineProductUsageV3(() => ({ promptCount: 99 })).already, true);
+    assert.equal(store.listUsers()[0].promptCount, 4);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
@@ -183,15 +187,16 @@ test('report de admin monta funil e rankings de uso', () => {
   store.recordUsage(a.user.id, { method: 'POST', path: '/api/luca-ai/persona-team/run', statusCode: 200 });
   store.recordUsage(a.user.id, { method: 'POST', path: '/api/luca-ai/persona-team/run', statusCode: 200 });
   store.recordUsage(b.user.id, { method: 'GET', path: '/api/state', statusCode: 200 });
-  store.recordUsage(b.user.id, { method: 'GET', path: '/api/personas/available', statusCode: 200 });
+  store.recordUsage(b.user.id, { method: 'PATCH', path: '/api/luca-ai/chat/sessions/x', statusCode: 200 });
   const report = store.report({ limit: 5 });
   assert.equal(report.funnel.registered, 2);
   assert.equal(report.funnel.withRuns, 1);
   assert.equal(report.rankings.byRuns[0].email, 'a@example.com');
   assert.equal(report.rankings.byRuns[0].rank, 1);
+  assert.equal(report.rankings.byRuns[0].promptCount, 2);
   assert.ok(report.overview.totalRuns >= 2);
-  // Polling de /api/state não entra no ranking de solicitações.
-  assert.equal(report.rankings.byRequests.find((row) => row.email === 'b@example.com')?.requestCount, 1);
+  // b não enviou prompt; polling/autosave não contam.
+  assert.equal(report.rankings.byRequests.find((row) => row.email === 'b@example.com')?.promptCount || 0, 0);
 });
 
 test('rejeita senha inválida, duplicidade e credenciais incorretas', () => {

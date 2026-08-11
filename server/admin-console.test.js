@@ -56,11 +56,15 @@ test('ADMIN_CONSOLE_V1 chat overlay is full-screen bancada (not right drawer)', 
   assert.match(viewer, /como o usuário viu na bancada/);
 });
 
-test('ADMIN_CONSOLE_V1 product request tracking excludes polling noise', () => {
-  assert.match(store, /isProductRequest/);
-  assert.match(store, /usageMetricsV2/);
-  assert.match(store, /\/api\/state/);
-  assert.match(store, /\/api\/events/);
+test('ADMIN_CONSOLE_V1 product metrics use prompts not HTTP volume', () => {
+  assert.match(store, /classifyProductUsage/);
+  assert.match(store, /usageMetricsV3/);
+  assert.match(store, /persona-team\/run/);
+  assert.match(store, /autosave/);
+  assert.match(auth, /getProductUsage/);
+  assert.match(auth, /promptCount/);
+  assert.match(page, /Prompts/);
+  assert.match(page, /1 prompt = 1 envio/);
 });
 
 test('ADMIN_CONSOLE_V1 support impersonation enter + exit', () => {

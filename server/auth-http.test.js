@@ -63,7 +63,9 @@ test('fluxo HTTP protege API e libera painel para a primeira conta admin', async
   assert.equal(usersResponse.status, 200);
   const usersPayload = await usersResponse.json();
   assert.equal(usersPayload.users.length, 1);
-  assert.equal(usersPayload.users.find((user) => user.email === 'admin@luca.test').requestCount, 1);
+  // requestCount/promptCount só sobe em POST /api/luca-ai/persona-team/run — não em GET /api/private.
+  assert.equal(usersPayload.users.find((user) => user.email === 'admin@luca.test').requestCount, 0);
+  assert.equal(usersPayload.users.find((user) => user.email === 'admin@luca.test').promptCount ?? 0, 0);
 
   // Cria segunda conta e admin entra nela (suporte).
   const second = await fetch(`${baseUrl}/api/auth/register`, {
