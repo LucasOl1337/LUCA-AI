@@ -27,4 +27,6 @@ declare module '../../shared/request-timeout.js' {
   ): Promise<T>;
 
   export function buildApiErrorMessage(error: unknown, fallback?: string): string;
+  export function isTransientRequestError(error: unknown): boolean;
+  export function isEdgeTimeoutError(error: unknown): boolean;
 }

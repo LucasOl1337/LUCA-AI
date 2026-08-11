@@ -117,6 +117,21 @@ function makeSession(partial = {}) {
     finalResult: partial.finalResult ?? null,
     visualPack: partial.visualPack ?? null,
     activePersonaSlug: partial.activePersonaSlug ? String(partial.activePersonaSlug) : null,
+    activePersonaRun: normalizeActivePersonaRun(partial.activePersonaRun),
+  };
+}
+
+function normalizeActivePersonaRun(value) {
+  if (!value || typeof value !== 'object') return null;
+  const runId = String(value.runId || '').trim();
+  if (!runId) return null;
+  const status = String(value.status || 'running').trim() || 'running';
+  return {
+    runId,
+    traceId: String(value.traceId || runId).trim(),
+    status,
+    startedAt: String(value.startedAt || nowIso()),
+    errorMessage: value.errorMessage ? String(value.errorMessage).slice(0, 400) : null,
   };
 }
 
@@ -267,6 +282,7 @@ function archiveSessionSnapshot(userId, session, reason = 'snapshot') {
       finalResult: session.finalResult ?? null,
       visualPack: session.visualPack ?? null,
       activePersonaSlug: session.activePersonaSlug || null,
+      activePersonaRun: session.activePersonaRun || null,
       workflowAssignments: session.workflowAssignments || null,
       individualAssignments: session.individualAssignments || null,
     },
@@ -790,6 +806,9 @@ export function updateChatSession(sessionId, patch = {}) {
     if (Object.prototype.hasOwnProperty.call(patch, 'activePersonaSlug')) {
       session.activePersonaSlug = patch.activePersonaSlug ? String(patch.activePersonaSlug) : null;
     }
+    if (Object.prototype.hasOwnProperty.call(patch, 'activePersonaRun')) {
+      session.activePersonaRun = normalizeActivePersonaRun(patch.activePersonaRun);
+    }
     if (!String(session.title || '').trim() || session.title === 'Nova sessão') {
       const fromMission = String(session.missionDraft || '').trim();
       if (fromMission) session.title = clipTitle(fromMission);
@@ -804,6 +823,7 @@ export function updateChatSession(sessionId, patch = {}) {
       || Array.isArray(patch.appendTranscript)
       || Object.prototype.hasOwnProperty.call(patch, 'finalResult')
       || Object.prototype.hasOwnProperty.call(patch, 'visualPack')
+      || Object.prototype.hasOwnProperty.call(patch, 'activePersonaRun')
       || patch.operationMode === 'team'
       || patch.operationMode === 'individual'
       || patch.workflowAssignments
@@ -811,6 +831,63 @@ export function updateChatSession(sessionId, patch = {}) {
     );
     if (contentful) session.updatedAt = nowIso();
 
+    return session;
+  });
+}
+
+/**
+ * Marca rodada assíncrona na sessão (sobrevive a 524/F5 enquanto o job roda na VM).
+ */
+export function markPersonaRunStartedOnSession(sessionId, meta = {}) {
+  const sid = String(sessionId || '').trim();
+  const runId = String(meta.runId || '').trim();
+  if (!sid || !runId) return null;
+  return withLibrary((library) => {
+    const session = library.sessions.find((item) => item.id === sid);
+    if (!session) return null;
+    session.activePersonaRun = normalizeActivePersonaRun({
+      runId,
+      traceId: meta.traceId || runId,
+      status: 'running',
+      startedAt: meta.startedAt || nowIso(),
+      errorMessage: null,
+    });
+    session.updatedAt = nowIso();
+    return session;
+  });
+}
+
+export function markPersonaRunFailedOnSession(sessionId, meta = {}) {
+  const sid = String(sessionId || '').trim();
+  if (!sid) return null;
+  return withLibrary((library) => {
+    const session = library.sessions.find((item) => item.id === sid);
+    if (!session) return null;
+    const prev = normalizeActivePersonaRun(session.activePersonaRun);
+    if (!prev && !meta.runId) {
+      session.activePersonaRun = null;
+      return session;
+    }
+    session.activePersonaRun = normalizeActivePersonaRun({
+      runId: meta.runId || prev?.runId,
+      traceId: meta.traceId || prev?.traceId,
+      status: 'failed',
+      startedAt: prev?.startedAt || nowIso(),
+      errorMessage: meta.errorMessage || meta.message || 'persona_run_failed',
+    });
+    session.updatedAt = nowIso();
+    return session;
+  });
+}
+
+export function clearPersonaRunOnSession(sessionId) {
+  const sid = String(sessionId || '').trim();
+  if (!sid) return null;
+  return withLibrary((library) => {
+    const session = library.sessions.find((item) => item.id === sid);
+    if (!session) return null;
+    session.activePersonaRun = null;
+    session.updatedAt = nowIso();
     return session;
   });
 }
@@ -854,6 +931,8 @@ export function recordPersonaRunOnSession(sessionId, run = {}) {
     session.finalResult = finalEntryFromPersonaRun(run);
     session.visualPack = run.visualPack && typeof run.visualPack === 'object' ? run.visualPack : null;
     if (run.ok) session.draftAttachments = [];
+    // Job terminou — limpa marcador de rodada em andamento.
+    session.activePersonaRun = null;
 
     if (!String(session.title || '').trim() || session.title === 'Nova sessão') {
       if (mission) session.title = clipTitle(mission);

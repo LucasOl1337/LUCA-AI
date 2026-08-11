@@ -6,6 +6,8 @@ import {
   RequestNetworkError,
   RequestTimeoutError,
   buildApiErrorMessage,
+  isEdgeTimeoutError,
+  isTransientRequestError,
   requestJson,
 } from '../shared/request-timeout.js';
 
@@ -56,4 +58,19 @@ test('buildApiErrorMessage gera mensagens operacionais claras', () => {
     })),
     'A execução demorou além do limite da conexão. Ela pode continuar em segundo plano; acompanhe o progresso e tente atualizar em instantes.',
   );
+});
+
+test('isTransientRequestError cobre timeout, rede e 5xx de borda', () => {
+  assert.equal(isTransientRequestError(new RequestTimeoutError('t', { timeoutMs: 1000 })), true);
+  assert.equal(isTransientRequestError(new RequestNetworkError('n')), true);
+  assert.equal(isTransientRequestError(new RequestHttpError('e', { status: 524, bodyText: '' })), true);
+  assert.equal(isTransientRequestError(new RequestHttpError('e', { status: 502, bodyText: '' })), true);
+  assert.equal(isTransientRequestError(new RequestHttpError('e', {
+    status: 200,
+    bodyText: '<!DOCTYPE html> cloudflare',
+  })), true);
+  assert.equal(isTransientRequestError(new RequestHttpError('e', { status: 409, bodyText: 'lock' })), false);
+  assert.equal(isTransientRequestError(new Error('boom')), false);
+  assert.equal(isEdgeTimeoutError(new RequestHttpError('e', { status: 524, bodyText: '' })), true);
+  assert.equal(isEdgeTimeoutError(new RequestTimeoutError('t', { timeoutMs: 1 })), false);
 });

@@ -16,12 +16,21 @@ import type {
   YumePersonaSummary,
 } from './types';
 import { buildApiErrorMessage, requestJson } from './requestTimeout';
+// @ts-expect-error -- shared helper stays in plain JS so node:test can import without transpilation.
+import { PersonaRunWatchError, watchPersonaTeamRun } from '../../shared/persona-run-watch.js';
+// @ts-expect-error -- shared helper stays in plain JS so node:test can import without transpilation.
+import { isTransientRequestError } from '../../shared/request-timeout.js';
 
 const apiBase = typeof window !== 'undefined' ? window.location.origin : '';
 const STATE_REQUEST_TIMEOUT_MS = 8000;
 const ACTION_REQUEST_TIMEOUT_MS = 20000;
-const PERSONA_RUN_POLL_INTERVAL_MS = 1200;
+/** Aceite do job: borda pode hesitar sob carga; ainda deve ser bem abaixo do 524 (~100s). */
+const PERSONA_RUN_START_TIMEOUT_MS = 45_000;
+const PERSONA_RUN_POLL_TIMEOUT_MS = 12_000;
+const PERSONA_RUN_POLL_INTERVAL_MS = 1500;
 const PERSONA_RUN_MAX_WAIT_MS = 30 * 60 * 1000;
+/** Só desiste do acompanhamento se a borda ficar instável por este período seguido. */
+const PERSONA_RUN_MAX_CONSECUTIVE_ERROR_MS = 3 * 60 * 1000;
 
 function apiUrl(path: string, base = apiBase): string {
   return `${base.replace(/\/+$/, '')}${path}`;
@@ -114,23 +123,138 @@ function wait(ms: number): Promise<void> {
 }
 
 async function waitForPersonaTeamRun(
-  accepted: LucaAiPersonaTeamRunAccepted,
+  accepted: Pick<LucaAiPersonaTeamRunAccepted, 'runId' | 'traceId'>,
   base = apiBase,
 ): Promise<LucaAiPersonaTeamRunResponse> {
-  const deadline = Date.now() + PERSONA_RUN_MAX_WAIT_MS;
-  while (Date.now() < deadline) {
-    const job = await apiGet<LucaAiPersonaTeamRunStatus>(
-      `/api/luca-ai/persona-team/runs/${encodeURIComponent(accepted.runId)}`,
+  const result = await watchPersonaTeamRun({
+    runId: accepted.runId,
+    traceId: accepted.traceId,
+    maxWaitMs: PERSONA_RUN_MAX_WAIT_MS,
+    pollIntervalMs: PERSONA_RUN_POLL_INTERVAL_MS,
+    maxConsecutiveErrorMs: PERSONA_RUN_MAX_CONSECUTIVE_ERROR_MS,
+    isTransient: isTransientRequestError,
+    wait,
+    getStatus: (runId: string) => apiGet<LucaAiPersonaTeamRunStatus>(
+      `/api/luca-ai/persona-team/runs/${encodeURIComponent(runId)}`,
+      PERSONA_RUN_POLL_TIMEOUT_MS,
+      base,
+    ),
+  });
+  return result as LucaAiPersonaTeamRunResponse;
+}
+
+/**
+ * Se o poll da borda falhou mas o servidor já gravou a rodada na sessão,
+ * recupera o resultado sem reenviar a missão (evita rodada duplicada cara).
+ */
+async function recoverPersonaRunFromSession(
+  sessionId: string | undefined,
+  traceId: string | undefined,
+  base = apiBase,
+): Promise<LucaAiPersonaTeamRunResponse | null> {
+  const sid = String(sessionId || '').trim();
+  if (!sid) return null;
+  try {
+    const data = await apiGet<{ ok: boolean; session?: LucaAiChatSession }>(
+      `/api/luca-ai/chat/sessions/${encodeURIComponent(sid)}`,
       ACTION_REQUEST_TIMEOUT_MS,
       base,
     );
-    if (job.status === 'complete' && job.result) return job.result;
-    if (job.status === 'failed') {
-      throw new Error(job.error?.message || 'A rodada de personas falhou durante a execução.');
-    }
-    await wait(PERSONA_RUN_POLL_INTERVAL_MS);
+    const session = data?.session;
+    if (!session) return null;
+
+    // Rodada ainda marcada como ativa no servidor — não inventar sucesso.
+    const active = session.activePersonaRun;
+    if (active && String(active.status || '') === 'running') return null;
+    if (active && String(active.status || '') === 'failed') return null;
+
+    const finalResult = session.finalResult;
+    if (!finalResult || typeof finalResult !== 'object') return null;
+
+    const transcript = Array.isArray(session.transcript) ? session.transcript : [];
+    const hasAssistantContent = transcript.some((entry) => {
+      const role = String((entry as { role?: string })?.role || '');
+      return role === 'persona' || role === 'assistant' || role === 'final' || role === 'judge';
+    }) || Boolean(String((finalResult as { content?: string }).content || '').trim());
+
+    if (!hasAssistantContent) return null;
+
+    return {
+      ok: true,
+      recoveredFromSession: true,
+      traceId: String(traceId || active?.traceId || ''),
+      mission: String(session.missionDraft || ''),
+      team: [],
+      replies: [],
+      finalDisplay: {
+        roleId: 'recovered',
+        roleLabel: 'Recuperado',
+        slug: 'session',
+        name: 'Sessão',
+        content: String((finalResult as { content?: string }).content || ''),
+      },
+      visualPack: session.visualPack ?? null,
+      generatedAt: new Date().toISOString(),
+    };
+  } catch {
+    return null;
   }
-  throw new Error('A rodada continua em segundo plano e excedeu o tempo de acompanhamento desta tela.');
+}
+
+async function finishPersonaTeamRunWatch(
+  accepted: Pick<LucaAiPersonaTeamRunAccepted, 'runId' | 'traceId'>,
+  sessionId: string | undefined,
+  base = apiBase,
+): Promise<LucaAiPersonaTeamRunResponse> {
+  const runId = accepted.runId;
+  const traceId = String(accepted.traceId || '');
+  try {
+    return await waitForPersonaTeamRun(accepted, base);
+  } catch (error) {
+    // Última chance: job pode ter terminado enquanto a borda flapeava.
+    if (error instanceof PersonaRunWatchError || isTransientRequestError(error)) {
+      try {
+        const job = await apiGet<LucaAiPersonaTeamRunStatus>(
+          `/api/luca-ai/persona-team/runs/${encodeURIComponent(runId)}`,
+          PERSONA_RUN_POLL_TIMEOUT_MS,
+          base,
+        );
+        if (job.status === 'complete' && job.result) return job.result;
+        if (job.status === 'failed') {
+          throw new PersonaRunWatchError(
+            job.error?.message || 'A rodada de personas falhou durante a execução.',
+            {
+              runId,
+              traceId: job.traceId || traceId,
+              code: String(job.error?.code || 'persona_run_failed'),
+              cause: job.error || null,
+            },
+          );
+        }
+      } catch (probeError) {
+        if (probeError instanceof PersonaRunWatchError) throw probeError;
+        // segue para recovery de sessão
+      }
+
+      const recovered = await recoverPersonaRunFromSession(sessionId, traceId, base);
+      if (recovered) return recovered;
+
+      if (error instanceof PersonaRunWatchError) throw error;
+      throw new PersonaRunWatchError(
+        buildApiErrorMessage(
+          error,
+          'A execução demorou além do limite da conexão. Ela pode continuar em segundo plano; acompanhe o progresso e tente atualizar em instantes.',
+        ),
+        {
+          runId,
+          traceId,
+          code: 'persona_run_edge_unstable',
+          cause: error,
+        },
+      );
+    }
+    throw error;
+  }
 }
 
 async function startPersonaTeamRun(
@@ -141,12 +265,35 @@ async function startPersonaTeamRun(
     '/api/luca-ai/persona-team/run',
     body,
     base,
-    ACTION_REQUEST_TIMEOUT_MS,
+    PERSONA_RUN_START_TIMEOUT_MS,
   );
-  return waitForPersonaTeamRun(accepted, base);
+
+  if (!accepted?.runId) {
+    throw new Error('Runtime aceitou a rodada sem runId.');
+  }
+
+  const sessionId = typeof body.sessionId === 'string' ? body.sessionId : undefined;
+  return finishPersonaTeamRunWatch(
+    { runId: accepted.runId, traceId: String(accepted.traceId || body.traceId || '') },
+    sessionId,
+    base,
+  );
 }
 
-export { buildApiErrorMessage };
+async function startPersonaTeamRunResume(
+  input: { runId: string; traceId?: string; sessionId?: string },
+  base = apiBase,
+): Promise<LucaAiPersonaTeamRunResponse> {
+  const runId = String(input.runId || '').trim();
+  if (!runId) throw new Error('runId ausente para retomar a rodada.');
+  return finishPersonaTeamRunWatch(
+    { runId, traceId: String(input.traceId || runId) },
+    input.sessionId,
+    base,
+  );
+}
+
+export { buildApiErrorMessage, PersonaRunWatchError, isTransientRequestError };
 
 // ─── Ações do contrato (server/index.js) ───
 export const lucaApi = {
@@ -213,6 +360,13 @@ export const lucaApi = {
       { mission, mode: 'individual', slugs, judgeSlug, traceId, modelOverrides, sessionId, attachmentIds, depth },
       base,
     ),
+  /** Retoma o acompanhamento de um job já aceito (F5 / flap de borda). */
+  resumePersonaTeamRun: (
+    runId: string,
+    traceId?: string,
+    sessionId?: string,
+    base?: string,
+  ) => startPersonaTeamRunResume({ runId, traceId, sessionId }, base),
   listEvents: (params: { traceId?: string; type?: string; limit?: number } = {}, base?: string) =>
     apiGet<{ ok: boolean; events: RuntimeEvent[] }>(`/api/events${queryString(params)}`, 8000, base),
   getChatLibrary: (base?: string) =>

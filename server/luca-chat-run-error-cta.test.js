@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 const root = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(join(root, '../src/pages/LucaAiPage.tsx'), 'utf8');
 
-test('runMission clears composer on send and restores mission for re-run on failure', () => {
+test('runMission clears composer on send and restores mission for re-run on hard failure', () => {
   const start = source.indexOf('async function runMission()');
   assert.ok(start >= 0, 'runMission present');
   // Delimita pela proxima declaracao, nao por contagem de caracteres: a funcao
@@ -21,18 +21,22 @@ test('runMission clears composer on send and restores mission for re-run on fail
   // Sent message lives on the operator bubble; composer empties immediately after commit.
   assert.ok(slice.includes("setMission('')") || slice.includes('setMission("")'), 'clears composer after send');
   assert.ok(slice.includes("missionDraft: ''") || slice.includes('missionDraft: ""'), 'persists empty draft after send');
-  assert.ok(slice.includes('setMission(trimmedMission)'), 'restores mission so Reenviar missão works');
+  assert.ok(slice.includes('setMission(trimmedMission)'), 'restores mission so Reenviar missão works on hard fail');
+  // Soft edge (524): does not force re-send while job may still be running.
+  assert.ok(slice.includes('isWatchSoft') || slice.includes('PersonaRunWatchError'), 'distinguishes edge soft-fail');
+  assert.ok(slice.includes('recoveredFromSession') || slice.includes('refreshChatLibrary'), 'can recover from server session');
 });
 
 test('chat notice run failure re-sends mission instead of only reloading personas', () => {
   const start = source.indexOf('data-luca-chat-error');
   assert.ok(start >= 0, 'chat error shell present');
-  const slice = source.slice(start, start + 900);
+  const slice = source.slice(start, start + 1200);
   assert.ok(slice.includes('data-luca-chat-error-kind'), 'error kind marker');
   assert.ok(slice.includes("errorRetry === 'run'") || slice.includes('errorRetry === "run"'), 'branches on run kind');
   assert.ok(slice.includes('void runMission()'), 'retry can re-run mission');
   assert.ok(slice.includes('void loadPersonas()'), 'personas path still available');
   assert.ok(slice.includes('Reenviar missão'), 'run retry label');
+  assert.ok(slice.includes('Atualizar sessão'), 'edge soft-fail refreshes session instead of duplicate run');
   assert.ok(slice.includes('onDismiss='), 'dismiss still present');
   assert.equal(slice.includes('data-luca-activity-empty'), false, 'activity empty not inside error');
   assert.equal(slice.includes('data-luca-canvas-empty'), false, 'canvas empty not inside error');

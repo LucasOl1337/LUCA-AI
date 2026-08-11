@@ -68,6 +68,7 @@ import {
 import { runWithWorkspaceUser, getWorkspaceUserId } from './workspace-context.js';
 import {
   activateChatSession,
+  clearPersonaRunOnSession,
   createChatFolder,
   createChatSession,
   deleteChatFolder,
@@ -77,6 +78,8 @@ import {
   getChatSession,
   getChatSessionForUser,
   getProductUsageSummaryForUser,
+  markPersonaRunFailedOnSession,
+  markPersonaRunStartedOnSession,
   recordPersonaRunOnSession,
   renameChatFolder,
   updateChatSession,
@@ -150,15 +153,18 @@ import {
   reconcileOfficialPersonaAgents,
 } from './persona-cards.js';
 import {
+  buildConversationContextFromTranscript,
   buildIndividualJudgePrompt,
   buildIndividualRevisionPrompt,
   buildPersonaTeamPrompt,
   cleanPersonaTeamOutput,
+  collectPriorAttachmentIds,
   DEPTH_BUDGETS,
   normalizePersonaTeamRunInput,
   PERSONA_WORKFLOW_ROLES,
   runIndividualResolution,
 } from './persona-team.js';
+import { personaRunOperatorEntryId } from '../shared/persona-run-transcript.js';
 import { createPersonaRunJobStore } from './persona-run-jobs.js';
 import { createDeliberations } from './deliberations/index.js';
 import {
@@ -1956,7 +1962,7 @@ function appendLucaAiTraceEvent(traceId, type, payload = {}) {
   }
 }
 
-async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, workflowRole = null, accumulatedContext = '', independent = false, phase = null, maxTokens = 900, attachments = [], toolsEnabled = true, traceId = null }) {
+async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, workflowRole = null, accumulatedContext = '', independent = false, phase = null, maxTokens = 900, attachments = [], toolsEnabled = true, traceId = null, conversationContext = '' }) {
   const name = loaded.name || slug;
   const model = loaded.model || ROUTER_MODEL;
   const prompt = buildPersonaTeamPrompt({
@@ -1969,6 +1975,7 @@ async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, wo
     workflowRole,
     accumulatedContext,
     independent,
+    conversationContext,
   });
   const startedAt = new Date().toISOString();
   const startedMs = Date.now();
@@ -2060,7 +2067,7 @@ async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, wo
   }
 }
 
-async function runLucaAiIndividualRevision({ slug, mission, originalReply, contributions, loaded, maxTokens, attachments = [], toolsEnabled = true, traceId = null }) {
+async function runLucaAiIndividualRevision({ slug, mission, originalReply, contributions, loaded, maxTokens, attachments = [], toolsEnabled = true, traceId = null, conversationContext = '' }) {
   const name = loaded.name || slug;
   const model = loaded.model || ROUTER_MODEL;
   const prompt = buildIndividualRevisionPrompt({
@@ -2071,6 +2078,7 @@ async function runLucaAiIndividualRevision({ slug, mission, originalReply, contr
     runtimeModel: model,
     originalReply,
     contributions,
+    conversationContext,
   });
   const startedAt = new Date().toISOString();
   const startedMs = Date.now();
@@ -2147,7 +2155,7 @@ async function runLucaAiIndividualRevision({ slug, mission, originalReply, contr
   }
 }
 
-export async function runLucaAiIndividualJudge({ slug, mission, replies, originalReplies = [], loaded, maxTokens = 1400, attachments = [], toolsEnabled = true, traceId = null }) {
+export async function runLucaAiIndividualJudge({ slug, mission, replies, originalReplies = [], loaded, maxTokens = 1400, attachments = [], toolsEnabled = true, traceId = null, conversationContext = '' }) {
   const name = loaded.name || slug;
   const model = loaded.model || ROUTER_MODEL;
   const prompt = buildIndividualJudgePrompt({
@@ -2158,6 +2166,7 @@ export async function runLucaAiIndividualJudge({ slug, mission, replies, origina
     runtimeModel: model,
     replies,
     originalReplies,
+    conversationContext,
   });
   const startedAt = new Date().toISOString();
   const startedMs = Date.now();
@@ -2245,7 +2254,7 @@ export async function runLucaAiIndividualJudge({ slug, mission, replies, origina
   }
 }
 
-async function runLucaAiPersonaWorkflow({ mission, workflow, teamNames, loadedBySlug, attachments = [], toolsEnabled = true, traceId = null }) {
+async function runLucaAiPersonaWorkflow({ mission, workflow, teamNames, loadedBySlug, attachments = [], toolsEnabled = true, traceId = null, conversationContext = '' }) {
   const steps = [];
   const contextSections = [];
 
@@ -2304,6 +2313,7 @@ async function runLucaAiPersonaWorkflow({ mission, workflow, teamNames, loadedBy
         toolsEnabled: role.roleId === 'visual' ? false : toolsEnabled,
         maxTokens: role.roleId === 'visual' ? 2200 : 900,
         traceId,
+        conversationContext,
       });
     }));
     const stepCompletedAt = new Date().toISOString();
@@ -3516,7 +3526,12 @@ app.post('/api/luca-ai/persona-team/run', (req, res) => {
     traceId: input.traceId,
     execute: () => runWithWorkspaceUser(ownerId, async () => {
       try {
-        return await executeLucaAiPersonaTeamRun(input);
+        const result = await executeLucaAiPersonaTeamRun(input);
+        // recordPersonaRunOnSession já limpa activePersonaRun; reforça se sessionId ausente no payload.
+        if (input.sessionId) {
+          try { clearPersonaRunOnSession(input.sessionId); } catch { /* best-effort */ }
+        }
+        return result;
       } catch (error) {
         appendLucaAiTraceEvent(input.traceId, 'luca_ai.workflow.failed', {
           mode: input.mode,
@@ -3524,11 +3539,33 @@ app.post('/api/luca-ai/persona-team/run', (req, res) => {
           code: error?.code || 'persona_run_failed',
         });
         console.error(`[persona-team] run ${input.traceId} falhou: ${error?.message || String(error)}`);
+        if (input.sessionId) {
+          try {
+            markPersonaRunFailedOnSession(input.sessionId, {
+              runId: job.runId,
+              traceId: job.traceId || input.traceId,
+              errorMessage: error?.message || String(error),
+            });
+          } catch { /* best-effort */ }
+        }
         throw error;
       }
     }),
   });
 
+  if (input.sessionId) {
+    try {
+      markPersonaRunStartedOnSession(input.sessionId, {
+        runId: job.runId,
+        traceId: job.traceId || input.traceId,
+        startedAt: job.startedAt,
+      });
+    } catch (error) {
+      console.error(`[chat-library] markPersonaRunStartedOnSession falhou: ${error?.message || String(error)}`);
+    }
+  }
+
+  // 202 imediato — a borda Cloudflare (~100s) não espera a rodada multi-agente.
   res.status(202).json({
     ok: true,
     runId: job.runId,

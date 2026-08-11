@@ -29,7 +29,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { buildApiErrorMessage, lucaApi } from '@/lib/api';
+import { buildApiErrorMessage, lucaApi, PersonaRunWatchError } from '@/lib/api';
 import type {
   LucaAiChatAttachment,
   LucaAiChatSession,
@@ -646,6 +646,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   } = useChatLibrary();
   const boundSessionIdRef = useRef<string | null>(null);
   const runOwnerSessionIdRef = useRef<string | null>(null);
+  /** Evita retomar o mesmo job mais de uma vez (F5 / rehydrate). */
+  const resumedRunKeyRef = useRef<string | null>(null);
   const assignments = useMemo(() => normalizeWorkflowAssignments(workflowState), [workflowState]);
   const assignedSlugs = useMemo(() => flattenWorkflowAssignments(assignments), [assignments]);
   const individualAssignments = useMemo<IndividualAssignments>(() => ({
@@ -763,6 +765,77 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     }
     applySession(activeSession);
   }, [activeSession, activeSessionId, applySession, libraryReady, persistSession]);
+
+  // Retoma acompanhamento de rodada marcada no servidor (524/F5/aba reaberta).
+  useEffect(() => {
+    if (!libraryReady || !activeSession || running) return;
+    const activeRun = activeSession.activePersonaRun;
+    if (!activeRun || String(activeRun.status || '') !== 'running') return;
+    const runId = String(activeRun.runId || '').trim();
+    if (!runId) return;
+    const key = `${activeSession.id}:${runId}`;
+    if (resumedRunKeyRef.current === key) return;
+    if (runOwnerSessionIdRef.current === activeSession.id) return;
+    resumedRunKeyRef.current = key;
+
+    const ownerSessionId = activeSession.id;
+    const traceId = String(activeRun.traceId || runId);
+    runOwnerSessionIdRef.current = ownerSessionId;
+    setRunning(true);
+    setError(null);
+    setErrorRetry(null);
+    setActiveTraceId(traceId);
+    setActiveWorkspaceView('activity');
+
+    const stillOwner = () => (
+      runOwnerSessionIdRef.current === ownerSessionId
+      && boundSessionIdRef.current === ownerSessionId
+    );
+
+    void (async () => {
+      try {
+        const data = await lucaApi.resumePersonaTeamRun(runId, traceId, ownerSessionId, bridgeBase);
+        if (!stillOwner()) return;
+        if (data.traceId) setActiveTraceId(data.traceId);
+        if (data.recoveredFromSession) {
+          await refreshChatLibrary();
+          return;
+        }
+        const nextMessages = transcriptEntriesFromResponse(data);
+        setTranscript((prev) => {
+          const existingIds = new Set(prev.map((entry) => entry.id));
+          const merged = [...prev];
+          for (const entry of nextMessages) {
+            if (!existingIds.has(entry.id)) merged.push(entry);
+          }
+          return merged.slice(-140);
+        });
+        const nextFinal = finalEntryFromPersonaRun(data) as TeamTranscriptEntry | null;
+        if (nextFinal) setFinalResult(nextFinal);
+        if (data.visualPack && typeof data.visualPack === 'object') setVisualPack(data.visualPack);
+        await refreshChatLibrary();
+        if (!data.ok) {
+          setError('A equipe foi acionada, mas nenhuma persona retornou resposta util.');
+          setErrorRetry('run');
+        }
+      } catch (err) {
+        if (!stillOwner()) return;
+        try { await refreshChatLibrary(); } catch { /* best-effort */ }
+        const isWatchSoft = err instanceof PersonaRunWatchError
+          || (err instanceof Error && /segundo plano|limite da conexão|instável/i.test(err.message));
+        const message = err instanceof Error
+          ? err.message
+          : buildApiErrorMessage(err, 'Falha ao retomar a rodada em andamento.');
+        setError(message);
+        setErrorRetry(isWatchSoft ? null : 'run');
+        // Soft fail: libera retomada no próximo "Atualizar sessão"/refresh.
+        if (isWatchSoft && resumedRunKeyRef.current === key) resumedRunKeyRef.current = null;
+      } finally {
+        if (stillOwner()) setRunning(false);
+        if (runOwnerSessionIdRef.current === ownerSessionId) runOwnerSessionIdRef.current = null;
+      }
+    })();
+  }, [activeSession, bridgeBase, libraryReady, refreshChatLibrary, running]);
 
   const buildPersistPayload = useCallback((overrides: Record<string, unknown> = {}) => ({
     operationMode,
@@ -1479,6 +1552,13 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         );
       if (!stillOwner()) return;
       if (data.traceId) setActiveTraceId(data.traceId);
+
+      // Resultado recuperado da sessão após flap de borda: servidor já é canônico.
+      if (data.recoveredFromSession) {
+        if (stillOwner()) await refreshChatLibrary();
+        return;
+      }
+
       const nextMessages = transcriptEntriesFromResponse(data);
       const transcriptAfter = [...transcriptWithOperator, ...nextMessages].slice(-140);
       setTranscript(transcriptAfter);
@@ -1500,29 +1580,49 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       // Success: composer stays empty; original question lives on the operator bubble.
     } catch (err) {
       if (!stillOwner()) return;
-      const message = buildApiErrorMessage(err, operationMode === 'individual'
-        ? 'Falha ao rodar resolução individual.'
-        : 'Falha ao rodar fluxo de personas.');
+
+      // Tentativa final: sessão pode ter recebido o resultado no servidor.
+      try {
+        await refreshChatLibrary();
+        if (!stillOwner()) return;
+      } catch {
+        // library refresh is best-effort here
+      }
+
+      const isWatchSoft = err instanceof PersonaRunWatchError
+        || (err instanceof Error && /segundo plano|limite da conexão|instável/i.test(err.message));
+      const message = isWatchSoft
+        ? (err instanceof Error ? err.message : buildApiErrorMessage(err))
+        : buildApiErrorMessage(err, operationMode === 'individual'
+          ? 'Falha ao rodar resolução individual.'
+          : 'Falha ao rodar fluxo de personas.');
+
+      // Soft edge failure: não recoloca a missão no composer (evita reenvio duplicado
+      // enquanto o job ainda roda). Usuário atualiza / reabre a sessão.
       setError(message);
-      setErrorRetry('run');
-      setMission(trimmedMission);
-      setDraftAttachments(attachmentsToRun);
+      setErrorRetry(isWatchSoft ? null : 'run');
+      if (!isWatchSoft) {
+        setMission(trimmedMission);
+        setDraftAttachments(attachmentsToRun);
+      }
       const errorEntry: TeamTranscriptEntry = {
         id: nowId('system-error'),
         role: 'system',
         name: 'LUCA-AI',
         content: message,
-        status: 'error',
+        status: isWatchSoft ? 'info' : 'error',
         timestamp: new Date().toISOString(),
       };
       const transcriptAfterError = [...transcriptWithOperator, errorEntry].slice(-140);
       setTranscript(transcriptAfterError);
-      void flushSessionNow(ownerSessionId, {
-        missionDraft: trimmedMission,
-        draftAttachments: attachmentsToRun,
-        transcript: transcriptAfterError,
-        finalResult: null,
-      });
+      if (!isWatchSoft) {
+        void flushSessionNow(ownerSessionId, {
+          missionDraft: trimmedMission,
+          draftAttachments: attachmentsToRun,
+          transcript: transcriptAfterError,
+          finalResult: null,
+        });
+      }
     } finally {
       if (stillOwner()) {
         try {
@@ -1711,8 +1811,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         <div
           className="luca-ai-chat-notice"
           data-luca-chat-error
-          data-tone="error"
-          data-luca-chat-error-kind={errorRetry === 'run' ? 'run' : 'personas'}
+          data-tone={errorRetry ? 'error' : 'warning'}
+          data-luca-chat-error-kind={errorRetry === 'run' ? 'run' : errorRetry === 'personas' ? 'personas' : 'edge'}
           role="alert"
         >
           <Notice
@@ -1720,14 +1820,22 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
             body={error}
             onRetry={() => {
               if (errorRetry === 'run') void runMission();
-              else void loadPersonas();
+              else if (errorRetry === 'personas') void loadPersonas();
+              else {
+                // Soft edge: limpa trava de resume e recarrega — se o job ainda
+                // estiver running no servidor, o effect retoma o poll sozinho.
+                setError(null);
+                setErrorRetry(null);
+                resumedRunKeyRef.current = null;
+                void refreshChatLibrary();
+              }
             }}
             onDismiss={() => {
               setError(null);
               setErrorRetry(null);
             }}
             busy={loading || running}
-            retryLabel={errorRetry === 'run' ? 'Reenviar missão' : 'Tentar novamente'}
+            retryLabel={errorRetry === 'run' ? 'Reenviar missão' : errorRetry === 'personas' ? 'Tentar novamente' : 'Atualizar sessão'}
           />
         </div>
       )}

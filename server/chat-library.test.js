@@ -445,3 +445,47 @@ test('CHAT_LIBRARY_V1 product usage counts operator prompts not agent replies', 
   assert.ok(usage.chatSessionCount >= 1);
   assert.ok(usage.messageCount > 2, 'inclui respostas dos agentes além dos prompts');
 });
+
+test('CHAT_LIBRARY_V1 activePersonaRun marca e limpa rodada em andamento', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-active-run-'));
+  const { workspace, chatLibrary } = await loadChatLibrary(dataDir);
+
+  workspace.runWithWorkspaceUser('user-active-run', () => {
+    const sessionId = chatLibrary.getChatLibrarySnapshot().activeSessionId;
+    chatLibrary.markPersonaRunStartedOnSession(sessionId, {
+      runId: 'run-xyz',
+      traceId: 'trace-xyz',
+      startedAt: '2026-08-11T12:00:00.000Z',
+    });
+    let session = chatLibrary.getChatSession(sessionId);
+    assert.equal(session.activePersonaRun.runId, 'run-xyz');
+    assert.equal(session.activePersonaRun.status, 'running');
+
+    chatLibrary.recordPersonaRunOnSession(sessionId, {
+      mission: 'Missao com borda instavel',
+      mode: 'team',
+      traceId: 'trace-xyz',
+      generatedAt: new Date().toISOString(),
+      replies: [{ ok: true, slug: 'a', name: 'A', content: 'ok', completedAt: new Date().toISOString() }],
+      steps: [],
+      judge: null,
+      finalDisplay: { name: 'Final', content: 'ok' },
+    });
+    session = chatLibrary.getChatSession(sessionId);
+    assert.equal(session.activePersonaRun, null, 'record limpa marcador ativo');
+    assert.ok(session.finalResult);
+
+    chatLibrary.markPersonaRunStartedOnSession(sessionId, { runId: 'run-fail', traceId: 'trace-fail' });
+    chatLibrary.markPersonaRunFailedOnSession(sessionId, {
+      runId: 'run-fail',
+      traceId: 'trace-fail',
+      errorMessage: 'boom',
+    });
+    session = chatLibrary.getChatSession(sessionId);
+    assert.equal(session.activePersonaRun.status, 'failed');
+    assert.match(String(session.activePersonaRun.errorMessage), /boom/);
+    chatLibrary.clearPersonaRunOnSession(sessionId);
+    session = chatLibrary.getChatSession(sessionId);
+    assert.equal(session.activePersonaRun, null);
+  });
+});

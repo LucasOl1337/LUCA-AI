@@ -82,21 +82,57 @@ export async function requestJson(url, options = {}) {
   return response.json();
 }
 
+/** Status HTTP de borda/proxy que costumam ser transitórios (Cloudflare, tunnel, gateway). */
+const TRANSIENT_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 527]);
+
+function looksLikeCloudflareBody(bodyText) {
+  return /<!doctype\s+html|cloudflare|cf-error-details|error code (?:52[0-7]|504|503)/i.test(String(bodyText || ''));
+}
+
+/**
+ * Erros de rede/borda que não significam falha definitiva da rodada.
+ * O job assíncrono no Express pode continuar; o cliente deve re-pollar.
+ */
+export function isTransientRequestError(error) {
+  if (!error || typeof error !== 'object') return false;
+  if (error instanceof RequestTimeoutError) return true;
+  if (error instanceof RequestNetworkError) return true;
+  if (error instanceof RequestHttpError) {
+    if (TRANSIENT_HTTP_STATUSES.has(Number(error.status) || 0)) return true;
+    if (looksLikeCloudflareBody(error.bodyText)) return true;
+  }
+  const name = String(error.name || '');
+  if (name === 'RequestTimeoutError' || name === 'RequestNetworkError') return true;
+  if (name === 'RequestHttpError') {
+    if (TRANSIENT_HTTP_STATUSES.has(Number(error.status) || 0)) return true;
+    if (looksLikeCloudflareBody(error.bodyText)) return true;
+  }
+  return false;
+}
+
+export function isEdgeTimeoutError(error) {
+  if (!(error instanceof RequestHttpError) && String(error?.name || '') !== 'RequestHttpError') {
+    return false;
+  }
+  const status = Number(error.status) || 0;
+  if (status === 524) return true;
+  return looksLikeCloudflareBody(error.bodyText);
+}
+
 export function buildApiErrorMessage(error, fallback = 'Falha ao falar com o runtime.') {
-  if (error instanceof RequestTimeoutError) {
-    const seconds = Math.max(1, Math.round(error.timeoutMs / 1000));
+  if (error instanceof RequestTimeoutError || String(error?.name || '') === 'RequestTimeoutError') {
+    const seconds = Math.max(1, Math.round(Number(error.timeoutMs || 0) / 1000) || 1);
     return `Tempo limite excedido (${seconds}s). O runtime nao respondeu a tempo.`;
   }
-  if (error instanceof RequestHttpError) {
-    const looksLikeCloudflareHtml = /<!doctype\s+html|cloudflare|cf-error-details/i.test(error.bodyText);
-    if (error.status === 524 || looksLikeCloudflareHtml) {
+  if (error instanceof RequestHttpError || String(error?.name || '') === 'RequestHttpError') {
+    if (isEdgeTimeoutError(error) || TRANSIENT_HTTP_STATUSES.has(Number(error.status) || 0)) {
       return 'A execução demorou além do limite da conexão. Ela pode continuar em segundo plano; acompanhe o progresso e tente atualizar em instantes.';
     }
     return error.bodyText
       ? `Runtime respondeu com erro (${error.status}): ${error.bodyText}`
       : `Runtime respondeu com erro HTTP ${error.status}.`;
   }
-  if (error instanceof RequestNetworkError) {
+  if (error instanceof RequestNetworkError || String(error?.name || '') === 'RequestNetworkError') {
     return 'Falha de conexao com o runtime. Verifique a disponibilidade da API.';
   }
   if (error instanceof Error && error.message.trim()) {

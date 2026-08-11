@@ -142,6 +142,16 @@ export interface LucaAiPersonaTeamRunResponse {
   visualPack?: LucaAiVisualPack | null;
   attachments?: LucaAiChatAttachment[];
   generatedAt: string;
+  /** Cliente recuperou resultado via sessão após falha de borda (524/timeout). */
+  recoveredFromSession?: boolean;
+}
+
+export interface LucaAiActivePersonaRun {
+  runId: string;
+  traceId: string;
+  status: 'running' | 'failed' | string;
+  startedAt: string;
+  errorMessage?: string | null;
 }
 
 export interface LucaAiPersonaTeamRunAccepted {
@@ -465,6 +475,8 @@ export interface LucaAiChatSession extends LucaAiChatSessionSummary {
   finalResult?: Record<string, unknown> | null;
   visualPack?: LucaAiVisualPack | null;
   activePersonaSlug?: string | null;
+  /** Rodada assíncrona em andamento (sobrevive a 524/F5). */
+  activePersonaRun?: LucaAiActivePersonaRun | null;
 }
 
 export interface LucaAiChatLibraryResponse {
