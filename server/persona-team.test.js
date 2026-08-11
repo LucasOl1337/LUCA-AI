@@ -415,6 +415,7 @@ test('buildPersonaTeamPrompt da etapa visual exige JSON de artefatos', () => {
   assert.match(prompt.user, /SOMENTE JSON valido/i);
   assert.match(prompt.user, /imageEngine/i);
   assert.match(prompt.user, /charts/i);
+  assert.match(prompt.user, /infographic|explained-chart/i);
 });
 
 test('buildPersonaTeamPrompt declara o motor 9Router e bloqueia identidade GLM legada', () => {

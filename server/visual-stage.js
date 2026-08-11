@@ -116,7 +116,7 @@ function normalizeImageSpec(raw = {}, index = 0) {
     title: clip(raw.title || `Imagem ${index + 1}`, 120),
     prompt,
     aspectRatio: ALLOWED_ASPECT.has(aspect) ? aspect : '16:9',
-    style: clip(raw.style || 'cinematic', 40) || 'cinematic',
+    style: clip(raw.style || 'infographic', 40) || 'infographic',
   };
 }
 

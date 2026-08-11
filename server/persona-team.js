@@ -482,7 +482,7 @@ export function buildPersonaTeamPrompt({
     const roleInstruction = workflowRole?.instruction || role?.instruction || '';
     const context = String(accumulatedContext || '').trim();
     const visualJsonHint = role?.id === 'visual'
-      ? 'Responda SOMENTE com JSON valido contendo summary, report, charts (ate 3, pie|tower|line), images (ate 2 prompts em ingles) e imageEngine (grok-imagine|gpt-image).'
+      ? 'Responda SOMENTE com JSON valido contendo summary, report, charts (ate 3, pie|tower|line), images (ate 2 prompts em ingles de infografico/explained-chart) e imageEngine (grok-imagine|gpt-image).'
       : '';
     const extraUser = [
       historyBlock,
@@ -528,12 +528,12 @@ ${role?.id === 'visual'
     const outputContract = role?.id === 'display'
       ? 'Entregue a exibicao final em secoes curtas: Resumo, Decisao, Evidencias, Riscos, Proximas acoes.'
       : role?.id === 'visual'
-        ? `Voce e a etapa final de artefatos da bancada. Com base no contexto acumulado (especialmente Aprovacao e Exibicao final), produza SOMENTE JSON valido — sem markdown fora do JSON — neste formato:
+        ? `Voce e a etapa final de artefatos da bancada. Com base no contexto acumulado (especialmente Aprovacao, Exibicao final ou veredito do juiz), produza SOMENTE JSON valido — sem markdown fora do JSON — neste formato:
 {
   "summary": "1-2 frases sobre o que sera visualizado",
   "report": {
     "title": "titulo do relatorio",
-    "markdown": "relatorio executivo em markdown (pt-BR), curto e acionavel"
+    "markdown": "relatorio em markdown (pt-BR): explique o que cada grafico/imagem mostra e por que importa; 2-4 bullets acionaveis"
   },
   "charts": [
     {
@@ -547,19 +547,20 @@ ${role?.id === 'visual'
   "images": [
     {
       "id": "i1",
-      "title": "titulo",
-      "prompt": "English cinematic prompt grounded in the findings (no illegible text, photoreal or film still)",
+      "title": "titulo do infografico",
+      "prompt": "English infographic / explained-chart prompt: readable title, clear labels/axes, accurate values from context, 1-3 callouts, embedded caption/legend, high contrast, clean typography, no fake product UI, no illegible text",
       "aspect_ratio": "16:9",
-      "style": "cinematic"
+      "style": "infographic"
     }
   ],
   "imageEngine": "grok-imagine"
 }
 Regras:
-- Ate 3 charts (ate 8 itens cada), 1 report, ate 2 images.
+- Ate 3 charts SVG (ate 8 itens cada) para numeros precisos; 1 report; ate 2 images de infografico/explained-chart via image gen.
+- Preferir images[].style "infographic" ou "explained-chart" (nao still cinematografico generico).
 - Use "line" para evolucao/sequencia temporal, "tower" para ranking/comparacao e "pie" para composicao percentual.
-- So use numeros/labels sustentados pelo contexto; se faltar dado, omita o chart ou use ranking qualitativo com valores relativos honestos.
-- Prompts de imagem em ingles, cinematograficos, fiéis aos achados (cenas de exemplo, nao screenshots de UI).
+- So use numeros/labels sustentados pelo contexto; se faltar dado, omita o chart/imagem ou use ranking qualitativo com valores relativos honestos.
+- Prompts de imagem em ingles, fiéis aos achados: grafico/infografico bem explicado, tipografia legivel, contraste alto.
 - imageEngine pode ser "grok-imagine" ou "gpt-image".
 - Nao mencione runtime interno, 9router, agents nem logs.`
         : 'Entregue uma contribuicao objetiva em 3 a 6 bullets. Inclua uma decisao, uma acao imediata e um risco/observacao quando fizer sentido.';

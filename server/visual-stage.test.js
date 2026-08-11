@@ -29,8 +29,22 @@ test('parseVisualPlanOutput le JSON com charts e images', () => {
   assert.equal(plan.charts.length, 1);
   assert.equal(plan.charts[0].type, 'tower');
   assert.equal(plan.images.length, 1);
+  assert.equal(plan.images[0].style, 'infographic');
   assert.match(plan.report.markdown, /Prioridade/);
   assert.equal(plan.imageEngine, 'grok-imagine');
+});
+
+test('parseVisualPlanOutput aceita style explained-chart', () => {
+  const plan = parseVisualPlanOutput(JSON.stringify({
+    summary: 'infografico',
+    images: [{
+      id: 'i1',
+      title: 'Ranking',
+      prompt: 'Clean infographic bar chart with readable labels and callouts',
+      style: 'explained-chart',
+    }],
+  }));
+  assert.equal(plan.images[0].style, 'explained-chart');
 });
 
 test('parseVisualPlanOutput faz fallback textual sem JSON', () => {

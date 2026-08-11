@@ -159,6 +159,11 @@ import {
   reconcileOfficialPersonaAgents,
 } from './persona-cards.js';
 import {
+  getBuiltinPersona,
+  getBuiltinSystemPrompt,
+  mergeBuiltinPersonas,
+} from './builtin-personas.js';
+import {
   buildConversationContextFromTranscript,
   buildIndividualJudgePrompt,
   buildIndividualRevisionPrompt,
@@ -1755,20 +1760,45 @@ Responda como ${def.name}, em 1 a 4 linhas. Use [chat:tipo] para o que deve apar
 // especialista. Nunca escreve no Yume.
 // ---------------------------------------------------------------------------
 
+function seedBuiltinPersonaCaches(personas = []) {
+  const now = new Date().toISOString();
+  for (const persona of Array.isArray(personas) ? personas : []) {
+    if (!persona?.luca_builtin) continue;
+    const slug = String(persona.slug || '').trim();
+    const systemPrompt = getBuiltinSystemPrompt(slug);
+    if (!slug || !systemPrompt) continue;
+    const existing = getPersonaAgents().find((agent) => agent.slug === slug);
+    if (!existing) continue;
+    // Builtin injetado: cacheia prompt local para a etapa visual não depender do Kamui.
+    if (existing.source === 'luca-builtin' && existing.cachedSystemPrompt === systemPrompt) continue;
+    updatePersonaAgent(slug, {
+      source: 'luca-builtin',
+      name: persona.name || existing.name,
+      yumeModel: String(persona.model || existing.yumeModel || '').trim(),
+      cachedSystemPrompt: systemPrompt,
+      cachedVersion: 'luca-builtin',
+      cachedAt: now,
+      lastError: null,
+    });
+  }
+}
+
 function applyOfficialPersonaRoster(personas) {
   const reconciled = reconcileOfficialPersonaAgents(personas, getPersonaAgents());
   if (reconciled.changed) replacePersonaAgents(reconciled.roster);
+  seedBuiltinPersonaCaches(personas);
   return reconciled;
 }
 
 async function syncOfficialPersonaRoster() {
-  const personas = await listYumePersonas();
+  // Builtins preenchem slugs canônicos ausentes no Yume (ex.: especialista-visual).
+  const personas = mergeBuiltinPersonas(await listYumePersonas());
   const reconciled = applyOfficialPersonaRoster(personas);
   return { personas, ...reconciled };
 }
 
 async function syncAllOfficialPersonaRosters() {
-  const personas = await listYumePersonas();
+  const personas = mergeBuiltinPersonas(await listYumePersonas());
   let changedWorkspaces = 0;
   for (const userId of listWorkspaceUserIds()) {
     runWithWorkspaceUser(userId, () => {
@@ -1782,8 +1812,27 @@ async function syncAllOfficialPersonaRosters() {
   return { personas, changedWorkspaces };
 }
 
+function resolveBuiltinPromptPayload(slug, persona, { stale = false, warning = '' } = {}) {
+  const builtin = getBuiltinPersona(slug);
+  const systemPrompt = getBuiltinSystemPrompt(slug) || persona?.cachedSystemPrompt || '';
+  if (!builtin || !systemPrompt) return null;
+  return {
+    systemPrompt,
+    model: builtin.model || persona?.yumeModel || '',
+    version: 'luca-builtin',
+    cached: true,
+    builtin: true,
+    ...(stale ? { stale: true } : {}),
+    ...(warning ? { warning } : {}),
+  };
+}
+
 async function resolvePersonaSystemPrompt(slug) {
   const persona = getPersonaAgents().find((p) => p.slug === slug);
+  if (persona?.source === 'luca-builtin') {
+    const builtinPayload = resolveBuiltinPromptPayload(slug, persona);
+    if (builtinPayload) return builtinPayload;
+  }
   try {
     const versionInfo = await getYumePersonaVersion(slug);
     const currentVersion = versionInfo?.version ?? null;
@@ -1810,6 +1859,11 @@ async function resolvePersonaSystemPrompt(slug) {
     });
     return { systemPrompt, model, version: currentVersion, cached: false };
   } catch (error) {
+    const builtinPayload = resolveBuiltinPromptPayload(slug, persona, {
+      stale: true,
+      warning: error?.message || String(error),
+    });
+    if (builtinPayload) return builtinPayload;
     if (persona?.cachedSystemPrompt) {
       updatePersonaAgent(slug, { lastError: error?.message || String(error) });
       return {
@@ -1887,8 +1941,64 @@ async function runPersonaAgentChat(slug, { mode = 'chat_only', reason = '', chat
   }
 }
 
+function buildLoadedPersonaPrompt(slug, {
+  name,
+  systemPrompt,
+  yumeModel = '',
+  localModel = '',
+  modelOverride = '',
+  version = null,
+  cached = false,
+  stale = false,
+  builtin = false,
+  warning = '',
+} = {}) {
+  const model = resolvePersonaRuntimeModel({
+    localModel,
+    yumeModel,
+    overrideModel: modelOverride,
+    fallback: ROUTER_MODEL,
+  });
+  return {
+    name: name || slug,
+    model,
+    yumeModel,
+    localModel: isAllowed9RouterModel(localModel) ? localModel : '',
+    modelOverridden: Boolean(
+      (isAllowed9RouterModel(modelOverride) && modelOverride !== yumeModel)
+      || (isAllowed9RouterModel(localModel) && yumeModel && localModel !== yumeModel),
+    ),
+    systemPrompt,
+    version,
+    cached,
+    ...(stale ? { stale: true } : {}),
+    ...(builtin ? { builtin: true } : {}),
+    ...(warning ? { warning } : {}),
+  };
+}
+
 async function loadPersonaTeamPrompt(slug, { modelOverride = '' } = {}) {
   const persona = getPersonaAgents().find((p) => p.slug === slug);
+  const builtin = getBuiltinPersona(slug);
+  const localModel = String(persona?.model || '').trim();
+
+  // Persona injetada pelo LUCA: prompt local, sem round-trip no Kamui.
+  if (persona?.source === 'luca-builtin' || (builtin && persona?.cachedVersion === 'luca-builtin')) {
+    const systemPrompt = getBuiltinSystemPrompt(slug) || persona?.cachedSystemPrompt || '';
+    if (systemPrompt) {
+      return buildLoadedPersonaPrompt(slug, {
+        name: builtin?.name || persona?.name || slug,
+        systemPrompt,
+        yumeModel: String(builtin?.model || persona?.yumeModel || '').trim(),
+        localModel,
+        modelOverride,
+        version: 'luca-builtin',
+        cached: true,
+        builtin: true,
+      });
+    }
+  }
+
   try {
     const data = await fetchYumePersonaSystemPrompt(slug);
     let version = null;
@@ -1899,48 +2009,43 @@ async function loadPersonaTeamPrompt(slug, { modelOverride = '' } = {}) {
       version = data?.version ?? null;
     }
     const yumeModel = String(data?.model || '').trim();
-    const localModel = String(persona?.model || '').trim();
-    const model = resolvePersonaRuntimeModel({
-      localModel,
-      yumeModel,
-      overrideModel: modelOverride,
-      fallback: ROUTER_MODEL,
-    });
-    return {
+    return buildLoadedPersonaPrompt(slug, {
       name: data?.name || persona?.name || slug,
-      model,
-      yumeModel,
-      localModel: isAllowed9RouterModel(localModel) ? localModel : '',
-      modelOverridden: Boolean(
-        (isAllowed9RouterModel(modelOverride) && modelOverride !== yumeModel)
-        || (isAllowed9RouterModel(localModel) && yumeModel && localModel !== yumeModel),
-      ),
       systemPrompt: data?.system_prompt || '',
+      yumeModel,
+      localModel,
+      modelOverride,
       version,
       cached: false,
-    };
+    });
   } catch (error) {
-    if (persona?.cachedSystemPrompt) {
-      const yumeModel = '';
-      const localModel = String(persona.model || '').trim();
-      const model = resolvePersonaRuntimeModel({
+    const builtinPrompt = getBuiltinSystemPrompt(slug);
+    if (builtin && builtinPrompt) {
+      return buildLoadedPersonaPrompt(slug, {
+        name: builtin.name || persona?.name || slug,
+        systemPrompt: builtinPrompt,
+        yumeModel: String(builtin.model || '').trim(),
         localModel,
-        yumeModel,
-        overrideModel: modelOverride,
-        fallback: ROUTER_MODEL,
+        modelOverride,
+        version: 'luca-builtin',
+        cached: true,
+        stale: true,
+        builtin: true,
+        warning: error?.message || String(error),
       });
-      return {
+    }
+    if (persona?.cachedSystemPrompt) {
+      return buildLoadedPersonaPrompt(slug, {
         name: persona.name || slug,
-        model,
-        yumeModel,
-        localModel: isAllowed9RouterModel(localModel) ? localModel : '',
-        modelOverridden: Boolean(isAllowed9RouterModel(modelOverride) || isAllowed9RouterModel(localModel)),
         systemPrompt: persona.cachedSystemPrompt,
+        yumeModel: '',
+        localModel,
+        modelOverride,
         version: persona.cachedVersion ?? null,
         cached: true,
         stale: true,
         warning: error?.message || String(error),
-      };
+      });
     }
     throw error;
   }
@@ -3016,7 +3121,7 @@ app.get('/api/personas/available', async (_req, res) => {
     res.json({
       ok: true,
       personas: normalizeYumePersonasForLuca(personas, roster),
-      rosterSource: 'yume.is_official',
+      rosterSource: 'yume.is_official+luca.builtin',
     });
   } catch (error) {
     res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
