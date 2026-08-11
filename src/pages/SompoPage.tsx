@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ArrowLeft,
   ArrowRight,
-  BookOpen,
   Building2,
-  CloudRain,
   Filter,
   Loader2,
   MapPin,
@@ -32,6 +31,7 @@ import {
 import {
   SOMPO_EXAMPLE_CASES,
   SOMPO_INDUSTRY_CONTEXT,
+  SOMPO_PAGE_BACKGROUND,
   SOMPO_SEVERITY_LABELS,
   buildSompoCaseMission,
   queueSompoLaunch,
@@ -40,6 +40,7 @@ import {
   type SompoLaunchMode,
   type SompoProductLine,
 } from '@/lib/sompo-cases';
+import '@/sompo-page.css';
 
 interface SompoPageProps {
   onNavigate: (page: PageId) => void;
@@ -64,12 +65,10 @@ const SEVERITY_FILTERS: { id: SeverityFilter; label: string }[] = [
   { id: 'baixa', label: 'Baixa' },
 ];
 
-function severityColor(severity: SompoCaseSeverity, theme: ReturnType<typeof useTheme>): string {
-  if (severity === 'critica') return theme.error;
-  if (severity === 'alta') return theme.warning;
-  if (severity === 'media') return theme.goldDeep;
-  return theme.alive;
-}
+/** Três fatos-chave no header — o resto do contexto fica de fora pra reduzir poluição. */
+const CONTEXT_HIGHLIGHTS = SOMPO_INDUSTRY_CONTEXT.filter((fact) =>
+  ['triade-climatica', 'seca', 'zarc'].includes(fact.id),
+);
 
 function defaultTeamPresetId(list: LucaTeamPreset[]): string {
   return list.find((item) => item.id === 'risco-agro')?.id
@@ -91,7 +90,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
   const [query, setQuery] = useState('');
   const [productFilter, setProductFilter] = useState<ProductFilter>('all');
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all');
-  const [selectedId, setSelectedId] = useState<string>(SOMPO_EXAMPLE_CASES[0]?.id || '');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [teamMode, setTeamMode] = useState<SompoLaunchMode>('team');
   const [teamPresets, setTeamPresets] = useState<LucaTeamPreset[]>(LUCA_TEAM_PRESETS);
   const [individualPresets, setIndividualPresets] = useState<LucaIndividualPreset[]>(LUCA_INDIVIDUAL_PRESETS);
@@ -138,6 +137,18 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
     void loadTemplates();
   }, [loadTemplates]);
 
+  useEffect(() => {
+    if (!selectedId) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setSelectedId(null);
+        setLaunchError(null);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedId]);
+
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
     return SOMPO_EXAMPLE_CASES.filter((item) => {
@@ -162,8 +173,8 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
   }, [productFilter, query, severityFilter]);
 
   const selected = useMemo(
-    () => filtered.find((item) => item.id === selectedId) || filtered[0] || null,
-    [filtered, selectedId],
+    () => (selectedId ? SOMPO_EXAMPLE_CASES.find((item) => item.id === selectedId) || null : null),
+    [selectedId],
   );
 
   const selectedTeam = useMemo(
@@ -180,6 +191,30 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
     if (teamMode === 'team') return teamPresetSlugs(activeSquad as LucaTeamPreset);
     return individualPresetSlugs(activeSquad as LucaIndividualPreset);
   }, [activeSquad, teamMode]);
+
+  function openCase(caseItem: SompoExampleCase) {
+    setSelectedId(caseItem.id);
+    setLaunchError(null);
+    setTeamMode(caseItem.suggestedMode);
+    if (caseItem.suggestedMode === 'team') {
+      setSelectedTeamId((prev) => (
+        teamPresets.some((item) => item.id === caseItem.suggestedPresetId)
+          ? caseItem.suggestedPresetId
+          : prev
+      ));
+    } else {
+      setSelectedIndividualId((prev) => (
+        individualPresets.some((item) => item.id === caseItem.suggestedPresetId)
+          ? caseItem.suggestedPresetId
+          : prev
+      ));
+    }
+  }
+
+  function closeLaunch() {
+    setSelectedId(null);
+    setLaunchError(null);
+  }
 
   async function runCaseWithSquad(caseItem: SompoExampleCase) {
     if (!activeSquad || launching || sessionsBusy) return;
@@ -208,394 +243,301 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
   }
 
   return (
-    <div className="luca-page-shell h-full overflow-y-auto px-6 py-7 sm:px-8">
-      <div className="mx-auto max-w-[1360px] space-y-6">
-        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div
-              className="mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em]"
-              style={{ background: theme.goldSoft, color: theme.goldDeep }}
-            >
-              <Wheat className="h-3.5 w-3.5" />
-              SOMPO · casos + equipe
-            </div>
-            <h1 className="void-title text-3xl">SOMPO</h1>
-            <p className="mt-2 max-w-[70ch] text-sm leading-relaxed" style={{ color: theme.textMute }}>
-              1) escolha o caso agrícola · 2) escolha a equipe (modo Equipe ou Individual) · 3) rode a avaliação
-              na bancada. Cenários didáticos com padrões públicos do seguro rural.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Metric label="casos" value={SOMPO_EXAMPLE_CASES.length} />
-            <Metric label="equipes" value={teamPresets.length} />
-            <Metric label="individuais" value={individualPresets.length} />
-          </div>
-        </header>
+    <div
+      className="sompo-page"
+      style={{ ['--sompo-bg-image' as string]: `url('${SOMPO_PAGE_BACKGROUND}')` }}
+    >
+      <div className="sompo-page-bg" aria-hidden="true" />
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {SOMPO_INDUSTRY_CONTEXT.map((fact) => (
-            <article
-              key={fact.id}
-              className="rounded-2xl border p-4"
-              style={{ borderColor: theme.border, background: theme.surface }}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: theme.textGhost }}>
-                  {fact.label}
-                </span>
-                <CloudRain className="h-4 w-4 shrink-0" style={{ color: theme.goldDeep }} />
+      <div className="sompo-page-scroll">
+        <div className="sompo-page-inner">
+          <header className="sompo-header">
+            <div>
+              <div className="sompo-kicker">
+                <Wheat className="h-3.5 w-3.5" />
+                SOMPO · casos + equipe
               </div>
-              <p className="mt-2 text-xl font-semibold" style={{ color: theme.text }}>{fact.value}</p>
-              <p className="mt-1 text-xs leading-relaxed" style={{ color: theme.textMute }}>{fact.detail}</p>
-              <p className="mt-3 text-[10px] leading-relaxed" style={{ color: theme.textGhost }}>Fonte: {fact.source}</p>
-            </article>
-          ))}
-        </section>
-
-        <section className="flex flex-col gap-3 rounded-2xl border p-4" style={{ borderColor: theme.border, background: theme.surface }}>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-            <label className="relative min-w-0 flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: theme.textGhost }} />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar por cultura, região, evento, ZARC, granizo…"
-                className="w-full rounded-xl border py-2.5 pl-10 pr-3 text-sm outline-none"
-                style={{ borderColor: theme.border, background: theme.input, color: theme.text }}
-              />
-            </label>
-            <div className="flex flex-wrap items-center gap-2">
-              <Filter className="h-4 w-4" style={{ color: theme.textGhost }} />
-              {PRODUCT_FILTERS.map((item) => (
-                <Chip
-                  key={item.id}
-                  active={productFilter === item.id}
-                  onClick={() => setProductFilter(item.id)}
-                  label={item.label}
-                />
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: theme.textGhost }}>
-              Severidade
-            </span>
-            {SEVERITY_FILTERS.map((item) => (
-              <Chip
-                key={item.id}
-                active={severityFilter === item.id}
-                onClick={() => setSeverityFilter(item.id)}
-                label={item.label}
-              />
-            ))}
-          </div>
-        </section>
-
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.95fr)]">
-          <section className="space-y-3">
-            <h2 className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: theme.textGhost }}>
-              1 · Caso agrícola
-            </h2>
-            {filtered.length === 0 && (
-              <p className="rounded-2xl border px-4 py-10 text-center text-sm" style={{ borderColor: theme.border, color: theme.textMute }}>
-                Nenhum caso com esses filtros.
+              <h1 className="sompo-title">SOMPO</h1>
+              <p className="sompo-lead">
+                Escolha o caso agrícola, defina a equipe e rode a avaliação na bancada —
+                sem poluição visual, com foco no sinistro.
               </p>
-            )}
-            {filtered.map((item) => {
-              const active = selected?.id === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setSelectedId(item.id)}
-                  className="w-full rounded-2xl border p-4 text-left transition-colors"
-                  style={{
-                    borderColor: active ? theme.borderActive : theme.border,
-                    background: active ? theme.surfaceHi : theme.surface,
-                    boxShadow: active ? `0 0 0 1px ${theme.goldSoft}` : undefined,
-                  }}
-                  data-sompo-case={item.id}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h3 className="text-base font-semibold" style={{ color: theme.text }}>{item.title}</h3>
-                      <p className="mt-1 text-xs leading-relaxed" style={{ color: theme.textMute }}>{item.subtitle}</p>
-                    </div>
-                    <span
-                      className="rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
-                      style={{ background: theme.input, color: severityColor(item.severity, theme) }}
-                    >
-                      {SOMPO_SEVERITY_LABELS[item.severity]}
-                    </span>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2 text-[11px]" style={{ color: theme.textSoft }}>
-                    <Meta icon={Sprout} text={item.culture} />
-                    <Meta icon={MapPin} text={item.region} />
-                    <Meta icon={Building2} text={item.productLabel} />
-                    <Meta icon={TriangleAlert} text={item.riskEvent} />
-                  </div>
-                </button>
-              );
-            })}
+            </div>
+            <div className="sompo-metrics">
+              <div className="sompo-metric">
+                <strong>{SOMPO_EXAMPLE_CASES.length}</strong>
+                <span>casos</span>
+              </div>
+              <div className="sompo-metric">
+                <strong>{teamPresets.length}</strong>
+                <span>equipes</span>
+              </div>
+              <div className="sompo-metric">
+                <strong>{individualPresets.length}</strong>
+                <span>individuais</span>
+              </div>
+            </div>
+          </header>
+
+          <section className="sompo-context" aria-label="Contexto setorial">
+            {CONTEXT_HIGHLIGHTS.map((fact) => (
+              <article key={fact.id} className="sompo-context-card">
+                <span>{fact.label}</span>
+                <strong>{fact.value}</strong>
+                <p>{fact.detail}</p>
+              </article>
+            ))}
           </section>
 
-          <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
-            {selected ? (
-              <>
-                <article
-                  className="space-y-3 rounded-2xl border p-5"
-                  style={{ borderColor: theme.border, background: theme.surface }}
-                  data-sompo-detail={selected.id}
-                >
-                  <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ background: theme.goldSoft, color: theme.goldDeep }}>
-                      {selected.stageLabel}
-                    </span>
-                    <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ background: theme.input, color: severityColor(selected.severity, theme) }}>
-                      {SOMPO_SEVERITY_LABELS[selected.severity]}
-                    </span>
-                  </div>
-                  <h2 className="text-xl font-semibold" style={{ color: theme.text }}>{selected.title}</h2>
-                  <p className="text-sm leading-relaxed" style={{ color: theme.textSoft }}>{selected.situation}</p>
-                  <Block title="Sinais" theme={theme}>
-                    <ul className="space-y-1 text-xs leading-relaxed" style={{ color: theme.textMute }}>
-                      {selected.signals.slice(0, 4).map((signal) => (
-                        <li key={signal}>• {signal}</li>
-                      ))}
-                    </ul>
-                  </Block>
-                </article>
-
-                <article
-                  className="space-y-4 rounded-2xl border p-5"
-                  style={{ borderColor: theme.border, background: theme.surface }}
-                  data-sompo-squad-panel
-                >
-                  <div>
-                    <h2 className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: theme.textGhost }}>
-                      2 · Quem avalia
-                    </h2>
-                    <p className="mt-1 text-sm" style={{ color: theme.textMute }}>
-                      Escolha um template do modo Equipe ou do modo Individual (os mesmos da Configuração / bancada).
-                    </p>
-                  </div>
-
-                  <div className="luca-ai-view-switch w-full" role="group" aria-label="Modo da equipe">
-                    <button
-                      type="button"
-                      className={teamMode === 'team' ? 'active' : ''}
-                      aria-pressed={teamMode === 'team'}
-                      onClick={() => setTeamMode('team')}
-                    >
-                      <Users className="h-4 w-4" /> Equipe
-                    </button>
-                    <button
-                      type="button"
-                      className={teamMode === 'individual' ? 'active' : ''}
-                      aria-pressed={teamMode === 'individual'}
-                      onClick={() => setTeamMode('individual')}
-                    >
-                      <Scale className="h-4 w-4" /> Individual
-                    </button>
-                  </div>
-
-                  {templatesError && (
-                    <p className="rounded-xl border px-3 py-2 text-xs" style={{ borderColor: theme.border, color: theme.warning }}>
-                      {templatesError}
-                    </p>
-                  )}
-
-                  {templatesLoading ? (
-                    <div className="flex items-center gap-2 text-sm" style={{ color: theme.textMute }}>
-                      <Loader2 className="h-4 w-4 animate-spin" /> Carregando equipes…
-                    </div>
-                  ) : (
-                    <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
-                      {teamMode === 'team'
-                        ? teamPresets.map((preset) => {
-                          const active = selectedTeam?.id === preset.id;
-                          const Icon = preset.icon;
-                          const slugs = teamPresetSlugs(preset);
-                          return (
-                            <button
-                              key={preset.id}
-                              type="button"
-                              onClick={() => setSelectedTeamId(preset.id)}
-                              className="w-full rounded-xl border p-3 text-left"
-                              style={{
-                                borderColor: active ? theme.borderActive : theme.border,
-                                background: active ? theme.goldSoft : theme.input,
-                              }}
-                              data-sompo-team={preset.id}
-                            >
-                              <div className="flex items-start gap-3">
-                                <span className="grid h-9 w-9 place-items-center rounded-lg" style={{ background: theme.surface, color: theme.goldDeep }}>
-                                  <Icon className="h-4 w-4" />
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                  <div className="text-sm font-semibold" style={{ color: theme.text }}>{preset.label}</div>
-                                  <p className="mt-0.5 text-[11px] leading-relaxed" style={{ color: theme.textMute }}>
-                                    {preset.description || 'Template de equipe'}
-                                  </p>
-                                  <div className="mt-2 flex flex-wrap gap-1">
-                                    {slugs.slice(0, 6).map((slug) => (
-                                      <span key={slug} className="rounded-full border px-1.5 py-0.5 text-[9px]" style={{ borderColor: theme.border, color: theme.textGhost }}>
-                                        {slug}
-                                      </span>
-                                    ))}
-                                    {slugs.length > 6 && (
-                                      <span className="text-[9px]" style={{ color: theme.textGhost }}>+{slugs.length - 6}</span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })
-                        : individualPresets.map((preset) => {
-                          const active = selectedIndividual?.id === preset.id;
-                          const Icon = preset.icon;
-                          const slugs = individualPresetSlugs(preset);
-                          return (
-                            <button
-                              key={preset.id}
-                              type="button"
-                              onClick={() => setSelectedIndividualId(preset.id)}
-                              className="w-full rounded-xl border p-3 text-left"
-                              style={{
-                                borderColor: active ? theme.borderActive : theme.border,
-                                background: active ? theme.goldSoft : theme.input,
-                              }}
-                              data-sompo-individual={preset.id}
-                            >
-                              <div className="flex items-start gap-3">
-                                <span className="grid h-9 w-9 place-items-center rounded-lg" style={{ background: theme.surface, color: theme.goldDeep }}>
-                                  <Icon className="h-4 w-4" />
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                  <div className="text-sm font-semibold" style={{ color: theme.text }}>{preset.label}</div>
-                                  <p className="mt-0.5 text-[11px] leading-relaxed" style={{ color: theme.textMute }}>
-                                    {preset.description || 'Seleção individual com juiz'}
-                                  </p>
-                                  <div className="mt-2 flex flex-wrap gap-1">
-                                    {slugs.map((slug) => (
-                                      <span key={slug} className="rounded-full border px-1.5 py-0.5 text-[9px]" style={{ borderColor: theme.border, color: theme.textGhost }}>
-                                        {slug === preset.judge ? `${slug} · juiz` : slug}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                    </div>
-                  )}
-
-                  <div className="rounded-xl border px-3 py-2 text-xs leading-relaxed" style={{ borderColor: theme.border, color: theme.textSoft }}>
-                    <strong style={{ color: theme.text }}>{activeSquad?.label || 'Nenhuma equipe'}</strong>
-                    {' · '}
-                    {teamMode === 'team' ? 'fluxo coordenado' : 'respostas isoladas + juiz'}
-                    {activeSlugs.length ? ` · ${activeSlugs.length} personas` : ''}
-                  </div>
-
-                  {launchError && (
-                    <p className="rounded-xl border px-3 py-2 text-xs" style={{ borderColor: theme.border, color: theme.error }}>
-                      {launchError}
-                    </p>
-                  )}
-
+          <section className="sompo-toolbar">
+            <div className="sompo-toolbar-row">
+              <label className="sompo-search">
+                <Search />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Buscar por cultura, região, evento, ZARC, granizo…"
+                  aria-label="Buscar casos agrícolas"
+                />
+              </label>
+              <div className="sompo-chips">
+                <Filter className="h-4 w-4" style={{ color: theme.textGhost }} aria-hidden="true" />
+                {PRODUCT_FILTERS.map((item) => (
                   <button
+                    key={item.id}
                     type="button"
-                    className="btn-primary inline-flex w-full items-center justify-center gap-2"
-                    disabled={!selected || !activeSquad || launching || sessionsBusy || templatesLoading}
-                    onClick={() => void runCaseWithSquad(selected)}
-                    data-sompo-run={selected.id}
+                    className="sompo-chip"
+                    aria-pressed={productFilter === item.id}
+                    onClick={() => setProductFilter(item.id)}
                   >
-                    {launching || sessionsBusy ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Preparando run…
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-4 w-4" />
-                        Rodar avaliação na bancada
-                        <ArrowRight className="h-4 w-4" />
-                      </>
-                    )}
+                    {item.label}
                   </button>
-                  <p className="text-[10px] leading-relaxed" style={{ color: theme.textGhost }}>
-                    Abre uma sessão limpa no LUCA-AI, monta o briefing do caso, aplica a equipe escolhida e inicia a run.
-                  </p>
-                </article>
-              </>
-            ) : (
-              <div className="rounded-2xl border px-4 py-10 text-center text-sm" style={{ borderColor: theme.border, color: theme.textMute }}>
-                <BookOpen className="mx-auto mb-2 h-5 w-5" />
-                Selecione um caso para escolher a equipe e rodar.
+                ))}
               </div>
+            </div>
+            <div className="sompo-toolbar-row">
+              <span className="sompo-chip-label">Severidade</span>
+              <div className="sompo-chips">
+                {SEVERITY_FILTERS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="sompo-chip"
+                    aria-pressed={severityFilter === item.id}
+                    onClick={() => setSeverityFilter(item.id)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="sompo-grid" aria-label="Casos agrícolas">
+            {filtered.length === 0 && (
+              <p className="sompo-empty">Nenhum caso com esses filtros.</p>
             )}
-          </aside>
+            {filtered.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="sompo-case-card"
+                onClick={() => openCase(item)}
+                data-sompo-case={item.id}
+              >
+                <div className="sompo-case-card-media">
+                  <img src={item.image} alt="" loading="lazy" />
+                  <span className={`sompo-severity sompo-severity-${item.severity}`}>
+                    {SOMPO_SEVERITY_LABELS[item.severity]}
+                  </span>
+                </div>
+                <div className="sompo-case-card-body">
+                  <h3>{item.title}</h3>
+                  <p>{item.subtitle}</p>
+                  <div className="sompo-case-meta">
+                    <span><Sprout /> {item.culture}</span>
+                    <span><MapPin /> {item.region}</span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </section>
         </div>
       </div>
-    </div>
-  );
-}
 
-function Metric({ label, value }: { label: string; value: number | string }) {
-  const theme = useTheme();
-  return (
-    <div className="rounded-xl border px-3 py-2 text-center" style={{ borderColor: theme.border, background: theme.surface }}>
-      <div className="text-lg font-semibold" style={{ color: theme.text }}>{value}</div>
-      <div className="text-[10px] uppercase tracking-[0.14em]" style={{ color: theme.textGhost }}>{label}</div>
-    </div>
-  );
-}
+      {selected && (
+        <div
+          className="sompo-launch"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="sompo-launch-title"
+          data-sompo-detail={selected.id}
+        >
+          <div className="sompo-launch-panel">
+            <section className="sompo-launch-case">
+              <div className="sompo-launch-hero">
+                <img src={selected.image} alt="" />
+                <button type="button" className="sompo-launch-back" onClick={closeLaunch}>
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  Casos
+                </button>
+              </div>
+              <div className="sompo-launch-case-body">
+                <div className="sompo-launch-badges">
+                  <span className="sompo-launch-badge">{selected.stageLabel}</span>
+                  <span className={`sompo-severity sompo-severity-${selected.severity}`} style={{ position: 'static' }}>
+                    {SOMPO_SEVERITY_LABELS[selected.severity]}
+                  </span>
+                </div>
+                <h2 id="sompo-launch-title">{selected.title}</h2>
+                <div className="sompo-launch-meta-row">
+                  <span><Sprout /> {selected.culture}</span>
+                  <span><MapPin /> {selected.region}</span>
+                  <span><Building2 /> {selected.productLabel}</span>
+                  <span><TriangleAlert /> {selected.riskEvent}</span>
+                </div>
+                <p className="sompo-launch-situation">{selected.situation}</p>
+                <div className="sompo-launch-signals">
+                  <h3>Sinais</h3>
+                  <ul>
+                    {selected.signals.slice(0, 3).map((signal) => (
+                      <li key={signal}>{signal}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </section>
 
-function Chip({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
-  const theme = useTheme();
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-full border px-3 py-1 text-[11px] font-medium"
-      style={{
-        borderColor: active ? theme.borderActive : theme.border,
-        background: active ? theme.goldSoft : theme.input,
-        color: active ? theme.goldDeep : theme.textSoft,
-      }}
-      aria-pressed={active}
-    >
-      {label}
-    </button>
-  );
-}
+            <aside className="sompo-launch-squad" data-sompo-squad-panel>
+              <div className="sompo-launch-squad-head">
+                <h2>2 · Quem avalia</h2>
+                <p>Escolha o template de equipe ou individual e rode na bancada.</p>
+              </div>
 
-function Meta({ icon: Icon, text }: { icon: typeof MapPin; text: string }) {
-  return (
-    <span className="inline-flex items-center gap-1">
-      <Icon className="h-3.5 w-3.5 opacity-70" />
-      {text}
-    </span>
-  );
-}
+              <div className="sompo-mode-switch" role="group" aria-label="Modo da equipe">
+                <button
+                  type="button"
+                  className={teamMode === 'team' ? 'active' : ''}
+                  aria-pressed={teamMode === 'team'}
+                  onClick={() => setTeamMode('team')}
+                >
+                  <Users /> Equipe
+                </button>
+                <button
+                  type="button"
+                  className={teamMode === 'individual' ? 'active' : ''}
+                  aria-pressed={teamMode === 'individual'}
+                  onClick={() => setTeamMode('individual')}
+                >
+                  <Scale /> Individual
+                </button>
+              </div>
 
-function Block({
-  title,
-  children,
-  theme,
-}: {
-  title: string;
-  children: React.ReactNode;
-  theme: ReturnType<typeof useTheme>;
-}) {
-  return (
-    <div>
-      <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: theme.textGhost }}>
-        {title}
-      </h3>
-      {children}
+              {templatesError && (
+                <p className="sompo-templates-error">{templatesError}</p>
+              )}
+
+              {templatesLoading ? (
+                <div className="sompo-loading">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Carregando equipes…
+                </div>
+              ) : (
+                <div className="sompo-squad-list">
+                  {teamMode === 'team'
+                    ? teamPresets.map((preset) => {
+                      const active = selectedTeam?.id === preset.id;
+                      const Icon = preset.icon;
+                      const slugs = teamPresetSlugs(preset);
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          className="sompo-squad-item"
+                          aria-pressed={active}
+                          onClick={() => setSelectedTeamId(preset.id)}
+                          data-sompo-team={preset.id}
+                        >
+                          <span className="sompo-squad-icon"><Icon /></span>
+                          <div className="min-w-0 flex-1">
+                            <strong>{preset.label}</strong>
+                            <p>{preset.description || 'Template de equipe'}</p>
+                            <div className="sompo-squad-slugs">
+                              {slugs.slice(0, 5).map((slug) => (
+                                <span key={slug}>{slug}</span>
+                              ))}
+                              {slugs.length > 5 && <span>+{slugs.length - 5}</span>}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                    : individualPresets.map((preset) => {
+                      const active = selectedIndividual?.id === preset.id;
+                      const Icon = preset.icon;
+                      const slugs = individualPresetSlugs(preset);
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          className="sompo-squad-item"
+                          aria-pressed={active}
+                          onClick={() => setSelectedIndividualId(preset.id)}
+                          data-sompo-individual={preset.id}
+                        >
+                          <span className="sompo-squad-icon"><Icon /></span>
+                          <div className="min-w-0 flex-1">
+                            <strong>{preset.label}</strong>
+                            <p>{preset.description || 'Seleção individual com juiz'}</p>
+                            <div className="sompo-squad-slugs">
+                              {slugs.map((slug) => (
+                                <span key={slug}>{slug === preset.judge ? `${slug} · juiz` : slug}</span>
+                              ))}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                </div>
+              )}
+
+              <div className="sompo-launch-summary">
+                <strong>{activeSquad?.label || 'Nenhuma equipe'}</strong>
+                {' · '}
+                {teamMode === 'team' ? 'fluxo coordenado' : 'respostas isoladas + juiz'}
+                {activeSlugs.length ? ` · ${activeSlugs.length} personas` : ''}
+              </div>
+
+              {launchError && (
+                <p className="sompo-launch-error">{launchError}</p>
+              )}
+
+              <button
+                type="button"
+                className="sompo-run-btn"
+                disabled={!selected || !activeSquad || launching || sessionsBusy || templatesLoading}
+                onClick={() => void runCaseWithSquad(selected)}
+                data-sompo-run={selected.id}
+              >
+                {launching || sessionsBusy ? (
+                  <>
+                    <Loader2 className="animate-spin" />
+                    Preparando run…
+                  </>
+                ) : (
+                  <>
+                    <Play />
+                    Rodar avaliação na bancada
+                    <ArrowRight />
+                  </>
+                )}
+              </button>
+              <p className="sompo-run-hint">
+                Abre sessão limpa no LUCA-AI, monta o briefing do caso, aplica a equipe e inicia a run.
+              </p>
+            </aside>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -42,6 +42,8 @@ export interface SompoExampleCase {
   stage: SompoCaseStage;
   stageLabel: string;
   riskEvent: string;
+  /** Cover image under public/sompo — visual do caso na grade e no launch. */
+  image: string;
   tags: string[];
   situation: string;
   signals: string[];
@@ -55,6 +57,9 @@ export interface SompoExampleCase {
   suggestedPresetId: 'risco-agro' | 'comite-risco-agro';
   suggestedMode: 'team' | 'individual';
 }
+
+/** Fundo agrícola da página SOMPO. */
+export const SOMPO_PAGE_BACKGROUND = '/sompo/bg-agro.jpg';
 
 export const SOMPO_INDUSTRY_CONTEXT: SompoIndustryFact[] = [
   {
@@ -114,6 +119,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
     stage: 'aviso',
     stageLabel: 'Aviso de sinistro',
     riskEvent: 'Estiagem prolongada no enchimento de grãos',
+    image: '/sompo/seca-milho-safrinha-pr.jpg',
     tags: ['seca', 'safrinha', 'produtividade', 'ZARC'],
     situation:
       'Produtor com apólice de produtividade em milho safrinha aciona sinistro após estiagem no Oeste do PR. NDVI e chuva acumulada nos 60 dias críticos ficam bem abaixo da média histórica da mesorregião. Colheita parcial já aponta kg/ha abaixo da produtividade segurada em 3 de 5 talhões. Corretor pergunta se a unidade segurada será apurada por talhão ou por consolidado da fazenda.',
@@ -158,6 +164,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
     stage: 'regulacao',
     stageLabel: 'Regulação',
     riskEvent: 'Granizo de alta intensidade',
+    image: '/sompo/granizo-soja-rs.jpg',
     tags: ['granizo', 'soja', 'vistoria', 'dano-direto'],
     situation:
       'Célula de tempestade com granizo atinge parte da lavoura de soja em R5–R6. Imagens de drone mostram faixas com desfolha severa e vagens danificadas; áreas vizinhas sem dano. Segurado pede regulação urgente porque a colheita começa em 12 dias e teme perda de prova. Perito precisa decidir amostragem e se a perda será parcial por gleba.',
@@ -201,6 +208,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
     stage: 'underwriting',
     stageLabel: 'Underwriting',
     riskEvent: 'Geada tardia',
+    image: '/sompo/geada-trigo-sc.jpg',
     tags: ['geada', 'trigo', 'pricing', 'carteira'],
     situation:
       'Após geada no espigamento, vários avisos de trigo sobem na mesma praça. Underwriting pergunta se a taxa e o nível de cobertura da renovação da carteira da cooperativa local ainda fazem sentido, ou se é preciso restringir produtividade garantida e exigir práticas de manejo/janelas mais conservadoras.',
@@ -244,6 +252,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
     stage: 'aviso',
     stageLabel: 'Aviso de sinistro',
     riskEvent: 'Chuva excessiva / encharcamento pós-plantio',
+    image: '/sompo/chuva-replantio-mt.jpg',
     tags: ['chuva-excessiva', 'replantio', 'custeio', 'stand'],
     situation:
       'Chuvas concentradas logo após o plantio de soja reduzem o stand em vários talhões. Segurado avalia replantio, mas a janela ZARC está no limite. Apólice de custeio pode cobrir reembolso de despesas de plantio em perda total da unidade — a equipe precisa distinguir falha de emergência coberta de manejo inadequado e de risco excluído.',
@@ -287,6 +296,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
     stage: 'negativa',
     stageLabel: 'Risco de negativa',
     riskEvent: 'Estiagem + plantio fora da janela ZARC',
+    image: '/sompo/zarc-fora-janela.jpg',
     tags: ['ZARC', 'compliance', 'negativa', 'governanca'],
     situation:
       'Segurado aciona sinistro por seca, mas o caderno de campo e as imagens de satélite sugerem plantio 9 dias após o fim da janela ZARC do município/cultura. Corretor alega atraso de insumos; underwriting e jurídico precisam de um dossiê objetivo: o que a apólice e as regras de subvenção/Proagro costumam exigir, e como a Sompo deve responder sem improviso.',
@@ -330,6 +340,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
     stage: 'indenizacao',
     stageLabel: 'Indenização',
     riskEvent: 'Incêndio em máquina agrícola',
+    image: '/sompo/penhor-trator-incendio.jpg',
     tags: ['penhor', 'maquinas', 'incendio', 'credito-rural'],
     situation:
       'Trator financiado (penhor) sofre incêndio no pátio da fazenda. Banco é beneficiário da apólice; produtor quer reposição rápida para não parar o plantio. Regulador precisa cruzar laudo de bombeiros, valor de mercado, salvados e saldo devedor — linha de negócio relevante na carteira rural da Sompo.',
@@ -373,6 +384,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
     stage: 'regulacao',
     stageLabel: 'Regulação',
     riskEvent: 'Alagamento + falha de irrigação + pressão de pragas',
+    image: '/sompo/irrigacao-alagamento-aurora.jpg',
     tags: ['alagamento', 'irrigacao', 'telemetria', 'csv'],
     situation:
       'Fazenda com histórico de alagamento no talhão norte, oscilação de vazão na irrigação leste e picos de pragas. CSV de sinistros recentes + telemetria em tempo quase real pedem um canvas executivo para a Sompo: o que é risco coberto, o que é manutenção, e qual plano preventivo reduz sinistralidade antes da renovação.',
@@ -415,6 +427,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
     stage: 'renovacao',
     stageLabel: 'Renovação',
     riskEvent: 'Concentração de risco climático',
+    image: '/sompo/carteira-renovacao-cooperativa.jpg',
     tags: ['renovacao', 'portfolio', 'sinistralidade', 'cooperativa'],
     situation:
       'Cooperativa renova pacote de apólices agrícolas com sinistralidade em alta após duas safrinhas secas. Sompo precisa decidir: manter capacidade, cortar municípios, elevar franquia, ou exigir pacote de mitigação (ZARC, sementes, irrigação parcial). Há pressão comercial para não perder o canal.',
