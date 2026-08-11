@@ -3145,9 +3145,53 @@ async function ensureCatalogPersonaCached(slug, catalogBySlug) {
 }
 
 async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) {
-  const resolvedAttachments = input.attachmentIds?.length
-    ? resolveChatAttachmentsForModel(input.sessionId, input.attachmentIds)
-    : [];
+  // Follow-up continuity: compact prior operator + final bubbles from the same session.
+  // Current operator bubble (already the mission field) is excluded by trace-derived id.
+  const currentOperatorId = personaRunOperatorEntryId({ traceId: input.traceId });
+  let conversationContextNamed = '';
+  let conversationContextAnon = '';
+  let effectiveAttachmentIds = Array.isArray(input.attachmentIds) ? input.attachmentIds.slice() : [];
+  if (input.sessionId) {
+    try {
+      const session = getChatSession(input.sessionId);
+      const transcript = Array.isArray(session?.transcript) ? session.transcript : [];
+      conversationContextNamed = buildConversationContextFromTranscript(transcript, {
+        excludeOperatorId: currentOperatorId,
+        anonymizePersonas: false,
+      });
+      conversationContextAnon = buildConversationContextFromTranscript(transcript, {
+        excludeOperatorId: currentOperatorId,
+        anonymizePersonas: true,
+      });
+      effectiveAttachmentIds = collectPriorAttachmentIds(transcript, {
+        excludeOperatorId: currentOperatorId,
+        preferIds: input.attachmentIds || [],
+      });
+    } catch {
+      // Session missing/deleted mid-run: continue as one-shot without history.
+    }
+  }
+  const conversationContextTeam = conversationContextNamed;
+  const conversationContextParticipant = input.mode === 'individual'
+    ? conversationContextAnon
+    : conversationContextNamed;
+  const conversationContextJudge = conversationContextNamed;
+
+  // Explicit attachments of this turn fail hard; prior reattach is best-effort
+  // (deleted/corrupt files must not abort a follow-up that still has text context).
+  const explicitAttachmentIds = new Set(
+    (Array.isArray(input.attachmentIds) ? input.attachmentIds : [])
+      .map((id) => String(id || '').trim())
+      .filter(Boolean),
+  );
+  const resolvedAttachments = [];
+  for (const attachmentId of effectiveAttachmentIds) {
+    try {
+      resolvedAttachments.push(...resolveChatAttachmentsForModel(input.sessionId, [attachmentId]));
+    } catch (error) {
+      if (explicitAttachmentIds.has(String(attachmentId || '').trim())) throw error;
+    }
+  }
   const attachmentParts = resolvedAttachments.map((attachment) => attachment.part);
   const attachmentMetadata = resolvedAttachments.map((attachment) => attachment.meta);
   const { personas } = await syncOfficialPersonaRoster();
@@ -3181,6 +3225,9 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
       slugs: role.slugs,
     })) ?? [],
     attachments: attachmentMetadata.map(({ id, name, mimeType, size }) => ({ id, name, mimeType, size })),
+    contextChars: conversationContextNamed.length,
+    contextAnonChars: conversationContextAnon.length,
+    priorAttachmentCount: Math.max(0, effectiveAttachmentIds.length - (input.attachmentIds?.length || 0)),
   });
 
   const slugsToLoad = input.mode === 'individual'
@@ -3212,6 +3259,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
       attachments: attachmentParts,
       toolsEnabled,
       traceId: input.traceId,
+      conversationContext: conversationContextTeam,
     });
     replies = steps.flatMap((step) => step.replies.map((reply) => ({
       ...reply,
@@ -3252,6 +3300,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
           attachments: attachmentParts,
           toolsEnabled,
           traceId: input.traceId,
+          conversationContext: conversationContextParticipant,
         });
       },
       runRevision: ({ slug, originalReply, contributions }) => {
@@ -3279,6 +3328,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
           attachments: attachmentParts,
           toolsEnabled,
           traceId: input.traceId,
+          conversationContext: conversationContextParticipant,
         });
       },
       runJudge: ({ slug, replies: participantReplies, originalReplies = [] }) => {
@@ -3306,6 +3356,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
           attachments: attachmentParts,
           toolsEnabled,
           traceId: input.traceId,
+          conversationContext: conversationContextJudge,
         }).then((reply) => ({ ...reply, phase: 'judge' }));
       },
     });
@@ -3386,6 +3437,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
         attachments: attachmentParts,
         toolsEnabled,
         traceId: input.traceId,
+        conversationContext: conversationContextTeam,
       });
     }));
   }

@@ -3,6 +3,9 @@ const DEFAULT_MAX_MISSION_CHARS = 6000;
 const DEFAULT_MAX_EXECUTION_SLUGS = 4;
 const DEFAULT_MAX_INDIVIDUAL_PARTICIPANTS = 5;
 const DEFAULT_MAX_ATTACHMENTS = 4;
+/** Compact prior-turn context injected into persona prompts on follow-up. */
+export const DEFAULT_MAX_CONVERSATION_CONTEXT_CHARS = 3000;
+const DEFAULT_MAX_CONTEXT_ENTRY_CHARS = 1200;
 
 export const DEPTH_BUDGETS = Object.freeze({
   1: Object.freeze({ participant: 1100, judge: 1600 }),
@@ -320,6 +323,112 @@ export function isPureModelAgent({ personaSlug = '', systemPrompt = '' } = {}) {
   return false;
 }
 
+function clipContextText(value, maxChars) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, Math.max(0, maxChars - 1))}…`;
+}
+
+function isOperatorTranscriptEntry(entry) {
+  return String(entry?.role || '').trim() === 'operator';
+}
+
+function isFinalishTranscriptEntry(entry) {
+  if (!entry || isOperatorTranscriptEntry(entry)) return false;
+  if (String(entry.phase || '').trim().toLowerCase() === 'judge') return true;
+  const stage = String(entry.stage || '').trim().toLowerCase();
+  if (stage.includes('juiz') || stage.includes('exibi') || stage.includes('display')) return true;
+  const id = String(entry.id || '').trim().toLowerCase();
+  return id.startsWith('judge_') || id.startsWith('final_');
+}
+
+/**
+ * Compact prior turns from the session transcript for follow-up runs.
+ * Keeps operator questions + last finals/verdicts; drops oldest first under maxChars.
+ * Excludes the operator bubble of the in-flight run (already the mission field).
+ */
+export function buildConversationContextFromTranscript(transcript = [], options = {}) {
+  const maxChars = Number.isInteger(options.maxChars) && options.maxChars > 0
+    ? options.maxChars
+    : DEFAULT_MAX_CONVERSATION_CONTEXT_CHARS;
+  const maxEntryChars = Number.isInteger(options.maxEntryChars) && options.maxEntryChars > 0
+    ? options.maxEntryChars
+    : DEFAULT_MAX_CONTEXT_ENTRY_CHARS;
+  const excludeOperatorId = String(options.excludeOperatorId || '').trim();
+  const anonymizePersonas = Boolean(options.anonymizePersonas);
+
+  const lines = [];
+  for (const entry of Array.isArray(transcript) ? transcript : []) {
+    const content = clipContextText(entry?.content, maxEntryChars);
+    if (!content) continue;
+    if (isOperatorTranscriptEntry(entry)) {
+      if (excludeOperatorId && String(entry.id || '').trim() === excludeOperatorId) continue;
+      lines.push(`[Operador] ${content}`);
+      continue;
+    }
+    if (!isFinalishTranscriptEntry(entry)) continue;
+    if (anonymizePersonas) {
+      lines.push(`[Entrega anterior da bancada] ${content}`);
+    } else {
+      const label = String(entry.stage || entry.name || 'Persona').trim() || 'Persona';
+      lines.push(`[${label}] ${content}`);
+    }
+  }
+
+  if (!lines.length) return '';
+
+  // Prefer recent turns: drop oldest first until under budget.
+  let selected = lines.slice();
+  let text = selected.join('\n\n');
+  while (selected.length > 1 && text.length > maxChars) {
+    selected = selected.slice(1);
+    text = selected.join('\n\n');
+  }
+  if (text.length > maxChars) {
+    text = `${text.slice(0, Math.max(0, maxChars - 1))}…`;
+  }
+  return text.trim();
+}
+
+export function formatConversationContextForPrompt(rawContext) {
+  const text = String(rawContext || '').trim();
+  if (!text) return '';
+  return `Contexto de turnos anteriores desta conversa (gerado pela bancada — nao e sua resposta anterior):\n${text}`;
+}
+
+/**
+ * Prefer current-run attachment ids, then fill with prior operator attachments (same session disk).
+ */
+export function collectPriorAttachmentIds(transcript = [], options = {}) {
+  const maxIds = Number.isInteger(options.maxIds) && options.maxIds > 0
+    ? options.maxIds
+    : DEFAULT_MAX_ATTACHMENTS;
+  const excludeOperatorId = String(options.excludeOperatorId || '').trim();
+  const preferIds = Array.isArray(options.preferIds) ? options.preferIds : [];
+  const prior = [];
+
+  for (const entry of Array.isArray(transcript) ? transcript : []) {
+    if (!isOperatorTranscriptEntry(entry)) continue;
+    if (excludeOperatorId && String(entry.id || '').trim() === excludeOperatorId) continue;
+    for (const attachment of Array.isArray(entry.attachments) ? entry.attachments : []) {
+      const id = String(attachment?.id || '').trim();
+      if (id) prior.push(id);
+    }
+  }
+
+  const seen = new Set();
+  const out = [];
+  for (const value of [...preferIds, ...prior]) {
+    const id = String(value || '').trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    if (out.length >= maxIds) break;
+  }
+  return out;
+}
+
 function modelTruthBlock(model, { pure = false } = {}) {
   const id = String(model || '').trim();
   if (!id) {
@@ -351,6 +460,7 @@ export function buildPersonaTeamPrompt({
   workflowRole = null,
   accumulatedContext = '',
   independent = false,
+  conversationContext = '',
 }) {
   const name = String(personaName || personaSlug || 'Persona Yume').trim();
   const slug = String(personaSlug || '').trim();
@@ -358,6 +468,7 @@ export function buildPersonaTeamPrompt({
   const model = String(runtimeModel || '').trim();
   const pure = isPureModelAgent({ personaSlug: slug, systemPrompt: basePrompt });
   const modelBlock = modelTruthBlock(model, { pure });
+  const historyBlock = formatConversationContextForPrompt(conversationContext);
 
   // Pure model agents: keep the Yume system almost raw. Only add motor truth + mission.
   if (pure) {
@@ -369,6 +480,7 @@ export function buildPersonaTeamPrompt({
       ? 'Responda SOMENTE com JSON valido contendo summary, report, charts (ate 3, pie|tower), images (ate 2 prompts em ingles) e imageEngine (grok-imagine|gpt-image).'
       : '';
     const extraUser = [
+      historyBlock,
       roleLabel ? `Etapa: ${roleLabel}. ${roleInstruction}` : '',
       visualJsonHint,
       context ? `Contexto acumulado:\n${context}` : '',
@@ -459,7 +571,7 @@ Regras:
   Responda em pt-BR, com postura de agente especialista e foco em acao concreta.${workflowSystem}${individualSystem}`,
       user: `Missao desta bancada:
   ${mission}
-
+${historyBlock ? `\n  ${historyBlock.replace(/\n/g, '\n  ')}\n` : ''}
   ${independent ? '' : `Equipe ativa: ${teammates}\n`}
   Sua persona: ${name}${slug ? ` (${slug})` : ''}
   ${model ? `Motor 9Router: ${model}` : ''}
@@ -477,6 +589,7 @@ export function buildIndividualJudgePrompt({
   runtimeModel = '',
   replies = [],
   originalReplies = [],
+  conversationContext = '',
 }) {
   const name = String(judgeName || judgeSlug || 'Juiz').trim();
   const slug = String(judgeSlug || '').trim();
@@ -509,6 +622,8 @@ Motor LLM desta execucao nao foi declarado explicitamente.
   const originalsAppendix = originals
     ? `\n\nRespostas cegas originais (anexo contextual; priorize as revisoes):\n${originals}`
     : '';
+  const historyBlock = formatConversationContextForPrompt(conversationContext);
+  const historyAppendix = historyBlock ? `\n\n${historyBlock}` : '';
 
   if (pure) {
     return {
@@ -520,7 +635,7 @@ Motor LLM desta execucao nao foi declarado explicitamente.
 ${modelBlock}
 Voce avalia contribuicoes de outros agentes. Seja direto, livre de formato e sem personagem fixo.`,
       user: `Missao:
-${mission}
+${mission}${historyAppendix}
 
 Contribuicoes:
 ${contributions || 'Nenhuma contribuicao utilizavel.'}${originalsAppendix}
@@ -543,7 +658,7 @@ Entregue seu julgamento final com liberdade de forma.`,
   Responda em pt-BR.`,
       user: `Missao original:
   ${mission}
-
+${historyBlock ? `\n  ${historyBlock.replace(/\n/g, '\n  ')}\n` : ''}
   Persona juiza: ${name}${slug ? ` (${slug})` : ''}
   ${model ? `Motor 9Router do juiz: ${model}` : ''}
 
@@ -568,6 +683,7 @@ export function buildIndividualRevisionPrompt({
   runtimeModel = '',
   originalReply,
   contributions = [],
+  conversationContext = '',
 }) {
   const name = String(personaName || personaSlug || 'Participante').trim();
   const slug = String(personaSlug || '').trim();
@@ -581,6 +697,8 @@ export function buildIndividualRevisionPrompt({
       ? cleanPersonaTeamOutput(contribution.content)
       : `FALHA: ${String(contribution?.error || contribution?.content || 'sem resposta').trim()}`}`
   )).join('\n\n');
+  const historyBlock = formatConversationContextForPrompt(conversationContext);
+  const historyAppendix = historyBlock ? `\n\n${historyBlock}` : '';
 
   return {
     name,
@@ -591,7 +709,7 @@ ${modelTruthBlock(model, { pure: isPureModelAgent({ personaSlug: slug, systemPro
 Voce recebera contribuicoes anonimas de outros participantes sobre a mesma missao. Revise sua resposta: mantenha o que sustenta, corrija o que os outros refutaram com evidencia melhor, aponte erros alheios objetivamente. Nao presuma autoridade por estilo — avalie evidencia.
 Nao tente identificar os autores das contribuicoes. Responda em pt-BR.`,
     user: `Missao original:
-${mission}
+${mission}${historyAppendix}
 
 Sua resposta original:
 ${original}

@@ -2,11 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  buildConversationContextFromTranscript,
   buildIndividualJudgePrompt,
   buildIndividualRevisionPrompt,
   buildPersonaTeamPrompt,
   cleanPersonaTeamOutput,
+  collectPriorAttachmentIds,
+  DEFAULT_MAX_CONVERSATION_CONTEXT_CHARS,
   DEPTH_BUDGETS,
+  formatConversationContextForPrompt,
   normalizePersonaTeamRunInput,
   normalizePersonaTeamSlug,
   runIndividualResolution,
@@ -220,6 +224,85 @@ test('normalizePersonaTeamRunInput exige juiz na resolucao individual', () => {
   assert.equal(input.error, 'judge_required');
 });
 
+test('buildConversationContextFromTranscript keeps prior operator + final and excludes current operator', () => {
+  const transcript = [
+    { id: 'op_old', role: 'operator', content: 'Caso SOMPO com milho safrinha' },
+    { id: 'r1', role: 'persona', name: 'Aurora', stage: 'Execucao', content: 'rascunho intermediario' },
+    { id: 'final_old', role: 'persona', name: 'Narrador', stage: 'Exibicao final', content: 'Veredito: priorizar talhoes secos' },
+    { id: 'op_current', role: 'operator', content: 'E a franquia?' },
+  ];
+
+  const ctx = buildConversationContextFromTranscript(transcript, {
+    excludeOperatorId: 'op_current',
+  });
+  assert.match(ctx, /Caso SOMPO/);
+  assert.match(ctx, /Veredito: priorizar/);
+  assert.doesNotMatch(ctx, /E a franquia/);
+  assert.doesNotMatch(ctx, /rascunho intermediario/);
+  assert.match(ctx, /\[Operador\]/);
+  assert.match(ctx, /\[Exibicao final\]/);
+});
+
+test('buildConversationContextFromTranscript anonymizes persona labels when requested', () => {
+  const ctx = buildConversationContextFromTranscript([
+    { id: 'op1', role: 'operator', content: 'Missao A' },
+    { id: 'judge_1', role: 'persona', name: 'Maestro', stage: 'Juiz', phase: 'judge', content: 'Decisao X' },
+  ], { anonymizePersonas: true });
+
+  assert.match(ctx, /\[Entrega anterior da bancada\]/);
+  assert.doesNotMatch(ctx, /Maestro/);
+  assert.doesNotMatch(ctx, /\[Juiz\]/);
+});
+
+test('buildConversationContextFromTranscript drops oldest turns under char budget', () => {
+  const transcript = [
+    { id: 'op1', role: 'operator', content: `AAA-${'a'.repeat(800)}` },
+    { id: 'final_1', role: 'persona', stage: 'Exibicao final', content: `BBB-${'b'.repeat(800)}` },
+    { id: 'op2', role: 'operator', content: `CCC-${'c'.repeat(800)}` },
+    { id: 'final_2', role: 'persona', stage: 'Exibicao final', content: `DDD-${'d'.repeat(800)}` },
+  ];
+  const ctx = buildConversationContextFromTranscript(transcript, { maxChars: 900, maxEntryChars: 500 });
+  assert.ok(ctx.length <= 900);
+  assert.match(ctx, /DDD-/);
+  assert.doesNotMatch(ctx, /AAA-/);
+});
+
+test('collectPriorAttachmentIds prefers current ids then prior operator attachments', () => {
+  const transcript = [
+    {
+      id: 'op1',
+      role: 'operator',
+      content: 'caso',
+      attachments: [{ id: 'att_old_1' }, { id: 'att_old_2' }],
+    },
+    { id: 'op_now', role: 'operator', content: 'follow', attachments: [{ id: 'att_new' }] },
+  ];
+  assert.deepEqual(
+    collectPriorAttachmentIds(transcript, {
+      excludeOperatorId: 'op_now',
+      preferIds: ['att_new'],
+      maxIds: 4,
+    }),
+    ['att_new', 'att_old_1', 'att_old_2'],
+  );
+  assert.deepEqual(
+    collectPriorAttachmentIds(transcript, {
+      excludeOperatorId: 'op_now',
+      preferIds: [],
+      maxIds: 1,
+    }),
+    ['att_old_1'],
+  );
+});
+
+test('formatConversationContextForPrompt labels history as bancada-generated', () => {
+  const block = formatConversationContextForPrompt('[Operador] pergunta anterior');
+  assert.match(block, /Contexto de turnos anteriores/i);
+  assert.match(block, /nao e sua resposta anterior/i);
+  assert.match(block, /pergunta anterior/);
+  assert.equal(formatConversationContextForPrompt('  '), '');
+});
+
 test('buildPersonaTeamPrompt isola a bancada do Operacional global', () => {
   const prompt = buildPersonaTeamPrompt({
     mission: 'Auditar leads',
@@ -233,6 +316,23 @@ test('buildPersonaTeamPrompt isola a bancada do Operacional global', () => {
   assert.match(prompt.system, /nao acione agentes fixos do Operacional/i);
   assert.match(prompt.user, /Equipe ativa: Maestro, Designer/i);
   assert.match(prompt.user, /Auditar leads/i);
+});
+
+test('buildPersonaTeamPrompt injects conversationContext on follow-up', () => {
+  const prompt = buildPersonaTeamPrompt({
+    mission: 'E a franquia?',
+    personaName: 'Maestro',
+    personaSlug: 'maestro',
+    systemPrompt: 'Coordena.',
+    teamNames: ['Maestro'],
+    conversationContext: '[Operador] Caso SOMPO milho\n\n[Exibicao final] Priorizar talhoes',
+  });
+  assert.match(prompt.user, /E a franquia/);
+  assert.match(prompt.user, /Contexto de turnos anteriores/i);
+  assert.match(prompt.user, /Caso SOMPO milho/);
+  assert.match(prompt.user, /Priorizar talhoes/);
+  // Constant is part of the contract: keep follow-up budget intentional.
+  assert.equal(DEFAULT_MAX_CONVERSATION_CONTEXT_CHARS, 3000);
 });
 
 test('buildPersonaTeamPrompt remove identidade dos demais participantes no contexto individual', () => {
@@ -377,6 +477,30 @@ test('buildIndividualRevisionPrompt pede replica objetiva sem expor identidades 
   assert.match(prompt.user, /Contribuicao B/);
   assert.match(prompt.user, /o que mantem, o que muda/i);
   assert.doesNotMatch(prompt.user, /maestro|grok/i);
+});
+
+test('buildIndividualJudgePrompt and revision inject conversationContext', () => {
+  const judge = buildIndividualJudgePrompt({
+    mission: 'E a franquia?',
+    judgeName: 'Maestro',
+    judgeSlug: 'maestro',
+    systemPrompt: 'Julga.',
+    replies: [{ ok: true, name: 'Aurora', slug: 'aurora', content: 'proposta' }],
+    conversationContext: '[Operador] Caso SOMPO\n\n[Entrega anterior da bancada] veredito previo',
+  });
+  assert.match(judge.user, /Contexto de turnos anteriores/i);
+  assert.match(judge.user, /Caso SOMPO/);
+
+  const revision = buildIndividualRevisionPrompt({
+    mission: 'E a franquia?',
+    personaName: 'Aurora',
+    personaSlug: 'aurora',
+    originalReply: { ok: true, content: 'primeira' },
+    contributions: [],
+    conversationContext: '[Operador] Caso SOMPO',
+  });
+  assert.match(revision.user, /Contexto de turnos anteriores/i);
+  assert.match(revision.user, /Caso SOMPO/);
 });
 
 test('runIndividualResolution isola participantes e chama o juiz depois de reunir todas as respostas', async () => {
