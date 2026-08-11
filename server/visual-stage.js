@@ -108,7 +108,10 @@ function normalizeChart(raw = {}, index = 0) {
 }
 
 function normalizeImageSpec(raw = {}, index = 0) {
-  const prompt = clip(raw.prompt || raw.description || '', MAX_IMAGE_PROMPT_CHARS);
+  const prompt = clip(
+    raw.prompt || raw.description || raw.image_prompt || raw.imagePrompt || '',
+    MAX_IMAGE_PROMPT_CHARS,
+  );
   if (!prompt) return null;
   const aspect = String(raw.aspect_ratio || raw.aspectRatio || '16:9').trim();
   return {
@@ -118,6 +121,52 @@ function normalizeImageSpec(raw = {}, index = 0) {
     aspectRatio: ALLOWED_ASPECT.has(aspect) ? aspect : '16:9',
     style: clip(raw.style || 'infographic', 40) || 'infographic',
   };
+}
+
+/**
+ * Quando a persona omite images[] (comum), o runtime ainda precisa gerar
+ * pelo menos um infográfico a partir do restante do plano / missão.
+ */
+export function synthesizeVisualImageSpecs(plan = {}, { mission = '' } = {}) {
+  if (Array.isArray(plan.images) && plan.images.length) return plan.images;
+  const chartBits = (Array.isArray(plan.charts) ? plan.charts : [])
+    .slice(0, 3)
+    .map((chart) => {
+      const items = (Array.isArray(chart.items) ? chart.items : [])
+        .slice(0, 6)
+        .map((item) => `${item.label}: ${item.value}`)
+        .join(', ');
+      return items ? `${chart.title} (${chart.type || 'chart'}) — ${items}` : chart.title;
+    })
+    .filter(Boolean);
+  const topic = clip(
+    plan.summary
+      || plan.report?.title
+      || plan.report?.markdown
+      || mission
+      || 'Key findings from the session',
+    420,
+  );
+  const dataLine = chartBits.length
+    ? `Include these exact data points as a clean explained chart: ${chartBits.join('; ')}.`
+    : 'Turn the findings into one clear explained chart or ranked comparison with readable labels.';
+  const prompt = clip([
+    'Editorial infographic / explained chart, not a photo.',
+    `Topic: ${topic}`,
+    dataLine,
+    'Readable title, clear category labels, accurate values, 1-3 short callouts, embedded legend/caption,',
+    'high contrast, clean sans typography, dark editorial or paper background,',
+    'no fake software UI, no dashboard chrome, no illegible text, no watermark.',
+  ].join(' '), MAX_IMAGE_PROMPT_CHARS);
+
+  return [{
+    id: uniqueId('img'),
+    title: clip(plan.report?.title || plan.summary || 'Infográfico da sessão', 120) || 'Infográfico da sessão',
+    prompt,
+    aspectRatio: '16:9',
+    style: 'infographic',
+    synthesized: true,
+  }];
 }
 
 function normalizeReport(raw = {}, fallbackTitle = 'Relatório visual') {
@@ -155,7 +204,12 @@ export function parseVisualPlanOutput(output = '', { mission = '' } = {}) {
     .filter(Boolean)
     .slice(0, MAX_VISUAL_CHARTS);
 
-  const images = (Array.isArray(parsed.images) ? parsed.images : [])
+  const rawImages = Array.isArray(parsed.images)
+    ? parsed.images
+    : Array.isArray(parsed.stills)
+      ? parsed.stills
+      : (parsed.image ? [parsed.image] : []);
+  const images = rawImages
     .map((item, index) => normalizeImageSpec(item, index))
     .filter(Boolean)
     .slice(0, MAX_VISUAL_IMAGES);
@@ -176,26 +230,35 @@ export function parseVisualPlanOutput(output = '', { mission = '' } = {}) {
 /**
  * Plano inutilizável para artefatos ricos (sem JSON ou fallback textual):
  * o runtime deve re-promptar a persona uma vez antes de aceitar degradação.
+ * Também re-tenta quando o JSON veio sem images — a etapa visual precisa gerar imagem.
  */
 export function visualPlanNeedsRetry(plan) {
   if (!plan) return true;
   if (plan.source === 'text-fallback') return true;
-  return !plan.report && !plan.charts?.length && !plan.images?.length;
+  if (!plan.report && !plan.charts?.length && !plan.images?.length) return true;
+  return !plan.images?.length;
 }
 
 export function buildVisualRetryContext(previousOutput = '') {
   const excerpt = clip(previousOutput, 1_500);
   return [
     '## Correção obrigatória da etapa visual',
-    'Sua resposta anterior NÃO seguiu o contrato: era texto/markdown em vez de JSON válido de artefatos.',
+    'Sua resposta anterior NÃO seguiu o contrato de artefatos.',
     'Responda novamente SOMENTE com o objeto JSON combinado (summary, report, charts, images, imageEngine), sem nenhum texto fora do JSON.',
+    'OBRIGATÓRIO: inclua pelo menos 1 item em images[] com prompt em inglês de infográfico/explained-chart (título legível, labels, callouts, legenda). Não diga que não há imagens — invente um gráfico fiel ao contexto.',
     excerpt ? `Resposta anterior (para referência do conteúdo, não do formato):\n${excerpt}` : '',
   ].filter(Boolean).join('\n');
 }
 
 function writeBinaryArtifact(dir, artifactId, buffer, mimeType) {
   fs.mkdirSync(dir, { recursive: true });
-  const ext = mimeType === 'image/jpeg' ? 'jpg' : mimeType === 'image/webp' ? 'webp' : 'png';
+  const ext = mimeType === 'image/jpeg'
+    ? 'jpg'
+    : mimeType === 'image/webp'
+      ? 'webp'
+      : mimeType === 'image/svg+xml'
+        ? 'svg'
+        : 'png';
   const fileName = `${artifactId}.${ext}`;
   const filePath = path.join(dir, fileName);
   fs.writeFileSync(filePath, buffer);
@@ -209,6 +272,156 @@ function writeBinaryArtifact(dir, artifactId, buffer, mimeType) {
   };
   fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));
   return meta;
+}
+
+function escapeXml(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function wrapSvgText(value = '', maxChars = 54) {
+  const words = String(value || '').trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const lines = [];
+  let current = '';
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > maxChars && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+    if (lines.length >= 4) break;
+  }
+  if (current && lines.length < 4) lines.push(current);
+  return lines;
+}
+
+/**
+ * Infográfico SVG local quando o 9Router não tem provider de imagem.
+ * Garante que a etapa visual sempre poste um artefato visual no chat.
+ */
+export function renderLocalInfographicSvg({
+  title = 'Infográfico da sessão',
+  summary = '',
+  charts = [],
+  prompt = '',
+} = {}) {
+  const chart = (Array.isArray(charts) ? charts : []).find((item) => Array.isArray(item?.items) && item.items.length)
+    || null;
+  const items = (chart?.items || [])
+    .slice(0, 6)
+    .map((item) => ({
+      label: clip(item.label || 'Item', 28) || 'Item',
+      value: Number(item.value) || 0,
+    }));
+  const maxValue = Math.max(1, ...items.map((item) => item.value));
+  const heading = clip(title || chart?.title || 'Infográfico da sessão', 72) || 'Infográfico da sessão';
+  const subtitle = clip(summary || chart?.rationale || prompt || 'Achados da rodada', 180);
+  const barWidth = 920;
+  const barRows = items.map((item, index) => {
+    const y = 210 + index * 58;
+    const width = Math.max(24, Math.round((item.value / maxValue) * 620));
+    return `
+      <text x="80" y="${y + 18}" fill="#9fb4c8" font-size="18" font-family="Segoe UI, Arial, sans-serif">${escapeXml(item.label)}</text>
+      <rect x="280" y="${y}" width="${barWidth - 280}" height="28" rx="8" fill="rgba(255,255,255,0.06)"/>
+      <rect x="280" y="${y}" width="${width}" height="28" rx="8" fill="url(#barGrad)"/>
+      <text x="${290 + width}" y="${y + 20}" fill="#e8f2ff" font-size="18" font-family="Segoe UI, Arial, sans-serif">${escapeXml(String(item.value))}</text>
+    `;
+  }).join('\n');
+
+  const fallbackBlocks = items.length
+    ? barRows
+    : wrapSvgText(subtitle || 'Sem série numérica — resumo visual da sessão.', 48)
+      .map((line, index) => `<text x="80" y="${240 + index * 34}" fill="#d7e6f5" font-size="22" font-family="Segoe UI, Arial, sans-serif">${escapeXml(line)}</text>`)
+      .join('\n');
+
+  const captionLines = wrapSvgText(subtitle, 70);
+  const caption = captionLines
+    .map((line, index) => `<text x="80" y="${620 + index * 26}" fill="#8fa3b7" font-size="16" font-family="Segoe UI, Arial, sans-serif">${escapeXml(line)}</text>`)
+    .join('\n');
+
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="${escapeXml(heading)}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1220"/>
+      <stop offset="100%" stop-color="#152238"/>
+    </linearGradient>
+    <linearGradient id="barGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0a84ff"/>
+      <stop offset="100%" stop-color="#64d2ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <circle cx="1180" cy="80" r="120" fill="rgba(10,132,255,0.12)"/>
+  <circle cx="80" cy="660" r="160" fill="rgba(100,210,255,0.08)"/>
+  <text x="80" y="78" fill="#64d2ff" font-size="16" letter-spacing="3" font-family="Segoe UI, Arial, sans-serif">LUCA AI · ARTEFATO VISUAL</text>
+  <text x="80" y="130" fill="#f4f8ff" font-size="40" font-weight="700" font-family="Segoe UI, Arial, sans-serif">${escapeXml(heading)}</text>
+  <text x="80" y="168" fill="#9fb4c8" font-size="18" font-family="Segoe UI, Arial, sans-serif">${escapeXml(clip(chart?.title ? `Gráfico: ${chart.title}` : 'Infográfico gerado a partir da sessão', 90))}</text>
+  ${fallbackBlocks}
+  ${caption}
+  <text x="80" y="700" fill="#607588" font-size="14" font-family="Segoe UI, Arial, sans-serif">fallback local · image gen indisponível no roteador</text>
+</svg>`;
+  return Buffer.from(svg, 'utf8');
+}
+
+export async function generateVisualImageWithFallback({
+  callImage,
+  engines = [],
+  prompt,
+  aspectRatio = '16:9',
+  resolution = '1k',
+  localTitle = 'Infográfico da sessão',
+  localSummary = '',
+  localCharts = [],
+} = {}) {
+  const uniqueEngines = [...new Set((Array.isArray(engines) ? engines : []).filter(Boolean))];
+  const attempts = [];
+  for (const engine of uniqueEngines) {
+    if (typeof callImage !== 'function') break;
+    try {
+      const result = await callImage({
+        prompt,
+        model: engine,
+        n: 1,
+        responseFormat: 'b64_json',
+        aspectRatio,
+        resolution,
+      });
+      const first = result?.images?.[0];
+      if (!first?.b64Json && !first?.url) throw new Error('image_payload_missing');
+      return {
+        source: 'router',
+        model: result.model || engine,
+        b64Json: first.b64Json || null,
+        url: first.url || null,
+        attempts,
+      };
+    } catch (error) {
+      attempts.push({
+        engine,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return {
+    source: 'local-infographic',
+    model: 'local-infographic',
+    svgBuffer: renderLocalInfographicSvg({
+      title: localTitle,
+      summary: localSummary,
+      charts: localCharts,
+      prompt,
+    }),
+    attempts,
+  };
 }
 
 export function readVisualArtifactFile(userId, traceId, artifactId) {
@@ -258,14 +471,25 @@ export async function materializeVisualPack({
     };
   }
 
+  // Persona frequentemente devolve só summary/report sem images — sintetiza 1 prompt.
+  const imageSpecs = synthesizeVisualImageSpecs(plan, { mission });
+  const synthesizedImages = imageSpecs.some((item) => item.synthesized);
+
   const engine = sanitizeImageGenerationModel(plan.imageEngine || imageModel, IMAGE_GENERATION_MODEL);
   const errors = [];
   let images = [];
 
-  if (generateImages && typeof callImage === 'function' && plan.images.length) {
+  if (generateImages && imageSpecs.length) {
     const dir = artifactsDir(ownerId, traceId);
+    const engines = [
+      engine,
+      IMAGE_GENERATION_MODEL,
+      'cx/gpt-image-1',
+      'xai/grok-imagine-image',
+    ];
     // Paralelo: cada imagem falha isolada; ordem do plano preservada no resultado.
-    images = await Promise.all(plan.images.map(async (spec) => {
+    // Se o 9Router não tiver provider de imagem, cai no infográfico SVG local.
+    images = await Promise.all(imageSpecs.map(async (spec) => {
       const base = {
         id: spec.id,
         kind: 'image',
@@ -273,22 +497,34 @@ export async function materializeVisualPack({
         prompt: spec.prompt,
         aspectRatio: spec.aspectRatio,
         style: spec.style,
+        ...(spec.synthesized ? { synthesized: true } : {}),
       };
       try {
-        const result = await callImage({
+        const result = await generateVisualImageWithFallback({
+          callImage: typeof callImage === 'function' ? callImage : null,
+          engines,
           prompt: spec.prompt,
-          model: engine,
-          n: 1,
-          responseFormat: 'b64_json',
           aspectRatio: spec.aspectRatio,
           resolution: '1k',
+          localTitle: spec.title || plan.report?.title || plan.summary || 'Infográfico da sessão',
+          localSummary: plan.summary || plan.report?.markdown || mission,
+          localCharts: plan.charts,
         });
-        const first = result?.images?.[0];
-        if (!first?.b64Json && !first?.url) {
-          throw new Error('image_payload_missing');
+        if (result.source === 'local-infographic' && result.svgBuffer) {
+          const meta = writeBinaryArtifact(dir, spec.id, result.svgBuffer, 'image/svg+xml');
+          return {
+            ...base,
+            mimeType: meta.mimeType,
+            size: meta.size,
+            url: `/api/luca-ai/visual-artifacts/${encodeURIComponent(traceId)}/${encodeURIComponent(spec.id)}`,
+            model: result.model,
+            status: 'ok',
+            fallback: 'local-infographic',
+            routerAttempts: result.attempts || [],
+          };
         }
-        if (first.b64Json) {
-          const buffer = Buffer.from(first.b64Json, 'base64');
+        if (result.b64Json) {
+          const buffer = Buffer.from(result.b64Json, 'base64');
           if (buffer.length < 32) throw new Error('image_too_small');
           const meta = writeBinaryArtifact(dir, spec.id, buffer, 'image/png');
           return {
@@ -300,22 +536,25 @@ export async function materializeVisualPack({
             status: 'ok',
           };
         }
-        return {
-          ...base,
-          mimeType: 'image/*',
-          size: 0,
-          url: first.url,
-          model: result.model || engine,
-          status: 'ok',
-        };
+        if (result.url) {
+          return {
+            ...base,
+            mimeType: 'image/*',
+            size: 0,
+            url: result.url,
+            model: result.model || engine,
+            status: 'ok',
+          };
+        }
+        throw new Error('image_payload_missing');
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         errors.push({ id: spec.id, error: message });
         return { ...base, status: 'failed', error: message };
       }
     }));
-  } else if (plan.images.length && !generateImages) {
-    for (const spec of plan.images) {
+  } else if (imageSpecs.length && !generateImages) {
+    for (const spec of imageSpecs) {
       images.push({
         id: spec.id,
         kind: 'image',
@@ -323,6 +562,7 @@ export async function materializeVisualPack({
         prompt: spec.prompt,
         aspectRatio: spec.aspectRatio,
         style: spec.style,
+        ...(spec.synthesized ? { synthesized: true } : {}),
         status: 'skipped',
         error: 'image_generation_disabled',
       });
@@ -351,6 +591,7 @@ export async function materializeVisualPack({
 
   const hasOkImage = images.some((item) => item.status === 'ok');
   const hasFailedImage = images.some((item) => item.status === 'failed');
+  const usedLocalFallback = images.some((item) => item.fallback === 'local-infographic');
   const hasContent = Boolean(report || charts.length || hasOkImage);
   let status = 'skipped';
   if (hasContent && !hasFailedImage && !errors.length) status = 'complete';
@@ -363,8 +604,10 @@ export async function materializeVisualPack({
     report,
     charts,
     images,
-    imageEngine: engine,
+    imageEngine: usedLocalFallback ? 'local-infographic' : engine,
     planSource: plan.source,
+    synthesizedImages: Boolean(synthesizedImages),
+    localImageFallback: Boolean(usedLocalFallback),
     retried: Boolean(retried),
     errors,
     generatedAt: new Date().toISOString(),

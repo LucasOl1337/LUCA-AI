@@ -3261,7 +3261,12 @@ function LucaMissionCanvas({
           <FinalDisplayCard entry={finalResult} persona={finalResult.slug ? personaBySlug.get(finalResult.slug) : undefined} />
         )}
 
-        {visualPack && visualPack.status !== 'skipped' && (
+        {visualPack && (
+          visualPack.status !== 'skipped'
+          || Boolean(visualPack.report)
+          || (Array.isArray(visualPack.charts) && visualPack.charts.length > 0)
+          || (Array.isArray(visualPack.images) && visualPack.images.length > 0)
+        ) && (
           <VisualPackCard pack={visualPack} />
         )}
 
@@ -3305,8 +3310,13 @@ function VisualPackCard({ pack }: { pack: LucaAiVisualPack }) {
           </span>
         ) : null}
         {pack.imageEngine ? (
-          <span className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px]" style={{ background: 'rgba(255,255,255,0.05)', color: theme.textGhost }} title="Motor de imagem 9Router">
+          <span className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px]" style={{ background: 'rgba(255,255,255,0.05)', color: theme.textGhost }} title="Motor de imagem">
             {pack.imageEngine}
+          </span>
+        ) : null}
+        {pack.localImageFallback ? (
+          <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px]" style={{ background: 'rgba(255,255,255,0.05)', color: theme.textGhost }} title="9Router sem provider de imagem — infográfico SVG gerado localmente">
+            fallback local
           </span>
         ) : null}
         {report?.markdown ? (
@@ -3360,7 +3370,7 @@ function VisualPackCard({ pack }: { pack: LucaAiVisualPack }) {
                   <img
                     src={image.url}
                     alt={image.title || 'Artefato visual'}
-                    className="max-h-72 w-full object-cover"
+                    className="max-h-80 w-full bg-black/20 object-contain"
                     loading="lazy"
                   />
                 ) : (

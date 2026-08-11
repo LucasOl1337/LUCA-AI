@@ -9,6 +9,8 @@ import {
   materializeVisualPack,
   parseVisualPlanOutput,
   readVisualArtifactFile,
+  renderLocalInfographicSvg,
+  synthesizeVisualImageSpecs,
   visualPlanNeedsRetry,
 } from './visual-stage.js';
 
@@ -67,13 +69,43 @@ test('parseVisualPlanOutput aceita chart line com ate 8 itens', () => {
 test('visualPlanNeedsRetry detecta plano inutilizavel e aceita plano valido', () => {
   assert.equal(visualPlanNeedsRetry(null), true);
   assert.equal(visualPlanNeedsRetry(parseVisualPlanOutput('prosa sem json')), true);
-  const valid = parseVisualPlanOutput(JSON.stringify({
+  const withoutImages = parseVisualPlanOutput(JSON.stringify({
     summary: 'ok',
     report: { title: 'R', markdown: 'texto' },
   }));
+  assert.equal(visualPlanNeedsRetry(withoutImages), true);
+  const valid = parseVisualPlanOutput(JSON.stringify({
+    summary: 'ok',
+    report: { title: 'R', markdown: 'texto' },
+    images: [{ prompt: 'Clean infographic bar chart with readable labels' }],
+  }));
   assert.equal(visualPlanNeedsRetry(valid), false);
   assert.match(buildVisualRetryContext('resposta anterior'), /SOMENTE com o objeto JSON/);
+  assert.match(buildVisualRetryContext('resposta anterior'), /images\[\]/);
   assert.match(buildVisualRetryContext('resposta anterior'), /resposta anterior/);
+});
+
+test('synthesizeVisualImageSpecs cria prompt quando images vem vazio', () => {
+  const specs = synthesizeVisualImageSpecs({
+    summary: 'Oeste lidera o risco',
+    charts: [{ title: 'Risco', type: 'tower', items: [{ label: 'Oeste', value: 3 }, { label: 'Sul', value: 1 }] }],
+    images: [],
+  }, { mission: 'Mapear risco' });
+  assert.equal(specs.length, 1);
+  assert.equal(specs[0].synthesized, true);
+  assert.match(specs[0].prompt, /Oeste|infographic|explained chart/i);
+});
+
+test('renderLocalInfographicSvg gera svg com barras do chart', () => {
+  const buffer = renderLocalInfographicSvg({
+    title: 'Risco regional',
+    summary: 'Oeste concentra a exposição',
+    charts: [{ title: 'Ranking', items: [{ label: 'Oeste', value: 70 }, { label: 'Centro', value: 40 }] }],
+  });
+  const svg = buffer.toString('utf8');
+  assert.match(svg, /<svg/);
+  assert.match(svg, /Oeste/);
+  assert.match(svg, /70/);
 });
 
 test('materializeVisualPack gera imagem e persiste artefato por conta/trace', async () => {
@@ -145,22 +177,50 @@ test('materializeVisualPack gera imagens em paralelo preservando ordem', async (
   assert.equal(pack.status, 'complete');
 });
 
-test('materializeVisualPack fica partial se a imagem falhar', async () => {
+test('materializeVisualPack usa infografico local se image gen falhar', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-visual-local-'));
+  process.env.LUCA_DATA_DIR = dataDir;
   const pack = await materializeVisualPack({
-    mission: 'Teste',
+    mission: 'Mapear risco Oeste 70 Centro 40',
     personaOutput: JSON.stringify({
-      report: { title: 'R', markdown: 'texto' },
-      charts: [],
-      images: [{ id: 'bad', title: 'X', prompt: 'fail me' }],
+      summary: 'Oeste lidera',
+      report: { title: 'Risco', markdown: '## Oeste' },
+      charts: [{ title: 'Ranking', type: 'tower', items: [{ label: 'Oeste', value: 70 }, { label: 'Centro', value: 40 }] }],
+      images: [{ id: 'img1', title: 'Infografico', prompt: 'will fail remotely' }],
     }),
-    ownerId: 'user-2',
-    traceId: 'trace-visual-2',
+    ownerId: 'u-local',
+    traceId: 't-local',
     callImage: async () => {
-      throw new Error('9router_image 500');
+      throw new Error('No credentials for provider: xai');
     },
+    generateImages: true,
   });
+  assert.equal(pack.images[0].status, 'ok');
+  assert.equal(pack.images[0].fallback, 'local-infographic');
+  assert.equal(pack.localImageFallback, true);
+  assert.match(pack.images[0].url, /visual-artifacts/);
+  const artifact = readVisualArtifactFile('u-local', 't-local', 'img1');
+  assert.ok(artifact);
+  assert.equal(artifact.mimeType, 'image/svg+xml');
+  assert.match(artifact.buffer.toString('utf8'), /Oeste/);
+});
 
-  assert.equal(pack.status, 'partial');
-  assert.equal(pack.report.status, 'ok');
-  assert.equal(pack.images[0].status, 'failed');
+test('materializeVisualPack sintetiza imagem quando plano vem sem images', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-visual-synth-'));
+  process.env.LUCA_DATA_DIR = dataDir;
+  const pack = await materializeVisualPack({
+    mission: 'Sem images no JSON',
+    personaOutput: JSON.stringify({
+      summary: 'Só texto',
+      report: { title: 'R', markdown: 'conteudo' },
+    }),
+    ownerId: 'u-synth',
+    traceId: 't-synth',
+    callImage: null,
+    generateImages: true,
+  });
+  assert.equal(pack.images.length, 1);
+  assert.equal(pack.images[0].status, 'ok');
+  assert.equal(pack.images[0].synthesized, true);
+  assert.equal(pack.images[0].fallback, 'local-infographic');
 });

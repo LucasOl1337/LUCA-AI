@@ -557,6 +557,8 @@ export interface LucaAiVisualPack {
   planSource?: string;
   /** True quando o runtime re-promptou a persona por JSON inválido. */
   retried?: boolean;
+  /** True quando a imagem veio do infográfico SVG local (9Router sem provider). */
+  localImageFallback?: boolean;
   errors?: Array<{ id?: string; error?: string }>;
   generatedAt?: string;
   reason?: string;
