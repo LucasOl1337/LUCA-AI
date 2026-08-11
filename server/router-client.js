@@ -7,6 +7,7 @@ import {
   IMAGE_GENERATION_MODEL,
   assertAllowed9RouterModel,
   assertAllowedImageGenerationModel,
+  imageSizeForAspectRatio,
 } from './config.js';
 
 function extractChoiceContent(data) {
@@ -332,6 +333,7 @@ export async function call9Router({
 
 /**
  * Text-to-image via 9Router OpenAI-compatible images API.
+ * Mesmo contrato do Maestro: POST /images/generations com size + b64_json.
  * Models live in a separate whitelist from chat completions.
  */
 export async function call9RouterImageGeneration({
@@ -341,6 +343,7 @@ export async function call9RouterImageGeneration({
   responseFormat = 'b64_json',
   aspectRatio = '16:9',
   resolution = '1k',
+  size = '',
   timeoutMs = ROUTER_IMAGE_TIMEOUT_MS,
 } = {}) {
   const route = assertAllowedImageGenerationModel(model);
@@ -353,11 +356,15 @@ export async function call9RouterImageGeneration({
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Number(timeoutMs) || ROUTER_IMAGE_TIMEOUT_MS);
 
+  const resolvedSize = String(size || '').trim() || imageSizeForAspectRatio(aspectRatio);
+  // Payload alinhado ao Maestro (size). Mantém aspect_ratio/resolution para engines
+  // tipo Grok Imagine que ainda os aceitam no mesmo endpoint.
   const body = {
     model: route,
     prompt: text,
     n: Math.max(1, Math.min(4, Number(n) || 1)),
     response_format: responseFormat === 'url' ? 'url' : 'b64_json',
+    size: resolvedSize,
     aspect_ratio: String(aspectRatio || '16:9'),
     resolution: String(resolution || '1k'),
   };

@@ -101,12 +101,14 @@ export const MISSION_TRANSFORMER_MODEL = sanitize9RouterModel(process.env.MISSIO
 export const DESIGNER_MODEL = sanitize9RouterModel(process.env.DESIGNER_MODEL, DEFAULT_SPECIALIST_MODEL);
 export const MAESTRO_MODEL = sanitize9RouterModel(process.env.MAESTRO_MODEL, DEFAULT_SPECIALIST_MODEL);
 
-// Geracao de imagem e endpoint separado (/images/generations), fora do catalogo de chat.
-// IDs confirmados no skill 9Router + GPT Image sob o prefixo cx (OpenAI via 9Router).
+// Geracao de imagem: mesmo caminho do Maestro/Sennin via 9Router POST /images/generations.
+// Primario confirmado em producao: cx/gpt-5.5-image (Codex); fallbacks iguais ao Maestro.
 const IMAGE_GENERATION_PROFILE_DEFINITIONS = [
+  ['gpt-image', 'GPT Image 5.5', 'cx/gpt-5.5-image'],
+  ['gpt-image-5.4', 'GPT Image 5.4', 'cx/gpt-5.4-image'],
+  ['gpt-image-1', 'GPT Image 1', 'cx/gpt-image-1'],
   ['grok-imagine', 'Grok Imagine', 'xai/grok-imagine-image'],
   ['grok-imagine-quality', 'Grok Imagine Quality', 'xai/grok-imagine-image-quality'],
-  ['gpt-image', 'GPT Image', 'cx/gpt-image-1'],
 ];
 
 export const IMAGE_GENERATION_CAPABILITIES = Object.freeze({
@@ -115,6 +117,7 @@ export const IMAGE_GENERATION_CAPABILITIES = Object.freeze({
   outputModalities: Object.freeze(['image']),
   responseFormats: Object.freeze(['b64_json', 'url']),
   aspectRatios: Object.freeze(['1:1', '16:9', '9:16', '4:3', '3:4']),
+  sizes: Object.freeze(['1024x1024', '1536x1024', '1024x1536']),
 });
 
 export const IMAGE_GENERATION_PROFILES = Object.freeze(
@@ -139,11 +142,29 @@ const IMAGE_ENGINE_ALIASES = Object.freeze({
   'imagine-2': 'xai/grok-imagine-image',
   'grok': 'xai/grok-imagine-image',
   'grok-imagine-quality': 'xai/grok-imagine-image-quality',
-  'gpt-image': 'cx/gpt-image-1',
+  'gpt-image': 'cx/gpt-5.5-image',
+  'gpt-5.5-image': 'cx/gpt-5.5-image',
+  'gpt-image-5.5': 'cx/gpt-5.5-image',
+  'gpt-5.4-image': 'cx/gpt-5.4-image',
+  'gpt-image-5.4': 'cx/gpt-5.4-image',
   'gpt-image-1': 'cx/gpt-image-1',
-  'gpt': 'cx/gpt-image-1',
+  'gpt': 'cx/gpt-5.5-image',
 });
-const DEFAULT_IMAGE_GENERATION_MODEL = 'xai/grok-imagine-image';
+const DEFAULT_IMAGE_GENERATION_MODEL = 'cx/gpt-5.5-image';
+
+/** Mapa aspect_ratio → size no formato Maestro/OpenAI images. */
+const ASPECT_RATIO_TO_SIZE = Object.freeze({
+  '1:1': '1024x1024',
+  '16:9': '1536x1024',
+  '4:3': '1536x1024',
+  '9:16': '1024x1536',
+  '3:4': '1024x1536',
+});
+
+export function imageSizeForAspectRatio(aspectRatio = '16:9') {
+  const key = String(aspectRatio || '16:9').trim();
+  return ASPECT_RATIO_TO_SIZE[key] || '1536x1024';
+}
 
 export function isAllowedImageGenerationModel(value) {
   return IMAGE_GENERATION_ROUTE_ID_SET.has(String(value || '').trim());

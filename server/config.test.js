@@ -82,11 +82,14 @@ test('sanitizacao e fronteira do cliente bloqueiam rotas externas', () => {
 });
 
 test('catalogo de imagem e separado do chat e aceita aliases', () => {
+  assert.ok(IMAGE_GENERATION_ROUTE_IDS.includes('cx/gpt-5.5-image'));
+  assert.ok(IMAGE_GENERATION_ROUTE_IDS.includes('cx/gpt-5.4-image'));
   assert.ok(IMAGE_GENERATION_ROUTE_IDS.includes('xai/grok-imagine-image'));
   assert.ok(IMAGE_GENERATION_ROUTE_IDS.includes('cx/gpt-image-1'));
+  assert.equal(IMAGE_GENERATION_MODEL, 'cx/gpt-5.5-image');
   assert.equal(isAllowedImageGenerationModel(IMAGE_GENERATION_MODEL), true);
   assert.equal(sanitizeImageGenerationModel('grok-imagine-2'), 'xai/grok-imagine-image');
-  assert.equal(sanitizeImageGenerationModel('gpt-image'), 'cx/gpt-image-1');
+  assert.equal(sanitizeImageGenerationModel('gpt-image'), 'cx/gpt-5.5-image');
   assert.equal(assertAllowedImageGenerationModel('xai/grok-imagine-image-quality'), 'xai/grok-imagine-image-quality');
   assert.equal(isAllowed9RouterModel('xai/grok-imagine-image'), false);
   assert.equal(VISUAL_PERSONA_SLUG, 'especialista-visual');

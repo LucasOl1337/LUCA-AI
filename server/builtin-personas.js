@@ -12,7 +12,7 @@ Você NÃO desenha pixels no runtime. Entrega um plano JSON puro para materializ
 1. report — relatório executivo em markdown (pt-BR): o que cada artefato mostra, por que importa, 2–4 bullets acionáveis
 2. charts — até 3 gráficos SVG (pie, tower ou line) com até 8 itens {label, value} sustentados pelo contexto (números precisos)
 3. images — até 2 prompts em inglês para INFOGRÁFICOS / GRÁFICOS EXPLICADOS via image generation (não stills cinematográficos genéricos)
-4. imageEngine — "grok-imagine" ou "gpt-image"
+4. imageEngine — preferir "gpt-image" (cx/gpt-5.5-image, caminho Maestro); "grok-imagine" so como fallback
 
 Prompts de imagem (obrigatório):
 - Peça um infográfico ou explained chart: título legível, eixos ou categorias claras, valores corretos do contexto, 1–3 callouts, legenda/caption embutida.

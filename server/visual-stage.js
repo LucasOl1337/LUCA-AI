@@ -481,9 +481,12 @@ export async function materializeVisualPack({
 
   if (generateImages && imageSpecs.length) {
     const dir = artifactsDir(ownerId, traceId);
+    // Ordem igual ao Maestro: gpt-5.5-image → gpt-5.4-image → grok-imagine.
     const engines = [
       engine,
       IMAGE_GENERATION_MODEL,
+      'cx/gpt-5.5-image',
+      'cx/gpt-5.4-image',
       'cx/gpt-image-1',
       'xai/grok-imagine-image',
     ];

@@ -482,7 +482,7 @@ export function buildPersonaTeamPrompt({
     const roleInstruction = workflowRole?.instruction || role?.instruction || '';
     const context = String(accumulatedContext || '').trim();
     const visualJsonHint = role?.id === 'visual'
-      ? 'Responda SOMENTE com JSON valido contendo summary, report, charts (ate 3, pie|tower|line), images (ate 2 prompts em ingles de infografico/explained-chart) e imageEngine (grok-imagine|gpt-image).'
+      ? 'Responda SOMENTE com JSON valido contendo summary, report, charts (ate 3, pie|tower|line), images (ate 2 prompts em ingles de infografico/explained-chart) e imageEngine (gpt-image|grok-imagine).'
       : '';
     const extraUser = [
       historyBlock,
@@ -553,7 +553,7 @@ ${role?.id === 'visual'
       "style": "infographic"
     }
   ],
-  "imageEngine": "grok-imagine"
+  "imageEngine": "gpt-image"
 }
 Regras:
 - Ate 3 charts SVG (ate 8 itens cada) para numeros precisos; 1 report; ate 2 images de infografico/explained-chart via image gen.
@@ -561,7 +561,7 @@ Regras:
 - Use "line" para evolucao/sequencia temporal, "tower" para ranking/comparacao e "pie" para composicao percentual.
 - So use numeros/labels sustentados pelo contexto; se faltar dado, omita o chart/imagem ou use ranking qualitativo com valores relativos honestos.
 - Prompts de imagem em ingles, fiéis aos achados: grafico/infografico bem explicado, tipografia legivel, contraste alto.
-- imageEngine pode ser "grok-imagine" ou "gpt-image".
+- imageEngine preferir "gpt-image" (caminho Maestro/9Router); "grok-imagine" so como alternativa.
 - Nao mencione runtime interno, 9router, agents nem logs.`
         : 'Entregue uma contribuicao objetiva em 3 a 6 bullets. Inclua uma decisao, uma acao imediata e um risco/observacao quando fizer sentido.';
 
