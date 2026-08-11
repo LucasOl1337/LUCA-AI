@@ -10,7 +10,13 @@ const source = readFileSync(join(root, '../src/pages/LucaAiPage.tsx'), 'utf8');
 
 test('chat notice error shell has recoverable CTAs', () => {
   assert.ok(source.includes('data-luca-chat-error'), 'error shell marker');
-  assert.ok(source.includes('data-tone="error"') || source.includes("data-tone='error'"), 'error tone');
+  // Tone é dinâmico: 'error' quando há retry acionável, 'warning' para aviso solto.
+  assert.ok(
+    source.includes('data-tone="error"')
+    || source.includes("data-tone='error'")
+    || /data-tone=\{[^}]*'error'/.test(source),
+    'error tone',
+  );
   assert.ok(source.includes('role="alert"') || source.includes("role='alert'"), 'alert role');
   assert.ok(source.includes('data-luca-chat-retry'), 'retry button marker');
   assert.ok(source.includes('data-luca-chat-dismiss'), 'dismiss button marker');
@@ -30,7 +36,8 @@ test('Notice recovery block is not bare warning text', () => {
   const start = source.indexOf('data-luca-chat-error');
   assert.ok(start >= 0, 'chat error shell present');
   // Call-site is short: props only; CTAs live in Notice body.
-  const slice = source.slice(start, start + 520);
+  // 1100 chars cobre o handler de retry com os tres ramos (run/personas/edge).
+  const slice = source.slice(start, start + 1100);
   assert.ok(slice.includes('onRetry='), 'retry prop on Notice');
   assert.ok(slice.includes('onDismiss='), 'dismiss prop on Notice');
   assert.ok(slice.includes('role="alert"') || slice.includes("role='alert'"), 'alert on shell');

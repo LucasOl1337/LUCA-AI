@@ -92,7 +92,7 @@ type TranscriptRole = 'operator' | 'persona' | 'system';
 type OperationMode = 'team' | 'individual';
 type WorkflowRoleId = 'supervisor' | 'mission' | 'execution' | 'approval' | 'display' | 'visual';
 type WorkflowAssignments = Record<WorkflowRoleId, string[]>;
-type IndividualPickerId = 'participants' | 'judge';
+type IndividualPickerId = 'participants' | 'judge' | 'visual';
 type PickerTarget = { mode: 'team'; id: WorkflowRoleId } | { mode: 'individual'; id: IndividualPickerId };
 
 function consumeEntryMode(): OperationMode | null {
@@ -108,6 +108,8 @@ function consumeEntryMode(): OperationMode | null {
 interface IndividualAssignments {
   participants: string[];
   judge: string | null;
+  /** Etapa opcional de artefatos (gráficos/relatório/imagens) após o juiz. */
+  visual: string | null;
 }
 
 interface PersonaPickerConfig {
@@ -166,6 +168,7 @@ const REQUIRED_WORKFLOW_ROLES = WORKFLOW_ROLES.filter((role) => !role.optional);
 const INDIVIDUAL_PICKER_CONFIGS: Record<IndividualPickerId, PersonaPickerConfig> = {
   participants: { id: 'participants', label: 'Participantes', icon: Users, multiple: true, maxSlugs: 5 },
   judge: { id: 'judge', label: 'Juiz', icon: Scale, multiple: false, maxSlugs: 1 },
+  visual: { id: 'visual', label: 'Especialista visual', icon: ImageIcon, multiple: false, maxSlugs: 1, optional: true },
 };
 
 const INDIVIDUAL_DEPTH_OPTIONS: Array<{ value: LucaAiIndividualDepth; label: string; description: string }> = [
@@ -442,7 +445,7 @@ function parseMessageBlocks(value: string): MessageBlock[] {
 }
 
 function createEmptyIndividualAssignments(): IndividualAssignments {
-  return { participants: [], judge: null };
+  return { participants: [], judge: null, visual: null };
 }
 
 
@@ -653,10 +656,12 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const individualAssignments = useMemo<IndividualAssignments>(() => ({
     participants: uniqueSlugs(Array.isArray(individualState?.participants) ? individualState.participants : [], 5),
     judge: String(individualState?.judge || '').trim() || null,
+    visual: String(individualState?.visual || '').trim() || null,
   }), [individualState]);
   const individualConfiguredSlugs = useMemo(() => uniqueSlugs([
     ...individualAssignments.participants,
     individualAssignments.judge,
+    individualAssignments.visual,
   ]), [individualAssignments]);
   const configuredSlugs = operationMode === 'individual' ? individualConfiguredSlugs : assignedSlugs;
   const readyRoles = useMemo(
@@ -729,6 +734,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setIndividualState({
       participants: uniqueSlugs(session.individualAssignments?.participants || [], 5),
       judge: session.individualAssignments?.judge ? String(session.individualAssignments.judge) : null,
+      visual: session.individualAssignments?.visual ? String(session.individualAssignments.visual) : null,
     });
     setMission(sessionMission || launch?.mission || '');
     setDraftAttachments(Array.isArray(session.draftAttachments) ? session.draftAttachments.slice(0, 4) : []);
@@ -1090,8 +1096,13 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         5,
       );
       const judge = rosterSet.has(String(prev?.judge || '')) ? String(prev.judge) : null;
-      if (participants.join('|') === (prev?.participants || []).join('|') && judge === (prev?.judge || null)) return prev;
-      return { participants, judge };
+      const visual = rosterSet.has(String(prev?.visual || '')) ? String(prev.visual) : null;
+      if (
+        participants.join('|') === (prev?.participants || []).join('|')
+        && judge === (prev?.judge || null)
+        && visual === (prev?.visual || null)
+      ) return prev;
+      return { participants, judge, visual };
     });
   }, [loading, personas, setIndividualState]);
 
@@ -1252,6 +1263,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setIndividualState((prev) => ({
       participants: uniqueSlugs([...(prev?.participants || []), slug], 5),
       judge: prev?.judge || null,
+      visual: prev?.visual || null,
     }));
     setActivePersonaSlug(slug);
   }
@@ -1261,6 +1273,17 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setIndividualState((prev) => ({
       participants: uniqueSlugs(prev?.participants || [], 5),
       judge: slug || null,
+      visual: prev?.visual || null,
+    }));
+    if (slug) setActivePersonaSlug(slug);
+  }
+
+  async function setIndividualVisual(slug: string) {
+    if (slug && !(await ensurePersonaAvailable(slug))) return;
+    setIndividualState((prev) => ({
+      participants: uniqueSlugs(prev?.participants || [], 5),
+      judge: prev?.judge || null,
+      visual: slug || null,
     }));
     if (slug) setActivePersonaSlug(slug);
   }
@@ -1269,6 +1292,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setIndividualState((prev) => ({
       participants: uniqueSlugs(prev?.participants || [], 5).filter((item) => item !== slug),
       judge: prev?.judge || null,
+      visual: prev?.visual || null,
     }));
   }
 
@@ -1407,7 +1431,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       const { ok, failed } = await resolveCatalogPresetSlugs(wanted);
       const participants = uniqueSlugs(preset.participants.filter((slug) => ok.has(slug)), 5);
       const judge = ok.has(preset.judge) ? preset.judge : null;
-      setIndividualState({ participants, judge });
+      // Preset não define especialista visual: preserva a escolha atual do operador.
+      setIndividualState((prev) => ({ participants, judge, visual: prev?.visual || null }));
       setOperationMode('individual');
       const first = participants[0] ?? judge;
       if (first) setActivePersonaSlug(first);
@@ -1447,6 +1472,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     const individualToRun = {
       participants: uniqueSlugs(individualAssignments.participants, 5),
       judge: individualAssignments.judge,
+      visual: individualAssignments.visual,
     };
     const slugsToRun = operationMode === 'individual'
       ? individualToRun.participants
@@ -1472,7 +1498,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       ? plannedRuntimeEvents(traceId, trimmedMission, assignmentsToRun, personaBySlug)
       : []);
     const runPersonas = operationMode === 'individual'
-      ? uniqueSlugs([...slugsToRun, individualToRun.judge])
+      ? uniqueSlugs([...slugsToRun, individualToRun.judge, individualToRun.visual])
       : slugsToRun;
     if (!activePersonaSlug || !runPersonas.includes(activePersonaSlug)) {
       setActivePersonaSlug(runPersonas[0] ?? null);
@@ -1539,6 +1565,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           ownerSessionId,
           attachmentsToRun.map((attachment) => attachment.id),
           individualDepth,
+          individualToRun.visual || undefined,
         )
         : await lucaApi.runLucaAiPersonaTeam(
           trimmedMission,
@@ -1702,7 +1729,9 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       ? assignments[pickerTarget.id]
       : pickerTarget.id === 'participants'
         ? individualAssignments.participants
-        : individualAssignments.judge ? [individualAssignments.judge] : []
+        : pickerTarget.id === 'visual'
+          ? individualAssignments.visual ? [individualAssignments.visual] : []
+          : individualAssignments.judge ? [individualAssignments.judge] : []
     : [];
 
   return (
@@ -1911,6 +1940,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
                 onClear={clearIndividualAssignments}
                 onRemoveParticipant={removeIndividualParticipant}
                 onClearJudge={() => void setIndividualJudge('')}
+                onClearVisual={() => void setIndividualVisual('')}
                 onInspect={setActivePersonaSlug}
                 onOpenPicker={(id) => setPickerTarget({ mode: 'individual', id })}
                 onSetModel={setPersonaModel}
@@ -1970,6 +2000,10 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
                 }
               } else if (pickerTarget.id === 'participants') {
                 await addIndividualParticipant(slug);
+              } else if (pickerTarget.id === 'visual') {
+                await setIndividualVisual(slug);
+                setPickerTarget(null);
+                setQuery('');
               } else {
                 await setIndividualJudge(slug);
                 setPickerTarget(null);
@@ -1979,6 +2013,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
             onRemove={(slug) => {
               if (pickerTarget.mode === 'team') removeRoleSlug(pickerTarget.id, slug);
               else if (pickerTarget.id === 'participants') removeIndividualParticipant(slug);
+              else if (pickerTarget.id === 'visual') void setIndividualVisual('');
               else void setIndividualJudge('');
             }}
           />
@@ -2153,6 +2188,7 @@ function LucaIndividualPanel({
   onClear,
   onRemoveParticipant,
   onClearJudge,
+  onClearVisual,
   onInspect,
   onOpenPicker,
   onSetModel,
@@ -2177,6 +2213,7 @@ function LucaIndividualPanel({
   onClear: () => void;
   onRemoveParticipant: (slug: string) => void;
   onClearJudge: () => void;
+  onClearVisual: () => void;
   onInspect: (slug: string | null) => void;
   onOpenPicker: (id: IndividualPickerId) => void;
   onSetModel: (slug: string, model: string) => void | Promise<void>;
@@ -2190,7 +2227,7 @@ function LucaIndividualPanel({
   const theme = useTheme();
   const readyCount = Number(assignments.participants.length > 0) + Number(Boolean(assignments.judge));
   const ready = readyCount === 2;
-  const configuredCount = uniqueSlugs([...assignments.participants, assignments.judge]).length;
+  const configuredCount = uniqueSlugs([...assignments.participants, assignments.judge, assignments.visual]).length;
 
   return (
     <aside className="luca-ai-flow-panel min-h-0 overflow-hidden">
@@ -2217,7 +2254,7 @@ function LucaIndividualPanel({
             ? 'As personas respondem isoladamente; o juiz entra depois.'
             : ready
               ? `${assignments.participants.length} participante${assignments.participants.length === 1 ? '' : 's'} e um juiz prontos.`
-              : 'Escolha de 1 a 5 participantes e uma persona juíza. O juiz pode também estar entre os participantes.'}
+              : 'Escolha de 1 a 5 participantes e uma persona juíza. O especialista visual é opcional e gera gráficos, relatório e imagens após o veredito.'}
         </p>
       </header>
 
@@ -2246,6 +2283,19 @@ function LucaIndividualPanel({
             busySlug={busySlug}
             onOpen={() => onOpenPicker('participants')}
             onRemove={onRemoveParticipant}
+            onInspect={onInspect}
+            onSetModel={onSetModel}
+          />
+          <WorkflowRoleRow
+            role={INDIVIDUAL_PICKER_CONFIGS.visual}
+            personaBySlug={personaBySlug}
+            routerProfiles={routerProfiles}
+            selectedSlugs={assignments.visual ? [assignments.visual] : []}
+            activeSlug={activeSlug}
+            disabled={running}
+            busySlug={busySlug}
+            onOpen={() => onOpenPicker('visual')}
+            onRemove={onClearVisual}
             onInspect={onInspect}
             onSetModel={onSetModel}
           />
@@ -3019,7 +3069,9 @@ function LucaMissionCanvas({
     ? operationMode === 'individual' ? 'respostas individuais em andamento' : 'workflow em andamento'
     : finalResult
       ? operationMode === 'individual'
-        ? 'veredito do juiz pronto'
+        ? visualPack && visualPack.status !== 'skipped'
+          ? 'veredito do juiz e artefatos visuais prontos'
+          : 'veredito do juiz pronto'
         : visualPack && visualPack.status !== 'skipped'
           ? 'entrega final e artefatos visuais prontos'
           : 'exibicao final pronta'
@@ -3158,6 +3210,11 @@ function VisualPackCard({ pack }: { pack: LucaAiVisualPack }) {
         <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ color: theme.textMute }}>
           {statusLabel}
         </span>
+        {pack.retried ? (
+          <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px]" style={{ background: 'rgba(255,255,255,0.05)', color: theme.textGhost }} title="A persona respondeu fora do contrato JSON e o runtime pediu correção uma vez">
+            plano corrigido
+          </span>
+        ) : null}
         {pack.imageEngine ? (
           <span className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px]" style={{ background: 'rgba(255,255,255,0.05)', color: theme.textGhost }} title="Motor de imagem 9Router">
             {pack.imageEngine}
@@ -3192,7 +3249,7 @@ function VisualPackCard({ pack }: { pack: LucaAiVisualPack }) {
               <DashboardBlock
                 key={chart.id}
                 block={{
-                  type: chart.type === 'pie' ? 'pie' : 'tower',
+                  type: chart.type === 'pie' || chart.type === 'line' ? chart.type : 'tower',
                   title: chart.title,
                   items: chart.items,
                   body: chart.rationale,

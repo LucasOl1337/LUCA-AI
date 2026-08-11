@@ -15,8 +15,9 @@ export const MAX_VISUAL_CHARTS = 3;
 export const MAX_VISUAL_IMAGES = 2;
 export const MAX_VISUAL_REPORT_CHARS = 12_000;
 export const MAX_IMAGE_PROMPT_CHARS = 2_000;
+export const MAX_CHART_ITEMS = 8;
 
-const ALLOWED_CHART_TYPES = new Set(['pie', 'tower', 'bar']);
+const ALLOWED_CHART_TYPES = new Set(['pie', 'tower', 'bar', 'line']);
 const ALLOWED_ASPECT = new Set(['1:1', '16:9', '9:16', '4:3', '3:4']);
 
 function workspacesRoot() {
@@ -89,7 +90,7 @@ function normalizeChartItems(items = []) {
       };
     })
     .filter(Boolean)
-    .slice(0, 6);
+    .slice(0, MAX_CHART_ITEMS);
 }
 
 function normalizeChart(raw = {}, index = 0) {
@@ -172,6 +173,26 @@ export function parseVisualPlanOutput(output = '', { mission = '' } = {}) {
   };
 }
 
+/**
+ * Plano inutilizável para artefatos ricos (sem JSON ou fallback textual):
+ * o runtime deve re-promptar a persona uma vez antes de aceitar degradação.
+ */
+export function visualPlanNeedsRetry(plan) {
+  if (!plan) return true;
+  if (plan.source === 'text-fallback') return true;
+  return !plan.report && !plan.charts?.length && !plan.images?.length;
+}
+
+export function buildVisualRetryContext(previousOutput = '') {
+  const excerpt = clip(previousOutput, 1_500);
+  return [
+    '## Correção obrigatória da etapa visual',
+    'Sua resposta anterior NÃO seguiu o contrato: era texto/markdown em vez de JSON válido de artefatos.',
+    'Responda novamente SOMENTE com o objeto JSON combinado (summary, report, charts, images, imageEngine), sem nenhum texto fora do JSON.',
+    excerpt ? `Resposta anterior (para referência do conteúdo, não do formato):\n${excerpt}` : '',
+  ].filter(Boolean).join('\n');
+}
+
 function writeBinaryArtifact(dir, artifactId, buffer, mimeType) {
   fs.mkdirSync(dir, { recursive: true });
   const ext = mimeType === 'image/jpeg' ? 'jpg' : mimeType === 'image/webp' ? 'webp' : 'png';
@@ -221,6 +242,7 @@ export async function materializeVisualPack({
   imageModel = IMAGE_GENERATION_MODEL,
   callImage = null,
   generateImages = true,
+  retried = false,
 } = {}) {
   const plan = parseVisualPlanOutput(personaOutput, { mission });
   if (!plan) {
@@ -238,11 +260,20 @@ export async function materializeVisualPack({
 
   const engine = sanitizeImageGenerationModel(plan.imageEngine || imageModel, IMAGE_GENERATION_MODEL);
   const errors = [];
-  const images = [];
+  let images = [];
 
   if (generateImages && typeof callImage === 'function' && plan.images.length) {
     const dir = artifactsDir(ownerId, traceId);
-    for (const spec of plan.images) {
+    // Paralelo: cada imagem falha isolada; ordem do plano preservada no resultado.
+    images = await Promise.all(plan.images.map(async (spec) => {
+      const base = {
+        id: spec.id,
+        kind: 'image',
+        title: spec.title,
+        prompt: spec.prompt,
+        aspectRatio: spec.aspectRatio,
+        style: spec.style,
+      };
       try {
         const result = await callImage({
           prompt: spec.prompt,
@@ -256,57 +287,33 @@ export async function materializeVisualPack({
         if (!first?.b64Json && !first?.url) {
           throw new Error('image_payload_missing');
         }
-        let url = null;
-        let mimeType = 'image/png';
         if (first.b64Json) {
           const buffer = Buffer.from(first.b64Json, 'base64');
           if (buffer.length < 32) throw new Error('image_too_small');
-          const meta = writeBinaryArtifact(dir, spec.id, buffer, mimeType);
-          url = `/api/luca-ai/visual-artifacts/${encodeURIComponent(traceId)}/${encodeURIComponent(spec.id)}`;
-          images.push({
-            id: spec.id,
-            kind: 'image',
-            title: spec.title,
-            prompt: spec.prompt,
-            aspectRatio: spec.aspectRatio,
-            style: spec.style,
+          const meta = writeBinaryArtifact(dir, spec.id, buffer, 'image/png');
+          return {
+            ...base,
             mimeType: meta.mimeType,
             size: meta.size,
-            url,
+            url: `/api/luca-ai/visual-artifacts/${encodeURIComponent(traceId)}/${encodeURIComponent(spec.id)}`,
             model: result.model || engine,
             status: 'ok',
-          });
-        } else {
-          url = first.url;
-          images.push({
-            id: spec.id,
-            kind: 'image',
-            title: spec.title,
-            prompt: spec.prompt,
-            aspectRatio: spec.aspectRatio,
-            style: spec.style,
-            mimeType: 'image/*',
-            size: 0,
-            url,
-            model: result.model || engine,
-            status: 'ok',
-          });
+          };
         }
+        return {
+          ...base,
+          mimeType: 'image/*',
+          size: 0,
+          url: first.url,
+          model: result.model || engine,
+          status: 'ok',
+        };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         errors.push({ id: spec.id, error: message });
-        images.push({
-          id: spec.id,
-          kind: 'image',
-          title: spec.title,
-          prompt: spec.prompt,
-          aspectRatio: spec.aspectRatio,
-          style: spec.style,
-          status: 'failed',
-          error: message,
-        });
+        return { ...base, status: 'failed', error: message };
       }
-    }
+    }));
   } else if (plan.images.length && !generateImages) {
     for (const spec of plan.images) {
       images.push({
@@ -358,6 +365,7 @@ export async function materializeVisualPack({
     images,
     imageEngine: engine,
     planSource: plan.source,
+    retried: Boolean(retried),
     errors,
     generatedAt: new Date().toISOString(),
   };

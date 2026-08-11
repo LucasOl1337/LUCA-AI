@@ -5,9 +5,11 @@ import os from 'node:os';
 import path from 'node:path';
 
 import {
+  buildVisualRetryContext,
   materializeVisualPack,
   parseVisualPlanOutput,
   readVisualArtifactFile,
+  visualPlanNeedsRetry,
 } from './visual-stage.js';
 
 test('parseVisualPlanOutput le JSON com charts e images', () => {
@@ -36,6 +38,28 @@ test('parseVisualPlanOutput faz fallback textual sem JSON', () => {
   assert.equal(plan.source, 'text-fallback');
   assert.equal(plan.charts.length, 0);
   assert.match(plan.report.markdown, /Relatorio livre/);
+});
+
+test('parseVisualPlanOutput aceita chart line com ate 8 itens', () => {
+  const items = Array.from({ length: 10 }, (_, i) => ({ label: `mes ${i + 1}`, value: i + 1 }));
+  const plan = parseVisualPlanOutput(JSON.stringify({
+    summary: 'serie temporal',
+    charts: [{ id: 'c1', title: 'Evolucao', type: 'line', items }],
+  }));
+  assert.equal(plan.charts[0].type, 'line');
+  assert.equal(plan.charts[0].items.length, 8);
+});
+
+test('visualPlanNeedsRetry detecta plano inutilizavel e aceita plano valido', () => {
+  assert.equal(visualPlanNeedsRetry(null), true);
+  assert.equal(visualPlanNeedsRetry(parseVisualPlanOutput('prosa sem json')), true);
+  const valid = parseVisualPlanOutput(JSON.stringify({
+    summary: 'ok',
+    report: { title: 'R', markdown: 'texto' },
+  }));
+  assert.equal(visualPlanNeedsRetry(valid), false);
+  assert.match(buildVisualRetryContext('resposta anterior'), /SOMENTE com o objeto JSON/);
+  assert.match(buildVisualRetryContext('resposta anterior'), /resposta anterior/);
 });
 
 test('materializeVisualPack gera imagem e persiste artefato por conta/trace', async () => {
@@ -72,6 +96,39 @@ test('materializeVisualPack gera imagem e persiste artefato por conta/trace', as
   const stored = readVisualArtifactFile('user-1', 'trace-visual-1', 'shot1');
   assert.ok(stored);
   assert.ok(stored.buffer.length > 50);
+});
+
+test('materializeVisualPack gera imagens em paralelo preservando ordem', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-visual-par-'));
+  process.env.LUCA_DATA_DIR = dataDir;
+  const tinyPng = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const pack = await materializeVisualPack({
+    mission: 'Paralelo',
+    personaOutput: JSON.stringify({
+      report: { title: 'R', markdown: 'texto' },
+      images: [
+        { id: 'a1', title: 'A', prompt: 'first cinematic shot' },
+        { id: 'b2', title: 'B', prompt: 'second cinematic shot' },
+      ],
+    }),
+    ownerId: 'user-par',
+    traceId: 'trace-par',
+    callImage: async () => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      inFlight -= 1;
+      return { model: 'xai/grok-imagine-image', images: [{ b64Json: tinyPng.toString('base64'), url: null }] };
+    },
+  });
+  assert.equal(maxInFlight, 2, 'as duas imagens devem gerar em paralelo');
+  assert.deepEqual(pack.images.map((image) => image.id), ['a1', 'b2']);
+  assert.equal(pack.status, 'complete');
 });
 
 test('materializeVisualPack fica partial se a imagem falhar', async () => {

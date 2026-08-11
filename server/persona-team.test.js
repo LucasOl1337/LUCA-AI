@@ -193,6 +193,35 @@ test('normalizePersonaTeamRunInput aceita resolucao individual com ate cinco par
   assert.equal(input.depth, 1);
 });
 
+test('normalizePersonaTeamRunInput aceita especialista visual opcional no modo individual', () => {
+  const withVisual = normalizePersonaTeamRunInput({
+    mission: 'Comparar propostas',
+    mode: 'individual',
+    slugs: ['aurora'],
+    judgeSlug: 'maestro',
+    visualSlug: 'yume:especialista-visual',
+  });
+  assert.equal(withVisual.ok, true);
+  assert.equal(withVisual.visualSlug, 'especialista-visual');
+
+  const withoutVisual = normalizePersonaTeamRunInput({
+    mission: 'Comparar propostas',
+    mode: 'individual',
+    slugs: ['aurora'],
+    judgeSlug: 'maestro',
+  });
+  assert.equal(withoutVisual.ok, true);
+  assert.equal(withoutVisual.visualSlug, undefined);
+
+  // Modo equipe ignora visualSlug — a etapa visual vem do workflow.
+  const team = normalizePersonaTeamRunInput({
+    mission: 'Missao',
+    slugs: ['aurora', 'maestro'],
+    visualSlug: 'especialista-visual',
+  });
+  assert.equal(team.visualSlug, undefined);
+});
+
 test('normalizePersonaTeamRunInput aceita somente profundidades 1, 2 e 3', () => {
   const base = {
     mission: 'Comparar propostas',

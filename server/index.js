@@ -29,7 +29,13 @@ import {
   resolvePersonaRuntimeModel,
 } from './config.js';
 import { call9Router, call9RouterImageGeneration, check9RouterHealth } from './router-client.js';
-import { materializeVisualPack, readVisualArtifactFile } from './visual-stage.js';
+import {
+  buildVisualRetryContext,
+  materializeVisualPack,
+  parseVisualPlanOutput,
+  readVisualArtifactFile,
+  visualPlanNeedsRetry,
+} from './visual-stage.js';
 import { runAgentWithTools } from './agent-loop.js';
 import {
   addHeartbeat,
@@ -2358,6 +2364,138 @@ async function runLucaAiPersonaWorkflow({ mission, workflow, teamNames, loadedBy
 }
 
 // ---------------------------------------------------------------------------
+// VISUAL_STAGE_V2 — etapa de artefatos compartilhada (workflow e individual).
+// ---------------------------------------------------------------------------
+
+const VISUAL_WORKFLOW_ROLE = PERSONA_WORKFLOW_ROLES.find((role) => role.id === 'visual');
+
+/** Contexto acumulado no formato das etapas do workflow, sem a etapa visual. */
+function buildVisualStageContext(steps = []) {
+  return steps
+    .filter((step) => step.roleId !== 'visual')
+    .map((step) => {
+      const body = (step.replies || [])
+        .map((reply) => `${reply.name || reply.slug}: ${reply.ok ? reply.content : `FALHA: ${reply.error || 'erro desconhecido'}`}`)
+        .join('\n');
+      return `## ${step.roleLabel || step.roleId}\n${body || 'Sem resposta nesta etapa.'}`;
+    })
+    .join('\n\n');
+}
+
+function skippedVisualPack(errors = []) {
+  return {
+    status: 'skipped',
+    reason: 'visual_persona_failed',
+    summary: '',
+    report: null,
+    charts: [],
+    images: [],
+    imageEngine: null,
+    errors,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Materializa o pack visual com uma rodada de correção de JSON:
+ * se a persona respondeu prosa/JSON inválido, re-prompta UMA vez com o
+ * contrato antes de aceitar o fallback textual. Nunca derruba a rodada.
+ */
+async function finalizeLucaAiVisualStage({
+  input,
+  visualReply,
+  visualEntry = null,
+  accumulatedContext = '',
+  teamNames = [],
+  attachments = [],
+  conversationContext = '',
+}) {
+  let reply = visualReply;
+  let retried = false;
+  const planIsUsable = (candidate) => !visualPlanNeedsRetry(
+    parseVisualPlanOutput(candidate?.content || '', { mission: input.mission }),
+  );
+
+  if (reply?.ok && visualEntry?.loaded && !planIsUsable(reply)) {
+    retried = true;
+    appendLucaAiTraceEvent(input.traceId, 'luca_ai.visual.retry', {
+      slug: reply.slug,
+      model: reply.model,
+      reason: 'invalid_json_plan',
+    });
+    try {
+      const second = await runLucaAiPersonaTeamMember({
+        slug: reply.slug,
+        mission: input.mission,
+        teamNames,
+        loaded: visualEntry.loaded,
+        workflowRole: {
+          roleId: 'visual',
+          roleLabel: VISUAL_WORKFLOW_ROLE?.label || 'Especialista visual',
+          instruction: VISUAL_WORKFLOW_ROLE?.instruction || '',
+        },
+        accumulatedContext: [accumulatedContext, buildVisualRetryContext(reply.content)]
+          .filter(Boolean)
+          .join('\n\n'),
+        attachments,
+        toolsEnabled: false,
+        maxTokens: 2200,
+        traceId: input.traceId,
+        conversationContext,
+      });
+      if (second?.ok && planIsUsable(second)) reply = second;
+    } catch {
+      // Retry é best-effort: mantém a primeira resposta (fallback textual).
+    }
+  }
+
+  appendLucaAiTraceEvent(input.traceId, 'luca_ai.visual.started', {
+    slug: reply.slug,
+    model: reply.model,
+    retried,
+  });
+  try {
+    const visualPack = await materializeVisualPack({
+      mission: input.mission,
+      personaOutput: reply.content,
+      ownerId: getWorkspaceUserId(),
+      traceId: input.traceId,
+      imageModel: IMAGE_GENERATION_MODEL,
+      callImage: call9RouterImageGeneration,
+      generateImages: true,
+      retried,
+    });
+    appendLucaAiTraceEvent(input.traceId, 'luca_ai.visual.completed', {
+      status: visualPack.status,
+      planSource: visualPack.planSource || null,
+      retried,
+      chartCount: visualPack.charts?.length || 0,
+      imageOkCount: (visualPack.images || []).filter((item) => item.status === 'ok').length,
+      imageEngine: visualPack.imageEngine || null,
+    });
+    return { visualPack, visualReply: reply };
+  } catch (error) {
+    appendLucaAiTraceEvent(input.traceId, 'luca_ai.visual.failed', {
+      error: summarizeLucaAiTraceText(error?.message || String(error), 240),
+    });
+    return {
+      visualPack: {
+        status: 'failed',
+        summary: '',
+        report: null,
+        charts: [],
+        images: [],
+        imageEngine: IMAGE_GENERATION_MODEL,
+        retried,
+        errors: [{ error: error?.message || String(error) }],
+        generatedAt: new Date().toISOString(),
+      },
+      visualReply: reply,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Missao de conversa entre agentes (turnos com evidencia temporal).
 // ---------------------------------------------------------------------------
 
@@ -3200,7 +3338,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
       .map((persona) => [String(persona?.slug || '').trim(), persona])
       .filter(([slug]) => Boolean(slug)),
   );
-  const requestedSlugs = [...new Set([...input.slugs, input.judgeSlug].filter(Boolean))];
+  const requestedSlugs = [...new Set([...input.slugs, input.judgeSlug, input.visualSlug].filter(Boolean))];
   const missingSlugs = requestedSlugs.filter((slug) => !catalogBySlug.has(slug));
   if (missingSlugs.length > 0) {
     const error = new Error('Uma ou mais personas nao existem no catalogo Yume.');
@@ -3231,7 +3369,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
   });
 
   const slugsToLoad = input.mode === 'individual'
-    ? [...new Set([...input.slugs, input.judgeSlug])]
+    ? [...new Set([...input.slugs, input.judgeSlug, input.visualSlug].filter(Boolean))]
     : input.slugs;
   const modelOverrides = input.modelOverrides || {};
   const loaded = await Promise.all(slugsToLoad.map(async (slug) => {
@@ -3451,56 +3589,107 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
     const visualStep = steps.find((step) => step.roleId === 'visual') || null;
     const visualReply = visualStep?.replies?.find((reply) => reply.ok) || null;
     if (visualReply?.content) {
-      appendLucaAiTraceEvent(input.traceId, 'luca_ai.visual.started', {
-        slug: visualReply.slug,
-        model: visualReply.model,
+      const finalized = await finalizeLucaAiVisualStage({
+        input,
+        visualReply,
+        visualEntry: loadedBySlug.get(visualReply.slug) || null,
+        accumulatedContext: buildVisualStageContext(steps),
+        teamNames,
+        attachments: attachmentParts,
+        conversationContext: conversationContextTeam,
       });
-      try {
-        visualPack = await materializeVisualPack({
-          mission: input.mission,
-          personaOutput: visualReply.content,
-          ownerId: getWorkspaceUserId(),
-          traceId: input.traceId,
-          imageModel: IMAGE_GENERATION_MODEL,
-          callImage: call9RouterImageGeneration,
-          generateImages: true,
-        });
-        appendLucaAiTraceEvent(input.traceId, 'luca_ai.visual.completed', {
-          status: visualPack.status,
-          chartCount: visualPack.charts?.length || 0,
-          imageOkCount: (visualPack.images || []).filter((item) => item.status === 'ok').length,
-          imageEngine: visualPack.imageEngine || null,
-        });
-      } catch (error) {
-        visualPack = {
-          status: 'failed',
-          summary: '',
-          report: null,
-          charts: [],
-          images: [],
-          imageEngine: IMAGE_GENERATION_MODEL,
-          errors: [{ error: error?.message || String(error) }],
-          generatedAt: new Date().toISOString(),
-        };
-        appendLucaAiTraceEvent(input.traceId, 'luca_ai.visual.failed', {
-          error: summarizeLucaAiTraceText(error?.message || String(error), 240),
-        });
-      }
+      visualPack = finalized.visualPack;
     } else if (visualStep) {
-      visualPack = {
-        status: 'skipped',
-        reason: 'visual_persona_failed',
-        summary: '',
-        report: null,
-        charts: [],
-        images: [],
-        imageEngine: null,
-        errors: (visualStep.replies || [])
-          .filter((reply) => !reply.ok)
-          .map((reply) => ({ id: reply.slug, error: reply.error || 'persona_failed' })),
-        generatedAt: new Date().toISOString(),
-      };
+      visualPack = skippedVisualPack((visualStep.replies || [])
+        .filter((reply) => !reply.ok)
+        .map((reply) => ({ id: reply.slug, error: reply.error || 'persona_failed' })));
     }
+  } else if (input.mode === 'individual' && input.visualSlug) {
+    // Etapa visual opcional após o juiz: gráficos/relatório/imagens do veredito.
+    const visualEntry = loadedBySlug.get(input.visualSlug);
+    const visualStartedAt = new Date().toISOString();
+    const visualStartedMs = Date.now();
+    appendLucaAiTraceEvent(input.traceId, 'luca_ai.workflow.step_started', {
+      roleId: 'visual',
+      roleLabel: VISUAL_WORKFLOW_ROLE?.label || 'Especialista visual',
+      participantCount: 1,
+      participants: [{ slug: input.visualSlug }],
+    });
+    let visualReply;
+    if (!visualEntry || visualEntry.error) {
+      visualReply = {
+        ok: false,
+        slug: input.visualSlug,
+        name: visualEntry?.loaded?.name || input.visualSlug,
+        model: visualEntry?.loaded?.model || '',
+        version: null,
+        cached: false,
+        stale: false,
+        error: visualEntry?.error || 'persona_not_loaded',
+      };
+      visualPack = skippedVisualPack([{ id: input.visualSlug, error: visualReply.error }]);
+    } else {
+      const accumulatedContext = buildVisualStageContext(steps);
+      visualReply = await runLucaAiPersonaTeamMember({
+        slug: input.visualSlug,
+        mission: input.mission,
+        teamNames,
+        loaded: visualEntry.loaded,
+        workflowRole: {
+          roleId: 'visual',
+          roleLabel: VISUAL_WORKFLOW_ROLE?.label || 'Especialista visual',
+          instruction: VISUAL_WORKFLOW_ROLE?.instruction || '',
+        },
+        accumulatedContext,
+        attachments: attachmentParts,
+        toolsEnabled: false,
+        maxTokens: 2200,
+        traceId: input.traceId,
+        conversationContext: conversationContextNamed,
+      });
+      if (visualReply?.ok && visualReply.content) {
+        const finalized = await finalizeLucaAiVisualStage({
+          input,
+          visualReply,
+          visualEntry,
+          accumulatedContext,
+          teamNames,
+          attachments: attachmentParts,
+          conversationContext: conversationContextNamed,
+        });
+        visualPack = finalized.visualPack;
+        visualReply = finalized.visualReply;
+      } else {
+        visualPack = skippedVisualPack([{ id: input.visualSlug, error: visualReply?.error || 'persona_failed' }]);
+      }
+    }
+    const visualCompletedAt = new Date().toISOString();
+    const visualDurationMs = Date.now() - visualStartedMs;
+    steps.push({
+      id: 'visual',
+      roleId: 'visual',
+      roleLabel: VISUAL_WORKFLOW_ROLE?.label || 'Especialista visual',
+      participants: [{
+        slug: input.visualSlug,
+        name: visualEntry?.loaded?.name || input.visualSlug,
+        model: visualEntry?.loaded?.model || '',
+      }],
+      replies: [visualReply],
+      startedAt: visualStartedAt,
+      completedAt: visualCompletedAt,
+      durationMs: visualDurationMs,
+    });
+    appendLucaAiTraceEvent(input.traceId, 'luca_ai.workflow.step_completed', {
+      roleId: 'visual',
+      roleLabel: VISUAL_WORKFLOW_ROLE?.label || 'Especialista visual',
+      durationMs: visualDurationMs,
+      okCount: visualReply?.ok ? 1 : 0,
+      errorCount: visualReply?.ok ? 0 : 1,
+      outputSummary: summarizeLucaAiTraceText(
+        visualPack?.summary || (visualReply?.ok ? 'Plano visual materializado.' : `FALHA: ${visualReply?.error || 'erro desconhecido'}`),
+        520,
+      ),
+    });
   }
 
   const generatedAt = new Date().toISOString();

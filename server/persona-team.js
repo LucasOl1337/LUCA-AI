@@ -235,6 +235,10 @@ export function normalizePersonaTeamRunInput(body = {}, options = {}) {
   const judgeSlug = individualMode
     ? normalizePersonaTeamSlug(body?.judgeSlug || body?.judge || body?.judgePersona)
     : '';
+  // Etapa visual opcional no modo individual: roda depois do juiz quando preenchida.
+  const visualSlug = individualMode
+    ? normalizePersonaTeamSlug(body?.visualSlug || body?.visual)
+    : '';
   const participantLimit = individualMode ? maxIndividualParticipants : maxTeamSize;
   const sourceSlugs = Array.isArray(body?.slugs)
     ? body.slugs
@@ -290,6 +294,7 @@ export function normalizePersonaTeamRunInput(body = {}, options = {}) {
     mode: individualMode ? 'individual' : workflow.length ? 'workflow' : 'parallel',
     depth,
     judgeSlug: individualMode ? judgeSlug : undefined,
+    visualSlug: individualMode ? (visualSlug || undefined) : undefined,
     modelOverrides: normalizeModelOverrides(body?.modelOverrides || body?.models),
     sessionId: sessionId || undefined,
     attachmentIds,
@@ -477,7 +482,7 @@ export function buildPersonaTeamPrompt({
     const roleInstruction = workflowRole?.instruction || role?.instruction || '';
     const context = String(accumulatedContext || '').trim();
     const visualJsonHint = role?.id === 'visual'
-      ? 'Responda SOMENTE com JSON valido contendo summary, report, charts (ate 3, pie|tower), images (ate 2 prompts em ingles) e imageEngine (grok-imagine|gpt-image).'
+      ? 'Responda SOMENTE com JSON valido contendo summary, report, charts (ate 3, pie|tower|line), images (ate 2 prompts em ingles) e imageEngine (grok-imagine|gpt-image).'
       : '';
     const extraUser = [
       historyBlock,
@@ -534,7 +539,7 @@ ${role?.id === 'visual'
     {
       "id": "c1",
       "title": "titulo",
-      "type": "pie|tower",
+      "type": "pie|tower|line",
       "items": [{ "label": "nome", "value": 1 }],
       "rationale": "por que este grafico"
     }
@@ -551,7 +556,8 @@ ${role?.id === 'visual'
   "imageEngine": "grok-imagine"
 }
 Regras:
-- Ate 3 charts, 1 report, ate 2 images.
+- Ate 3 charts (ate 8 itens cada), 1 report, ate 2 images.
+- Use "line" para evolucao/sequencia temporal, "tower" para ranking/comparacao e "pie" para composicao percentual.
 - So use numeros/labels sustentados pelo contexto; se faltar dado, omita o chart ou use ranking qualitativo com valores relativos honestos.
 - Prompts de imagem em ingles, cinematograficos, fiéis aos achados (cenas de exemplo, nao screenshots de UI).
 - imageEngine pode ser "grok-imagine" ou "gpt-image".

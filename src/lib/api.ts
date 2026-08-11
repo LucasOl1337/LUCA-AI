@@ -355,9 +355,10 @@ export const lucaApi = {
     sessionId?: string,
     attachmentIds: string[] = [],
     depth?: LucaAiIndividualDepth,
+    visualSlug?: string,
   ) =>
     startPersonaTeamRun(
-      { mission, mode: 'individual', slugs, judgeSlug, traceId, modelOverrides, sessionId, attachmentIds, depth },
+      { mission, mode: 'individual', slugs, judgeSlug, visualSlug: visualSlug || undefined, traceId, modelOverrides, sessionId, attachmentIds, depth },
       base,
     ),
   /** Retoma o acompanhamento de um job já aceito (F5 / flap de borda). */

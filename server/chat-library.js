@@ -62,7 +62,7 @@ function emptyAssignments() {
 }
 
 function emptyIndividual() {
-  return { participants: [], judge: null };
+  return { participants: [], judge: null, visual: null };
 }
 
 function normalizeDraftAttachments(value, sessionId) {
@@ -109,6 +109,7 @@ function makeSession(partial = {}) {
             ? partial.individualAssignments.participants.map(String).filter(Boolean).slice(0, 5)
             : [],
           judge: partial.individualAssignments.judge ? String(partial.individualAssignments.judge) : null,
+          visual: partial.individualAssignments.visual ? String(partial.individualAssignments.visual) : null,
         }
       : emptyIndividual(),
     missionDraft: String(partial.missionDraft || ''),
@@ -784,6 +785,9 @@ export function updateChatSession(sessionId, patch = {}) {
         judge: Object.prototype.hasOwnProperty.call(patch.individualAssignments, 'judge')
           ? (patch.individualAssignments.judge ? String(patch.individualAssignments.judge) : null)
           : session.individualAssignments.judge,
+        visual: Object.prototype.hasOwnProperty.call(patch.individualAssignments, 'visual')
+          ? (patch.individualAssignments.visual ? String(patch.individualAssignments.visual) : null)
+          : (session.individualAssignments.visual ?? null),
       };
     }
     if (typeof patch.missionDraft === 'string') session.missionDraft = patch.missionDraft;

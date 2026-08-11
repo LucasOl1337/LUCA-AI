@@ -8,6 +8,12 @@
 - Persona Yume canônica `especialista-visual` documentada em `docs/yume-personas/` (criar na VM; LUCA só lê).
 - Templates seed de equipe já preenchem o slot visual.
 
+### Onda 2 — especialista visual no individual + pipeline mais robusta
+- Modo individual ganha slot opcional de Especialista visual: artefatos (relatório, gráficos, imagens) após o veredito do juiz.
+- Retry automático de JSON: persona que responde prosa fora do contrato é re-promptada uma vez antes do fallback textual (badge "plano corrigido" no pack).
+- Imagens do pack geram em paralelo (antes sequencial, até ~2x mais rápido na etapa).
+- Novo tipo de gráfico `line` (evolução/série temporal) e até 8 itens por gráfico.
+
 ## v0.2.0 — Consolidação canônica (2026-08-05)
 
 ### Novidades

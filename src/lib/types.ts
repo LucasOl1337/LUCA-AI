@@ -468,6 +468,7 @@ export interface LucaAiChatSession extends LucaAiChatSessionSummary {
   individualAssignments?: {
     participants?: string[];
     judge?: string | null;
+    visual?: string | null;
   };
   missionDraft?: string;
   draftAttachments?: LucaAiChatAttachment[];
@@ -516,7 +517,7 @@ export interface LucaAiVisualChartArtifact {
   id: string;
   kind: 'chart';
   title: string;
-  type: 'pie' | 'tower' | string;
+  type: 'pie' | 'tower' | 'line' | string;
   items: Array<{ label: string; value: number }>;
   rationale?: string;
   status?: string;
@@ -553,6 +554,8 @@ export interface LucaAiVisualPack {
   images?: LucaAiVisualImageArtifact[];
   imageEngine?: string | null;
   planSource?: string;
+  /** True quando o runtime re-promptou a persona por JSON inválido. */
+  retried?: boolean;
   errors?: Array<{ id?: string; error?: string }>;
   generatedAt?: string;
   reason?: string;

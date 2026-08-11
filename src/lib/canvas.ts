@@ -67,7 +67,7 @@ export function normalizeChartItems(items: unknown[]): ChartItem[] {
       };
     })
     .filter((item) => item.label)
-    .slice(0, 5);
+    .slice(0, 8);
 }
 
 const PIE_PALETTE = ['#0a84ff', '#7FB3D5', '#1E4E8C', '#43d18a', '#b58cff'];
