@@ -6,7 +6,6 @@ import {
   Gauge,
   Loader2,
   LogIn,
-  MessageSquareText,
   MousePointerClick,
   Play,
   RefreshCw,
@@ -16,10 +15,10 @@ import {
   UsersRound,
   Workflow,
   AlertTriangle,
-  X,
 } from 'lucide-react';
 import type { AuthUser } from '@/hooks/useAuth';
 import { useAuth } from '@/hooks/useAuth';
+import AdminChatViewer from '@/components/AdminChatViewer';
 import type {
   LucaAiChatFolder as ChatFolder,
   LucaAiChatLibraryStats,
@@ -174,35 +173,6 @@ function RankList({
         </ol>
       )}
     </div>
-  );
-}
-
-function AdminChatSessionButton({
-  session,
-  active,
-  onOpen,
-}: {
-  session: ChatSessionSummary;
-  active: boolean;
-  onOpen: () => void;
-}) {
-  const archived = Boolean(session.deleted || session.archivedOnly);
-  return (
-    <button
-      type="button"
-      className={`admin-chat-session ${active ? 'active' : ''} ${archived ? 'is-deleted' : ''}`}
-      onClick={onOpen}
-    >
-      <span>
-        {session.title || 'Sem título'}
-        {archived ? ` · ${session.archiveReason === 'transcript_clear' ? 'antes da limpeza' : 'apagada'}` : ''}
-      </span>
-      <small>
-        {session.messageCount || 0} msg · {session.operationMode || 'team'}
-        {session.deleted ? ' · soft-delete' : ''}
-        {session.archivedOnly ? ' · arquivo' : ''}
-      </small>
-    </button>
   );
 }
 
@@ -581,143 +551,18 @@ export default function AdminPage() {
 
       {inspectUser && typeof document !== 'undefined'
         ? createPortal(
-          <div className="admin-chat-layer" data-admin-chat-inspect-layer role="dialog" aria-modal="true" aria-label="Histórico de chats da conta">
-            <button type="button" className="admin-chat-backdrop" aria-label="Fechar" onClick={closeChatInspect} />
-            <aside className="admin-chat-panel">
-              <header className="admin-chat-header">
-                <div>
-                  <span>VISÃO SOMENTE LEITURA · inclui apagadas</span>
-                  <h2>{inspectUser.name}</h2>
-                  <p>{inspectUser.email}</p>
-                </div>
-                <button type="button" className="admin-chat-close" onClick={closeChatInspect} aria-label="Fechar painel">
-                  <X />
-                </button>
-              </header>
-
-              <div className="admin-chat-stats">
-                <article>
-                  <span>Pastas</span>
-                  <strong>{chatLibrary?.stats?.folderCount ?? '—'}</strong>
-                </article>
-                <article>
-                  <span>Sessões (todas)</span>
-                  <strong>{chatLibrary?.stats?.sessionCount ?? '—'}</strong>
-                </article>
-                <article>
-                  <span>Apagadas / arquivo</span>
-                  <strong>
-                    {(chatLibrary?.stats?.deletedSessionCount || 0)
-                      + (chatLibrary?.stats?.archivedOnlyCount || 0)}
-                  </strong>
-                </article>
-                <article>
-                  <span>Mensagens</span>
-                  <strong>{chatLibrary?.stats?.messageCount ?? '—'}</strong>
-                </article>
-              </div>
-
-              {chatError ? (
-                <div className="admin-state error" role="alert">
-                  <p className="admin-error-title">Não foi possível inspecionar</p>
-                  <p className="admin-error-detail">{chatError}</p>
-                </div>
-              ) : (
-                <div className="admin-chat-body">
-                  <section className="admin-chat-list" aria-label="Sessões do usuário">
-                    <div className="admin-chat-list-head">
-                      <MessageSquareText />
-                      <h3>Sessões de chat</h3>
-                      {chatBusy ? <Loader2 className="animate-spin" /> : null}
-                    </div>
-                    {(chatLibrary?.folders || []).map((folder) => {
-                      const children = (chatLibrary?.sessions || []).filter((session) => session.folderId === folder.id);
-                      return (
-                        <div key={folder.id} className="admin-chat-group">
-                          <strong>{folder.name}</strong>
-                          {children.length === 0 ? (
-                            <p className="admin-chat-empty">Sem sessões nesta pasta</p>
-                          ) : children.map((session) => (
-                            <AdminChatSessionButton
-                              key={session.id}
-                              session={session}
-                              active={chatSession?.id === session.id}
-                              onOpen={() => void openChatSession(session.id)}
-                            />
-                          ))}
-                        </div>
-                      );
-                    })}
-                    <div className="admin-chat-group">
-                      <strong>Sem pasta</strong>
-                      {(chatLibrary?.sessions || []).filter((session) => !session.folderId).map((session) => (
-                        <AdminChatSessionButton
-                          key={session.id}
-                          session={session}
-                          active={chatSession?.id === session.id}
-                          onOpen={() => void openChatSession(session.id)}
-                        />
-                      ))}
-                      {!chatBusy && (chatLibrary?.sessions || []).length === 0 ? (
-                        <p className="admin-chat-empty">Esta conta ainda não tem sessões de chat.</p>
-                      ) : null}
-                    </div>
-                  </section>
-
-                  <section className="admin-chat-transcript" aria-label="Transcript da sessão">
-                    {!chatSession ? (
-                      <div className="admin-state">
-                        <p>Selecione uma sessão para ver o histórico como o usuário viu.</p>
-                      </div>
-                    ) : (
-                      <>
-                        <header>
-                          <div>
-                            <h3>{chatSession.title || 'Sessão'}</h3>
-                            <p>
-                              {chatSession.operationMode === 'individual' ? 'Modo individual' : 'Modo equipe'}
-                              {chatSession.updatedAt ? ` · atualizada ${formatRelative(chatSession.updatedAt)}` : ''}
-                            </p>
-                          </div>
-                          <em>somente leitura</em>
-                        </header>
-                        {chatSession.missionDraft ? (
-                          <div className="admin-chat-draft">
-                            <span>Rascunho / última missão</span>
-                            <p>{chatSession.missionDraft}</p>
-                          </div>
-                        ) : null}
-                        <div className="admin-chat-messages">
-                          {(chatSession.transcript || []).length === 0 ? (
-                            <p className="admin-chat-empty">Transcript vazio nesta sessão.</p>
-                          ) : (chatSession.transcript || []).map((entry, index) => (
-                            <article key={entry.id || `${index}`} data-role={entry.role || 'system'}>
-                              <div>
-                                <strong>{entry.name || entry.role || 'mensagem'}</strong>
-                                {entry.stage ? <span>{entry.stage}</span> : null}
-                                {entry.model ? <span className="font-mono">{entry.model}</span> : null}
-                                {entry.timestamp ? <time>{formatRelative(entry.timestamp)}</time> : null}
-                              </div>
-                              <p>{entry.content || '—'}</p>
-                            </article>
-                          ))}
-                          {chatSession.finalResult?.content ? (
-                            <article data-role="final">
-                              <div>
-                                <strong>{chatSession.finalResult.name || 'Resultado final'}</strong>
-                                <span>{chatSession.finalResult.stage || 'final'}</span>
-                              </div>
-                              <p>{chatSession.finalResult.content}</p>
-                            </article>
-                          ) : null}
-                        </div>
-                      </>
-                    )}
-                  </section>
-                </div>
-              )}
-            </aside>
-          </div>,
+          <AdminChatViewer
+            account={inspectUser}
+            library={chatLibrary}
+            session={chatSession}
+            busy={chatBusy}
+            error={chatError}
+            canEnterAsUser={inspectUser.id !== user?.id}
+            enterBusy={enterBusyId === inspectUser.id}
+            onClose={closeChatInspect}
+            onOpenSession={(sessionId) => void openChatSession(sessionId)}
+            onEnterAsUser={() => void enterAsUser(inspectUser)}
+          />,
           document.body,
         )
         : null}

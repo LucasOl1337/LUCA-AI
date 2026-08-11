@@ -37,14 +37,23 @@ test('ADMIN_CONSOLE_V1 backend exposes readonly chat inspect per user', () => {
   assert.match(auth, /admin_readonly/);
   assert.match(page, /Ver chats/);
   assert.match(page, /data-admin-chat-inspect/);
-  assert.match(page, /inclui apagadas/);
+  assert.match(page, /AdminChatViewer/);
   assert.match(page, /createPortal/, 'chat inspect portal escapa do shell com isolation');
 });
 
-test('ADMIN_CONSOLE_V1 chat overlay is opaque and high z-index', () => {
+test('ADMIN_CONSOLE_V1 chat overlay is full-screen bancada (not right drawer)', () => {
   assert.match(css, /--l-panel:\s*#0c1219/);
   assert.match(css, /\.admin-chat-layer\s*\{[^}]*z-index:\s*20000/s);
-  assert.match(css, /\.admin-chat-panel\s*\{[^}]*background:\s*var\(--l-panel\)/s);
+  assert.match(css, /\.admin-chat-layer\s*\{[^}]*background:\s*var\(--l-panel\)/s);
+  assert.match(css, /\.admin-chat-shell/);
+  assert.match(css, /\.admin-chat-workspace/);
+  assert.match(css, /\.admin-chat-rail/);
+  assert.doesNotMatch(css, /\.admin-chat-layer\s*\{[^}]*justify-content:\s*flex-end/s);
+  const viewer = fs.readFileSync(path.join(root, 'src/components/AdminChatViewer.tsx'), 'utf8');
+  assert.match(viewer, /inclui apagadas/);
+  assert.match(viewer, /luca-ai-chat-thread/);
+  assert.match(viewer, /luca-ai-message-operator/);
+  assert.match(viewer, /como o usuário viu na bancada/);
 });
 
 test('ADMIN_CONSOLE_V1 product request tracking excludes polling noise', () => {
