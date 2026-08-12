@@ -3,7 +3,8 @@
 ## Unreleased
 
 ### Melhorias
-- **Grok 4.6 no catálogo fechado** (`gcli/grok-4.6`): o seletor da bancada passa a oferecer a rota live do 9Router; o especialista visual e os presets passam a planejar nela (templates legados migram na abertura).
+- **Grok 4.6 no catálogo fechado** (`gcli/grok-4.6` e High/Medium/Low): o seletor da bancada oferece a família completa, agrupada por provedor e sem aliases Ultra duplicados; o especialista visual e os presets usam `gcli/grok-4.6-high` (templates legados migram na abertura). Grok 4.5 permanece para overrides e sessões antigas.
+- Rodada que termina sem veredito útil (`ok: false` ou recuperação após F5) avisa no canvas sem devolver o texto ao composer nem armar "Reenviar missão", evitando bolha duplicada.
 - Contrato da etapa visual pede infográficos/explained charts; a instrução de workflow deixou de pedir stills cinematográficos.
 - Domínio público canônico em `https://luca-ai.com.br`: a borda redireciona HTTP com `308` e envia HSTS, evitando sessões aparentes sem cookie `Secure`.
 - Módulo "Artefatos visuais" com toggle liga/desliga no painel de Seleção do modo individual: ligar auto-preenche a persona padrão; desligado, a rodada termina no juiz mesmo com persona salva (`visualEnabled` persistido na sessão).

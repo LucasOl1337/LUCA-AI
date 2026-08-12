@@ -125,7 +125,7 @@ test('especialista visual usa Grok 4.6 por padrão e respeita override explícit
       is_official: true,
     },
   ]);
-  assert.equal(defaultVisual.model, 'gcli/grok-4.6');
+  assert.equal(defaultVisual.model, 'gcli/grok-4.6-high');
   assert.equal(defaultVisual.localModel, '');
 
   const [overriddenVisual] = normalizeYumePersonasForLuca(

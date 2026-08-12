@@ -16,15 +16,18 @@ test('runMission clears composer on send and restores mission for re-run on hard
   const end = source.indexOf('const activeTeamPresetId', start);
   assert.ok(end > start, 'runMission end marker present');
   const slice = source.slice(start, end);
-  assert.ok(slice.includes("setErrorRetry('run')") || slice.includes('setErrorRetry("run")'), 'run failure marks retry kind');
   assert.ok(slice.includes('if (!data.ok)'), 'errors only when run is not ok');
+  assert.ok(slice.includes('noticeCompletedRunFailure()'), 'completed ok:false does not re-arm send');
   // Sent message lives on the operator bubble; composer empties immediately after commit.
   assert.ok(slice.includes("setMission('')") || slice.includes('setMission("")'), 'clears composer after send');
   assert.ok(slice.includes("missionDraft: ''") || slice.includes('missionDraft: ""'), 'persists empty draft after send');
+  // Hard fail (catch, not watch-soft): restores composer so Reenviar missão works.
   assert.ok(slice.includes('setMission(trimmedMission)'), 'restores mission so Reenviar missão works on hard fail');
+  assert.ok(slice.includes("setErrorRetry(isWatchSoft ? null : 'run')") || slice.includes('setErrorRetry("run")'), 'hard fail marks retry kind');
   // Soft edge (524): does not force re-send while job may still be running.
   assert.ok(slice.includes('isWatchSoft') || slice.includes('PersonaRunWatchError'), 'distinguishes edge soft-fail');
   assert.ok(slice.includes('recoveredFromSession') || slice.includes('refreshChatLibrary'), 'can recover from server session');
+  assert.ok(slice.includes('if (!data.ok) noticeCompletedRunFailure()'), 'recovery and completed-without-verdict share the no-rerun notice');
 });
 
 test('chat notice run failure re-sends mission instead of only reloading personas', () => {
@@ -50,4 +53,21 @@ test('Notice supports contextual retry labels', () => {
   assert.ok(noticeSlice.includes('Reenviando'), 'busy label for re-run');
   assert.ok(noticeSlice.includes('data-luca-chat-retry'), 'retry marker kept');
   assert.ok(noticeSlice.includes('data-luca-chat-dismiss'), 'dismiss marker kept');
+});
+
+test('completed run without verdict does not arm Reenviar missão', () => {
+  const start = source.indexOf('const noticeCompletedRunFailure = useCallback');
+  assert.ok(start >= 0, 'noticeCompletedRunFailure present');
+  const slice = source.slice(start, start + 900);
+  assert.ok(slice.includes('setErrorRetry(null)'), 'clears run retry kind');
+  assert.equal(slice.includes("setErrorRetry('run')"), false, 'does not arm duplicate send');
+});
+
+test('model picker groups unique 9Router routes and hides Ultra aliases', () => {
+  const start = source.indexOf('function uniqueRouterProfiles');
+  assert.ok(start >= 0, 'uniqueRouterProfiles present');
+  const slice = source.slice(start, source.indexOf('function PersonaModelSelect'));
+  assert.ok(slice.includes("seen.has(route)"), 'dedupes by route id');
+  assert.ok(slice.includes("gcli: 'Grok'"), 'groups Grok family');
+  assert.ok(source.includes('<optgroup'), 'native optgroup in the select');
 });

@@ -24,9 +24,9 @@ test('runMission clears composer after send and restores only on failure', () =>
     'clears composer after send',
   );
   assert.ok(slice.includes("missionDraft: ''") || slice.includes('missionDraft: ""'), 'persists empty draft after send');
-  // Soft/hard failure must put the text back for "Reenviar missão".
-  const failRegion = slice.slice(slice.indexOf('if (!data.ok)'), slice.indexOf('} finally {'));
-  assert.ok(failRegion.includes('setMission(trimmedMission)'), 'restores mission on failure');
+  assert.ok(slice.includes('noticeCompletedRunFailure()'), 'completed ok:false does not restore composer');
+  // Hard fail (catch) still puts the text back for "Reenviar missão".
+  assert.ok(slice.includes('setMission(trimmedMission)'), 'restores mission on hard failure');
 });
 
 test('mode switch does not call clearTranscript', () => {

@@ -772,6 +772,15 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     applySession(activeSession);
   }, [activeSession, activeSessionId, applySession, libraryReady, persistSession]);
 
+  const noticeCompletedRunFailure = useCallback(() => {
+    // Rodada já persistida no transcript: avisa sem devolver o texto ao composer
+    // nem armar "Reenviar missão" (isso criaria outra bolha op_<traceId>).
+    setError(operationMode === 'individual'
+      ? 'As respostas individuais foram acionadas, mas o juiz não concluiu um veredito útil.'
+      : 'A equipe foi acionada, mas nenhuma persona retornou resposta util.');
+    setErrorRetry(null);
+  }, [operationMode]);
+
   // Retoma acompanhamento de rodada marcada no servidor (524/F5/aba reaberta).
   useEffect(() => {
     if (!libraryReady || !activeSession || running) return;
@@ -805,6 +814,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         if (data.traceId) setActiveTraceId(data.traceId);
         if (data.recoveredFromSession) {
           await refreshChatLibrary();
+          if (!data.ok) noticeCompletedRunFailure();
           return;
         }
         const nextMessages = transcriptEntriesFromResponse(data);
@@ -820,10 +830,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         if (nextFinal) setFinalResult(nextFinal);
         if (data.visualPack && typeof data.visualPack === 'object') setVisualPack(data.visualPack);
         await refreshChatLibrary();
-        if (!data.ok) {
-          setError('A equipe foi acionada, mas nenhuma persona retornou resposta util.');
-          setErrorRetry('run');
-        }
+        if (!data.ok) noticeCompletedRunFailure();
       } catch (err) {
         if (!stillOwner()) return;
         try { await refreshChatLibrary(); } catch { /* best-effort */ }
@@ -841,7 +848,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         if (runOwnerSessionIdRef.current === ownerSessionId) runOwnerSessionIdRef.current = null;
       }
     })();
-  }, [activeSession, bridgeBase, libraryReady, refreshChatLibrary, running]);
+  }, [activeSession, bridgeBase, libraryReady, noticeCompletedRunFailure, refreshChatLibrary, running]);
 
   const buildPersistPayload = useCallback((overrides: Record<string, unknown> = {}) => ({
     operationMode,
@@ -1611,6 +1618,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       // Resultado recuperado da sessão após flap de borda: servidor já é canônico.
       if (data.recoveredFromSession) {
         if (stillOwner()) await refreshChatLibrary();
+        if (!data.ok) noticeCompletedRunFailure();
         return;
       }
 
@@ -1623,16 +1631,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setVisualPack(nextVisual);
       // O servidor é o escritor canônico da rodada: recarrega em vez de reenviar.
       if (stillOwner()) await refreshChatLibrary();
-      if (!data.ok) {
-        // Soft failure: put the message back so "Reenviar missão" works.
-        setMission(trimmedMission);
-        setDraftAttachments(attachmentsToRun);
-        setError(operationMode === 'individual'
-          ? 'As respostas individuais foram acionadas, mas o juiz não concluiu um veredito útil.'
-          : 'A equipe foi acionada, mas nenhuma persona retornou resposta util.');
-        setErrorRetry('run');
-      }
-      // Success: composer stays empty; original question lives on the operator bubble.
+      if (!data.ok) noticeCompletedRunFailure();
+      // Success or completed-without-verdict: composer stays empty; question lives on the operator bubble.
     } catch (err) {
       if (!stillOwner()) return;
 
@@ -2764,6 +2764,40 @@ function WorkflowRoleRow({
   );
 }
 
+function uniqueRouterProfiles(profiles: RouterModelProfile[]): RouterModelProfile[] {
+  const seen = new Set<string>();
+  return profiles.filter((profile) => {
+    const route = String(profile.model || '').trim();
+    if (!route || seen.has(route)) return false;
+    seen.add(route);
+    return true;
+  });
+}
+
+const ROUTER_PROFILE_GROUP_LABELS: Record<string, string> = {
+  cc: 'Claude',
+  cx: 'GPT',
+  gcli: 'Grok',
+  kimi: 'Kimi',
+};
+
+function groupedRouterProfiles(profiles: RouterModelProfile[]): Array<{ label: string; profiles: RouterModelProfile[] }> {
+  const groups: Array<{ label: string; profiles: RouterModelProfile[] }> = [];
+  const byLabel = new Map<string, RouterModelProfile[]>();
+  for (const profile of uniqueRouterProfiles(profiles)) {
+    const prefix = String(profile.model || '').split('/')[0];
+    const label = ROUTER_PROFILE_GROUP_LABELS[prefix] || prefix || 'Outros';
+    let list = byLabel.get(label);
+    if (!list) {
+      list = [];
+      byLabel.set(label, list);
+      groups.push({ label, profiles: list });
+    }
+    list.push(profile);
+  }
+  return groups;
+}
+
 function PersonaModelSelect({
   slug,
   persona,
@@ -2779,11 +2813,13 @@ function PersonaModelSelect({
 }) {
   const theme = useTheme();
   const value = String(persona?.model || '').trim();
-  const options = profiles.length
-    ? profiles
+  const unique = uniqueRouterProfiles(profiles);
+  const options = unique.length
+    ? unique
     : value
       ? [{ id: value, name: value, model: value }]
       : [];
+  const groups = groupedRouterProfiles(options);
   const hasValue = options.some((profile) => profile.model === value);
   // Fundo opaco: option nativo no Windows herda contraste ruim de rgba translúcido.
   const selectSurface = '#12161d';
@@ -2806,10 +2842,14 @@ function PersonaModelSelect({
         style={{ background: selectSurface, borderColor: theme.border, color: selectText, colorScheme: 'dark' }}
       >
         {!hasValue && <option value="">{value || 'Escolher modelo'}</option>}
-        {options.map((profile) => (
-          <option key={`${profile.id}-${profile.model}`} value={profile.model} style={{ background: selectSurface, color: selectText }}>
-            {profile.name}
-          </option>
+        {groups.map((group) => (
+          <optgroup key={group.label} label={group.label}>
+            {group.profiles.map((profile) => (
+              <option key={profile.id} value={profile.model} style={{ background: selectSurface, color: selectText }}>
+                {profile.name}
+              </option>
+            ))}
+          </optgroup>
         ))}
       </select>
       {persona?.modelOverridden ? (

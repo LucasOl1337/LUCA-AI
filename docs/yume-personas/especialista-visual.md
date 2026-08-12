@@ -13,7 +13,7 @@ O LUCA **não escreve no Yume**. Se a persona ainda não existir no Yume, o runt
 | slug | `especialista-visual` |
 | name | Especialista Visual |
 | is_official | `true` (obrigatório para aparecer no roster principal do Yume) |
-| model (Yume) | `gcli/grok-4.6` (default LUCA; ou outra rota do catálogo 9Router) |
+| model (Yume) | `gcli/grok-4.6-high` (default LUCA; ou outra rota do catálogo 9Router) |
 | purpose | Transformar a sessão em gráficos SVG, infográficos explicados via image gen e relatório acionável |
 
 ## System prompt (colar no Yume)

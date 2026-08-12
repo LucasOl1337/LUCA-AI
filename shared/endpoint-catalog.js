@@ -40,7 +40,7 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
           endpoint('events-summary', 'GET', '/api/events/summary', 'resumo operacional do feed persistido, com contagem por type/source e suporte aos mesmos filtros do feed', 'both'),
           endpoint('events-flows', 'GET', '/api/events/flows', 'agrupa eventos por traceId ou janela temporal para reconstruir trilhas operacionais e evidencias', 'both'),
           endpoint('preflight', 'GET', '/api/preflight', 'readiness operacional antes de missão live, validando health/state/events e lock de concorrência', 'local'),
-          endpoint('router-models', 'GET', '/api/router/models', 'catalogo fechado do 9Router com 14 perfis visuais e 12 rotas permitidas', 'local'),
+          endpoint('router-models', 'GET', '/api/router/models', 'catalogo fechado do 9Router com 22 perfis visuais e 20 rotas permitidas', 'local'),
           endpoint('governance', 'GET', '/api/governance', 'resumo de governanca operacional adaptado do TARS', 'cloud'),
           endpoint('goals', 'GET', '/api/goals', 'fila persistida de goals inspirada no TARS, com status e budgets', 'cloud'),
         ],

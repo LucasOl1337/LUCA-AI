@@ -2,7 +2,7 @@
 // Frontend mapeia `icon` → Lucide; server grava no workspace no primeiro GET.
 
 export const VISUAL_PERSONA_SLUG = 'especialista-visual';
-export const VISUAL_PERSONA_MODEL = 'gcli/grok-4.6';
+export const VISUAL_PERSONA_MODEL = 'gcli/grok-4.6-high';
 export const MAX_PARTICIPANTS = 5;
 export const PRESET_ICON_IDS = ['sprout', 'hardhat', 'briefcase', 'swords', 'crown', 'stethoscope', 'users'];
 
@@ -10,7 +10,7 @@ export const PRESET_ICON_IDS = ['sprout', 'hardhat', 'briefcase', 'swords', 'cro
 // e falso consenso. A etapa visual usa um default fixo próprio.
 const DIVERSE_MODELS = [
   'cc/claude-opus-4-8(max)',
-  'gcli/grok-4.6',
+  'gcli/grok-4.6-high',
   'kimi/k3',
   'cx/gpt-5.6-luna-xhigh',
   'cc/claude-fable-5',
@@ -18,7 +18,7 @@ const DIVERSE_MODELS = [
   'kimi/kimi-k3',
   'cx/gpt-5.6-sol-xhigh',
   'cx/gpt-5.6-sol-high',
-  'gcli/grok-4.5',
+  'gcli/grok-4.6',
 ];
 // Sol xhigh é a rota de maior esforço da família GPT 5.6 mais nova; o perfil
 // Ultra aponta para o mesmo ID, portanto não oferece capacidade adicional.

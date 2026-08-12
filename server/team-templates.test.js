@@ -75,7 +75,7 @@ test('modelos do template são sanitizados e formato legado continua válido', a
     assert.deepEqual(created.models, {
       aurora: 'gcli/grok-4.5-high',
       'supervisor-agentes-ia': 'cx/gpt-5.6-sol-xhigh',
-      'especialista-visual': 'gcli/grok-4.6',
+      'especialista-visual': 'gcli/grok-4.6-high',
     });
 
     const legacy = templates.createTeamTemplate('individual', {
@@ -85,13 +85,13 @@ test('modelos do template são sanitizados e formato legado continua válido', a
     });
     assert.deepEqual(legacy.participants, ['medico']);
     assert.equal(legacy.judge, 'supervisor-agentes-ia');
-    assert.deepEqual(legacy.models, { 'especialista-visual': 'gcli/grok-4.6' });
+    assert.deepEqual(legacy.models, { 'especialista-visual': 'gcli/grok-4.6-high' });
     templates._resetTeamTemplatesCacheForTests();
     const reloadedLegacy = templates.getTeamTemplatesSnapshot().individual.find((item) => item.id === legacy.id);
     assert.deepEqual(reloadedLegacy?.participants, ['medico']);
     assert.deepEqual(
       reloadedLegacy?.models,
-      { 'especialista-visual': 'gcli/grok-4.6' },
+      { 'especialista-visual': 'gcli/grok-4.6-high' },
       'template salvo sem models recebe apenas o default visual',
     );
 
@@ -121,10 +121,10 @@ test('templates sempre incluem o especialista visual com Grok 4.6', async () => 
       },
     });
     assert.deepEqual(team.assignments.visual, ['especialista-visual']);
-    assert.equal(team.models['especialista-visual'], 'gcli/grok-4.6');
+    assert.equal(team.models['especialista-visual'], 'gcli/grok-4.6-high');
 
     const individual = templates.getTeamTemplatesSnapshot().individual[0];
-    assert.equal(individual.models['especialista-visual'], 'gcli/grok-4.6');
+    assert.equal(individual.models['especialista-visual'], 'gcli/grok-4.6-high');
   });
 });
 
@@ -158,12 +158,12 @@ test('store legado migra o modelo visual de todos os templates para Grok 4.6', a
 
   workspace.runWithWorkspaceUser(userId, () => {
     const snapshot = templates.getTeamTemplatesSnapshot();
-    assert.equal(snapshot.team[0].models['especialista-visual'], 'gcli/grok-4.6');
-    assert.equal(snapshot.individual[0].models['especialista-visual'], 'gcli/grok-4.6');
+    assert.equal(snapshot.team[0].models['especialista-visual'], 'gcli/grok-4.6-high');
+    assert.equal(snapshot.individual[0].models['especialista-visual'], 'gcli/grok-4.6-high');
   });
 
   const persisted = JSON.parse(fs.readFileSync(storePath, 'utf8'));
-  assert.equal(persisted.version, 3);
+  assert.equal(persisted.version, 4);
 });
 
 test('create update delete reorder', async () => {
