@@ -39,6 +39,13 @@ Express apenas traduzem HTTP. A persistência da sessão ocorre antes de `comple
 restart. `shared/persona-run-watch.js` é o observer HTTP usado pelo browser, não outro
 owner do estado.
 
+No modo individual, a profundidade 1 é cega+juiz; a 2 acrescenta uma revisão anônima
+paralela; a 3 corre consenso round-robin (`server/persona-consensus.js`) com teto de
+5 ciclos, pressão a partir do ciclo 3 e veredito do juiz com consenso ou dissenso
+registrado. A triagem de domínio vive em `shared/mission-triage.js` (auto + override
+manual). O diário da missão (`shared/mission-ledger.js`) persiste na sessão e entra
+no briefing das rodadas seguintes no lugar de concatenar o transcript inteiro.
+
 O Express é o único runtime de aplicação ativo da produção. O runtime em `worker/` permanece legado e não deve ser tratado como provider ou origem do frontend publicado. O script pequeno `deploy/luca-ai-vm-proxy.js` atua somente como proxy reverso de borda e não executa modelos, personas ou regras do produto.
 
 Todos os processos de aplicação vivem na VM `sennin-core-01`. O PC Windows é somente ambiente de desenvolvimento e não participa do tráfego de `luca-ai.com.br`. Na VM, `luca-ai.service` serve o Express em loopback e `cloudflared-luca-ai.service` mantém o Tunnel; o domínio público chega pelo proxy de borda (Workers VPC → Tunnel → Express).

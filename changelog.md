@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Melhorias
+- **Depth 3 é consenso de verdade**: round-robin com quadro de negociação, teto de 5 ciclos, pressão a partir do ciclo 3 e veredito do juiz com consenso ou dissenso registrado (antes era depth 2 + 20k tokens).
+- **Diário da missão**: estado compacto `{decisões, evidências, pendências, divergências}` persiste na sessão e entra no briefing do follow-up.
+- **Triagem de domínio** automática (seguro, código, esporte, geral) com override manual no painel de seleção.
 - **Grok 4.6 no catálogo fechado** (`gcli/grok-4.6` e High/Medium/Low): o seletor da bancada oferece a família completa, agrupada por provedor e sem aliases Ultra duplicados; o especialista visual e os presets usam `gcli/grok-4.6-high` (templates legados migram na abertura). Grok 4.5 permanece para overrides e sessões antigas.
 - Rodada que termina sem veredito útil (`ok: false` ou recuperação após F5) avisa no canvas sem devolver o texto ao composer nem armar "Reenviar missão", evitando bolha duplicada.
 - Contrato da etapa visual pede infográficos/explained charts; a instrução de workflow deixou de pedir stills cinematográficos.

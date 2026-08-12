@@ -2,6 +2,8 @@ import type {
   PersonaWorkflowAssignments,
   PersonaWorkflowRoleId,
 } from '../../shared/persona-workflow.js';
+import type { MissionDomain, MissionDomainSource } from '../../shared/mission-triage.js';
+import type { MissionLedger } from '../../shared/mission-ledger.js';
 
 // Tipos do contrato do backend LUCA-AI (server/state.js getState()).
 // Mantidos propositalmente permissivos: o backend evolui e o front degrada com
@@ -70,7 +72,10 @@ export interface RouterModelsResponse {
 }
 
 export type LucaAiIndividualDepth = 1 | 2 | 3;
-export type LucaAiPersonaTeamPhase = 'blind' | 'revision' | 'judge';
+export type LucaAiPersonaTeamPhase = 'blind' | 'revision' | 'consensus' | 'judge';
+export type LucaAiMissionDomain = MissionDomain;
+export type LucaAiMissionDomainSource = MissionDomainSource;
+export type LucaAiMissionLedger = MissionLedger;
 
 export interface LucaAiPersonaTeamReply {
   ok: boolean;
@@ -147,6 +152,21 @@ export interface LucaAiPersonaTeamRunResponse {
     content?: string;
   } | null;
   visualPack?: LucaAiVisualPack | null;
+  missionLedger?: LucaAiMissionLedger | null;
+  domain?: LucaAiMissionDomain;
+  domainSource?: LucaAiMissionDomainSource;
+  consensus?: {
+    outcome?: 'consensus' | 'dissent' | string;
+    cycleCount?: number;
+    board?: {
+      seats?: Array<{
+        label?: string;
+        vote?: string;
+        stance?: string;
+        dissentReason?: string;
+      }>;
+    };
+  } | null;
   attachments?: LucaAiChatAttachment[];
   generatedAt: string;
   /** Servidor recuperou o resultado da sessão após perder a memória do job. */
@@ -494,6 +514,9 @@ export interface LucaAiChatSession extends LucaAiChatSessionSummary {
   transcript?: Array<Record<string, unknown>>;
   finalResult?: Record<string, unknown> | null;
   visualPack?: LucaAiVisualPack | null;
+  missionLedger?: LucaAiMissionLedger | null;
+  missionDomain?: LucaAiMissionDomain | string | null;
+  missionDomainOverride?: boolean;
   activePersonaSlug?: string | null;
   /** Rodada assíncrona em andamento (sobrevive a 524/F5). */
   activePersonaRun?: LucaAiActivePersonaRun | null;

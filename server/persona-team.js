@@ -3,6 +3,8 @@ import {
   normalizePersonaSlug,
   resolvePersonaWorkflow,
 } from '../shared/persona-workflow.js';
+import { resolveMissionDomain } from '../shared/mission-triage.js';
+import { runConsensusRounds, formatNegotiationBoard } from './persona-consensus.js';
 
 const DEFAULT_MAX_TEAM_SIZE = 10;
 const DEFAULT_MAX_MISSION_CHARS = 6000;
@@ -54,6 +56,11 @@ export function normalizePersonaTeamRunInput(body = {}, options = {}) {
   const requestedMode = String(body?.mode || '').trim().toLowerCase();
   const individualMode = requestedMode === 'individual';
   const depth = Number.isInteger(body?.depth) && DEPTH_BUDGETS[body.depth] ? body.depth : 1;
+  const domainOverride = body?.domainOverride === true || body?.domainOverride === 'true';
+  const resolvedDomain = resolveMissionDomain(missionText, {
+    domain: body?.domain,
+    domainOverride,
+  });
   const judgeSlug = individualMode
     ? normalizePersonaSlug(body?.judgeSlug || body?.judge || body?.judgePersona)
     : '';
@@ -104,6 +111,8 @@ export function normalizePersonaTeamRunInput(body = {}, options = {}) {
     workflow,
     mode: individualMode ? 'individual' : workflow.length ? 'workflow' : 'parallel',
     depth,
+    domain: resolvedDomain.domain,
+    domainSource: resolvedDomain.domainSource,
     judgeSlug: individualMode ? judgeSlug : undefined,
     visualSlug: individualMode ? (visualSlug || undefined) : undefined,
     modelOverrides: normalizeModelOverrides(body?.modelOverrides || body?.models),
@@ -399,6 +408,10 @@ ${historyBlock ? `\n  ${historyBlock.replace(/\n/g, '\n  ')}\n` : ''}
     };
   }
 
+function formatConsensusBoardForJudge(board) {
+  return formatNegotiationBoard(board);
+}
+
 export function buildIndividualJudgePrompt({
   mission,
   judgeName,
@@ -408,6 +421,7 @@ export function buildIndividualJudgePrompt({
   replies = [],
   originalReplies = [],
   conversationContext = '',
+  consensus = null,
 }) {
   const name = String(judgeName || judgeSlug || 'Juiz').trim();
   const slug = String(judgeSlug || '').trim();
@@ -440,6 +454,22 @@ Motor LLM desta execucao nao foi declarado explicitamente.
   const originalsAppendix = originals
     ? `\n\nRespostas cegas originais (anexo contextual; priorize as revisoes):\n${originals}`
     : '';
+  const consensusOutcome = String(consensus?.outcome || '').trim();
+  const consensusAppendix = consensusOutcome
+    ? `\n\nResultado do consenso: ${consensusOutcome === 'consensus' ? 'CONSENSO' : 'DISSENSO'} apos ${consensus.cycleCount || '?'} ciclo(s) (teto 5).
+Quadro de negociacao:
+${formatConsensusBoardForJudge(consensus.board)}
+${consensusOutcome === 'consensus'
+    ? 'Nao reabra pontos ja acordados. Redija o veredito a partir do quadro.'
+    : 'Registre o dissenso explicitamente no veredito e decida mesmo assim.'}`
+    : '';
+  const ledgerRequest = `
+Ao final, emita exatamente este bloco (listas curtas, separadas por ponto-e-virgula):
+DIARIO DA MISSAO
+decisoes:
+evidencias:
+pendencias:
+divergencias:`;
   const historyBlock = formatConversationContextForPrompt(conversationContext);
   const historyAppendix = historyBlock ? `\n\n${historyBlock}` : '';
 
@@ -456,9 +486,9 @@ Voce avalia contribuicoes de outros agentes. Seja direto, livre de formato e sem
 ${mission}${historyAppendix}
 
 Contribuicoes:
-${contributions || 'Nenhuma contribuicao utilizavel.'}${originalsAppendix}
+${contributions || 'Nenhuma contribuicao utilizavel.'}${originalsAppendix}${consensusAppendix}
 
-Entregue seu julgamento final com liberdade de forma.`,
+Entregue seu julgamento final com liberdade de forma.${ledgerRequest}`,
     };
   }
 
@@ -481,7 +511,7 @@ ${historyBlock ? `\n  ${historyBlock.replace(/\n/g, '\n  ')}\n` : ''}
   ${model ? `Motor 9Router do juiz: ${model}` : ''}
 
   Contribuicoes individuais:
-  ${contributions || 'Nenhuma contribuicao utilizavel foi recebida.'}${originalsAppendix}
+  ${contributions || 'Nenhuma contribuicao utilizavel foi recebida.'}${originalsAppendix}${consensusAppendix}
 
   Produza obrigatoriamente estas partes, nesta ordem:
   0. Resposta livre — comece com sua leitura espontanea da missao e das contribuicoes, no formato que preferir (paragrafos, raciocinio aberto, observacoes soltas). Use este espaco para pensar em voz alta como juiz, sem obrigacao de estrutura.
@@ -489,7 +519,7 @@ ${historyBlock ? `\n  ${historyBlock.replace(/\n/g, '\n  ')}\n` : ''}
   1. Avaliacao dos participantes — diga o que foi util em cada resposta.
   2. Alertas de qualidade — identifique, por participante, qualquer trecho falso, nao sustentado ou incompleto. Se nao houver, diga explicitamente.
   3. Complementacao — combine o que for compativel e corrija as lacunas relevantes.
-  4. Veredito final — apresente a melhor decisao final, sua justificativa e proximas acoes.`,
+  4. Veredito final — apresente a melhor decisao final, sua justificativa e proximas acoes.${ledgerRequest}`,
     };
   }
 
@@ -545,17 +575,32 @@ export async function runIndividualResolution({
   depth = 1,
   runParticipant,
   runRevision,
+  runConsensusTurn,
   runJudge,
 }) {
   const blindReplies = await Promise.all(
     participantSlugs.map((slug) => runParticipant({ slug })),
   );
-  if (depth < 2 || typeof runRevision !== 'function') {
+  if (depth < 2 || (typeof runRevision !== 'function' && typeof runConsensusTurn !== 'function')) {
     const judge = await runJudge({ slug: judgeSlug, replies: blindReplies });
     return { replies: blindReplies, judge };
   }
 
-  // TODO(depth-3): substituir esta replica unica pelo consenso round-robin na proxima onda.
+  if (depth >= 3 && typeof runConsensusTurn === 'function') {
+    const consensus = await runConsensusRounds({
+      participantSlugs,
+      blindReplies,
+      runTurn: runConsensusTurn,
+    });
+    const judge = await runJudge({
+      slug: judgeSlug,
+      replies: consensus.replies,
+      originalReplies: blindReplies,
+      consensus,
+    });
+    return { replies: consensus.replies, blindReplies, judge, consensus };
+  }
+
   const replies = await Promise.all(participantSlugs.map((slug, participantIndex) => {
     const contributions = blindReplies.flatMap((reply, replyIndex) => (
       replyIndex === participantIndex

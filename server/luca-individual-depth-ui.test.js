@@ -24,7 +24,7 @@ test('individual REST client accepts and sends depth', () => {
 
 test('depth and reply phases are typed as closed unions', () => {
   assert.match(types, /LucaAiIndividualDepth\s*=\s*1\s*\|\s*2\s*\|\s*3/);
-  assert.match(types, /LucaAiPersonaTeamPhase\s*=\s*'blind'\s*\|\s*'revision'\s*\|\s*'judge'/);
+  assert.match(types, /LucaAiPersonaTeamPhase\s*=\s*'blind'\s*\|\s*'revision'\s*\|\s*'consensus'\s*\|\s*'judge'/);
   const reply = between(types, 'export interface LucaAiPersonaTeamReply', 'export interface LucaAiWorkflowAssignment');
   const step = between(types, 'export interface LucaAiPersonaTeamStep', 'export interface LucaAiChatAttachment');
   assert.match(reply, /phase\?:\s*LucaAiPersonaTeamPhase/);
@@ -40,7 +40,7 @@ test('individual panel keeps judge then participants then presets and exposes th
   assert.match(panel, /data-luca-individual-depth/);
   assert.match(page, /value:\s*1,\s*label:\s*'1 Padrão'/);
   assert.match(page, /value:\s*2,\s*label:\s*'2 Deliberação'/);
-  assert.match(page, /value:\s*3,\s*label:\s*'3 Máx\.'/);
+  assert.match(page, /value:\s*3,\s*label:\s*'3 Consenso'/);
 });
 
 test('selected depth reaches the individual run and phases render as short labels', () => {
@@ -49,6 +49,7 @@ test('selected depth reaches the individual run and phases render as short label
   assert.match(runMission, /runLucaAiIndividualResolution\([\s\S]*individualDepth/);
   assert.match(page, /blind:\s*'Cega'/);
   assert.match(page, /revision:\s*'Revisão'/);
+  assert.match(page, /consensus:\s*'Consenso'/);
   assert.match(page, /judge:\s*'Juiz'/);
 });
 

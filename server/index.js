@@ -166,6 +166,14 @@ import {
   normalizePersonaTeamRunInput,
   runIndividualResolution,
 } from './persona-team.js';
+import { buildConsensusTurnPrompt } from './persona-consensus.js';
+import {
+  extractMissionLedgerFromText,
+  formatRunBriefing,
+  ledgerFromConsensusBoard,
+  mergeMissionLedger,
+  normalizeMissionLedger,
+} from '../shared/mission-ledger.js';
 import { PERSONA_WORKFLOW_ROLES } from '../shared/persona-workflow.js';
 import { personaRunOperatorEntryId } from '../shared/persona-run-transcript.js';
 import { createPersonaRunJobStore } from './persona-run-jobs.js';
@@ -2080,7 +2088,116 @@ async function runLucaAiIndividualRevision({ slug, mission, originalReply, contr
   }
 }
 
-export async function runLucaAiIndividualJudge({ slug, mission, replies, originalReplies = [], loaded, maxTokens = 1400, attachments = [], toolsEnabled = true, traceId = null, conversationContext = '' }) {
+async function runLucaAiIndividualConsensusTurn({
+  slug,
+  mission,
+  originalReply,
+  contributions,
+  board,
+  cycle,
+  pressure,
+  loaded,
+  maxTokens,
+  attachments = [],
+  toolsEnabled = true,
+  traceId = null,
+  conversationContext = '',
+}) {
+  const name = loaded.name || slug;
+  const model = loaded.model || ROUTER_MODEL;
+  const prompt = buildConsensusTurnPrompt({
+    mission,
+    personaName: name,
+    personaSlug: slug,
+    systemPrompt: loaded.systemPrompt,
+    runtimeModel: model,
+    originalReply,
+    contributions,
+    board,
+    cycle,
+    pressure,
+    conversationContext,
+  });
+  const startedAt = new Date().toISOString();
+  const startedMs = Date.now();
+  const trace = { slug, name: prompt.name, model, roleId: 'consensus', roleLabel: `Consenso ${cycle}` };
+  appendLucaAiTraceEvent(traceId, 'luca_ai.llm.requested', {
+    ...trace,
+    inputSummary: summarizeLucaAiTraceText(prompt.user),
+    systemSummary: summarizeLucaAiTraceText(prompt.system, 180),
+    inputChars: prompt.user.length,
+    systemChars: prompt.system.length,
+    cycle,
+    pressure,
+  });
+
+  try {
+    const agentRun = await runAgentWithTools({
+      system: prompt.system,
+      user: prompt.user,
+      attachments,
+      toolsEnabled,
+      agentId: `luca-ai-consensus-${slug}`,
+      model,
+      maxTokens,
+      maxRounds: 3,
+    });
+    const completedAt = new Date().toISOString();
+    const durationMs = Date.now() - startedMs;
+    const content = cleanPersonaTeamOutput(agentRun.content);
+    const toolTrace = Array.isArray(agentRun.toolTrace) ? agentRun.toolTrace : [];
+    appendLucaAiTraceEvent(traceId, 'luca_ai.llm.completed', {
+      ...trace,
+      durationMs,
+      outputSummary: summarizeLucaAiTraceText(content, 420),
+      outputChars: content.length,
+      toolCount: toolTrace.length,
+      tools: toolTrace.map((item) => item.name),
+    });
+    return {
+      ok: true,
+      slug,
+      name: prompt.name,
+      model,
+      version: loaded.version ?? null,
+      cached: Boolean(loaded.cached),
+      stale: Boolean(loaded.stale),
+      phase: 'consensus',
+      cycle,
+      content,
+      toolTrace,
+      startedAt,
+      completedAt,
+      durationMs,
+    };
+  } catch (error) {
+    const completedAt = new Date().toISOString();
+    const durationMs = Date.now() - startedMs;
+    appendLucaAiTraceEvent(traceId, 'luca_ai.llm.failed', {
+      ...trace,
+      durationMs,
+      error: summarizeLucaAiTraceText(error?.message || String(error), 240),
+    });
+    return {
+      ok: false,
+      slug,
+      name,
+      model,
+      version: loaded.version ?? null,
+      cached: Boolean(loaded.cached),
+      stale: Boolean(loaded.stale),
+      phase: 'consensus',
+      cycle,
+      error: error?.message || String(error),
+      toolTrace: [],
+      startedAt,
+      completedAt,
+      durationMs,
+    };
+  }
+}
+
+export async function runLucaAiIndividualJudge({ slug, mission, replies, originalReplies = [], loaded, maxTokens = 1400, attachments = [], toolsEnabled = true, traceId = null, conversationContext = '', consensus = null }) {
   const name = loaded.name || slug;
   const model = loaded.model || ROUTER_MODEL;
   const prompt = buildIndividualJudgePrompt({
@@ -2092,6 +2209,7 @@ export async function runLucaAiIndividualJudge({ slug, mission, replies, origina
     replies,
     originalReplies,
     conversationContext,
+    consensus,
   });
   const startedAt = new Date().toISOString();
   const startedMs = Date.now();
@@ -3175,11 +3293,13 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
   const currentOperatorId = personaRunOperatorEntryId({ traceId: input.traceId });
   let conversationContextNamed = '';
   let conversationContextAnon = '';
+  let sessionLedger = null;
   let effectiveAttachmentIds = Array.isArray(input.attachmentIds) ? input.attachmentIds.slice() : [];
   if (input.sessionId) {
     try {
       const session = getChatSession(input.sessionId);
       const transcript = Array.isArray(session?.transcript) ? session.transcript : [];
+      sessionLedger = normalizeMissionLedger(session?.missionLedger);
       conversationContextNamed = buildConversationContextFromTranscript(transcript, {
         excludeOperatorId: currentOperatorId,
         anonymizePersonas: false,
@@ -3201,6 +3321,19 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
     ? conversationContextAnon
     : conversationContextNamed;
   const conversationContextJudge = conversationContextNamed;
+  const runBriefing = formatRunBriefing({
+    domain: input.domain,
+    domainSource: input.domainSource,
+    ledger: sessionLedger,
+  });
+  const withBriefing = (context) => (
+    runBriefing
+      ? (context ? `${runBriefing}\n\n${context}` : runBriefing)
+      : context
+  );
+  const conversationContextTeamBriefed = withBriefing(conversationContextTeam);
+  const conversationContextParticipantBriefed = withBriefing(conversationContextParticipant);
+  const conversationContextJudgeBriefed = withBriefing(conversationContextJudge);
 
   // Explicit attachments of this turn fail hard; prior reattach is best-effort
   // (deleted/corrupt files must not abort a follow-up that still has text context).
@@ -3234,6 +3367,8 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
   appendLucaAiTraceEvent(input.traceId, 'luca_ai.workflow.started', {
     mode: input.mode,
     depth: input.depth,
+    domain: input.domain,
+    domainSource: input.domainSource,
     missionSummary: summarizeLucaAiTraceText(input.mission, 360),
     teamSize: input.slugs.length,
     workflow: input.workflow?.map((role) => ({
@@ -3253,6 +3388,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
   let steps = [];
   let replies = [];
   let judgeReply = null;
+  let consensusResult = null;
 
   if (input.mode === 'workflow') {
     steps = await runLucaAiPersonaWorkflow({
@@ -3263,7 +3399,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
       attachments: attachmentParts,
       toolsEnabled,
       traceId: input.traceId,
-      conversationContext: conversationContextTeam,
+      conversationContext: conversationContextTeamBriefed,
     });
     replies = steps.flatMap((step) => step.replies.map((reply) => ({
       ...reply,
@@ -3304,7 +3440,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
           attachments: attachmentParts,
           toolsEnabled,
           traceId: input.traceId,
-          conversationContext: conversationContextParticipant,
+          conversationContext: conversationContextParticipantBriefed,
         });
       },
       runRevision: ({ slug, originalReply, contributions }) => {
@@ -3332,10 +3468,42 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
           attachments: attachmentParts,
           toolsEnabled,
           traceId: input.traceId,
-          conversationContext: conversationContextParticipant,
+          conversationContext: conversationContextParticipantBriefed,
         });
       },
-      runJudge: ({ slug, replies: participantReplies, originalReplies = [] }) => {
+      runConsensusTurn: ({ slug, originalReply, contributions, board, cycle, pressure }) => {
+        const entry = loadedBySlug.get(slug);
+        if (!entry || entry.error) {
+          return Promise.resolve({
+            ok: false,
+            slug,
+            name: entry?.loaded?.name || slug,
+            model: entry?.loaded?.model || '',
+            version: null,
+            cached: false,
+            stale: false,
+            phase: 'consensus',
+            cycle,
+            error: entry?.error || 'persona_not_loaded',
+          });
+        }
+        return runLucaAiIndividualConsensusTurn({
+          slug,
+          mission: input.mission,
+          originalReply,
+          contributions,
+          board,
+          cycle,
+          pressure,
+          loaded: entry.loaded,
+          maxTokens: budgets.participant,
+          attachments: attachmentParts,
+          toolsEnabled,
+          traceId: input.traceId,
+          conversationContext: conversationContextParticipantBriefed,
+        });
+      },
+      runJudge: ({ slug, replies: participantReplies, originalReplies = [], consensus = null }) => {
         const entry = loadedBySlug.get(slug);
         if (!entry || entry.error) {
           return Promise.resolve({
@@ -3360,12 +3528,14 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
           attachments: attachmentParts,
           toolsEnabled,
           traceId: input.traceId,
-          conversationContext: conversationContextJudge,
+          conversationContext: conversationContextJudgeBriefed,
+          consensus,
         }).then((reply) => ({ ...reply, phase: 'judge' }));
       },
     });
     replies = result.replies;
     judgeReply = result.judge;
+    consensusResult = result.consensus || null;
     const blindReplies = result.blindReplies || result.replies;
     const participants = input.slugs.map((slug) => {
       const entry = loadedBySlug.get(slug);
@@ -3374,11 +3544,17 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
     const blindCompletedAt = blindReplies.reduce((latest, reply) => (
       String(reply.completedAt || '') > latest ? String(reply.completedAt) : latest
     ), individualStartedAt);
-    const revisionStartedAt = result.blindReplies ? blindCompletedAt : null;
-    const revisionCompletedAt = result.blindReplies
+    const consensusCycles = Array.isArray(result.consensus?.cycles) ? result.consensus.cycles : [];
+    const revisionStartedAt = result.blindReplies && !result.consensus ? blindCompletedAt : null;
+    const revisionCompletedAt = revisionStartedAt
       ? replies.reduce((latest, reply) => (
           String(reply.completedAt || '') > latest ? String(reply.completedAt) : latest
         ), revisionStartedAt)
+      : null;
+    const lastConsensusCompletedAt = consensusCycles.length
+      ? consensusCycles[consensusCycles.length - 1].replies.reduce((latest, reply) => (
+          String(reply.completedAt || '') > latest ? String(reply.completedAt) : latest
+        ), blindCompletedAt)
       : null;
     steps = [
       {
@@ -3392,7 +3568,26 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
         completedAt: blindCompletedAt,
         durationMs: Math.max(0, new Date(blindCompletedAt).getTime() - individualStartedMs),
       },
-      ...(result.blindReplies ? [{
+      ...(result.consensus ? consensusCycles.map((item) => {
+        const startedAt = item.replies.reduce((earliest, reply) => {
+          const stamp = String(reply.startedAt || '');
+          return stamp && (earliest === '' || stamp < earliest) ? stamp : earliest;
+        }, '') || blindCompletedAt;
+        const completedAt = item.replies.reduce((latest, reply) => (
+          String(reply.completedAt || '') > latest ? String(reply.completedAt) : latest
+        ), startedAt);
+        return {
+          id: `consensus-${item.cycle}`,
+          roleId: 'consensus',
+          roleLabel: `Consenso ${item.cycle}`,
+          phase: 'consensus',
+          participants,
+          replies: item.replies,
+          startedAt,
+          completedAt,
+          durationMs: Math.max(0, new Date(completedAt).getTime() - new Date(startedAt).getTime()),
+        };
+      }) : result.blindReplies ? [{
         id: 'revision',
         roleId: 'revision',
         roleLabel: 'Revisao',
@@ -3414,7 +3609,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
           model: loadedBySlug.get(input.judgeSlug)?.loaded?.model || '',
         }],
         replies: [judgeReply],
-        startedAt: judgeReply?.startedAt || revisionCompletedAt || blindCompletedAt,
+        startedAt: judgeReply?.startedAt || lastConsensusCompletedAt || revisionCompletedAt || blindCompletedAt,
         completedAt: judgeReply?.completedAt || new Date().toISOString(),
         durationMs: judgeReply?.durationMs || 0,
       },
@@ -3441,7 +3636,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
         attachments: attachmentParts,
         toolsEnabled,
         traceId: input.traceId,
-        conversationContext: conversationContextTeam,
+        conversationContext: conversationContextTeamBriefed,
       });
     }));
   }
@@ -3462,7 +3657,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
         accumulatedContext: buildVisualStageContext(steps),
         teamNames,
         attachments: attachmentParts,
-        conversationContext: conversationContextTeam,
+        conversationContext: conversationContextTeamBriefed,
       });
       visualPack = finalized.visualPack;
     } else if (visualStep) {
@@ -3511,7 +3706,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
         toolsEnabled: false,
         maxTokens: 2200,
         traceId: input.traceId,
-        conversationContext: conversationContextNamed,
+        conversationContext: conversationContextTeamBriefed,
       });
       if (visualReply?.ok && visualReply.content) {
         const finalized = await finalizeLucaAiVisualStage({
@@ -3521,7 +3716,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
           accumulatedContext,
           teamNames,
           attachments: attachmentParts,
-          conversationContext: conversationContextNamed,
+          conversationContext: conversationContextTeamBriefed,
         });
         visualPack = finalized.visualPack;
         visualReply = finalized.visualReply;
@@ -3572,13 +3767,29 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
     errorCount: replies.filter((reply) => !reply.ok).length,
     finalDisplaySlug: finalDisplayReply?.slug || null,
     visualStatus: visualPack?.status || null,
+    consensusOutcome: consensusResult?.outcome || null,
+    consensusCycles: consensusResult?.cycleCount || 0,
   });
+
+  const extractedLedger = extractMissionLedgerFromText(
+    judgeReply?.content || finalDisplayReply?.content || '',
+  );
+  const boardLedger = consensusResult
+    ? ledgerFromConsensusBoard(consensusResult.board, consensusResult.outcome)
+    : null;
+  const missionLedger = mergeMissionLedger(
+    mergeMissionLedger(sessionLedger, boardLedger),
+    extractedLedger,
+  );
 
   const runPayload = {
     ok: runOk,
     traceId: input.traceId,
     mission: input.mission,
     mode: input.mode,
+    domain: input.domain,
+    domainSource: input.domainSource,
+    missionLedger,
     team: loaded.map((entry) => ({
       slug: entry.slug,
       name: entry.loaded?.name || entry.slug,
@@ -3602,6 +3813,14 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true } = {}) 
       content: finalDisplayReply.content,
     } : null,
     visualPack,
+    missionLedger,
+    consensus: consensusResult
+      ? {
+          outcome: consensusResult.outcome,
+          cycleCount: consensusResult.cycleCount,
+          board: consensusResult.board,
+        }
+      : null,
     attachments: attachmentMetadata,
     startedAt: runStartedAt,
     durationMs,

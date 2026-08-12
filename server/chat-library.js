@@ -7,6 +7,7 @@ import {
   transcriptEntriesFromPersonaRun,
 } from '../shared/persona-run-transcript.js';
 import { VISUAL_PERSONA_SLUG } from '../shared/luca-preset-seed.js';
+import { missionLedgerHasItems, normalizeMissionLedger } from '../shared/mission-ledger.js';
 import { getWorkspaceUserId, requireWorkspaceUserId } from './workspace-context.js';
 
 const rootStateDir = path.resolve(process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'));
@@ -135,6 +136,11 @@ function makeSession(partial = {}, { forceVisualDefaults = false } = {}) {
     transcript: Array.isArray(partial.transcript) ? partial.transcript.slice(-MAX_TRANSCRIPT) : [],
     finalResult: partial.finalResult ?? null,
     visualPack: partial.visualPack ?? null,
+    missionLedger: missionLedgerHasItems(partial.missionLedger)
+      ? normalizeMissionLedger(partial.missionLedger)
+      : null,
+    missionDomain: String(partial.missionDomain || '').trim() || null,
+    missionDomainOverride: Boolean(partial.missionDomainOverride),
     activePersonaSlug: partial.activePersonaSlug ? String(partial.activePersonaSlug) : null,
     activePersonaRun: normalizeActivePersonaRun(partial.activePersonaRun),
     lastPersonaRun: normalizePersonaRunReceipt(partial.lastPersonaRun),
@@ -856,6 +862,17 @@ export function updateChatSession(sessionId, patch = {}) {
     }
     if (Object.prototype.hasOwnProperty.call(patch, 'finalResult')) session.finalResult = patch.finalResult ?? null;
     if (Object.prototype.hasOwnProperty.call(patch, 'visualPack')) session.visualPack = patch.visualPack ?? null;
+    if (Object.prototype.hasOwnProperty.call(patch, 'missionLedger')) {
+      session.missionLedger = missionLedgerHasItems(patch.missionLedger)
+        ? normalizeMissionLedger(patch.missionLedger)
+        : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'missionDomain')) {
+      session.missionDomain = patch.missionDomain ? String(patch.missionDomain).trim() : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'missionDomainOverride')) {
+      session.missionDomainOverride = Boolean(patch.missionDomainOverride);
+    }
     if (Object.prototype.hasOwnProperty.call(patch, 'activePersonaSlug')) {
       session.activePersonaSlug = patch.activePersonaSlug ? String(patch.activePersonaSlug) : null;
     }
@@ -876,6 +893,8 @@ export function updateChatSession(sessionId, patch = {}) {
       || Array.isArray(patch.appendTranscript)
       || Object.prototype.hasOwnProperty.call(patch, 'finalResult')
       || Object.prototype.hasOwnProperty.call(patch, 'visualPack')
+      || Object.prototype.hasOwnProperty.call(patch, 'missionLedger')
+      || Object.prototype.hasOwnProperty.call(patch, 'missionDomain')
       || Object.prototype.hasOwnProperty.call(patch, 'activePersonaRun')
       || patch.operationMode === 'team'
       || patch.operationMode === 'individual'
@@ -986,6 +1005,11 @@ export function recordPersonaRunOnSession(sessionId, run = {}, meta = {}) {
 
     session.finalResult = finalEntryFromPersonaRun(run);
     session.visualPack = run.visualPack && typeof run.visualPack === 'object' ? run.visualPack : null;
+    if (run.missionLedger && missionLedgerHasItems(run.missionLedger)) {
+      session.missionLedger = normalizeMissionLedger(run.missionLedger);
+    }
+    if (run.domain) session.missionDomain = String(run.domain);
+    if (run.domainSource === 'override') session.missionDomainOverride = true;
     if (run.ok) session.draftAttachments = [];
     const runId = String(meta.runId || activeRun?.runId || '').trim();
     if (runId) {
@@ -1066,6 +1090,7 @@ export function findPersonaRunOnSession(runId) {
           content: String(finalResult.content || ''),
         } : null,
         visualPack: session.visualPack ?? null,
+        missionLedger: session.missionLedger ?? null,
         generatedAt: receipt.completedAt,
       },
     };

@@ -221,9 +221,11 @@ export const lucaApi = {
     modelOverrides?: Record<string, string>,
     sessionId?: string,
     attachmentIds: string[] = [],
+    domain?: string,
+    domainOverride?: boolean,
   ) =>
     startPersonaTeamRun(
-      { mission, slugs, workflow, traceId, modelOverrides, sessionId, attachmentIds },
+      { mission, slugs, workflow, traceId, modelOverrides, sessionId, attachmentIds, domain, domainOverride },
       base,
     ),
   runLucaAiIndividualResolution: (
@@ -237,9 +239,11 @@ export const lucaApi = {
     attachmentIds: string[] = [],
     depth?: LucaAiIndividualDepth,
     visualSlug?: string,
+    domain?: string,
+    domainOverride?: boolean,
   ) =>
     startPersonaTeamRun(
-      { mission, mode: 'individual', slugs, judgeSlug, visualSlug: visualSlug || undefined, traceId, modelOverrides, sessionId, attachmentIds, depth },
+      { mission, mode: 'individual', slugs, judgeSlug, visualSlug: visualSlug || undefined, traceId, modelOverrides, sessionId, attachmentIds, depth, domain, domainOverride },
       base,
     ),
   /** Retoma o acompanhamento de um job já aceito (F5 / flap de borda). */

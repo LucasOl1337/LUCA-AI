@@ -82,6 +82,16 @@ import {
   type PersonaWorkflowAssignments,
   type PersonaWorkflowRoleId,
 } from '../../shared/persona-workflow.js';
+import {
+  classifyMissionDomain,
+  MISSION_DOMAIN_LABELS,
+  normalizeMissionDomain,
+  type MissionDomain,
+} from '../../shared/mission-triage.js';
+import {
+  missionLedgerHasItems,
+  type MissionLedger,
+} from '../../shared/mission-ledger.js';
 
 const LUCA_AI_CLEAN_UI_VERSION = 'session-isolation-v2';
 const LUCA_AI_CLEAN_UI_STORAGE_KEY = 'luca.lucaAi.cleanUiVersion';
@@ -194,14 +204,23 @@ const INDIVIDUAL_PICKER_CONFIGS: Record<IndividualPickerId, PersonaPickerConfig>
 const INDIVIDUAL_DEPTH_OPTIONS: Array<{ value: LucaAiIndividualDepth; label: string; description: string }> = [
   { value: 1, label: '1 Padrão', description: 'Respostas cegas e decisão do juiz.' },
   { value: 2, label: '2 Deliberação', description: 'Inclui revisão anônima antes do juiz.' },
-  { value: 3, label: '3 Máx.', description: 'Mesmo protocolo, com orçamento máximo.' },
+  { value: 3, label: '3 Consenso', description: 'Round-robin com teto de 5 ciclos; o juiz fecha com dissenso se não houver acordo.' },
 ];
 
 const INDIVIDUAL_PHASE_LABELS: Record<LucaAiPersonaTeamPhase, string> = {
   blind: 'Cega',
   revision: 'Revisão',
+  consensus: 'Consenso',
   judge: 'Juiz',
 };
+
+const MISSION_DOMAIN_OPTIONS: Array<{ value: MissionDomain | 'auto'; label: string }> = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'general', label: 'Geral' },
+  { value: 'insurance', label: 'Seguro' },
+  { value: 'code', label: 'Código' },
+  { value: 'sports', label: 'Esporte' },
+];
 
 const ROLE_LABEL_BY_ID = new Map(WORKFLOW_ROLES.map((role) => [role.id, role.label]));
 
@@ -587,6 +606,9 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const [workflowState, setWorkflowState] = useState<WorkflowAssignments>(createDefaultWorkflowAssignments());
   const [individualState, setIndividualState] = useState<IndividualAssignments>(createDefaultIndividualAssignments());
   const [individualDepth, setIndividualDepth] = useState<LucaAiIndividualDepth>(1);
+  const [domainOverride, setDomainOverride] = useState(false);
+  const [domainManual, setDomainManual] = useState<MissionDomain>('general');
+  const [missionLedger, setMissionLedger] = useState<MissionLedger | null>(null);
   const [mission, setMission] = useState<string>('');
   const [draftAttachments, setDraftAttachments] = useState<LucaAiChatAttachment[]>([]);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
@@ -711,6 +733,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setTranscript([]);
       setFinalResult(null);
       setVisualPack(null);
+      setMissionLedger(null);
+      setDomainOverride(false);
       pendingSompoLaunchRef.current = launch;
       sompoAutoRunArmedRef.current = Boolean(launch?.autoRun);
       return;
@@ -741,6 +765,18 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setTranscript(nextTranscript);
     setFinalResult(isTeamTranscriptEntry(session.finalResult) ? session.finalResult : null);
     setVisualPack(session.visualPack && typeof session.visualPack === 'object' ? session.visualPack as LucaAiVisualPack : null);
+    setMissionLedger(session.missionLedger && missionLedgerHasItems(session.missionLedger) ? session.missionLedger : null);
+    if (session.missionDomainOverride) {
+      const storedDomain = normalizeMissionDomain(session.missionDomain);
+      if (storedDomain) {
+        setDomainOverride(true);
+        setDomainManual(storedDomain);
+      } else {
+        setDomainOverride(false);
+      }
+    } else {
+      setDomainOverride(false);
+    }
     setActivePersonaSlug(session.activePersonaSlug ? String(session.activePersonaSlug) : null);
     setHydratedSessionId(session.id);
     pendingSompoLaunchRef.current = launch;
@@ -1601,6 +1637,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           attachmentsToRun.map((attachment) => attachment.id),
           individualDepth,
           individualToRun.visual || undefined,
+          activeDomain,
+          domainOverride,
         )
         : await lucaApi.runLucaAiPersonaTeam(
           trimmedMission,
@@ -1611,6 +1649,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           modelOverrides,
           ownerSessionId,
           attachmentsToRun.map((attachment) => attachment.id),
+          activeDomain,
+          domainOverride,
         );
       if (!stillOwner()) return;
       if (data.traceId) setActiveTraceId(data.traceId);
@@ -1629,6 +1669,9 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setFinalResult(nextFinal);
       const nextVisual = data.visualPack && typeof data.visualPack === 'object' ? data.visualPack : null;
       setVisualPack(nextVisual);
+      if (data.missionLedger && missionLedgerHasItems(data.missionLedger)) {
+        setMissionLedger(data.missionLedger);
+      }
       // O servidor é o escritor canônico da rodada: recarrega em vez de reenviar.
       if (stillOwner()) await refreshChatLibrary();
       if (!data.ok) noticeCompletedRunFailure();
@@ -1698,6 +1741,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const activeIndividualPresetId = useMemo(() => (
     individualPresets.find((preset) => individualPresetMatches(individualAssignments, preset))?.id ?? null
   ), [individualAssignments, individualPresets]);
+  const detectedDomain = classifyMissionDomain(mission || lastOperatorMission(transcript));
+  const activeDomain: MissionDomain = domainOverride ? domainManual : detectedDomain;
 
   const activePersona = activePersonaSlug ? personaBySlug.get(activePersonaSlug) ?? null : null;
   const activePersonaRoleIds = useMemo(() => (
@@ -1909,6 +1954,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
               onInspect={setActivePersonaSlug}
               operationMode={operationMode}
               missionDraft={mission}
+              ledger={missionLedger}
+              domain={activeDomain}
             />
           ) : (
             <div className="h-full min-h-0 w-full overflow-y-auto px-4 py-4 sm:px-5">
@@ -1974,6 +2021,17 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
                 onOpenPicker={(id) => setPickerTarget({ mode: 'individual', id })}
                 onSetModel={setPersonaModel}
                 onDepthChange={setIndividualDepth}
+                domain={activeDomain}
+                domainOverride={domainOverride}
+                detectedDomain={detectedDomain}
+                onDomainChange={(next) => {
+                  if (next === 'auto') {
+                    setDomainOverride(false);
+                    return;
+                  }
+                  setDomainOverride(true);
+                  setDomainManual(next);
+                }}
                 onApplyPreset={(preset) => void applyIndividualPreset(preset)}
                 onOpenPersonas={() => onNavigate('personas')}
                 onClose={() => setTeamPanelOpen(false)}
@@ -2002,6 +2060,17 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
                 onApplyPreset={(preset) => void applyTeamPreset(preset)}
                 onOpenPersonas={() => onNavigate('personas')}
                 onClose={() => setTeamPanelOpen(false)}
+                domain={activeDomain}
+                domainOverride={domainOverride}
+                detectedDomain={detectedDomain}
+                onDomainChange={(next) => {
+                  if (next === 'auto') {
+                    setDomainOverride(false);
+                    return;
+                  }
+                  setDomainOverride(true);
+                  setDomainManual(next);
+                }}
               />
             )}
           </motion.aside>
@@ -2202,6 +2271,63 @@ function LucaAiStartState({
   );
 }
 
+function DomainTriageFieldset({
+  domain,
+  domainOverride,
+  detectedDomain,
+  disabled,
+  onDomainChange,
+}: {
+  domain: MissionDomain;
+  domainOverride: boolean;
+  detectedDomain: MissionDomain;
+  disabled?: boolean;
+  onDomainChange: (domain: MissionDomain | 'auto') => void;
+}) {
+  const theme = useTheme();
+  const selected = domainOverride ? domain : 'auto';
+  const detectedLabel = MISSION_DOMAIN_LABELS[detectedDomain] || 'Geral';
+  return (
+    <fieldset
+      className="rounded-xl border p-3"
+      data-luca-mission-domain
+      disabled={disabled}
+      style={{ borderColor: theme.border }}
+    >
+      <legend className="px-1 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: theme.textGhost }}>
+        Formato
+      </legend>
+      <div className="grid grid-cols-5 gap-1" role="radiogroup" aria-label="Formato da missão">
+        {MISSION_DOMAIN_OPTIONS.map((option) => {
+          const active = selected === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              className="rounded-lg border px-1 py-2 text-[10px] font-semibold transition"
+              onClick={() => onDomainChange(option.value)}
+              style={{
+                background: active ? theme.goldSoft : theme.input,
+                borderColor: active ? theme.borderActive : theme.border,
+                color: active ? theme.goldDeep : theme.textMute,
+              }}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-[10px] leading-relaxed" style={{ color: theme.textGhost }}>
+        {domainOverride
+          ? `Override manual: ${MISSION_DOMAIN_LABELS[domain] || domain}. Auto detectaria ${detectedLabel}.`
+          : `Triagem automática: ${detectedLabel}.`}
+      </p>
+    </fieldset>
+  );
+}
+
 function LucaIndividualPanel({
   personas,
   personaBySlug,
@@ -2223,6 +2349,10 @@ function LucaIndividualPanel({
   onOpenPicker,
   onSetModel,
   onDepthChange,
+  domain,
+  domainOverride,
+  detectedDomain,
+  onDomainChange,
   onOpenPersonas,
   onClose,
   activePresetId,
@@ -2249,6 +2379,10 @@ function LucaIndividualPanel({
   onOpenPicker: (id: IndividualPickerId) => void;
   onSetModel: (slug: string, model: string) => void | Promise<void>;
   onDepthChange: (depth: LucaAiIndividualDepth) => void;
+  domain: MissionDomain;
+  domainOverride: boolean;
+  detectedDomain: MissionDomain;
+  onDomainChange: (domain: MissionDomain | 'auto') => void;
   onOpenPersonas: () => void;
   onClose: () => void;
   activePresetId: string | null;
@@ -2419,10 +2553,19 @@ function LucaIndividualPanel({
               {INDIVIDUAL_DEPTH_OPTIONS.find((option) => option.value === depth)?.description}
             </p>
           </fieldset>
+          <DomainTriageFieldset
+            domain={domain}
+            domainOverride={domainOverride}
+            detectedDomain={detectedDomain}
+            disabled={running}
+            onDomainChange={onDomainChange}
+          />
           <div className="rounded-xl px-3 py-3 text-[11px] leading-relaxed" style={{ background: theme.surfaceHi, color: theme.textMute }}>
             {depth === 1
               ? 'Cada participante responde às cegas; depois, o juiz compara e decide.'
-              : 'Cada participante responde às cegas, revisa com contribuições anônimas e então o juiz decide.'}
+              : depth === 2
+                ? 'Cada participante responde às cegas, revisa com contribuições anônimas e então o juiz decide.'
+                : 'Cada participante responde às cegas, debate em round-robin (teto de 5 ciclos) e o juiz fecha com consenso ou dissenso registrado.'}
           </div>
         </div>
         <div className="mt-3">
@@ -2474,6 +2617,10 @@ function LucaWorkflowPanel({
   activePresetId,
   applyingPresetId,
   onApplyPreset,
+  domain,
+  domainOverride,
+  detectedDomain,
+  onDomainChange,
 }: {
   personas: YumePersonaSummary[];
   personaBySlug: Map<string, YumePersonaSummary>;
@@ -2497,6 +2644,10 @@ function LucaWorkflowPanel({
   activePresetId: string | null;
   applyingPresetId: string | null;
   onApplyPreset: (preset: LucaTeamPreset) => void;
+  domain: MissionDomain;
+  domainOverride: boolean;
+  detectedDomain: MissionDomain;
+  onDomainChange: (domain: MissionDomain | 'auto') => void;
 }) {
   const theme = useTheme();
   const denom = Math.max(1, requiredRoleCount);
@@ -2534,6 +2685,15 @@ function LucaWorkflowPanel({
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className="mb-3">
+          <DomainTriageFieldset
+            domain={domain}
+            domainOverride={domainOverride}
+            detectedDomain={detectedDomain}
+            disabled={running}
+            onDomainChange={onDomainChange}
+          />
+        </div>
         <PresetGallery
           title="Equipes prontas"
           presets={teamPresets}
@@ -3177,6 +3337,8 @@ export function LucaMissionCanvas({
   onInspect,
   operationMode,
   missionDraft,
+  ledger = null,
+  domain,
 }: {
   transcript: TeamTranscriptEntry[];
   finalResult: TeamTranscriptEntry | null;
@@ -3187,6 +3349,8 @@ export function LucaMissionCanvas({
   onInspect: (slug: string | null) => void;
   operationMode: OperationMode;
   missionDraft?: string;
+  ledger?: MissionLedger | null;
+  domain?: MissionDomain;
 }) {
   const theme = useTheme();
   const headerStatus = running
@@ -3237,12 +3401,38 @@ export function LucaMissionCanvas({
           </div>
         )}
 
+        {ledger && missionLedgerHasItems(ledger) && (
+          <div
+            className="luca-ai-mission-ledger mb-4 rounded-2xl border px-4 py-3"
+            data-luca-mission-ledger
+            style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}
+          >
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: theme.textGhost }}>
+              Diário da missão{domain ? ` · ${MISSION_DOMAIN_LABELS[domain] || domain}` : ''}
+            </p>
+            <div className="grid gap-2 text-[12px] leading-relaxed" style={{ color: theme.textMute }}>
+              {ledger.decisions.length > 0 && (
+                <p><span className="font-semibold" style={{ color: theme.text }}>Decisões.</span> {ledger.decisions.join(' · ')}</p>
+              )}
+              {ledger.evidence.length > 0 && (
+                <p><span className="font-semibold" style={{ color: theme.text }}>Evidências.</span> {ledger.evidence.join(' · ')}</p>
+              )}
+              {ledger.pending.length > 0 && (
+                <p><span className="font-semibold" style={{ color: theme.text }}>Pendências.</span> {ledger.pending.join(' · ')}</p>
+              )}
+              {ledger.divergences.length > 0 && (
+                <p><span className="font-semibold" style={{ color: theme.text }}>Divergências.</span> {ledger.divergences.join(' · ')}</p>
+              )}
+            </div>
+          </div>
+        )}
+
         {supportingTranscript.length ? supportingTranscript.map((entry) => (
           entry.role === 'operator' ? (
             <div key={entry.id} className="block w-full min-w-0">
               <TranscriptEntry entry={entry} persona={undefined} />
             </div>
-          ) : entry.phase === 'blind' || entry.phase === 'revision' ? (
+          ) : entry.phase === 'blind' || entry.phase === 'revision' || entry.phase === 'consensus' ? (
             <IndividualResponseCard
               key={entry.id}
               entry={entry}

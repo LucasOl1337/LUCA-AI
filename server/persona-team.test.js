@@ -242,6 +242,22 @@ test('normalizePersonaTeamRunInput aceita somente profundidades 1, 2 e 3', () =>
   });
 });
 
+test('normalizePersonaTeamRunInput classifies domain and honors override', () => {
+  const base = {
+    mission: 'Sinistro de granizo Sompo com franquia',
+    mode: 'individual',
+    slugs: ['aurora'],
+    judgeSlug: 'maestro',
+  };
+  const auto = normalizePersonaTeamRunInput(base);
+  assert.equal(auto.domain, 'insurance');
+  assert.equal(auto.domainSource, 'auto');
+
+  const overridden = normalizePersonaTeamRunInput({ ...base, domain: 'code', domainOverride: true });
+  assert.equal(overridden.domain, 'code');
+  assert.equal(overridden.domainSource, 'override');
+});
+
 test('normalizePersonaTeamRunInput exige juiz na resolucao individual', () => {
   const input = normalizePersonaTeamRunInput({
     mission: 'Escolher uma resposta',
@@ -605,6 +621,44 @@ test('runIndividualResolution no nivel 2 anonimiza replicas e entrega revisoes a
     'Revisao de maestro',
     'Revisao de qa',
   ]);
+});
+
+test('runIndividualResolution no nivel 3 usa consenso round-robin e entrega o quadro ao juiz', async () => {
+  const turns = [];
+  const judgeInputs = [];
+  const result = await runIndividualResolution({
+    depth: 3,
+    participantSlugs: ['aurora', 'maestro'],
+    judgeSlug: 'juiz',
+    runParticipant: async ({ slug }) => ({
+      ok: true,
+      slug,
+      name: slug,
+      content: `cega de ${slug}`,
+    }),
+    runRevision: async () => {
+      throw new Error('depth 3 must not call runRevision');
+    },
+    runConsensusTurn: async (input) => {
+      turns.push(input);
+      return {
+        ok: true,
+        slug: input.slug,
+        content: 'voto: converge\nposicao: vistoria no talhao norte',
+      };
+    },
+    runJudge: async (input) => {
+      judgeInputs.push(input);
+      return { ok: true, slug: 'juiz', content: 'Veredito' };
+    },
+  });
+
+  assert.equal(turns.length, 2);
+  assert.equal(result.consensus.outcome, 'consensus');
+  assert.equal(result.consensus.cycleCount, 1);
+  assert.equal(judgeInputs[0].consensus.outcome, 'consensus');
+  assert.deepEqual(result.replies.map((reply) => reply.phase), ['consensus', 'consensus']);
+  assert.match(result.blindReplies[0].content, /cega de aurora/);
 });
 
 test('cleanPersonaTeamOutput remove tags de chat herdadas do runtime antigo', () => {
