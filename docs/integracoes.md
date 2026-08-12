@@ -6,7 +6,7 @@ Leia SOMENTE ao mudar roteador LLM, Kamui, personas Yume ou a publicação pela 
 
 `server/router-client.js` usa uma API compativel com OpenAI. O padrao e `http://127.0.0.1:20128/v1`.
 
-`server/config.js` mantem o catalogo fechado do 9Router: 18 perfis visuais resolvem para 16 IDs de rota (inclui Grok 4.5 High/Medium/Low e GPT 5.5 base). Perfis Ultra sao aliases das respectivas rotas `-xhigh`; o cliente nao envia campos de esforco ou raciocinio. `GET /api/router/models` expoe esse catalogo e as capacidades declaradas pelo runtime local, sem credenciais.
+`server/config.js` mantem o catalogo fechado do 9Router: 19 perfis visuais resolvem para 17 IDs de rota (inclui Grok 4.6, Grok 4.5 High/Medium/Low e GPT 5.5 base). Perfis Ultra sao aliases das respectivas rotas `-xhigh`; o cliente nao envia campos de esforco ou raciocinio. `GET /api/router/models` expoe esse catalogo e as capacidades declaradas pelo runtime local, sem credenciais.
 
 | Variavel | Uso |
 | --- | --- |
@@ -19,7 +19,7 @@ Leia SOMENTE ao mudar roteador LLM, Kamui, personas Yume ou a publicação pela 
 | `IMAGE_GENERATION_MODEL` | Motor default de imagem (padrao Maestro: `cx/gpt-5.5-image`). |
 | `VISUAL_PERSONA_SLUG` | Slug Yume da etapa visual (padrao `especialista-visual`). |
 
-Valores de modelo vindos do ambiente, do estado local ou de personas Yume sao aceitos somente quando correspondem a um dos 16 IDs do catalogo 9Router. Uma rota externa nunca e encaminhada ao provider.
+Valores de modelo vindos do ambiente, do estado local ou de personas Yume sao aceitos somente quando correspondem a um dos 17 IDs do catalogo 9Router. Uma rota externa nunca e encaminhada ao provider.
 
 Ao importar uma persona, o módulo `server/persona-source.js` preserva nome, prompt, versão e provenance. O estado local `personaAgents.model` guarda somente override explícito (vazio = seguir Yume/builtin). O motor efetivo no 9Router é resolvido uma vez nessa interface: override da rodada > override local do LUCA > model da fonte se estiver no catálogo fechado > `ROUTER_MODEL`. O prompt de execução declara explicitamente o motor 9Router da rodada para a persona não inventar IDs legados (ex. GLM). `POST /api/agent/config` com `agentId: "yume:<slug>"` grava override; `POST /api/luca-ai/persona-team/run` aceita `modelOverrides` por slug só para aquela missão.
 

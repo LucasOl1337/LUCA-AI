@@ -32,6 +32,8 @@ test('workflow configuration aplica optionality e readiness pela mesma interface
 
   const visual = PERSONA_WORKFLOW_ROLES.find((role) => role.id === 'visual');
   assert.equal(visual?.optional, true);
+  assert.match(visual?.instruction || '', /infograficos\/explained charts/);
+  assert.equal(/cinematograficas/.test(visual?.instruction || ''), false);
   assert.equal(PERSONA_WORKFLOW_ROLES.find((role) => role.id === 'approval')?.maxSlugs, 2);
 });
 

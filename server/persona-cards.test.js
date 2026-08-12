@@ -116,7 +116,7 @@ test('resolvePersonaRuntimeModel prioriza override > local > yume > fallback', (
   assert.equal(resolvePersonaRuntimeModel({ yumeModel: 'glm-5.2' }), ROUTER_MODEL);
 });
 
-test('especialista visual usa Grok 4.5 High por padrão e respeita override explícito', () => {
+test('especialista visual usa Grok 4.6 por padrão e respeita override explícito', () => {
   const [defaultVisual] = normalizeYumePersonasForLuca([
     {
       slug: 'especialista-visual',
@@ -125,7 +125,7 @@ test('especialista visual usa Grok 4.5 High por padrão e respeita override expl
       is_official: true,
     },
   ]);
-  assert.equal(defaultVisual.model, 'gcli/grok-4.5-high');
+  assert.equal(defaultVisual.model, 'gcli/grok-4.6');
   assert.equal(defaultVisual.localModel, '');
 
   const [overriddenVisual] = normalizeYumePersonasForLuca(

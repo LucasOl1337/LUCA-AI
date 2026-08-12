@@ -24,7 +24,7 @@ test('templates seed atribuem uma rota válida e diversa a cada persona', () => 
     const slugs = teamSlugs(preset);
     const nonVisualSlugs = slugs.filter((slug) => slug !== VISUAL_PERSONA_SLUG);
     assert.deepEqual(Object.keys(preset.models).sort(), [...slugs].sort(), `${preset.id}: cobertura de modelos`);
-    assert.equal(preset.models[VISUAL_PERSONA_SLUG], VISUAL_PERSONA_MODEL, `${preset.id}: visual usa Grok High`);
+    assert.equal(preset.models[VISUAL_PERSONA_SLUG], VISUAL_PERSONA_MODEL, `${preset.id}: visual usa Grok 4.6`);
     assert.equal(
       new Set(nonVisualSlugs.map((slug) => preset.models[slug])).size,
       nonVisualSlugs.length,
@@ -41,7 +41,7 @@ test('templates seed atribuem uma rota válida e diversa a cada persona', () => 
     const nonVisualSlugs = [...preset.participants, preset.judge];
     const slugs = [...nonVisualSlugs, VISUAL_PERSONA_SLUG];
     assert.deepEqual(Object.keys(preset.models).sort(), [...slugs].sort(), `${preset.id}: cobertura de modelos`);
-    assert.equal(preset.models[VISUAL_PERSONA_SLUG], VISUAL_PERSONA_MODEL, `${preset.id}: visual usa Grok High`);
+    assert.equal(preset.models[VISUAL_PERSONA_SLUG], VISUAL_PERSONA_MODEL, `${preset.id}: visual usa Grok 4.6`);
     assert.equal(
       new Set(nonVisualSlugs.map((slug) => preset.models[slug])).size,
       nonVisualSlugs.length,

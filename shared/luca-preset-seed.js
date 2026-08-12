@@ -2,7 +2,7 @@
 // Frontend mapeia `icon` → Lucide; server grava no workspace no primeiro GET.
 
 export const VISUAL_PERSONA_SLUG = 'especialista-visual';
-export const VISUAL_PERSONA_MODEL = 'gcli/grok-4.5-high';
+export const VISUAL_PERSONA_MODEL = 'gcli/grok-4.6';
 export const MAX_PARTICIPANTS = 5;
 export const PRESET_ICON_IDS = ['sprout', 'hardhat', 'briefcase', 'swords', 'crown', 'stethoscope', 'users'];
 
@@ -10,7 +10,7 @@ export const PRESET_ICON_IDS = ['sprout', 'hardhat', 'briefcase', 'swords', 'cro
 // e falso consenso. A etapa visual usa um default fixo próprio.
 const DIVERSE_MODELS = [
   'cc/claude-opus-4-8(max)',
-  'gcli/grok-4.5-high',
+  'gcli/grok-4.6',
   'kimi/k3',
   'cx/gpt-5.6-luna-xhigh',
   'cc/claude-fable-5',

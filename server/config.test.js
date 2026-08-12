@@ -28,6 +28,7 @@ const EXPECTED_ROUTE_IDS = [
   'cx/gpt-5.6-luna-xhigh',
   'cx/gpt-5.5',
   'cx/gpt-5.5-xhigh',
+  'gcli/grok-4.6',
   'gcli/grok-4.5',
   'gcli/grok-4.5-high',
   'gcli/grok-4.5-medium',
@@ -38,10 +39,10 @@ const EXPECTED_ROUTE_IDS = [
   'kimi/kimi-for-coding-highspeed',
 ];
 
-test('catalogo 9Router expoe 18 perfis visuais e 16 rotas permitidas', () => {
-  assert.equal(NINE_ROUTER_MODEL_PROFILES.length, 18);
+test('catalogo 9Router expoe 19 perfis visuais e 17 rotas permitidas', () => {
+  assert.equal(NINE_ROUTER_MODEL_PROFILES.length, 19);
   assert.deepEqual(NINE_ROUTER_ROUTE_IDS, EXPECTED_ROUTE_IDS);
-  assert.equal(new Set(NINE_ROUTER_MODEL_PROFILES.map((profile) => profile.id)).size, 18);
+  assert.equal(new Set(NINE_ROUTER_MODEL_PROFILES.map((profile) => profile.id)).size, 19);
 });
 
 test('perfis Ultra sao aliases visuais das rotas xhigh', () => {

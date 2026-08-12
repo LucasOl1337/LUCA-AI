@@ -41,7 +41,7 @@ export const PERSONA_WORKFLOW_ROLES = Object.freeze([
     label: 'Especialista visual',
     maxSlugs: 1,
     optional: true,
-    instruction: 'Com base no resultado aprovado e na entrega final, selecione o conteudo mais relevante e produza um plano de artefatos: graficos com dados, relatorio executivo e prompts de imagens cinematograficas de exemplo. Nao invente metricas sem base no contexto.',
+    instruction: 'Com base no resultado aprovado e na entrega final, selecione o conteudo mais relevante e produza um plano de artefatos: graficos com dados precisos, relatorio executivo e prompts de infograficos/explained charts (nao stills cinematograficos). Nao invente metricas sem base no contexto.',
   }),
 ]);
 

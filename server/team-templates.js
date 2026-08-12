@@ -20,7 +20,7 @@ const rootStateDir = path.resolve(process.env.LUCA_DATA_DIR || path.resolve(proc
 const workspacesRoot = path.join(rootStateDir, 'workspaces');
 const MAX_TEMPLATES_PER_KIND = 40;
 const ICON_SET = new Set(PRESET_ICON_IDS);
-const TEMPLATE_STORE_VERSION = 2;
+const TEMPLATE_STORE_VERSION = 3;
 
 /** @type {Map<string, any>} */
 const cache = new Map();
