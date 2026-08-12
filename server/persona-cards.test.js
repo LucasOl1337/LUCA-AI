@@ -153,6 +153,31 @@ test('resolvePersonaRuntimeModel prioriza override > local > yume > fallback', (
   assert.equal(resolvePersonaRuntimeModel({ yumeModel: 'glm-5.2' }), ROUTER_MODEL);
 });
 
+test('especialista visual usa Grok 4.5 High por padrão e respeita override explícito', () => {
+  const [defaultVisual] = normalizeYumePersonasForLuca([
+    {
+      slug: 'especialista-visual',
+      name: 'Especialista Visual',
+      model: 'cx/gpt-5.6-sol-high',
+      is_official: true,
+    },
+  ]);
+  assert.equal(defaultVisual.model, 'gcli/grok-4.5-high');
+  assert.equal(defaultVisual.localModel, '');
+
+  const [overriddenVisual] = normalizeYumePersonasForLuca(
+    [{
+      slug: 'especialista-visual',
+      name: 'Especialista Visual',
+      model: 'cx/gpt-5.6-sol-high',
+      is_official: true,
+    }],
+    [{ slug: 'especialista-visual', model: 'kimi/k3' }],
+  );
+  assert.equal(overriddenVisual.model, 'kimi/k3');
+  assert.equal(overriddenVisual.localModel, 'kimi/k3');
+});
+
 test('mantem avatar externo direto e nao tenta proxiar pelo LUCA', () => {
   const avatar = 'https://cdn.example.com/avatar.jpg';
   assert.equal(buildYumeAvatarProxyUrl(avatar), avatar);

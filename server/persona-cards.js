@@ -4,6 +4,10 @@ import {
   isAllowed9RouterModel,
   resolvePersonaRuntimeModel,
 } from './config.js';
+import {
+  VISUAL_PERSONA_MODEL,
+  VISUAL_PERSONA_SLUG,
+} from '../shared/luca-preset-seed.js';
 
 const YUME_AVATAR_PREFIX = '/api/avatars/';
 
@@ -42,9 +46,12 @@ export function normalizeYumePersonaForLuca(persona = {}, importedAgents = new M
   const isOfficial = persona.is_official === true;
   const yumeModel = String(persona.model || '').trim();
   const localModel = String(importedAgent?.model || '').trim();
+  const defaultedYumeModel = slug === VISUAL_PERSONA_SLUG && !isAllowed9RouterModel(localModel)
+    ? VISUAL_PERSONA_MODEL
+    : yumeModel;
   const model = resolvePersonaRuntimeModel({
     localModel,
-    yumeModel,
+    yumeModel: defaultedYumeModel,
     fallback: ROUTER_MODEL,
   });
   const modelOverridden = Boolean(

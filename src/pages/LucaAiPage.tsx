@@ -72,7 +72,10 @@ import {
   consumeSompoLaunch,
   type SompoLaunchPayload,
 } from '@/lib/sompo-cases';
-import { VISUAL_PERSONA_SLUG } from '../../shared/luca-preset-seed.js';
+import {
+  VISUAL_PERSONA_MODEL,
+  VISUAL_PERSONA_SLUG,
+} from '../../shared/luca-preset-seed.js';
 
 const MAX_EXECUTORS = 4;
 const LUCA_AI_CLEAN_UI_VERSION = 'session-isolation-v2';
@@ -199,6 +202,13 @@ function createEmptyWorkflowAssignments(): WorkflowAssignments {
     approval: [],
     display: [],
     visual: [],
+  };
+}
+
+function createDefaultWorkflowAssignments(): WorkflowAssignments {
+  return {
+    ...createEmptyWorkflowAssignments(),
+    visual: [VISUAL_PERSONA_SLUG],
   };
 }
 
@@ -454,6 +464,15 @@ function createEmptyIndividualAssignments(): IndividualAssignments {
   return { participants: [], judge: null, visual: null, visualEnabled: false };
 }
 
+function createDefaultIndividualAssignments(): IndividualAssignments {
+  return {
+    participants: [],
+    judge: null,
+    visual: VISUAL_PERSONA_SLUG,
+    visualEnabled: true,
+  };
+}
+
 
 function isTeamTranscriptEntry(value: unknown): value is TeamTranscriptEntry {
   if (!value || typeof value !== 'object') return false;
@@ -602,8 +621,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   // Session-bound UI lives in React state + backend chat-library.
   // localStorage here would leak mission/transcript across sessions.
   const [operationMode, setOperationMode] = useState<OperationMode>('team');
-  const [workflowState, setWorkflowState] = useState<WorkflowAssignments>(createEmptyWorkflowAssignments());
-  const [individualState, setIndividualState] = useState<IndividualAssignments>(createEmptyIndividualAssignments());
+  const [workflowState, setWorkflowState] = useState<WorkflowAssignments>(createDefaultWorkflowAssignments());
+  const [individualState, setIndividualState] = useState<IndividualAssignments>(createDefaultIndividualAssignments());
   const [individualDepth, setIndividualDepth] = useState<LucaAiIndividualDepth>(1);
   const [mission, setMission] = useState<string>('');
   const [draftAttachments, setDraftAttachments] = useState<LucaAiChatAttachment[]>([]);
@@ -721,6 +740,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setHydratedSessionId(null);
       const launch = consumeSompoLaunch();
       setOperationMode(launch?.mode || consumeEntryMode() || 'team');
+      setWorkflowState(createDefaultWorkflowAssignments());
+      setIndividualState(createDefaultIndividualAssignments());
       setMission(launch?.mission || '');
       setDraftAttachments([]);
       setTranscript([]);
@@ -737,16 +758,20 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     const workspaceEmpty = !sessionMission && nextTranscript.length === 0;
     const launch = workspaceEmpty ? consumeSompoLaunch() : null;
     setOperationMode(launch?.mode || consumeEntryMode() || (session.operationMode === 'individual' ? 'individual' : 'team'));
-    setWorkflowState(normalizeWorkflowAssignments(session.workflowAssignments || createEmptyWorkflowAssignments()));
-    setIndividualState({
-      participants: uniqueSlugs(session.individualAssignments?.participants || [], 5),
-      judge: session.individualAssignments?.judge ? String(session.individualAssignments.judge) : null,
-      visual: session.individualAssignments?.visual ? String(session.individualAssignments.visual) : null,
-      // Sessões salvas antes do toggle: persona escolhida implica módulo ligado.
-      visualEnabled: session.individualAssignments?.visualEnabled !== undefined
-        ? Boolean(session.individualAssignments.visualEnabled)
-        : Boolean(session.individualAssignments?.visual),
-    });
+    setWorkflowState(session.workflowAssignments
+      ? normalizeWorkflowAssignments(session.workflowAssignments)
+      : createDefaultWorkflowAssignments());
+    setIndividualState(session.individualAssignments
+      ? {
+          participants: uniqueSlugs(session.individualAssignments.participants || [], 5),
+          judge: session.individualAssignments.judge ? String(session.individualAssignments.judge) : null,
+          visual: session.individualAssignments.visual ? String(session.individualAssignments.visual) : null,
+          // Sessões salvas antes do toggle: persona escolhida implica módulo ligado.
+          visualEnabled: session.individualAssignments.visualEnabled !== undefined
+            ? Boolean(session.individualAssignments.visualEnabled)
+            : Boolean(session.individualAssignments.visual),
+        }
+      : createDefaultIndividualAssignments());
     setMission(sessionMission || launch?.mission || '');
     setDraftAttachments(Array.isArray(session.draftAttachments) ? session.draftAttachments.slice(0, 4) : []);
     setTranscript(nextTranscript);
@@ -1360,7 +1385,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setError(null);
     setErrorRetry(null);
     try {
-      const wanted = teamPresetSlugs(preset);
+      const wanted = uniqueSlugs([...teamPresetSlugs(preset), VISUAL_PERSONA_SLUG]);
       const missing = wanted.filter((slug) => !personaBySlug.has(slug));
       if (missing.length) {
         setError(presetApplyError(preset.label, missing, []) || '');
@@ -1370,7 +1395,10 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       const { ok, failed } = await resolveCatalogPresetSlugs(wanted);
       const next = createEmptyWorkflowAssignments();
       for (const role of WORKFLOW_ROLES) {
-        next[role.id] = uniqueSlugs((preset.assignments[role.id] ?? []).filter((slug) => ok.has(slug)), role.maxSlugs);
+        const configured = role.id === 'visual' && !(preset.assignments.visual ?? []).length
+          ? [VISUAL_PERSONA_SLUG]
+          : (preset.assignments[role.id] ?? []);
+        next[role.id] = uniqueSlugs(configured.filter((slug) => ok.has(slug)), role.maxSlugs);
       }
       setWorkflowState(next);
       setOperationMode('team');
@@ -1451,7 +1479,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setError(null);
     setErrorRetry(null);
     try {
-      const wanted = individualPresetSlugs(preset);
+      const wanted = uniqueSlugs([...individualPresetSlugs(preset), VISUAL_PERSONA_SLUG]);
       const missing = wanted.filter((slug) => !personaBySlug.has(slug));
       if (missing.length) {
         setError(presetApplyError(preset.label, missing, []) || '');
@@ -1461,13 +1489,12 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       const { ok, failed } = await resolveCatalogPresetSlugs(wanted);
       const participants = uniqueSlugs(preset.participants.filter((slug) => ok.has(slug)), 5);
       const judge = ok.has(preset.judge) ? preset.judge : null;
-      // Preset não define especialista visual: preserva a escolha atual do operador.
-      setIndividualState((prev) => ({
+      setIndividualState({
         participants,
         judge,
-        visual: prev?.visual || null,
-        visualEnabled: Boolean(prev?.visualEnabled),
-      }));
+        visual: ok.has(VISUAL_PERSONA_SLUG) ? VISUAL_PERSONA_SLUG : null,
+        visualEnabled: ok.has(VISUAL_PERSONA_SLUG),
+      });
       setOperationMode('individual');
       const first = participants[0] ?? judge;
       if (first) setActivePersonaSlug(first);
@@ -1585,7 +1612,10 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       const modelOverrides = Object.fromEntries(
         runPersonas
           .map((slug) => {
-            const model = String(presetModels?.[slug] || personaBySlug.get(slug)?.model || '').trim();
+            const persona = personaBySlug.get(slug);
+            const model = String(slug === VISUAL_PERSONA_SLUG
+              ? persona?.localModel || presetModels?.[slug] || VISUAL_PERSONA_MODEL
+              : presetModels?.[slug] || persona?.model || '').trim();
             return model ? [slug, model] : null;
           })
           .filter(Boolean) as Array<[string, string]>,

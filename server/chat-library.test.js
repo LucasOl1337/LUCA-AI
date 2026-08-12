@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -74,15 +75,17 @@ test('CHAT_LIBRARY_V1 creates sessions and folders per account', async () => {
   }
 });
 
-test('CHAT_LIBRARY_V1 persiste visualEnabled do modo individual e infere legado', async () => {
+test('CHAT_LIBRARY_V3 inicia especialista visual ligado nos modos equipe e individual', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-visual-'));
   const { workspace, chatLibrary } = await loadChatLibrary(dataDir);
 
   workspace.runWithWorkspaceUser('user-a', () => {
     const session = chatLibrary.createChatSession({ title: 'Visual toggle' });
-    assert.equal(session.individualAssignments.visualEnabled, false);
+    assert.deepEqual(session.workflowAssignments.visual, ['especialista-visual']);
+    assert.equal(session.individualAssignments.visual, 'especialista-visual');
+    assert.equal(session.individualAssignments.visualEnabled, true);
 
-    // Ligar o módulo persiste o flag junto da persona.
+    // O estado default persiste junto da sessão.
     chatLibrary.updateChatSession(session.id, {
       individualAssignments: { participants: ['p1'], judge: 'juiz', visual: 'especialista-visual', visualEnabled: true },
     });
@@ -104,7 +107,47 @@ test('CHAT_LIBRARY_V1 persiste visualEnabled do modo individual e infere legado'
     });
     snap = chatLibrary.getChatLibrarySnapshot();
     assert.equal(snap.activeSession.individualAssignments.visualEnabled, false);
+
+    // Um projeto novo sempre renasce com o padrão visual, mesmo ao copiar a equipe anterior.
+    const nextProject = chatLibrary.createChatSession({ title: 'Novo projeto', seedFromActive: true });
+    assert.deepEqual(nextProject.workflowAssignments.visual, ['especialista-visual']);
+    assert.equal(nextProject.individualAssignments.visual, 'especialista-visual');
+    assert.equal(nextProject.individualAssignments.visualEnabled, true);
   });
+});
+
+test('CHAT_LIBRARY_V3 migra projetos existentes para o novo padrão visual', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-chatlib-visual-migration-'));
+  const { workspace, chatLibrary } = await loadChatLibrary(dataDir);
+  const userId = 'legacy-visual-user';
+  const safeUserDir = createHash('sha256').update(userId).digest('hex').slice(0, 32);
+  const libraryPath = path.join(dataDir, 'workspaces', safeUserDir, 'chat-library.json');
+  fs.mkdirSync(path.dirname(libraryPath), { recursive: true });
+  fs.writeFileSync(libraryPath, JSON.stringify({
+    version: 2,
+    folders: [],
+    activeSessionId: 'legacy-session',
+    sessions: [{
+      id: 'legacy-session',
+      title: 'Projeto existente',
+      workflowAssignments: {
+        supervisor: [], mission: [], execution: [], approval: [], display: [], visual: [],
+      },
+      individualAssignments: {
+        participants: [], judge: null, visual: null, visualEnabled: false,
+      },
+    }],
+  }));
+
+  workspace.runWithWorkspaceUser(userId, () => {
+    const session = chatLibrary.getChatLibrarySnapshot().activeSession;
+    assert.deepEqual(session.workflowAssignments.visual, ['especialista-visual']);
+    assert.equal(session.individualAssignments.visual, 'especialista-visual');
+    assert.equal(session.individualAssignments.visualEnabled, true);
+  });
+
+  const persisted = JSON.parse(fs.readFileSync(libraryPath, 'utf8'));
+  assert.equal(persisted.version, 3);
 });
 
 test('CHAT_LIBRARY_V1 delete folder moves sessions to root by default', async () => {

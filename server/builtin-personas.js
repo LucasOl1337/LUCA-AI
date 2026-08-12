@@ -1,7 +1,8 @@
 // Personas canônicas do LUCA quando o Yume ainda não as publicou.
 // O LUCA continua GET-only no Yume: isto só preenche o roster local.
 
-import { ROUTER_MODEL, VISUAL_PERSONA_SLUG } from './config.js';
+import { VISUAL_PERSONA_MODEL } from '../shared/luca-preset-seed.js';
+import { VISUAL_PERSONA_SLUG } from './config.js';
 
 export const ESPECIALISTA_VISUAL_SYSTEM_PROMPT = `Você é o Especialista Visual da bancada LUCA-AI.
 
@@ -31,7 +32,7 @@ const BUILTIN_PERSONAS = Object.freeze([
     slug: VISUAL_PERSONA_SLUG,
     name: 'Especialista Visual',
     is_official: true,
-    model: ROUTER_MODEL,
+    model: VISUAL_PERSONA_MODEL,
     purpose: 'Transformar o conteúdo da sessão em gráficos SVG, infográficos explicados via image gen e relatório acionável',
     description: 'Builtin LUCA: gráficos e infográficos explicados a partir da sessão (disponível mesmo sem persona no Yume).',
     luca_builtin: true,

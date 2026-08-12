@@ -6,6 +6,7 @@ import {
   personaRunOperatorEntryId,
   transcriptEntriesFromPersonaRun,
 } from '../shared/persona-run-transcript.js';
+import { VISUAL_PERSONA_SLUG } from '../shared/luca-preset-seed.js';
 import { getWorkspaceUserId, requireWorkspaceUserId } from './workspace-context.js';
 
 const rootStateDir = path.resolve(process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'));
@@ -21,6 +22,7 @@ const MAX_FOLDERS = 40;
 const MAX_TRANSCRIPT = 200;
 const MAX_DRAFT_ATTACHMENTS = 4;
 const TITLE_MAX = 80;
+const CHAT_LIBRARY_VERSION = 3;
 
 function safeUserDir(userId) {
   const clean = String(userId || '').trim();
@@ -57,12 +59,17 @@ function emptyAssignments() {
     execution: [],
     approval: [],
     display: [],
-    visual: [],
+    visual: [VISUAL_PERSONA_SLUG],
   };
 }
 
 function emptyIndividual() {
-  return { participants: [], judge: null, visual: null, visualEnabled: false };
+  return {
+    participants: [],
+    judge: null,
+    visual: VISUAL_PERSONA_SLUG,
+    visualEnabled: true,
+  };
 }
 
 function normalizeDraftAttachments(value, sessionId) {
@@ -88,7 +95,7 @@ function normalizeDraftAttachments(value, sessionId) {
   return result;
 }
 
-function makeSession(partial = {}) {
+function makeSession(partial = {}, { forceVisualDefaults = false } = {}) {
   const createdAt = partial.createdAt || nowIso();
   const id = partial.id || makeId('sess');
   const deletedAt = partial.deletedAt ? String(partial.deletedAt) : null;
@@ -101,7 +108,10 @@ function makeSession(partial = {}) {
     deletedAt,
     operationMode: partial.operationMode === 'individual' ? 'individual' : 'team',
     workflowAssignments: partial.workflowAssignments && typeof partial.workflowAssignments === 'object'
-      ? partial.workflowAssignments
+      ? {
+          ...partial.workflowAssignments,
+          ...(forceVisualDefaults ? { visual: [VISUAL_PERSONA_SLUG] } : {}),
+        }
       : emptyAssignments(),
     individualAssignments: partial.individualAssignments && typeof partial.individualAssignments === 'object'
       ? {
@@ -109,9 +119,13 @@ function makeSession(partial = {}) {
             ? partial.individualAssignments.participants.map(String).filter(Boolean).slice(0, 5)
             : [],
           judge: partial.individualAssignments.judge ? String(partial.individualAssignments.judge) : null,
-          visual: partial.individualAssignments.visual ? String(partial.individualAssignments.visual) : null,
+          visual: forceVisualDefaults
+            ? VISUAL_PERSONA_SLUG
+            : (partial.individualAssignments.visual ? String(partial.individualAssignments.visual) : null),
           // Sessões antigas sem o flag: persona salva implica módulo ligado.
-          visualEnabled: partial.individualAssignments.visualEnabled !== undefined
+          visualEnabled: forceVisualDefaults
+            ? true
+            : partial.individualAssignments.visualEnabled !== undefined
             ? Boolean(partial.individualAssignments.visualEnabled)
             : Boolean(partial.individualAssignments.visual),
         }
@@ -180,7 +194,7 @@ function makeFolder(partial = {}) {
 function emptyLibrary() {
   const session = makeSession({ title: 'Nova sessão' });
   return {
-    version: 2,
+    version: CHAT_LIBRARY_VERSION,
     folders: [],
     sessions: [session],
     activeSessionId: session.id,
@@ -190,13 +204,14 @@ function emptyLibrary() {
 function normalizeLibrary(raw) {
   const base = emptyLibrary();
   if (!raw || typeof raw !== 'object') return base;
+  const forceVisualDefaults = Number(raw.version || 0) < CHAT_LIBRARY_VERSION;
   const folders = Array.isArray(raw.folders)
     ? raw.folders.map((item) => makeFolder(item)).slice(0, MAX_FOLDERS)
     : [];
   const folderIds = new Set(folders.map((item) => item.id));
   let sessions = Array.isArray(raw.sessions)
     ? raw.sessions.map((item) => {
-        const session = makeSession(item);
+        const session = makeSession(item, { forceVisualDefaults });
         if (session.folderId && !folderIds.has(session.folderId)) session.folderId = null;
         return session;
       }).slice(0, MAX_RETAINED_SESSIONS)
@@ -208,7 +223,7 @@ function normalizeLibrary(raw) {
   let activeSessionId = raw.activeSessionId ? String(raw.activeSessionId) : '';
   const live = liveSessions({ sessions });
   if (!live.some((item) => item.id === activeSessionId)) activeSessionId = live[0].id;
-  return { version: 2, folders, sessions, activeSessionId };
+  return { version: CHAT_LIBRARY_VERSION, folders, sessions, activeSessionId };
 }
 
 function loadArchiveRecords(userId, { limit = Infinity } = {}) {
@@ -368,15 +383,18 @@ function loadLibrary(userId) {
   const filePath = libraryPathFor(id);
   let library;
   let created = false;
+  let migrated = false;
   try {
-    library = normalizeLibrary(JSON.parse(fs.readFileSync(filePath, 'utf8')));
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    migrated = Number(raw?.version || 0) < CHAT_LIBRARY_VERSION;
+    library = normalizeLibrary(raw);
   } catch {
     // First touch: materialize a stable empty library so F5 keeps the same session id.
     library = emptyLibrary();
     created = true;
   }
   cache.set(id, library);
-  if (created) persistLibrary(id, library);
+  if (created || migrated) persistLibrary(id, library);
   return library;
 }
 
@@ -728,8 +746,15 @@ export function createChatSession({ title, folderId, seedFromActive = false } = 
           title: title || 'Nova sessão',
           folderId: validFolderId,
           operationMode: active.operationMode,
-          workflowAssignments: active.workflowAssignments,
-          individualAssignments: active.individualAssignments,
+          workflowAssignments: {
+            ...active.workflowAssignments,
+            visual: [VISUAL_PERSONA_SLUG],
+          },
+          individualAssignments: {
+            ...active.individualAssignments,
+            visual: VISUAL_PERSONA_SLUG,
+            visualEnabled: true,
+          },
           activePersonaSlug: active.activePersonaSlug,
           missionDraft: '',
           draftAttachments: [],

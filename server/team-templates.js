@@ -10,12 +10,15 @@ import {
   MAX_PARTICIPANTS,
   PRESET_ICON_IDS,
   TEAM_ROLE_ORDER,
+  VISUAL_PERSONA_MODEL,
+  VISUAL_PERSONA_SLUG,
 } from '../shared/luca-preset-seed.js';
 
 const rootStateDir = path.resolve(process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'));
 const workspacesRoot = path.join(rootStateDir, 'workspaces');
 const MAX_TEMPLATES_PER_KIND = 40;
 const ICON_SET = new Set(PRESET_ICON_IDS);
+const TEMPLATE_STORE_VERSION = 2;
 
 /** @type {Map<string, any>} */
 const cache = new Map();
@@ -78,7 +81,7 @@ function sanitizeTemplateModels(rawModels, slugs) {
   return models;
 }
 
-function sanitizeTeamTemplate(raw = {}, { requireId = false } = {}) {
+function sanitizeTeamTemplate(raw = {}, { requireId = false, forceVisualModel = false } = {}) {
   const id = clipText(raw.id, 64, '').toLowerCase().replace(/[^a-z0-9-]/g, '');
   if (requireId && !id) {
     const error = new Error('template_id_required');
@@ -92,7 +95,14 @@ function sanitizeTeamTemplate(raw = {}, { requireId = false } = {}) {
     const list = Array.isArray(rawList) ? rawList : rawList ? [rawList] : [];
     assignments[roleId] = uniqueSlugs(list, limit);
   }
+  if (!assignments.visual.length) assignments.visual = [VISUAL_PERSONA_SLUG];
   const models = sanitizeTemplateModels(raw.models, TEAM_ROLE_ORDER.flatMap((roleId) => assignments[roleId]));
+  if (
+    assignments.visual.includes(VISUAL_PERSONA_SLUG)
+    && (forceVisualModel || !models[VISUAL_PERSONA_SLUG])
+  ) {
+    models[VISUAL_PERSONA_SLUG] = VISUAL_PERSONA_MODEL;
+  }
   return {
     id: id || slugifyId(raw.label),
     label: clipText(raw.label, 80, 'Equipe'),
@@ -103,7 +113,7 @@ function sanitizeTeamTemplate(raw = {}, { requireId = false } = {}) {
   };
 }
 
-function sanitizeIndividualTemplate(raw = {}, { requireId = false } = {}) {
+function sanitizeIndividualTemplate(raw = {}, { requireId = false, forceVisualModel = false } = {}) {
   const id = clipText(raw.id, 64, '').toLowerCase().replace(/[^a-z0-9-]/g, '');
   if (requireId && !id) {
     const error = new Error('template_id_required');
@@ -115,7 +125,10 @@ function sanitizeIndividualTemplate(raw = {}, { requireId = false } = {}) {
     MAX_PARTICIPANTS,
   );
   const judge = String(raw.judge || '').trim() || null;
-  const models = sanitizeTemplateModels(raw.models, [...participants, judge]);
+  const models = sanitizeTemplateModels(raw.models, [...participants, judge, VISUAL_PERSONA_SLUG]);
+  if (forceVisualModel || !models[VISUAL_PERSONA_SLUG]) {
+    models[VISUAL_PERSONA_SLUG] = VISUAL_PERSONA_MODEL;
+  }
   return {
     id: id || slugifyId(raw.label),
     label: clipText(raw.label, 80, 'Seleção'),
@@ -129,7 +142,7 @@ function sanitizeIndividualTemplate(raw = {}, { requireId = false } = {}) {
 
 function seedStore() {
   return {
-    version: 1,
+    version: TEMPLATE_STORE_VERSION,
     team: LUCA_TEAM_PRESET_SEED.map((item) => sanitizeTeamTemplate(item)),
     individual: LUCA_INDIVIDUAL_PRESET_SEED.map((item) => sanitizeIndividualTemplate(item)),
   };
@@ -137,15 +150,16 @@ function seedStore() {
 
 function normalizeStore(raw) {
   if (!raw || typeof raw !== 'object') return seedStore();
+  const forceVisualModel = Number(raw.version || 0) < TEMPLATE_STORE_VERSION;
   const team = Array.isArray(raw.team)
-    ? raw.team.map((item) => sanitizeTeamTemplate(item)).slice(0, MAX_TEMPLATES_PER_KIND)
+    ? raw.team.map((item) => sanitizeTeamTemplate(item, { forceVisualModel })).slice(0, MAX_TEMPLATES_PER_KIND)
     : [];
   const individual = Array.isArray(raw.individual)
-    ? raw.individual.map((item) => sanitizeIndividualTemplate(item)).slice(0, MAX_TEMPLATES_PER_KIND)
+    ? raw.individual.map((item) => sanitizeIndividualTemplate(item, { forceVisualModel })).slice(0, MAX_TEMPLATES_PER_KIND)
     : [];
   // Empty both kinds → first-touch seed. Partial data is kept as-is.
   if (!team.length && !individual.length) return seedStore();
-  return { version: 1, team, individual };
+  return { version: TEMPLATE_STORE_VERSION, team, individual };
 }
 
 function loadStore(userId) {
@@ -155,14 +169,17 @@ function loadStore(userId) {
   const filePath = storePathFor(id);
   let store;
   let created = false;
+  let migrated = false;
   try {
-    store = normalizeStore(JSON.parse(fs.readFileSync(filePath, 'utf8')));
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    migrated = Number(raw?.version || 0) < TEMPLATE_STORE_VERSION;
+    store = normalizeStore(raw);
   } catch {
     store = seedStore();
     created = true;
   }
   cache.set(id, store);
-  if (created) persistStore(id, store);
+  if (created || migrated) persistStore(id, store);
   return store;
 }
 

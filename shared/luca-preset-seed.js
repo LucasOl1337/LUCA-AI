@@ -3,12 +3,13 @@
 
 export const TEAM_ROLE_ORDER = ['supervisor', 'mission', 'execution', 'approval', 'display', 'visual'];
 export const VISUAL_PERSONA_SLUG = 'especialista-visual';
+export const VISUAL_PERSONA_MODEL = 'gcli/grok-4.5-high';
 export const MAX_EXECUTORS = 4;
 export const MAX_PARTICIPANTS = 5;
 export const PRESET_ICON_IDS = ['sprout', 'hardhat', 'briefcase', 'swords', 'crown', 'stethoscope', 'users'];
 
-// Alterna famílias e rotas do catálogo fechado; até oito participantes recebem
-// motores distintos para reduzir erro correlacionado e falso consenso.
+// Alterna famílias e rotas do catálogo fechado para reduzir erro correlacionado
+// e falso consenso. A etapa visual usa um default fixo próprio.
 const DIVERSE_MODELS = [
   'cc/claude-opus-4-8(max)',
   'gcli/grok-4.5-high',
@@ -26,11 +27,20 @@ const DIVERSE_MODELS = [
 const STRONGEST_JUDGE_MODEL = 'cx/gpt-5.6-sol-xhigh';
 
 function modelsFor(slugs) {
-  return Object.fromEntries(slugs.map((slug, index) => [slug, DIVERSE_MODELS[index % DIVERSE_MODELS.length]]));
+  return Object.fromEntries(slugs.map((slug, index) => [
+    slug,
+    slug === VISUAL_PERSONA_SLUG
+      ? VISUAL_PERSONA_MODEL
+      : DIVERSE_MODELS[index % DIVERSE_MODELS.length],
+  ]));
 }
 
 function individualModels(participants, judge) {
-  return { ...modelsFor(participants), [judge]: STRONGEST_JUDGE_MODEL };
+  return {
+    ...modelsFor(participants),
+    [judge]: STRONGEST_JUDGE_MODEL,
+    [VISUAL_PERSONA_SLUG]: VISUAL_PERSONA_MODEL,
+  };
 }
 
 export const LUCA_TEAM_PRESET_SEED = [
