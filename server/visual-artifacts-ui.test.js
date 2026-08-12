@@ -9,10 +9,13 @@ const page = readFileSync(join(root, '../src/pages/LucaAiPage.tsx'), 'utf8');
 const styles = readFileSync(join(root, '../src/index.css'), 'utf8');
 const card = page.slice(page.indexOf('function VisualPackCard'), page.indexOf('function LucaMissionBar'));
 
-test('single visual artifact uses the full chat width without the old thumbnail cap', () => {
-  assert.match(card, /images\.length === 1 \? 'grid gap-3' : 'grid gap-3 sm:grid-cols-2'/);
+test('every generated image keeps the full chat width, including multi-image packs', () => {
+  assert.match(card, /<section className="luca-ai-visual-gallery">/);
+  assert.doesNotMatch(card, /images\.length === 1[\s\S]*sm:grid-cols-2/);
   assert.doesNotMatch(card, /max-h-80/);
   assert.match(styles, /\.luca-ai-visual-preview img[\s\S]*max-height: 70vh/);
+  assert.match(styles, /\.luca-ai-visual-gallery\s*{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  assert.match(styles, /\.luca-ai-visual-caption-prompt\s*{[\s\S]*-webkit-line-clamp:\s*3/);
 });
 
 test('visual artifact opens an accessible native-dialog lightbox', () => {

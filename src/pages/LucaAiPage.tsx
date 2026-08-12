@@ -3438,11 +3438,11 @@ function VisualPackCard({ pack }: { pack: LucaAiVisualPack }) {
         ) : null}
 
         {images.length > 0 ? (
-          <section className={images.length === 1 ? 'grid gap-3' : 'grid gap-3 sm:grid-cols-2'}>
+          <section className="luca-ai-visual-gallery">
             {images.map((image) => (
               <figure
                 key={image.id}
-                className="overflow-hidden rounded-xl border"
+                className="luca-ai-visual-card"
                 style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}
               >
                 {image.status === 'ok' && image.url ? (
@@ -3463,7 +3463,7 @@ function VisualPackCard({ pack }: { pack: LucaAiVisualPack }) {
                     />
                     <span className="luca-ai-visual-preview-action">
                       <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
-                      Ampliar
+                      Ampliar imagem
                     </span>
                   </button>
                 ) : (
@@ -3473,10 +3473,10 @@ function VisualPackCard({ pack }: { pack: LucaAiVisualPack }) {
                       : 'Imagem não gerada'}
                   </div>
                 )}
-                <figcaption className="space-y-1 px-3 py-2">
+                <figcaption className="luca-ai-visual-caption">
                   <strong className="block text-xs" style={{ color: theme.text }}>{image.title || image.id}</strong>
                   {image.prompt ? (
-                    <p className="text-[11px] leading-snug" style={{ color: theme.textGhost }}>{image.prompt}</p>
+                    <p className="luca-ai-visual-caption-prompt" style={{ color: theme.textGhost }}>{image.prompt}</p>
                   ) : null}
                 </figcaption>
               </figure>

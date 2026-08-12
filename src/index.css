@@ -1208,6 +1208,19 @@
   letter-spacing: -0.01em;
 }
 
+.luca-ai-visual-gallery {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.luca-ai-visual-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid;
+  border-radius: 0.75rem;
+}
+
 .luca-ai-visual-preview {
   position: relative;
   display: flex;
@@ -1255,6 +1268,21 @@
 .luca-ai-visual-preview:focus-visible .luca-ai-visual-preview-action {
   background: rgba(3, 6, 10, 0.94);
   opacity: 1;
+}
+
+.luca-ai-visual-caption {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.625rem 0.75rem 0.75rem;
+}
+
+.luca-ai-visual-caption-prompt {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  font-size: 0.6875rem;
+  line-height: 1.4;
 }
 
 .luca-ai-visual-lightbox {
