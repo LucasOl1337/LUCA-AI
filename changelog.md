@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Melhorias
+- Domínio público canônico em `https://luca-ai.com.br`: a borda redireciona HTTP com `308` e envia HSTS, evitando sessões aparentes sem cookie `Secure`.
 - Módulo "Artefatos visuais" com toggle liga/desliga no painel de Seleção do modo individual: ligar auto-preenche a persona padrão; desligado, a rodada termina no juiz mesmo com persona salva (`visualEnabled` persistido na sessão).
 - **Especialista visual disponível sem Yume**: builtin local `especialista-visual` entra no roster quando a slug falta no Kamui, com system prompt embutido (infográficos/explained charts via image gen + charts SVG).
 - Contrato visual prioriza prompts de infográfico/gráfico explicado (labels legíveis, callouts, legenda) em vez de stills cinematográficos genéricos.
