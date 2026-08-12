@@ -41,7 +41,7 @@ test('SHARE_LINKS_V1 creates public snapshot link and resolves without auth cont
     const session = seedSession(chatLibrary);
     share = shareLinks.createShareLink(session.id);
     assert.ok(share.token.length >= 16);
-    assert.equal(share.url, `/s/${share.token}`);
+    assert.equal(share.url, `/leitura/${share.token}`);
     assert.equal(share.messageCount, 2);
   });
 
@@ -52,14 +52,9 @@ test('SHARE_LINKS_V1 creates public snapshot link and resolves without auth cont
   assert.equal(resolved.snapshot.transcript.length, 2);
   assert.equal(resolved.snapshot.finalResult.name, 'TARS');
 
-  const html = shareLinks.renderShareHtml(resolved);
-  assert.match(html, /Sessão compartilhável/);
-  assert.match(html, /Visualização pública/);
-  assert.match(html, /Resultado final/);
-  assert.match(html, /<blockquote>Preservar as condições para florescer\.<\/blockquote>/);
-  assert.match(html, /<strong>Memória<\/strong>/);
-  // No auth artifacts and content is escaped, not scriptable.
-  assert.doesNotMatch(html, /<script/i);
+  const payload = shareLinks.publicSharePayload(share.token);
+  assert.equal(payload.snapshot.title, 'Sessão compartilhável');
+  assert.equal(payload.snapshot.finalResult.name, 'TARS');
 });
 
 test('SHARE_LINKS_V1 public snapshot never carries private session attachments', async () => {
@@ -91,13 +86,12 @@ test('SHARE_LINKS_V1 public snapshot never carries private session attachments',
 
   const resolved = shareLinks.resolvePublicShare(share.token);
   // O texto continua público, mas nenhum handle de arquivo pode vazar:
-  // /s/:token é anônimo e o download vive atrás de requireUser.
+  // /leitura/:token é anônimo, mas anexos privados continuam atrás de requireUser.
   assert.equal(resolved.snapshot.transcript.length, 1);
   assert.equal(resolved.snapshot.transcript[0].attachments, undefined);
 
-  const html = shareLinks.renderShareHtml(resolved);
-  assert.doesNotMatch(html, /sigiloso\.txt/);
-  assert.doesNotMatch(html, /\/attachments\//);
+  assert.doesNotMatch(JSON.stringify(resolved), /sigiloso\.txt/);
+  assert.doesNotMatch(JSON.stringify(resolved), /\/attachments\//);
 });
 
 test('SHARE_LINKS_V1 snapshot is immutable until refreshed and revoke kills the link', async () => {
@@ -169,7 +163,7 @@ test('SHARE_LINKS_V1 cannot share or revoke another account session', async () =
   });
 });
 
-test('SHARE_LINKS_V1 escapes HTML injection in shared content', async () => {
+test('SHARE_LINKS_V1 returns unmodified text for React to render safely', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-share-xss-'));
   const { workspace, chatLibrary, shareLinks } = await loadModules(dataDir);
 
@@ -184,10 +178,41 @@ test('SHARE_LINKS_V1 escapes HTML injection in shared content', async () => {
     share = shareLinks.createShareLink(session.id);
   });
 
-  const html = shareLinks.renderShareHtml(shareLinks.resolvePublicShare(share.token));
-  assert.doesNotMatch(html, /<script>alert/);
-  assert.doesNotMatch(html, /<img src=x/);
-  assert.match(html, /&lt;script&gt;/);
+  const resolved = shareLinks.resolvePublicShare(share.token);
+  assert.equal(resolved.snapshot.title, '<img src=x onerror=alert(1)>');
+  assert.equal(resolved.snapshot.transcript[0].name, '<script>alert(2)</script>');
+  assert.equal(resolved.snapshot.transcript[0].content, '<script>alert(3)</script>');
+});
+
+test('SHARE_LINKS_V2 keeps visual packs and rewrites only authorized local artifacts', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-share-visual-'));
+  const { workspace, chatLibrary, shareLinks } = await loadModules(dataDir);
+  let share;
+  workspace.runWithWorkspaceUser('owner-visual', () => {
+    const session = chatLibrary.createChatSession({ title: 'Sessão visual' });
+    chatLibrary.updateChatSession(session.id, {
+      visualPack: {
+        status: 'complete',
+        summary: 'Canvas pronto',
+        charts: [{ id: 'ranking', kind: 'chart', title: 'Ranking', type: 'tower', items: [{ label: 'T01', value: 88 }] }],
+        images: [{ id: 'mapa', kind: 'image', title: 'Mapa', status: 'ok', url: '/api/luca-ai/visual-artifacts/trace-1/mapa' }],
+      },
+    });
+    share = shareLinks.createShareLink(session.id);
+  });
+
+  const payload = shareLinks.publicSharePayload(share.token);
+  assert.equal(payload.snapshot.visualPack.summary, 'Canvas pronto');
+  assert.equal(payload.snapshot.visualPack.charts[0].items[0].value, 88);
+  assert.equal(
+    payload.snapshot.visualPack.images[0].url,
+    `/api/public/share/${share.token}/artifacts/trace-1/mapa`,
+  );
+  assert.deepEqual(
+    shareLinks.resolvePublicShareArtifactAccess(share.token, 'trace-1', 'mapa'),
+    { ownerUserId: 'owner-visual' },
+  );
+  assert.equal(shareLinks.resolvePublicShareArtifactAccess(share.token, 'trace-1', 'outro'), null);
 });
 
 test('SHARE_LINKS_V1 invalid or unknown token resolves to null', async () => {

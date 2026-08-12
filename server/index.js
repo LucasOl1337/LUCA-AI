@@ -91,8 +91,8 @@ import {
   createShareLink,
   getShareLinkForSession,
   revokeShareLink,
-  resolvePublicShare,
-  renderShareHtml,
+  publicSharePayload,
+  resolvePublicShareArtifactAccess,
 } from './share-links.js';
 import {
   listYumePersonas,
@@ -292,16 +292,41 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// SHARE_LINKS_V1 — public read-only viewer. No auth, no workspace, snapshot only.
+// Legacy links keep working, but the canonical viewer is the React app.
 app.get('/s/:token', (req, res) => {
-  const share = resolvePublicShare(req.params.token);
+  res.redirect(302, `/leitura/${encodeURIComponent(req.params.token)}`);
+});
+
+// Anonymous read-only data used by /leitura/:token. It stays before requireUser.
+app.get('/api/public/share/:token', (req, res) => {
+  const share = publicSharePayload(req.params.token);
+  res.setHeader('Cache-Control', 'no-store');
   if (!share) {
-    res.status(404).setHeader('Cache-Control', 'no-store');
-    res.type('html').send('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Link indisponível — LUCA</title><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#090c11;color:rgba(255,255,255,.72);font-family:Inter,system-ui,sans-serif;text-align:center;padding:24px}h1{font-size:20px;color:rgba(255,255,255,.94);margin:0 0 8px}</style></head><body><div><h1>Link indisponível</h1><p>Este link de compartilhamento não existe ou foi revogado pelo autor.</p></div></body></html>');
+    res.status(404).json({ ok: false, error: 'share_not_found' });
     return;
   }
-  res.setHeader('Cache-Control', 'no-store');
-  res.type('html').send(renderShareHtml(share));
+  res.json({ ok: true, share });
+});
+
+app.get('/api/public/share/:token/artifacts/:traceId/:artifactId', (req, res) => {
+  const access = resolvePublicShareArtifactAccess(
+    req.params.token,
+    req.params.traceId,
+    req.params.artifactId,
+  );
+  if (!access) {
+    res.status(404).json({ ok: false, error: 'share_artifact_not_found' });
+    return;
+  }
+  const file = readVisualArtifactFile(access.ownerUserId, req.params.traceId, req.params.artifactId);
+  if (!file?.buffer) {
+    res.status(404).json({ ok: false, error: 'share_artifact_not_found' });
+    return;
+  }
+  res.setHeader('Content-Type', file.meta.mimeType || 'application/octet-stream');
+  res.setHeader('Content-Length', String(file.buffer.length));
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  res.send(file.buffer);
 });
 
 createDeliberations({

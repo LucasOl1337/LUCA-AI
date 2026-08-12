@@ -5,7 +5,18 @@ import { ThemeProvider } from './hooks/useTheme';
 import { LucaStateProvider } from './hooks/useLucaState';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import AuthPage from './pages/AuthPage';
+import PublicReadingPage from './pages/PublicReadingPage';
 import './index.css';
+
+function publicReadingToken() {
+  const match = window.location.pathname.match(/^\/leitura\/([^/]+)\/?$/);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
 
 function AuthenticatedApp() {
   const { loading, user } = useAuth();
@@ -14,12 +25,18 @@ function AuthenticatedApp() {
   return <LucaStateProvider><App /></LucaStateProvider>;
 }
 
+const readingToken = publicReadingToken();
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeProvider>
-      <AuthProvider>
-        <AuthenticatedApp />
-      </AuthProvider>
+      {readingToken ? (
+        <PublicReadingPage token={readingToken} />
+      ) : (
+        <AuthProvider>
+          <AuthenticatedApp />
+        </AuthProvider>
+      )}
     </ThemeProvider>
   </React.StrictMode>,
 );

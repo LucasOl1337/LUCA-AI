@@ -101,7 +101,7 @@ interface LucaAiPageProps {
 }
 
 type TranscriptRole = 'operator' | 'persona' | 'system';
-type OperationMode = 'team' | 'individual';
+export type OperationMode = 'team' | 'individual';
 type WorkflowRoleId = PersonaWorkflowRoleId;
 type WorkflowAssignments = PersonaWorkflowAssignments;
 type IndividualPickerId = 'participants' | 'judge' | 'visual';
@@ -141,7 +141,7 @@ interface WorkflowRoleConfig extends PersonaPickerConfig {
   optional?: boolean;
 }
 
-interface TeamTranscriptEntry {
+export interface TeamTranscriptEntry {
   id: string;
   role: TranscriptRole;
   name: string;
@@ -3127,7 +3127,7 @@ function lastOperatorMission(transcript: TeamTranscriptEntry[]): string {
   return '';
 }
 
-function LucaMissionCanvas({
+export function LucaMissionCanvas({
   transcript,
   finalResult,
   visualPack,

@@ -2615,3 +2615,55 @@ a.luca-ai-attachment:focus-visible {
 .luca-persona-model-select:disabled {
   opacity: 0.55;
 }
+/* Public reading mode reuses the product shell and conversation renderer. */
+.luca-reading-sidebar { display: flex; width: 228px; flex-direction: column; }
+.luca-reading-brand { background: var(--l-gold-soft); box-shadow: inset 0 0.5px 0 rgba(255,255,255,.28); }
+.luca-reading-nav-item { cursor: default; }
+.luca-reading-nav-item:not(.active) { opacity: .48; }
+.luca-reading-nav-item:hover { background: transparent; color: var(--l-text-mute); }
+.luca-reading-nav-item.active:hover { background: var(--l-gold-soft); color: var(--l-text); }
+
+.luca-reading-session {
+  display: flex; min-width: 0; align-items: flex-start; gap: 8px; padding: 9px 10px;
+  border: 1px solid var(--l-border-active); border-radius: 10px;
+  background: var(--l-gold-soft); color: var(--l-gold-bright);
+}
+.luca-reading-session > span { display: flex; min-width: 0; flex-direction: column; }
+.luca-reading-session strong, .luca-reading-session small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.luca-reading-session strong { color: var(--l-text); font-size: 11px; }
+.luca-reading-session small { margin-top: 3px; color: var(--l-text-ghost); font-size: 9px; }
+
+.luca-reading-account {
+  display: flex; min-width: 0; align-items: center; gap: 9px; padding: 9px;
+  border-radius: 12px; background: rgba(255,255,255,.05); color: var(--l-text-ghost);
+}
+.luca-reading-account > span {
+  display: grid; width: 29px; height: 29px; flex: none; place-items: center;
+  border-radius: 9px; background: var(--l-navy-soft); color: var(--l-navy-deep);
+}
+.luca-reading-account > div { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+.luca-reading-account strong { color: var(--l-text); font-size: 11px; }
+.luca-reading-account small { margin-top: 2px; color: var(--l-text-ghost); font-size: 9px; }
+
+.luca-reading-badge { cursor: default; user-select: none; }
+.luca-reading-state {
+  display: flex; min-height: 100%; flex: 1; flex-direction: column; align-items: center;
+  justify-content: center; gap: 12px; padding: 32px; color: var(--l-text-mute); text-align: center;
+}
+.luca-reading-state strong { color: var(--l-text); font-size: 16px; }
+.luca-reading-state p { max-width: 46ch; margin: -4px 0 4px; }
+
+.luca-reading-composer {
+  display: flex; width: min(100%,640px); min-height: 54px; align-items: center; gap: 10px;
+  padding: 10px 16px; border: 1px solid rgba(255,255,255,.10); border-radius: 22px;
+  background: rgba(28,32,40,.88); color: var(--l-text-mute); font-size: 12px;
+  box-shadow: 0 12px 36px rgba(0,8,20,.30), inset 0 .5px 0 rgba(255,255,255,.14);
+  -webkit-backdrop-filter: blur(24px) saturate(150%); backdrop-filter: blur(24px) saturate(150%);
+}
+.luca-reading-composer svg { color: var(--l-navy-deep); }
+.luca-reading-shell .luca-ai-view-switch button[aria-disabled="true"] { cursor: default; }
+.luca-reading-shell .luca-ai-view-switch button[aria-disabled="true"]:active { transform: none; }
+
+@media (max-width: 900px) {
+  .luca-reading-composer { width: 100%; border-radius: 18px; }
+}
