@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertCircle,
@@ -12,6 +13,7 @@ import {
   Image as ImageIcon,
   Link2,
   Loader2,
+  Maximize2,
   MessageSquareText,
   Paperclip,
   Play,
@@ -37,6 +39,7 @@ import type {
   LucaAiIndividualDepth,
   LucaAiPersonaTeamPhase,
   LucaAiPersonaTeamRunResponse,
+  LucaAiVisualImageArtifact,
   LucaAiVisualPack,
   LucaAiWorkflowAssignment,
   RouterModelProfile,
@@ -3281,8 +3284,86 @@ function LucaMissionCanvas({
   );
 }
 
+function VisualArtifactLightbox({
+  image,
+  onDismiss,
+}: {
+  image: LucaAiVisualImageArtifact;
+  onDismiss: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return undefined;
+    dialog.showModal();
+    closeButtonRef.current?.focus();
+    return () => {
+      if (dialog.open) dialog.close();
+    };
+  }, []);
+
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <dialog
+      ref={dialogRef}
+      className="luca-ai-visual-lightbox"
+      aria-labelledby="luca-ai-visual-lightbox-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        onDismiss();
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onDismiss();
+      }}
+    >
+      <div className="luca-ai-visual-lightbox-panel">
+        <header className="luca-ai-visual-lightbox-header">
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--l-text-ghost)' }}>
+              Artefato visual
+            </p>
+            <h2 id="luca-ai-visual-lightbox-title" className="mt-1 truncate text-sm font-semibold" style={{ color: 'var(--l-text)' }}>
+              {image.title || 'Imagem gerada'}
+            </h2>
+          </div>
+          <a
+            href={image.url}
+            target="_blank"
+            rel="noreferrer"
+            className="luca-ai-visual-lightbox-action"
+          >
+            <Link2 className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Abrir original</span>
+          </a>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            className="luca-ai-visual-lightbox-close"
+            aria-label="Fechar imagem ampliada"
+            onClick={onDismiss}
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </header>
+        <div className="luca-ai-visual-lightbox-stage">
+          <img src={image.url} alt={image.title || 'Artefato visual'} />
+        </div>
+        {image.prompt ? (
+          <p className="luca-ai-visual-lightbox-caption">{image.prompt}</p>
+        ) : null}
+      </div>
+    </dialog>,
+    document.body,
+  );
+}
+
 function VisualPackCard({ pack }: { pack: LucaAiVisualPack }) {
   const theme = useTheme();
+  const [expandedImage, setExpandedImage] = useState<LucaAiVisualImageArtifact | null>(null);
+  const lightboxTriggerRef = useRef<HTMLButtonElement | null>(null);
   const charts = Array.isArray(pack.charts) ? pack.charts : [];
   const images = Array.isArray(pack.images) ? pack.images : [];
   const report = pack.report || null;
@@ -3294,8 +3375,14 @@ function VisualPackCard({ pack }: { pack: LucaAiVisualPack }) {
         ? 'falhou'
         : String(pack.status || 'artefatos');
 
+  function dismissLightbox() {
+    setExpandedImage(null);
+    window.requestAnimationFrame(() => lightboxTriggerRef.current?.focus());
+  }
+
   return (
-    <article className="luca-ai-message mt-4">
+    <>
+      <article className="luca-ai-message mt-4">
       <div className="luca-ai-message-meta">
         <span className="inline-flex h-8 w-8 items-center justify-center rounded-full" style={{ background: theme.goldSoft, color: theme.gold }}>
           <ImageIcon className="h-4 w-4" />
@@ -3359,7 +3446,7 @@ function VisualPackCard({ pack }: { pack: LucaAiVisualPack }) {
         ) : null}
 
         {images.length > 0 ? (
-          <section className="grid gap-3 sm:grid-cols-2">
+          <section className={images.length === 1 ? 'grid gap-3' : 'grid gap-3 sm:grid-cols-2'}>
             {images.map((image) => (
               <figure
                 key={image.id}
@@ -3367,12 +3454,26 @@ function VisualPackCard({ pack }: { pack: LucaAiVisualPack }) {
                 style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}
               >
                 {image.status === 'ok' && image.url ? (
-                  <img
-                    src={image.url}
-                    alt={image.title || 'Artefato visual'}
-                    className="max-h-80 w-full bg-black/20 object-contain"
-                    loading="lazy"
-                  />
+                  <button
+                    type="button"
+                    className="luca-ai-visual-preview"
+                    aria-label={`Ampliar ${image.title || 'artefato visual'}`}
+                    aria-haspopup="dialog"
+                    onClick={(event) => {
+                      lightboxTriggerRef.current = event.currentTarget;
+                      setExpandedImage(image);
+                    }}
+                  >
+                    <img
+                      src={image.url}
+                      alt={image.title || 'Artefato visual'}
+                      loading="lazy"
+                    />
+                    <span className="luca-ai-visual-preview-action">
+                      <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      Ampliar
+                    </span>
+                  </button>
                 ) : (
                   <div className="flex min-h-32 items-center justify-center px-3 py-6 text-center text-xs" style={{ color: theme.textMute }}>
                     {image.status === 'failed'
@@ -3397,7 +3498,11 @@ function VisualPackCard({ pack }: { pack: LucaAiVisualPack }) {
           </p>
         ) : null}
       </div>
-    </article>
+      </article>
+      {expandedImage ? (
+        <VisualArtifactLightbox image={expandedImage} onDismiss={dismissLightbox} />
+      ) : null}
+    </>
   );
 }
 
