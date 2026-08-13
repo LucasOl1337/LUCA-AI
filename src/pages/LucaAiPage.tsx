@@ -3432,8 +3432,8 @@ export function LucaMissionCanvas({
             <div key={entry.id} className="block w-full min-w-0">
               <TranscriptEntry entry={entry} persona={undefined} />
             </div>
-          ) : entry.phase === 'blind' || entry.phase === 'revision' || entry.phase === 'consensus' ? (
-            <IndividualResponseCard
+          ) : entry.role === 'persona' ? (
+            <PersonaResponseCard
               key={entry.id}
               entry={entry}
               persona={entry.slug ? personaBySlug.get(entry.slug) : undefined}
@@ -3483,7 +3483,12 @@ export function LucaMissionCanvas({
         )}
 
         {finalResult && (
-          <FinalDisplayCard entry={finalResult} persona={finalResult.slug ? personaBySlug.get(finalResult.slug) : undefined} />
+          <PersonaResponseCard
+            entry={finalResult}
+            persona={finalResult.slug ? personaBySlug.get(finalResult.slug) : undefined}
+            onInspect={onInspect}
+            final
+          />
         )}
 
         {visualPack && (
@@ -3996,79 +4001,80 @@ function PersonaAvatar({ persona, size = 'md' }: { persona: YumePersonaSummary; 
   );
 }
 
-function FinalDisplayCard({ entry, persona }: { entry: TeamTranscriptEntry; persona?: YumePersonaSummary }) {
-  const theme = useTheme();
-  const isJudge = entry.stage === 'Juiz';
-  return (
-    <article className="luca-ai-message group">
-      <div className="luca-ai-message-meta">
-        <SpeakerAvatar entry={entry} persona={persona} compact />
-        <h3 className="truncate text-[13px] font-semibold" style={{ color: theme.text }}>{entry.name}</h3>
-        {entry.phase && <PhaseBadge phase={entry.phase} />}
-        {!isJudge && (
-          <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ color: theme.textMute }}>
-            <Eye className="h-3 w-3" /> Entrega final
-          </span>
-        )}
-        {entry.model ? (
-          <span className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px]" style={{ background: 'rgba(255,255,255,0.05)', color: theme.textGhost }} title="Motor 9Router">
-            {entry.model}
-          </span>
-        ) : null}
-        <span className="luca-ai-message-copy ml-auto">
-          <CopyLogButton text={entry.content} label="Copiar veredito" />
-        </span>
-      </div>
-      <div className="luca-ai-message-body luca-ai-selectable">
-        <RichMessageBody content={entry.content} />
-      </div>
-    </article>
-  );
-}
-
-function IndividualResponseCard({
+function PersonaResponseCard({
   entry,
   persona,
   onInspect,
+  final = false,
 }: {
   entry: TeamTranscriptEntry;
   persona?: YumePersonaSummary;
   onInspect: (slug: string | null) => void;
+  final?: boolean;
 }) {
   const theme = useTheme();
+  const isJudge = entry.stage === 'Juiz';
+  const header = (
+    <>
+      <SpeakerAvatar entry={entry} persona={persona} compact />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-semibold" style={{ color: entry.status === 'error' ? theme.error : theme.text }}>{entry.name}</span>
+        {!final ? (
+          <span className="block text-[11px]" style={{ color: theme.textGhost }}>{entry.status === 'error' ? 'Falha na resposta' : 'Resposta · expandir'}</span>
+        ) : null}
+      </span>
+      {entry.phase ? <PhaseBadge phase={entry.phase} /> : entry.stage ? <StageBadge stage={entry.stage} /> : null}
+      {final && !isJudge ? (
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ color: theme.textMute }}>
+          <Eye className="h-3 w-3" /> Entrega final
+        </span>
+      ) : null}
+      {entry.model ? (
+        <span className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px]" style={{ background: 'rgba(255,255,255,0.05)', color: theme.textGhost }} title="Motor 9Router">
+          {entry.model}
+        </span>
+      ) : null}
+      <span
+        className={`luca-ai-message-copy${final ? ' ml-auto' : ''}`}
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <CopyLogButton
+          text={entry.content}
+          label={final ? (isJudge ? 'Copiar veredito' : 'Copiar entrega final') : `Copiar resposta de ${entry.name}`}
+        />
+      </span>
+    </>
+  );
+  const body = (
+    <div className={`luca-ai-message-body luca-ai-selectable${final ? '' : ' mt-2 pl-1'}`}>
+      <RichMessageBody content={entry.content} />
+    </div>
+  );
+
+  if (final) {
+    return (
+      <motion.article initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="luca-ai-message group">
+        <div className="luca-ai-message-meta">{header}</div>
+        {body}
+      </motion.article>
+    );
+  }
+
   return (
     <motion.details
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      className="luca-ai-individual-response luca-ai-message group"
+      className="luca-ai-response luca-ai-message group"
     >
       <summary
         className="luca-ai-message-meta cursor-pointer list-none"
         onClick={() => onInspect(entry.slug || null)}
       >
-        <SpeakerAvatar entry={entry} persona={persona} compact />
-        <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-semibold" style={{ color: entry.status === 'error' ? theme.error : theme.text }}>{entry.name}</span>
-                  <span className="block text-[11px]" style={{ color: theme.textGhost }}>{entry.status === 'error' ? 'Falha individual' : 'Resposta individual · expandir'}</span>
-                </span>
-                {entry.phase && <PhaseBadge phase={entry.phase} />}
-                {entry.model ? (
-                  <span className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px]" style={{ background: 'rgba(255,255,255,0.05)', color: theme.textGhost }} title="Motor 9Router">
-                    {entry.model}
-                  </span>
-                ) : null}
-                <span
-                  className="luca-ai-message-copy"
-                  onClick={(event) => event.stopPropagation()}
-                  onPointerDown={(event) => event.stopPropagation()}
-                >
-                  <CopyLogButton text={entry.content} label={`Copiar resposta de ${entry.name}`} />
-                </span>
-        <ChevronDown className="luca-ai-individual-chevron h-4 w-4 shrink-0" style={{ color: theme.textMute }} />
+        {header}
+        <ChevronDown className="luca-ai-response-chevron h-4 w-4 shrink-0" style={{ color: theme.textMute }} />
       </summary>
-      <div className="luca-ai-message-body luca-ai-selectable mt-2 pl-1">
-        <RichMessageBody content={entry.content} />
-      </div>
+      {body}
     </motion.details>
   );
 }

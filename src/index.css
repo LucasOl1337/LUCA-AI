@@ -1715,11 +1715,11 @@ a.luca-ai-attachment:focus-visible {
   background: rgba(10, 132, 255, 0.28);
 }
 
-.luca-ai-individual-response > summary::-webkit-details-marker { display: none; }
-.luca-ai-individual-response > summary { transition: background 160ms ease; }
-.luca-ai-individual-response > summary:hover { background: rgba(255, 255, 255, 0.04); }
-.luca-ai-individual-chevron { transition: transform 180ms ease; }
-.luca-ai-individual-response[open] .luca-ai-individual-chevron { transform: rotate(180deg); }
+.luca-ai-response > summary::-webkit-details-marker { display: none; }
+.luca-ai-response > summary { transition: background 160ms ease; }
+.luca-ai-response > summary:hover { background: rgba(255, 255, 255, 0.04); }
+.luca-ai-response-chevron { transition: transform 180ms ease; }
+.luca-ai-response[open] .luca-ai-response-chevron { transform: rotate(180deg); }
 
 /* Painel da equipe: coluna lateral no fluxo (não sobrepõe o chat) */
 .luca-ai-team-side {
