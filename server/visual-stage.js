@@ -444,6 +444,21 @@ export function readVisualArtifactFile(userId, traceId, artifactId) {
 }
 
 /**
+ * Serve a stored visual artifact. Meta is flattened onto the file object
+ * (`file.mimeType`), not nested as `file.meta`. With X-Content-Type-Options:
+ * nosniff, a fallback of application/octet-stream makes the browser refuse
+ * to render the image on public share pages.
+ */
+export function sendVisualArtifact(res, file) {
+  if (!file?.buffer) return false;
+  res.setHeader('Content-Type', file.mimeType || 'image/png');
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  res.setHeader('Content-Length', String(file.buffer.length));
+  res.send(file.buffer);
+  return true;
+}
+
+/**
  * Materializa o plano visual: charts/report em JSON + imagens via 9Router.
  * Falha de imagem vira partial; não derruba a rodada da equipe.
  */

@@ -32,6 +32,7 @@ import {
   materializeVisualPack,
   parseVisualPlanOutput,
   readVisualArtifactFile,
+  sendVisualArtifact,
   visualPlanNeedsRetry,
 } from './visual-stage.js';
 import { runAgentWithTools } from './agent-loop.js';
@@ -327,14 +328,9 @@ app.get('/api/public/share/:token/artifacts/:traceId/:artifactId', (req, res) =>
     return;
   }
   const file = readVisualArtifactFile(access.ownerUserId, req.params.traceId, req.params.artifactId);
-  if (!file?.buffer) {
+  if (!sendVisualArtifact(res, file)) {
     res.status(404).json({ ok: false, error: 'share_artifact_not_found' });
-    return;
   }
-  res.setHeader('Content-Type', file.meta.mimeType || 'application/octet-stream');
-  res.setHeader('Content-Length', String(file.buffer.length));
-  res.setHeader('Cache-Control', 'private, max-age=3600');
-  res.send(file.buffer);
 });
 
 createDeliberations({
@@ -2840,14 +2836,9 @@ app.get('/api/router/models', (_req, res) => {
 app.get('/api/luca-ai/visual-artifacts/:traceId/:artifactId', (req, res) => {
   const ownerId = getWorkspaceUserId();
   const file = readVisualArtifactFile(ownerId, req.params.traceId, req.params.artifactId);
-  if (!file?.buffer) {
+  if (!sendVisualArtifact(res, file)) {
     res.status(404).json({ ok: false, error: 'visual_artifact_not_found' });
-    return;
   }
-  res.setHeader('Content-Type', file.mimeType || 'image/png');
-  res.setHeader('Cache-Control', 'private, max-age=3600');
-  res.setHeader('Content-Length', String(file.buffer.length));
-  res.send(file.buffer);
 });
 
 app.get('/api/catalog/audit', (_req, res) => {

@@ -215,6 +215,17 @@ test('SHARE_LINKS_V2 keeps visual packs and rewrites only authorized local artif
   assert.equal(shareLinks.resolvePublicShareArtifactAccess(share.token, 'trace-1', 'outro'), null);
 });
 
+test('SHARE_LINKS_V2 public artifact route serves flattened mimeType, not nested meta', () => {
+  const source = fs.readFileSync(path.resolve('server/index.js'), 'utf8');
+  const publicRoute = source.slice(
+    source.indexOf("app.get('/api/public/share/:token/artifacts/:traceId/:artifactId'"),
+    source.indexOf("createDeliberations({"),
+  );
+  assert.match(publicRoute, /sendVisualArtifact\(res, file\)/);
+  assert.doesNotMatch(publicRoute, /file\.meta\.mimeType/);
+  assert.doesNotMatch(publicRoute, /application\/octet-stream/);
+});
+
 test('SHARE_LINKS_V1 invalid or unknown token resolves to null', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-share-miss-'));
   const { shareLinks } = await loadModules(dataDir);

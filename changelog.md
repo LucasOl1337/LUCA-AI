@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Correções
+- **Modo leitura público volta a exibir imagens geradas**: o endpoint anônimo de artefato usava `file.meta.mimeType` (inexistente) e caía em `application/octet-stream`; com `X-Content-Type-Options: nosniff` o browser recusava renderizar o `<img>`.
+
 ### Melhorias
 - **Depth 3 é consenso de verdade**: round-robin com quadro de negociação, teto de 5 ciclos, pressão a partir do ciclo 3 e veredito do juiz com consenso ou dissenso registrado (antes era depth 2 + 20k tokens).
 - **Diário da missão**: estado compacto `{decisões, evidências, pendências, divergências}` persiste na sessão e entra no briefing do follow-up.

@@ -10,6 +10,7 @@ import {
   parseVisualPlanOutput,
   readVisualArtifactFile,
   renderLocalInfographicSvg,
+  sendVisualArtifact,
   synthesizeVisualImageSpecs,
   visualPlanNeedsRetry,
 } from './visual-stage.js';
@@ -223,4 +224,24 @@ test('materializeVisualPack sintetiza imagem quando plano vem sem images', async
   assert.equal(pack.images[0].status, 'ok');
   assert.equal(pack.images[0].synthesized, true);
   assert.equal(pack.images[0].fallback, 'local-infographic');
+});
+
+test('sendVisualArtifact uses flattened mimeType so nosniff can render the image', () => {
+  const headers = {};
+  let body = null;
+  const res = {
+    setHeader(name, value) { headers[name] = value; },
+    send(value) { body = value; },
+  };
+  const buffer = Buffer.from('fake-png');
+  assert.equal(sendVisualArtifact(res, { mimeType: 'image/png', buffer }), true);
+  assert.equal(headers['Content-Type'], 'image/png');
+  assert.equal(headers['Content-Length'], String(buffer.length));
+  assert.equal(body, buffer);
+
+  assert.equal(sendVisualArtifact(res, { meta: { mimeType: 'image/svg+xml' }, buffer }), true);
+  assert.equal(headers['Content-Type'], 'image/png', 'nested file.meta.mimeType must not win; that was the share-page bug');
+
+  assert.equal(sendVisualArtifact(res, null), false);
+  assert.equal(sendVisualArtifact(res, { mimeType: 'image/png' }), false);
 });
