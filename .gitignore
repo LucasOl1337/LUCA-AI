@@ -34,4 +34,5 @@ tmp-live-ui/
 
 # Runtime local de captura (pode conter estado de sessao e snapshots efemeros).
 .codex-tmp/
+.grok-fable/
 
