@@ -18,12 +18,20 @@ src -> /api e /ws -> server -> shared -> .luca
 Fluxo da telemetria SOMPO:
 
 ```text
-ESP32 -> Mosquitto -> Firebase Realtime Database -> GET /api/sompo/telemetry -> SompoPage -> snapshot fechado -> bancada de agentes
+ESP32 -> Mosquitto -> Firebase Realtime Database -- SSE persistente --> Express -- /ws autenticado --> SompoPage
+                                                               \-> snapshot fechado sob demanda -> bancada de agentes
 ```
 
 O navegador nunca consulta o Firebase diretamente. `server/sompo-telemetry-source.js`
-concentra URL fixa, timeout, cache curto, normalização e detecção de snapshot parado;
-`shared/sompo-telemetry.js` concentra o contrato e o briefing auditável enviado à bancada.
+mantém uma única assinatura REST Streaming, aplica eventos `put`/`patch`, reconecta com
+backoff, preserva o último snapshot e detecta dado parado. O endpoint autenticado
+`GET /api/sompo/telemetry` lê essa memória; não abre outro GET no Firebase. O WebSocket
+existente distribui `sompo.telemetry` para as sessões autenticadas, e
+`shared/sompo-telemetry.js` concentra o contrato e o briefing auditável da bancada.
+
+Esse fluxo é de subida: equipamento para LUCA. Um canal de descida exige contrato no
+firmware (comando, correlação e confirmação) e credenciais restritas do broker/Firebase;
+o runtime não escreve no equipamento enquanto esse contrato não existir.
 
 Fluxo de produção:
 

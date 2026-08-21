@@ -4,6 +4,7 @@ import type {
 } from '../../shared/persona-workflow.js';
 import type { MissionDomain, MissionDomainSource } from '../../shared/mission-triage.js';
 import type { MissionLedger } from '../../shared/mission-ledger.js';
+import type { SompoTelemetrySnapshot } from '../../shared/sompo-telemetry.js';
 export type {
   SompoTelemetryFreshness,
   SompoTelemetryResponse,
@@ -467,7 +468,8 @@ export type BackendEvent =
 
 export type WsPayload =
   | { kind: 'state'; state: LucaState }
-  | { kind: 'event'; event: BackendEvent };
+  | { kind: 'event'; event: BackendEvent }
+  | { kind: 'sompo.telemetry'; telemetry: SompoTelemetrySnapshot };
 
 export interface LucaAiChatFolder {
   id: string;

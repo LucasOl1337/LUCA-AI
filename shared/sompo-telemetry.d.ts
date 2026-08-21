@@ -2,6 +2,7 @@ export const SOMPO_TELEMETRY_PATH: '/trator/001/sensores';
 
 export type SompoTelemetryFreshness = 'checking' | 'fresh' | 'stale';
 export type SompoTelemetryStatus = 'normal' | 'alert';
+export type SompoTelemetryConnectionState = 'connecting' | 'live' | 'reconnecting' | 'stopped';
 
 export interface SompoTelemetryVector {
   x: number | null;
@@ -16,6 +17,12 @@ export interface SompoTelemetrySnapshot {
   changedAt: string;
   unchangedForMs: number;
   freshness: SompoTelemetryFreshness;
+  connection: {
+    state: SompoTelemetryConnectionState;
+    connectedAt: string | null;
+    lastEventAt: string | null;
+    retryAttempt: number;
+  };
   deviceTimestamp: number | null;
   status: SompoTelemetryStatus;
   risks: {

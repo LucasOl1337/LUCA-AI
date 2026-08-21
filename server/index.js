@@ -196,7 +196,10 @@ import {
   updateTeamTemplate,
 } from './team-templates.js';
 import { createAuthService } from './auth.js';
-import { createSompoTelemetryHttpHandler } from './sompo-telemetry-source.js';
+import {
+  createSompoTelemetryHttpHandler,
+  sompoTelemetrySource,
+} from './sompo-telemetry-source.js';
 
 const app = express();
 const personaRunJobs = createPersonaRunJobStore();
@@ -563,6 +566,16 @@ function emitState() {
     client.send(payload);
   }
 }
+
+function emitSompoTelemetry(telemetry) {
+  const payload = JSON.stringify({ kind: 'sompo.telemetry', telemetry });
+  for (const client of wss.clients) {
+    if (client.readyState !== 1 || !client.userId) continue;
+    client.send(payload);
+  }
+}
+
+sompoTelemetrySource.subscribe(emitSompoTelemetry);
 
 function publicStateSnapshot() {
   return buildPublicStateSnapshot(getState(), {
@@ -4152,9 +4165,15 @@ wss.on('connection', (socket, req) => {
   runWithWorkspaceUser(userId, () => {
     socket.send(JSON.stringify({ kind: 'state', state: publicStateSnapshot() }));
   });
+  void sompoTelemetrySource.read().then((telemetry) => {
+    if (socket.readyState === 1) {
+      socket.send(JSON.stringify({ kind: 'sompo.telemetry', telemetry }));
+    }
+  }).catch(() => {});
 });
 
 httpServer.listen(PORT, HOST, () => {
+  sompoTelemetrySource.start();
   startHeartbeatMonitor();
   startScheduler();
   void personaSource.syncAllRosters().catch((error) => {

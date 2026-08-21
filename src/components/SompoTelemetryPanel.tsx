@@ -57,14 +57,23 @@ export default function SompoTelemetryPanel({
   children,
 }: SompoTelemetryPanelProps) {
   const stale = telemetry?.freshness === 'stale';
+  const connectionState = telemetry?.connection.state || 'connecting';
+  const live = connectionState === 'live';
+  const historical = stale || !live;
+  const connectionWarning = error
+    || (connectionState === 'reconnecting'
+      ? `Canal com o Firebase caiu; reconexão automática em andamento (tentativa ${telemetry?.connection.retryAttempt || 1}).`
+      : connectionState === 'stopped'
+        ? 'O canal em tempo real foi interrompido no runtime.'
+        : null);
 
   return (
     <section className="sompo-telemetry" aria-label="Telemetria do trator 001" data-sompo-telemetry>
       {loading && !telemetry && (
         <div className="sompo-telemetry-empty" role="status">
           <Loader2 className="animate-spin" />
-          <strong>Conectando ao Firebase…</strong>
-          <p>Lendo o snapshot do ESP32 em /trator/001/sensores.</p>
+          <strong>Abrindo canal em tempo real…</strong>
+          <p>Assinando continuamente /trator/001/sensores no Firebase.</p>
         </div>
       )}
 
@@ -91,19 +100,24 @@ export default function SompoTelemetryPanel({
                 <div className="sompo-telemetry-eyebrow">ESP32 · Trator {telemetry.tractorId}</div>
                 <h2>
                   {telemetry.status === 'alert'
-                    ? stale ? 'Alerta registrado' : 'Alerta ativo'
+                    ? historical ? 'Alerta registrado' : 'Alerta ativo'
                     : 'Operação sem flags de risco'}
                 </h2>
               </div>
             </div>
             <div className="sompo-telemetry-connection" aria-live="polite">
-              <span data-freshness={telemetry.freshness}>
-                {stale ? <WifiOff /> : <Wifi />}
-                {telemetry.freshness === 'fresh' && 'Fluxo confirmado'}
-                {telemetry.freshness === 'checking' && 'Validando atualização'}
-                {stale && `Sem mudança há ${age(telemetry.unchangedForMs)}`}
+              <span data-freshness={telemetry.freshness} data-connection={connectionState}>
+                {(connectionState === 'connecting' || connectionState === 'reconnecting')
+                  ? <Loader2 className="animate-spin" />
+                  : historical ? <WifiOff /> : <Wifi />}
+                {connectionState === 'connecting' && 'Conectando ao fluxo'}
+                {connectionState === 'reconnecting' && 'Reconectando ao fluxo'}
+                {connectionState === 'stopped' && 'Fluxo interrompido'}
+                {live && telemetry.freshness === 'fresh' && 'Tempo real conectado'}
+                {live && telemetry.freshness === 'checking' && 'Canal conectado · validando dados'}
+                {live && stale && `Conectado · sem mudança há ${age(telemetry.unchangedForMs)}`}
               </span>
-              <small>Firebase consultado às {clock(telemetry.observedAt)}</small>
+              <small>Último evento às {clock(telemetry.connection.lastEventAt || telemetry.observedAt)}</small>
               <button
                 type="button"
                 aria-label="Atualizar telemetria agora"
@@ -116,9 +130,9 @@ export default function SompoTelemetryPanel({
             </div>
           </div>
 
-          {error && (
+          {connectionWarning && (
             <p className="sompo-telemetry-warning" role="status">
-              <TriangleAlert /> Último snapshot preservado. {error}
+              <TriangleAlert /> Último snapshot preservado. {connectionWarning}
             </p>
           )}
 
@@ -127,14 +141,14 @@ export default function SompoTelemetryPanel({
               <ShieldAlert />
               <div>
                 <span>Risco de colisão</span>
-                <strong>{riskValue(telemetry.risks.collision, 'Livre', stale)}</strong>
+                <strong>{riskValue(telemetry.risks.collision, 'Livre', historical)}</strong>
               </div>
             </article>
             <article data-active={telemetry.risks.inclination}>
               <Gauge />
               <div>
                 <span>Risco de inclinação</span>
-                <strong>{riskValue(telemetry.risks.inclination, 'Estável', stale)}</strong>
+                <strong>{riskValue(telemetry.risks.inclination, 'Estável', historical)}</strong>
               </div>
             </article>
           </div>
@@ -183,7 +197,7 @@ export default function SompoTelemetryPanel({
               <Database />
               <div>
                 <strong>{telemetry.source.provider}</strong>
-                <span>{telemetry.source.path} · timestamp bruto {telemetry.deviceTimestamp ?? '—'}</span>
+                <span>assinatura SSE · {telemetry.source.path} · timestamp bruto {telemetry.deviceTimestamp ?? '—'}</span>
               </div>
             </div>
             <p>* Unidades de exibição seguem a convenção esperada dos sensores e precisam ser confirmadas no firmware.</p>

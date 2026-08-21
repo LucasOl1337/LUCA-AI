@@ -11,6 +11,7 @@ import type {
   HeartbeatMonitor,
   LucaState,
   Mission,
+  SompoTelemetrySnapshot,
   TemporaryDashboard,
   WsPayload,
 } from '@/lib/types';
@@ -128,6 +129,7 @@ function missionLockReasonForState(current: LucaState | null, busy: boolean): st
 export interface LucaContextValue {
   backendReady: boolean;
   connectionState: 'checking' | 'online' | 'offline';
+  sompoTelemetry: SompoTelemetrySnapshot | null;
   runtimeMode: 'backend' | 'cloud';
   supervisorMode: string;
   missionActionBusy: boolean;
@@ -168,6 +170,7 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
   const [runtimeMode] = useState<'backend' | 'cloud'>(localRuntime ? 'backend' : 'cloud');
   const [backendReady, setBackendReady] = useState(false);
   const [connectionState, setConnectionState] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [sompoTelemetry, setSompoTelemetry] = useState<SompoTelemetrySnapshot | null>(null);
   const [missionActionBusy, setMissionActionBusy] = useState(false);
   const [operationError, setOperationError] = useState<string | null>(null);
   const [state, setState] = useState<LucaState | null>(null);
@@ -367,7 +370,7 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
 
     async function connect() {
       const hasBackend = await refresh();
-      if (!localRuntime || !hasBackend || closed) return;
+      if (!hasBackend || closed) return;
       socket = new WebSocket(wsUrl());
 
       socket.addEventListener('open', () => {
@@ -395,6 +398,7 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
           const payload = JSON.parse(message.data) as WsPayload;
           if (payload.kind === 'state') syncState(payload.state);
           if (payload.kind === 'event') applyBackendEvent(payload.event);
+          if (payload.kind === 'sompo.telemetry') setSompoTelemetry(payload.telemetry);
         } catch {
           // Payload invalido nao deve derrubar a interface.
         }
@@ -445,7 +449,7 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
       if (eventRefreshTimerRef.current) clearTimeout(eventRefreshTimerRef.current);
       clearCloudRefreshTimers();
     };
-  }, [applyBackendEvent, clearCloudRefreshTimers, localRuntime, refresh, runtimeMode, syncState]);
+  }, [applyBackendEvent, clearCloudRefreshTimers, refresh, runtimeMode, syncState]);
 
   const getAgentLines = useCallback(
     (agentId: string): string[] => {
@@ -486,6 +490,7 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
     () => ({
       backendReady,
       connectionState,
+      sompoTelemetry,
       runtimeMode,
       supervisorMode,
       missionActionBusy,
@@ -603,7 +608,7 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
       refresh,
     }),
     [
-      backendReady, connectionState, runtimeMode, supervisorMode, missionActionBusy, operationError, missionLockReason, missionPhase,
+      backendReady, connectionState, sompoTelemetry, runtimeMode, supervisorMode, missionActionBusy, operationError, missionLockReason, missionPhase,
       activeMission, agents, allAgents, database, heartbeatMonitor, heartbeatLogs, globalChatMessages, temporaryDashboard,
       state, getAgentLines, getAgentStatus, refresh, scheduleCloudRefreshBurst, syncState, wrap,
     ],

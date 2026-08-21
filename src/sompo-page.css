@@ -297,6 +297,19 @@
   box-shadow: 0 0 0 1px rgba(255, 196, 107, 0.24);
 }
 
+.sompo-telemetry-connection > span[data-connection='connecting'],
+.sompo-telemetry-connection > span[data-connection='reconnecting'] {
+  background: rgba(201, 162, 39, 0.12);
+  color: #e8c96a;
+  box-shadow: 0 0 0 1px rgba(232, 201, 106, 0.22);
+}
+
+.sompo-telemetry-connection > span[data-connection='stopped'] {
+  background: rgba(255, 69, 58, 0.12);
+  color: #ff8a82;
+  box-shadow: 0 0 0 1px rgba(255, 138, 130, 0.2);
+}
+
 .sompo-telemetry-connection > span svg {
   width: 13px;
   height: 13px;

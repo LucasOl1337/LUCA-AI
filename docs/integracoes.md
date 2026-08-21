@@ -70,18 +70,30 @@ O ESP32 do trator `001` publica via Mosquitto no Firebase Realtime Database. A o
 atual é `https://trator-monitoramento-default-rtdb.firebaseio.com` e o caminho de
 leitura é `/trator/001/sensores`.
 
-O Express consulta essa origem somente pelo endpoint autenticado
-`GET /api/sompo/telemetry`. A resposta normaliza distância, temperatura, umidade,
-pitch, roll, aceleração, rotação e as flags determinísticas `riscoColisao` e
-`riscoInclinacao`. O runtime guarda cache curto, evita leituras externas duplicadas e
-marca como `stale` um snapshot que não muda por 15 segundos. Esse estado não apaga o
-último valor: a UI o apresenta explicitamente como registro possivelmente defasado.
+O Express abre uma única conexão REST Streaming (`Accept: text/event-stream`) nessa
+origem. Eventos Firebase `put` e `patch` atualizam o snapshot normalizado de distância,
+temperatura, umidade, pitch, roll, aceleração, rotação e das flags determinísticas
+`riscoColisao` e `riscoInclinacao`. O runtime reconecta automaticamente, preserva o
+último valor durante a queda e marca como `stale` um snapshot que não muda por 15
+segundos. O WebSocket autenticado `/ws` entrega cada mudança à interface com o evento
+`sompo.telemetry`; não existe polling periódico no navegador.
+
+`GET /api/sompo/telemetry` permanece como leitura autenticada do último snapshot em
+memória e bootstrap manual da tela. Ele não cria uma segunda consulta ao Firebase.
+O contrato expõe `connecting`, `live`, `reconnecting` e `stopped`, além do instante do
+último evento, para a UI nunca apresentar um snapshot preservado como se ainda estivesse
+chegando do equipamento.
 
 Ao iniciar uma análise, a tela fecha o snapshot corrente em texto antes de navegar
 para a bancada. O briefing distingue fatos, hipóteses e lacunas e proíbe que os
 agentes inventem limiares, calibração, apólice ou impacto financeiro. Como o JSON do
 dispositivo não declara unidades, as unidades exibidas são convenções esperadas e
 precisam ser confirmadas no firmware.
+
+O caminho atual é somente equipamento -> LUCA. O LUCA não publica comandos no Firebase
+nem no Mosquitto: faltam no projeto o repositório/contrato de recepção do ESP32, os
+tópicos do broker e credenciais de escrita restritas. Antes disso, qualquer alegação de
+troca bidirecional seria incorreta e potencialmente insegura.
 
 ## Publicação atual
 

@@ -64,6 +64,12 @@ export function normalizeSompoTelemetry(raw, { observedAt = new Date().toISOStri
     changedAt: observedAt,
     unchangedForMs: 0,
     freshness: 'checking',
+    connection: {
+      state: 'connecting',
+      connectedAt: null,
+      lastEventAt: null,
+      retryAttempt: 0,
+    },
     deviceTimestamp: finiteNumber(raw.timestamp),
     status: collision || inclination ? 'alert' : 'normal',
     risks: {
@@ -96,6 +102,13 @@ function freshnessLabel(value) {
   return 'snapshot recebido; fluxo do dispositivo ainda em validação';
 }
 
+function connectionLabel(value) {
+  if (value === 'live') return 'conectado em tempo real';
+  if (value === 'reconnecting') return 'reconectando; snapshot preservado';
+  if (value === 'stopped') return 'interrompido; snapshot preservado';
+  return 'conectando';
+}
+
 export function buildSompoTelemetryMission(snapshot, teamLabel) {
   if (!snapshot || typeof snapshot !== 'object') {
     throw new Error('sompo_telemetry_snapshot_required');
@@ -110,6 +123,8 @@ export function buildSompoTelemetryMission(snapshot, teamLabel) {
     `Origem: ${source.provider || 'Firebase Realtime Database'} ${source.path || SOMPO_TELEMETRY_PATH}`,
     `Leitura recebida pelo LUCA em: ${snapshot.observedAt || 'não informado'}`,
     `Última mudança observada pelo runtime: ${snapshot.changedAt || 'não informado'}`,
+    `Canal do runtime: ${connectionLabel(snapshot.connection?.state)}`,
+    `Último evento recebido pelo canal: ${snapshot.connection?.lastEventAt || 'não informado'}`,
     `Frescor do fluxo: ${freshnessLabel(snapshot.freshness)}`,
     `Timestamp bruto do dispositivo: ${reading(snapshot.deviceTimestamp)} (contador enviado pelo ESP32; não interpretar como data/hora).`,
     '',

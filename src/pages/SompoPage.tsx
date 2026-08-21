@@ -19,6 +19,7 @@ import type { PageId } from '@/components/Layout';
 import SompoTelemetryPanel from '@/components/SompoTelemetryPanel';
 import { useTheme } from '@/hooks/useTheme';
 import { useChatLibrary } from '@/hooks/useChatLibrary';
+import { useLuca } from '@/hooks/useLucaState';
 import { buildApiErrorMessage, lucaApi } from '@/lib/api';
 import type { SompoTelemetrySnapshot } from '@/lib/types';
 import {
@@ -53,8 +54,6 @@ interface SompoPageProps {
 type ProductFilter = 'all' | SompoProductLine;
 type SeverityFilter = 'all' | SompoCaseSeverity;
 type SompoViewMode = 'telemetry' | 'cases';
-
-const TELEMETRY_POLL_MS = 2_500;
 
 const PRODUCT_FILTERS: { id: ProductFilter; label: string }[] = [
   { id: 'all', label: 'Todos' },
@@ -94,6 +93,7 @@ function defaultIndividualPresetId(list: LucaIndividualPreset[]): string {
 export default function SompoPage({ onNavigate }: SompoPageProps) {
   const theme = useTheme();
   const { createSession, busy: sessionsBusy } = useChatLibrary();
+  const { sompoTelemetry: streamedTelemetry } = useLuca();
   const [viewMode, setViewMode] = useState<SompoViewMode>('telemetry');
   const [query, setQuery] = useState('');
   const [productFilter, setProductFilter] = useState<ProductFilter>('all');
@@ -110,28 +110,28 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
   const [templatesError, setTemplatesError] = useState<string | null>(null);
   const [launching, setLaunching] = useState(false);
   const [launchError, setLaunchError] = useState<string | null>(null);
-  const [telemetry, setTelemetry] = useState<SompoTelemetrySnapshot | null>(null);
+  const [bootstrapTelemetry, setBootstrapTelemetry] = useState<SompoTelemetrySnapshot | null>(null);
   const [telemetryLoading, setTelemetryLoading] = useState(true);
   const [telemetryRefreshing, setTelemetryRefreshing] = useState(false);
   const [telemetryError, setTelemetryError] = useState<string | null>(null);
   const [telemetryLaunching, setTelemetryLaunching] = useState(false);
   const [telemetryLaunchError, setTelemetryLaunchError] = useState<string | null>(null);
-  const telemetryPollBusyRef = useRef(false);
+  const telemetryRequestBusyRef = useRef(false);
 
-  const loadTelemetry = useCallback(async (kind: 'initial' | 'manual' | 'poll' = 'poll') => {
-    if (telemetryPollBusyRef.current) return;
-    telemetryPollBusyRef.current = true;
+  const loadTelemetry = useCallback(async (kind: 'initial' | 'manual' = 'manual') => {
+    if (telemetryRequestBusyRef.current) return;
+    telemetryRequestBusyRef.current = true;
     if (kind === 'initial') setTelemetryLoading(true);
     if (kind === 'manual') setTelemetryRefreshing(true);
     try {
       const result = await lucaApi.getSompoTelemetry(undefined, 6_000);
       if (!result?.ok || !result.telemetry) throw new Error('Snapshot de telemetria inválido.');
-      setTelemetry(result.telemetry);
+      setBootstrapTelemetry(result.telemetry);
       setTelemetryError(null);
     } catch (err) {
       setTelemetryError(buildApiErrorMessage(err, 'Não foi possível ler a telemetria do trator.'));
     } finally {
-      telemetryPollBusyRef.current = false;
+      telemetryRequestBusyRef.current = false;
       if (kind === 'initial') setTelemetryLoading(false);
       if (kind === 'manual') setTelemetryRefreshing(false);
     }
@@ -174,8 +174,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
   useEffect(() => {
     if (viewMode !== 'telemetry') return undefined;
     void loadTelemetry('initial');
-    const intervalId = window.setInterval(() => void loadTelemetry('poll'), TELEMETRY_POLL_MS);
-    return () => window.clearInterval(intervalId);
+    return undefined;
   }, [loadTelemetry, viewMode]);
 
   useEffect(() => {
@@ -212,6 +211,9 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
       return haystack.includes(term);
     });
   }, [productFilter, query, severityFilter]);
+
+  const telemetry = streamedTelemetry || bootstrapTelemetry;
+  const visibleTelemetryError = streamedTelemetry ? null : telemetryError;
 
   const selected = useMemo(
     () => (selectedId ? SOMPO_EXAMPLE_CASES.find((item) => item.id === selectedId) || null : null),
@@ -326,8 +328,8 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
               </div>
               <h1 className="sompo-title">SOMPO</h1>
               <p className="sompo-lead">
-                Monitore sinais reais do campo ou escolha um caso agrícola e leve um snapshot
-                auditável para a equipe de agentes.
+                Acompanhe o ESP32 por uma conexão contínua ou leve um snapshot auditável
+                dos sinais reais para a equipe de agentes.
               </p>
             </div>
             <div className="sompo-metrics">
@@ -370,7 +372,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
               telemetry={telemetry}
               loading={telemetryLoading}
               refreshing={telemetryRefreshing}
-              error={telemetryError}
+              error={visibleTelemetryError}
               onRefresh={() => void loadTelemetry('manual')}
             >
                   <aside className="sompo-telemetry-action" aria-label="Enviar telemetria para os agentes">

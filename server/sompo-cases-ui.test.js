@@ -15,6 +15,8 @@ const sompoCss = readFileSync(new URL('../src/sompo-page.css', import.meta.url),
 const lucaAiPage = readFileSync(new URL('../src/pages/LucaAiPage.tsx', import.meta.url), 'utf8');
 const api = readFileSync(new URL('../src/lib/api.ts', import.meta.url), 'utf8');
 const serverIndex = readFileSync(new URL('./index.js', import.meta.url), 'utf8');
+const sompoSource = readFileSync(new URL('./sompo-telemetry-source.js', import.meta.url), 'utf8');
+const lucaStateHook = readFileSync(new URL('../src/hooks/useLucaState.tsx', import.meta.url), 'utf8');
 
 test('SOMPO aparece na navegação e no App', () => {
   assert.match(layout, /id: 'sompo'/);
@@ -37,17 +39,24 @@ test('página SOMPO escolhe caso + equipe e dispara run', () => {
   assert.match(sompoPage, /Individual/);
 });
 
-test('modo SOMPO Telemetria lê o Firebase e fecha snapshot para a bancada', () => {
+test('modo SOMPO Telemetria assina o Firebase em tempo real e fecha snapshot para a bancada', () => {
   assert.match(sompoTelemetryPanel, /data-sompo-telemetry/);
   assert.match(sompoPage, /getSompoTelemetry/);
-  assert.match(sompoPage, /TELEMETRY_POLL_MS/);
+  assert.doesNotMatch(sompoPage, /TELEMETRY_POLL_MS|loadTelemetry\('poll'\)/);
+  assert.match(sompoPage, /streamedTelemetry/);
   assert.match(sompoPage, /buildSompoTelemetryMission/);
   assert.match(sompoPage, /data-sompo-telemetry-run/);
   assert.match(sompoTelemetryPanel, /risks\.collision/);
   assert.match(sompoTelemetryPanel, /risks\.inclination/);
   assert.match(api, /\/api\/sompo\/telemetry/);
   assert.match(serverIndex, /createSompoTelemetryHttpHandler/);
+  assert.match(serverIndex, /sompoTelemetrySource\.start\(\)/);
+  assert.match(serverIndex, /kind: 'sompo\.telemetry'/);
   assert.match(serverIndex, /app\.get\('\/api\/sompo\/telemetry'/);
+  assert.match(sompoSource, /text\/event-stream/);
+  assert.match(sompoSource, /eventName === 'put'/);
+  assert.match(sompoSource, /eventName !== 'patch'/);
+  assert.match(lucaStateHook, /payload\.kind === 'sompo\.telemetry'/);
   assert.match(sompoCss, /\.sompo-telemetry/);
   assert.match(sompoCss, /\.sompo-risk-grid/);
   assert.match(sompoCss, /\.sompo-sensor-grid/);
