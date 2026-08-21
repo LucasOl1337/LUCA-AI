@@ -4,6 +4,13 @@ import type {
 } from '../../shared/persona-workflow.js';
 import type { MissionDomain, MissionDomainSource } from '../../shared/mission-triage.js';
 import type { MissionLedger } from '../../shared/mission-ledger.js';
+export type {
+  SompoTelemetryFreshness,
+  SompoTelemetryResponse,
+  SompoTelemetrySnapshot,
+  SompoTelemetryStatus,
+  SompoTelemetryVector,
+} from '../../shared/sompo-telemetry.js';
 
 // Tipos do contrato do backend LUCA-AI (server/state.js getState()).
 // Mantidos propositalmente permissivos: o backend evolui e o front degrada com

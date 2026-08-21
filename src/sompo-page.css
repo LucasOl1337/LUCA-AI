@@ -121,6 +121,546 @@
   text-transform: uppercase;
 }
 
+/* —— Modos SOMPO —— */
+.sompo-view-switch {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 4px;
+  margin-bottom: 18px;
+  padding: 4px;
+  border-radius: 18px;
+  background: rgba(8, 16, 12, 0.78);
+  box-shadow: 0 0 0 1px oklch(1 0 0 / 0.1);
+  backdrop-filter: blur(12px);
+}
+
+.sompo-view-switch button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 7px 14px;
+  border-radius: 14px;
+  background: transparent;
+  color: rgba(220, 235, 225, 0.58);
+  text-align: left;
+  transition-property: background-color, color, box-shadow, transform;
+  transition-duration: 140ms;
+  transition-timing-function: ease-out;
+}
+
+.sompo-view-switch button:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sompo-view-switch button[aria-pressed='true'] {
+  color: #f0d78a;
+  background: rgba(201, 162, 39, 0.18);
+  box-shadow: 0 0 0 1px rgba(232, 201, 106, 0.28);
+}
+
+.sompo-view-switch button:active,
+.sompo-telemetry-empty button:active,
+.sompo-telemetry-connection button:active {
+  transform: scale(0.96);
+}
+
+.sompo-view-switch button:focus-visible,
+.sompo-telemetry button:focus-visible,
+.sompo-telemetry select:focus-visible {
+  outline: 2px solid #e8c96a;
+  outline-offset: 2px;
+}
+
+.sompo-view-switch svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  stroke-width: 2;
+}
+
+.sompo-view-switch span,
+.sompo-view-switch strong,
+.sompo-view-switch small {
+  display: block;
+}
+
+.sompo-view-switch strong {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.sompo-view-switch small {
+  margin-top: 2px;
+  color: rgba(210, 230, 215, 0.46);
+  font-size: 10.5px;
+}
+
+/* —— Telemetria de campo —— */
+.sompo-telemetry {
+  padding: 18px;
+  border-radius: 22px;
+  background: rgba(7, 14, 11, 0.9);
+  box-shadow:
+    0 0 0 1px oklch(1 0 0 / 0.11),
+    0 18px 44px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(16px);
+}
+
+.sompo-telemetry-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 16px;
+}
+
+.sompo-telemetry-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sompo-telemetry-risk-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  background: rgba(48, 209, 88, 0.12);
+  color: #7dff9a;
+  box-shadow: 0 0 0 1px rgba(125, 255, 154, 0.22);
+}
+
+.sompo-telemetry-risk-icon.alert {
+  background: rgba(255, 69, 58, 0.15);
+  color: #ff8a82;
+  box-shadow: 0 0 0 1px rgba(255, 138, 130, 0.26);
+}
+
+.sompo-telemetry-risk-icon svg {
+  width: 23px;
+  height: 23px;
+  stroke-width: 2;
+}
+
+.sompo-telemetry-eyebrow {
+  margin-bottom: 4px;
+  color: rgba(210, 230, 215, 0.46);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.sompo-telemetry-identity h2 {
+  color: rgba(255, 255, 255, 0.96);
+  font-size: clamp(1.1rem, 2vw, 1.35rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.sompo-telemetry-connection {
+  display: grid;
+  grid-template-columns: auto 34px;
+  align-items: center;
+  justify-items: end;
+  gap: 2px 10px;
+}
+
+.sompo-telemetry-connection > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: rgba(48, 209, 88, 0.12);
+  color: #7dff9a;
+  font-size: 10.5px;
+  font-weight: 700;
+  box-shadow: 0 0 0 1px rgba(125, 255, 154, 0.2);
+}
+
+.sompo-telemetry-connection > span[data-freshness='checking'] {
+  background: rgba(201, 162, 39, 0.12);
+  color: #e8c96a;
+  box-shadow: 0 0 0 1px rgba(232, 201, 106, 0.22);
+}
+
+.sompo-telemetry-connection > span[data-freshness='stale'] {
+  background: rgba(255, 159, 10, 0.13);
+  color: #ffc46b;
+  box-shadow: 0 0 0 1px rgba(255, 196, 107, 0.24);
+}
+
+.sompo-telemetry-connection > span svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: 2;
+}
+
+.sompo-telemetry-connection small {
+  grid-column: 1;
+  color: rgba(210, 230, 215, 0.42);
+  font-size: 10px;
+}
+
+.sompo-telemetry-connection button {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(230, 240, 232, 0.7);
+  box-shadow: 0 0 0 1px oklch(1 0 0 / 0.1);
+  transition-property: background-color, color, transform;
+  transition-duration: 140ms;
+  transition-timing-function: ease-out;
+}
+
+.sompo-telemetry-connection button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.sompo-telemetry-connection button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.sompo-telemetry-warning {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px !important;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 159, 10, 0.1);
+  color: #ffc46b;
+  font-size: 11px;
+  line-height: 1.4;
+  box-shadow: 0 0 0 1px rgba(255, 196, 107, 0.2);
+}
+
+.sompo-telemetry-warning svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.sompo-risk-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.sompo-risk-grid article {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 72px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(48, 209, 88, 0.07);
+  color: #7dff9a;
+  box-shadow: 0 0 0 1px rgba(125, 255, 154, 0.16);
+}
+
+.sompo-risk-grid article[data-active='true'] {
+  background: rgba(255, 69, 58, 0.11);
+  color: #ff8a82;
+  box-shadow:
+    0 0 0 1px rgba(255, 138, 130, 0.24),
+    0 10px 24px rgba(140, 24, 18, 0.1);
+}
+
+.sompo-risk-grid article > svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  stroke-width: 2;
+}
+
+.sompo-risk-grid span,
+.sompo-risk-grid strong {
+  display: block;
+}
+
+.sompo-risk-grid span {
+  color: rgba(220, 235, 225, 0.48);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.sompo-risk-grid strong {
+  margin-top: 3px;
+  color: currentColor;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.sompo-sensor-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sompo-sensor-grid article {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 88px;
+  padding: 13px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: 0 0 0 1px oklch(1 0 0 / 0.085);
+}
+
+.sompo-sensor-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  background: rgba(201, 162, 39, 0.1);
+  color: #e8c96a;
+}
+
+.sompo-sensor-icon svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2;
+}
+
+.sompo-sensor-grid article > div {
+  min-width: 0;
+}
+
+.sompo-sensor-grid article span,
+.sompo-sensor-grid article strong,
+.sompo-sensor-grid article small {
+  display: block;
+}
+
+.sompo-sensor-grid article > div > span {
+  color: rgba(210, 230, 215, 0.48);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sompo-sensor-grid strong {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.sompo-sensor-grid strong small {
+  display: inline;
+  color: rgba(220, 235, 225, 0.52);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.sompo-sensor-grid article > div > small {
+  margin-top: 5px;
+  color: rgba(210, 230, 215, 0.4);
+  font-size: 9.5px;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+.sompo-telemetry-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 2px 0;
+}
+
+.sompo-telemetry-source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sompo-telemetry-source > svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  color: #e8c96a;
+}
+
+.sompo-telemetry-source strong,
+.sompo-telemetry-source span {
+  display: block;
+}
+
+.sompo-telemetry-source strong {
+  color: rgba(230, 240, 232, 0.72);
+  font-size: 10.5px;
+}
+
+.sompo-telemetry-source span,
+.sompo-telemetry-footer > p {
+  color: rgba(210, 230, 215, 0.4);
+  font-size: 9.5px;
+  line-height: 1.35;
+}
+
+.sompo-telemetry-footer > p {
+  max-width: 430px;
+  text-align: right;
+}
+
+.sompo-telemetry-action {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 0.85fr) minmax(210px, 0.65fr);
+  align-items: center;
+  gap: 18px;
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(201, 162, 39, 0.08);
+  box-shadow: 0 0 0 1px rgba(232, 201, 106, 0.18);
+}
+
+.sompo-telemetry-action-copy > span {
+  color: #e8c96a;
+  font-size: 9.5px;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.sompo-telemetry-action-copy h3 {
+  margin-top: 4px !important;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.sompo-telemetry-action-copy p {
+  margin-top: 5px !important;
+  color: rgba(220, 235, 225, 0.52);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.sompo-telemetry-controls {
+  display: grid;
+  gap: 7px;
+}
+
+.sompo-telemetry-team-select {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.sompo-telemetry-team-select > span {
+  color: rgba(210, 230, 215, 0.44);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sompo-telemetry-team-select select {
+  width: 100%;
+  height: 34px;
+  padding: 0 28px 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.9);
+  font: inherit;
+  font-size: 11.5px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.sompo-telemetry-team-select option {
+  color: #101512;
+}
+
+.sompo-telemetry-team-summary {
+  color: rgba(210, 230, 215, 0.44);
+  font-size: 9.5px;
+  text-align: right;
+}
+
+.sompo-telemetry-run {
+  display: grid;
+  gap: 8px;
+}
+
+.sompo-telemetry-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-height: 390px;
+  place-content: center;
+  color: rgba(220, 235, 225, 0.62);
+  text-align: center;
+}
+
+.sompo-telemetry-empty > svg {
+  width: 28px;
+  height: 28px;
+  color: #e8c96a;
+}
+
+.sompo-telemetry-empty strong {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 15px;
+}
+
+.sompo-telemetry-empty p {
+  max-width: 420px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.sompo-telemetry-empty button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  margin-top: 4px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: rgba(201, 162, 39, 0.18);
+  color: #f0d78a;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 0 0 1px rgba(232, 201, 106, 0.26);
+  transition-property: background-color, transform;
+  transition-duration: 140ms;
+  transition-timing-function: ease-out;
+}
+
+.sompo-telemetry-empty button svg {
+  width: 14px;
+  height: 14px;
+}
+
 /* —— Contexto setorial compacto —— */
 .sompo-context {
   display: grid;
@@ -819,6 +1359,14 @@
 
 /* responsive */
 @media (max-width: 1100px) {
+  .sompo-telemetry-action {
+    grid-template-columns: minmax(220px, 1fr) minmax(260px, 1fr);
+  }
+
+  .sompo-telemetry-run {
+    grid-column: 1 / -1;
+  }
+
   .sompo-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -831,6 +1379,18 @@
 
   .sompo-context {
     grid-template-columns: 1fr;
+  }
+
+  .sompo-sensor-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sompo-telemetry-action {
+    grid-template-columns: 1fr;
+  }
+
+  .sompo-telemetry-run {
+    grid-column: auto;
   }
 
   .sompo-grid {
@@ -863,6 +1423,36 @@
 }
 
 @media (max-width: 560px) {
+  .sompo-view-switch {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .sompo-telemetry {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .sompo-telemetry-head,
+  .sompo-telemetry-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .sompo-telemetry-connection {
+    justify-items: start;
+  }
+
+  .sompo-risk-grid,
+  .sompo-sensor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sompo-telemetry-footer > p {
+    text-align: left;
+  }
+
   .sompo-grid {
     grid-template-columns: 1fr;
   }

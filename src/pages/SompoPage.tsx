@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Activity,
   ArrowLeft,
   ArrowRight,
   Building2,
@@ -15,9 +16,11 @@ import {
   Wheat,
 } from 'lucide-react';
 import type { PageId } from '@/components/Layout';
+import SompoTelemetryPanel from '@/components/SompoTelemetryPanel';
 import { useTheme } from '@/hooks/useTheme';
 import { useChatLibrary } from '@/hooks/useChatLibrary';
 import { buildApiErrorMessage, lucaApi } from '@/lib/api';
+import type { SompoTelemetrySnapshot } from '@/lib/types';
 import {
   hydrateIndividualTemplate,
   hydrateTeamTemplate,
@@ -40,6 +43,7 @@ import {
   type SompoLaunchMode,
   type SompoProductLine,
 } from '@/lib/sompo-cases';
+import { buildSompoTelemetryMission } from '../../shared/sompo-telemetry.js';
 import '@/sompo-page.css';
 
 interface SompoPageProps {
@@ -48,6 +52,9 @@ interface SompoPageProps {
 
 type ProductFilter = 'all' | SompoProductLine;
 type SeverityFilter = 'all' | SompoCaseSeverity;
+type SompoViewMode = 'telemetry' | 'cases';
+
+const TELEMETRY_POLL_MS = 2_500;
 
 const PRODUCT_FILTERS: { id: ProductFilter; label: string }[] = [
   { id: 'all', label: 'Todos' },
@@ -87,6 +94,7 @@ function defaultIndividualPresetId(list: LucaIndividualPreset[]): string {
 export default function SompoPage({ onNavigate }: SompoPageProps) {
   const theme = useTheme();
   const { createSession, busy: sessionsBusy } = useChatLibrary();
+  const [viewMode, setViewMode] = useState<SompoViewMode>('telemetry');
   const [query, setQuery] = useState('');
   const [productFilter, setProductFilter] = useState<ProductFilter>('all');
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all');
@@ -102,6 +110,32 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
   const [templatesError, setTemplatesError] = useState<string | null>(null);
   const [launching, setLaunching] = useState(false);
   const [launchError, setLaunchError] = useState<string | null>(null);
+  const [telemetry, setTelemetry] = useState<SompoTelemetrySnapshot | null>(null);
+  const [telemetryLoading, setTelemetryLoading] = useState(true);
+  const [telemetryRefreshing, setTelemetryRefreshing] = useState(false);
+  const [telemetryError, setTelemetryError] = useState<string | null>(null);
+  const [telemetryLaunching, setTelemetryLaunching] = useState(false);
+  const [telemetryLaunchError, setTelemetryLaunchError] = useState<string | null>(null);
+  const telemetryPollBusyRef = useRef(false);
+
+  const loadTelemetry = useCallback(async (kind: 'initial' | 'manual' | 'poll' = 'poll') => {
+    if (telemetryPollBusyRef.current) return;
+    telemetryPollBusyRef.current = true;
+    if (kind === 'initial') setTelemetryLoading(true);
+    if (kind === 'manual') setTelemetryRefreshing(true);
+    try {
+      const result = await lucaApi.getSompoTelemetry(undefined, 6_000);
+      if (!result?.ok || !result.telemetry) throw new Error('Snapshot de telemetria inválido.');
+      setTelemetry(result.telemetry);
+      setTelemetryError(null);
+    } catch (err) {
+      setTelemetryError(buildApiErrorMessage(err, 'Não foi possível ler a telemetria do trator.'));
+    } finally {
+      telemetryPollBusyRef.current = false;
+      if (kind === 'initial') setTelemetryLoading(false);
+      if (kind === 'manual') setTelemetryRefreshing(false);
+    }
+  }, []);
 
   const loadTemplates = useCallback(async () => {
     setTemplatesLoading(true);
@@ -136,6 +170,13 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
   useEffect(() => {
     void loadTemplates();
   }, [loadTemplates]);
+
+  useEffect(() => {
+    if (viewMode !== 'telemetry') return undefined;
+    void loadTelemetry('initial');
+    const intervalId = window.setInterval(() => void loadTelemetry('poll'), TELEMETRY_POLL_MS);
+    return () => window.clearInterval(intervalId);
+  }, [loadTelemetry, viewMode]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -242,6 +283,32 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
     }
   }
 
+  async function runTelemetryWithSquad() {
+    if (!telemetry || !activeSquad || telemetryLaunching || sessionsBusy) return;
+    setTelemetryLaunching(true);
+    setTelemetryLaunchError(null);
+    try {
+      const session = await createSession();
+      if (!session) {
+        setTelemetryLaunchError('Não foi possível abrir uma sessão limpa na bancada.');
+        return;
+      }
+      queueSompoLaunch({
+        caseId: `telemetria-trator-${telemetry.tractorId}-${telemetry.deviceTimestamp ?? 'snapshot'}`,
+        mission: buildSompoTelemetryMission(telemetry, activeSquad.label),
+        mode: teamMode,
+        presetId: activeSquad.id,
+        presetLabel: activeSquad.label,
+        autoRun: true,
+      });
+      onNavigate('luca-ai');
+    } catch (err) {
+      setTelemetryLaunchError(buildApiErrorMessage(err, 'Falha ao enviar a telemetria para a bancada.'));
+    } finally {
+      setTelemetryLaunching(false);
+    }
+  }
+
   return (
     <div
       className="sompo-page"
@@ -255,15 +322,19 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
             <div>
               <div className="sompo-kicker">
                 <Wheat className="h-3.5 w-3.5" />
-                SOMPO · casos + equipe
+                SOMPO · campo + agentes
               </div>
               <h1 className="sompo-title">SOMPO</h1>
               <p className="sompo-lead">
-                Escolha o caso agrícola, defina a equipe e rode a avaliação na bancada —
-                sem poluição visual, com foco no sinistro.
+                Monitore sinais reais do campo ou escolha um caso agrícola e leve um snapshot
+                auditável para a equipe de agentes.
               </p>
             </div>
             <div className="sompo-metrics">
+              <div className="sompo-metric">
+                <strong>{telemetry?.tractorId || '001'}</strong>
+                <span>trator</span>
+              </div>
               <div className="sompo-metric">
                 <strong>{SOMPO_EXAMPLE_CASES.length}</strong>
                 <span>casos</span>
@@ -272,96 +343,188 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
                 <strong>{teamPresets.length}</strong>
                 <span>equipes</span>
               </div>
-              <div className="sompo-metric">
-                <strong>{individualPresets.length}</strong>
-                <span>individuais</span>
-              </div>
             </div>
           </header>
 
-          <section className="sompo-context" aria-label="Contexto setorial">
-            {CONTEXT_HIGHLIGHTS.map((fact) => (
-              <article key={fact.id} className="sompo-context-card">
-                <span>{fact.label}</span>
-                <strong>{fact.value}</strong>
-                <p>{fact.detail}</p>
-              </article>
-            ))}
+          <section className="sompo-view-switch" aria-label="Modo SOMPO">
+            <button
+              type="button"
+              aria-pressed={viewMode === 'telemetry'}
+              onClick={() => setViewMode('telemetry')}
+            >
+              <Activity />
+              <span><strong>Telemetria</strong><small>Dados reais do trator</small></span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={viewMode === 'cases'}
+              onClick={() => setViewMode('cases')}
+            >
+              <Wheat />
+              <span><strong>Casos agrícolas</strong><small>Cenários para avaliação</small></span>
+            </button>
           </section>
 
-          <section className="sompo-toolbar">
-            <div className="sompo-toolbar-row">
-              <label className="sompo-search">
-                <Search />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Buscar por cultura, região, evento, ZARC, granizo…"
-                  aria-label="Buscar casos agrícolas"
-                />
-              </label>
-              <div className="sompo-chips">
-                <Filter className="h-4 w-4" style={{ color: theme.textGhost }} aria-hidden="true" />
-                {PRODUCT_FILTERS.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className="sompo-chip"
-                    aria-pressed={productFilter === item.id}
-                    onClick={() => setProductFilter(item.id)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="sompo-toolbar-row">
-              <span className="sompo-chip-label">Severidade</span>
-              <div className="sompo-chips">
-                {SEVERITY_FILTERS.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className="sompo-chip"
-                    aria-pressed={severityFilter === item.id}
-                    onClick={() => setSeverityFilter(item.id)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
+          {viewMode === 'telemetry' ? (
+            <SompoTelemetryPanel
+              telemetry={telemetry}
+              loading={telemetryLoading}
+              refreshing={telemetryRefreshing}
+              error={telemetryError}
+              onRefresh={() => void loadTelemetry('manual')}
+            >
+                  <aside className="sompo-telemetry-action" aria-label="Enviar telemetria para os agentes">
+                    <div className="sompo-telemetry-action-copy">
+                      <span>Próxima etapa</span>
+                      <h3>Processar este snapshot com a equipe</h3>
+                      <p>O LUCA fecha a leitura atual em um briefing, registra alertas e lacunas e inicia uma sessão nova.</p>
+                    </div>
+                    <div className="sompo-telemetry-controls">
+                      <div className="sompo-mode-switch" role="group" aria-label="Modo da equipe para telemetria">
+                        <button
+                          type="button"
+                          className={teamMode === 'team' ? 'active' : ''}
+                          aria-pressed={teamMode === 'team'}
+                          onClick={() => setTeamMode('team')}
+                        >
+                          <Users /> Equipe
+                        </button>
+                        <button
+                          type="button"
+                          className={teamMode === 'individual' ? 'active' : ''}
+                          aria-pressed={teamMode === 'individual'}
+                          onClick={() => setTeamMode('individual')}
+                        >
+                          <Scale /> Individual
+                        </button>
+                      </div>
+                      <label className="sompo-telemetry-team-select">
+                        <span>Template</span>
+                        <select
+                          value={teamMode === 'team' ? selectedTeamId : selectedIndividualId}
+                          disabled={templatesLoading}
+                          onChange={(event) => {
+                            if (teamMode === 'team') setSelectedTeamId(event.target.value);
+                            else setSelectedIndividualId(event.target.value);
+                          }}
+                        >
+                          {(teamMode === 'team' ? teamPresets : individualPresets).map((preset) => (
+                            <option key={preset.id} value={preset.id}>{preset.label}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="sompo-telemetry-team-summary">
+                        {activeSquad?.label || 'Carregando equipe'}
+                        {activeSlugs.length ? ` · ${activeSlugs.length} personas` : ''}
+                      </div>
+                    </div>
 
-          <section className="sompo-grid" aria-label="Casos agrícolas">
-            {filtered.length === 0 && (
-              <p className="sompo-empty">Nenhum caso com esses filtros.</p>
-            )}
-            {filtered.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className="sompo-case-card"
-                onClick={() => openCase(item)}
-                data-sompo-case={item.id}
-              >
-                <div className="sompo-case-card-media">
-                  <img src={item.image} alt="" loading="lazy" />
-                  <span className={`sompo-severity sompo-severity-${item.severity}`}>
-                    {SOMPO_SEVERITY_LABELS[item.severity]}
-                  </span>
-                </div>
-                <div className="sompo-case-card-body">
-                  <h3>{item.title}</h3>
-                  <p>{item.subtitle}</p>
-                  <div className="sompo-case-meta">
-                    <span><Sprout /> {item.culture}</span>
-                    <span><MapPin /> {item.region}</span>
+                    <div className="sompo-telemetry-run">
+                      {templatesError && <p className="sompo-templates-error">{templatesError}</p>}
+                      {telemetryLaunchError && <p className="sompo-launch-error">{telemetryLaunchError}</p>}
+                      <button
+                        type="button"
+                        className="sompo-run-btn"
+                        disabled={!activeSquad || telemetryLaunching || sessionsBusy || templatesLoading}
+                        onClick={() => void runTelemetryWithSquad()}
+                        data-sompo-telemetry-run
+                      >
+                        {telemetryLaunching || sessionsBusy ? (
+                          <><Loader2 className="animate-spin" /> Preparando run…</>
+                        ) : (
+                          <><Play /> Analisar na bancada <ArrowRight /></>
+                        )}
+                      </button>
+                    </div>
+              </aside>
+            </SompoTelemetryPanel>
+          ) : (
+            <>
+              <section className="sompo-context" aria-label="Contexto setorial">
+                {CONTEXT_HIGHLIGHTS.map((fact) => (
+                  <article key={fact.id} className="sompo-context-card">
+                    <span>{fact.label}</span>
+                    <strong>{fact.value}</strong>
+                    <p>{fact.detail}</p>
+                  </article>
+                ))}
+              </section>
+
+              <section className="sompo-toolbar">
+                <div className="sompo-toolbar-row">
+                  <label className="sompo-search">
+                    <Search />
+                    <input
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Buscar por cultura, região, evento, ZARC, granizo…"
+                      aria-label="Buscar casos agrícolas"
+                    />
+                  </label>
+                  <div className="sompo-chips">
+                    <Filter className="h-4 w-4" style={{ color: theme.textGhost }} aria-hidden="true" />
+                    {PRODUCT_FILTERS.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className="sompo-chip"
+                        aria-pressed={productFilter === item.id}
+                        onClick={() => setProductFilter(item.id)}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              </button>
-            ))}
-          </section>
+                <div className="sompo-toolbar-row">
+                  <span className="sompo-chip-label">Severidade</span>
+                  <div className="sompo-chips">
+                    {SEVERITY_FILTERS.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className="sompo-chip"
+                        aria-pressed={severityFilter === item.id}
+                        onClick={() => setSeverityFilter(item.id)}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              <section className="sompo-grid" aria-label="Casos agrícolas">
+                {filtered.length === 0 && (
+                  <p className="sompo-empty">Nenhum caso com esses filtros.</p>
+                )}
+                {filtered.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="sompo-case-card"
+                    onClick={() => openCase(item)}
+                    data-sompo-case={item.id}
+                  >
+                    <div className="sompo-case-card-media">
+                      <img src={item.image} alt="" loading="lazy" />
+                      <span className={`sompo-severity sompo-severity-${item.severity}`}>
+                        {SOMPO_SEVERITY_LABELS[item.severity]}
+                      </span>
+                    </div>
+                    <div className="sompo-case-card-body">
+                      <h3>{item.title}</h3>
+                      <p>{item.subtitle}</p>
+                      <div className="sompo-case-meta">
+                        <span><Sprout /> {item.culture}</span>
+                        <span><MapPin /> {item.region}</span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </section>
+            </>
+          )}
         </div>
       </div>
 

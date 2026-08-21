@@ -9,9 +9,12 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const layout = readFileSync(new URL('../src/components/Layout.tsx', import.meta.url), 'utf8');
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const sompoPage = readFileSync(new URL('../src/pages/SompoPage.tsx', import.meta.url), 'utf8');
+const sompoTelemetryPanel = readFileSync(new URL('../src/components/SompoTelemetryPanel.tsx', import.meta.url), 'utf8');
 const sompoCases = readFileSync(new URL('../src/lib/sompo-cases.ts', import.meta.url), 'utf8');
 const sompoCss = readFileSync(new URL('../src/sompo-page.css', import.meta.url), 'utf8');
 const lucaAiPage = readFileSync(new URL('../src/pages/LucaAiPage.tsx', import.meta.url), 'utf8');
+const api = readFileSync(new URL('../src/lib/api.ts', import.meta.url), 'utf8');
+const serverIndex = readFileSync(new URL('./index.js', import.meta.url), 'utf8');
 
 test('SOMPO aparece na navegação e no App', () => {
   assert.match(layout, /id: 'sompo'/);
@@ -23,7 +26,7 @@ test('SOMPO aparece na navegação e no App', () => {
 });
 
 test('página SOMPO escolhe caso + equipe e dispara run', () => {
-  assert.match(sompoPage, /SOMPO · casos \+ equipe/);
+  assert.match(sompoPage, /SOMPO · campo \+ agentes/);
   assert.match(sompoPage, /queueSompoLaunch/);
   assert.match(sompoPage, /Rodar avaliação na bancada/);
   assert.match(sompoPage, /teamMode/);
@@ -32,6 +35,22 @@ test('página SOMPO escolhe caso + equipe e dispara run', () => {
   assert.match(sompoPage, /SOMPO_EXAMPLE_CASES/);
   assert.match(sompoPage, /Equipe/);
   assert.match(sompoPage, /Individual/);
+});
+
+test('modo SOMPO Telemetria lê o Firebase e fecha snapshot para a bancada', () => {
+  assert.match(sompoTelemetryPanel, /data-sompo-telemetry/);
+  assert.match(sompoPage, /getSompoTelemetry/);
+  assert.match(sompoPage, /TELEMETRY_POLL_MS/);
+  assert.match(sompoPage, /buildSompoTelemetryMission/);
+  assert.match(sompoPage, /data-sompo-telemetry-run/);
+  assert.match(sompoTelemetryPanel, /risks\.collision/);
+  assert.match(sompoTelemetryPanel, /risks\.inclination/);
+  assert.match(api, /\/api\/sompo\/telemetry/);
+  assert.match(serverIndex, /createSompoTelemetryHttpHandler/);
+  assert.match(serverIndex, /app\.get\('\/api\/sompo\/telemetry'/);
+  assert.match(sompoCss, /\.sompo-telemetry/);
+  assert.match(sompoCss, /\.sompo-risk-grid/);
+  assert.match(sompoCss, /\.sompo-sensor-grid/);
 });
 
 test('página SOMPO usa grade com imagem e launch focado sem painel lateral fixo', () => {

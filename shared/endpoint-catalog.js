@@ -61,7 +61,9 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
         label: 'Missões',
         description: 'ativação, contexto, sinais operacionais e fechamento',
         featured: true,
-        outbound: [],
+        outbound: [
+          endpoint('sompo-telemetry', 'GET', '/api/sompo/telemetry', 'snapshot normalizado da telemetria do trator 001 no Firebase, com risco e frescor do fluxo', 'local'),
+        ],
         inbound: [
           endpoint(
             'mission-activate',

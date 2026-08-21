@@ -15,6 +15,16 @@ Fluxo local principal:
 src -> /api e /ws -> server -> shared -> .luca
 ```
 
+Fluxo da telemetria SOMPO:
+
+```text
+ESP32 -> Mosquitto -> Firebase Realtime Database -> GET /api/sompo/telemetry -> SompoPage -> snapshot fechado -> bancada de agentes
+```
+
+O navegador nunca consulta o Firebase diretamente. `server/sompo-telemetry-source.js`
+concentra URL fixa, timeout, cache curto, normalização e detecção de snapshot parado;
+`shared/sompo-telemetry.js` concentra o contrato e o briefing auditável enviado à bancada.
+
 Fluxo de produção:
 
 ```text

@@ -196,6 +196,7 @@ import {
   updateTeamTemplate,
 } from './team-templates.js';
 import { createAuthService } from './auth.js';
+import { createSompoTelemetryHttpHandler } from './sompo-telemetry-source.js';
 
 const app = express();
 const personaRunJobs = createPersonaRunJobStore();
@@ -2832,6 +2833,8 @@ app.get('/api/router/models', (_req, res) => {
     defaultImageModel: IMAGE_GENERATION_MODEL,
   });
 });
+
+app.get('/api/sompo/telemetry', createSompoTelemetryHttpHandler());
 
 app.get('/api/luca-ai/visual-artifacts/:traceId/:artifactId', (req, res) => {
   const ownerId = getWorkspaceUserId();

@@ -13,6 +13,7 @@ import type {
   PersonaAgentEntry,
   RouterModelsResponse,
   RuntimeEvent,
+  SompoTelemetryResponse,
   YumePersonaSummary,
 } from './types';
 import { buildApiErrorMessage, requestJson } from './requestTimeout';
@@ -202,6 +203,8 @@ export const lucaApi = {
     apiPost<{ ok: boolean; agent: PersonaAgentEntry | Record<string, unknown> }>('/api/agent/config', { agentId, ...patch }, base),
   listRouterModels: (base?: string, timeoutMs = ACTION_REQUEST_TIMEOUT_MS) =>
     apiGet<RouterModelsResponse>('/api/router/models', timeoutMs, base),
+  getSompoTelemetry: (base?: string, timeoutMs = 8_000) =>
+    apiGet<SompoTelemetryResponse>('/api/sompo/telemetry', timeoutMs, base),
   listTeamTemplates: (base?: string, timeoutMs = ACTION_REQUEST_TIMEOUT_MS) =>
     apiGet<LucaAiTeamTemplatesResponse>('/api/luca-ai/team-templates', timeoutMs, base),
   createTeamTemplate: (kind: 'team' | 'individual', template: Record<string, unknown>, base?: string) =>

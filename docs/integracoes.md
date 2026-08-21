@@ -64,6 +64,25 @@ localmente. Promoção ou remoção editorial continua sendo feita no Yume.
 
 No domínio público, as telas de Personas e LUCA-AI usam `/api` na mesma origem. O proxy de borda (`luca-ai-vm-proxy`) encaminha o tráfego ao Express via Workers VPC + Tunnel `luca-ai-production` na VM (`127.0.0.1:4242`). O navegador do visitante e o PC de desenvolvimento nunca participam do caminho interno.
 
+## Telemetria SOMPO
+
+O ESP32 do trator `001` publica via Mosquitto no Firebase Realtime Database. A origem
+atual é `https://trator-monitoramento-default-rtdb.firebaseio.com` e o caminho de
+leitura é `/trator/001/sensores`.
+
+O Express consulta essa origem somente pelo endpoint autenticado
+`GET /api/sompo/telemetry`. A resposta normaliza distância, temperatura, umidade,
+pitch, roll, aceleração, rotação e as flags determinísticas `riscoColisao` e
+`riscoInclinacao`. O runtime guarda cache curto, evita leituras externas duplicadas e
+marca como `stale` um snapshot que não muda por 15 segundos. Esse estado não apaga o
+último valor: a UI o apresenta explicitamente como registro possivelmente defasado.
+
+Ao iniciar uma análise, a tela fecha o snapshot corrente em texto antes de navegar
+para a bancada. O briefing distingue fatos, hipóteses e lacunas e proíbe que os
+agentes inventem limiares, calibração, apólice ou impacto financeiro. Como o JSON do
+dispositivo não declara unidades, as unidades exibidas são convenções esperadas e
+precisam ser confirmadas no firmware.
+
 ## Publicação atual
 
 O ambiente de produção usa somente o 9Router da VM. A Cloudflare fornece DNS, um proxy reverso de borda e Tunnel, sem executar modelos e sem exigir conta Cloudflare do visitante. O runtime legado em `worker/` não participa da publicação de `luca-ai.com.br`. O proxy mínimo de borda versionado em `deploy/luca-ai-vm-proxy.js` só encaminha o domínio público; não é o runtime de aplicação. Na VM, as units atuais são `luca-ai.service`, `kamui-backend.service`, `yume-backend.service` e `cloudflared-luca-ai.service`.
