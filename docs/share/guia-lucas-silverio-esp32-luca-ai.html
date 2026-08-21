@@ -298,6 +298,8 @@
               <span>GET Firebase: HTTP 200</span>
               <span>SSE: evento inicial “put”</span>
               <span>13/13 testes SOMPO aprovados</span>
+              <span>Firebase → WebSocket: 335 ms</span>
+              <span>Fable 5: aprovado com ressalvas</span>
               <span>Produção: release 0ff09d8 ativa</span>
             </div>
           </article>
@@ -350,7 +352,8 @@
           <div class="secret-item"><span>Firmware</span><strong>Unidades e limiares confirmados</strong></div>
         </div>
 
-        <div class="warning"><strong>Segurança:</strong> não coloque senha de Wi-Fi, credencial MQTT, token Firebase ou chave privada neste HTML, em prints, no Git ou no Serial Monitor.</div>
+        <div class="warning"><strong>Achado adversarial de segurança:</strong> em 21/08/2026, uma escrita REST anônima e condicional no campo <code>timestamp</code> foi aceita com HTTP 200. O fluxo funciona, mas a integridade dos dados ainda não está protegida. O dono do Firebase precisa restringir <code>.write</code> à ponte ou ao dispositivo antes de tratar o protótipo como ambiente seguro.</div>
+        <div class="warning"><strong>Proteja os segredos:</strong> não coloque senha de Wi-Fi, credencial MQTT, token Firebase ou chave privada neste HTML, em prints, no Git ou no Serial Monitor.</div>
       </div>
     </section>
 

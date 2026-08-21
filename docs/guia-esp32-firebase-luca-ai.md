@@ -26,9 +26,10 @@ funcional sem uma decisão do grupo.
 Em 21/08/2026, uma leitura pública do endpoint retornou HTTP 200 com o snapshot do
 trator `001`, e uma assinatura com `Accept: text/event-stream` recebeu o evento inicial
 `put`. Isso comprova que a URL, a leitura pública e o caminho Firebase -> LUCA estão
-ativos. Não comprova que o ESP físico está ligado agora nem que uma gravação sem token
-será aceita. A permissão de escrita só pode ser confirmada pelo proprietário no console
-do Firebase ou por um teste de escrita autorizado.
+ativos. Um ensaio autorizado alterou somente o filho `timestamp` com `If-Match`, viu a
+mudança atravessar Firebase -> SSE -> Express -> WebSocket autenticado em 335 ms e
+restaurou o valor original com outra condição ETag. O teste comprova o caminho a partir
+do Firebase, mas não comprova que o ESP físico e a ponte Mosquitto estão ligados agora.
 
 ## 1. Contrato exato que o LUCA espera
 
@@ -137,10 +138,13 @@ O backend atual do LUCA assina o Firebase sem token. Portanto, a regra `.read` d
 precisa continuar pública até o backend ganhar uma credencial própria. O GET público
 funcionou no teste de 21/08/2026.
 
-Isso não permite concluir que `.write` também esteja pública. No caminho atual, as
-credenciais de escrita podem estar somente na ponte Mosquitto -> Firebase. Não faça uma
-gravação REST de teste no nó real sem combinar o horário, pois um `PUT` incorreto
-substitui o snapshot e aparece imediatamente no painel.
+O ensaio condicional do mesmo dia também provou que uma escrita REST anônima no filho
+`timestamp` foi aceita com HTTP 200. Isso confirma a integração funcional, mas expõe uma
+falha de integridade: qualquer pessoa que conheça a URL pode tentar adulterar a
+telemetria. Antes de tratar o protótipo como ambiente seguro, restrinja `.write` à
+identidade da ponte ou do dispositivo. Não faça outro teste no nó real sem combinar o
+horário; um `PUT` incorreto pode substituir o snapshot e aparecer imediatamente no
+painel.
 
 ### Opções oficiais
 
@@ -327,7 +331,10 @@ reconexão, e admite backoff adicional após falhas.
 
 O código atual do LUCA implementa `put`, `patch`, `keep-alive`, `cancel`,
 `auth_revoked`, redirects e reconexão exponencial de 1 a 15 segundos. Ele preserva o
-último snapshot durante a queda e informa ao painel que está reconectando.
+último snapshot durante a queda e informa ao painel que está reconectando. Hoje,
+`cancel` e `auth_revoked` não possuem estado próprio: ambos entram no mesmo ciclo de
+reconexão de uma queda de rede. Se um desses eventos ocorrer, verifique Rules e
+credenciais; a mensagem genérica do painel não identifica a causa.
 
 Fontes oficiais:
 
@@ -404,7 +411,7 @@ Fonte oficial: [Firebase — limites do Realtime Database](https://firebase.goog
 
 ## Pendências que dependem do dono do Firebase ou do firmware
 
-- confirmar se a escrita atual exige token e ver as Security Rules reais;
+- fechar a escrita pública provada no ensaio e conferir as Security Rules reais;
 - obter do sketch o broker, a porta e o tópico exatos e confirmar que a ponte está ativa;
 - escolher e provisionar a identidade do dispositivo `001`;
 - entregar o sketch/repositório do ESP32 para adaptar sem adivinhar bibliotecas;
