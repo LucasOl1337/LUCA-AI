@@ -2112,9 +2112,10 @@ a.luca-ai-attachment:focus-visible {
 .auth-card form { display: flex; flex-direction: column; gap: 18px; margin-top: 36px; }
 .auth-card label > span { display: block; margin: 0 0 8px 2px; color: var(--l-text-soft); font-size: 11px; font-weight: 650; }
 .auth-card label > div { height: 52px; display: flex; align-items: center; gap: 11px; padding: 0 15px; border: 1px solid var(--l-border); border-radius: 13px; background: var(--l-input); transition: border-color .15s, box-shadow .15s; }
-.auth-card label > div:focus-within { border-color: var(--l-border-hover); box-shadow: var(--l-focus); }
+.auth-card label > div:focus-within { border-color: var(--l-border); background: rgba(255, 255, 255, 0.11); box-shadow: none; }
 .auth-card label svg { width: 17px; height: 17px; flex: none; color: var(--l-text-ghost); }
 .auth-card label input { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--l-text); caret-color: var(--l-text); background: transparent; font-size: 14px; }
+.auth-card label input:focus-visible { box-shadow: none !important; }
 .auth-card label input::selection { color: inherit; background: var(--l-gold-soft); }
 .auth-card label input::placeholder { color: var(--l-text-ghost); }
 .auth-card label button { width: 34px; height: 34px; display: grid; flex: none; place-items: center; color: var(--l-text-mute); }

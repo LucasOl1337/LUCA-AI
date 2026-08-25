@@ -86,6 +86,7 @@ export function normalizeSompoTelemetry(raw, { observedAt = new Date().toISOStri
       rotation,
     },
     source: {
+      kind: 'firebase',
       provider: 'Firebase Realtime Database',
       path: SOMPO_TELEMETRY_PATH,
     },
@@ -116,19 +117,51 @@ export function buildSompoTelemetryMission(snapshot, teamLabel) {
   const { readings = {}, risks = {}, source = {} } = snapshot;
   const acceleration = readings.acceleration || {};
   const rotation = readings.rotation || {};
+  const simulation = source.kind === 'simulation';
+  const originLine = simulation
+    ? `Origem: ${source.provider || 'Simulador 3D local'} ${source.path || 'simulation://sompo'} (dados sintéticos; não enviados ao Firebase)`
+    : `Origem: ${source.provider || 'Firebase Realtime Database'} ${source.path || SOMPO_TELEMETRY_PATH}`;
+  const timestampLine = simulation
+    ? `Relógio da simulação: ${reading(snapshot.deviceTimestamp)} ms.`
+    : `Timestamp bruto do dispositivo: ${reading(snapshot.deviceTimestamp)} (contador enviado pelo ESP32; não interpretar como data/hora).`;
+  const alertHeading = simulation
+    ? 'Flags sintéticas selecionadas no cenário (não são limiares do firmware):'
+    : 'Alertas determinísticos enviados pelo dispositivo:';
+  const connectionLine = simulation
+    ? 'Estado do gerador local: ativo no navegador'
+    : `Canal do runtime: ${connectionLabel(snapshot.connection?.state)}`;
+  const lastEventLine = simulation
+    ? `Última amostra sintética: ${snapshot.connection?.lastEventAt || snapshot.observedAt || 'não informado'}`
+    : `Último evento recebido pelo canal: ${snapshot.connection?.lastEventAt || 'não informado'}`;
+  const freshnessLine = simulation
+    ? 'Atualização do cenário: amostra sintética atual'
+    : `Frescor do fluxo: ${freshnessLabel(snapshot.freshness)}`;
+  const observedLine = simulation
+    ? `Amostra disponível no LUCA em: ${snapshot.observedAt || 'não informado'}`
+    : `Leitura recebida pelo LUCA em: ${snapshot.observedAt || 'não informado'}`;
+  const changedLine = simulation
+    ? `Última atualização sintética: ${snapshot.changedAt || 'não informado'}`
+    : `Última mudança observada pelo runtime: ${snapshot.changedAt || 'não informado'}`;
+  const objective = simulation
+    ? 'Objetivo: exercitar a triagem operacional e securitária em um cenário virtual, avaliar a coerência das respostas e recomendar quais verificações devem ser repetidas no equipamento físico antes de qualquer decisão real.'
+    : 'Objetivo: avaliar a condição operacional e securitária do equipamento, priorizar risco imediato, explicar correlações defensáveis entre os sinais e recomendar próximas ações de campo para operador, manutenção e gestão de risco.';
+  const rules = simulation
+    ? 'Regras: este é um ensaio sintético local. Trate leituras e flags como hipóteses de teste, nunca como evidência do equipamento físico, do firmware ou de um sinistro real. Separe fatos do cenário, inferências e lacunas; valide qualquer conclusão em telemetria real antes de uma decisão operacional.'
+    : 'Regras: trate as flags de colisão e inclinação como fatos do firmware. Separe fatos, hipóteses e lacunas. Não invente limiares, calibração, localização, apólice ou impacto financeiro. As unidades não vieram no JSON; valide-as contra o firmware antes de sustentar uma decisão técnica ou de sinistro.';
 
   return [
-    `Telemetria SOMPO — trator ${snapshot.tractorId || '001'}`,
+    `${simulation ? '[SIMULAÇÃO] ' : ''}Telemetria SOMPO — trator ${snapshot.tractorId || '001'}`,
     `Equipe selecionada para avaliar: ${teamLabel || 'equipe de risco agro'}`,
-    `Origem: ${source.provider || 'Firebase Realtime Database'} ${source.path || SOMPO_TELEMETRY_PATH}`,
-    `Leitura recebida pelo LUCA em: ${snapshot.observedAt || 'não informado'}`,
-    `Última mudança observada pelo runtime: ${snapshot.changedAt || 'não informado'}`,
-    `Canal do runtime: ${connectionLabel(snapshot.connection?.state)}`,
-    `Último evento recebido pelo canal: ${snapshot.connection?.lastEventAt || 'não informado'}`,
-    `Frescor do fluxo: ${freshnessLabel(snapshot.freshness)}`,
-    `Timestamp bruto do dispositivo: ${reading(snapshot.deviceTimestamp)} (contador enviado pelo ESP32; não interpretar como data/hora).`,
+    originLine,
+    ...(simulation && source.scenarioLabel ? [`Cenário virtual: ${source.scenarioLabel}`] : []),
+    observedLine,
+    changedLine,
+    connectionLine,
+    lastEventLine,
+    freshnessLine,
+    timestampLine,
     '',
-    'Alertas determinísticos enviados pelo dispositivo:',
+    alertHeading,
     `- riscoColisao=${Boolean(risks.collision)}`,
     `- riscoInclinacao=${Boolean(risks.inclination)}`,
     '',
@@ -140,8 +173,8 @@ export function buildSompoTelemetryMission(snapshot, teamLabel) {
     `- aceleracao: x=${reading(acceleration.x)}, y=${reading(acceleration.y)}, z=${reading(acceleration.z)}, magnitude=${reading(acceleration.magnitude)}`,
     `- rotacao: x=${reading(rotation.x)}, y=${reading(rotation.y)}, z=${reading(rotation.z)}, magnitude=${reading(rotation.magnitude)}`,
     '',
-    'Objetivo: avaliar a condição operacional e securitária do equipamento, priorizar risco imediato, explicar correlações defensáveis entre os sinais e recomendar próximas ações de campo para operador, manutenção e gestão de risco.',
+    objective,
     '',
-    'Regras: trate as flags de colisão e inclinação como fatos do firmware. Separe fatos, hipóteses e lacunas. Não invente limiares, calibração, localização, apólice ou impacto financeiro. As unidades não vieram no JSON; valide-as contra o firmware antes de sustentar uma decisão técnica ou de sinistro.',
+    rules,
   ].join('\n');
 }

@@ -3,6 +3,7 @@ export const SOMPO_TELEMETRY_PATH: '/trator/001/sensores';
 export type SompoTelemetryFreshness = 'checking' | 'fresh' | 'stale';
 export type SompoTelemetryStatus = 'normal' | 'alert';
 export type SompoTelemetryConnectionState = 'connecting' | 'live' | 'reconnecting' | 'stopped';
+export type SompoTelemetrySourceKind = 'firebase' | 'simulation';
 
 export interface SompoTelemetryVector {
   x: number | null;
@@ -39,8 +40,11 @@ export interface SompoTelemetrySnapshot {
     rotation: SompoTelemetryVector;
   };
   source: {
+    kind: SompoTelemetrySourceKind;
     provider: string;
     path: string;
+    scenarioId?: string;
+    scenarioLabel?: string;
   };
 }
 

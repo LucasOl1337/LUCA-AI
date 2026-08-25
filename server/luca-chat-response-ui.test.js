@@ -32,3 +32,15 @@ test('shared response module owns collapsed replies and expanded final delivery'
   assert.match(styles, /\.luca-ai-response\[open\] \.luca-ai-response-chevron/);
   assert.doesNotMatch(styles, /luca-ai-individual-response|luca-ai-individual-chevron/);
 });
+
+test('running persona jobs merge progress into the visible transcript', () => {
+  assert.match(page, /function mergeTranscriptEntries/);
+  assert.match(page, /const applyRunProgress = useCallback/);
+  assert.ok((page.match(/applyRunProgress\(progress\)/g) || []).length >= 3);
+});
+
+test('duration label distinguishes operator send time from persona response time', () => {
+  const duration = between(page, 'function MessageDuration(', 'function PersonaResponseCard(');
+  assert.match(duration, /entry\.role === 'operator' \? 'Tempo de envio' : 'Tempo de resposta'/);
+  assert.match(duration, /aria-label=\{measured \? `\$\{metricLabel\}: \$\{duration\}`/);
+});

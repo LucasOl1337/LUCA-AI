@@ -7,6 +7,7 @@ export class PersonaRunWatchError extends Error {
 
 export interface PersonaRunStatus {
   status?: string;
+  progress?: { revision: number; [key: string]: unknown } | null;
   result?: unknown;
   error?: { message?: string; code?: string } | null;
   traceId?: string;
@@ -24,6 +25,7 @@ export interface PersonaRunWatchOptions {
   maxBackoffMs?: number;
   isTransient?: (error: unknown) => boolean;
   onTransientError?: (error: unknown, info: { runId: string; consecutiveMs: number }) => void;
+  onProgress?: (progress: { revision: number; [key: string]: unknown }) => void;
 }
 
 export function watchPersonaTeamRun(options: PersonaRunWatchOptions): Promise<unknown>;

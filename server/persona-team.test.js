@@ -432,6 +432,8 @@ test('buildPersonaTeamPrompt da etapa visual exige JSON de artefatos', () => {
   assert.match(prompt.user, /imageEngine/i);
   assert.match(prompt.user, /charts/i);
   assert.match(prompt.user, /infographic|explained-chart/i);
+  assert.match(prompt.user, /texto vis[ií]vel.*pt-BR/i);
+  assert.doesNotMatch(prompt.user, /prompts? (?:de imagem )?em ingl[eê]s|English infographic/i);
 });
 
 test('buildPersonaTeamPrompt declara o motor 9Router e bloqueia identidade GLM legada', () => {
@@ -570,6 +572,34 @@ test('runIndividualResolution isola participantes e chama o juiz depois de reuni
   assert.equal(result.replies.length, 2);
   assert.equal(result.judge.content, 'veredito consolidado');
   assert.equal(result.blindReplies, undefined);
+});
+
+test('runIndividualResolution inicia participantes em paralelo e publica quem termina primeiro', async () => {
+  let releaseFast;
+  let releaseSlow;
+  const fast = new Promise((resolve) => { releaseFast = resolve; });
+  const slow = new Promise((resolve) => { releaseSlow = resolve; });
+  const started = [];
+  const progress = [];
+  const run = runIndividualResolution({
+    participantSlugs: ['fast', 'slow'],
+    judgeSlug: 'judge',
+    runParticipant: ({ slug }) => {
+      started.push(slug);
+      return slug === 'fast' ? fast : slow;
+    },
+    runJudge: async ({ replies }) => ({ ok: true, slug: 'judge', content: String(replies.length) }),
+    onReply: ({ reply, phase }) => progress.push(`${phase}:${reply.slug}`),
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(started, ['fast', 'slow'], 'ambos iniciam antes de qualquer resposta concluir');
+  releaseFast({ ok: true, slug: 'fast', content: 'pronta' });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(progress, ['blind:fast'], 'a resposta pronta aparece sem esperar a irma lenta');
+  releaseSlow({ ok: true, slug: 'slow', content: 'pronta depois' });
+  await run;
+  assert.deepEqual(progress, ['blind:fast', 'blind:slow', 'judge:judge']);
 });
 
 test('runIndividualResolution no nivel 2 anonimiza replicas e entrega revisoes ao juiz', async () => {

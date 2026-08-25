@@ -27,7 +27,26 @@ function replyEntry(reply, { id, timestamp, stage, phase, content } = {}) {
     content: text,
     status: reply?.ok ? 'ok' : 'error',
     timestamp: reply?.completedAt || timestamp,
+    startedAt: reply?.startedAt || undefined,
+    completedAt: reply?.completedAt || undefined,
+    durationMs: Number.isFinite(reply?.durationMs) ? Math.max(0, reply.durationMs) : undefined,
   };
+}
+
+export function formatPersonaRunDuration(value) {
+  const durationMs = typeof value === 'number' ? value : Number.NaN;
+  if (!Number.isFinite(durationMs) || durationMs < 0) return '—';
+  if (durationMs < 100) return '<0,1 s';
+  if (durationMs < 60_000) {
+    return `${(durationMs / 1000).toLocaleString('pt-BR', {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    })} s`;
+  }
+  const totalSeconds = Math.round(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes} min ${String(seconds).padStart(2, '0')} s`;
 }
 
 export function transcriptEntriesFromPersonaRun(run = {}) {
@@ -41,7 +60,7 @@ export function transcriptEntriesFromPersonaRun(run = {}) {
       for (const reply of (step?.replies || [])) {
         const isVisual = step?.roleId === 'visual' && reply?.ok;
         const entry = replyEntry(reply, {
-          id: `r_${traceId}_${safePart(reply?.slug, 'persona')}_${safePart(step?.roleId, 'step')}_${entries.length}`,
+          id: `r_${traceId}_${safePart(reply?.slug, 'persona')}_${safePart(step?.id || step?.roleId, 'step')}`,
           timestamp,
           stage,
           phase: reply?.phase || step?.phase,
@@ -55,8 +74,12 @@ export function transcriptEntriesFromPersonaRun(run = {}) {
     return entries;
   }
   for (const reply of (run.replies || [])) {
+    const replyKey = [reply?.workflowRoleId, reply?.phase, reply?.cycle]
+      .map((value) => safePart(value, ''))
+      .filter(Boolean)
+      .join('-') || String(entries.length);
     const entry = replyEntry(reply, {
-      id: `r_${traceId}_${safePart(reply?.slug, 'persona')}_${entries.length}`,
+      id: `r_${traceId}_${safePart(reply?.slug, 'persona')}_${safePart(replyKey, String(entries.length))}`,
       timestamp,
       stage: reply?.workflowRoleLabel,
       phase: reply?.phase,
@@ -80,10 +103,23 @@ export function finalEntryFromPersonaRun(run = {}) {
       stage: 'Juiz',
       content: run.judge.content,
       status: run.judge.ok ? 'ok' : 'error',
-      timestamp,
+      timestamp: run.judge.completedAt || timestamp,
+      startedAt: run.judge.startedAt || undefined,
+      completedAt: run.judge.completedAt || undefined,
+      durationMs: Number.isFinite(run.judge.durationMs) ? Math.max(0, run.judge.durationMs) : undefined,
     };
   }
   if (!run.finalDisplay?.content) return null;
+  const finalReply = (Array.isArray(run.steps) ? run.steps : [])
+    .flatMap((step) => Array.isArray(step?.replies) ? step.replies : [])
+    .find((reply) => (
+      reply?.slug === run.finalDisplay.slug
+      && String(reply?.content || '').trim() === String(run.finalDisplay.content || '').trim()
+    )) || (Array.isArray(run.replies) ? run.replies : [])
+    .find((reply) => (
+      reply?.slug === run.finalDisplay.slug
+      && String(reply?.content || '').trim() === String(run.finalDisplay.content || '').trim()
+    ));
   return {
     id: `final_${traceId}`,
     role: 'persona',
@@ -93,6 +129,9 @@ export function finalEntryFromPersonaRun(run = {}) {
     stage: run.finalDisplay.roleLabel || 'Exibição final',
     content: run.finalDisplay.content,
     status: 'ok',
-    timestamp,
+    timestamp: finalReply?.completedAt || timestamp,
+    startedAt: finalReply?.startedAt || undefined,
+    completedAt: finalReply?.completedAt || undefined,
+    durationMs: Number.isFinite(finalReply?.durationMs) ? Math.max(0, finalReply.durationMs) : undefined,
   };
 }

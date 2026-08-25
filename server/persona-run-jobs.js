@@ -7,6 +7,7 @@ function publicJob(job) {
     status: job.status,
     startedAt: job.startedAt,
     completedAt: job.completedAt,
+    progress: job.progress,
     result: job.result,
     error: job.error,
   };
@@ -51,14 +52,24 @@ export function createPersonaRunJobStore({
       status: 'running',
       startedAt: now().toISOString(),
       completedAt: null,
+      progress: null,
       result: null,
       error: null,
     };
     jobs.set(runId, job);
 
     schedule(() => {
+      const reportProgress = (value) => {
+        if (job.status !== 'running' || !value || typeof value !== 'object') return;
+        const revision = Number(job.progress?.revision || 0) + 1;
+        job.progress = {
+          ...value,
+          revision,
+          updatedAt: now().toISOString(),
+        };
+      };
       Promise.resolve()
-        .then(() => execute(publicJob(job)))
+        .then(() => execute(publicJob(job), reportProgress))
         .then((result) => {
           job.status = 'complete';
           job.result = result;

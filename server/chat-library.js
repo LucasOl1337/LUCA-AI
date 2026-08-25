@@ -991,7 +991,8 @@ export function recordPersonaRunOnSession(sessionId, run = {}, meta = {}) {
         name: 'Operador',
         content: mission,
         status: 'info',
-        timestamp,
+        timestamp: String(run.startedAt || timestamp),
+        durationMs: 0,
         attachments: Array.isArray(run.attachments) ? run.attachments : [],
       });
     }

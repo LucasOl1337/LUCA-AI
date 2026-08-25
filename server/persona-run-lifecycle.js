@@ -103,9 +103,9 @@ export function createPersonaRunLifecycle({
     const job = jobs.start({
       ownerId: cleanOwnerId,
       traceId,
-      execute: (jobMeta) => inOwner(cleanOwnerId, async () => {
+      execute: (jobMeta, reportProgress) => inOwner(cleanOwnerId, async () => {
         try {
-          const result = await execute(jobMeta);
+          const result = await execute(jobMeta, reportProgress);
           if (sessionId) {
             const saved = sessions.complete(sessionId, result, {
               runId: jobMeta.runId,

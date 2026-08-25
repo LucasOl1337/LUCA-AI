@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   ArrowLeft,
   ArrowRight,
+  Box as BoxIcon,
   Building2,
+  Database,
   Filter,
   Loader2,
   MapPin,
@@ -47,7 +49,10 @@ import {
   type SompoProductLine,
 } from '@/lib/sompo-cases';
 import { buildSompoTelemetryMission } from '../../shared/sompo-telemetry.js';
+import { createSompoSimulationSnapshot } from '../../shared/sompo-telemetry-simulator.js';
 import '@/sompo-page.css';
+
+const SompoTruckSimulator = lazy(() => import('@/components/SompoTruckSimulator'));
 
 interface SompoPageProps {
   onNavigate: (page: PageId) => void;
@@ -56,6 +61,7 @@ interface SompoPageProps {
 type ProductFilter = 'all' | SompoProductLine;
 type SeverityFilter = 'all' | SompoCaseSeverity;
 type SompoViewMode = 'telemetry' | 'cases';
+type TelemetrySourceMode = 'firebase' | 'simulation';
 
 const PRODUCT_FILTERS: { id: ProductFilter; label: string }[] = [
   { id: 'all', label: 'Todos' },
@@ -110,6 +116,10 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
     ? location.gravidade as SompoCaseSeverity
     : 'all';
   const selectedId = location.caso || null;
+  const telemetrySourceMode: TelemetrySourceMode = location.fonte === 'simulacao' ? 'simulation' : 'firebase';
+  const [simulatedTelemetry, setSimulatedTelemetry] = useState<SompoTelemetrySnapshot>(() => (
+    createSompoSimulationSnapshot()
+  ));
   const [teamMode, setTeamMode] = useState<SompoLaunchMode>('team');
   const [teamPresets, setTeamPresets] = useState<LucaTeamPreset[]>(LUCA_TEAM_PRESETS);
   const [individualPresets, setIndividualPresets] = useState<LucaIndividualPreset[]>(LUCA_INDIVIDUAL_PRESETS);
@@ -223,8 +233,9 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
     });
   }, [productFilter, query, severityFilter]);
 
-  const telemetry = streamedTelemetry || bootstrapTelemetry;
-  const visibleTelemetryError = streamedTelemetry ? null : telemetryError;
+  const firebaseTelemetry = streamedTelemetry || bootstrapTelemetry;
+  const telemetry = telemetrySourceMode === 'simulation' ? simulatedTelemetry : firebaseTelemetry;
+  const visibleTelemetryError = telemetrySourceMode === 'firebase' && !streamedTelemetry ? telemetryError : null;
 
   const selected = useMemo(
     () => (selectedId ? SOMPO_EXAMPLE_CASES.find((item) => item.id === selectedId) || null : null),
@@ -265,7 +276,11 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
   }, [activeSquad, teamMode]);
 
   function setViewMode(mode: SompoViewMode) {
-    navigate({ aba: mode === 'cases' ? SOMPO_ABA : '', caso: mode === 'cases' ? location.caso : '' }, 'replace');
+    navigate({
+      aba: mode === 'cases' ? SOMPO_ABA : '',
+      caso: mode === 'cases' ? location.caso : '',
+      fonte: mode === 'cases' ? '' : location.fonte,
+    }, 'replace');
   }
 
   function setQuery(value: string) {
@@ -341,7 +356,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
         return;
       }
       queueSompoLaunch({
-        caseId: `telemetria-trator-${telemetry.tractorId}-${telemetry.deviceTimestamp ?? 'snapshot'}`,
+        caseId: `${telemetry.source.kind === 'simulation' ? 'simulacao' : 'telemetria'}-trator-${telemetry.tractorId}-${telemetry.deviceTimestamp ?? 'snapshot'}`,
         mission: buildSompoTelemetryMission(telemetry, activeSquad.label),
         mode: teamMode,
         presetId: activeSquad.id,
@@ -373,14 +388,14 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
               </div>
               <h1 className="sompo-title">SOMPO</h1>
               <p className="sompo-lead">
-                Acompanhe o ESP32 por uma conexão contínua ou leve um snapshot auditável
-                dos sinais reais para a equipe de agentes.
+                Acompanhe o ESP32 pelo Firebase ou teste cenários com o caminhão virtual,
+                sempre com a origem do snapshot preservada para a equipe de agentes.
               </p>
             </div>
             <div className="sompo-metrics">
               <div className="sompo-metric">
                 <strong>{telemetry?.tractorId || '001'}</strong>
-                <span>trator</span>
+                <span>{telemetrySourceMode === 'simulation' ? 'caminhão' : 'trator'}</span>
               </div>
               <div className="sompo-metric">
                 <strong>{SOMPO_EXAMPLE_CASES.length}</strong>
@@ -400,7 +415,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
               onClick={() => setViewMode('telemetry')}
             >
               <Activity />
-              <span><strong>Telemetria</strong><small>Dados reais do trator</small></span>
+              <span><strong>Telemetria</strong><small>Firebase + simulador 3D</small></span>
             </button>
             <button
               type="button"
@@ -413,18 +428,70 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
           </section>
 
           {viewMode === 'telemetry' ? (
-            <SompoTelemetryPanel
-              telemetry={telemetry}
-              loading={telemetryLoading}
-              refreshing={telemetryRefreshing}
-              error={visibleTelemetryError}
-              onRefresh={() => void loadTelemetry('manual')}
-            >
+            <>
+              <section className="sompo-source-switch" aria-label="Origem dos dados da telemetria">
+                <div className="sompo-source-switch-label">
+                  <span>Origem dos dados</span>
+                  <small>O Firebase continua ativo quando o simulador é aberto.</small>
+                </div>
+                <div className="sompo-source-switch-options">
+                  <button
+                    type="button"
+                    aria-pressed={telemetrySourceMode === 'firebase'}
+                    onClick={() => {
+                      navigate({ fonte: '' }, 'replace');
+                      setTelemetryLaunchError(null);
+                    }}
+                  >
+                    <Database />
+                    <span>
+                      <strong>Firebase</strong>
+                      <small>Dispositivo físico · fonte principal</small>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={telemetrySourceMode === 'simulation'}
+                    onClick={() => {
+                      navigate({ fonte: 'simulacao' }, 'replace');
+                      setTelemetryLaunchError(null);
+                    }}
+                  >
+                    <BoxIcon />
+                    <span>
+                      <strong>Simulador 3D</strong>
+                      <small>Three.js · ensaio local</small>
+                    </span>
+                  </button>
+                </div>
+              </section>
+
+              {telemetrySourceMode === 'simulation' && (
+                <Suspense fallback={(
+                  <div className="sompo-simulator-loading" role="status">
+                    <Loader2 className="animate-spin" /> Preparando laboratório 3D…
+                  </div>
+                )}>
+                  <SompoTruckSimulator onTelemetry={setSimulatedTelemetry} />
+                </Suspense>
+              )}
+
+              <SompoTelemetryPanel
+                telemetry={telemetry}
+                loading={telemetrySourceMode === 'firebase' && telemetryLoading}
+                refreshing={telemetrySourceMode === 'firebase' && telemetryRefreshing}
+                error={visibleTelemetryError}
+                onRefresh={telemetrySourceMode === 'firebase' ? () => void loadTelemetry('manual') : undefined}
+              >
                   <aside className="sompo-telemetry-action" aria-label="Enviar telemetria para os agentes">
                     <div className="sompo-telemetry-action-copy">
                       <span>Próxima etapa</span>
-                      <h3>Processar este snapshot com a equipe</h3>
-                      <p>O LUCA fecha a leitura atual em um briefing, registra alertas e lacunas e inicia uma sessão nova.</p>
+                      <h3>{telemetrySourceMode === 'simulation' ? 'Analisar este ensaio com a equipe' : 'Processar este snapshot com a equipe'}</h3>
+                      <p>
+                        {telemetrySourceMode === 'simulation'
+                          ? 'O LUCA marca o briefing como simulação, registra os sinais do cenário e inicia uma sessão nova.'
+                          : 'O LUCA fecha a leitura real em um briefing, registra alertas e lacunas e inicia uma sessão nova.'}
+                      </p>
                     </div>
                     <div className="sompo-telemetry-controls">
                       <div className="sompo-mode-switch" role="group" aria-label="Modo da equipe para telemetria">
@@ -472,19 +539,24 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
                       <button
                         type="button"
                         className="sompo-run-btn"
-                        disabled={!activeSquad || telemetryLaunching || sessionsBusy || templatesLoading}
+                        disabled={!telemetry || !activeSquad || telemetryLaunching || sessionsBusy || templatesLoading}
                         onClick={() => void runTelemetryWithSquad()}
                         data-sompo-telemetry-run
                       >
                         {telemetryLaunching || sessionsBusy ? (
                           <><Loader2 className="animate-spin" /> Preparando run…</>
                         ) : (
-                          <><Play /> Analisar na bancada <ArrowRight /></>
+                          <>
+                            <Play />
+                            {telemetrySourceMode === 'simulation' ? 'Analisar simulação' : 'Analisar na bancada'}
+                            <ArrowRight />
+                          </>
                         )}
                       </button>
                     </div>
-              </aside>
-            </SompoTelemetryPanel>
+                  </aside>
+              </SompoTelemetryPanel>
+            </>
           ) : (
             <>
               <section className="sompo-context" aria-label="Contexto setorial">
