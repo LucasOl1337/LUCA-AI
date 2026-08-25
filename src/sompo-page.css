@@ -197,6 +197,497 @@
   font-size: 10.5px;
 }
 
+/* —— Origem da telemetria —— */
+.sompo-source-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+  padding: 10px 12px 10px 14px;
+  border-radius: 16px;
+  background: rgba(7, 14, 11, 0.84);
+  box-shadow: 0 0 0 1px oklch(1 0 0 / 0.1);
+  backdrop-filter: blur(14px);
+}
+
+.sompo-source-switch-label > span,
+.sompo-source-switch-label > small {
+  display: block;
+}
+
+.sompo-source-switch-label > span {
+  color: rgba(240, 247, 242, 0.86);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.sompo-source-switch-label > small {
+  margin-top: 3px;
+  color: rgba(210, 230, 215, 0.52);
+  font-size: 10.5px;
+}
+
+.sompo-source-switch-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(200px, 1fr));
+  gap: 6px;
+}
+
+.sompo-source-switch-options button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 48px;
+  padding: 7px 11px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(220, 235, 225, 0.62);
+  text-align: left;
+  box-shadow: inset 0 0 0 1px oklch(1 0 0 / 0.08);
+  transition: background-color 140ms ease-out, color 140ms ease-out, transform 140ms ease-out;
+}
+
+.sompo-source-switch-options button:hover {
+  background: rgba(255, 255, 255, 0.075);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.sompo-source-switch-options button[aria-pressed='true'] {
+  background: rgba(201, 162, 39, 0.16);
+  color: #f3da8e;
+  box-shadow: inset 0 0 0 1px rgba(232, 201, 106, 0.28);
+}
+
+.sompo-source-switch-options button > svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.sompo-source-switch-options button span,
+.sompo-source-switch-options button strong,
+.sompo-source-switch-options button small {
+  display: block;
+}
+
+.sompo-source-switch-options button strong {
+  font-size: 12px;
+}
+
+.sompo-source-switch-options button small {
+  margin-top: 2px;
+  color: rgba(210, 230, 215, 0.48);
+  font-size: 10px;
+}
+
+.sompo-source-switch button:focus-visible,
+.sompo-simulator button:focus-visible,
+.sompo-simulator input:focus-visible {
+  outline: 2px solid #e8c96a;
+  outline-offset: 2px;
+}
+
+/* —— Laboratório 3D —— */
+.sompo-simulator,
+.sompo-simulator-loading {
+  margin-bottom: 14px;
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(9, 21, 15, 0.96), rgba(5, 12, 9, 0.95));
+  box-shadow:
+    0 0 0 1px rgba(232, 201, 106, 0.18),
+    0 20px 48px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(16px);
+}
+
+.sompo-simulator-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 360px;
+  color: rgba(236, 244, 238, 0.72);
+  font-size: 13px;
+}
+
+.sompo-simulator-loading svg {
+  width: 17px;
+  height: 17px;
+  color: #e8c96a;
+}
+
+.sompo-simulator-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 18px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.075);
+}
+
+.sompo-simulator-head > div > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #e8c96a;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.sompo-simulator-head > div > span svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sompo-simulator-head h2 {
+  margin-top: 5px !important;
+  color: rgba(255, 255, 255, 0.96);
+  font-size: clamp(1.05rem, 2vw, 1.28rem);
+  font-weight: 720;
+  letter-spacing: -0.02em;
+}
+
+.sompo-simulator-head p {
+  margin-top: 5px !important;
+  color: rgba(220, 235, 225, 0.58);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.sompo-simulator-head > strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgba(201, 162, 39, 0.12);
+  color: #efd477;
+  font-size: 10.5px;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(232, 201, 106, 0.22);
+}
+
+.sompo-simulator-head > strong svg {
+  width: 13px;
+  height: 13px;
+}
+
+.sompo-simulator-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.8fr);
+  min-height: 430px;
+}
+
+.sompo-simulator-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 430px;
+  overflow: hidden;
+  border-radius: 0 0 0 22px;
+  background:
+    radial-gradient(circle at 48% 42%, rgba(34, 96, 61, 0.2), transparent 42%),
+    linear-gradient(180deg, rgba(6, 18, 12, 0.52), rgba(3, 8, 6, 0.9));
+}
+
+.sompo-simulator-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.sompo-simulator-canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+.sompo-simulator-canvas canvas:active {
+  cursor: grabbing;
+}
+
+.sompo-simulator-webgl {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px;
+  color: rgba(220, 235, 225, 0.62);
+  text-align: center;
+}
+
+.sompo-simulator-webgl > svg {
+  width: 32px;
+  height: 32px;
+  color: #e8c96a;
+}
+
+.sompo-simulator-webgl strong {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 14px;
+}
+
+.sompo-simulator-webgl p {
+  font-size: 11.5px;
+}
+
+.sompo-simulator-stage-badges {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.sompo-simulator-stage-badges > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: rgba(4, 11, 8, 0.76);
+  color: rgba(229, 241, 232, 0.72);
+  font-size: 10px;
+  font-weight: 650;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.sompo-simulator-led {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #55f982;
+  box-shadow: 0 0 9px rgba(85, 249, 130, 0.72);
+}
+
+.sompo-simulator-camera {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  gap: 6px;
+}
+
+.sompo-simulator-camera button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 11px;
+  border-radius: 10px;
+  background: rgba(4, 11, 8, 0.8);
+  color: rgba(236, 245, 238, 0.76);
+  font-size: 10.5px;
+  font-weight: 680;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px);
+}
+
+.sompo-simulator-camera button:hover {
+  background: rgba(232, 201, 106, 0.14);
+  color: #f6df98;
+}
+
+.sompo-simulator-camera svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sompo-simulator-hint {
+  position: absolute;
+  left: 14px;
+  bottom: 17px;
+  color: rgba(220, 235, 225, 0.42);
+  font-size: 9.5px;
+  pointer-events: none;
+}
+
+.sompo-simulator-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  min-width: 0;
+  padding: 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.075);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.sompo-simulator-control-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sompo-simulator-control-head span,
+.sompo-simulator-control-head strong,
+.sompo-simulator-control-head p {
+  display: block;
+}
+
+.sompo-simulator-control-head span {
+  color: rgba(210, 230, 215, 0.48);
+  font-size: 9.5px;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.sompo-simulator-control-head strong {
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 14px;
+}
+
+.sompo-simulator-control-head p {
+  margin-top: 3px !important;
+  color: rgba(220, 235, 225, 0.5);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.sompo-simulator-control-head > button {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.055);
+  color: rgba(235, 243, 237, 0.68);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.sompo-simulator-control-head > button:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+}
+
+.sompo-simulator-control-head > button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.sompo-simulator-presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.sompo-simulator-presets button {
+  min-height: 38px;
+  padding: 5px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(225, 238, 228, 0.6);
+  font-size: 10.5px;
+  font-weight: 650;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.sompo-simulator-presets button:hover {
+  background: rgba(255, 255, 255, 0.075);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.sompo-simulator-presets button[aria-pressed='true'] {
+  background: rgba(201, 162, 39, 0.16);
+  color: #f2d985;
+  box-shadow: inset 0 0 0 1px rgba(232, 201, 106, 0.28);
+}
+
+.sompo-simulator-ranges {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.sompo-simulator-ranges label:first-child {
+  grid-column: 1 / -1;
+}
+
+.sompo-simulator-ranges label,
+.sompo-simulator-ranges label > span {
+  display: block;
+  min-width: 0;
+}
+
+.sompo-simulator-ranges label > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 5px;
+  color: rgba(220, 235, 225, 0.56);
+  font-size: 10px;
+}
+
+.sompo-simulator-ranges label > span strong {
+  color: rgba(255, 255, 255, 0.88);
+  font-variant-numeric: tabular-nums;
+}
+
+.sompo-simulator-ranges input {
+  width: 100%;
+  accent-color: #d4ad2d;
+  cursor: pointer;
+}
+
+.sompo-simulator-flags {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.sompo-simulator-flags button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 5px 8px;
+  border-radius: 10px;
+  background: rgba(48, 209, 88, 0.07);
+  color: #83ef9b;
+  font-size: 10px;
+  font-weight: 680;
+  box-shadow: inset 0 0 0 1px rgba(125, 255, 154, 0.16);
+}
+
+.sompo-simulator-flags button[aria-pressed='true'] {
+  background: rgba(255, 69, 58, 0.12);
+  color: #ff9189;
+  box-shadow: inset 0 0 0 1px rgba(255, 138, 130, 0.25);
+}
+
+.sompo-simulator-flags svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sompo-simulator-disclaimer {
+  margin-top: auto !important;
+  padding: 8px 9px;
+  border-radius: 9px;
+  background: rgba(201, 162, 39, 0.08);
+  color: rgba(239, 218, 151, 0.72);
+  font-size: 10px;
+  line-height: 1.4;
+  box-shadow: inset 0 0 0 1px rgba(232, 201, 106, 0.14);
+}
+
 /* —— Telemetria de campo —— */
 .sompo-telemetry {
   padding: 18px;
@@ -1372,6 +1863,16 @@
 
 /* responsive */
 @media (max-width: 1100px) {
+  .sompo-source-switch {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .sompo-simulator-workspace {
+    grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.85fr);
+  }
+
   .sompo-telemetry-action {
     grid-template-columns: minmax(220px, 1fr) minmax(260px, 1fr);
   }
@@ -1392,6 +1893,20 @@
 
   .sompo-context {
     grid-template-columns: 1fr;
+  }
+
+  .sompo-simulator-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .sompo-simulator-stage {
+    min-height: 360px;
+    border-radius: 0;
+  }
+
+  .sompo-simulator-controls {
+    border-top: 1px solid rgba(255, 255, 255, 0.075);
+    border-left: 0;
   }
 
   .sompo-sensor-grid {
@@ -1440,6 +1955,63 @@
     display: grid;
     grid-template-columns: 1fr;
     width: 100%;
+  }
+
+  .sompo-source-switch {
+    padding: 12px;
+  }
+
+  .sompo-source-switch-options {
+    grid-template-columns: 1fr;
+  }
+
+  .sompo-simulator,
+  .sompo-simulator-loading {
+    border-radius: 18px;
+  }
+
+  .sompo-simulator-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .sompo-simulator-stage {
+    min-height: 280px;
+  }
+
+  .sompo-simulator-stage-badges {
+    top: 10px;
+    left: 10px;
+    right: 10px;
+  }
+
+  .sompo-simulator-stage-badges > span:last-child,
+  .sompo-simulator-hint {
+    display: none;
+  }
+
+  .sompo-simulator-camera {
+    right: 10px;
+    bottom: 10px;
+  }
+
+  .sompo-simulator-camera button {
+    min-height: 42px;
+  }
+
+  .sompo-simulator-controls {
+    padding: 14px;
+  }
+
+  .sompo-simulator-ranges,
+  .sompo-simulator-flags {
+    grid-template-columns: 1fr;
+  }
+
+  .sompo-simulator-ranges label:first-child {
+    grid-column: auto;
   }
 
   .sompo-telemetry {

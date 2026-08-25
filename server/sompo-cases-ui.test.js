@@ -10,6 +10,8 @@ const layout = readFileSync(new URL('../src/components/Layout.tsx', import.meta.
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const sompoPage = readFileSync(new URL('../src/pages/SompoPage.tsx', import.meta.url), 'utf8');
 const sompoTelemetryPanel = readFileSync(new URL('../src/components/SompoTelemetryPanel.tsx', import.meta.url), 'utf8');
+const sompoSimulator = readFileSync(new URL('../src/components/SompoTruckSimulator.tsx', import.meta.url), 'utf8');
+const packageJson = readFileSync(new URL('../package.json', import.meta.url), 'utf8');
 const sompoCases = readFileSync(new URL('../src/lib/sompo-cases.ts', import.meta.url), 'utf8');
 const sompoCss = readFileSync(new URL('../src/sompo-page.css', import.meta.url), 'utf8');
 const lucaAiPage = readFileSync(new URL('../src/pages/LucaAiPage.tsx', import.meta.url), 'utf8');
@@ -60,6 +62,28 @@ test('modo SOMPO Telemetria assina o Firebase em tempo real e fecha snapshot par
   assert.match(sompoCss, /\.sompo-telemetry/);
   assert.match(sompoCss, /\.sompo-risk-grid/);
   assert.match(sompoCss, /\.sompo-sensor-grid/);
+});
+
+test('modo SOMPO oferece simulador 3D local sem substituir nem escrever no Firebase', () => {
+  assert.match(sompoPage, /TelemetrySourceMode = 'firebase' \| 'simulation'/);
+  assert.match(sompoPage, /useState<TelemetrySourceMode>\('firebase'\)/);
+  assert.match(sompoPage, /telemetrySourceMode === 'simulation' \? simulatedTelemetry : firebaseTelemetry/);
+  assert.match(sompoPage, /lazy\(\(\) => import\('@\/components\/SompoTruckSimulator'\)\)/);
+  assert.match(sompoPage, /Simulador 3D/);
+  assert.match(sompoPage, /setSimulatedTelemetry/);
+  assert.match(sompoSimulator, /from 'three'/);
+  assert.match(sompoSimulator, /OrbitControls/);
+  assert.match(sompoSimulator, /data-sompo-simulator/);
+  assert.match(sompoSimulator, /ESP32 VIRTUAL/);
+  assert.match(sompoSimulator, /Não envia ao Firebase/);
+  assert.match(sompoSimulator, /renderer\.dispose\(\)/);
+  assert.match(sompoSimulator, /cancelAnimationFrame/);
+  assert.match(sompoSimulator, /prefers-reduced-motion/);
+  assert.match(sompoTelemetryPanel, /source\.kind === 'simulation'/);
+  assert.match(sompoTelemetryPanel, /simulation \? 'off' : 'polite'/);
+  assert.match(sompoCss, /\.sompo-simulator-workspace/);
+  assert.match(packageJson, /"three":/);
+  assert.doesNotMatch(sompoSimulator, /fetch\(|lucaApi|setSompoTelemetry/);
 });
 
 test('página SOMPO usa grade com imagem e launch focado sem painel lateral fixo', () => {

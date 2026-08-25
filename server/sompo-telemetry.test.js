@@ -78,6 +78,7 @@ test('normaliza o contrato real do ESP32 e mantém flags determinísticas', () =
   assert.equal(snapshot.readings.distance, 70.66);
   assert.equal(snapshot.readings.acceleration.x, 10.01);
   assert.ok(snapshot.readings.acceleration.magnitude > 10);
+  assert.equal(snapshot.source.kind, 'firebase');
   assert.equal(snapshot.source.path, '/trator/001/sensores');
 });
 
