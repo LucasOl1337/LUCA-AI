@@ -34,12 +34,22 @@ for (const token of [
   'var(--l-void)',
   'var(--l-navy-deep)',
   'var(--l-navy-soft)',
-  'var(--l-focus)',
   'var(--l-gold-soft)',
   'var(--l-error-bg)',
   'rgba(10, 132, 255, 0.72)',
 ]) {
   assert.ok(section.includes(token), `missing product token ${token}`);
 }
+
+assert.match(
+  section,
+  /\.auth-card label > div:focus-within \{[^}]*border-color: var\(--l-border\);[^}]*box-shadow: none;/,
+  'auth fields keep a neutral border and no blue focus ring',
+);
+assert.match(
+  section,
+  /\.auth-card label input:focus-visible \{ box-shadow: none !important; \}/,
+  'auth inputs suppress the global blue focus ring',
+);
 
 console.log('auth-visual-tokens: ok');

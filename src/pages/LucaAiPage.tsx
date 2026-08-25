@@ -3908,12 +3908,13 @@ function MessageDuration({ entry }: { entry: TeamTranscriptEntry }) {
   const theme = useTheme();
   const measured = Number.isFinite(entry.durationMs) && Number(entry.durationMs) >= 0;
   const duration = formatPersonaRunDuration(entry.durationMs);
+  const metricLabel = entry.role === 'operator' ? 'Tempo de envio' : 'Tempo de resposta';
   return (
     <span
       className="inline-flex shrink-0 items-center gap-1 font-mono text-[10px]"
       style={{ color: theme.textGhost }}
-      title={measured ? `Tempo até a mensagem ficar pronta: ${duration}` : 'Tempo não registrado nesta mensagem antiga'}
-      aria-label={measured ? `Tempo de resposta: ${duration}` : 'Tempo de resposta não registrado'}
+      title={measured ? `${metricLabel}: ${duration}` : `${metricLabel} não registrado nesta mensagem antiga`}
+      aria-label={measured ? `${metricLabel}: ${duration}` : `${metricLabel} não registrado`}
     >
       <Timer className="h-3 w-3 opacity-70" aria-hidden="true" />
       {duration}
