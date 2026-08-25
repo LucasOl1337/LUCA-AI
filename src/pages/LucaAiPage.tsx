@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   Target,
   Terminal,
+  Timer,
   UserRound,
   Users,
   X,
@@ -47,6 +48,7 @@ import type {
 } from '@/lib/types';
 import {
   finalEntryFromPersonaRun,
+  formatPersonaRunDuration,
   personaRunOperatorEntryId,
   transcriptEntriesFromPersonaRun,
 } from '../../shared/persona-run-transcript.js';
@@ -82,12 +84,6 @@ import {
   type PersonaWorkflowAssignments,
   type PersonaWorkflowRoleId,
 } from '../../shared/persona-workflow.js';
-import {
-  classifyMissionDomain,
-  MISSION_DOMAIN_LABELS,
-  normalizeMissionDomain,
-  type MissionDomain,
-} from '../../shared/mission-triage.js';
 import {
   missionLedgerHasItems,
   type MissionLedger,
@@ -162,6 +158,9 @@ export interface TeamTranscriptEntry {
   content: string;
   status?: 'ok' | 'error' | 'info';
   timestamp: string;
+  startedAt?: string;
+  completedAt?: string;
+  durationMs?: number;
   attachments?: LucaAiChatAttachment[];
 }
 
@@ -213,14 +212,6 @@ const INDIVIDUAL_PHASE_LABELS: Record<LucaAiPersonaTeamPhase, string> = {
   consensus: 'Consenso',
   judge: 'Juiz',
 };
-
-const MISSION_DOMAIN_OPTIONS: Array<{ value: MissionDomain | 'auto'; label: string }> = [
-  { value: 'auto', label: 'Auto' },
-  { value: 'general', label: 'Geral' },
-  { value: 'insurance', label: 'Seguro' },
-  { value: 'code', label: 'Código' },
-  { value: 'sports', label: 'Esporte' },
-];
 
 const ROLE_LABEL_BY_ID = new Map(WORKFLOW_ROLES.map((role) => [role.id, role.label]));
 
@@ -606,8 +597,6 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const [workflowState, setWorkflowState] = useState<WorkflowAssignments>(createDefaultWorkflowAssignments());
   const [individualState, setIndividualState] = useState<IndividualAssignments>(createDefaultIndividualAssignments());
   const [individualDepth, setIndividualDepth] = useState<LucaAiIndividualDepth>(1);
-  const [domainOverride, setDomainOverride] = useState(false);
-  const [domainManual, setDomainManual] = useState<MissionDomain>('general');
   const [missionLedger, setMissionLedger] = useState<MissionLedger | null>(null);
   const [mission, setMission] = useState<string>('');
   const [draftAttachments, setDraftAttachments] = useState<LucaAiChatAttachment[]>([]);
@@ -734,7 +723,6 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setFinalResult(null);
       setVisualPack(null);
       setMissionLedger(null);
-      setDomainOverride(false);
       pendingSompoLaunchRef.current = launch;
       sompoAutoRunArmedRef.current = Boolean(launch?.autoRun);
       return;
@@ -766,17 +754,6 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setFinalResult(isTeamTranscriptEntry(session.finalResult) ? session.finalResult : null);
     setVisualPack(session.visualPack && typeof session.visualPack === 'object' ? session.visualPack as LucaAiVisualPack : null);
     setMissionLedger(session.missionLedger && missionLedgerHasItems(session.missionLedger) ? session.missionLedger : null);
-    if (session.missionDomainOverride) {
-      const storedDomain = normalizeMissionDomain(session.missionDomain);
-      if (storedDomain) {
-        setDomainOverride(true);
-        setDomainManual(storedDomain);
-      } else {
-        setDomainOverride(false);
-      }
-    } else {
-      setDomainOverride(false);
-    }
     setActivePersonaSlug(session.activePersonaSlug ? String(session.activePersonaSlug) : null);
     setHydratedSessionId(session.id);
     pendingSompoLaunchRef.current = launch;
@@ -1578,6 +1555,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       content: trimmedMission,
       status: 'info',
       timestamp: startedAt,
+      durationMs: 0,
       attachments: attachmentsToRun,
     };
     // Capture next transcript eagerly — setState is async and F5 must not lose the question.
@@ -1637,8 +1615,6 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           attachmentsToRun.map((attachment) => attachment.id),
           individualDepth,
           individualToRun.visual || undefined,
-          activeDomain,
-          domainOverride,
         )
         : await lucaApi.runLucaAiPersonaTeam(
           trimmedMission,
@@ -1649,8 +1625,6 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           modelOverrides,
           ownerSessionId,
           attachmentsToRun.map((attachment) => attachment.id),
-          activeDomain,
-          domainOverride,
         );
       if (!stillOwner()) return;
       if (data.traceId) setActiveTraceId(data.traceId);
@@ -1710,6 +1684,9 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         content: message,
         status: isWatchSoft ? 'info' : 'error',
         timestamp: new Date().toISOString(),
+        startedAt,
+        completedAt: new Date().toISOString(),
+        durationMs: Math.max(0, Date.now() - Date.parse(startedAt)),
       };
       const transcriptAfterError = [...transcriptWithOperator, errorEntry].slice(-140);
       setTranscript(transcriptAfterError);
@@ -1741,9 +1718,6 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const activeIndividualPresetId = useMemo(() => (
     individualPresets.find((preset) => individualPresetMatches(individualAssignments, preset))?.id ?? null
   ), [individualAssignments, individualPresets]);
-  const detectedDomain = classifyMissionDomain(mission || lastOperatorMission(transcript));
-  const activeDomain: MissionDomain = domainOverride ? domainManual : detectedDomain;
-
   const activePersona = activePersonaSlug ? personaBySlug.get(activePersonaSlug) ?? null : null;
   const activePersonaRoleIds = useMemo(() => (
     activePersonaSlug
@@ -1955,7 +1929,6 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
               operationMode={operationMode}
               missionDraft={mission}
               ledger={missionLedger}
-              domain={activeDomain}
             />
           ) : (
             <div className="h-full min-h-0 w-full overflow-y-auto px-4 py-4 sm:px-5">
@@ -2021,17 +1994,6 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
                 onOpenPicker={(id) => setPickerTarget({ mode: 'individual', id })}
                 onSetModel={setPersonaModel}
                 onDepthChange={setIndividualDepth}
-                domain={activeDomain}
-                domainOverride={domainOverride}
-                detectedDomain={detectedDomain}
-                onDomainChange={(next) => {
-                  if (next === 'auto') {
-                    setDomainOverride(false);
-                    return;
-                  }
-                  setDomainOverride(true);
-                  setDomainManual(next);
-                }}
                 onApplyPreset={(preset) => void applyIndividualPreset(preset)}
                 onOpenPersonas={() => onNavigate('personas')}
                 onClose={() => setTeamPanelOpen(false)}
@@ -2060,17 +2022,6 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
                 onApplyPreset={(preset) => void applyTeamPreset(preset)}
                 onOpenPersonas={() => onNavigate('personas')}
                 onClose={() => setTeamPanelOpen(false)}
-                domain={activeDomain}
-                domainOverride={domainOverride}
-                detectedDomain={detectedDomain}
-                onDomainChange={(next) => {
-                  if (next === 'auto') {
-                    setDomainOverride(false);
-                    return;
-                  }
-                  setDomainOverride(true);
-                  setDomainManual(next);
-                }}
               />
             )}
           </motion.aside>
@@ -2271,63 +2222,6 @@ function LucaAiStartState({
   );
 }
 
-function DomainTriageFieldset({
-  domain,
-  domainOverride,
-  detectedDomain,
-  disabled,
-  onDomainChange,
-}: {
-  domain: MissionDomain;
-  domainOverride: boolean;
-  detectedDomain: MissionDomain;
-  disabled?: boolean;
-  onDomainChange: (domain: MissionDomain | 'auto') => void;
-}) {
-  const theme = useTheme();
-  const selected = domainOverride ? domain : 'auto';
-  const detectedLabel = MISSION_DOMAIN_LABELS[detectedDomain] || 'Geral';
-  return (
-    <fieldset
-      className="rounded-xl border p-3"
-      data-luca-mission-domain
-      disabled={disabled}
-      style={{ borderColor: theme.border }}
-    >
-      <legend className="px-1 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: theme.textGhost }}>
-        Formato
-      </legend>
-      <div className="grid grid-cols-5 gap-1" role="radiogroup" aria-label="Formato da missão">
-        {MISSION_DOMAIN_OPTIONS.map((option) => {
-          const active = selected === option.value;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              className="rounded-lg border px-1 py-2 text-[10px] font-semibold transition"
-              onClick={() => onDomainChange(option.value)}
-              style={{
-                background: active ? theme.goldSoft : theme.input,
-                borderColor: active ? theme.borderActive : theme.border,
-                color: active ? theme.goldDeep : theme.textMute,
-              }}
-            >
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
-      <p className="mt-2 text-[10px] leading-relaxed" style={{ color: theme.textGhost }}>
-        {domainOverride
-          ? `Override manual: ${MISSION_DOMAIN_LABELS[domain] || domain}. Auto detectaria ${detectedLabel}.`
-          : `Triagem automática: ${detectedLabel}.`}
-      </p>
-    </fieldset>
-  );
-}
-
 function LucaIndividualPanel({
   personas,
   personaBySlug,
@@ -2349,10 +2243,6 @@ function LucaIndividualPanel({
   onOpenPicker,
   onSetModel,
   onDepthChange,
-  domain,
-  domainOverride,
-  detectedDomain,
-  onDomainChange,
   onOpenPersonas,
   onClose,
   activePresetId,
@@ -2379,10 +2269,6 @@ function LucaIndividualPanel({
   onOpenPicker: (id: IndividualPickerId) => void;
   onSetModel: (slug: string, model: string) => void | Promise<void>;
   onDepthChange: (depth: LucaAiIndividualDepth) => void;
-  domain: MissionDomain;
-  domainOverride: boolean;
-  detectedDomain: MissionDomain;
-  onDomainChange: (domain: MissionDomain | 'auto') => void;
   onOpenPersonas: () => void;
   onClose: () => void;
   activePresetId: string | null;
@@ -2553,13 +2439,6 @@ function LucaIndividualPanel({
               {INDIVIDUAL_DEPTH_OPTIONS.find((option) => option.value === depth)?.description}
             </p>
           </fieldset>
-          <DomainTriageFieldset
-            domain={domain}
-            domainOverride={domainOverride}
-            detectedDomain={detectedDomain}
-            disabled={running}
-            onDomainChange={onDomainChange}
-          />
           <div className="rounded-xl px-3 py-3 text-[11px] leading-relaxed" style={{ background: theme.surfaceHi, color: theme.textMute }}>
             {depth === 1
               ? 'Cada participante responde às cegas; depois, o juiz compara e decide.'
@@ -2617,10 +2496,6 @@ function LucaWorkflowPanel({
   activePresetId,
   applyingPresetId,
   onApplyPreset,
-  domain,
-  domainOverride,
-  detectedDomain,
-  onDomainChange,
 }: {
   personas: YumePersonaSummary[];
   personaBySlug: Map<string, YumePersonaSummary>;
@@ -2644,10 +2519,6 @@ function LucaWorkflowPanel({
   activePresetId: string | null;
   applyingPresetId: string | null;
   onApplyPreset: (preset: LucaTeamPreset) => void;
-  domain: MissionDomain;
-  domainOverride: boolean;
-  detectedDomain: MissionDomain;
-  onDomainChange: (domain: MissionDomain | 'auto') => void;
 }) {
   const theme = useTheme();
   const denom = Math.max(1, requiredRoleCount);
@@ -2685,15 +2556,6 @@ function LucaWorkflowPanel({
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        <div className="mb-3">
-          <DomainTriageFieldset
-            domain={domain}
-            domainOverride={domainOverride}
-            detectedDomain={detectedDomain}
-            disabled={running}
-            onDomainChange={onDomainChange}
-          />
-        </div>
         <PresetGallery
           title="Equipes prontas"
           presets={teamPresets}
@@ -3338,7 +3200,6 @@ export function LucaMissionCanvas({
   operationMode,
   missionDraft,
   ledger = null,
-  domain,
 }: {
   transcript: TeamTranscriptEntry[];
   finalResult: TeamTranscriptEntry | null;
@@ -3350,7 +3211,6 @@ export function LucaMissionCanvas({
   operationMode: OperationMode;
   missionDraft?: string;
   ledger?: MissionLedger | null;
-  domain?: MissionDomain;
 }) {
   const theme = useTheme();
   const headerStatus = running
@@ -3408,7 +3268,7 @@ export function LucaMissionCanvas({
             style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}
           >
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: theme.textGhost }}>
-              Diário da missão{domain ? ` · ${MISSION_DOMAIN_LABELS[domain] || domain}` : ''}
+              Diário da missão
             </p>
             <div className="grid gap-2 text-[12px] leading-relaxed" style={{ color: theme.textMute }}>
               {ledger.decisions.length > 0 && (
@@ -4001,6 +3861,23 @@ function PersonaAvatar({ persona, size = 'md' }: { persona: YumePersonaSummary; 
   );
 }
 
+function MessageDuration({ entry }: { entry: TeamTranscriptEntry }) {
+  const theme = useTheme();
+  const measured = Number.isFinite(entry.durationMs) && Number(entry.durationMs) >= 0;
+  const duration = formatPersonaRunDuration(entry.durationMs);
+  return (
+    <span
+      className="inline-flex shrink-0 items-center gap-1 font-mono text-[10px]"
+      style={{ color: theme.textGhost }}
+      title={measured ? `Tempo até a mensagem ficar pronta: ${duration}` : 'Tempo não registrado nesta mensagem antiga'}
+      aria-label={measured ? `Tempo de resposta: ${duration}` : 'Tempo de resposta não registrado'}
+    >
+      <Timer className="h-3 w-3 opacity-70" aria-hidden="true" />
+      {duration}
+    </span>
+  );
+}
+
 function PersonaResponseCard({
   entry,
   persona,
@@ -4034,6 +3911,7 @@ function PersonaResponseCard({
           {entry.model}
         </span>
       ) : null}
+      <MessageDuration entry={entry} />
       <span
         className={`luca-ai-message-copy${final ? ' ml-auto' : ''}`}
         onClick={(event) => event.stopPropagation()}
@@ -4098,6 +3976,9 @@ function TranscriptEntry({ entry, persona }: { entry: TeamTranscriptEntry; perso
           <span className="luca-ai-message-copy luca-ai-message-copy-operator">
             <CopyLogButton text={entry.content} label="Copiar mensagem enviada" />
           </span>
+          <div className="mt-1 flex justify-end pr-1">
+            <MessageDuration entry={entry} />
+          </div>
         </div>
       </motion.div>
     );
@@ -4118,9 +3999,7 @@ function TranscriptEntry({ entry, persona }: { entry: TeamTranscriptEntry; perso
             {entry.model}
           </span>
         ) : null}
-        <time className="ml-auto shrink-0 text-[10px] font-mono" style={{ color: theme.textGhost }}>
-          {new Date(entry.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-        </time>
+        <span className="ml-auto"><MessageDuration entry={entry} /></span>
         <span className="luca-ai-message-copy">
           <CopyLogButton text={entry.content} label={`Copiar mensagem de ${entry.name}`} />
         </span>
