@@ -578,12 +578,27 @@ export async function runIndividualResolution({
   runRevision,
   runConsensusTurn,
   runJudge,
+  onReply,
 }) {
+  const reportReply = (reply, metadata) => {
+    if (typeof onReply === 'function') {
+      try {
+        onReply({ reply, ...metadata });
+      } catch {
+        // Progresso e best-effort e nunca pode interromper a deliberacao.
+      }
+    }
+    return reply;
+  };
   const blindReplies = await Promise.all(
-    participantSlugs.map((slug) => runParticipant({ slug })),
+    participantSlugs.map((slug, participantIndex) => Promise.resolve(runParticipant({ slug }))
+      .then((reply) => reportReply(reply, { phase: 'blind', slug, participantIndex }))),
   );
   if (depth < 2 || (typeof runRevision !== 'function' && typeof runConsensusTurn !== 'function')) {
-    const judge = await runJudge({ slug: judgeSlug, replies: blindReplies });
+    const judge = reportReply(
+      await runJudge({ slug: judgeSlug, replies: blindReplies }),
+      { phase: 'judge', slug: judgeSlug },
+    );
     return { replies: blindReplies, judge };
   }
 
@@ -591,14 +606,19 @@ export async function runIndividualResolution({
     const consensus = await runConsensusRounds({
       participantSlugs,
       blindReplies,
-      runTurn: runConsensusTurn,
+      runTurn: (input) => Promise.resolve(runConsensusTurn(input))
+        .then((reply) => reportReply(reply, {
+          phase: 'consensus',
+          slug: input.slug,
+          cycle: input.cycle,
+        })),
     });
-    const judge = await runJudge({
+    const judge = reportReply(await runJudge({
       slug: judgeSlug,
       replies: consensus.replies,
       originalReplies: blindReplies,
       consensus,
-    });
+    }), { phase: 'judge', slug: judgeSlug });
     return { replies: consensus.replies, blindReplies, judge, consensus };
   }
 
@@ -611,13 +631,16 @@ export async function runIndividualResolution({
             ...redactAnonymousContribution(reply),
           }]
     ));
-    return runRevision({
+    return Promise.resolve(runRevision({
       slug,
       originalReply: blindReplies[participantIndex],
       contributions,
-    });
+    })).then((reply) => reportReply(reply, { phase: 'revision', slug, participantIndex }));
   }));
-  const judge = await runJudge({ slug: judgeSlug, replies, originalReplies: blindReplies });
+  const judge = reportReply(
+    await runJudge({ slug: judgeSlug, replies, originalReplies: blindReplies }),
+    { phase: 'judge', slug: judgeSlug },
+  );
   return { replies, blindReplies, judge };
 }
 

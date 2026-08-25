@@ -40,6 +40,29 @@ test('persona run job inicia running e termina complete com o resultado', async 
   assert.ok(completed.completedAt);
 });
 
+test('persona run job publica progresso enquanto o resultado final ainda esta pendente', async () => {
+  const work = deferred();
+  const store = createPersonaRunJobStore({ idFactory: () => 'run-progress' });
+  const started = store.start({
+    ownerId: 'user-1',
+    traceId: 'trace-progress',
+    execute: (_job, reportProgress) => {
+      reportProgress({ replies: [{ slug: 'aurora', content: 'primeira resposta' }] });
+      return work.promise;
+    },
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  const running = store.get(started.runId, 'user-1');
+  assert.equal(running.status, 'running');
+  assert.equal(running.result, null);
+  assert.equal(running.progress.revision, 1);
+  assert.equal(running.progress.replies[0].content, 'primeira resposta');
+
+  work.resolve({ ok: true, replies: [{ slug: 'aurora' }] });
+  await waitForStatus(store, started.runId, 'user-1', 'complete');
+});
+
 test('persona run job termina failed sem expor o job para outro workspace', async () => {
   const store = createPersonaRunJobStore({ idFactory: () => 'run-2' });
   const started = store.start({

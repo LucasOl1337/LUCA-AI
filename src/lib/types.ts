@@ -208,6 +208,11 @@ export interface LucaAiPersonaTeamRunAccepted {
   reused?: boolean;
 }
 
+export type LucaAiPersonaTeamRunProgress = Partial<LucaAiPersonaTeamRunResponse> & {
+  revision: number;
+  updatedAt?: string;
+};
+
 export interface LucaAiPersonaTeamRunStatus {
   ok: boolean;
   runId: string;
@@ -215,6 +220,7 @@ export interface LucaAiPersonaTeamRunStatus {
   status: 'running' | 'complete' | 'failed';
   startedAt: string;
   completedAt?: string | null;
+  progress?: LucaAiPersonaTeamRunProgress | null;
   result?: LucaAiPersonaTeamRunResponse | null;
   error?: {
     code?: string;

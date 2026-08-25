@@ -4,6 +4,7 @@ import type {
   LucaAiChatSession,
   LucaAiChatSessionShareResponse,
   LucaAiIndividualDepth,
+  LucaAiPersonaTeamRunProgress,
   LucaAiPersonaTeamRunAccepted,
   LucaAiPersonaTeamRunResponse,
   LucaAiPersonaTeamRunStatus,
@@ -31,7 +32,7 @@ const ACTION_REQUEST_TIMEOUT_MS = 20000;
 /** Aceite do job: borda pode hesitar sob carga; ainda deve ser bem abaixo do 524 (~100s). */
 const PERSONA_RUN_START_TIMEOUT_MS = 45_000;
 const PERSONA_RUN_POLL_TIMEOUT_MS = 12_000;
-const PERSONA_RUN_POLL_INTERVAL_MS = 1500;
+const PERSONA_RUN_POLL_INTERVAL_MS = 750;
 const PERSONA_RUN_MAX_WAIT_MS = 30 * 60 * 1000;
 /** Só desiste do acompanhamento se a borda ficar instável por este período seguido. */
 const PERSONA_RUN_MAX_CONSECUTIVE_ERROR_MS = 3 * 60 * 1000;
@@ -129,6 +130,7 @@ function wait(ms: number): Promise<void> {
 async function startPersonaTeamRun(
   body: Record<string, unknown>,
   base = apiBase,
+  onProgress?: (progress: LucaAiPersonaTeamRunProgress) => void,
 ): Promise<LucaAiPersonaTeamRunResponse> {
   const result = await startAndWatchPersonaTeamRun({
     traceId: String(body.traceId || ''),
@@ -147,6 +149,7 @@ async function startPersonaTeamRun(
     pollIntervalMs: PERSONA_RUN_POLL_INTERVAL_MS,
     maxConsecutiveErrorMs: PERSONA_RUN_MAX_CONSECUTIVE_ERROR_MS,
     isTransient: isTransientRequestError,
+    onProgress,
     wait,
   });
   return result as LucaAiPersonaTeamRunResponse;
@@ -155,6 +158,7 @@ async function startPersonaTeamRun(
 async function startPersonaTeamRunResume(
   input: { runId: string; traceId?: string },
   base = apiBase,
+  onProgress?: (progress: LucaAiPersonaTeamRunProgress) => void,
 ): Promise<LucaAiPersonaTeamRunResponse> {
   const runId = String(input.runId || '').trim();
   if (!runId) throw new Error('runId ausente para retomar a rodada.');
@@ -170,6 +174,7 @@ async function startPersonaTeamRunResume(
     pollIntervalMs: PERSONA_RUN_POLL_INTERVAL_MS,
     maxConsecutiveErrorMs: PERSONA_RUN_MAX_CONSECUTIVE_ERROR_MS,
     isTransient: isTransientRequestError,
+    onProgress,
     wait,
   });
   return result as LucaAiPersonaTeamRunResponse;
@@ -226,10 +231,12 @@ export const lucaApi = {
     attachmentIds: string[] = [],
     domain?: string,
     domainOverride?: boolean,
+    onProgress?: (progress: LucaAiPersonaTeamRunProgress) => void,
   ) =>
     startPersonaTeamRun(
       { mission, slugs, workflow, traceId, modelOverrides, sessionId, attachmentIds, domain, domainOverride },
       base,
+      onProgress,
     ),
   runLucaAiIndividualResolution: (
     mission: string,
@@ -244,17 +251,20 @@ export const lucaApi = {
     visualSlug?: string,
     domain?: string,
     domainOverride?: boolean,
+    onProgress?: (progress: LucaAiPersonaTeamRunProgress) => void,
   ) =>
     startPersonaTeamRun(
       { mission, mode: 'individual', slugs, judgeSlug, visualSlug: visualSlug || undefined, traceId, modelOverrides, sessionId, attachmentIds, depth, domain, domainOverride },
       base,
+      onProgress,
     ),
   /** Retoma o acompanhamento de um job já aceito (F5 / flap de borda). */
   resumePersonaTeamRun: (
     runId: string,
     traceId?: string,
     base?: string,
-  ) => startPersonaTeamRunResume({ runId, traceId }, base),
+    onProgress?: (progress: LucaAiPersonaTeamRunProgress) => void,
+  ) => startPersonaTeamRunResume({ runId, traceId }, base, onProgress),
   listEvents: (params: { traceId?: string; type?: string; limit?: number } = {}, base?: string) =>
     apiGet<{ ok: boolean; events: RuntimeEvent[] }>(`/api/events${queryString(params)}`, 8000, base),
   getChatLibrary: (base?: string) =>

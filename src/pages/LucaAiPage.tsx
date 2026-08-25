@@ -39,6 +39,7 @@ import type {
   LucaAiChatSessionShare,
   LucaAiIndividualDepth,
   LucaAiPersonaTeamPhase,
+  LucaAiPersonaTeamRunProgress,
   LucaAiPersonaTeamRunResponse,
   LucaAiVisualImageArtifact,
   LucaAiVisualPack,
@@ -318,6 +319,24 @@ function AttachmentList({ attachments }: { attachments?: LucaAiChatAttachment[] 
 
 function transcriptEntriesFromResponse(data: LucaAiPersonaTeamRunResponse): TeamTranscriptEntry[] {
   return transcriptEntriesFromPersonaRun(data) as TeamTranscriptEntry[];
+}
+
+function mergeTranscriptEntries(
+  current: TeamTranscriptEntry[],
+  incoming: TeamTranscriptEntry[],
+): TeamTranscriptEntry[] {
+  const merged = [...current];
+  const indexById = new Map(merged.map((entry, index) => [entry.id, index]));
+  for (const entry of incoming) {
+    const existingIndex = indexById.get(entry.id);
+    if (existingIndex === undefined) {
+      indexById.set(entry.id, merged.length);
+      merged.push(entry);
+    } else {
+      merged[existingIndex] = entry;
+    }
+  }
+  return merged.slice(-140);
 }
 
 function stripOuterMarkdown(value: string): string {
@@ -794,6 +813,20 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setErrorRetry(null);
   }, [operationMode]);
 
+  const applyRunProgress = useCallback((progress: LucaAiPersonaTeamRunProgress) => {
+    const partial = progress as LucaAiPersonaTeamRunResponse;
+    if (partial.traceId) setActiveTraceId(partial.traceId);
+    const nextMessages = transcriptEntriesFromResponse(partial);
+    if (nextMessages.length) {
+      setTranscript((prev) => mergeTranscriptEntries(prev, nextMessages));
+    }
+    const nextFinal = finalEntryFromPersonaRun(partial) as TeamTranscriptEntry | null;
+    if (nextFinal) setFinalResult(nextFinal);
+    if (partial.visualPack && typeof partial.visualPack === 'object') {
+      setVisualPack(partial.visualPack);
+    }
+  }, []);
+
   // Retoma acompanhamento de rodada marcada no servidor (524/F5/aba reaberta).
   useEffect(() => {
     if (!libraryReady || !activeSession || running) return;
@@ -822,7 +855,14 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
 
     void (async () => {
       try {
-        const data = await lucaApi.resumePersonaTeamRun(runId, traceId, bridgeBase);
+        const data = await lucaApi.resumePersonaTeamRun(
+          runId,
+          traceId,
+          bridgeBase,
+          (progress) => {
+            if (stillOwner()) applyRunProgress(progress);
+          },
+        );
         if (!stillOwner()) return;
         if (data.traceId) setActiveTraceId(data.traceId);
         if (data.recoveredFromSession) {
@@ -831,14 +871,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           return;
         }
         const nextMessages = transcriptEntriesFromResponse(data);
-        setTranscript((prev) => {
-          const existingIds = new Set(prev.map((entry) => entry.id));
-          const merged = [...prev];
-          for (const entry of nextMessages) {
-            if (!existingIds.has(entry.id)) merged.push(entry);
-          }
-          return merged.slice(-140);
-        });
+        setTranscript((prev) => mergeTranscriptEntries(prev, nextMessages));
         const nextFinal = finalEntryFromPersonaRun(data) as TeamTranscriptEntry | null;
         if (nextFinal) setFinalResult(nextFinal);
         if (data.visualPack && typeof data.visualPack === 'object') setVisualPack(data.visualPack);
@@ -861,7 +894,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         if (runOwnerSessionIdRef.current === ownerSessionId) runOwnerSessionIdRef.current = null;
       }
     })();
-  }, [activeSession, bridgeBase, libraryReady, noticeCompletedRunFailure, refreshChatLibrary, running]);
+  }, [activeSession, applyRunProgress, bridgeBase, libraryReady, noticeCompletedRunFailure, refreshChatLibrary, running]);
 
   const buildPersistPayload = useCallback((overrides: Record<string, unknown> = {}) => ({
     operationMode,
@@ -1615,6 +1648,11 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           attachmentsToRun.map((attachment) => attachment.id),
           individualDepth,
           individualToRun.visual || undefined,
+          undefined,
+          false,
+          (progress) => {
+            if (stillOwner()) applyRunProgress(progress);
+          },
         )
         : await lucaApi.runLucaAiPersonaTeam(
           trimmedMission,
@@ -1625,6 +1663,11 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           modelOverrides,
           ownerSessionId,
           attachmentsToRun.map((attachment) => attachment.id),
+          undefined,
+          false,
+          (progress) => {
+            if (stillOwner()) applyRunProgress(progress);
+          },
         );
       if (!stillOwner()) return;
       if (data.traceId) setActiveTraceId(data.traceId);

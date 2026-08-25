@@ -121,6 +121,29 @@ test('Persona Run Lifecycle persiste antes de publicar complete', async () => {
   assert.equal(sessions.sessions.get('session-1').activePersonaRun, null);
 });
 
+test('Persona Run Lifecycle encaminha progresso antes da persistencia final', async () => {
+  const { lifecycle } = fixture({
+    jobs: createPersonaRunJobStore({ idFactory: () => 'run-progress' }),
+  });
+  const work = deferred();
+  const accepted = lifecycle.start({
+    ownerId: 'owner-1',
+    input: { traceId: 'trace-progress', sessionId: 'session-1' },
+    execute: (_job, reportProgress) => {
+      reportProgress({ replies: [{ slug: 'maestro', content: 'parcial' }] });
+      return work.promise;
+    },
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  const running = lifecycle.get(accepted.runId, 'owner-1');
+  assert.equal(running.status, 'running');
+  assert.equal(running.progress.replies[0].content, 'parcial');
+
+  work.resolve({ ok: true, generatedAt: '2026-08-25T12:30:00.000Z' });
+  await waitForStatus(lifecycle, accepted.runId, 'complete');
+});
+
 test('Persona Run Lifecycle marca falha duravel e preserva o erro do job', async () => {
   const { sessions, lifecycle } = fixture({
     jobs: createPersonaRunJobStore({ idFactory: () => 'run-fail' }),

@@ -60,7 +60,7 @@ export function transcriptEntriesFromPersonaRun(run = {}) {
       for (const reply of (step?.replies || [])) {
         const isVisual = step?.roleId === 'visual' && reply?.ok;
         const entry = replyEntry(reply, {
-          id: `r_${traceId}_${safePart(reply?.slug, 'persona')}_${safePart(step?.roleId, 'step')}_${entries.length}`,
+          id: `r_${traceId}_${safePart(reply?.slug, 'persona')}_${safePart(step?.id || step?.roleId, 'step')}`,
           timestamp,
           stage,
           phase: reply?.phase || step?.phase,
@@ -74,8 +74,12 @@ export function transcriptEntriesFromPersonaRun(run = {}) {
     return entries;
   }
   for (const reply of (run.replies || [])) {
+    const replyKey = [reply?.workflowRoleId, reply?.phase, reply?.cycle]
+      .map((value) => safePart(value, ''))
+      .filter(Boolean)
+      .join('-') || String(entries.length);
     const entry = replyEntry(reply, {
-      id: `r_${traceId}_${safePart(reply?.slug, 'persona')}_${entries.length}`,
+      id: `r_${traceId}_${safePart(reply?.slug, 'persona')}_${safePart(replyKey, String(entries.length))}`,
       timestamp,
       stage: reply?.workflowRoleLabel,
       phase: reply?.phase,

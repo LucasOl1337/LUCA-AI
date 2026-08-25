@@ -32,3 +32,9 @@ test('shared response module owns collapsed replies and expanded final delivery'
   assert.match(styles, /\.luca-ai-response\[open\] \.luca-ai-response-chevron/);
   assert.doesNotMatch(styles, /luca-ai-individual-response|luca-ai-individual-chevron/);
 });
+
+test('running persona jobs merge progress into the visible transcript', () => {
+  assert.match(page, /function mergeTranscriptEntries/);
+  assert.match(page, /const applyRunProgress = useCallback/);
+  assert.ok((page.match(/applyRunProgress\(progress\)/g) || []).length >= 3);
+});

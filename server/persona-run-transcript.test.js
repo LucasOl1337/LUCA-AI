@@ -61,6 +61,29 @@ test('final workflow entry inherits timing from its source reply', () => {
   assert.equal(entry.durationMs, reply.durationMs);
 });
 
+test('workflow reply ids stay stable while sibling replies arrive', () => {
+  const first = {
+    ok: true,
+    slug: 'fast',
+    name: 'Fast',
+    content: 'Resposta rapida.',
+  };
+  const partial = transcriptEntriesFromPersonaRun({
+    traceId: 'progress-id',
+    steps: [{ roleId: 'execution', roleLabel: 'Execucao', replies: [first] }],
+  });
+  const complete = transcriptEntriesFromPersonaRun({
+    traceId: 'progress-id',
+    steps: [{
+      roleId: 'execution',
+      roleLabel: 'Execucao',
+      replies: [{ ok: true, slug: 'slow', name: 'Slow', content: 'Resposta lenta.' }, first],
+    }],
+  });
+
+  assert.equal(partial[0].id, complete.find((entry) => entry.slug === 'fast').id);
+});
+
 test('duration formatter stays compact and marks legacy messages', () => {
   assert.equal(formatPersonaRunDuration(undefined), '—');
   assert.equal(formatPersonaRunDuration(0), '<0,1 s');
