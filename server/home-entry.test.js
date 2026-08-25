@@ -32,7 +32,10 @@ test('home ships binary mode entry with cyber agent art', () => {
 
 test('mode CTA hands its choice to the real workbench once', () => {
   assert.ok(landing.includes("sessionStorage.setItem('luca.lucaAi.entryMode', mode)"));
+  assert.ok(landing.includes("modo: mode === 'individual' ? 'individual' : ''"));
   assert.ok(workbench.includes('window.sessionStorage.getItem(LUCA_AI_ENTRY_MODE_STORAGE_KEY)'));
   assert.ok(workbench.includes('window.sessionStorage.removeItem(LUCA_AI_ENTRY_MODE_STORAGE_KEY)'));
   assert.ok(/setOperationMode\([^)]*consumeEntryMode\(\)/.test(workbench));
+  assert.ok(workbench.includes("location.modo === 'individual' ? 'individual' : 'team'"));
+  assert.equal(workbench.includes("session.operationMode === 'individual' ? 'individual' : 'team'"), false);
 });

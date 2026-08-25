@@ -9,6 +9,8 @@ import {
   UsersRound,
 } from 'lucide-react';
 import { useLuca } from '@/hooks/useLucaState';
+import { useDeferredFlag } from '@/hooks/useDeferredFlag';
+import { useAppLocation } from '@/hooks/useAppLocation';
 import type { PageId } from '@/components/Layout';
 import '@/home-page.css';
 
@@ -65,6 +67,7 @@ function ModeArtwork({ mode }: { mode: HomeEntryMode }) {
 
 export default function LandingPage({ onNavigate }: LandingPageProps) {
   const reduceMotion = useReducedMotion();
+  const { navigate } = useAppLocation();
   const {
     backendReady,
     connectionState,
@@ -77,16 +80,18 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
   const cloudRuntime = runtimeMode === 'cloud';
   const runtimeOnline = cloudRuntime ? connectionState !== 'offline' : backendReady;
   const checking = connectionState === 'checking';
-  const systemBadge = checking ? 'conectando' : runtimeOnline ? 'online' : 'offline';
+  const showChecking = useDeferredFlag(checking);
+  const confirmOffline = !checking && !runtimeOnline;
+  const systemBadge = showChecking ? 'conectando' : runtimeOnline ? 'online' : confirmOffline ? 'offline' : 'online';
   const needsRecovery = Boolean(operationError) || (!checking && !runtimeOnline);
-  const statusTone = operationError || !runtimeOnline
+  const statusTone = operationError || confirmOffline
     ? 'error'
-    : checking
+    : showChecking
       ? 'warning'
       : 'ok';
   const statusCopy = operationError
     ? operationError
-    : checking
+    : showChecking
       ? 'Conectando ao runtime para preparar o LUCA-AI e o catálogo de personas.'
       : cloudRuntime
         ? 'Modo público online. O runtime da VM está conectado ao 9Router e pronto para atender o LUCA-AI.'
@@ -96,7 +101,7 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
 
   function startMode(mode: HomeEntryMode) {
     window.sessionStorage.setItem('luca.lucaAi.entryMode', mode);
-    onNavigate('luca-ai');
+    navigate({ page: 'luca-ai', modo: mode === 'individual' ? 'individual' : '' }, 'push');
   }
 
   async function retryConnection() {

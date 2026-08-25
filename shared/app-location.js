@@ -76,6 +76,7 @@ const EMPTY_QUERY = Object.freeze({
   conta: '',
   ordem: '',
   fonte: '',
+  modo: '',
 });
 
 export function emptyAppLocation() {
@@ -133,6 +134,7 @@ function parseQuery(search) {
     conta: readParam(search, 'conta'),
     ordem,
     fonte: readParam(search, 'fonte') === 'simulacao' ? 'simulacao' : '',
+    modo: readParam(search, 'modo') === 'individual' ? 'individual' : '',
   };
 }
 
@@ -224,6 +226,7 @@ export function formatAppUrl(location) {
   if (page === 'luca-ai') {
     setIfPresent(params, 'sessao', loc.sessao);
     if (loc.aba === LUCA_ABA) params.set('aba', LUCA_ABA);
+    if (loc.modo === 'individual') params.set('modo', 'individual');
   }
 
   const query = params.toString();

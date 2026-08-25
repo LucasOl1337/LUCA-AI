@@ -42,6 +42,7 @@ export function AppLocationProvider({ children }: { children: ReactNode }) {
 
   const apply = useCallback((next: AppLocation, history: HistoryMode) => {
     const nextHref = formatAppUrl(next);
+    locationRef.current = parseAppLocation(nextHref);
     const now = currentHref();
     if (nextHref === now) {
       setHref(nextHref);

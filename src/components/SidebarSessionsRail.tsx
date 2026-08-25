@@ -12,6 +12,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useChatLibrary } from '@/hooks/useChatLibrary';
+import { useDeferredFlag } from '@/hooks/useDeferredFlag';
 import { useAppLocation } from '@/hooks/useAppLocation';
 
 interface SidebarSessionsRailProps {
@@ -22,10 +23,13 @@ interface SidebarSessionsRailProps {
 export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: SidebarSessionsRailProps) {
   const { navigate } = useAppLocation();
   const {
+    ready,
     busy,
+    error,
     folders,
     sessions,
     activeSessionId,
+    refresh,
     createSession,
     activateSession,
     deleteSession,
@@ -40,6 +44,9 @@ export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: S
   const [menuFolderId, setMenuFolderId] = useState<string | null>(null);
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+
+  const showSessionSkeleton = useDeferredFlag(!ready && sessions.length === 0);
+  const searching = query.trim().length > 0;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -56,7 +63,13 @@ export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: S
   );
 
   async function handleActivate(sessionId: string) {
-    navigate({ page: 'luca-ai', sessao: sessionId, aba: '' }, 'push');
+    const session = sessions.find((item) => item.id === sessionId);
+    navigate({
+      page: 'luca-ai',
+      sessao: sessionId,
+      aba: '',
+      modo: session?.operationMode === 'individual' ? 'individual' : '',
+    }, 'push');
     onOpenLucaAi?.();
     await activateSession(sessionId);
   }
@@ -161,7 +174,36 @@ export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: S
         </div>
       )}
 
+      {error ? (
+        <div className="luca-sidebar-library-error" data-sidebar-sessions-error data-tone="error" role="alert">
+          <p>{error}</p>
+          <button type="button" data-sidebar-sessions-retry onClick={() => void refresh()} disabled={busy}>
+            Tentar novamente
+          </button>
+        </div>
+      ) : null}
+
       <div className="luca-sidebar-session-scroll">
+        {showSessionSkeleton ? (
+          <div className="luca-sidebar-skeleton" data-sidebar-sessions-loading role="status" aria-label="Carregando sessões">
+            <span /><span /><span /><span />
+          </div>
+        ) : null}
+
+        {!showSessionSkeleton && searching && filtered.length === 0 && sessions.length > 0 ? (
+          <div className="luca-sidebar-empty-block" data-sidebar-sessions-empty="search">
+            <p>Nenhuma sessão para “{query.trim()}”.</p>
+            <button type="button" onClick={() => setQuery('')}>Limpar busca</button>
+          </div>
+        ) : null}
+
+        {!showSessionSkeleton && !searching && sessions.length === 0 && folders.length === 0 && !error ? (
+          <div className="luca-sidebar-empty-block" data-sidebar-sessions-empty="library">
+            <p>Nenhum chat ainda. A primeira sessão guarda a missão e o rumo da equipe.</p>
+            <button type="button" disabled={busy} onClick={() => void handleCreate(null)}>Começar o primeiro chat</button>
+          </div>
+        ) : null}
+
         {folders.map((folder) => {
           const children = filtered.filter((session) => session.folderId === folder.id);
           const isCollapsed = Boolean(collapsed[folder.id]);
@@ -223,7 +265,14 @@ export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: S
               </div>
               {!isCollapsed && (
                 children.length === 0
-                  ? <p className="luca-sidebar-empty">Sem sessões</p>
+                  ? (
+                    <div className="luca-sidebar-empty-block compact" data-sidebar-sessions-empty="folder">
+                      <p>Este projeto ainda não tem sessões.</p>
+                      <button type="button" disabled={busy} onClick={() => void handleCreate(folder.id)}>
+                        Nova sessão aqui
+                      </button>
+                    </div>
+                  )
                   : children.map((session) => (
                     <SessionItem
                       key={session.id}
@@ -260,9 +309,16 @@ export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: S
               </button>
             </div>
           </div>
-          {rootSessions.length === 0 ? (
-            <p className="luca-sidebar-empty">Nenhum chat</p>
-          ) : rootSessions.map((session) => (
+          {sessions.length > 0 && rootSessions.length === 0 ? (
+            <div className="luca-sidebar-empty-block compact" data-sidebar-sessions-empty="recent">
+              <p>{searching ? 'Nada recente com essa busca.' : 'Nenhum chat fora de projeto.'}</p>
+              {searching ? (
+                <button type="button" onClick={() => setQuery('')}>Limpar busca</button>
+              ) : (
+                <button type="button" disabled={busy} onClick={() => void handleCreate(null)}>Nova sessão recente</button>
+              )}
+            </div>
+          ) : rootSessions.length === 0 && sessions.length === 0 ? null : rootSessions.map((session) => (
             <SessionItem
               key={session.id}
               title={session.title}

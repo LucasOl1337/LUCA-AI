@@ -60,6 +60,37 @@ test('SOMPO, admin, configuração e bancada serializam só o que não é defaul
   assert.equal(formatAppUrl({ page: 'configuracao', tipo: 'team' }), '/configuracao');
   assert.equal(formatAppUrl({ page: 'configuracao', tipo: 'individual', novo: true }), '/configuracao?tipo=individual&novo=1');
   assert.equal(formatAppUrl({ page: 'luca-ai', aba: 'atividade', sessao: 'abc' }), '/luca-ai?sessao=abc&aba=atividade');
+  assert.equal(formatAppUrl({ page: 'luca-ai', modo: 'individual' }), '/luca-ai?modo=individual');
+});
+
+test('toda tela alcançável redonda no parser sem perder o endereço', () => {
+  const screens = [
+    ['/', '/'],
+    ['/cadastro', '/cadastro'],
+    ['/entrar', '/'],
+    ['/personas', '/personas'],
+    ['/personas?filtro=oficiais', '/personas?filtro=oficiais'],
+    ['/personas?busca=juiz&filtro=oficiais', '/personas?busca=juiz&filtro=oficiais'],
+    ['/personas?filtro=secundarias', '/personas?filtro=secundarias'],
+    ['/configuracao', '/configuracao'],
+    ['/configuracao?tipo=individual', '/configuracao?tipo=individual'],
+    ['/configuracao?novo=1', '/configuracao?novo=1'],
+    ['/configuracao?tipo=individual&modelo=risco-agro', '/configuracao?tipo=individual&modelo=risco-agro'],
+    ['/sompo', '/sompo'],
+    ['/sompo?fonte=simulacao', '/sompo?fonte=simulacao'],
+    ['/sompo?aba=casos', '/sompo?aba=casos'],
+    ['/sompo?aba=casos&produto=penhor&gravidade=alta&caso=penhor-trator-incendio', '/sompo?aba=casos&produto=penhor&gravidade=alta&caso=penhor-trator-incendio'],
+    ['/luca-ai', '/luca-ai'],
+    ['/luca-ai?modo=individual', '/luca-ai?modo=individual'],
+    ['/luca-ai?sessao=abc&aba=atividade&modo=individual', '/luca-ai?sessao=abc&aba=atividade&modo=individual'],
+    ['/admin', '/admin'],
+    ['/admin?busca=ana&ordem=prompts', '/admin?busca=ana&ordem=prompts'],
+    ['/admin?conta=u1&sessao=s1', '/admin?conta=u1&sessao=s1'],
+    ['/leitura/token-publico', '/leitura/token-publico'],
+  ];
+  for (const [href, expected] of screens) {
+    assert.equal(formatAppUrl(parseAppLocation(href)), expected, href);
+  }
 });
 
 test('produto aceita id antigo e escreve o apelido curto', () => {

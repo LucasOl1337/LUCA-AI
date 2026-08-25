@@ -33,6 +33,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { buildApiErrorMessage, lucaApi, PersonaRunWatchError } from '@/lib/api';
+import { pickFailureCopy } from '@/lib/surface-failure';
+import { useDeferredFlag } from '@/hooks/useDeferredFlag';
 import type {
   LucaAiChatAttachment,
   LucaAiChatSession,
@@ -609,6 +611,8 @@ function plannedRuntimeEvents(traceId: string, mission: string, assignments: Wor
 export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const { runtimeMode, refresh } = useLuca();
   const { location, navigate } = useAppLocation();
+  const modoRef = useRef(location.modo);
+  modoRef.current = location.modo;
   const [personas, setPersonas] = useState<YumePersonaSummary[]>([]);
   const [routerProfiles, setRouterProfiles] = useState<RouterModelProfile[]>([]);
   const [teamPresets, setTeamPresets] = useState<LucaTeamPreset[]>(LUCA_TEAM_PRESETS);
@@ -712,8 +716,11 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       if (templates?.team) setTeamPresets(templates.team.map(hydrateTeamTemplate));
       if (templates?.individual) setIndividualPresets(templates.individual.map(hydrateIndividualTemplate));
     } catch (err) {
-      const fallback = 'Falha ao carregar personas do Yume.';
-      setError(buildApiErrorMessage(err, fallback));
+      setError(pickFailureCopy(err, {
+        offline: 'Sem internet. A bancada não montou a equipe — reconecte e tente de novo.',
+        forbidden: 'Esta conta não pode ver as personas da bancada. Peça acesso a quem opera o Yume.',
+        server: 'As personas do Yume não chegaram. Tente de novo ou abra o catálogo.',
+      }));
       setErrorRetry('personas');
     } finally {
       setLoading(false);
@@ -736,6 +743,12 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     navigate({ aba }, 'replace');
   }, [activeWorkspaceView, location.aba, location.page, navigate]);
 
+  useEffect(() => {
+    if (location.page !== 'luca-ai') return;
+    const next = location.modo === 'individual' ? 'individual' : 'team';
+    setOperationMode((prev) => (prev === next ? prev : next));
+  }, [location.modo, location.page]);
+
   const applySession = useCallback((session: LucaAiChatSession | null | undefined) => {
     setRunning(false);
     setProcessEvents([]);
@@ -749,7 +762,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       boundSessionIdRef.current = null;
       setHydratedSessionId(null);
       const launch = consumeSompoLaunch();
-      setOperationMode(launch?.mode || consumeEntryMode() || 'team');
+      setOperationMode(launch?.mode || consumeEntryMode() || (modoRef.current === 'individual' ? 'individual' : 'team'));
       setWorkflowState(createDefaultWorkflowAssignments());
       setIndividualState(createDefaultIndividualAssignments());
       setMission(launch?.mission || '');
@@ -768,7 +781,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       .filter(isTeamTranscriptEntry);
     const workspaceEmpty = !sessionMission && nextTranscript.length === 0;
     const launch = workspaceEmpty ? consumeSompoLaunch() : null;
-    setOperationMode(launch?.mode || consumeEntryMode() || (session.operationMode === 'individual' ? 'individual' : 'team'));
+    setOperationMode(launch?.mode || consumeEntryMode() || (modoRef.current === 'individual' ? 'individual' : 'team'));
     setWorkflowState(session.workflowAssignments
       ? resolvePersonaWorkflow(session.workflowAssignments).assignments
       : createDefaultWorkflowAssignments());
@@ -975,7 +988,11 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       const data = await lucaApi.getChatSessionShare(activeSessionId, bridgeBase);
       setShareInfo(data.share ?? null);
     } catch (err) {
-      setShareError(buildApiErrorMessage(err, 'Falha ao consultar o link de compartilhamento.'));
+      setShareError(pickFailureCopy(err, {
+        offline: 'Sem internet. O painel de compartilhamento continua aberto — reconecte e consulte de novo.',
+        forbidden: 'Esta conta não pode ver o link público desta sessão.',
+        server: 'O link de compartilhamento não foi consultado. Tente de novo.',
+      }));
     } finally {
       setShareBusy(false);
     }
@@ -1004,7 +1021,11 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setShareInfo(data.share ?? null);
       if (data.share) void copyShareUrl(data.share);
     } catch (err) {
-      setShareError(buildApiErrorMessage(err, 'Falha ao gerar o link público.'));
+      setShareError(pickFailureCopy(err, {
+        offline: 'Sem internet. A sessão continua aqui — reconecte e gere o link de novo.',
+        forbidden: 'Esta conta não pode gerar link público.',
+        server: 'O link público não foi gerado. Tente de novo.',
+      }));
     } finally {
       setShareBusy(false);
     }
@@ -1019,7 +1040,11 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setShareInfo(null);
       setShareCopied(false);
     } catch (err) {
-      setShareError(buildApiErrorMessage(err, 'Falha ao revogar o link.'));
+      setShareError(pickFailureCopy(err, {
+        offline: 'Sem internet. O link continua ativo — reconecte e revogue de novo.',
+        forbidden: 'Esta conta não pode revogar o link.',
+        server: 'O link não foi revogado. Tente de novo.',
+      }));
     } finally {
       setShareBusy(false);
     }
@@ -1221,7 +1246,11 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       await flushSessionNow(ownerSessionId, { draftAttachments: next });
     } catch (err) {
       if (stillOwner()) {
-        setError(buildApiErrorMessage(err, 'Falha ao anexar arquivo.'));
+        setError(pickFailureCopy(err, {
+          offline: 'Sem internet. O arquivo não foi anexado — o texto da missão continua no compositor.',
+          forbidden: 'Esta conta não pode anexar arquivos.',
+          server: 'O arquivo não foi anexado. A missão digitada continua no compositor — tente de novo.',
+        }));
         setErrorRetry(null);
       }
     } finally {
@@ -1238,7 +1267,11 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       // continua na tela e o arquivo segue removível, em vez de virar órfão.
       await lucaApi.deleteChatAttachment(ownerSessionId, attachment.id, bridgeBase);
     } catch (err) {
-      setError(buildApiErrorMessage(err, 'Falha ao remover anexo.'));
+      setError(pickFailureCopy(err, {
+        offline: 'Sem internet. O anexo continua na missão — reconecte e tente remover de novo.',
+        forbidden: 'Esta conta não pode remover anexos.',
+        server: 'O anexo não foi removido. Tente de novo.',
+      }));
       setErrorRetry(null);
       return;
     }
@@ -1265,7 +1298,11 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       if (runtimeMode === 'backend') await refresh();
       return true;
     } catch (err) {
-      setError(buildApiErrorMessage(err, `Falha ao preparar ${persona.name || slug}.`));
+      setError(pickFailureCopy(err, {
+        offline: `Sem internet. ${persona.name || slug} não foi preparada — a seleção continua como estava.`,
+        forbidden: `Esta conta não pode preparar ${persona.name || slug}.`,
+        server: `${persona.name || slug} não ficou pronta. A seleção continua — tente de novo.`,
+      }));
       setErrorRetry('personas');
       return false;
     } finally {
@@ -1285,7 +1322,11 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setPersonas(normalizePersonaAssetUrls(data.personas ?? [], bridgeBase));
       if (runtimeMode === 'backend') await refresh();
     } catch (err) {
-      setError(buildApiErrorMessage(err, `Falha ao definir modelo de ${slug}.`));
+      setError(pickFailureCopy(err, {
+        offline: `Sem internet. O modelo de ${slug} não mudou — reconecte e tente de novo.`,
+        forbidden: `Esta conta não pode trocar o modelo de ${slug}.`,
+        server: `O modelo de ${slug} não mudou. Tente de novo.`,
+      }));
       setErrorRetry('personas');
     } finally {
       setBusyPersonaSlug(null);
@@ -1550,6 +1591,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   function switchOperationMode(next: OperationMode) {
     if (next === operationMode || running) return;
     setOperationMode(next);
+    navigate({ modo: next === 'individual' ? 'individual' : '' }, 'replace');
     setPickerTarget(null);
     // Keep transcript/finalResult/mission — mode is view/config, not a new session.
     setProcessEvents([]);
@@ -1625,7 +1667,11 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     } catch (err) {
       setMission(trimmedMission);
       setDraftAttachments(attachmentsToRun);
-      setError(buildApiErrorMessage(err, 'Falha ao salvar a missão antes de iniciar.'));
+      setError(pickFailureCopy(err, {
+        offline: 'Sem internet. A missão digitada continua no compositor — reconecte e envie de novo.',
+        forbidden: 'Esta conta não pode gravar a missão.',
+        server: 'A missão não foi gravada antes de iniciar. O texto continua no compositor — tente de novo.',
+      }));
       setErrorRetry('run');
       setRunning(false);
       runOwnerSessionIdRef.current = null;
@@ -1951,7 +1997,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           role="alert"
         >
           <Notice
-            title="Atenção"
+            title={errorRetry === 'run' ? 'A missão não foi enviada' : errorRetry === 'personas' ? 'A equipe não pôde ser carregada' : 'A sessão precisa ser atualizada'}
             body={error}
             onRetry={() => {
               if (errorRetry === 'run') void runMission();
@@ -2205,6 +2251,45 @@ function LucaAiStartState({
   const theme = useTheme();
   const loading = state === 'loading';
   const error = state === 'error';
+  const showLoadingShape = useDeferredFlag(loading);
+
+  if (loading && !showLoadingShape) {
+    return (
+      <div
+        className="h-full"
+        data-luca-start-state="loading"
+        role="status"
+        aria-busy="true"
+        aria-label="Preparando a equipe"
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <div
+        className="luca-ai-page luca-ai-chat-page relative h-full min-h-0"
+        data-luca-start-state="loading"
+        role="status"
+        aria-busy="true"
+        aria-label="Preparando a equipe"
+      >
+        <div className="luca-ai-chat-column">
+          <header className="luca-ai-chat-toolbar">
+            <span className="h-9 w-40 animate-pulse rounded-lg" style={{ background: theme.surfaceHi }} />
+            <span className="h-9 w-28 animate-pulse rounded-lg" style={{ background: theme.surfaceHi }} />
+          </header>
+          <main className="luca-ai-chat-stage px-5 py-5">
+            <div className="space-y-3">
+              <div className="h-16 animate-pulse rounded-2xl" style={{ background: theme.surfaceHi }} />
+              <div className="h-24 animate-pulse rounded-2xl" style={{ background: theme.surfaceHi }} />
+              <div className="h-24 animate-pulse rounded-2xl" style={{ background: theme.surfaceHi }} />
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -2219,18 +2304,16 @@ function LucaAiStartState({
         <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full" style={{ background: `radial-gradient(circle, ${theme.goldSoft}, transparent 68%)` }} />
         <div className="relative max-w-[560px]">
           <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl" style={{ background: error ? theme.errorBg : theme.goldSoft, color: error ? theme.error : theme.goldDeep }}>
-            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : error ? <AlertCircle className="h-5 w-5" /> : <BrainCircuit className="h-5 w-5" />}
+            {error ? <AlertCircle className="h-5 w-5" /> : <BrainCircuit className="h-5 w-5" />}
           </div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: theme.textGhost }}>Bancada de personas</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] sm:text-3xl" style={{ color: theme.text }}>
-            {loading ? 'Preparando a equipe' : error ? 'A equipe não pôde ser carregada' : 'Conecte a primeira persona'}
+            {error ? 'A equipe não pôde ser carregada' : 'Conecte a primeira persona'}
           </h1>
           <p className="mt-3 max-w-[58ch] text-sm leading-relaxed" style={{ color: theme.textMute }}>
-            {loading
-              ? 'Buscando as personas disponíveis no Yume e conferindo quais já estão conectadas ao LUCA.'
-              : error
-                ? message
-                : 'Escolha no catálogo as personas que poderão supervisionar, executar, aprovar e apresentar as missões desta bancada.'}
+            {error
+              ? message
+              : 'Escolha no catálogo as personas que poderão supervisionar, executar, aprovar e apresentar as missões desta bancada.'}
           </p>
           {!loading && (
             <div className="mt-7 flex flex-wrap gap-2" data-luca-start-actions={error ? 'error' : 'empty'}>

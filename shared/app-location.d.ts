@@ -19,6 +19,7 @@ export interface AppLocation {
     conta: string;
     ordem: string;
     fonte: string;
+    modo: string;
   }
 
 export const APP_PAGES: readonly AppPageId[];
