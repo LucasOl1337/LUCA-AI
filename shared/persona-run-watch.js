@@ -32,6 +32,7 @@ export async function watchPersonaTeamRun({
   maxBackoffMs = 8000,
   isTransient = isTransientRequestError,
   onTransientError = null,
+  onProgress = null,
 } = {}) {
   const cleanRunId = String(runId || '').trim();
   if (!cleanRunId) {
@@ -51,6 +52,7 @@ export async function watchPersonaTeamRun({
   let consecutiveErrorStartedAt = null;
   let backoffMs = Math.max(250, Number(pollIntervalMs) || 1500);
   let lastError = null;
+  let lastProgressRevision = 0;
 
   while (now() < deadline) {
     try {
@@ -58,6 +60,16 @@ export async function watchPersonaTeamRun({
       consecutiveErrorStartedAt = null;
       backoffMs = Math.max(250, Number(pollIntervalMs) || 1500);
       lastError = null;
+
+      const progressRevision = Number(job?.progress?.revision || 0);
+      if (progressRevision > lastProgressRevision && typeof onProgress === 'function') {
+        lastProgressRevision = progressRevision;
+        try {
+          onProgress(job.progress);
+        } catch {
+          // A tela e observadora: falha de render nao interrompe o job do servidor.
+        }
+      }
 
       const status = String(job?.status || '').trim();
       if (status === 'complete' && job?.result) {

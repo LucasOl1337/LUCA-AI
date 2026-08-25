@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import {
   Activity,
+  Cpu,
   Database,
   Droplets,
   Gauge,
@@ -21,7 +22,7 @@ interface SompoTelemetryPanelProps {
   loading: boolean;
   refreshing: boolean;
   error: string | null;
-  onRefresh: () => void;
+  onRefresh?: () => void;
   children?: ReactNode;
 }
 
@@ -57,10 +58,11 @@ export default function SompoTelemetryPanel({
   children,
 }: SompoTelemetryPanelProps) {
   const stale = telemetry?.freshness === 'stale';
+  const simulation = telemetry?.source.kind === 'simulation';
   const connectionState = telemetry?.connection.state || 'connecting';
   const live = connectionState === 'live';
   const historical = stale || !live;
-  const connectionWarning = error
+  const connectionWarning = simulation ? null : error
     || (connectionState === 'reconnecting'
       ? `Canal com o Firebase caiu; reconexão automática em andamento (tentativa ${telemetry?.connection.retryAttempt || 1}).`
       : connectionState === 'stopped'
@@ -68,7 +70,14 @@ export default function SompoTelemetryPanel({
         : null);
 
   return (
-    <section className="sompo-telemetry" aria-label="Telemetria do trator 001" data-sompo-telemetry>
+    <section
+      className="sompo-telemetry"
+      aria-label={simulation
+        ? `Telemetria simulada do caminhão ${telemetry?.tractorId || 'SIM-001'}`
+        : `Telemetria do trator ${telemetry?.tractorId || '001'}`}
+      data-sompo-telemetry
+      data-source={simulation ? 'simulation' : 'firebase'}
+    >
       {loading && !telemetry && (
         <div className="sompo-telemetry-empty" role="status">
           <Loader2 className="animate-spin" />
@@ -82,10 +91,12 @@ export default function SompoTelemetryPanel({
           <WifiOff />
           <strong>Telemetria indisponível</strong>
           <p>{error || 'O Firebase não respondeu.'}</p>
-          <button type="button" onClick={onRefresh} disabled={refreshing}>
-            <RefreshCw className={refreshing ? 'animate-spin' : ''} />
-            Tentar novamente
-          </button>
+          {onRefresh && (
+            <button type="button" onClick={onRefresh} disabled={refreshing}>
+              <RefreshCw className={refreshing ? 'animate-spin' : ''} />
+              Tentar novamente
+            </button>
+          )}
         </div>
       )}
 
@@ -97,36 +108,43 @@ export default function SompoTelemetryPanel({
                 {telemetry.status === 'alert' ? <ShieldAlert /> : <ShieldCheck />}
               </span>
               <div>
-                <div className="sompo-telemetry-eyebrow">ESP32 · Trator {telemetry.tractorId}</div>
+                <div className="sompo-telemetry-eyebrow">
+                  {simulation ? 'ESP32 virtual · Caminhão' : 'ESP32 · Trator'} {telemetry.tractorId}
+                </div>
                 <h2>
                   {telemetry.status === 'alert'
-                    ? historical ? 'Alerta registrado' : 'Alerta ativo'
-                    : 'Operação sem flags de risco'}
+                    ? simulation ? 'Cenário com flags de risco' : historical ? 'Alerta registrado' : 'Alerta ativo'
+                    : simulation ? 'Ensaio sem flags de risco' : 'Operação sem flags de risco'}
                 </h2>
               </div>
             </div>
-            <div className="sompo-telemetry-connection" aria-live="polite">
+            <div className="sompo-telemetry-connection" aria-live={simulation ? 'off' : 'polite'}>
               <span data-freshness={telemetry.freshness} data-connection={connectionState}>
-                {(connectionState === 'connecting' || connectionState === 'reconnecting')
+                {simulation
+                  ? <Cpu />
+                  : (connectionState === 'connecting' || connectionState === 'reconnecting')
                   ? <Loader2 className="animate-spin" />
                   : historical ? <WifiOff /> : <Wifi />}
-                {connectionState === 'connecting' && 'Conectando ao fluxo'}
-                {connectionState === 'reconnecting' && 'Reconectando ao fluxo'}
-                {connectionState === 'stopped' && 'Fluxo interrompido'}
-                {live && telemetry.freshness === 'fresh' && 'Tempo real conectado'}
-                {live && telemetry.freshness === 'checking' && 'Canal conectado · validando dados'}
-                {live && stale && `Conectado · sem mudança há ${age(telemetry.unchangedForMs)}`}
+                {simulation && 'Simulação local ativa'}
+                {!simulation && connectionState === 'connecting' && 'Conectando ao fluxo'}
+                {!simulation && connectionState === 'reconnecting' && 'Reconectando ao fluxo'}
+                {!simulation && connectionState === 'stopped' && 'Fluxo interrompido'}
+                {!simulation && live && telemetry.freshness === 'fresh' && 'Tempo real conectado'}
+                {!simulation && live && telemetry.freshness === 'checking' && 'Canal conectado · validando dados'}
+                {!simulation && live && stale && `Conectado · sem mudança há ${age(telemetry.unchangedForMs)}`}
               </span>
-              <small>Último evento às {clock(telemetry.connection.lastEventAt || telemetry.observedAt)}</small>
-              <button
-                type="button"
-                aria-label="Atualizar telemetria agora"
-                title="Atualizar telemetria agora"
-                onClick={onRefresh}
-                disabled={refreshing}
-              >
-                <RefreshCw className={refreshing ? 'animate-spin' : ''} />
-              </button>
+              <small>{simulation ? 'Amostra gerada' : 'Último evento'} às {clock(telemetry.connection.lastEventAt || telemetry.observedAt)}</small>
+              {onRefresh && (
+                <button
+                  type="button"
+                  aria-label="Atualizar telemetria agora"
+                  title="Atualizar telemetria agora"
+                  onClick={onRefresh}
+                  disabled={refreshing}
+                >
+                  <RefreshCw className={refreshing ? 'animate-spin' : ''} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -136,7 +154,11 @@ export default function SompoTelemetryPanel({
             </p>
           )}
 
-          <div className="sompo-risk-grid" aria-label="Flags do firmware">
+          <div
+            className="sompo-risk-grid"
+            role="group"
+            aria-label={simulation ? 'Flags sintéticas do cenário' : 'Flags do firmware'}
+          >
             <article data-active={telemetry.risks.collision}>
               <ShieldAlert />
               <div>
@@ -153,7 +175,7 @@ export default function SompoTelemetryPanel({
             </article>
           </div>
 
-          <div className="sompo-sensor-grid" aria-label="Leituras dos sensores">
+          <div className="sompo-sensor-grid" role="group" aria-label="Leituras dos sensores">
             <article>
               <span className="sompo-sensor-icon"><Ruler /></span>
               <div><span>Distância frontal</span><strong>{number(telemetry.readings.distance)} <small>cm*</small></strong></div>
@@ -194,13 +216,21 @@ export default function SompoTelemetryPanel({
 
           <div className="sompo-telemetry-footer">
             <div className="sompo-telemetry-source">
-              <Database />
+              {simulation ? <Cpu /> : <Database />}
               <div>
                 <strong>{telemetry.source.provider}</strong>
-                <span>assinatura SSE · {telemetry.source.path} · timestamp bruto {telemetry.deviceTimestamp ?? '—'}</span>
+                <span>
+                  {simulation
+                    ? `cena local · ${telemetry.source.scenarioLabel || 'cenário virtual'} · relógio ${telemetry.deviceTimestamp ?? '—'} ms`
+                    : `assinatura SSE · ${telemetry.source.path} · timestamp bruto ${telemetry.deviceTimestamp ?? '—'}`}
+                </span>
               </div>
             </div>
-            <p>* Unidades de exibição seguem a convenção esperada dos sensores e precisam ser confirmadas no firmware.</p>
+            <p>
+              {simulation
+                ? '* Dados sintéticos para ensaio. Flags são controles do cenário, não regras confirmadas do firmware.'
+                : '* Unidades de exibição seguem a convenção esperada dos sensores e precisam ser confirmadas no firmware.'}
+            </p>
           </div>
 
           {children}

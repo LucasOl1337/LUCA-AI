@@ -29,6 +29,20 @@ backoff, preserva o último snapshot e detecta dado parado. O endpoint autentica
 existente distribui `sompo.telemetry` para as sessões autenticadas, e
 `shared/sompo-telemetry.js` concentra o contrato e o briefing auditável da bancada.
 
+Quando o equipamento físico não está disponível, a interface oferece um adapter local
+de simulação com Three.js:
+
+```text
+SompoTruckSimulator -> snapshot sintético compatível -> SompoTelemetryPanel -> bancada de agentes
+```
+
+O Firebase permanece a origem principal e selecionada por padrão. O simulador roda
+somente no navegador, não escreve no Firebase, não substitui o snapshot recebido por
+WebSocket e não cria um segundo fluxo no Express. Ambos os adapters entregam
+`SompoTelemetrySnapshot`; `source.kind` (`firebase` ou `simulation`) preserva a
+proveniência na tela e no briefing. Flags simuladas são controles explícitos do cenário,
+não inferências sobre limiares ainda não confirmados do firmware.
+
 Esse fluxo é de subida: equipamento para LUCA. Um canal de descida exige contrato no
 firmware (comando, correlação e confirmação) e credenciais restritas do broker/Firebase;
 o runtime não escreve no equipamento enquanto esse contrato não existir.

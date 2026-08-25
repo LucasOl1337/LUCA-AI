@@ -43,6 +43,33 @@ test('watchPersonaTeamRun ignora 524 transitórios e devolve resultado quando jo
   assert.ok(calls >= 4);
 });
 
+test('watchPersonaTeamRun entrega cada revisao parcial antes do complete', async () => {
+  let calls = 0;
+  const observed = [];
+  const result = await watchPersonaTeamRun({
+    runId: 'run-progress',
+    pollIntervalMs: 1,
+    wait: async () => {},
+    onProgress: (progress) => observed.push(progress),
+    getStatus: async () => {
+      calls += 1;
+      if (calls === 1) {
+        return { status: 'running', progress: { revision: 1, replies: [{ content: 'primeira' }] } };
+      }
+      if (calls === 2) {
+        return { status: 'running', progress: { revision: 1, replies: [{ content: 'primeira' }] } };
+      }
+      if (calls === 3) {
+        return { status: 'running', progress: { revision: 2, replies: [{ content: 'primeira' }, { content: 'segunda' }] } };
+      }
+      return { status: 'complete', result: { ok: true } };
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(observed.map((progress) => progress.revision), [1, 2]);
+});
+
 test('watchPersonaTeamRun falha se a borda ficar instável por tempo demais', async () => {
   let now = 1_000_000;
   await assert.rejects(

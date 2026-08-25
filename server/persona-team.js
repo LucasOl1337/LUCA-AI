@@ -302,7 +302,7 @@ export function buildPersonaTeamPrompt({
     const roleInstruction = workflowRole?.instruction || role?.instruction || '';
     const context = String(accumulatedContext || '').trim();
     const visualJsonHint = role?.id === 'visual'
-      ? 'Responda SOMENTE com JSON valido contendo summary, report, charts (ate 3, pie|tower|line), images (ate 2 prompts em ingles de infografico/explained-chart) e imageEngine (gpt-image|grok-imagine).'
+      ? 'Responda SOMENTE com JSON valido contendo summary, report, charts (ate 3, pie|tower|line), images (ate 2 prompts em pt-BR de infografico/explained-chart) e imageEngine (gpt-image|grok-imagine). Todos os campos legiveis e todo texto visivel solicitado nas imagens devem permanecer em pt-BR.'
       : '';
     const extraUser = [
       historyBlock,
@@ -318,7 +318,7 @@ export function buildPersonaTeamPrompt({
 ---
 ${modelBlock}
 ${role?.id === 'visual'
-    ? 'Nesta etapa o formato de saida e JSON de artefatos visuais (sem markdown fora do JSON).'
+    ? 'Nesta etapa o formato de saida e JSON de artefatos visuais (sem markdown fora do JSON). Escreva summary, report, titulos, rotulos, legendas, chamadas e prompts de imagem em pt-BR; todo texto visivel da arte deve estar em pt-BR.'
     : 'Responda com liberdade de formato. Sem personagem fixo alem do que o system acima definir.'}`,
       user: extraUser
         ? `${String(mission || '').trim()}\n\n${extraUser}`
@@ -350,7 +350,7 @@ ${role?.id === 'visual'
       : role?.id === 'visual'
         ? `Voce e a etapa final de artefatos da bancada. Com base no contexto acumulado (especialmente Aprovacao, Exibicao final ou veredito do juiz), produza SOMENTE JSON valido — sem markdown fora do JSON — neste formato:
 {
-  "summary": "1-2 frases sobre o que sera visualizado",
+  "summary": "1-2 frases em pt-BR sobre o que sera visualizado",
   "report": {
     "title": "titulo do relatorio",
     "markdown": "relatorio em markdown (pt-BR): explique o que cada grafico/imagem mostra e por que importa; 2-4 bullets acionaveis"
@@ -368,7 +368,7 @@ ${role?.id === 'visual'
     {
       "id": "i1",
       "title": "titulo do infografico",
-      "prompt": "English infographic / explained-chart prompt: readable title, clear labels/axes, accurate values from context, 1-3 callouts, embedded caption/legend, high contrast, clean typography, no fake product UI, no illegible text",
+      "prompt": "Prompt em pt-BR para infografico/grafico explicado: titulo legivel, rotulos/eixos claros, valores corretos do contexto, 1-3 chamadas, legenda embutida, alto contraste, tipografia limpa, sem UI de produto inventada e sem texto ilegivel. Todo texto visivel deve estar em pt-BR",
       "aspect_ratio": "16:9",
       "style": "infographic"
     }
@@ -380,7 +380,8 @@ Regras:
 - Preferir images[].style "infographic" ou "explained-chart" (nao still cinematografico generico).
 - Use "line" para evolucao/sequencia temporal, "tower" para ranking/comparacao e "pie" para composicao percentual.
 - So use numeros/labels sustentados pelo contexto; se faltar dado, omita o chart/imagem ou use ranking qualitativo com valores relativos honestos.
-- Prompts de imagem em ingles, fiéis aos achados: grafico/infografico bem explicado, tipografia legivel, contraste alto.
+- Todos os campos legiveis do JSON devem estar em pt-BR: summary, report, titulos, rotulos, rationale e prompts.
+- Prompts de imagem em pt-BR, fieis aos achados: grafico/infografico bem explicado, tipografia legivel, contraste alto. Exija que todo texto visivel da arte (titulo, rotulos, eixos, legendas, chamadas e notas) permaneça em pt-BR e nao seja traduzido para ingles.
 - imageEngine preferir "gpt-image" (caminho Maestro/9Router); "grok-imagine" so como alternativa.
 - Nao mencione runtime interno, 9router, agents nem logs.`
         : 'Entregue uma contribuicao objetiva em 3 a 6 bullets. Inclua uma decisao, uma acao imediata e um risco/observacao quando fizer sentido.';
@@ -577,12 +578,27 @@ export async function runIndividualResolution({
   runRevision,
   runConsensusTurn,
   runJudge,
+  onReply,
 }) {
+  const reportReply = (reply, metadata) => {
+    if (typeof onReply === 'function') {
+      try {
+        onReply({ reply, ...metadata });
+      } catch {
+        // Progresso e best-effort e nunca pode interromper a deliberacao.
+      }
+    }
+    return reply;
+  };
   const blindReplies = await Promise.all(
-    participantSlugs.map((slug) => runParticipant({ slug })),
+    participantSlugs.map((slug, participantIndex) => Promise.resolve(runParticipant({ slug }))
+      .then((reply) => reportReply(reply, { phase: 'blind', slug, participantIndex }))),
   );
   if (depth < 2 || (typeof runRevision !== 'function' && typeof runConsensusTurn !== 'function')) {
-    const judge = await runJudge({ slug: judgeSlug, replies: blindReplies });
+    const judge = reportReply(
+      await runJudge({ slug: judgeSlug, replies: blindReplies }),
+      { phase: 'judge', slug: judgeSlug },
+    );
     return { replies: blindReplies, judge };
   }
 
@@ -590,14 +606,19 @@ export async function runIndividualResolution({
     const consensus = await runConsensusRounds({
       participantSlugs,
       blindReplies,
-      runTurn: runConsensusTurn,
+      runTurn: (input) => Promise.resolve(runConsensusTurn(input))
+        .then((reply) => reportReply(reply, {
+          phase: 'consensus',
+          slug: input.slug,
+          cycle: input.cycle,
+        })),
     });
-    const judge = await runJudge({
+    const judge = reportReply(await runJudge({
       slug: judgeSlug,
       replies: consensus.replies,
       originalReplies: blindReplies,
       consensus,
-    });
+    }), { phase: 'judge', slug: judgeSlug });
     return { replies: consensus.replies, blindReplies, judge, consensus };
   }
 
@@ -610,13 +631,16 @@ export async function runIndividualResolution({
             ...redactAnonymousContribution(reply),
           }]
     ));
-    return runRevision({
+    return Promise.resolve(runRevision({
       slug,
       originalReply: blindReplies[participantIndex],
       contributions,
-    });
+    })).then((reply) => reportReply(reply, { phase: 'revision', slug, participantIndex }));
   }));
-  const judge = await runJudge({ slug: judgeSlug, replies, originalReplies: blindReplies });
+  const judge = reportReply(
+    await runJudge({ slug: judgeSlug, replies, originalReplies: blindReplies }),
+    { phase: 'judge', slug: judgeSlug },
+  );
   return { replies, blindReplies, judge };
 }
 

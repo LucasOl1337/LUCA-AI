@@ -24,6 +24,8 @@ ESP32 -> Mosquitto -> Firebase -- SSE --> Express -- /ws autenticado --> painel
 
 O navegador nunca fala com o Firebase. Uma assinatura REST Streaming no Express (`put`/`patch`, backoff, snapshot preservado, `stale` apos 15s sem mudanca). `GET /api/sompo/telemetry` le essa memoria; nao abre outro GET.
 
+Sem equipamento, o painel tem simulador no navegador (`SompoTruckSimulator`). Firebase continua o padrao. O simulador nao escreve no Firebase, nao substitui o snapshot do WebSocket e nao abre fluxo no Express. `source.kind` (`firebase` ou `simulation`) vai na tela e no briefing.
+
 So sobe dado. O LUCA nao escreve no Firebase nem no Mosquitto. Canal de descida exige contrato no firmware e credencial restrita — sem isso, nao invente comando bidirecional.
 
 ## Pegadinha
