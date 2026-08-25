@@ -16,9 +16,10 @@ export interface AppLocation {
   gravidade: string;
   caso: string;
   sessao: string;
-  conta: string;
-  ordem: string;
-}
+    conta: string;
+    ordem: string;
+    fonte: string;
+  }
 
 export const APP_PAGES: readonly AppPageId[];
 export const PAGE_PATHS: Record<AppPageId, string>;

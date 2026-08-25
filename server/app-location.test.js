@@ -54,6 +54,7 @@ test('SOMPO, admin, configuração e bancada serializam só o que não é defaul
     }),
     '/sompo?aba=casos&produto=penhor&gravidade=alta&caso=penhor-trator-incendio',
   );
+  assert.equal(formatAppUrl({ page: 'sompo', fonte: 'simulacao' }), '/sompo?fonte=simulacao');
   assert.equal(formatAppUrl({ page: 'admin', ordem: 'recente' }), '/admin');
   assert.equal(formatAppUrl({ page: 'admin', ordem: 'prompts', busca: 'ana' }), '/admin?busca=ana&ordem=prompts');
   assert.equal(formatAppUrl({ page: 'configuracao', tipo: 'team' }), '/configuracao');

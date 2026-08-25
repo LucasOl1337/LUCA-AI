@@ -75,6 +75,7 @@ const EMPTY_QUERY = Object.freeze({
   sessao: '',
   conta: '',
   ordem: '',
+  fonte: '',
 });
 
 export function emptyAppLocation() {
@@ -131,6 +132,7 @@ function parseQuery(search) {
     sessao: readParam(search, 'sessao'),
     conta: readParam(search, 'conta'),
     ordem,
+    fonte: readParam(search, 'fonte') === 'simulacao' ? 'simulacao' : '',
   };
 }
 
@@ -209,6 +211,7 @@ export function formatAppUrl(location) {
     setIfPresent(params, 'produto', loc.produto);
     setIfPresent(params, 'gravidade', loc.gravidade);
     setIfPresent(params, 'caso', loc.caso);
+    if (!loc.aba && loc.fonte === 'simulacao') params.set('fonte', 'simulacao');
   }
 
   if (page === 'admin') {
