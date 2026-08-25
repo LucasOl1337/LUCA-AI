@@ -50,6 +50,7 @@ interface AdminChatViewerProps {
   session: AdminChatSessionDetail | null;
   busy?: boolean;
   error?: string;
+  onRetry?: () => void;
   canEnterAsUser?: boolean;
   enterBusy?: boolean;
   onClose: () => void;
@@ -262,6 +263,7 @@ export default function AdminChatViewer({
   session,
   busy = false,
   error = '',
+  onRetry,
   canEnterAsUser = false,
   enterBusy = false,
   onClose,
@@ -345,11 +347,20 @@ export default function AdminChatViewer({
         </header>
 
         {error ? (
-          <div className="admin-state error" role="alert" style={{ margin: 24 }}>
+          <div className="admin-state error" data-admin-chat-error data-tone="error" role="alert" style={{ margin: 24 }}>
             <p className="admin-error-title">Não foi possível inspecionar</p>
             <p className="admin-error-detail">{error}</p>
+            {onRetry ? (
+              <div className="admin-error-actions">
+                <button type="button" className="btn-primary" data-admin-chat-retry onClick={onRetry} disabled={busy}>
+                  {busy ? 'Recarregando…' : 'Tentar novamente'}
+                </button>
+              </div>
+            ) : null}
           </div>
-        ) : (
+        ) : null}
+
+        {!error || library ? (
           <div className="admin-chat-workspace luca-ai-chat-page">
             {/* Rail de sessões — espelho da sidebar da bancada */}
             <aside className="admin-chat-rail" aria-label="Sessões do usuário">
@@ -388,7 +399,9 @@ export default function AdminChatViewer({
                     />
                   ))}
                   {!busy && (library?.sessions || []).length === 0 ? (
-                    <p className="admin-chat-empty">Esta conta ainda não tem sessões de chat.</p>
+                    <div className="admin-chat-empty-block" data-admin-chat-empty="library">
+                      <p>Esta conta ainda não começou nenhum chat. Peça ao usuário que abra a bancada, ou entre como ele para iniciar.</p>
+                    </div>
                   ) : null}
                 </div>
               </div>
@@ -420,10 +433,14 @@ export default function AdminChatViewer({
               </header>
 
               <main className="luca-ai-chat-stage">
-                {!session ? (
-                  <div className="admin-chat-empty-stage">
+                {busy && !session ? (
+                  <div className="admin-chat-thread-skeleton" data-admin-chat-loading role="status" aria-label="Carregando sessão">
+                    <span /><span /><span />
+                  </div>
+                ) : !session ? (
+                  <div className="admin-chat-empty-stage" data-admin-chat-empty="session">
                     <MessageSquareText />
-                    <p>Escolha uma sessão na barra à esquerda para ver o chat real.</p>
+                    <p>Escolha uma sessão na barra à esquerda para ver o chat como o usuário viu.</p>
                   </div>
                 ) : (
                   <div className="luca-ai-chat-scroll">
@@ -450,9 +467,13 @@ export default function AdminChatViewer({
                       ) : null}
 
                       {supporting.length === 0 && !finalResult ? (
-                        <p className="admin-chat-empty" style={{ textAlign: 'center', padding: '48px 16px' }}>
-                          Transcript vazio nesta sessão.
-                        </p>
+                        <div className="admin-chat-empty-block" data-admin-chat-empty="transcript" style={{ textAlign: 'center', padding: '48px 16px' }}>
+                          <p>
+                            {originalMission
+                              ? 'A missão está salva, mas esta sessão ainda não tem respostas das personas.'
+                              : 'Esta sessão existe e está vazia — o usuário ainda não enviou uma missão.'}
+                          </p>
+                        </div>
                       ) : (
                         supporting.map((entry, index) => (
                           <MessageEntry key={entry.id || `e-${index}`} entry={entry} />
@@ -501,7 +522,7 @@ export default function AdminChatViewer({
               </div>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

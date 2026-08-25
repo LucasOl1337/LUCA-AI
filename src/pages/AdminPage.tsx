@@ -19,6 +19,8 @@ import {
 import type { AuthUser } from '@/hooks/useAuth';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppLocation } from '@/hooks/useAppLocation';
+import { useDeferredFlag } from '@/hooks/useDeferredFlag';
+import { pickFailureCopy } from '@/lib/surface-failure';
 import AdminChatViewer from '@/components/AdminChatViewer';
 import { ORDEM_PARAM } from '../../shared/app-location.js';
 import type {
@@ -121,8 +123,19 @@ function formatRelative(value?: string) {
 }
 
 async function adminRequest(path: string) {
-  const response = await fetch(path, { credentials: 'same-origin' });
-  if (!response.ok) throw new Error('Não foi possível carregar o painel.');
+  let response: Response;
+  try {
+    response = await fetch(path, { credentials: 'same-origin' });
+  } catch (cause) {
+    const error = new Error('Não foi possível carregar o painel.');
+    error.name = 'RequestNetworkError';
+    throw error;
+  }
+  if (!response.ok) {
+    const error = new Error('Não foi possível carregar o painel.') as Error & { status: number };
+    error.status = response.status;
+    throw error;
+  }
   return response.json();
 }
 
@@ -163,7 +176,15 @@ function RankList({
         <span>{rows.length} top</span>
       </header>
       {rows.length === 0 ? (
-        <p className="admin-rank-empty">Sem dados ainda.</p>
+        <p className="admin-rank-empty" data-admin-rank-empty>
+          {title === 'Por prompts'
+            ? 'Nenhuma conta enviou prompt ainda. O ranking aparece no primeiro envio da bancada.'
+            : title === 'Por sessões de chat'
+              ? 'Nenhuma conta abriu sessão de chat ainda.'
+              : title === 'Por rodadas'
+                ? 'Nenhuma rodada registrada ainda.'
+                : 'Nenhuma atividade recente para ranquear.'}
+        </p>
       ) : (
         <ol>
           {rows.map((user) => (
@@ -237,7 +258,11 @@ export default function AdminPage() {
       setUsers(usersPayload.users);
       setReport(reportPayload.report);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Falha ao carregar o painel.');
+      setError(pickFailureCopy(cause, {
+        offline: 'Sem internet. Os números que já estavam no console continuam na tela — reconecte e atualize.',
+        forbidden: 'Esta conta não pode ver o console. Peça acesso a um administrador.',
+        server: 'Overview, relatório e contas não chegaram. Tente de novo; o que já estava no console permanece.',
+      }));
     } finally {
       setLoading(false);
     }
@@ -251,6 +276,10 @@ export default function AdminPage() {
     void load();
   }, [load]);
 
+  const showUsersSkeleton = useDeferredFlag(loading && users.length === 0);
+  function setSearch(value: string) {
+    navigate({ busca: value }, 'replace');
+  }
   const funnel = report?.funnel;
   const generatedLabel = useMemo(() => {
     const stamp = report?.generatedAt || overview?.generatedAt;
@@ -278,7 +307,11 @@ export default function AdminPage() {
         }
       }
     } catch (cause) {
-      setChatError(cause instanceof Error ? cause.message : 'Falha ao carregar chats da conta.');
+      setChatError(pickFailureCopy(cause, {
+        offline: 'Sem internet. A inspeção não abriu — reconecte e tente de novo.',
+        forbidden: 'Você não pode ver os chats desta conta. Peça acesso de administrador.',
+        server: 'Os chats desta conta não chegaram. Tente inspecionar de novo.',
+      }));
     } finally {
       setChatBusy(false);
     }
@@ -294,7 +327,11 @@ export default function AdminPage() {
       ) as { session: ChatSessionDetail };
       setChatSession(sessionPayload.session);
     } catch (cause) {
-      setChatError(cause instanceof Error ? cause.message : 'Falha ao abrir a sessão.');
+      setChatError(pickFailureCopy(cause, {
+        offline: 'Sem internet. A sessão não abriu — reconecte e escolha de novo.',
+        forbidden: 'Você não pode abrir esta sessão. Peça acesso de administrador.',
+        server: 'A sessão não abriu. Tente escolhê-la de novo.',
+      }));
     } finally {
       setChatBusy(false);
     }
@@ -353,7 +390,11 @@ export default function AdminPage() {
     try {
       await impersonateUser(account.id);
     } catch (cause) {
-      setEnterError(cause instanceof Error ? cause.message : 'Falha ao entrar na conta.');
+      setEnterError(pickFailureCopy(cause, {
+        offline: 'Sem internet. Você continua no console admin — reconecte e tente entrar de novo.',
+        forbidden: 'Você não pode entrar nesta conta. Confira se ainda é administrador.',
+        server: 'Não foi possível entrar na conta. Você continua no console — tente de novo.',
+      }));
       setEnterBusyId(null);
     }
   }
@@ -496,6 +537,14 @@ export default function AdminPage() {
               </button>
             </div>
           </div>
+        ) : null}
+
+        {showUsersSkeleton ? (
+          <div className="admin-table-wrap" data-admin-loading role="status" aria-label="Carregando contas">
+            <div className="admin-table-skeleton">
+              <span /><span /><span /><span /><span />
+            </div>
+          </div>
         ) : (
           <div className="admin-table-wrap">
             <table>
@@ -572,13 +621,15 @@ export default function AdminPage() {
                 <p className="admin-error-detail">{enterError}</p>
               </div>
             ) : null}
-            {!loading && users.length === 0 && (
+            {!loading && users.length === 0 && !error && (
               <div className="admin-state" data-admin-empty data-tone="empty">
-                <p className="admin-empty-title">Nenhuma conta encontrada</p>
+                <p className="admin-empty-title">
+                  {search.trim() ? 'Nenhuma conta encontrada' : 'Nenhuma conta cadastrada ainda'}
+                </p>
                 <p className="admin-empty-hint">
                   {search.trim()
                     ? 'Nenhuma conta corresponde à busca atual. Limpe o filtro ou tente de novo.'
-                    : 'Ainda não há contas cadastradas ou a lista não retornou resultados.'}
+                    : 'O console está vazio. A primeira conta aparece aqui quando alguém se cadastrar.'}
                 </p>
                 <div className="admin-empty-actions">
                   {search.trim() ? (
@@ -586,9 +637,7 @@ export default function AdminPage() {
                       type="button"
                       className="btn-primary"
                       data-admin-empty-clear
-                      onClick={() => {
-                        navigate({ busca: '' }, 'replace');
-                      }}
+                      onClick={() => setSearch('')}
                       disabled={loading}
                     >
                       Limpar busca
@@ -598,7 +647,7 @@ export default function AdminPage() {
                       type="button"
                       className="btn-primary"
                       data-admin-empty-retry
-                      onClick={() => void load(search)}
+                      onClick={() => void load('')}
                       disabled={loading}
                     >
                       Atualizar lista
@@ -619,6 +668,7 @@ export default function AdminPage() {
             session={chatSession}
             busy={chatBusy}
             error={chatError}
+            onRetry={() => void openUserChats(inspectUser, location.sessao || undefined)}
             canEnterAsUser={inspectUser.id !== user?.id}
             enterBusy={enterBusyId === inspectUser.id}
             onClose={closeChatInspect}

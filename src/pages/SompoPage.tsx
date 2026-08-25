@@ -24,7 +24,8 @@ import { useChatLibrary } from '@/hooks/useChatLibrary';
 import { useAppLocation } from '@/hooks/useAppLocation';
 import { useLuca } from '@/hooks/useLucaState';
 import { GRAVIDADE_VALUES, PRODUTO_PARAM, PRODUTO_VALUE, SOMPO_ABA } from '../../shared/app-location.js';
-import { buildApiErrorMessage, lucaApi } from '@/lib/api';
+import { lucaApi } from '@/lib/api';
+import { pickFailureCopy } from '@/lib/surface-failure';
 import type { SompoTelemetrySnapshot } from '@/lib/types';
 import {
   hydrateIndividualTemplate,
@@ -150,7 +151,11 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
       setBootstrapTelemetry(result.telemetry);
       setTelemetryError(null);
     } catch (err) {
-      setTelemetryError(buildApiErrorMessage(err, 'Não foi possível ler a telemetria do trator.'));
+      setTelemetryError(pickFailureCopy(err, {
+        offline: 'Sem internet. O último snapshot do trator, se houver, continua na tela — reconecte para atualizar.',
+        forbidden: 'Esta conta não pode ver a telemetria do trator. Peça acesso a quem opera o SOMPO.',
+        server: 'A telemetria do trator não chegou. Tente de novo; o último snapshot permanece se já tinha sido lido.',
+      }));
     } finally {
       telemetryRequestBusyRef.current = false;
       if (kind === 'initial') setTelemetryLoading(false);
@@ -178,7 +183,11 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
         nextIndividual.some((item) => item.id === prev) ? prev : defaultIndividualPresetId(nextIndividual)
       ));
     } catch (err) {
-      setTemplatesError(buildApiErrorMessage(err, 'Falha ao carregar equipes. Usando presets embutidos.'));
+      setTemplatesError(pickFailureCopy(err, {
+        offline: 'Sem internet. A lista abaixo é o preset embutido — reconecte para buscar as equipes gravadas.',
+        forbidden: 'Esta conta não pode ver as equipes gravadas. Os presets embutidos continuam disponíveis.',
+        server: 'As equipes gravadas não chegaram. Os presets embutidos estão na lista; tente recarregar.',
+      }));
       setTeamPresets(LUCA_TEAM_PRESETS);
       setIndividualPresets(LUCA_INDIVIDUAL_PRESETS);
       setSelectedTeamId(defaultTeamPresetId(LUCA_TEAM_PRESETS));
@@ -339,7 +348,11 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
       });
       navigate({ page: 'luca-ai', sessao: session.id }, 'push');
     } catch (err) {
-      setLaunchError(buildApiErrorMessage(err, 'Falha ao iniciar a avaliação do caso.'));
+      setLaunchError(pickFailureCopy(err, {
+        offline: 'Sem internet. O caso continua selecionado — reconecte e rode de novo.',
+        forbidden: 'Esta conta não pode abrir a bancada com este caso. Peça acesso a um administrador.',
+        server: 'A avaliação não começou. O caso continua selecionado — tente rodar de novo.',
+      }));
     } finally {
       setLaunching(false);
     }
@@ -365,7 +378,11 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
       });
       navigate({ page: 'luca-ai', sessao: session.id }, 'push');
     } catch (err) {
-      setTelemetryLaunchError(buildApiErrorMessage(err, 'Falha ao enviar a telemetria para a bancada.'));
+      setTelemetryLaunchError(pickFailureCopy(err, {
+        offline: 'Sem internet. O snapshot continua na tela — reconecte e envie de novo.',
+        forbidden: 'Esta conta não pode enviar a telemetria para a bancada. Peça acesso a um administrador.',
+        server: 'A telemetria não foi enviada à bancada. O snapshot continua aqui — tente de novo.',
+      }));
     } finally {
       setTelemetryLaunching(false);
     }
@@ -534,7 +551,14 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
                     </div>
 
                     <div className="sompo-telemetry-run">
-                      {templatesError && <p className="sompo-templates-error">{templatesError}</p>}
+                      {templatesError && (
+                        <div className="sompo-templates-error" data-sompo-templates-error role="alert">
+                          <p>{templatesError}</p>
+                          <button type="button" data-sompo-templates-retry onClick={() => void loadTemplates()} disabled={templatesLoading}>
+                            {templatesLoading ? 'Recarregando…' : 'Tentar novamente'}
+                          </button>
+                        </div>
+                      )}
                       {telemetryLaunchError && <p className="sompo-launch-error">{telemetryLaunchError}</p>}
                       <button
                         type="button"
@@ -615,7 +639,31 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
 
               <section className="sompo-grid" aria-label="Casos agrícolas">
                 {filtered.length === 0 && (
-                  <p className="sompo-empty">Nenhum caso com esses filtros.</p>
+                  <div className="sompo-empty" data-sompo-cases-empty data-tone="empty">
+                    <strong>
+                      {query.trim()
+                        ? `Nenhum caso para “${query.trim()}”`
+                        : 'Nenhum caso neste recorte'}
+                    </strong>
+                    <p>
+                      {query.trim() && (productFilter !== 'all' || severityFilter !== 'all')
+                        ? 'A busca e os filtros de produto e gravidade não encontram nenhum caso agrícola. Limpe o recorte para voltar à grade.'
+                        : query.trim()
+                          ? 'Nenhum caso agrícola corresponde a esse termo. Limpe a busca para ver a grade completa.'
+                          : 'Este produto ou gravidade não tem caso na coleção. Limpe os filtros para ver os demais.'}
+                    </p>
+                    <button
+                      type="button"
+                      data-sompo-cases-clear
+                      onClick={() => {
+                        setQuery('');
+                        setProductFilter('all');
+                        setSeverityFilter('all');
+                      }}
+                    >
+                      Limpar busca e filtros
+                    </button>
+                  </div>
                 )}
                 {filtered.map((item) => (
                   <button
@@ -716,17 +764,21 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
               </div>
 
               {templatesError && (
-                <p className="sompo-templates-error">{templatesError}</p>
+                <div className="sompo-templates-error" data-sompo-templates-error role="alert">
+                  <p>{templatesError}</p>
+                  <button type="button" data-sompo-templates-retry onClick={() => void loadTemplates()} disabled={templatesLoading}>
+                    {templatesLoading ? 'Recarregando…' : 'Tentar novamente'}
+                  </button>
+                </div>
               )}
 
-              {templatesLoading ? (
-                <div className="sompo-loading">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Carregando equipes…
-                </div>
-              ) : (
-                <div className="sompo-squad-list">
-                  {teamMode === 'team'
-                    ? teamPresets.map((preset) => {
+              <div className="sompo-squad-list" aria-busy={templatesLoading && teamPresets.length === 0}>
+                {templatesLoading && (teamMode === 'team' ? teamPresets : individualPresets).length === 0 ? (
+                  <div className="sompo-squad-skeleton" data-sompo-templates-loading role="status" aria-label="Carregando equipes">
+                    <span /><span /><span />
+                  </div>
+                ) : teamMode === 'team' ? (
+                  teamPresets.map((preset) => {
                       const active = selectedTeam?.id === preset.id;
                       const Icon = preset.icon;
                       const slugs = teamPresetSlugs(preset);
@@ -753,7 +805,8 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
                         </button>
                       );
                     })
-                    : individualPresets.map((preset) => {
+                ) : (
+                  individualPresets.map((preset) => {
                       const active = selectedIndividual?.id === preset.id;
                       const Icon = preset.icon;
                       const slugs = individualPresetSlugs(preset);
@@ -778,9 +831,9 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
                           </div>
                         </button>
                       );
-                    })}
-                </div>
-              )}
+                    })
+                )}
+              </div>
 
               <div className="sompo-launch-summary">
                 <strong>{activeSquad?.label || 'Nenhuma equipe'}</strong>

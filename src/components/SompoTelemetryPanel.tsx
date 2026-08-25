@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useDeferredFlag } from '@/hooks/useDeferredFlag';
 import {
   Activity,
   Cpu,
@@ -57,6 +58,7 @@ export default function SompoTelemetryPanel({
   onRefresh,
   children,
 }: SompoTelemetryPanelProps) {
+  const showInitialWait = useDeferredFlag(loading && !telemetry);
   const stale = telemetry?.freshness === 'stale';
   const simulation = telemetry?.source.kind === 'simulation';
   const connectionState = telemetry?.connection.state || 'connecting';
@@ -78,23 +80,37 @@ export default function SompoTelemetryPanel({
       data-sompo-telemetry
       data-source={simulation ? 'simulation' : 'firebase'}
     >
-      {loading && !telemetry && (
-        <div className="sompo-telemetry-empty" role="status">
-          <Loader2 className="animate-spin" />
-          <strong>Abrindo canal em tempo real…</strong>
-          <p>Assinando continuamente /trator/001/sensores no Firebase.</p>
+      {showInitialWait && (
+        <div className="sompo-telemetry-skeleton" data-sompo-telemetry-loading role="status" aria-label="Abrindo canal de telemetria">
+          <span className="sompo-telemetry-skeleton-head" />
+          <span className="sompo-telemetry-skeleton-grid" />
+          <span className="sompo-telemetry-skeleton-grid" />
         </div>
       )}
 
-      {!loading && !telemetry && (
-        <div className="sompo-telemetry-empty" role="alert">
+      {!loading && !telemetry && error && (
+        <div className="sompo-telemetry-empty" data-sompo-telemetry-error data-tone="error" role="alert">
           <WifiOff />
-          <strong>Telemetria indisponível</strong>
-          <p>{error || 'O Firebase não respondeu.'}</p>
+          <strong>Não foi possível ler o trator</strong>
+          <p>{error}</p>
           {onRefresh && (
-            <button type="button" onClick={onRefresh} disabled={refreshing}>
+            <button type="button" onClick={onRefresh} disabled={refreshing} data-sompo-telemetry-retry>
               <RefreshCw className={refreshing ? 'animate-spin' : ''} />
               Tentar novamente
+            </button>
+          )}
+        </div>
+      )}
+
+      {!loading && !telemetry && !error && (
+        <div className="sompo-telemetry-empty" data-sompo-telemetry-empty data-tone="empty">
+          <WifiOff />
+          <strong>Nenhum snapshot do trator ainda</strong>
+          <p>O canal abriu, mas o Firebase ainda não entregou uma leitura. Peça a quem opera o SOMPO para conferir o dispositivo, ou tente de novo.</p>
+          {onRefresh && (
+            <button type="button" onClick={onRefresh} disabled={refreshing} data-sompo-telemetry-retry>
+              <RefreshCw className={refreshing ? 'animate-spin' : ''} />
+              Procurar snapshot
             </button>
           )}
         </div>

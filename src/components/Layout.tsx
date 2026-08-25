@@ -16,6 +16,7 @@ import {
 import { useTheme } from '@/hooks/useTheme';
 import { useLuca } from '@/hooks/useLucaState';
 import { useAuth } from '@/hooks/useAuth';
+import { useDeferredFlag } from '@/hooks/useDeferredFlag';
 import SidebarSessionsRail from '@/components/SidebarSessionsRail';
 
 export type PageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'admin';
@@ -81,12 +82,14 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
   const cloudRuntime = runtimeMode === 'cloud';
   const runtimeOnline = cloudRuntime ? connectionState !== 'offline' : backendReady;
   const checking = connectionState === 'checking';
+  const showChecking = useDeferredFlag(checking);
+  const confirmOffline = !checking && !runtimeOnline;
   const needsShellRecovery = !checking && !runtimeOnline;
-  const statusTone = checking ? theme.warning : runtimeOnline ? theme.alive : theme.error;
+  const statusTone = showChecking ? theme.warning : runtimeOnline ? theme.alive : confirmOffline ? theme.error : theme.alive;
   const runtimeLabel = cloudRuntime
-    ? checking ? 'conectando 9router' : runtimeOnline ? '9router online' : '9router offline'
-    : checking ? 'checando sistema' : backendReady ? 'sistema online' : 'sistema offline';
-  const statusBadge = checking ? 'conectando' : runtimeOnline ? 'online' : 'offline';
+    ? showChecking ? 'conectando 9router' : runtimeOnline ? '9router online' : confirmOffline ? '9router offline' : '9router'
+    : showChecking ? 'checando sistema' : backendReady ? 'sistema online' : confirmOffline ? 'sistema offline' : 'sistema';
+  const statusBadge = showChecking ? 'conectando' : runtimeOnline ? 'online' : confirmOffline ? 'offline' : 'online';
   const activeItem = navItems.find((item) => item.id === activePage) ?? navItems[0];
 
   async function retryShellConnection() {

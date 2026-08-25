@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { AlertCircle, BadgeCheck, ChevronDown, ExternalLink, Layers3, Loader2, Plus, RefreshCw, Search, Sparkles, UsersRound } from 'lucide-react';
-import { buildApiErrorMessage, lucaApi } from '@/lib/api';
+import { lucaApi } from '@/lib/api';
+import { pickFailureCopy } from '@/lib/surface-failure';
+import { useDeferredFlag } from '@/hooks/useDeferredFlag';
 import type { YumePersonaSummary } from '@/lib/types';
 import { useTheme } from '@/hooks/useTheme';
 import { useAppLocation } from '@/hooks/useAppLocation';
@@ -60,8 +62,11 @@ export default function PersonasPage() {
       const data = await lucaApi.listPersonas(bridgeBase, bridgeBase ? 15000 : undefined);
       setPersonas(normalizePersonaAssetUrls(data.personas ?? [], bridgeBase));
     } catch (err) {
-      const fallback = 'Falha ao carregar as fontes de personas.';
-      setError(buildApiErrorMessage(err, fallback));
+      setError(pickFailureCopy(err, {
+        offline: 'Sem internet. Os cards que já estavam na grade continuam aqui — reconecte e recarregue as fontes.',
+        forbidden: 'Esta conta não pode ver o catálogo. Peça acesso a quem opera o Yume.',
+        server: 'As fontes de personas não responderam. Tente de novo; o catálogo que já estava na tela permanece.',
+      }));
     } finally {
       setLoading(false);
     }
@@ -92,6 +97,7 @@ export default function PersonasPage() {
   const secondaryExpanded = secondaryOpen;
   const visiblePersonaCount = (showRoster ? rosterPersonas.length : 0) + (showSecondary ? secondaryPersonas.length : 0);
 
+  const showCatalogSkeleton = useDeferredFlag(loading && personas.length === 0);
   const importedCount = personas.filter((persona) => persona.imported).length;
   const availableCount = Math.max(0, personas.length - personas.filter((persona) => persona.imported).length);
 
@@ -177,7 +183,7 @@ export default function PersonasPage() {
           />
         )}
 
-        {loading && personas.length === 0 ? (
+        {showCatalogSkeleton ? (
           <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
             {Array.from({ length: 12 }, (_, index) => (
               <div key={index} className="aspect-square animate-pulse rounded-lg" style={{ background: theme.surfaceHi, border: `1px solid ${theme.border}` }} />
@@ -279,7 +285,7 @@ export default function PersonasPage() {
           </div>
         ) : null}
 
-        {!loading && visiblePersonaCount === 0 && (
+        {!loading && !error && visiblePersonaCount === 0 && (
           <div
             className="flex min-h-[220px] flex-col items-center justify-center gap-4 rounded-lg border px-6 py-10 text-center"
             style={{ borderColor: theme.border, color: theme.textMute }}

@@ -8,7 +8,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { buildApiErrorMessage, lucaApi } from '@/lib/api';
+import { lucaApi } from '@/lib/api';
+import { pickFailureCopy } from '@/lib/surface-failure';
 import type {
   LucaAiChatFolder,
   LucaAiChatSession,
@@ -107,10 +108,15 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
           setActiveSession(full.session);
         }
       }
+      setError(null);
       setReady(true);
     } catch (err) {
       setReady(true);
-      setError(buildApiErrorMessage(err, 'Falha ao carregar sessões.'));
+      setError(pickFailureCopy(err, {
+        offline: 'Sem internet. As sessões que já estavam na barra continuam visíveis — reconecte e recarregue.',
+        forbidden: 'Esta conta não pode ver as sessões. Peça acesso a um administrador.',
+        server: 'As sessões não chegaram. Tente de novo; o que já estava na barra permanece.',
+      }));
     }
   }, [applySnapshot]);
 
@@ -135,7 +141,11 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
       if (session) setActiveSession(session);
       return session;
     } catch (err) {
-      setError(buildApiErrorMessage(err, 'Falha ao criar sessão.'));
+      setError(pickFailureCopy(err, {
+        offline: 'Sem internet. A sessão nova não foi criada — reconecte e tente de novo.',
+        forbidden: 'Esta conta não pode criar sessões. Peça acesso a um administrador.',
+        server: 'A sessão nova não foi criada. Tente de novo em instantes.',
+      }));
       return null;
     } finally {
       setBusy(false);
@@ -174,7 +184,11 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
       return session;
     } catch (err) {
       if (seq === activateSeqRef.current) {
-        setError(buildApiErrorMessage(err, 'Falha ao trocar de sessão.'));
+        setError(pickFailureCopy(err, {
+          offline: 'Sem internet. A sessão não abriu — reconecte e escolha de novo.',
+          forbidden: 'Esta conta não pode abrir essa sessão. Peça acesso a quem a compartilhou.',
+          server: 'A sessão não abriu. Tente escolhê-la de novo.',
+        }));
       }
       return null;
     } finally {
@@ -191,7 +205,11 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
       applySnapshot(data, { replaceSessionOrder: true, setActive: true });
       return data.activeSession || null;
     } catch (err) {
-      setError(buildApiErrorMessage(err, 'Falha ao apagar sessão.'));
+      setError(pickFailureCopy(err, {
+        offline: 'Sem internet. A sessão não foi apagada — reconecte e tente de novo.',
+        forbidden: 'Esta conta não pode apagar essa sessão.',
+        server: 'A sessão continua na lista. Tente apagar de novo.',
+      }));
       return null;
     } finally {
       setBusy(false);
@@ -205,7 +223,11 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
       const data = await lucaApi.createChatFolder(name);
       applySnapshot(data, { replaceSessionOrder: false, setActive: false });
     } catch (err) {
-      setError(buildApiErrorMessage(err, 'Falha ao criar pasta.'));
+      setError(pickFailureCopy(err, {
+        offline: 'Sem internet. O projeto não foi criado — reconecte e tente de novo.',
+        forbidden: 'Esta conta não pode criar projetos.',
+        server: 'O projeto não foi criado. Tente de novo em instantes.',
+      }));
     } finally {
       setBusy(false);
     }
@@ -221,7 +243,11 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
       const data = await lucaApi.renameChatFolder(id, nextName);
       applySnapshot(data, { replaceSessionOrder: false, setActive: false });
     } catch (err) {
-      setError(buildApiErrorMessage(err, 'Falha ao renomear pasta.'));
+      setError(pickFailureCopy(err, {
+        offline: 'Sem internet. O nome do projeto não mudou — reconecte e tente de novo.',
+        forbidden: 'Esta conta não pode renomear projetos.',
+        server: 'O nome do projeto não mudou. Tente de novo em instantes.',
+      }));
     } finally {
       setBusy(false);
     }
@@ -235,7 +261,11 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
       const data = await lucaApi.deleteChatFolder(folderId, false);
       applySnapshot(data, { replaceSessionOrder: false, setActive: false });
     } catch (err) {
-      setError(buildApiErrorMessage(err, 'Falha ao apagar pasta.'));
+      setError(pickFailureCopy(err, {
+        offline: 'Sem internet. O projeto não foi removido — reconecte e tente de novo.',
+        forbidden: 'Esta conta não pode remover projetos.',
+        server: 'O projeto continua na barra. Tente remover de novo.',
+      }));
     } finally {
       setBusy(false);
     }
@@ -249,7 +279,11 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
       const data = await lucaApi.updateChatSession(sessionId, { folderId });
       applySnapshot(data, { replaceSessionOrder: false, setActive: false });
     } catch (err) {
-      setError(buildApiErrorMessage(err, 'Falha ao mover sessão.'));
+      setError(pickFailureCopy(err, {
+        offline: 'Sem internet. A sessão não foi movida — reconecte e tente de novo.',
+        forbidden: 'Esta conta não pode mover sessões.',
+        server: 'A sessão não mudou de projeto. Tente mover de novo.',
+      }));
     } finally {
       setBusy(false);
     }

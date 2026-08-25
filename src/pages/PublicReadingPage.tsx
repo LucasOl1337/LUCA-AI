@@ -16,6 +16,8 @@ import {
   type OperationMode,
   type TeamTranscriptEntry,
 } from '@/pages/LucaAiPage';
+import { useDeferredFlag } from '@/hooks/useDeferredFlag';
+import { pickFailureCopy } from '@/lib/surface-failure';
 import type { LucaAiVisualPack, YumePersonaSummary } from '@/lib/types';
 
 interface PublicShareSnapshot {
@@ -147,11 +149,25 @@ export default function PublicReadingPage({ token }: { token: string }) {
         headers: { Accept: 'application/json' },
       });
       const payload = await response.json().catch(() => ({})) as PublicShareResponse;
-      if (!response.ok || !payload.ok || !payload.share) throw new Error('share_not_found');
+      if (response.status === 401 || response.status === 403) {
+        const denied = new Error('share_forbidden') as Error & { status: number };
+        denied.status = response.status;
+        throw denied;
+      }
+      if (!response.ok || !payload.ok || !payload.share) {
+        setShare(null);
+        setError(response.status === 404
+          ? 'Este link não existe ou foi revogado pelo autor. Peça um novo link a quem compartilhou a sessão.'
+          : 'A sessão compartilhada não abriu. Tente de novo em instantes.');
+        return;
+      }
       setShare(payload.share);
-    } catch {
-      setShare(null);
-      setError('Este link não existe ou foi revogado pelo autor.');
+    } catch (cause) {
+      setError(pickFailureCopy(cause, {
+        offline: 'Sem internet. Reconecte e tente abrir o link de novo — o endereço continua o mesmo.',
+        forbidden: 'Você não pode ver esta sessão. Peça um novo link a quem compartilhou, ou entre com a conta certa.',
+        server: 'A sessão compartilhada não abriu. Tente de novo em instantes.',
+      }));
     } finally {
       setLoading(false);
     }
@@ -181,6 +197,7 @@ export default function PublicReadingPage({ token }: { token: string }) {
     };
   }, [share?.snapshot.title]);
 
+  const showReadingWait = useDeferredFlag(loading && !share);
   const snapshot = share?.snapshot;
   const operationMode: OperationMode = snapshot?.operationMode === 'individual' ? 'individual' : 'team';
   const transcript = useMemo(
@@ -236,21 +253,25 @@ export default function PublicReadingPage({ token }: { token: string }) {
                   </header>
 
                   <main className="luca-ai-chat-stage">
-                    {loading ? (
-                      <div className="luca-reading-state" role="status">
-                        <RefreshCw className="h-5 w-5 animate-spin" />
-                        <strong>Abrindo sessão compartilhada…</strong>
+                    {showReadingWait ? (
+                      <div className="luca-reading-skeleton" data-leitura-loading role="status" aria-label="Abrindo sessão compartilhada">
+                        <span /><span /><span />
                       </div>
-                    ) : error || !snapshot ? (
-                      <div className="luca-reading-state" role="alert">
+                    ) : error && !snapshot ? (
+                      <div className="luca-reading-state" data-leitura-error data-tone="error" role="alert">
                         <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--l-error-bg)] text-[var(--l-error)]">
                           <LockKeyhole className="h-5 w-5" />
                         </div>
                         <strong>Link indisponível</strong>
                         <p>{error}</p>
-                        <button type="button" className="btn-fleet !min-h-9 !px-4 !text-xs" onClick={() => void loadShare()}>
+                        <button type="button" className="btn-fleet !min-h-9 !px-4 !text-xs" data-leitura-retry onClick={() => void loadShare()}>
                           Tentar novamente
                         </button>
+                      </div>
+                    ) : !snapshot ? (
+                      <div className="luca-reading-state" data-leitura-empty data-tone="empty">
+                        <strong>Nada neste link</strong>
+                        <p>O endereço está certo, mas a sessão compartilhada não tem conteúdo para ler. Peça um novo link a quem compartilhou.</p>
                       </div>
                     ) : (
                       <LucaMissionCanvas

@@ -744,6 +744,62 @@
   color: var(--l-text-ghost);
   font-size: 11px;
 }
+.luca-sidebar-library-error {
+  margin: 0 2px 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--l-error-bg);
+  color: var(--l-error);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.luca-sidebar-library-error p { margin: 0 0 8px; }
+.luca-sidebar-library-error button {
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--l-error) 16%, transparent);
+  color: var(--l-error);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.luca-sidebar-empty-block {
+  margin: 4px 2px 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.04);
+  color: var(--l-text-mute);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.luca-sidebar-empty-block.compact {
+  margin: 0 0 6px 16px;
+  padding: 8px 10px;
+}
+.luca-sidebar-empty-block p { margin: 0 0 8px; }
+.luca-sidebar-empty-block button {
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--l-gold-soft);
+  color: var(--l-gold-deep);
+  font-size: 10px;
+  font-weight: 700;
+}
+.luca-sidebar-skeleton {
+  display: grid;
+  gap: 6px;
+  padding: 4px 8px 10px 28px;
+}
+.luca-sidebar-skeleton span {
+  display: block;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.06);
+  animation: luca-auth-pulse 1.8s ease-in-out infinite;
+}
 .luca-sidebar-session {
   display: flex;
   align-items: center;
@@ -2081,7 +2137,28 @@ a.luca-ai-attachment:focus-visible {
   color: var(--l-text-mute); background: var(--l-void); font-size: 12px; letter-spacing: .08em;
 }
 .auth-loading img { width: 54px; height: 54px; border-radius: 16px; animation: luca-auth-pulse 1.8s ease-in-out infinite; }
+.auth-loading-quiet { opacity: 0; }
 @keyframes luca-auth-pulse { 50% { transform: scale(1.04); filter: drop-shadow(0 0 18px var(--l-navy-glow)); } }
+
+.estados-proof { max-width: 1280px; margin: 0 auto; padding: 28px 20px 64px; color: var(--l-text); }
+.estados-proof-head { margin-bottom: 28px; }
+.estados-proof-head p { margin: 0; color: var(--l-text-mute); font-size: 12px; }
+.estados-proof-head h1 { margin: 6px 0 8px; font-size: 28px; }
+.estados-row { margin: 0 0 28px; }
+.estados-row h2 { margin: 0 0 10px; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: var(--l-text-ghost); }
+.estados-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.estados-cell { min-height: 160px; padding: 10px; border-radius: 14px; background: rgba(255,255,255,.03); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.estados-cell header { margin-bottom: 8px; color: var(--l-gold); font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.estados-full, .estados-na { margin: 0; color: var(--l-text-mute); font-size: 12px; line-height: 1.4; }
+.estados-cell .sompo-telemetry-empty,
+.estados-cell .sompo-telemetry-skeleton,
+.estados-cell .luca-reading-state,
+.estados-cell .admin-state { min-height: 0; padding: 8px; }
+.estados-cell .sompo-empty { padding: 16px 12px; }
+.estados-na { color: var(--l-text-ghost); }
+@media (max-width: 900px) {
+  .estados-grid { grid-template-columns: 1fr 1fr; }
+}
 
 .auth-shell {
   width: 100vw; min-height: 100dvh; display: grid; grid-template-columns: minmax(0, 1.18fr) minmax(420px, .82fr);
@@ -2531,6 +2608,36 @@ a.luca-ai-attachment:focus-visible {
   font-size: 12px;
   line-height: 1.4;
 }
+.admin-table-skeleton {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+}
+.admin-table-skeleton span {
+  display: block;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.06);
+  animation: luca-auth-pulse 1.8s ease-in-out infinite;
+}
+.admin-chat-thread-skeleton {
+  display: grid;
+  gap: 10px;
+  padding: 24px;
+}
+.admin-chat-thread-skeleton span {
+  display: block;
+  height: 56px;
+  border-radius: 16px;
+  background: rgba(255,255,255,.06);
+  animation: luca-auth-pulse 1.8s ease-in-out infinite;
+}
+.admin-chat-empty-block {
+  margin: 0;
+  color: var(--l-text-mute);
+  font-size: 12px;
+  line-height: 1.45;
+}
 .admin-state { padding: 34px; color: var(--l-text-ghost); text-align: center; font-size: 12px; }
 .admin-state.error { color: #ff8a83; }
 
@@ -2653,6 +2760,18 @@ a.luca-ai-attachment:focus-visible {
 }
 .luca-reading-state strong { color: var(--l-text); font-size: 16px; }
 .luca-reading-state p { max-width: 46ch; margin: -4px 0 4px; }
+.luca-reading-skeleton {
+  display: grid;
+  gap: 12px;
+  padding: 28px 24px;
+}
+.luca-reading-skeleton span {
+  display: block;
+  height: 72px;
+  border-radius: 18px;
+  background: rgba(255,255,255,.06);
+  animation: luca-auth-pulse 1.8s ease-in-out infinite;
+}
 
 .luca-reading-composer {
   display: flex; width: min(100%,640px); min-height: 54px; align-items: center; gap: 10px;

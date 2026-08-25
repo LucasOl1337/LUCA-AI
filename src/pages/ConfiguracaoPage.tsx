@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
+  AlertCircle,
   ArrowDown,
   ArrowUp,
   Loader2,
@@ -11,7 +12,9 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { buildApiErrorMessage, lucaApi } from '@/lib/api';
+import { lucaApi } from '@/lib/api';
+import { pickFailureCopy } from '@/lib/surface-failure';
+import { useDeferredFlag } from '@/hooks/useDeferredFlag';
 import type { LucaAiIndividualTemplate, LucaAiTeamTemplate, YumePersonaSummary } from '@/lib/types';
 import {
   PRESET_ICON_MAP,
@@ -77,6 +80,7 @@ export default function ConfiguracaoPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorScope, setErrorScope] = useState<'load' | 'save' | 'mutate' | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftTeam, setDraftTeam] = useState<LucaAiTeamTemplate>(emptyTeam());
@@ -85,6 +89,7 @@ export default function ConfiguracaoPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setErrorScope(null);
     try {
       const [templates, catalog] = await Promise.all([
         lucaApi.listTeamTemplates(),
@@ -94,7 +99,12 @@ export default function ConfiguracaoPage() {
       setIndividual(templates.individual || []);
       setPersonas(catalog.personas || []);
     } catch (err) {
-      setError(buildApiErrorMessage(err, 'Falha ao carregar configuração de equipes.'));
+      setErrorScope('load');
+      setError(pickFailureCopy(err, {
+        offline: 'Sem internet. Os templates que já estavam na tela continuam aqui — reconecte e recarregue.',
+        forbidden: 'Esta conta não pode ver a configuração das equipes. Peça acesso a um administrador.',
+        server: 'A configuração das equipes não chegou. Tente de novo; o que já estava na lista permanece.',
+      }));
     } finally {
       setLoading(false);
     }
@@ -105,6 +115,7 @@ export default function ConfiguracaoPage() {
   }, [load]);
 
   const list = kind === 'team' ? team : individual;
+  const showListSkeleton = useDeferredFlag(loading && list.length === 0);
   const personaBySlug = useMemo(
     () => new Map(personas.map((persona) => [persona.slug, persona])),
     [personas],
@@ -181,6 +192,7 @@ export default function ConfiguracaoPage() {
   async function saveDraft() {
     setBusy(true);
     setError(null);
+    setErrorScope(null);
     try {
       if (kind === 'team') {
         const payload = {
@@ -210,7 +222,12 @@ export default function ConfiguracaoPage() {
       }
       closeEditor();
     } catch (err) {
-      setError(buildApiErrorMessage(err, 'Falha ao salvar template.'));
+      setErrorScope('save');
+      setError(pickFailureCopy(err, {
+        offline: 'Sem internet. O rascunho continua no formulário — reconecte e salve de novo.',
+        forbidden: 'Esta conta não pode gravar templates. Peça a um administrador.',
+        server: 'O template não foi gravado. O que você preencheu continua aqui — tente salvar de novo.',
+      }));
     } finally {
       setBusy(false);
     }
@@ -220,12 +237,18 @@ export default function ConfiguracaoPage() {
     if (!window.confirm('Apagar este template?')) return;
     setBusy(true);
     setError(null);
+    setErrorScope(null);
     try {
       const res = await lucaApi.deleteTeamTemplate(kind, id);
       setTeam(res.team || []);
       setIndividual(res.individual || []);
     } catch (err) {
-      setError(buildApiErrorMessage(err, 'Falha ao apagar template.'));
+      setErrorScope('mutate');
+      setError(pickFailureCopy(err, {
+        offline: 'Sem internet. O template não foi apagado — reconecte e tente de novo.',
+        forbidden: 'Esta conta não pode apagar templates. Peça a um administrador.',
+        server: 'O template continua na lista. Tente apagar de novo em instantes.',
+      }));
     } finally {
       setBusy(false);
     }
@@ -240,12 +263,18 @@ export default function ConfiguracaoPage() {
     [next[index], next[target]] = [next[target], next[index]];
     setBusy(true);
     setError(null);
+    setErrorScope(null);
     try {
       const res = await lucaApi.reorderTeamTemplates(kind, next);
       setTeam(res.team || []);
       setIndividual(res.individual || []);
     } catch (err) {
-      setError(buildApiErrorMessage(err, 'Falha ao reordenar templates.'));
+      setErrorScope('mutate');
+      setError(pickFailureCopy(err, {
+        offline: 'Sem internet. A ordem não mudou — reconecte e tente de novo.',
+        forbidden: 'Esta conta não pode reordenar templates. Peça a um administrador.',
+        server: 'A ordem não foi gravada. Tente mover de novo em instantes.',
+      }));
     } finally {
       setBusy(false);
     }
@@ -321,21 +350,58 @@ export default function ConfiguracaoPage() {
         </div>
 
         {error && (
-          <div className="rounded-xl border px-4 py-3 text-sm" style={{ borderColor: theme.border, background: theme.input, color: theme.error }}>
-            {error}
-          </div>
+          <Notice
+            tone="error"
+            title={errorScope === 'save'
+              ? 'O template não foi gravado'
+              : errorScope === 'mutate'
+                ? 'A lista não pôde ser atualizada'
+                : 'Configuração das equipes indisponível'}
+            body={error}
+            actions={(
+              <button
+                type="button"
+                className="btn-primary !px-4 !py-2 !text-xs"
+                data-config-retry
+                onClick={() => { if (errorScope === 'save') void saveDraft(); else void load(); }}
+                disabled={loading || busy}
+              >
+                {loading || busy ? 'Tentando…' : 'Tentar novamente'}
+              </button>
+            )}
+          />
         )}
 
-        {loading ? (
-          <div className="flex min-h-[240px] items-center justify-center gap-2 text-sm" style={{ color: theme.textMute }}>
-            <Loader2 className="h-4 w-4 animate-spin" /> Carregando templates…
+        {showListSkeleton ? (
+          <div className="space-y-3" data-config-loading role="status" aria-label="Carregando templates">
+            {Array.from({ length: 3 }, (_, index) => (
+              <div key={index} className="h-[88px] animate-pulse rounded-2xl" style={{ background: theme.surfaceHi, border: `1px solid ${theme.border}` }} />
+            ))}
           </div>
         ) : (
           <div className="space-y-3">
-            {list.length === 0 && (
-              <p className="rounded-xl border px-4 py-8 text-center text-sm" style={{ borderColor: theme.border, color: theme.textMute }}>
-                Nenhum template neste tipo. Crie o primeiro.
-              </p>
+            {list.length === 0 && !error && (
+              <div
+                className="flex min-h-[220px] flex-col items-center justify-center gap-4 rounded-xl border px-6 py-10 text-center"
+                style={{ borderColor: theme.border }}
+                data-config-empty
+                data-tone="empty"
+              >
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: theme.textSoft }}>
+                    {kind === 'team' ? 'Nenhuma equipe montada ainda' : 'Nenhum template individual ainda'}
+                  </p>
+                  <p className="mt-2 max-w-[48ch] text-xs leading-relaxed" style={{ color: theme.textGhost }}>
+                    {kind === 'team'
+                      ? 'Uma equipe guarda papéis e personas para repetir o mesmo fluxo na bancada. Crie a primeira para não montar de novo a cada missão.'
+                      : 'Um template individual guarda participantes e juiz. Crie o primeiro para comparar respostas sem refazer a seleção.'}
+                  </p>
+                </div>
+                <button type="button" className="btn-primary !px-4 !py-2 !text-xs inline-flex items-center gap-2" data-config-empty-create onClick={openCreate} disabled={busy}>
+                  <Plus className="h-3.5 w-3.5" />
+                  {kind === 'team' ? 'Criar equipe' : 'Criar template individual'}
+                </button>
+              </div>
             )}
             {list.map((item, index) => {
               const Icon = resolvePresetIcon(item.icon);
@@ -508,6 +574,12 @@ export default function ConfiguracaoPage() {
               )}
             </div>
 
+            {error && errorScope === 'save' && (
+              <p className="mt-4 text-xs leading-relaxed" style={{ color: theme.error }} role="alert">
+                {error}
+              </p>
+            )}
+
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" className="btn-fleet" onClick={closeEditor} disabled={busy}>Cancelar</button>
               <button type="button" className="btn-primary inline-flex items-center gap-2" onClick={() => void saveDraft()} disabled={busy}>
@@ -518,6 +590,38 @@ export default function ConfiguracaoPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function Notice({
+  tone,
+  title,
+  body,
+  actions,
+}: {
+  tone: 'warning' | 'error';
+  title: string;
+  body: string;
+  actions?: ReactNode;
+}) {
+  const theme = useTheme();
+  const color = tone === 'error' ? theme.error : theme.warning;
+  const bg = tone === 'error' ? theme.errorBg : theme.warningBg;
+  return (
+    <div
+      className="flex items-start gap-3 rounded-lg px-4 py-3"
+      style={{ background: bg, border: `1px solid ${color}` }}
+      data-config-error={tone === 'error' ? '' : undefined}
+      data-tone={tone}
+      role={tone === 'error' ? 'alert' : undefined}
+    >
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" style={{ color }} />
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-semibold" style={{ color }}>{title}</div>
+        <div className="mt-1 text-xs leading-relaxed" style={{ color: theme.textSoft }}>{body}</div>
+        {actions ? <div className="mt-3 flex flex-wrap gap-2">{actions}</div> : null}
+      </div>
     </div>
   );
 }
@@ -607,6 +711,29 @@ function RolePicker({
         style={{ background: theme.surface, borderColor: theme.border, color: theme.text }}
       />
       <div className="max-h-40 space-y-1 overflow-y-auto">
+        {visible.length === 0 && (
+          <div className="px-2 py-4 text-center" data-config-picker-empty>
+            <p className="text-xs font-semibold" style={{ color: theme.textSoft }}>
+              {personas.length === 0
+                ? 'Nenhuma persona no catálogo'
+                : `Nenhuma persona para “${query.trim()}”`}
+            </p>
+            <p className="mt-1 text-[11px] leading-relaxed" style={{ color: theme.textGhost }}>
+              {personas.length === 0
+                ? 'Peça a quem opera o Yume para publicar o roster. Sem personas não dá para montar o template.'
+                : 'Limpe a busca para ver o catálogo completo.'}
+            </p>
+            {personas.length > 0 && term ? (
+              <button
+                type="button"
+                className="btn-fleet !mt-2 !px-3 !py-1.5 !text-[10px]"
+                onClick={() => setQuery('')}
+              >
+                Limpar busca
+              </button>
+            ) : null}
+          </div>
+        )}
         {visible.map((persona) => {
           const active = selected.includes(persona.slug);
           const limitReached = !active && selected.length >= limit;

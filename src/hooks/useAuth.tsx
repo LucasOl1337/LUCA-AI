@@ -62,16 +62,31 @@ const authMessages: Record<string, string> = {
 };
 
 async function authRequest(path: string, body?: object) {
-  const response = await fetch(path, {
-    method: body ? 'POST' : 'GET',
-    credentials: 'same-origin',
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      method: body ? 'POST' : 'GET',
+      credentials: 'same-origin',
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new Error(
+      typeof navigator !== 'undefined' && navigator.onLine === false
+        ? 'Sem internet. O que você digitou continua no formulário — reconecte e tente de novo.'
+        : 'O LUCA não respondeu. O que você digitou continua no formulário — tente de novo em instantes.',
+    );
+  }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const code = String(payload?.error || 'auth_failed');
-    throw new Error(authMessages[code] || 'Não foi possível concluir a autenticação.');
+    if (response.status === 401 && !authMessages[code]) {
+      throw new Error('E-mail ou senha incorretos.');
+    }
+    if (response.status === 403 && !authMessages[code]) {
+      throw new Error('Esta conta não pode entrar. Peça acesso a um administrador.');
+    }
+    throw new Error(authMessages[code] || 'Não foi possível concluir a autenticação. Tente de novo — o que você digitou continua no formulário.');
   }
   return payload;
 }
