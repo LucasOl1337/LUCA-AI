@@ -17,6 +17,8 @@ export const MAX_VISUAL_REPORT_CHARS = 12_000;
 export const MAX_IMAGE_PROMPT_CHARS = 2_000;
 export const MAX_CHART_ITEMS = 8;
 
+const PT_BR_IMAGE_LANGUAGE_GUARD = 'Requisito obrigatório de idioma: todo texto visível na arte — título, subtítulo, rótulos, eixos, legendas, chamadas e notas — deve estar em português do Brasil (pt-BR). Não traduza o texto visível para inglês.';
+
 const ALLOWED_CHART_TYPES = new Set(['pie', 'tower', 'bar', 'line']);
 const ALLOWED_ASPECT = new Set(['1:1', '16:9', '9:16', '4:3', '3:4']);
 
@@ -37,6 +39,19 @@ function clip(text, max) {
 
 function uniqueId(prefix) {
   return `${prefix}_${randomBytes(4).toString('hex')}`;
+}
+
+function buildPtBrImageGenerationPrompt(prompt = '') {
+  const raw = String(prompt || '').trim();
+  if (raw.includes(PT_BR_IMAGE_LANGUAGE_GUARD)) return clip(raw, MAX_IMAGE_PROMPT_CHARS);
+  const separator = '\n\n';
+  const sourceBudget = Math.max(0, MAX_IMAGE_PROMPT_CHARS - PT_BR_IMAGE_LANGUAGE_GUARD.length - separator.length);
+  const source = clip(raw, sourceBudget);
+  return [source, PT_BR_IMAGE_LANGUAGE_GUARD].filter(Boolean).join(separator);
+}
+
+function buildPtBrImageCaption() {
+  return 'Infográfico gerado a partir dos achados da sessão. Todo texto visível da arte foi solicitado em português do Brasil (pt-BR).';
 }
 
 function artifactsDir(userId, traceId) {
@@ -148,15 +163,16 @@ export function synthesizeVisualImageSpecs(plan = {}, { mission = '' } = {}) {
     420,
   );
   const dataLine = chartBits.length
-    ? `Include these exact data points as a clean explained chart: ${chartBits.join('; ')}.`
-    : 'Turn the findings into one clear explained chart or ranked comparison with readable labels.';
+    ? `Inclua estes pontos de dados exatos em um gráfico explicado e limpo: ${chartBits.join('; ')}.`
+    : 'Transforme os achados em um gráfico explicado ou comparação ordenada, com rótulos legíveis.';
   const prompt = clip([
-    'Editorial infographic / explained chart, not a photo.',
-    `Topic: ${topic}`,
+    'Infográfico editorial / gráfico explicado, não uma fotografia.',
+    `Tema: ${topic}`,
     dataLine,
-    'Readable title, clear category labels, accurate values, 1-3 short callouts, embedded legend/caption,',
-    'high contrast, clean sans typography, dark editorial or paper background,',
-    'no fake software UI, no dashboard chrome, no illegible text, no watermark.',
+    'Título legível, categorias claras, valores corretos, 1-3 chamadas curtas e legenda embutida,',
+    'alto contraste, tipografia sem serifa limpa, fundo editorial escuro ou papel claro,',
+    'sem interface de software inventada, sem moldura de dashboard, sem texto ilegível e sem marca d\'agua.',
+    PT_BR_IMAGE_LANGUAGE_GUARD,
   ].join(' '), MAX_IMAGE_PROMPT_CHARS);
 
   return [{
@@ -245,7 +261,7 @@ export function buildVisualRetryContext(previousOutput = '') {
     '## Correção obrigatória da etapa visual',
     'Sua resposta anterior NÃO seguiu o contrato de artefatos.',
     'Responda novamente SOMENTE com o objeto JSON combinado (summary, report, charts, images, imageEngine), sem nenhum texto fora do JSON.',
-    'OBRIGATÓRIO: inclua pelo menos 1 item em images[] com prompt em inglês de infográfico/explained-chart (título legível, labels, callouts, legenda). Não diga que não há imagens — invente um gráfico fiel ao contexto.',
+    'OBRIGATÓRIO: escreva summary, report, títulos, rótulos e prompts em pt-BR. Inclua pelo menos 1 item em images[] com prompt em pt-BR de infográfico/gráfico explicado (título legível, rótulos, chamadas e legenda). Todo texto visível da arte deve permanecer em pt-BR e não ser traduzido para inglês. Não diga que não há imagens — crie um gráfico fiel ao contexto.',
     excerpt ? `Resposta anterior (para referência do conteúdo, não do formato):\n${excerpt}` : '',
   ].filter(Boolean).join('\n');
 }
@@ -508,11 +524,12 @@ export async function materializeVisualPack({
     // Paralelo: cada imagem falha isolada; ordem do plano preservada no resultado.
     // Se o 9Router não tiver provider de imagem, cai no infográfico SVG local.
     images = await Promise.all(imageSpecs.map(async (spec) => {
+      const generationPrompt = buildPtBrImageGenerationPrompt(spec.prompt);
       const base = {
         id: spec.id,
         kind: 'image',
         title: spec.title,
-        prompt: spec.prompt,
+        prompt: buildPtBrImageCaption(),
         aspectRatio: spec.aspectRatio,
         style: spec.style,
         ...(spec.synthesized ? { synthesized: true } : {}),
@@ -521,7 +538,7 @@ export async function materializeVisualPack({
         const result = await generateVisualImageWithFallback({
           callImage: typeof callImage === 'function' ? callImage : null,
           engines,
-          prompt: spec.prompt,
+          prompt: generationPrompt,
           aspectRatio: spec.aspectRatio,
           resolution: '1k',
           localTitle: spec.title || plan.report?.title || plan.summary || 'Infográfico da sessão',
@@ -577,7 +594,7 @@ export async function materializeVisualPack({
         id: spec.id,
         kind: 'image',
         title: spec.title,
-        prompt: spec.prompt,
+        prompt: buildPtBrImageCaption(),
         aspectRatio: spec.aspectRatio,
         style: spec.style,
         ...(spec.synthesized ? { synthesized: true } : {}),

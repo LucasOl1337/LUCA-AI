@@ -16,6 +16,8 @@ test('builtin especialista-visual expoe prompt de infografico explicado', () => 
   assert.equal(persona.model, 'gcli/grok-4.6-high');
   assert.match(ESPECIALISTA_VISUAL_SYSTEM_PROMPT, /infogr[aá]fico|explained chart/i);
   assert.match(getBuiltinSystemPrompt(VISUAL_PERSONA_SLUG), /INFOGRÁFICOS|explained chart/i);
+  assert.match(ESPECIALISTA_VISUAL_SYSTEM_PROMPT, /texto visível.*português do Brasil/i);
+  assert.doesNotMatch(ESPECIALISTA_VISUAL_SYSTEM_PROMPT, /prompts? em inglês/i);
   assert.equal(isLucaBuiltinPersona(VISUAL_PERSONA_SLUG), true);
   assert.equal(isLucaBuiltinPersona('aurora'), false);
 });

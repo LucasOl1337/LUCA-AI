@@ -145,6 +145,40 @@ test('materializeVisualPack gera imagem e persiste artefato por conta/trace', as
   assert.ok(stored.buffer.length > 50);
 });
 
+test('materializeVisualPack preserva pt-BR no texto visivel da imagem', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-visual-language-'));
+  process.env.LUCA_DATA_DIR = dataDir;
+  const tinyPng = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  const prompts = [];
+
+  const pack = await materializeVisualPack({
+    mission: 'Crie um infográfico sobre os riscos da safra',
+    personaOutput: JSON.stringify({
+      summary: 'Riscos da safra',
+      report: { title: 'Riscos', markdown: 'Prioridades' },
+      images: [{ id: 'risco', title: 'Riscos', prompt: 'Risk briefing with readable title and labels' }],
+    }),
+    ownerId: 'user-language',
+    traceId: 'trace-language',
+    callImage: async ({ prompt }) => {
+      prompts.push(prompt);
+      return {
+        model: 'cx/gpt-5.5-image',
+        images: [{ b64Json: tinyPng.toString('base64'), url: null }],
+      };
+    },
+  });
+
+  assert.equal(prompts.length, 1);
+  assert.match(prompts[0], /todo texto vis[ií]vel.*portugu[eê]s do Brasil|pt-BR/i);
+  assert.match(prompts[0], /n[aã]o traduza.*ingl[eê]s/i);
+  assert.match(pack.images[0].prompt, /portugu[eê]s do Brasil.*pt-BR/i);
+  assert.doesNotMatch(pack.images[0].prompt, /Risk briefing|readable title|labels/i);
+});
+
 test('materializeVisualPack gera imagens em paralelo preservando ordem', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-visual-par-'));
   process.env.LUCA_DATA_DIR = dataDir;
