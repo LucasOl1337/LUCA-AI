@@ -2,20 +2,16 @@
 
 Leia SOMENTE ao instalar, executar, testar, diagnosticar estado local ou preparar release.
 
-## Runtime local
+## Local
 
-Use Node.js e Python 3. O servidor chama `heartbeat_monitor.py`; o restante do runtime roda em Node.js.
+Node.js e Python 3 (`heartbeat_monitor.py`).
 
 ```powershell
 npm ci
 npm start
 ```
 
-`npm start` gera `dist/` e inicia o Express em `http://127.0.0.1:4242`. `npm run dev:full` inicia apenas o servidor e reutiliza o build existente.
-
-Confira a saude em `GET /api/health` e o preflight em `GET /api/preflight`.
-
-## Verificacao
+`npm start` gera `dist/` e sobe o Express em `http://127.0.0.1:4242`. `npm run dev:full` so inicia o servidor e reusa o build. Saude: `GET /api/health`. Preflight: `GET /api/preflight`.
 
 ```powershell
 npm test
@@ -23,20 +19,10 @@ npm run typecheck
 npm run build
 ```
 
-O teste do catalogo local le `../TARS/ferramentas` e `../Yume/ferramentas`. Mantenha esses checkouts como irmaos do LUCA-AI para executar a suite completa.
+Estado local fica em `.luca/` (ignorado pelo Git): `system-state.json`, `runtime-events.jsonl`, `auth.json`. Copie antes de apagar se precisar preservar missoes ou contas.
 
-## Estado local
+## Producao
 
-O runtime grava estado em `.luca/system-state.json` e eventos em `.luca/runtime-events.jsonl`. A pasta esta ignorada pelo Git. Copie esses arquivos antes de limpar o estado quando precisar preservar missoes, personas importadas ou historico.
+`npm run stage:release` empacota source/dist/state. Na sennin: `deploy/install-vm.sh <commit>`. Units: `luca-ai.service` (Express em `127.0.0.1:4242`) e `cloudflared-luca-ai.service` (Tunnel `luca-ai-production`). Env da VM: `/etc/sennin/luca-ai.env`. Dados: `/var/lib/luca-ai` (`LUCA_DATA_DIR`) — entra no backup da VM.
 
-## Produção
-
-Em produção, `luca-ai.service` inicia o Express em loopback na VM `sennin-core-01`, usando o 9Router, o Kamui e o Yume da mesma VM. O `cloudflared-luca-ai.service` mantém o Tunnel `luca-ai-production` até o Express em `127.0.0.1:4242`. O proxy de borda `luca-ai-vm-proxy` (Worker em `deploy/luca-ai-vm-proxy.js`) recebe `luca-ai.com.br/*` e alcança o Express via Workers VPC ligado a esse Tunnel — sem hostname de outro projeto. Nenhuma tarefa, Tunnel ou processo do PC Windows participa da produção. `deploy/run-luca-ai.ps1` existe apenas para desenvolvimento local.
-
-O endereço público canônico é `https://luca-ai.com.br`, sem `www`. A borda redireciona HTTP permanentemente com status `308`, preservando caminho e query string, e adiciona HSTS às respostas HTTPS. Cookies de autenticação continuam obrigatoriamente `Secure`.
-
-O produto possui autenticação própria por e-mail e senha. Contas listadas em `LUCA_ADMIN_EMAILS` visualizam o item `Admin` no menu. Somente quando essa variável não está configurada, a primeira conta criada se torna administradora para permitir o bootstrap.
-
-Os dados persistentes ficam em `/var/lib/luca-ai` na VM (`LUCA_DATA_DIR`), incluindo `auth.json`, estado, eventos e heartbeat. Esse diretório deve fazer parte do backup privado da VM. Os arquivos contêm hashes de senha e de tokens de sessão, nunca senhas ou tokens em texto puro.
-
-O painel `Admin` acompanha por conta logins, sessões, solicitações autenticadas, ações de escrita, execuções iniciadas, erros, conexões WebSocket e última atividade. O tracking guarda somente contadores e timestamps; conteúdo de prompts e respostas não é copiado para `auth.json`.
+Dominio canonico: `https://luca-ai.com.br` (sem `www`). A borda responde HTTP com `308` e manda HSTS; cookie de sessao e `Secure`. Contas em `LUCA_ADMIN_EMAILS` veem Admin; se a variavel estiver vazia, a primeira conta vira admin.
