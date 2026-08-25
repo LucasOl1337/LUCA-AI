@@ -4,6 +4,7 @@ import { AlertCircle, BadgeCheck, ChevronDown, ExternalLink, Layers3, Loader2, P
 import { buildApiErrorMessage, lucaApi } from '@/lib/api';
 import type { YumePersonaSummary } from '@/lib/types';
 import { useTheme } from '@/hooks/useTheme';
+import { useAppLocation } from '@/hooks/useAppLocation';
 
 type FilterMode = 'all' | 'imported' | 'available';
 
@@ -29,9 +30,24 @@ export default function PersonasPage() {
   const [personas, setPersonas] = useState<YumePersonaSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<FilterMode>('all');
+  const { location, navigate } = useAppLocation();
+  const query = location.busca;
+  const filter: FilterMode = location.filtro === 'oficiais'
+    ? 'imported'
+    : location.filtro === 'secundarias'
+      ? 'available'
+      : 'all';
   const [secondaryOpen, setSecondaryOpen] = useState(false);
+
+  function setQuery(value: string) {
+    navigate({ busca: value }, 'replace');
+  }
+
+  function setFilter(value: FilterMode) {
+    navigate({
+      filtro: value === 'imported' ? 'oficiais' : value === 'available' ? 'secundarias' : 'all',
+    }, 'replace');
+  }
 
   // No domínio, o Express está na mesma origem via Cloudflare Tunnel.
   // Usar 127.0.0.1 aqui apontaria para a máquina do visitante.
@@ -288,8 +304,7 @@ export default function PersonasPage() {
                   className="btn-primary !px-4 !py-2 !text-xs"
                   data-personas-clear-filters
                   onClick={() => {
-                    setQuery('');
-                    setFilter('all');
+                    navigate({ busca: '', filtro: 'all' }, 'replace');
                   }}
                 >
                   Limpar busca e filtro

@@ -19,6 +19,7 @@ import {
   type LucaPresetIconId,
 } from '@/lib/lucaPresets';
 import { useTheme } from '@/hooks/useTheme';
+import { useAppLocation } from '@/hooks/useAppLocation';
 import { PRESET_ICON_IDS } from '../../shared/luca-preset-seed.js';
 import {
   PERSONA_WORKFLOW_ROLES,
@@ -68,7 +69,8 @@ function unique(values: string[], limit: number): string[] {
 
 export default function ConfiguracaoPage() {
   const theme = useTheme();
-  const [kind, setKind] = useState<Kind>('team');
+  const { location, navigate } = useAppLocation();
+  const kind: Kind = location.tipo === 'individual' ? 'individual' : 'team';
   const [team, setTeam] = useState<LucaAiTeamTemplate[]>([]);
   const [individual, setIndividual] = useState<LucaAiIndividualTemplate[]>([]);
   const [personas, setPersonas] = useState<YumePersonaSummary[]>([]);
@@ -108,26 +110,73 @@ export default function ConfiguracaoPage() {
     [personas],
   );
 
+  function setKind(next: Kind) {
+    navigate({ tipo: next }, 'replace');
+  }
+
+  function fillEditor(id: string | null) {
+    if (!id) {
+      setEditingId(null);
+      setDraftTeam(emptyTeam());
+      setDraftIndividual(emptyIndividual());
+      setEditorOpen(true);
+      return true;
+    }
+    const teamItem = team.find((entry) => entry.id === id);
+    const individualItem = individual.find((entry) => entry.id === id);
+    if (teamItem) {
+      if (kind !== 'team') {
+        navigate({ tipo: 'team', modelo: id, novo: false }, 'replace');
+        return true;
+      }
+      setDraftTeam(JSON.parse(JSON.stringify(teamItem)));
+      setEditingId(id);
+      setEditorOpen(true);
+      return true;
+    }
+    if (individualItem) {
+      if (kind !== 'individual') {
+        navigate({ tipo: 'individual', modelo: id, novo: false }, 'replace');
+        return true;
+      }
+      setDraftIndividual(JSON.parse(JSON.stringify(individualItem)));
+      setEditingId(id);
+      setEditorOpen(true);
+      return true;
+    }
+    return false;
+  }
+
   function openCreate() {
-    setEditingId(null);
-    setDraftTeam(emptyTeam());
-    setDraftIndividual(emptyIndividual());
-    setEditorOpen(true);
+    navigate({ novo: true, modelo: '' }, 'push');
   }
 
   function openEdit(id: string) {
-    if (kind === 'team') {
-      const item = team.find((entry) => entry.id === id);
-      if (!item) return;
-      setDraftTeam(JSON.parse(JSON.stringify(item)));
-    } else {
-      const item = individual.find((entry) => entry.id === id);
-      if (!item) return;
-      setDraftIndividual(JSON.parse(JSON.stringify(item)));
-    }
-    setEditingId(id);
-    setEditorOpen(true);
+    navigate({ modelo: id, novo: false }, 'push');
   }
+
+  function closeEditor() {
+    navigate({ novo: false, modelo: '' }, 'push');
+  }
+
+  useEffect(() => {
+    if (loading) return;
+    if (location.novo) {
+      if (!editorOpen || editingId !== null) fillEditor(null);
+      return;
+    }
+    if (location.modelo) {
+      if (editorOpen && editingId === location.modelo) return;
+      if (!fillEditor(location.modelo)) {
+        navigate({ modelo: '', novo: false }, 'replace');
+      }
+      return;
+    }
+    if (editorOpen) {
+      setEditorOpen(false);
+      setEditingId(null);
+    }
+  }, [editingId, editorOpen, individual, kind, loading, location.modelo, location.novo, navigate, team]);
 
   async function saveDraft() {
     setBusy(true);
@@ -159,7 +208,7 @@ export default function ConfiguracaoPage() {
         setTeam(res.team || []);
         setIndividual(res.individual || []);
       }
-      setEditorOpen(false);
+      closeEditor();
     } catch (err) {
       setError(buildApiErrorMessage(err, 'Falha ao salvar template.'));
     } finally {
@@ -366,7 +415,7 @@ export default function ConfiguracaoPage() {
                   Personas secundárias podem ser escolhidas; o LUCA cacheia via Kamui GET.
                 </p>
               </div>
-              <button type="button" className="grid h-9 w-9 place-items-center rounded-lg" onClick={() => setEditorOpen(false)} aria-label="Fechar">
+              <button type="button" className="grid h-9 w-9 place-items-center rounded-lg" onClick={closeEditor} aria-label="Fechar">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -460,7 +509,7 @@ export default function ConfiguracaoPage() {
             </div>
 
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" className="btn-fleet" onClick={() => setEditorOpen(false)} disabled={busy}>Cancelar</button>
+              <button type="button" className="btn-fleet" onClick={closeEditor} disabled={busy}>Cancelar</button>
               <button type="button" className="btn-primary inline-flex items-center gap-2" onClick={() => void saveDraft()} disabled={busy}>
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Salvar

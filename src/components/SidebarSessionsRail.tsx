@@ -12,6 +12,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useChatLibrary } from '@/hooks/useChatLibrary';
+import { useAppLocation } from '@/hooks/useAppLocation';
 
 interface SidebarSessionsRailProps {
   compact?: boolean;
@@ -19,6 +20,7 @@ interface SidebarSessionsRailProps {
 }
 
 export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: SidebarSessionsRailProps) {
+  const { navigate } = useAppLocation();
   const {
     busy,
     folders,
@@ -54,13 +56,15 @@ export default function SidebarSessionsRail({ compact = false, onOpenLucaAi }: S
   );
 
   async function handleActivate(sessionId: string) {
+    navigate({ page: 'luca-ai', sessao: sessionId, aba: '' }, 'push');
     onOpenLucaAi?.();
     await activateSession(sessionId);
   }
 
   async function handleCreate(folderId?: string | null) {
     onOpenLucaAi?.();
-    await createSession(folderId);
+    const session = await createSession(folderId);
+    if (session?.id) navigate({ page: 'luca-ai', sessao: session.id, aba: '' }, 'push');
   }
 
   function submitFolder() {

@@ -6,46 +6,67 @@ import PersonasPage from '@/pages/PersonasPage';
 import ConfiguracaoPage from '@/pages/ConfiguracaoPage';
 import SompoPage from '@/pages/SompoPage';
 import AdminPage from '@/pages/AdminPage';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { useAuth } from '@/hooks/useAuth';
-import { ChatLibraryProvider } from '@/hooks/useChatLibrary';
-
-const ACTIVE_PAGES: readonly PageId[] = ['inicio', 'luca-ai', 'personas', 'configuracao', 'sompo', 'admin'];
-
-function isPageId(value: string): value is PageId {
-  return ACTIVE_PAGES.includes(value as PageId);
-}
+import { useAppLocation } from '@/hooks/useAppLocation';
+import { ChatLibraryProvider, useChatLibrary } from '@/hooks/useChatLibrary';
+import { isAppPage } from '../shared/app-location.js';
 
 export default function App() {
   const { user } = useAuth();
-  const [storedPage, setStoredPage] = usePersistentState<string>('activePage', 'inicio');
-  const activePage: PageId = isPageId(storedPage) ? storedPage : 'inicio';
+  const { location, navigate } = useAppLocation();
+  const activePage: PageId = isAppPage(location.page) ? location.page : 'inicio';
   const authorizedPage: PageId = activePage === 'admin' && user?.role !== 'admin' ? 'inicio' : activePage;
 
   useEffect(() => {
-    if (storedPage !== authorizedPage) setStoredPage(authorizedPage);
-  }, [authorizedPage, setStoredPage, storedPage]);
+    if (activePage === 'admin' && user?.role !== 'admin') {
+      navigate({ page: 'inicio' }, 'replace');
+    }
+  }, [activePage, navigate, user?.role]);
 
-  function navigate(page: PageId) {
-    setStoredPage(page);
+  function goToPage(page: PageId) {
+    navigate({ page }, 'push');
   }
 
   const renderPage = () => {
     switch (authorizedPage) {
-      case 'inicio':      return <LandingPage onNavigate={navigate} />;
-      case 'luca-ai':     return <LucaAiPage onNavigate={navigate} />;
+      case 'inicio':      return <LandingPage onNavigate={goToPage} />;
+      case 'luca-ai':     return <LucaAiPage onNavigate={goToPage} />;
       case 'personas':    return <PersonasPage />;
       case 'configuracao': return <ConfiguracaoPage />;
-      case 'sompo':       return <SompoPage onNavigate={navigate} />;
+      case 'sompo':       return <SompoPage onNavigate={goToPage} />;
       case 'admin':       return <AdminPage />;
     }
   };
 
   return (
     <ChatLibraryProvider>
-      <Layout activePage={authorizedPage} onPageChange={navigate}>
+      <LucaSessionAddress />
+      <Layout activePage={authorizedPage} onPageChange={goToPage}>
         {renderPage()}
       </Layout>
     </ChatLibraryProvider>
   );
+}
+
+function LucaSessionAddress() {
+  const { location, navigate } = useAppLocation();
+  const { ready, activeSessionId, activateSession } = useChatLibrary();
+
+  useEffect(() => {
+    if (!ready || location.page !== 'luca-ai') return;
+    if (location.sessao && location.sessao !== activeSessionId) {
+      void activateSession(location.sessao).then((session) => {
+        if (!session) navigate({ sessao: activeSessionId || '' }, 'replace');
+      });
+    }
+  }, [activateSession, activeSessionId, location.page, location.sessao, navigate, ready]);
+
+  useEffect(() => {
+    if (!ready || location.page !== 'luca-ai') return;
+    if (!location.sessao && activeSessionId) {
+      navigate({ sessao: activeSessionId }, 'replace');
+    }
+  }, [activeSessionId, location.page, location.sessao, navigate, ready]);
+
+  return null;
 }

@@ -66,7 +66,9 @@ import {
   type LucaTeamPreset,
 } from '@/lib/lucaPresets';
 import { useChatLibrary } from '@/hooks/useChatLibrary';
+import { useAppLocation } from '@/hooks/useAppLocation';
 import { useTheme } from '@/hooks/useTheme';
+import { LUCA_ABA } from '../../shared/app-location.js';
 import {
   consumeSompoLaunch,
   type SompoLaunchPayload,
@@ -596,6 +598,7 @@ function plannedRuntimeEvents(traceId: string, mission: string, assignments: Wor
 
 export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const { runtimeMode, refresh } = useLuca();
+  const { location, navigate } = useAppLocation();
   const [personas, setPersonas] = useState<YumePersonaSummary[]>([]);
   const [routerProfiles, setRouterProfiles] = useState<RouterModelProfile[]>([]);
   const [teamPresets, setTeamPresets] = useState<LucaTeamPreset[]>(LUCA_TEAM_PRESETS);
@@ -623,7 +626,9 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const [activePersonaSlug, setActivePersonaSlug] = useState<string | null>(null);
   const [activeTraceId, setActiveTraceId] = useState<string | null>(null);
   const [processEvents, setProcessEvents] = useState<RuntimeEvent[]>([]);
-  const [activeWorkspaceView, setActiveWorkspaceView] = useState<'result' | 'activity'>('result');
+  const [activeWorkspaceView, setActiveWorkspaceView] = useState<'result' | 'activity'>(
+    () => (location.aba === LUCA_ABA ? 'activity' : 'result'),
+  );
   const [teamPanelOpen, setTeamPanelOpen] = useState(true);
   const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
   const [busyPersonaSlug, setBusyPersonaSlug] = useState<string | null>(null);
@@ -711,6 +716,18 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     void loadPersonas();
   }, [loadPersonas]);
 
+  useEffect(() => {
+    const next = location.aba === LUCA_ABA ? 'activity' : 'result';
+    setActiveWorkspaceView((prev) => (prev === next ? prev : next));
+  }, [location.aba]);
+
+  useEffect(() => {
+    if (location.page !== 'luca-ai') return;
+    const aba = activeWorkspaceView === 'activity' ? LUCA_ABA : '';
+    if ((location.aba || '') === aba) return;
+    navigate({ aba }, 'replace');
+  }, [activeWorkspaceView, location.aba, location.page, navigate]);
+
   const applySession = useCallback((session: LucaAiChatSession | null | undefined) => {
     setRunning(false);
     setProcessEvents([]);
@@ -718,7 +735,6 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setError(null);
     setErrorRetry(null);
     setPickerTarget(null);
-    setActiveWorkspaceView('result');
     sompoPresetAppliedRef.current = false;
     sompoAutoRunArmedRef.current = false;
     if (!session) {

@@ -19,7 +19,9 @@ import type { PageId } from '@/components/Layout';
 import SompoTelemetryPanel from '@/components/SompoTelemetryPanel';
 import { useTheme } from '@/hooks/useTheme';
 import { useChatLibrary } from '@/hooks/useChatLibrary';
+import { useAppLocation } from '@/hooks/useAppLocation';
 import { useLuca } from '@/hooks/useLucaState';
+import { GRAVIDADE_VALUES, PRODUTO_PARAM, PRODUTO_VALUE, SOMPO_ABA } from '../../shared/app-location.js';
 import { buildApiErrorMessage, lucaApi } from '@/lib/api';
 import type { SompoTelemetrySnapshot } from '@/lib/types';
 import {
@@ -94,11 +96,20 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
   const theme = useTheme();
   const { createSession, busy: sessionsBusy } = useChatLibrary();
   const { sompoTelemetry: streamedTelemetry } = useLuca();
-  const [viewMode, setViewMode] = useState<SompoViewMode>('telemetry');
-  const [query, setQuery] = useState('');
-  const [productFilter, setProductFilter] = useState<ProductFilter>('all');
-  const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { location, navigate } = useAppLocation();
+  const viewMode: SompoViewMode = location.aba === SOMPO_ABA ? 'cases' : 'telemetry';
+  const query = location.busca;
+  const mappedProduct = PRODUTO_VALUE[location.produto];
+  const productFilter: ProductFilter = mappedProduct === 'agricola-produtividade'
+    || mappedProduct === 'agricola-custeio'
+    || mappedProduct === 'penhor-rural'
+    || mappedProduct === 'carteira'
+    ? mappedProduct
+    : 'all';
+  const severityFilter: SeverityFilter = GRAVIDADE_VALUES.includes(location.gravidade)
+    ? location.gravidade as SompoCaseSeverity
+    : 'all';
+  const selectedId = location.caso || null;
   const [teamMode, setTeamMode] = useState<SompoLaunchMode>('team');
   const [teamPresets, setTeamPresets] = useState<LucaTeamPreset[]>(LUCA_TEAM_PRESETS);
   const [individualPresets, setIndividualPresets] = useState<LucaIndividualPreset[]>(LUCA_INDIVIDUAL_PRESETS);
@@ -181,7 +192,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
     if (!selectedId) return;
     function onKey(event: KeyboardEvent) {
       if (event.key === 'Escape') {
-        setSelectedId(null);
+        navigate({ caso: '' }, 'push');
         setLaunchError(null);
       }
     }
@@ -220,6 +231,24 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
     [selectedId],
   );
 
+  useEffect(() => {
+    if (!selected) return;
+    setTeamMode(selected.suggestedMode);
+    if (selected.suggestedMode === 'team') {
+      setSelectedTeamId((prev) => (
+        teamPresets.some((item) => item.id === selected.suggestedPresetId)
+          ? selected.suggestedPresetId
+          : prev
+      ));
+    } else {
+      setSelectedIndividualId((prev) => (
+        individualPresets.some((item) => item.id === selected.suggestedPresetId)
+          ? selected.suggestedPresetId
+          : prev
+      ));
+    }
+  }, [individualPresets, selected, teamPresets]);
+
   const selectedTeam = useMemo(
     () => teamPresets.find((item) => item.id === selectedTeamId) || teamPresets[0] || null,
     [selectedTeamId, teamPresets],
@@ -235,8 +264,24 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
     return individualPresetSlugs(activeSquad as LucaIndividualPreset);
   }, [activeSquad, teamMode]);
 
+  function setViewMode(mode: SompoViewMode) {
+    navigate({ aba: mode === 'cases' ? SOMPO_ABA : '', caso: mode === 'cases' ? location.caso : '' }, 'replace');
+  }
+
+  function setQuery(value: string) {
+    navigate({ busca: value }, 'replace');
+  }
+
+  function setProductFilter(value: ProductFilter) {
+    navigate({ produto: value === 'all' ? '' : (PRODUTO_PARAM[value] || '') }, 'replace');
+  }
+
+  function setSeverityFilter(value: SeverityFilter) {
+    navigate({ gravidade: value === 'all' ? '' : value }, 'replace');
+  }
+
   function openCase(caseItem: SompoExampleCase) {
-    setSelectedId(caseItem.id);
+    navigate({ aba: SOMPO_ABA, caso: caseItem.id }, 'push');
     setLaunchError(null);
     setTeamMode(caseItem.suggestedMode);
     if (caseItem.suggestedMode === 'team') {
@@ -255,7 +300,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
   }
 
   function closeLaunch() {
-    setSelectedId(null);
+    navigate({ caso: '' }, 'push');
     setLaunchError(null);
   }
 
@@ -277,7 +322,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
         presetLabel: activeSquad.label,
         autoRun: true,
       });
-      onNavigate('luca-ai');
+      navigate({ page: 'luca-ai', sessao: session.id }, 'push');
     } catch (err) {
       setLaunchError(buildApiErrorMessage(err, 'Falha ao iniciar a avaliação do caso.'));
     } finally {
@@ -303,7 +348,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
         presetLabel: activeSquad.label,
         autoRun: true,
       });
-      onNavigate('luca-ai');
+      navigate({ page: 'luca-ai', sessao: session.id }, 'push');
     } catch (err) {
       setTelemetryLaunchError(buildApiErrorMessage(err, 'Falha ao enviar a telemetria para a bancada.'));
     } finally {

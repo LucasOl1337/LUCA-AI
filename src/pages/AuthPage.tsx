@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, UserRound } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppLocation } from '@/hooks/useAppLocation';
 
 function keepCaretFree(event: React.FocusEvent<HTMLInputElement>) {
   const input = event.currentTarget;
@@ -13,7 +14,13 @@ function keepCaretFree(event: React.FocusEvent<HTMLInputElement>) {
 
 export default function AuthPage() {
   const { login, register } = useAuth();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const { location, navigate } = useAppLocation();
+  const mode = location.kind === 'auth' && location.authMode === 'register' ? 'register' : 'login';
+
+  function setMode(next: 'login' | 'register') {
+    navigate({ kind: 'auth', authMode: next }, 'push');
+    setError('');
+  }
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -70,7 +77,7 @@ export default function AuthPage() {
 
           <footer>
             {mode === 'login' ? 'Ainda não tem uma conta?' : 'Já possui uma conta?'}
-            <button type="button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}>{mode === 'login' ? 'Criar conta' : 'Entrar'}</button>
+            <button type="button" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>{mode === 'login' ? 'Criar conta' : 'Entrar'}</button>
           </footer>
         </div>
       </section>

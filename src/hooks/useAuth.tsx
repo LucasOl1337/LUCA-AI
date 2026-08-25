@@ -143,24 +143,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const payload = await authRequest(`/api/admin/users/${encodeURIComponent(userId)}/impersonate`, {});
       setUser(payload.user ?? null);
       setImpersonation(normalizeImpersonation(payload.impersonation));
-      // Limpa UI da conta admin e abre a bancada na conta do usuário.
-      try {
-        window.localStorage.setItem('luca.activePage', JSON.stringify('luca-ai'));
-      } catch {
-        // best-effort
-      }
-      window.location.assign('/');
+      window.location.assign('/luca-ai');
     },
     async stopImpersonation() {
       const payload = await authRequest('/api/auth/stop-impersonation', {});
       setUser(payload.user ?? null);
       setImpersonation(null);
-      try {
-        window.localStorage.setItem('luca.activePage', JSON.stringify('admin'));
-      } catch {
-        // best-effort
-      }
-      window.location.assign('/');
+      window.location.assign('/admin');
     },
     refreshSession,
   }), [impersonation, loading, refreshSession, user]);

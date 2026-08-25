@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Activity,
@@ -18,7 +18,9 @@ import {
 } from 'lucide-react';
 import type { AuthUser } from '@/hooks/useAuth';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppLocation } from '@/hooks/useAppLocation';
 import AdminChatViewer from '@/components/AdminChatViewer';
+import { ORDEM_PARAM } from '../../shared/app-location.js';
 import type {
   LucaAiChatFolder as ChatFolder,
   LucaAiChatLibraryStats,
@@ -180,13 +182,37 @@ function RankList({
   );
 }
 
+function stubAccount(id: string, existing?: TrackedUser | null): TrackedUser {
+  if (existing) return existing;
+  return {
+    id,
+    name: '',
+    email: '',
+    role: 'user',
+    status: '',
+    createdAt: '',
+    lastLoginAt: '',
+    lastSeenAt: '',
+    loginCount: 0,
+    requestCount: 0,
+    actionCount: 0,
+    runCount: 0,
+    errorCount: 0,
+    websocketCount: 0,
+    lastRequestAt: '',
+    sessionCount: 0,
+  };
+}
+
 export default function AdminPage() {
   const { user, impersonateUser } = useAuth();
+  const { location, navigate } = useAppLocation();
+  const search = location.busca;
+  const sort = ORDEM_PARAM[location.ordem] || 'activity_desc';
+  const [searchDraft, setSearchDraft] = useState(location.busca);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [report, setReport] = useState<AdminReport | null>(null);
   const [users, setUsers] = useState<TrackedUser[]>([]);
-  const [search, setSearch] = useState('');
-  const [sort, setSort] = useState('activity_desc');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [inspectUser, setInspectUser] = useState<TrackedUser | null>(null);
@@ -196,6 +222,7 @@ export default function AdminPage() {
   const [chatError, setChatError] = useState('');
   const [enterBusyId, setEnterBusyId] = useState<string | null>(null);
   const [enterError, setEnterError] = useState('');
+  const inspectKeyRef = useRef('');
 
   const load = useCallback(async (query = search, nextSort = sort) => {
     setLoading(true);
@@ -217,6 +244,10 @@ export default function AdminPage() {
   }, [search, sort]);
 
   useEffect(() => {
+    setSearchDraft(location.busca);
+  }, [location.busca]);
+
+  useEffect(() => {
     void load();
   }, [load]);
 
@@ -226,7 +257,7 @@ export default function AdminPage() {
     return stamp ? formatDate(stamp) : '—';
   }, [overview?.generatedAt, report?.generatedAt]);
 
-  async function openUserChats(account: TrackedUser) {
+  async function openUserChats(account: TrackedUser, preferredSessionId?: string) {
     setInspectUser(account);
     setChatLibrary(null);
     setChatSession(null);
@@ -235,12 +266,16 @@ export default function AdminPage() {
     try {
       const payload = await adminRequest(`/api/admin/users/${encodeURIComponent(account.id)}/chat/library`) as UserChatLibrary;
       setChatLibrary(payload);
-      const preferredId = payload.activeSessionId || payload.sessions?.[0]?.id;
+      const preferredId = preferredSessionId || payload.activeSessionId || payload.sessions?.[0]?.id;
       if (preferredId) {
         const sessionPayload = await adminRequest(
           `/api/admin/users/${encodeURIComponent(account.id)}/chat/sessions/${encodeURIComponent(preferredId)}`,
         ) as { session: ChatSessionDetail };
         setChatSession(sessionPayload.session);
+        if (!preferredSessionId && preferredId) {
+          inspectKeyRef.current = `${account.id}:${preferredId}`;
+          navigate({ sessao: preferredId }, 'replace');
+        }
       }
     } catch (cause) {
       setChatError(cause instanceof Error ? cause.message : 'Falha ao carregar chats da conta.');
@@ -265,12 +300,36 @@ export default function AdminPage() {
     }
   }
 
-  function closeChatInspect() {
+  function resetInspect() {
     setInspectUser(null);
     setChatLibrary(null);
     setChatSession(null);
     setChatError('');
   }
+
+  function closeChatInspect() {
+    navigate({ conta: '', sessao: '' }, 'push');
+  }
+
+  useEffect(() => {
+    if (!location.conta) {
+      inspectKeyRef.current = '';
+      resetInspect();
+      return;
+    }
+    const found = users.find((account) => account.id === location.conta) || null;
+    if (found && inspectUser?.id === found.id && found.name && found.name !== inspectUser.name) {
+      setInspectUser(found);
+    }
+    const key = `${location.conta}:${location.sessao || ''}`;
+    if (inspectKeyRef.current === key) return;
+    inspectKeyRef.current = key;
+    if (inspectUser?.id === location.conta && location.sessao) {
+      void openChatSession(location.sessao);
+      return;
+    }
+    void openUserChats(stubAccount(location.conta, found), location.sessao || undefined);
+  }, [location.conta, location.sessao, users]);
 
   // Overlay de inspeção: portal no body + trava scroll + Esc.
   useEffect(() => {
@@ -392,8 +451,8 @@ export default function AdminPage() {
                 value={sort}
                 onChange={(event) => {
                   const next = event.target.value;
-                  setSort(next);
-                  void load(search, next);
+                  const ordem = Object.entries(ORDEM_PARAM).find(([, api]) => api === next)?.[0] || 'recente';
+                  navigate({ ordem }, 'replace');
                 }}
               >
                 <option value="activity_desc">Atividade recente</option>
@@ -406,13 +465,13 @@ export default function AdminPage() {
             <form
               onSubmit={(event) => {
                 event.preventDefault();
-                void load(search, sort);
+                navigate({ busca: searchDraft }, 'replace');
               }}
             >
               <Search />
               <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                value={searchDraft}
+                onChange={(event) => setSearchDraft(event.target.value)}
                 placeholder="Buscar nome ou e-mail"
               />
               <button type="submit">Buscar</button>
@@ -482,7 +541,7 @@ export default function AdminPage() {
                         type="button"
                         className="admin-inspect-btn"
                         data-admin-chat-inspect
-                        onClick={() => void openUserChats(account)}
+                        onClick={() => navigate({ conta: account.id, sessao: '' }, 'push')}
                       >
                         <Eye />
                         Ver chats
@@ -528,8 +587,7 @@ export default function AdminPage() {
                       className="btn-primary"
                       data-admin-empty-clear
                       onClick={() => {
-                        setSearch('');
-                        void load('');
+                        navigate({ busca: '' }, 'replace');
                       }}
                       disabled={loading}
                     >
@@ -564,7 +622,7 @@ export default function AdminPage() {
             canEnterAsUser={inspectUser.id !== user?.id}
             enterBusy={enterBusyId === inspectUser.id}
             onClose={closeChatInspect}
-            onOpenSession={(sessionId) => void openChatSession(sessionId)}
+            onOpenSession={(sessionId) => navigate({ sessao: sessionId }, 'push')}
             onEnterAsUser={() => void enterAsUser(inspectUser)}
           />,
           document.body,

@@ -3,8 +3,8 @@ import { type Dispatch, type SetStateAction, useCallback, useState } from 'react
 const STORAGE_PREFIX = 'luca.';
 
 /**
- * Persistent state — localStorage para preferências de UI (página ativa,
- * layout). O estado operacional vem do backend via useLucaState.
+ * Persistent state — localStorage para preferência da máquina (densidade,
+ * colunas). Página e filtro moram na URL; o operacional vem do backend.
  */
 export function usePersistentState<T>(
   key: string,
