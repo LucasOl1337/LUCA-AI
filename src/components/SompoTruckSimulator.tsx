@@ -26,6 +26,12 @@ import {
   SOMPO_TRUCK_PIVOT_Y,
 } from './sompo/createSompoTruckModel';
 import {
+  DEFAULT_SOMPO_AXIS_CALIBRATION,
+  SOMPO_EULER_ORDER,
+  sensorReadingToPose,
+  type SompoAxisCalibration,
+} from './sompo/sensorPose.js';
+import {
   SOMPO_COLLISION_FRAME_MOMENTS,
   SOMPO_COLLISION_SCRIPT,
   SOMPO_SIMULATION_SCENARIOS,
@@ -90,6 +96,23 @@ function controlsForScenario(scenarioId: SompoSimulationScenarioId): SompoSimula
 const INITIAL_CONTROLS = controlsForScenario('normal');
 const SIMULATION_HISTORY_FLUSH_MS = 2_000;
 const SIMULATION_HISTORY_MAX_BATCH = 50;
+const SOMPO_AXIS_CALIBRATION_STORAGE_KEY = 'luca:sompo-axis-calibration:v1';
+
+function loadAxisCalibration(): SompoAxisCalibration {
+  try {
+    const stored = window.localStorage.getItem(SOMPO_AXIS_CALIBRATION_STORAGE_KEY);
+    if (!stored) return { ...DEFAULT_SOMPO_AXIS_CALIBRATION };
+    const parsed = JSON.parse(stored) as Partial<SompoAxisCalibration>;
+    return {
+      invertPitch: parsed.invertPitch === true,
+      invertRoll: parsed.invertRoll === true,
+      invertYaw: parsed.invertYaw === true,
+      swapPitchRoll: parsed.swapPitchRoll === true,
+    };
+  } catch {
+    return { ...DEFAULT_SOMPO_AXIS_CALIBRATION };
+  }
+}
 function dampAngle(current: number, target: number, factor: number) {
   const shortestTurn = Math.atan2(Math.sin(target - current), Math.cos(target - current));
   return current + (shortestTurn * factor);
@@ -187,7 +210,17 @@ function formatReading(value: number | null | undefined, suffix: string) {
   return `${Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}${suffix}`;
 }
 
-function LiveReadings({ telemetry }: { telemetry: SompoTelemetrySnapshot }) {
+function LiveReadings({
+  telemetry,
+  calibration,
+  onCalibrationChange,
+  onCalibrationReset,
+}: {
+  telemetry: SompoTelemetrySnapshot;
+  calibration: SompoAxisCalibration;
+  onCalibrationChange: (key: keyof SompoAxisCalibration, value: boolean) => void;
+  onCalibrationReset: () => void;
+}) {
   return (
     <aside className="sompo-simulator-controls sompo-simulator-live-readings" aria-label="Leituras que movimentam o gêmeo digital">
       <div className="sompo-simulator-control-head">
@@ -237,6 +270,29 @@ function LiveReadings({ telemetry }: { telemetry: SompoTelemetrySnapshot }) {
         </div>
       </div>
 
+      <details className="sompo-axis-calibration" data-sompo-axis-calibration>
+        <summary>Calibração de eixos</summary>
+        <p>Incline o caminhão físico e ajuste até a tela seguir a mesma direção.</p>
+        <div>
+          {([
+            ['invertPitch', 'Inverter arfagem'],
+            ['invertRoll', 'Inverter rolagem'],
+            ['invertYaw', 'Inverter guinada'],
+            ['swapPitchRoll', 'Trocar arfagem ↔ rolagem'],
+          ] as const).map(([key, label]) => (
+            <label key={key}>
+              <input
+                type="checkbox"
+                checked={calibration[key]}
+                onChange={(event) => onCalibrationChange(key, event.target.checked)}
+              />
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
+        <button type="button" onClick={onCalibrationReset}>Voltar ao padrão</button>
+      </details>
+
       <p className="sompo-simulator-disclaimer">
         * A cena usa a convenção atual de exibição dos sensores. Confirme unidades e eixos no firmware para calibração física precisa.
       </p>
@@ -252,12 +308,14 @@ export default function SompoTruckSimulator({
 }: SompoTruckSimulatorProps) {
   const isFirebase = source === 'firebase';
   const [controls, setControls] = useState<SompoSimulationControls>(INITIAL_CONTROLS);
+  const [axisCalibration, setAxisCalibration] = useState<SompoAxisCalibration>(loadAxisCalibration);
   const [preview, setPreview] = useState<SompoTelemetrySnapshot>(() => (
     telemetry || createSompoSimulationSnapshot(INITIAL_CONTROLS, { elapsedMs: 0 })
   ));
   const mountRef = useRef<HTMLDivElement | null>(null);
   const sceneApiRef = useRef<SceneApi | null>(null);
   const controlsRef = useRef<SompoSimulationControls>(INITIAL_CONTROLS);
+  const axisCalibrationRef = useRef(axisCalibration);
   const previewRef = useRef<SompoTelemetrySnapshot>(preview);
   const onTelemetryRef = useRef(onTelemetry);
   const onEpisodeRecordedRef = useRef(onEpisodeRecorded);
@@ -292,6 +350,11 @@ export default function SompoTruckSimulator({
   useEffect(() => {
     controlsRef.current = controls;
   }, [controls]);
+
+  useEffect(() => {
+    axisCalibrationRef.current = axisCalibration;
+    window.localStorage.setItem(SOMPO_AXIS_CALIBRATION_STORAGE_KEY, JSON.stringify(axisCalibration));
+  }, [axisCalibration]);
 
   useEffect(() => {
     previewRef.current = preview;
@@ -579,8 +642,20 @@ export default function SompoTruckSimulator({
     for (let x = -13; x < 14; x += 3) {
       addBox(scene, [1.4, 0.025, 0.08], [x, 0.025, -3.15], centerLineMaterial);
     }
+    const frontArrow = new THREE.ArrowHelper(
+      new THREE.Vector3(1, 0, 0),
+      new THREE.Vector3(1.4, 0.06, -2.25),
+      2.2,
+      0x5fd0ff,
+      0.45,
+      0.22,
+    );
+    frontArrow.name = 'frente-caminhao-mais-x';
+    scene.add(frontArrow);
 
     const truckPoseGroup = new THREE.Group();
+    // O caminhão aponta para +X: guinada → arfagem → rolagem exige YZX para não misturar eixos.
+    truckPoseGroup.rotation.order = isFirebase ? SOMPO_EULER_ORDER : 'XYZ';
     truckPoseGroup.position.y = SOMPO_TRUCK_PIVOT_Y + 0.05;
     scene.add(truckPoseGroup);
 
@@ -666,12 +741,19 @@ export default function SompoTruckSimulator({
       previousTime = time;
       const settings = controlsRef.current;
       const snapshot = previewRef.current;
-      const pitch = THREE.MathUtils.degToRad(
-        reduceMotion.matches ? settings.pitch : snapshot.readings.pitch || 0,
-      );
-      const roll = THREE.MathUtils.degToRad(
-        reduceMotion.matches ? settings.roll : snapshot.readings.roll || 0,
-      );
+      const sensorPose = sensorReadingToPose({
+        pitch: snapshot.readings.pitch,
+        roll: snapshot.readings.roll,
+        yawRate: snapshot.readings.rotation?.z,
+        currentHeading: liveHeading,
+        deltaSeconds: reduceMotion.matches ? 0 : delta,
+      }, axisCalibrationRef.current);
+      const pitch = isFirebase
+        ? sensorPose.rotationZ
+        : THREE.MathUtils.degToRad(settings.pitch);
+      const roll = isFirebase
+        ? sensorPose.rotationX
+        : THREE.MathUtils.degToRad(settings.roll);
       if (reduceMotion.matches) {
         truckPoseGroup.rotation.z = pitch;
         truckPoseGroup.rotation.x = roll;
@@ -680,8 +762,7 @@ export default function SompoTruckSimulator({
         truckPoseGroup.rotation.x = dampAngle(truckPoseGroup.rotation.x, roll, 0.08);
       }
       if (isFirebase && !reduceMotion.matches) {
-        const yawRate = THREE.MathUtils.clamp(snapshot.readings.rotation?.z || 0, -180, 180);
-        liveHeading += THREE.MathUtils.degToRad(yawRate) * delta;
+        liveHeading = sensorPose.rotationY;
         truckPoseGroup.rotation.y = liveHeading;
       }
       const liveActivity = isFirebase
@@ -882,11 +963,16 @@ export default function SompoTruckSimulator({
               <Focus /> Focar ESP32
             </button>
           </div>
-          <p className="sompo-simulator-hint">Arraste para girar · roda ou setas ↑↓ para zoom · setas ←→ para girar</p>
+          <p className="sompo-simulator-hint">Seta ciano no piso = frente (+X) · arraste para girar · setas para navegar</p>
         </div>
 
         {isFirebase ? (
-          <LiveReadings telemetry={preview} />
+          <LiveReadings
+            telemetry={preview}
+            calibration={axisCalibration}
+            onCalibrationChange={(key, value) => setAxisCalibration((current) => ({ ...current, [key]: value }))}
+            onCalibrationReset={() => setAxisCalibration({ ...DEFAULT_SOMPO_AXIS_CALIBRATION })}
+          />
         ) : (
         <aside className="sompo-simulator-controls" aria-label="Controles do simulador">
           <div className="sompo-simulator-control-head">

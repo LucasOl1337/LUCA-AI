@@ -153,6 +153,7 @@ export function createSompoTruckModel({ sensorLabel }: SompoTruckModelOptions): 
     metalness: 0.08,
     clearcoat: 1,
     clearcoatRoughness: 0.04,
+    side: THREE.DoubleSide,
   });
   const tireMaterial = new THREE.MeshStandardMaterial({ color: 0x050707, roughness: 0.92 });
   const chrome = new THREE.MeshStandardMaterial({ color: 0xd4e1e5, roughness: 0.18, metalness: 0.94 });
@@ -217,11 +218,14 @@ export function createSompoTruckModel({ sensorLabel }: SompoTruckModelOptions): 
   addBox(cab, 'front-grille', [0.09, 0.76, 1.66], [4.34, 1.42, 0], blackPlastic, 0.05);
   const windshield = addBox(cab, 'front-windshield', [0.07, 1.03, 1.79], [4.11, 2.75, 0], glass, 0.03);
   windshield.rotation.z = -0.31;
-  for (const z of [-1.091, 1.091]) {
+  for (const z of [-1.155, 1.155]) {
     const sideWindow = addPart(cab, `side-window-${z}`, makeSideWindowGeometry(), glass, [0, 0, z]);
     if (z < 0) sideWindow.rotation.y = Math.PI;
-    addBox(cab, `mirror-arm-${z}`, [0.11, 0.11, 0.34], [3.77, 2.65, z * 1.08], blackPlastic, 0.035);
-    addBox(cab, `mirror-${z}`, [0.22, 0.46, 0.16], [3.77, 2.64, z * 1.18], blackPlastic, 0.06);
+    addBox(cab, `door-front-seam-${z}`, [0.035, 1.15, 0.025], [2.05, 1.76, z], paintedBlueDark);
+    addBox(cab, `door-lower-seam-${z}`, [1.08, 0.035, 0.025], [2.58, 1.17, z], paintedBlueDark);
+    addBox(cab, `door-handle-${z}`, [0.34, 0.08, 0.05], [2.32, 2.04, z * 1.015], blackPlastic, 0.025);
+    addBox(cab, `mirror-arm-${z}`, [0.11, 0.11, 0.34], [3.77, 2.65, z * 1.05], blackPlastic, 0.035);
+    addBox(cab, `mirror-${z}`, [0.22, 0.46, 0.16], [3.77, 2.64, z * 1.14], blackPlastic, 0.06);
     addBox(cab, `headlight-${z}`, [0.10, 0.23, 0.52], [4.37, 1.22, z * 0.66], lamp, 0.04);
   }
   addBox(cab, 'cab-roof-window', [0.78, 0.035, 0.94], [3.12, 3.79, 0], glass, 0.07);
@@ -287,8 +291,8 @@ export function createSompoTruckModel({ sensorLabel }: SompoTruckModelOptions): 
   const labelTexture = createLabelTexture(sensorLabel);
   const labelSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture, transparent: true }));
   labelSprite.name = 'sensor-label';
-  labelSprite.scale.set(2.25, 0.56, 1);
-  labelSprite.position.set(-0.4, 1.05, 0);
+  labelSprite.scale.set(1.78, 0.45, 1);
+  labelSprite.position.set(-0.95, 2.45, 0);
   sensorGroup.add(labelSprite);
 
   const rayMaterial = new THREE.LineBasicMaterial({ color: 0x7dff9a, transparent: true, opacity: 0.78 });

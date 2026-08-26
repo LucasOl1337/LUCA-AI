@@ -709,6 +709,50 @@
   font-size: 10px;
 }
 
+.sompo-axis-calibration {
+  padding: 10px 11px;
+  border-radius: 11px;
+  background: rgba(95, 208, 255, 0.045);
+  box-shadow: inset 0 0 0 1px rgba(95, 208, 255, 0.13);
+}
+
+.sompo-axis-calibration summary {
+  cursor: pointer;
+  color: rgba(220, 245, 255, 0.86);
+  font-size: 10.5px;
+  font-weight: 750;
+}
+
+.sompo-axis-calibration > p {
+  margin: 7px 0 9px !important;
+  color: rgba(220, 235, 225, 0.5);
+  font-size: 9.5px;
+  line-height: 1.35;
+}
+
+.sompo-axis-calibration > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.sompo-axis-calibration label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(235, 245, 238, 0.72);
+  font-size: 9.5px;
+}
+
+.sompo-axis-calibration button {
+  margin-top: 10px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(235, 245, 238, 0.72);
+  font-size: 9.5px;
+}
+
 .sompo-simulator-presets {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
