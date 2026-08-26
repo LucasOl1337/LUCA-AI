@@ -154,6 +154,28 @@ test('recupera length vazio pedindo resposta curta, nao continuacao longa', asyn
   assert.match(result.content, /GO/);
 });
 
+test('continua JSON visual cortado mesmo acima de 500 caracteres', async () => {
+  const requests = [];
+  const partial = `{"summary":"${'grafico '.repeat(80)}","charts":[`;
+  const result = await runAgentWithTools({
+    system: 'Visual.',
+    user: 'Artefatos.',
+    model: 'gcli/grok-4.6-high',
+    agentId: 'json',
+    maxRounds: 3,
+    toolsEnabled: false,
+    callChat: async (request) => {
+      requests.push(request);
+      if (requests.length === 1) {
+        return { content: partial, toolCalls: [], finishReason: 'length' };
+      }
+      return { content: '{"summary":"ok","charts":[]}', toolCalls: [], finishReason: 'stop' };
+    },
+  });
+  assert.equal(requests.length, 2);
+  assert.match(result.content, /summary/);
+});
+
 test('timeout do 9router tenta de novo sem ferramentas e com teto menor', async () => {
   const requests = [];
   const result = await runAgentWithTools({

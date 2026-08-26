@@ -149,6 +149,8 @@ function retryMaxTokens(original) {
 function truncatedReplyMode(content) {
   const text = String(content || '').trim();
   if (!text) return 'empty';
+  const maybeJson = text.startsWith('{') || text.startsWith('[');
+  if (maybeJson) return 'continue';
   if (text.length >= 500) return 'skip';
   return 'continue';
 }

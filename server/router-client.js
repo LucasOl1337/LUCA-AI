@@ -238,9 +238,72 @@ export function parseChatCompletionPayload(payloadText) {
   }
 }
 
+export function isRouterUnreachableError(error) {
+  return /9router_unreachable/i.test(String(error?.message || error || ''));
+}
+
+function abortDetail(error, timeoutMs) {
+  const aborted = error instanceof Error && error.name === 'AbortError';
+  if (aborted) return `timeout de ${Math.max(1, Math.round((Number(timeoutMs) || ROUTER_TIMEOUT_MS) / 1000))}s`;
+  return error instanceof Error ? error.message : String(error);
+}
+
+export function recoverPartialChatOnAbort(error, partialText, { url = '', timeoutMs = ROUTER_TIMEOUT_MS } = {}) {
+  const aborted = error instanceof Error && error.name === 'AbortError';
+  if (aborted && String(partialText || '').trim()) {
+    const parsed = parseChatCompletionPayload(partialText);
+    if (parsed.content || (Array.isArray(parsed.toolCalls) && parsed.toolCalls.length)) {
+      return {
+        ok: true,
+        parsed: {
+          ...parsed,
+          finishReason: parsed.finishReason || 'timeout',
+        },
+      };
+    }
+  }
+  return {
+    ok: false,
+    error: new Error(`9router_unreachable ${url}: ${abortDetail(error, timeoutMs)}`),
+  };
+}
+
+async function readResponseBody(response, { signal, onPartial } = {}) {
+  if (!response?.body || typeof response.body.getReader !== 'function') {
+    const text = await response.text();
+    onPartial?.(text);
+    return text;
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = '';
+  try {
+    while (true) {
+      if (signal?.aborted) break;
+      let chunk;
+      try {
+        chunk = await reader.read();
+      } catch (error) {
+        if ((error instanceof Error && error.name === 'AbortError') || signal?.aborted) break;
+        throw error;
+      }
+      if (chunk.done) break;
+      text += decoder.decode(chunk.value, { stream: true });
+      onPartial?.(text);
+    }
+    text += decoder.decode();
+    onPartial?.(text);
+    return text;
+  } finally {
+    try { await reader.cancel().catch(() => {}); } catch { /* ignore */ }
+    try { reader.releaseLock(); } catch { /* ignore */ }
+  }
+}
+
 /**
  * Low-level chat completion against 9Router.
  * Supports OpenAI-style tools/tool_choice and multi-turn messages.
+ * Streams by default so a timeout can still return tokens already received.
  */
 export async function call9RouterChat({
   messages,
@@ -252,6 +315,8 @@ export async function call9RouterChat({
   temperature = 0.3,
   tools = null,
   toolChoice = undefined,
+  timeoutMs = ROUTER_TIMEOUT_MS,
+  stream = true,
 } = {}) {
   const route = assertAllowed9RouterModel(model);
   const headers = {
@@ -259,8 +324,11 @@ export async function call9RouterChat({
   };
   if (ROUTER_API_KEY) headers.Authorization = `Bearer ${ROUTER_API_KEY}`;
   const url = `${ROUTER_BASE_URL}/chat/completions`;
+  const limitMs = Number.isFinite(Number(timeoutMs)) && Number(timeoutMs) > 0
+    ? Number(timeoutMs)
+    : ROUTER_TIMEOUT_MS;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), ROUTER_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), limitMs);
 
   const finalMessages = Array.isArray(messages) && messages.length
     ? messages
@@ -274,6 +342,7 @@ export async function call9RouterChat({
     messages: finalMessages,
     temperature,
     max_tokens: maxTokens,
+    stream: stream !== false,
   };
   if (Array.isArray(tools) && tools.length) {
     body.tools = tools;
@@ -281,31 +350,57 @@ export async function call9RouterChat({
   }
   if (agentId) body.user = String(agentId);
 
-  let response;
+  let partialText = '';
   try {
-    response = await fetch(url, {
+    const response = await fetch(url, {
       method: 'POST',
       headers,
       signal: controller.signal,
       body: JSON.stringify(body),
     });
+
+    if (!response.ok) {
+      const text = await response.text();
+      const streamRejected = stream !== false
+        && (response.status === 400 || response.status === 422)
+        && /stream/i.test(text);
+      if (streamRejected) {
+        clearTimeout(timeout);
+        return call9RouterChat({
+          messages: finalMessages,
+          agentId,
+          model,
+          maxTokens,
+          temperature,
+          tools,
+          toolChoice,
+          timeoutMs: limitMs,
+          stream: false,
+        });
+      }
+      throw new Error(`9router ${response.status}: ${text}`);
+    }
+
+    const text = await readResponseBody(response, {
+      signal: controller.signal,
+      onPartial: (value) => { partialText = value; },
+    });
+    if (controller.signal.aborted) {
+      const abort = new Error('aborted');
+      abort.name = 'AbortError';
+      const recovered = recoverPartialChatOnAbort(abort, text || partialText, { url, timeoutMs: limitMs });
+      if (recovered.ok) return recovered.parsed;
+      throw recovered.error;
+    }
+    return parseChatCompletionPayload(text);
   } catch (error) {
-    const aborted = error instanceof Error && error.name === 'AbortError';
-    const detail = aborted
-      ? `timeout de ${Math.round(ROUTER_TIMEOUT_MS / 1000)}s`
-      : (error instanceof Error ? error.message : String(error));
-    throw new Error(`9router_unreachable ${url}: ${detail}`);
+    if (String(error?.message || '').startsWith('9router ')) throw error;
+    const recovered = recoverPartialChatOnAbort(error, partialText, { url, timeoutMs: limitMs });
+    if (recovered.ok) return recovered.parsed;
+    throw recovered.error;
   } finally {
     clearTimeout(timeout);
   }
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`9router ${response.status}: ${text}`);
-  }
-
-  const text = await response.text();
-  return parseChatCompletionPayload(text);
 }
 
 export async function call9Router({
@@ -317,6 +412,7 @@ export async function call9Router({
   tools = null,
   toolChoice = undefined,
   messages = null,
+  timeoutMs = ROUTER_TIMEOUT_MS,
 } = {}) {
   const result = await call9RouterChat({
     system,
@@ -327,6 +423,7 @@ export async function call9Router({
     tools,
     toolChoice,
     messages,
+    timeoutMs,
   });
   return result.content || 'Sem resposta textual do modelo.';
 }
