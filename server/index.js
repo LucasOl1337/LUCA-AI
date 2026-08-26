@@ -204,6 +204,8 @@ import {
 } from './sompo-telemetry-source.js';
 import {
   createSompoTelemetryEpisodeFinishHttpHandler,
+  createSompoTelemetryEpisodeFrameGetHttpHandler,
+  createSompoTelemetryEpisodeFramesHttpHandler,
   createSompoTelemetryEpisodeGetHttpHandler,
   createSompoTelemetryEpisodeStartHttpHandler,
   createSompoTelemetryHistory,
@@ -2901,6 +2903,8 @@ app.post('/api/sompo/telemetry/simulation', createSompoTelemetrySimulationHttpHa
 app.post('/api/sompo/telemetry/episode', createSompoTelemetryEpisodeStartHttpHandler(sompoTelemetryHistory));
 app.get('/api/sompo/telemetry/episode/:publicId', createSompoTelemetryEpisodeGetHttpHandler(sompoTelemetryHistory));
 app.post('/api/sompo/telemetry/episode/:publicId/finish', createSompoTelemetryEpisodeFinishHttpHandler(sompoTelemetryHistory));
+app.post('/api/sompo/telemetry/episode/:publicId/frames', createSompoTelemetryEpisodeFramesHttpHandler(sompoTelemetryHistory));
+app.get('/api/sompo/telemetry/episode/:publicId/frames/:seq', createSompoTelemetryEpisodeFrameGetHttpHandler(sompoTelemetryHistory));
 
 app.get('/api/luca-ai/visual-artifacts/:traceId/:artifactId', (req, res) => {
   const ownerId = getWorkspaceUserId();

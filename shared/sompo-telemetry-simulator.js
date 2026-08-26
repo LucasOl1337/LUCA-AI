@@ -106,6 +106,18 @@ export const SOMPO_COLLISION_SCRIPT = Object.freeze({
   ]),
 });
 
+/**
+ * Momentos de captura de frame do canvas 3D, amarrados às fases do roteiro.
+ * O pico do pulso de impacto do roteiro acontece em 14 750 ms (meio da fase).
+ */
+export const SOMPO_COLLISION_FRAME_MOMENTS = Object.freeze([
+  Object.freeze({ offsetMs: 0, fase: 'aproximacao', label: 'Início da aproximação' }),
+  Object.freeze({ offsetMs: 7_000, fase: 'aproximacao', label: 'Meia aproximação' }),
+  Object.freeze({ offsetMs: 14_750, fase: 'impacto', label: 'Impacto — pico de aceleração' }),
+  Object.freeze({ offsetMs: 16_500, fase: 'pos-impacto', label: 'Pós-impacto imediato' }),
+  Object.freeze({ offsetMs: 21_500, fase: 'pos-impacto', label: 'Final do episódio' }),
+]);
+
 export function getSompoCollisionScriptPhase(elapsedMs) {
   const elapsed = clamp(finite(elapsedMs, 0), 0, SOMPO_COLLISION_SCRIPT.totalMs);
   const phase = SOMPO_COLLISION_SCRIPT.phases.find((item) => elapsed < item.endMs)

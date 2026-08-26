@@ -8,7 +8,10 @@ import type { SompoTelemetrySnapshot } from '../../shared/sompo-telemetry.js';
 export type {
   SompoTelemetryEpisode,
   SompoTelemetryEpisodeFinishResponse,
+  SompoTelemetryEpisodeFrame,
+  SompoTelemetryEpisodeFramesUploadResponse,
   SompoTelemetryEpisodeImpact,
+  SompoTelemetryEpisodeMissionFrame,
   SompoTelemetryEpisodePhase,
   SompoTelemetryEpisodeResponse,
   SompoTelemetryEpisodeStartResponse,

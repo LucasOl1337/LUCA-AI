@@ -307,12 +307,16 @@ function episodeFlagLine(summary) {
   return 'sem flag de colisão ativa no fim do episódio';
 }
 
-function buildEpisodeHumanSummary(episode, summary) {
+function buildEpisodeHumanSummary(episode, summary, frames = []) {
   const kindLabel = episodeKindLabel(episode.kind);
   const duration = episodeDurationSeconds(episode, summary);
   const count = Number(summary?.count) || 0;
   const statusSuffix = episode.status === 'complete' ? '' : ` (status ${episode.status}: gravação incompleta)`;
-  const headline = `[Ensaio no simulador] Episódio de ${kindLabel} registrado — ${duration === null ? 'duração não informada' : `${duration}s`}, ${count} amostra${count === 1 ? '' : 's'}.${statusSuffix}`;
+  const attachedFrames = (Array.isArray(frames) ? frames : []).filter((frame) => frame.attached !== false).length;
+  const framesSuffix = attachedFrames > 0
+    ? ` ${attachedFrames} frame${attachedFrames === 1 ? '' : 's'} do simulador anexado${attachedFrames === 1 ? '' : 's'} como evidência visual.`
+    : '';
+  const headline = `[Ensaio no simulador] Episódio de ${kindLabel} registrado — ${duration === null ? 'duração não informada' : `${duration}s`}, ${count} amostra${count === 1 ? '' : 's'}.${statusSuffix}${framesSuffix}`;
   const eventLine = `${episodeImpactLine(summary)}; ${episodeDistanceLine(summary)}; ${episodeFlagLine(summary)}.`;
   return [headline, eventLine, EPISODE_ASK_LINE].join('\n');
 }
@@ -333,7 +337,39 @@ function episodePhaseLines(summary) {
   return lines;
 }
 
-export function buildSompoEpisodeMission(episode, samples, summary, teamLabel) {
+const EPISODE_NO_FRAMES_LINE = 'Sem evidência visual: nenhum frame do simulador foi registrado neste episódio; a análise segue apenas com os dados de telemetria.';
+
+/**
+ * Seção "Evidência visual": lista numerada dos frames ANEXADOS (a numeração dos
+ * "Anexo N" segue a ordem dos anexos da missão) + frames registrados mas fora do
+ * orçamento de anexos, declarados explicitamente — nunca descartados em silêncio.
+ */
+function episodeVisualEvidenceLines(frames) {
+  const list = Array.isArray(frames) ? frames : [];
+  if (list.length === 0) return [EPISODE_NO_FRAMES_LINE];
+  const attached = list.filter((frame) => frame.attached !== false);
+  const skipped = list.filter((frame) => frame.attached === false);
+  const describe = (frame) => {
+    const label = String(frame.label || 'Frame do simulador').trim() || 'Frame do simulador';
+    const fase = frame.fase ? `fase ${frame.fase}` : 'fase não informada';
+    const offset = Number.isFinite(Number(frame.offsetMs)) ? formatOffsetSeconds(frame.offsetMs) : 'instante não informado';
+    return `${label} (${fase}, ${offset})`;
+  };
+  const lines = ['Evidência visual (frames do canvas Three.js capturados durante o roteiro e anexados a esta missão como imagens):'];
+  attached.forEach((frame, index) => {
+    lines.push(`- Anexo ${index + 1} — ${describe(frame)}`);
+  });
+  if (attached.length === 0) {
+    lines.push('- Nenhum frame pôde ser anexado nesta missão; os registros abaixo existem apenas no episódio.');
+  }
+  for (const frame of skipped) {
+    lines.push(`- Registrado no episódio mas NÃO anexado (orçamento de anexos da bancada): ${describe(frame)}`);
+  }
+  lines.push('Instrução: cruzem cada imagem com a telemetria do mesmo instante e digam explicitamente se batem ou divergem (ex.: "a distância registrada no dado confere com a posição do caminhão no Anexo 3?"). Citem os frames pelo número do anexo ao usar um exemplo visual na resposta. Concluam com a severidade do evento para a seguradora e a ação de prevenção no momento exato em que ela deveria ocorrer.');
+  return lines;
+}
+
+export function buildSompoEpisodeMission(episode, samples, summary, teamLabel, frames = []) {
   if (!episode || typeof episode !== 'object') {
     throw new Error('sompo_telemetry_episode_required');
   }
@@ -379,12 +415,14 @@ export function buildSompoEpisodeMission(episode, samples, summary, teamLabel) {
         })(),
       ]),
     '',
+    ...episodeVisualEvidenceLines(frames),
+    '',
     'Objetivo: avaliar o EVENTO em sua totalidade — dinâmica, sequência causal e severidade do episódio inteiro, não leituras isoladas — e recomendar a resposta operacional adequada.',
     '',
     'Regras: este é um ensaio sintético do roteiro de colisão no simulador. Analisem o evento completo (aproximação, impacto e pós-impacto) como sequência causal; não tratem amostras isoladas nem flags como evidência do equipamento físico, do firmware ou de sinistro real. Separem fatos do cenário, inferências e lacunas; validem qualquer conclusão em telemetria real antes de uma decisão operacional.',
   ].join('\n');
 
-  return `${buildEpisodeHumanSummary(episode, summary)}\n\n${SOMPO_MISSION_DOSSIER_DELIMITER}\n${briefing}`;
+  return `${buildEpisodeHumanSummary(episode, summary, frames)}\n\n${SOMPO_MISSION_DOSSIER_DELIMITER}\n${briefing}`;
 }
 
 export function buildSompoTelemetryMission(snapshot, teamLabel, history) {

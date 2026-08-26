@@ -64,7 +64,8 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
         outbound: [
           endpoint('sompo-telemetry', 'GET', '/api/sompo/telemetry', 'snapshot normalizado da telemetria do trator 001 no Firebase, com risco e frescor do fluxo', 'local'),
           endpoint('sompo-telemetry-history', 'GET', '/api/sompo/telemetry/history', 'janela histórica SQLite da telemetria Firebase ou simulada, com agregados e amostras-chave', 'local'),
-          endpoint('sompo-telemetry-episode', 'GET', '/api/sompo/telemetry/episode/:publicId', 'episódio de telemetria completo (todas as amostras, fases e resumo) gravado pelo simulador 3D', 'local'),
+          endpoint('sompo-telemetry-episode', 'GET', '/api/sompo/telemetry/episode/:publicId', 'episódio de telemetria completo (todas as amostras, fases, resumo e frames visuais) gravado pelo simulador 3D', 'local'),
+          endpoint('sompo-telemetry-episode-frame', 'GET', '/api/sompo/telemetry/episode/:publicId/frames/:seq', 'binário (JPEG/PNG) de um frame do simulador 3D capturado durante o episódio', 'local'),
         ],
         inbound: [
           endpoint(
@@ -116,6 +117,14 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
             'fecha um episódio em gravação e devolve o resumo com fases e pico de impacto',
             'local',
             '{\n  "status": "complete"\n}',
+          ),
+          endpoint(
+            'sompo-telemetry-episode-frames',
+            'POST',
+            '/api/sompo/telemetry/episode/:publicId/frames',
+            'anexa frames do canvas Three.js ao episódio (máx. 6 por episódio, ~300KB cada, mime validado pelos bytes; aceito em gravação ou logo após o finish)',
+            'local',
+            '{\n  "frames": [\n    {"dataUrl": "data:image/jpeg;base64,...", "offsetMs": 14750, "fase": "impacto", "label": "Impacto — pico de aceleração"}\n  ]\n}',
           ),
         ],
       },

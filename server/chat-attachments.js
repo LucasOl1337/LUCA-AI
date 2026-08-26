@@ -9,6 +9,7 @@ import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { getChatSession, onChatSessionsRemoved } from './chat-library.js';
 import { requireWorkspaceUserId } from './workspace-context.js';
+import { IMAGE_MIME_TYPES, hasImageSignature, inferredImageMime } from './image-signature.js';
 
 export const MAX_CHAT_ATTACHMENTS = 4;
 export const MAX_CHAT_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -30,7 +31,6 @@ const TEXT_MIME_TYPES = new Set([
   'application/json', 'application/xml', 'application/yaml', 'application/x-yaml',
   'application/toml', 'application/sql', 'application/javascript', 'application/typescript',
 ]);
-const IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
 function safeDirSegment(value) {
   return createHash('sha256').update(String(value)).digest('hex').slice(0, 32);
@@ -60,32 +60,6 @@ function cleanName(value) {
     .replace(/[\u0000-\u001f\u007f]/g, '')
     .trim();
   return (name || 'arquivo').slice(0, 180);
-}
-
-function hasImageSignature(buffer, mimeType) {
-  if (mimeType === 'image/png') {
-    return buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'));
-  }
-  if (mimeType === 'image/jpeg') {
-    return buffer.length >= 3 && buffer.subarray(0, 3).equals(Buffer.from('ffd8ff', 'hex'));
-  }
-  if (mimeType === 'image/webp') {
-    return buffer.length >= 12
-      && buffer.toString('ascii', 0, 4) === 'RIFF'
-      && buffer.toString('ascii', 8, 12) === 'WEBP';
-  }
-  if (mimeType === 'image/gif') {
-    const signature = buffer.toString('ascii', 0, 6);
-    return signature === 'GIF87a' || signature === 'GIF89a';
-  }
-  return false;
-}
-
-function inferredImageMime(buffer) {
-  for (const mimeType of IMAGE_MIME_TYPES) {
-    if (hasImageSignature(buffer, mimeType)) return mimeType;
-  }
-  return '';
 }
 
 function isDecodableText(buffer) {

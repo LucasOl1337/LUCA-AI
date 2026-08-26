@@ -177,6 +177,25 @@ export interface SompoTelemetryEpisodeSummary extends SompoTelemetryHistorySumma
   phases: SompoTelemetryEpisodePhase[];
 }
 
+export interface SompoTelemetryEpisodeFrame {
+  seq: number;
+  fase: string | null;
+  label: string | null;
+  offsetMs: number | null;
+  mimeType: string;
+  size: number;
+  url: string;
+}
+
+/** Frame na missão: metadados + flag de anexado (false = registrado mas fora do orçamento de anexos). */
+export interface SompoTelemetryEpisodeMissionFrame {
+  seq: number;
+  fase?: string | null;
+  label?: string | null;
+  offsetMs?: number | null;
+  attached?: boolean;
+}
+
 export interface SompoTelemetryEpisodeStartResponse {
   ok: boolean;
   episode: SompoTelemetryEpisode;
@@ -193,6 +212,14 @@ export interface SompoTelemetryEpisodeResponse {
   episode: SompoTelemetryEpisode;
   samples: SompoTelemetryHistorySample[];
   summary: SompoTelemetryEpisodeSummary;
+  frames: SompoTelemetryEpisodeFrame[];
+}
+
+export interface SompoTelemetryEpisodeFramesUploadResponse {
+  ok: boolean;
+  episode: SompoTelemetryEpisode;
+  frames: SompoTelemetryEpisodeFrame[];
+  added: number;
 }
 
 export function normalizeSompoTelemetry(
@@ -211,4 +238,5 @@ export function buildSompoEpisodeMission(
   samples: SompoTelemetryHistorySample[],
   summary: SompoTelemetryEpisodeSummary,
   teamLabel?: string,
+  frames?: SompoTelemetryEpisodeMissionFrame[],
 ): string;

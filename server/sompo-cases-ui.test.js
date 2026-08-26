@@ -11,6 +11,7 @@ const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const sompoPage = readFileSync(new URL('../src/pages/SompoPage.tsx', import.meta.url), 'utf8');
 const sompoTelemetryPanel = readFileSync(new URL('../src/components/SompoTelemetryPanel.tsx', import.meta.url), 'utf8');
 const sompoSimulator = readFileSync(new URL('../src/components/SompoTruckSimulator.tsx', import.meta.url), 'utf8');
+const sompoTruckModel = readFileSync(new URL('../src/components/sompo/createSompoTruckModel.ts', import.meta.url), 'utf8');
 const packageJson = readFileSync(new URL('../package.json', import.meta.url), 'utf8');
 const sompoCases = readFileSync(new URL('../src/lib/sompo-cases.ts', import.meta.url), 'utf8');
 const sompoCss = readFileSync(new URL('../src/sompo-page.css', import.meta.url), 'utf8');
@@ -108,6 +109,29 @@ test('modo Firebase acopla o snapshot em tempo real ao gêmeo 3D sem outro canal
   assert.match(sompoSimulator, /ESP32 FÍSICO/);
   assert.match(sompoSimulator, /Gêmeo digital/);
   assert.doesNotMatch(sompoSimulator, /firebaseio|new WebSocket/);
+});
+
+test('gêmeo 3D gira pelo centro e permanece acima do piso até de ponta-cabeça', () => {
+  assert.match(sompoSimulator, /const truckPoseGroup = new THREE\.Group\(\)/);
+  assert.match(sompoSimulator, /truckGroup\.position\.y = -SOMPO_TRUCK_PIVOT_Y/);
+  assert.match(sompoSimulator, /truckGroundHeight\(truckPoseGroup\.rotation\)/);
+  assert.match(sompoSimulator, /Math\.atan2\(Math\.sin\(target - current\), Math\.cos\(target - current\)\)/);
+  assert.match(sompoSimulator, /truckPoseGroup\.rotation\.z = dampAngle/);
+  assert.match(sompoSimulator, /truckPoseGroup\.rotation\.x = dampAngle/);
+  assert.match(sompoSimulator, /orbit\.target\.lerp\(focusPoint/);
+  assert.match(sompoSimulator, /sensorGroup\.getWorldPosition\(focusPoint\)/);
+  assert.doesNotMatch(sompoSimulator, /truckGroup\.rotation\.[xz] = THREE\.MathUtils\.lerp/);
+});
+
+test('Firebase e simulador compartilham o caminhão físico azul como um único modelo 3D', () => {
+  assert.match(sompoSimulator, /createSompoTruckModel\(/);
+  assert.match(sompoTruckModel, /paintedBlue/);
+  assert.match(sompoTruckModel, /cargo-horizontal-corrugation/);
+  assert.match(sompoTruckModel, /const axlePositions = \[3\.17, 0\.38, -2\.64, -3\.48\]/);
+  assert.match(sompoTruckModel, /ultrasonic-sensor-assembly/);
+  assert.match(sompoTruckModel, /ultrasonic-transducer/);
+  assert.match(sompoTruckModel, /root\.userData\.sculptRuntime/);
+  assert.doesNotMatch(sompoSimulator, /const gold = new THREE\.MeshStandardMaterial/);
 });
 
 test('página SOMPO usa grade com imagem e launch focado sem painel lateral fixo', () => {

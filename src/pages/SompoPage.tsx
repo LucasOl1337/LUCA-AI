@@ -26,7 +26,11 @@ import { useLuca } from '@/hooks/useLucaState';
 import { GRAVIDADE_VALUES, PRODUTO_PARAM, PRODUTO_VALUE, SOMPO_ABA } from '../../shared/app-location.js';
 import { lucaApi } from '@/lib/api';
 import { pickFailureCopy } from '@/lib/surface-failure';
-import type { SompoTelemetrySnapshot } from '@/lib/types';
+import type {
+  LucaAiChatAttachment,
+  SompoTelemetryEpisodeFrame,
+  SompoTelemetrySnapshot,
+} from '@/lib/types';
 import {
   hydrateIndividualTemplate,
   hydrateTeamTemplate,
@@ -63,6 +67,31 @@ type ProductFilter = 'all' | SompoProductLine;
 type SeverityFilter = 'all' | SompoCaseSeverity;
 type SompoViewMode = 'telemetry' | 'cases';
 type TelemetrySourceMode = 'firebase' | 'simulation';
+
+/** Orçamento de anexos da bancada (mesmo teto do chat: 4 por rodada). */
+const SOMPO_EPISODE_MAX_ATTACHED_FRAMES = 4;
+
+/**
+ * Escolhe quais frames viram anexo quando o episódio tem mais que o orçamento.
+ * Prioridade: impacto > abertura > fechamento > pós-impacto > demais; a ordem
+ * final de anexo segue a sequência temporal (seq).
+ */
+function selectEpisodeFramesForBench(
+  frames: SompoTelemetryEpisodeFrame[],
+): SompoTelemetryEpisodeFrame[] {
+  const ordered = [...frames].sort((a, b) => a.seq - b.seq);
+  if (ordered.length <= SOMPO_EPISODE_MAX_ATTACHED_FRAMES) return ordered;
+  const picked = new Set<number>();
+  const pick = (frame?: SompoTelemetryEpisodeFrame) => {
+    if (frame && picked.size < SOMPO_EPISODE_MAX_ATTACHED_FRAMES) picked.add(frame.seq);
+  };
+  for (const frame of ordered) if (frame.fase === 'impacto') pick(frame);
+  pick(ordered[0]);
+  pick(ordered[ordered.length - 1]);
+  for (const frame of ordered) if (frame.fase === 'pos-impacto') pick(frame);
+  for (const frame of ordered) pick(frame);
+  return ordered.filter((frame) => picked.has(frame.seq));
+}
 
 const PRODUCT_FILTERS: { id: ProductFilter; label: string }[] = [
   { id: 'all', label: 'Todos' },
@@ -368,6 +397,8 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
     try {
       let caseId: string;
       let mission: string;
+      let launchAttachments: LucaAiChatAttachment[] | undefined;
+      let launchSession: { id: string } | null = null;
       if (episodeReady && recordedEpisode) {
         // Episódio registrado: a bancada analisa o evento completo, sem fallback silencioso.
         const result = await lucaApi.getSompoTelemetryEpisode(recordedEpisode.publicId);
@@ -375,8 +406,55 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
           setTelemetryLaunchError('O episódio registrado não pôde ser lido no servidor. Tente de novo ou grave outro roteiro.');
           return;
         }
+        // A sessão nasce antes dos anexos: os frames sobem direto para ela.
+        launchSession = await createSession();
+        if (!launchSession) {
+          setTelemetryLaunchError('Não foi possível abrir uma sessão limpa na bancada.');
+          return;
+        }
+        const episodeFrames = Array.isArray(result.frames) ? result.frames : [];
+        const selectedFrames = selectEpisodeFramesForBench(episodeFrames);
+        if (selectedFrames.length > 0) {
+          try {
+            const uploaded: LucaAiChatAttachment[] = [];
+            for (const frame of selectedFrames) {
+              const blob = await lucaApi.getSompoTelemetryEpisodeFrameBlob(
+                result.episode.publicId,
+                frame.seq,
+              );
+              const extension = frame.mimeType === 'image/png' ? 'png' : 'jpg';
+              const file = new File(
+                [blob],
+                `frame-${frame.seq}-${frame.fase || 'episodio'}.${extension}`,
+                { type: frame.mimeType },
+              );
+              const upload = await lucaApi.uploadChatAttachment(launchSession.id, file);
+              if (!upload?.ok || !upload.attachment) throw new Error('sompo_episode_frame_attach_failed');
+              uploaded.push(upload.attachment);
+            }
+            launchAttachments = uploaded;
+          } catch {
+            // Falhar alto: sem anexo pela metade a bancada não recebe evidência inconsistente.
+            setTelemetryLaunchError('Falha ao anexar os frames do episódio à bancada. Nada foi enviado — tente de novo.');
+            return;
+          }
+        }
+        const attachedSeqs = new Set(selectedFrames.map((frame) => frame.seq));
+        const missionFrames = episodeFrames.map((frame) => ({
+          seq: frame.seq,
+          fase: frame.fase,
+          label: frame.label,
+          offsetMs: frame.offsetMs,
+          attached: attachedSeqs.has(frame.seq),
+        }));
         caseId = `episodio-colisao-${result.episode.publicId}`;
-        mission = buildSompoEpisodeMission(result.episode, result.samples, result.summary, activeSquad.label);
+        mission = buildSompoEpisodeMission(
+          result.episode,
+          result.samples,
+          result.summary,
+          activeSquad.label,
+          missionFrames,
+        );
       } else {
         let history = null;
         try {
@@ -393,7 +471,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
         caseId = `${telemetry.source.kind === 'simulation' ? 'simulacao' : 'telemetria'}-trator-${telemetry.tractorId}-${telemetry.deviceTimestamp ?? 'snapshot'}`;
         mission = buildSompoTelemetryMission(telemetry, activeSquad.label, history);
       }
-      const session = await createSession();
+      const session = launchSession ?? await createSession();
       if (!session) {
         setTelemetryLaunchError('Não foi possível abrir uma sessão limpa na bancada.');
         return;
@@ -405,6 +483,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
         presetId: activeSquad.id,
         presetLabel: activeSquad.label,
         autoRun: true,
+        attachments: launchAttachments,
       });
       navigate({ page: 'luca-ai', sessao: session.id }, 'push');
     } catch (err) {

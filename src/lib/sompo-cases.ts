@@ -6,6 +6,8 @@
  * reais de apólices confidenciais. Use-os para treinar a bancada LUCA-AI.
  */
 
+import type { LucaAiChatAttachment } from './types';
+
 export type SompoCaseSeverity = 'critica' | 'alta' | 'media' | 'baixa';
 export type SompoCaseStage =
   | 'aviso'
@@ -492,6 +494,8 @@ export interface SompoLaunchPayload {
   presetId: string;
   presetLabel: string;
   autoRun: boolean;
+  /** Anexos já enviados à sessão (frames do simulador como evidência visual). */
+  attachments?: LucaAiChatAttachment[];
 }
 
 export function buildSompoCaseMission(caseItem: SompoExampleCase, teamLabel?: string): string {
@@ -571,6 +575,9 @@ export function consumeSompoLaunch(): SompoLaunchPayload | null {
       presetId,
       presetLabel: String(parsed.presetLabel || presetId).trim(),
       autoRun: parsed.autoRun !== false,
+      attachments: Array.isArray(parsed.attachments)
+        ? parsed.attachments.filter((item) => item && typeof item.id === 'string' && item.id)
+        : undefined,
     };
   } catch {
     return null;

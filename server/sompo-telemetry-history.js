@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { normalizeSompoTelemetry } from '../shared/sompo-telemetry.js';
+import { inferredImageMime } from './image-signature.js';
 
 export const SOMPO_TELEMETRY_HISTORY_DEFAULT_LIMIT = 2000;
 export const SOMPO_TELEMETRY_HISTORY_DEFAULT_WINDOW_MIN = 15;
@@ -11,6 +12,12 @@ export const SOMPO_TELEMETRY_SIMULATION_MAX_BATCH = 50;
 export const SOMPO_TELEMETRY_EPISODE_KINDS = Object.freeze(['colisao']);
 export const SOMPO_TELEMETRY_EPISODE_RECORDING_TIMEOUT_MS = 10 * 60_000;
 export const SOMPO_TELEMETRY_EPISODE_KEY_SAMPLES_MAX = 30;
+export const SOMPO_TELEMETRY_EPISODE_FRAMES_MAX = 6;
+export const SOMPO_TELEMETRY_EPISODE_FRAME_MAX_BYTES = 300 * 1024;
+// Janela pós-finish em que o upload de frames ainda é aceito ("recém-complete").
+export const SOMPO_TELEMETRY_EPISODE_FRAME_GRACE_MS = SOMPO_TELEMETRY_EPISODE_RECORDING_TIMEOUT_MS;
+
+const EPISODE_FRAME_MIME_TYPES = new Set(['image/jpeg', 'image/png']);
 
 const SOURCE_KINDS = new Set(['firebase', 'simulation']);
 const EPISODE_KIND_SET = new Set(SOMPO_TELEMETRY_EPISODE_KINDS);
@@ -27,6 +34,62 @@ const FONTE_TO_KIND = Object.freeze({
 
 export function defaultSompoTelemetryDbPath() {
   return path.join(process.env.LUCA_DATA_DIR || '.luca', 'sompo-telemetry.db');
+}
+
+export function defaultSompoEpisodeFramesDir() {
+  return path.join(process.env.LUCA_DATA_DIR || '.luca', 'sompo-episodes');
+}
+
+/**
+ * Decodifica um frame `{dataUrl, offsetMs, fase, label}` validando o mime pelos
+ * BYTES (mesma verificação de assinatura do chat-attachments), nunca pelo rótulo.
+ */
+function parseEpisodeFrame(raw, index) {
+  const position = `Frame ${index + 1}`;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw httpError(400, 'sompo_telemetry_episode_frame_invalid', `${position}: frame inválido.`);
+  }
+  const dataUrl = String(raw.dataUrl || '').trim();
+  const match = dataUrl.match(/^data:(image\/jpeg|image\/png);base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) {
+    throw httpError(
+      400,
+      'sompo_telemetry_episode_frame_invalid',
+      `${position}: dataUrl deve ser data:image/jpeg;base64,... ou data:image/png;base64,...`,
+    );
+  }
+  const declaredMime = match[1];
+  let buffer;
+  try {
+    buffer = Buffer.from(match[2], 'base64');
+  } catch {
+    throw httpError(400, 'sompo_telemetry_episode_frame_invalid', `${position}: base64 ilegível.`);
+  }
+  if (!buffer.length) {
+    throw httpError(400, 'sompo_telemetry_episode_frame_invalid', `${position}: frame vazio.`);
+  }
+  if (buffer.length > SOMPO_TELEMETRY_EPISODE_FRAME_MAX_BYTES) {
+    throw httpError(
+      400,
+      'sompo_telemetry_episode_frame_too_large',
+      `${position}: ${buffer.length} bytes excede o teto de ${SOMPO_TELEMETRY_EPISODE_FRAME_MAX_BYTES} bytes por frame.`,
+    );
+  }
+  const sniffedMime = inferredImageMime(buffer);
+  if (!EPISODE_FRAME_MIME_TYPES.has(sniffedMime) || sniffedMime !== declaredMime) {
+    throw httpError(
+      400,
+      'sompo_telemetry_episode_frame_invalid',
+      `${position}: os bytes não correspondem a ${declaredMime} (assinatura detectada: ${sniffedMime || 'desconhecida'}).`,
+    );
+  }
+  return {
+    buffer,
+    mimeType: sniffedMime,
+    offsetMs: finiteNumber(raw.offsetMs),
+    fase: optionalText(raw.fase),
+    label: optionalText(raw.label),
+  };
 }
 
 function originKey(sourceKind, tractorId) {
@@ -422,8 +485,13 @@ function sendHistoryError(res, error, fallbackMessage) {
   });
 }
 
-export function createSompoTelemetryHistory({ dbPath = defaultSompoTelemetryDbPath(), now = Date.now } = {}) {
+export function createSompoTelemetryHistory({
+  dbPath = defaultSompoTelemetryDbPath(),
+  framesDir = defaultSompoEpisodeFramesDir(),
+  now = Date.now,
+} = {}) {
   const resolvedPath = dbPath === ':memory:' ? ':memory:' : path.resolve(dbPath);
+  const resolvedFramesDir = path.resolve(framesDir);
   if (resolvedPath !== ':memory:') {
     fs.mkdirSync(path.dirname(resolvedPath), { recursive: true });
   }
@@ -480,6 +548,19 @@ export function createSompoTelemetryHistory({ dbPath = defaultSompoTelemetryDbPa
         ended_ms INTEGER NULL,
         status TEXT NOT NULL DEFAULT 'recording'
       );
+      CREATE TABLE IF NOT EXISTS sompo_telemetry_episode_frames (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        episode_id INTEGER NOT NULL,
+        seq INTEGER NOT NULL,
+        fase TEXT NULL,
+        label TEXT NULL,
+        offset_ms INTEGER NULL,
+        mime TEXT NOT NULL,
+        byte_size INTEGER NOT NULL,
+        file_path TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE (episode_id, seq)
+      );
     `);
   } catch (error) {
     rethrowSqlite(error, 'open');
@@ -523,6 +604,39 @@ export function createSompoTelemetryHistory({ dbPath = defaultSompoTelemetryDbPa
     UPDATE sompo_telemetry_episodes
     SET status = ?, ended_at = ?, ended_ms = ?
     WHERE id = ? AND status = 'recording'
+  `);
+
+  const insertFrameStatement = db.prepare(`
+    INSERT INTO sompo_telemetry_episode_frames (
+      episode_id, seq, fase, label, offset_ms, mime, byte_size, file_path, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const framesByEpisodeStatement = db.prepare(`
+    SELECT
+      seq,
+      fase,
+      label,
+      offset_ms AS offsetMs,
+      mime,
+      byte_size AS byteSize,
+      file_path AS filePath
+    FROM sompo_telemetry_episode_frames
+    WHERE episode_id = ?
+    ORDER BY seq ASC
+  `);
+
+  const frameByEpisodeSeqStatement = db.prepare(`
+    SELECT
+      seq,
+      fase,
+      label,
+      offset_ms AS offsetMs,
+      mime,
+      byte_size AS byteSize,
+      file_path AS filePath
+    FROM sompo_telemetry_episode_frames
+    WHERE episode_id = ? AND seq = ?
   `);
 
   const episodeSamplesStatement = db.prepare(`
@@ -820,6 +934,123 @@ export function createSompoTelemetryHistory({ dbPath = defaultSompoTelemetryDbPa
     return closeEpisodeRow(episode, status);
   }
 
+  function mapFrameRow(episode, row) {
+    return {
+      seq: Number(row.seq),
+      fase: row.fase ?? null,
+      label: row.label ?? null,
+      offsetMs: finiteNumber(row.offsetMs),
+      mimeType: String(row.mime),
+      size: Number(row.byteSize),
+      url: `/api/sompo/telemetry/episode/${encodeURIComponent(episode.publicId)}/frames/${Number(row.seq)}`,
+    };
+  }
+
+  function listEpisodeFrameRows(episode) {
+    try {
+      return framesByEpisodeStatement.all(episode.id);
+    } catch (error) {
+      rethrowSqlite(error, 'episodeFrames');
+    }
+  }
+
+  // Frames só entram com o episódio em gravação ou recém-fechado como complete.
+  function assertEpisodeAcceptsFrames(episode) {
+    if (episode.status === 'recording') return;
+    const recentlyComplete = episode.status === 'complete'
+      && episode.endedMs !== null
+      && now() - episode.endedMs <= SOMPO_TELEMETRY_EPISODE_FRAME_GRACE_MS;
+    if (recentlyComplete) return;
+    throw httpError(
+      400,
+      'sompo_telemetry_episode_frames_closed',
+      `Episódio ${episode.publicId} está '${episode.status}' e fora da janela de upload; frames só entram durante a gravação ou logo após o finish.`,
+    );
+  }
+
+  function addEpisodeFrames(publicId, rawFrames) {
+    assertOpen();
+    const episode = requireEpisode(publicId);
+    assertEpisodeAcceptsFrames(episode);
+    if (!Array.isArray(rawFrames) || rawFrames.length === 0) {
+      throw httpError(400, 'sompo_telemetry_episode_frames_required', 'Envie { frames: [...] } com pelo menos um frame.');
+    }
+    const existing = listEpisodeFrameRows(episode);
+    if (existing.length + rawFrames.length > SOMPO_TELEMETRY_EPISODE_FRAMES_MAX) {
+      throw httpError(
+        400,
+        'sompo_telemetry_episode_frames_limit',
+        `Episódio ${episode.publicId} já tem ${existing.length} frame(s); o teto é ${SOMPO_TELEMETRY_EPISODE_FRAMES_MAX} por episódio.`,
+      );
+    }
+    // Valida TODOS antes de gravar qualquer um: rejeição não deixa resto pela metade.
+    const parsed = rawFrames.map((raw, index) => parseEpisodeFrame(raw, existing.length + index));
+    const dir = path.join(resolvedFramesDir, episode.publicId);
+    fs.mkdirSync(dir, { recursive: true });
+    const stored = [];
+    for (let index = 0; index < parsed.length; index += 1) {
+      const frame = parsed[index];
+      const seq = existing.length + index + 1;
+      const extension = frame.mimeType === 'image/png' ? 'png' : 'jpg';
+      const filePath = path.join(dir, `frame-${seq}.${extension}`);
+      fs.writeFileSync(filePath, frame.buffer);
+      try {
+        insertFrameStatement.run(
+          episode.id,
+          seq,
+          frame.fase,
+          frame.label,
+          frame.offsetMs,
+          frame.mimeType,
+          frame.buffer.length,
+          filePath,
+          new Date(now()).toISOString(),
+        );
+      } catch (error) {
+        rethrowSqlite(error, 'addEpisodeFrames');
+      }
+      stored.push(seq);
+    }
+    return {
+      episode,
+      frames: listEpisodeFrameRows(episode).map((row) => mapFrameRow(episode, row)),
+      added: stored.length,
+    };
+  }
+
+  function readEpisodeFrame(publicId, seq) {
+    assertOpen();
+    const episode = requireEpisode(publicId);
+    const seqNumber = Number(seq);
+    let row;
+    try {
+      row = Number.isInteger(seqNumber) && seqNumber > 0
+        ? frameByEpisodeSeqStatement.get(episode.id, seqNumber)
+        : undefined;
+    } catch (error) {
+      rethrowSqlite(error, 'readEpisodeFrame');
+    }
+    if (!row) {
+      throw httpError(
+        404,
+        'sompo_telemetry_episode_frame_not_found',
+        `Frame ${String(seq)} não existe no episódio ${episode.publicId}.`,
+      );
+    }
+    let buffer;
+    try {
+      buffer = fs.readFileSync(row.filePath);
+    } catch (error) {
+      // Metadado sem arquivo é corrupção real: falha alto, nada de 404 disfarçado.
+      throw httpError(
+        500,
+        'sompo_telemetry_episode_frame_unreadable',
+        `Frame ${seqNumber} do episódio ${episode.publicId} está registrado mas o arquivo não pôde ser lido (${error?.code || 'erro de leitura'}).`,
+      );
+    }
+    return { ...mapFrameRow(episode, row), buffer };
+  }
+
   function getEpisode(publicId) {
     const episode = requireEpisode(publicId);
     let samples;
@@ -828,7 +1059,12 @@ export function createSompoTelemetryHistory({ dbPath = defaultSompoTelemetryDbPa
     } catch (error) {
       rethrowSqlite(error, 'episodeSamples');
     }
-    return { episode, samples, summary: summarizeSompoEpisodeSamples(samples) };
+    return {
+      episode,
+      samples,
+      summary: summarizeSompoEpisodeSamples(samples),
+      frames: listEpisodeFrameRows(episode).map((row) => mapFrameRow(episode, row)),
+    };
   }
 
   function query({
@@ -873,8 +1109,11 @@ export function createSompoTelemetryHistory({ dbPath = defaultSompoTelemetryDbPa
     startEpisode,
     finishEpisode,
     getEpisode,
+    addEpisodeFrames,
+    readEpisodeFrame,
     close,
     dbPath: resolvedPath,
+    framesDir: resolvedFramesDir,
   };
 }
 
@@ -1011,10 +1250,36 @@ export function createSompoTelemetryEpisodeFinishHttpHandler(history) {
 export function createSompoTelemetryEpisodeGetHttpHandler(history) {
   return async function sompoTelemetryEpisodeGetHttpHandler(req, res) {
     try {
-      const { episode, samples, summary } = history.getEpisode(req.params?.publicId);
-      res.json({ ok: true, episode, samples, summary });
+      const { episode, samples, summary, frames } = history.getEpisode(req.params?.publicId);
+      res.json({ ok: true, episode, samples, summary, frames });
     } catch (error) {
       sendEpisodeError(res, error, 'Não foi possível ler o episódio de telemetria.');
+    }
+  };
+}
+
+export function createSompoTelemetryEpisodeFramesHttpHandler(history) {
+  return async function sompoTelemetryEpisodeFramesHttpHandler(req, res) {
+    try {
+      const { episode, frames, added } = history.addEpisodeFrames(req.params?.publicId, req.body?.frames);
+      res.json({ ok: true, episode, frames, added });
+    } catch (error) {
+      sendEpisodeError(res, error, 'Não foi possível gravar os frames do episódio.');
+    }
+  };
+}
+
+/** Leitura do binário no padrão visual-artifacts: Content-Type real + cache privado. */
+export function createSompoTelemetryEpisodeFrameGetHttpHandler(history) {
+  return async function sompoTelemetryEpisodeFrameGetHttpHandler(req, res) {
+    try {
+      const frame = history.readEpisodeFrame(req.params?.publicId, req.params?.seq);
+      res.setHeader('Content-Type', frame.mimeType);
+      res.setHeader('Cache-Control', 'private, max-age=3600');
+      res.setHeader('Content-Length', String(frame.buffer.length));
+      res.send(frame.buffer);
+    } catch (error) {
+      sendEpisodeError(res, error, 'Não foi possível ler o frame do episódio.');
     }
   };
 }

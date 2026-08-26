@@ -20,6 +20,13 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { SompoTelemetrySnapshot } from '@/lib/types';
 import { lucaApi } from '@/lib/api';
 import {
+  createSompoTruckModel,
+  SOMPO_TRUCK_FRONT_X,
+  SOMPO_TRUCK_HALF_SIZE,
+  SOMPO_TRUCK_PIVOT_Y,
+} from './sompo/createSompoTruckModel';
+import {
+  SOMPO_COLLISION_FRAME_MOMENTS,
   SOMPO_COLLISION_SCRIPT,
   SOMPO_SIMULATION_SCENARIOS,
   createSompoCollisionScriptSnapshot,
@@ -52,6 +59,18 @@ interface CollisionRunHandle {
   lastSampleMs: number;
 }
 
+interface CollisionFrameCapture {
+  dataUrl: string;
+  offsetMs: number;
+  fase: string;
+  label: string;
+}
+
+interface CollisionCaptureHandle {
+  nextIndex: number;
+  frames: CollisionFrameCapture[];
+}
+
 interface SceneApi {
   focus: (target: 'truck' | 'sensor') => void;
   adjust: (action: 'rotate-left' | 'rotate-right' | 'zoom-in' | 'zoom-out') => void;
@@ -71,8 +90,48 @@ function controlsForScenario(scenarioId: SompoSimulationScenarioId): SompoSimula
 const INITIAL_CONTROLS = controlsForScenario('normal');
 const SIMULATION_HISTORY_FLUSH_MS = 2_000;
 const SIMULATION_HISTORY_MAX_BATCH = 50;
+function dampAngle(current: number, target: number, factor: number) {
+  const shortestTurn = Math.atan2(Math.sin(target - current), Math.cos(target - current));
+  return current + (shortestTurn * factor);
+}
+
+function truckGroundHeight(rotation: THREE.Euler) {
+  const matrix = new THREE.Matrix4().makeRotationFromEuler(rotation).elements;
+  const verticalExtent = (
+    Math.abs(matrix[1]) * SOMPO_TRUCK_HALF_SIZE.x
+    + Math.abs(matrix[5]) * SOMPO_TRUCK_HALF_SIZE.y
+    + Math.abs(matrix[9]) * SOMPO_TRUCK_HALF_SIZE.z
+  );
+  return Math.max(SOMPO_TRUCK_PIVOT_Y + 0.05, verticalExtent + 0.08);
+}
 const COLLISION_TICK_MS = 250;
 const COLLISION_START_DISTANCE_CM = 210;
+const COLLISION_FRAME_WIDTH = 640;
+const COLLISION_FRAME_JPEG_QUALITY = 0.7;
+// Aba oculta pausa o rAF: momento perdido há mais de 1s não vira frame mentiroso.
+const COLLISION_FRAME_LATE_TOLERANCE_MS = 1_000;
+
+/**
+ * Captura síncrona logo após renderer.render — o buffer WebGL ainda está
+ * preenchido no mesmo rAF, então não precisamos de preserveDrawingBuffer.
+ * Reduz para ~640px num canvas 2D antes de serializar em JPEG.
+ */
+function captureCollisionFrameDataUrl(source: HTMLCanvasElement): string | null {
+  try {
+    const sourceWidth = Math.max(1, source.width);
+    const width = Math.min(COLLISION_FRAME_WIDTH, sourceWidth);
+    const height = Math.max(1, Math.round(width * (Math.max(1, source.height) / sourceWidth)));
+    const target = document.createElement('canvas');
+    target.width = width;
+    target.height = height;
+    const context = target.getContext('2d');
+    if (!context) return null;
+    context.drawImage(source, 0, 0, width, height);
+    return target.toDataURL('image/jpeg', COLLISION_FRAME_JPEG_QUALITY);
+  } catch {
+    return null;
+  }
+}
 
 /** Mesma régua da cena: distância (cm) → comprimento do feixe/afastamento do obstáculo. */
 function rangeForDistance(distance: number | null | undefined): number {
@@ -109,29 +168,6 @@ function disposeMaterial(material: THREE.Material) {
     if (value instanceof THREE.Texture) value.dispose();
   }
   material.dispose();
-}
-
-function createLabelTexture(label: string) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 128;
-  const context = canvas.getContext('2d');
-  if (context) {
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = 'rgba(4, 12, 8, 0.9)';
-    context.fillRect(8, 8, 496, 112);
-    context.strokeStyle = '#e8c96a';
-    context.lineWidth = 5;
-    context.strokeRect(8, 8, 496, 112);
-    context.fillStyle = '#f8e7a8';
-    context.font = '700 42px system-ui, sans-serif';
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    context.fillText(label, 256, 65);
-  }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
 }
 
 function addBox(
@@ -235,6 +271,9 @@ export default function SompoTruckSimulator({
   const flushBusyRef = useRef(false);
   const collisionRunRef = useRef<CollisionRunHandle | null>(null);
   const collisionVisualRef = useRef<{ baseRange: number } | null>(null);
+  const collisionCaptureRef = useRef<CollisionCaptureHandle | null>(null);
+  const [collisionFrameCount, setCollisionFrameCount] = useState(0);
+  const [collisionFramesWarning, setCollisionFramesWarning] = useState<string | null>(null);
 
   const collisionActive = collisionRun.status === 'starting'
     || collisionRun.status === 'recording'
@@ -348,9 +387,27 @@ export default function SompoTruckSimulator({
       stopTimers();
       collisionVisualRef.current = null;
       collisionRunRef.current = null;
+      collisionCaptureRef.current = null;
       setCollisionRun({ status: 'error', message });
       // Marca aborted no servidor; se a rede seguir fora, o timeout de 10 min resolve.
       void lucaApi.postSompoTelemetryEpisodeFinish(run.publicId, 'aborted').catch(() => undefined);
+    }
+
+    // Falha no envio dos frames NÃO derruba o episódio: os dados valem sozinhos,
+    // mas o painel avisa que a análise seguirá sem evidência visual.
+    async function uploadCapturedFrames() {
+      const frames = collisionCaptureRef.current?.frames ?? [];
+      if (frames.length === 0) return;
+      try {
+        // Um frame por request para ficar folgado no limite de body do servidor.
+        for (const frame of frames) {
+          await lucaApi.postSompoTelemetryEpisodeFrames(run.publicId, [frame]);
+        }
+      } catch {
+        setCollisionFramesWarning(
+          'Falha ao enviar os frames do simulador — o episódio foi gravado, mas a análise seguirá sem evidência visual.',
+        );
+      }
     }
 
     async function finishRun() {
@@ -365,15 +422,18 @@ export default function SompoTruckSimulator({
             run.publicId,
           );
         }
+        await uploadCapturedFrames();
         const result = await lucaApi.postSompoTelemetryEpisodeFinish(run.publicId, 'complete');
         if (!result?.ok) throw new Error('sompo_episode_finish_failed');
         collisionVisualRef.current = null;
         collisionRunRef.current = null;
+        collisionCaptureRef.current = null;
         setCollisionRun({ status: 'done', publicId: run.publicId });
         onEpisodeRecordedRef.current?.({ publicId: run.publicId, kind: SOMPO_COLLISION_SCRIPT.kind });
       } catch {
         collisionVisualRef.current = null;
         collisionRunRef.current = null;
+        collisionCaptureRef.current = null;
         setCollisionRun({
           status: 'error',
           message: 'Falha de rede ao fechar o episódio — gravação abortada. O simulador continua ativo.',
@@ -444,6 +504,9 @@ export default function SompoTruckSimulator({
       lastSampleMs: Number.NEGATIVE_INFINITY,
     };
     collisionVisualRef.current = { baseRange: rangeForDistance(COLLISION_START_DISTANCE_CM) };
+    collisionCaptureRef.current = { nextIndex: 0, frames: [] };
+    setCollisionFrameCount(0);
+    setCollisionFramesWarning(null);
     setCollisionElapsedSec(0);
     setCollisionRun({ status: 'recording', publicId });
   }
@@ -464,13 +527,15 @@ export default function SompoTruckSimulator({
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x08110d, 0.045);
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-    camera.position.set(9.4, 6.4, 10.5);
+    camera.position.set(10.8, 6.9, 12.6);
 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.setClearColor(0x07100c, 0);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.domElement.setAttribute('aria-hidden', 'true');
     mount.appendChild(renderer.domElement);
 
@@ -479,13 +544,16 @@ export default function SompoTruckSimulator({
     orbit.dampingFactor = 0.07;
     orbit.enablePan = false;
     orbit.minDistance = 6;
-    orbit.maxDistance = 20;
+    orbit.maxDistance = 24;
     orbit.maxPolarAngle = Math.PI * 0.49;
     orbit.target.set(0, 1.5, 0);
 
     scene.add(new THREE.HemisphereLight(0xcce9dc, 0x172219, 2.2));
     const keyLight = new THREE.DirectionalLight(0xffe6a0, 3.8);
     keyLight.position.set(5, 9, 7);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(1024, 1024);
+    keyLight.shadow.radius = 4;
     scene.add(keyLight);
     const rimLight = new THREE.PointLight(0x57ff8a, 18, 15, 2);
     rimLight.position.set(-3, 3.5, -4);
@@ -495,6 +563,7 @@ export default function SompoTruckSimulator({
     const road = new THREE.Mesh(new THREE.PlaneGeometry(32, 18), roadMaterial);
     road.rotation.x = -Math.PI / 2;
     road.position.y = -0.02;
+    road.receiveShadow = true;
     scene.add(road);
 
     const grid = new THREE.GridHelper(32, 32, 0x56634e, 0x263029);
@@ -511,99 +580,24 @@ export default function SompoTruckSimulator({
       addBox(scene, [1.4, 0.025, 0.08], [x, 0.025, -3.15], centerLineMaterial);
     }
 
-    const truckGroup = new THREE.Group();
-    truckGroup.position.y = 0.05;
-    scene.add(truckGroup);
+    const truckPoseGroup = new THREE.Group();
+    truckPoseGroup.position.y = SOMPO_TRUCK_PIVOT_Y + 0.05;
+    scene.add(truckPoseGroup);
 
-    const gold = new THREE.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.56, metalness: 0.35 });
-    const darkGreen = new THREE.MeshStandardMaterial({ color: 0x173c2b, roughness: 0.66, metalness: 0.18 });
-    const deepGreen = new THREE.MeshStandardMaterial({ color: 0x09251a, roughness: 0.72, metalness: 0.12 });
-    const glass = new THREE.MeshStandardMaterial({
-      color: 0x82b8a9,
-      roughness: 0.18,
-      metalness: 0.12,
-      transparent: true,
-      opacity: 0.42,
-    });
-    const tire = new THREE.MeshStandardMaterial({ color: 0x080b09, roughness: 0.92 });
-    const hub = new THREE.MeshStandardMaterial({ color: 0x737b70, roughness: 0.5, metalness: 0.7 });
     const warning = new THREE.MeshStandardMaterial({ color: 0xff4f45, roughness: 0.45, metalness: 0.2 });
-
-    addBox(truckGroup, [6.2, 0.42, 2.25], [0, 1.02, 0], deepGreen);
-    addBox(truckGroup, [2.05, 1.9, 2.05], [2.05, 2.05, 0], gold);
-    addBox(truckGroup, [2.12, 0.78, 2.09], [2.02, 3.2, 0], gold).rotation.z = -0.08;
-    addBox(truckGroup, [0.08, 0.75, 1.62], [3.09, 2.62, 0], glass);
-    addBox(truckGroup, [3.55, 2.05, 2.08], [-0.92, 2.2, 0], darkGreen);
-    addBox(truckGroup, [3.62, 0.12, 2.18], [-0.92, 3.26, 0], gold);
-    addBox(truckGroup, [0.42, 0.38, 2.32], [3.18, 1.08, 0], gold);
-
-    const wheels: THREE.Mesh[] = [];
-    for (const x of [-1.85, 1.75]) {
-      for (const z of [-1.18, 1.18]) {
-        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, 0.42, 28), tire);
-        wheel.rotation.x = Math.PI / 2;
-        wheel.position.set(x, 0.78, z);
-        truckGroup.add(wheel);
-        wheels.push(wheel);
-        const wheelHub = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.45, 20), hub);
-        wheelHub.rotation.x = Math.PI / 2;
-        wheelHub.position.copy(wheel.position);
-        truckGroup.add(wheelHub);
-      }
-    }
-
-    const sensorGroup = new THREE.Group();
-    sensorGroup.position.set(0.2, 3.62, 0);
-    truckGroup.add(sensorGroup);
-    const enclosureMaterial = new THREE.MeshStandardMaterial({
-      color: 0xe8c96a,
-      roughness: 0.2,
-      metalness: 0.1,
-      transparent: true,
-      opacity: 0.18,
-      depthWrite: false,
-      side: THREE.DoubleSide,
+    const truckModel = createSompoTruckModel({
+      sensorLabel: isFirebase ? 'ESP32 FÍSICO' : 'ESP32 VIRTUAL',
     });
-    const enclosure = addBox(sensorGroup, [1.42, 0.86, 1.16], [0, 0, 0], enclosureMaterial);
-    const enclosureEdges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(enclosure.geometry),
-      new THREE.LineBasicMaterial({ color: 0xe8c96a, transparent: true, opacity: 0.95 }),
-    );
-    sensorGroup.add(enclosureEdges);
-    const boardMaterial = new THREE.MeshStandardMaterial({ color: 0x0c8f57, roughness: 0.58, metalness: 0.25 });
-    addBox(sensorGroup, [0.9, 0.12, 0.62], [0, -0.04, 0], boardMaterial);
-    const chipMaterial = new THREE.MeshStandardMaterial({ color: 0x121713, roughness: 0.5, metalness: 0.45 });
-    addBox(sensorGroup, [0.28, 0.12, 0.28], [0.05, 0.08, 0], chipMaterial);
-    const ledMaterial = new THREE.MeshStandardMaterial({
-      color: 0x7dff9a,
-      emissive: 0x2dff6b,
-      emissiveIntensity: 3,
-      roughness: 0.2,
-    });
-    const led = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 12), ledMaterial);
-    led.position.set(0.34, 0.14, 0.18);
-    sensorGroup.add(led);
-
-    const labelTexture = createLabelTexture(isFirebase ? 'ESP32 FÍSICO' : 'ESP32 VIRTUAL');
-    const labelSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture, transparent: true }));
-    labelSprite.scale.set(2.35, 0.59, 1);
-    labelSprite.position.set(0.2, 1.05, 0);
-    sensorGroup.add(labelSprite);
-
-    const rayMaterial = new THREE.LineBasicMaterial({ color: 0x7dff9a, transparent: true, opacity: 0.78 });
-    const rayGroup = new THREE.Group();
-    rayGroup.position.set(3.42, 1.55, 0);
-    truckGroup.add(rayGroup);
-    for (const z of [-0.16, 0.16]) {
-      const ray = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(0, 0, z),
-          new THREE.Vector3(1, 0, z * 1.8),
-        ]),
-        rayMaterial,
-      );
-      rayGroup.add(ray);
-    }
+    const {
+      root: truckGroup,
+      wheels,
+      sensorGroup,
+      ledMaterial,
+      rayGroup,
+      rayMaterial,
+    } = truckModel;
+    truckGroup.position.y = -SOMPO_TRUCK_PIVOT_Y;
+    truckPoseGroup.add(truckGroup);
 
     const obstacleGroup = new THREE.Group();
     scene.add(obstacleGroup);
@@ -626,15 +620,19 @@ export default function SompoTruckSimulator({
     resizeObserver.observe(mount);
     resize();
 
+    let focusTarget: 'truck' | 'sensor' = 'truck';
+    const focusPoint = new THREE.Vector3();
+
     sceneApiRef.current = {
       focus(target) {
+        focusTarget = target;
         if (target === 'sensor') {
-          camera.position.set(1.4, 4.75, 3.6);
-          orbit.target.set(0.2, 3.55, 0);
+          camera.position.set(7.4, 4.7, 4.1);
+          orbit.target.set(4.48, 1.68, 0);
           orbit.minDistance = 2.5;
         } else {
-          camera.position.set(9.4, 6.4, 10.5);
-          orbit.target.set(0, 1.5, 0);
+          camera.position.set(10.8, 6.9, 12.6);
+          orbit.target.set(0, 1.9, 0);
           orbit.minDistance = 6;
         }
         orbit.update();
@@ -661,6 +659,7 @@ export default function SompoTruckSimulator({
     let frameId = 0;
     let previousTime = performance.now();
     let liveHeading = 0;
+    let truckBaseHeight = SOMPO_TRUCK_PIVOT_Y + 0.05;
 
     function render(time: number) {
       const delta = Math.min(0.04, Math.max(0, (time - previousTime) / 1_000));
@@ -674,21 +673,32 @@ export default function SompoTruckSimulator({
         reduceMotion.matches ? settings.roll : snapshot.readings.roll || 0,
       );
       if (reduceMotion.matches) {
-        truckGroup.rotation.z = pitch;
-        truckGroup.rotation.x = roll;
+        truckPoseGroup.rotation.z = pitch;
+        truckPoseGroup.rotation.x = roll;
       } else {
-        truckGroup.rotation.z = THREE.MathUtils.lerp(truckGroup.rotation.z, pitch, 0.08);
-        truckGroup.rotation.x = THREE.MathUtils.lerp(truckGroup.rotation.x, roll, 0.08);
+        truckPoseGroup.rotation.z = dampAngle(truckPoseGroup.rotation.z, pitch, 0.08);
+        truckPoseGroup.rotation.x = dampAngle(truckPoseGroup.rotation.x, roll, 0.08);
       }
       if (isFirebase && !reduceMotion.matches) {
         const yawRate = THREE.MathUtils.clamp(snapshot.readings.rotation?.z || 0, -180, 180);
         liveHeading += THREE.MathUtils.degToRad(yawRate) * delta;
-        truckGroup.rotation.y = liveHeading;
+        truckPoseGroup.rotation.y = liveHeading;
       }
       const liveActivity = isFirebase
         ? THREE.MathUtils.clamp((snapshot.readings.rotation?.magnitude || 0) * 0.012, 0, 0.1)
         : settings.roughness * 0.008;
-      truckGroup.position.y = 0.05 + (reduceMotion.matches ? 0 : Math.sin(time * 0.008) * liveActivity);
+      const targetHeight = truckGroundHeight(truckPoseGroup.rotation);
+      truckBaseHeight = reduceMotion.matches
+        ? targetHeight
+        : THREE.MathUtils.lerp(truckBaseHeight, targetHeight, 0.12);
+      truckPoseGroup.position.y = truckBaseHeight
+        + (reduceMotion.matches ? 0 : Math.sin(time * 0.008) * liveActivity);
+      if (focusTarget === 'sensor') {
+        sensorGroup.getWorldPosition(focusPoint);
+      } else {
+        focusPoint.set(truckPoseGroup.position.x, truckPoseGroup.position.y, truckPoseGroup.position.z);
+      }
+      orbit.target.lerp(focusPoint, reduceMotion.matches ? 1 : 0.08);
       const collisionVisual = collisionVisualRef.current;
       if (!isFirebase && !reduceMotion.matches) {
         // No roteiro de colisão a roda para junto com o caminhão (flag ativa = impacto/parado).
@@ -699,17 +709,17 @@ export default function SompoTruckSimulator({
       rayGroup.scale.x = rangeLength;
       if (collisionVisual) {
         // Obstáculo fixo no mundo; o caminhão avança até fechar a distância do roteiro.
-        obstacleGroup.position.x = 3.42 + collisionVisual.baseRange;
-        truckGroup.position.x = Math.max(0, collisionVisual.baseRange - rangeLength);
+        obstacleGroup.position.x = SOMPO_TRUCK_FRONT_X + collisionVisual.baseRange;
+        truckPoseGroup.position.x = Math.max(0, collisionVisual.baseRange - rangeLength);
         if (snapshot.risks.collision && (snapshot.readings.acceleration?.magnitude || 0) > 15) {
-          truckGroup.position.y += reduceMotion.matches ? 0 : Math.sin(time * 0.09) * 0.05;
+          truckPoseGroup.position.y += reduceMotion.matches ? 0 : Math.sin(time * 0.09) * 0.05;
         }
       } else {
-        obstacleGroup.position.x = 3.42 + rangeLength;
-        if (truckGroup.position.x !== 0) {
-          truckGroup.position.x = Math.abs(truckGroup.position.x) < 0.01
+        obstacleGroup.position.x = SOMPO_TRUCK_FRONT_X + rangeLength;
+        if (truckPoseGroup.position.x !== 0) {
+          truckPoseGroup.position.x = Math.abs(truckPoseGroup.position.x) < 0.01
             ? 0
-            : THREE.MathUtils.lerp(truckGroup.position.x, 0, 0.06);
+            : THREE.MathUtils.lerp(truckPoseGroup.position.x, 0, 0.06);
         }
       }
       rayMaterial.color.set(snapshot.risks.collision ? 0xff5d52 : 0x7dff9a);
@@ -719,6 +729,28 @@ export default function SompoTruckSimulator({
       ledMaterial.emissiveIntensity = reduceMotion.matches ? 2.4 : 2.2 + (Math.sin(time * 0.007) * 1.1);
       orbit.update();
       renderer.render(scene, camera);
+      // Captura síncrona no mesmo rAF do render: o framebuffer WebGL ainda está
+      // válido sem precisar de preserveDrawingBuffer.
+      const capture = collisionCaptureRef.current;
+      const activeRun = collisionRunRef.current;
+      if (capture && activeRun && collisionVisual) {
+        const elapsedMs = performance.now() - activeRun.startedAt;
+        while (capture.nextIndex < SOMPO_COLLISION_FRAME_MOMENTS.length) {
+          const moment = SOMPO_COLLISION_FRAME_MOMENTS[capture.nextIndex];
+          if (elapsedMs < moment.offsetMs) break;
+          capture.nextIndex += 1;
+          if (elapsedMs - moment.offsetMs > COLLISION_FRAME_LATE_TOLERANCE_MS) continue;
+          const dataUrl = captureCollisionFrameDataUrl(renderer.domElement);
+          if (!dataUrl) continue;
+          capture.frames.push({
+            dataUrl,
+            offsetMs: moment.offsetMs,
+            fase: moment.fase,
+            label: moment.label,
+          });
+          setCollisionFrameCount(capture.frames.length);
+        }
+      }
       if (!document.hidden) frameId = window.requestAnimationFrame(render);
     }
 
@@ -909,6 +941,7 @@ export default function SompoTruckSimulator({
             {collisionRun.status === 'recording' && (
               <p className="sompo-simulator-collision-status" role="status" data-sompo-collision-recording>
                 Gravando episódio de colisão… {collisionElapsedSec}s · fase: {collisionPhaseLabel}
+                {' '}· frames: {collisionFrameCount}/{SOMPO_COLLISION_FRAME_MOMENTS.length}
               </p>
             )}
             {collisionRun.status === 'finishing' && (
@@ -924,6 +957,15 @@ export default function SompoTruckSimulator({
             {collisionRun.status === 'error' && (
               <p className="sompo-simulator-collision-status is-error" role="alert" data-sompo-collision-error>
                 {collisionRun.message}
+              </p>
+            )}
+            {collisionFramesWarning && (
+              <p
+                className="sompo-simulator-collision-status is-error"
+                role="alert"
+                data-sompo-collision-frames-warning
+              >
+                {collisionFramesWarning}
               </p>
             )}
           </div>

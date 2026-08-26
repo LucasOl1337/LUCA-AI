@@ -767,7 +767,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setWorkflowState(createDefaultWorkflowAssignments());
       setIndividualState(createDefaultIndividualAssignments());
       setMission(launch?.mission || '');
-      setDraftAttachments([]);
+      // Frames do episódio SOMPO já enviados à sessão chegam prontos no launch.
+      setDraftAttachments(Array.isArray(launch?.attachments) ? launch.attachments.slice(0, 4) : []);
       setTranscript([]);
       setFinalResult(null);
       setVisualPack(null);
@@ -798,7 +799,9 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         }
       : createDefaultIndividualAssignments());
     setMission(sessionMission || launch?.mission || '');
-    setDraftAttachments(Array.isArray(session.draftAttachments) ? session.draftAttachments.slice(0, 4) : []);
+    setDraftAttachments(Array.isArray(session.draftAttachments) && session.draftAttachments.length > 0
+      ? session.draftAttachments.slice(0, 4)
+      : Array.isArray(launch?.attachments) ? launch.attachments.slice(0, 4) : []);
     setTranscript(nextTranscript);
     setFinalResult(isTeamTranscriptEntry(session.finalResult) ? session.finalResult : null);
     setVisualPack(session.visualPack && typeof session.visualPack === 'object' ? session.visualPack as LucaAiVisualPack : null);

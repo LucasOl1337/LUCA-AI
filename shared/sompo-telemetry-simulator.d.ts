@@ -58,6 +58,14 @@ export interface SompoCollisionScript {
 
 export const SOMPO_COLLISION_SCRIPT: Readonly<SompoCollisionScript>;
 
+export interface SompoCollisionFrameMoment {
+  offsetMs: number;
+  fase: SompoCollisionScriptPhaseId;
+  label: string;
+}
+
+export const SOMPO_COLLISION_FRAME_MOMENTS: readonly Readonly<SompoCollisionFrameMoment>[];
+
 export function getSompoCollisionScriptPhase(elapsedMs: number): SompoCollisionScriptPhaseId;
 
 export function createSompoCollisionScriptSnapshot(

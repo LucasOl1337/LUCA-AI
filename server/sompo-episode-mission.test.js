@@ -102,3 +102,34 @@ test('missão de episódio falha alto com entradas inválidas e sinaliza episód
   const aborted = buildSompoEpisodeMission({ ...episode, status: 'aborted' }, samples, summary, 'Risco Agro');
   assert.match(aborted, /\(status aborted: gravação incompleta\)/);
 });
+
+test('missão de episódio com frames: seção "Evidência visual", anexos numerados e frame fora do orçamento declarado', () => {
+  const { episode, samples, summary } = collisionEpisodeFixture();
+  const frames = [
+    { seq: 1, fase: 'aproximacao', label: 'Início da aproximação', offsetMs: 0, attached: true },
+    { seq: 2, fase: 'aproximacao', label: 'Meia aproximação', offsetMs: 7_000, attached: false },
+    { seq: 3, fase: 'impacto', label: 'Impacto — pico de aceleração', offsetMs: 14_750, attached: true },
+    { seq: 4, fase: 'pos-impacto', label: 'Pós-impacto imediato', offsetMs: 16_500, attached: true },
+    { seq: 5, fase: 'pos-impacto', label: 'Final do episódio', offsetMs: 21_500, attached: true },
+  ];
+  const mission = buildSompoEpisodeMission(episode, samples, summary, 'Risco Agro', frames);
+
+  assert.match(mission, /4 frames do simulador anexados como evidência visual\./);
+  assert.match(mission, /Evidência visual \(frames do canvas Three\.js capturados durante o roteiro e anexados a esta missão como imagens\):/);
+  assert.match(mission, /- Anexo 1 — Início da aproximação \(fase aproximacao, t\+0s\)/);
+  assert.match(mission, /- Anexo 2 — Impacto — pico de aceleração \(fase impacto, t\+14,75s\)/);
+  assert.match(mission, /- Anexo 4 — Final do episódio \(fase pos-impacto, t\+21,5s\)/);
+  assert.match(mission, /- Registrado no episódio mas NÃO anexado \(orçamento de anexos da bancada\): Meia aproximação \(fase aproximacao, t\+7s\)/);
+  assert.match(mission, /cruzem cada imagem com a telemetria do mesmo instante e digam explicitamente se batem ou divergem/);
+  assert.match(mission, /a distância registrada no dado confere com a posição do caminhão no Anexo 3\?/);
+  assert.match(mission, /Concluam com a severidade do evento para a seguradora e a ação de prevenção no momento exato/);
+  assert.doesNotMatch(mission, /Sem evidência visual/);
+});
+
+test('missão de episódio sem frames diz explicitamente que não há evidência visual', () => {
+  const { episode, samples, summary } = collisionEpisodeFixture();
+  const mission = buildSompoEpisodeMission(episode, samples, summary, 'Risco Agro');
+  assert.match(mission, /Sem evidência visual: nenhum frame do simulador foi registrado neste episódio; a análise segue apenas com os dados de telemetria\./);
+  assert.doesNotMatch(mission, /Anexo 1/);
+  assert.doesNotMatch(mission, /frames? do simulador anexado/);
+});

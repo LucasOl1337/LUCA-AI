@@ -15,6 +15,7 @@ import type {
   RouterModelsResponse,
   RuntimeEvent,
   SompoTelemetryEpisodeFinishResponse,
+  SompoTelemetryEpisodeFramesUploadResponse,
   SompoTelemetryEpisodeResponse,
   SompoTelemetryEpisodeStartResponse,
   SompoTelemetryHistoryResponse,
@@ -265,6 +266,29 @@ export const lucaApi = {
       timeoutMs,
       base,
     ),
+  postSompoTelemetryEpisodeFrames: (
+    publicId: string,
+    frames: { dataUrl: string; offsetMs: number; fase: string; label: string }[],
+    base?: string,
+    timeoutMs = ACTION_REQUEST_TIMEOUT_MS,
+  ) =>
+    apiPost<SompoTelemetryEpisodeFramesUploadResponse>(
+      `/api/sompo/telemetry/episode/${encodeURIComponent(publicId)}/frames`,
+      { frames },
+      base,
+      timeoutMs,
+    ),
+  getSompoTelemetryEpisodeFrameBlob: async (
+    publicId: string,
+    seq: number,
+    base = apiBase,
+  ): Promise<Blob> => {
+    const response = await fetch(
+      apiUrl(`/api/sompo/telemetry/episode/${encodeURIComponent(publicId)}/frames/${seq}`, base),
+    );
+    if (!response.ok) throw new Error(`sompo_episode_frame_fetch_failed:${response.status}`);
+    return response.blob();
+  },
   listTeamTemplates: (base?: string, timeoutMs = ACTION_REQUEST_TIMEOUT_MS) =>
     apiGet<LucaAiTeamTemplatesResponse>('/api/luca-ai/team-templates', timeoutMs, base),
   createTeamTemplate: (kind: 'team' | 'individual', template: Record<string, unknown>, base?: string) =>
