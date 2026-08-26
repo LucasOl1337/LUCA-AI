@@ -744,8 +744,14 @@
   font-size: 9.5px;
 }
 
-.sompo-axis-calibration button {
+.sompo-axis-calibration-actions {
+  display: flex;
+  gap: 7px;
   margin-top: 10px;
+}
+
+.sompo-axis-calibration button {
+  flex: 1;
   padding: 6px 9px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);

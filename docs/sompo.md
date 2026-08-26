@@ -44,7 +44,7 @@ So sobe dado. O LUCA nao escreve no Firebase nem no Mosquitto. Canal de descida 
 
 ## Eixos e calibracao
 
-Na cena, o caminhao aponta para `+X` e `+Y` e para cima. O gemeo Firebase compoe a pose na ordem Euler `YZX` (guinada, arfagem, rolagem), para a rolagem permanecer no referencial do veiculo quando pitch e roll aparecem juntos. A guinada ignora ruido de ate 1,5 graus/s e retorna suavemente ao zero quando o sensor fica quieto; isto evita deriva sem fingir uma fusao de sensores que o firmware nao fornece.
+Na cena, o caminhao aponta para `+X` e `+Y` e para cima. O gemeo Firebase compoe a pose na ordem Euler `YZX` (guinada, arfagem, rolagem), para a rolagem permanecer no referencial do veiculo quando pitch e roll aparecem juntos. A guinada ignora ruido de ate 1,5 graus/s — zona morta que impede a deriva com o caminhao parado — e o rumo FICA onde a curva parou: nao ha recentramento automatico. Um decaimento de volta ao zero desfaz a curva poucos segundos depois dela acontecer, e um gemeo que desfaz a curva nao acompanha a direcao do caminhao fisico, que e o unico servico que ele presta. Sem magnetometro no firmware nao ha norte absoluto, entao a deriva residual de curvas reais e do operador: **Recentrar guinada**, com o caminhao apontado para a seta ciano.
 
 O sinal e a montagem fisica do ESP32 so podem ser confirmados com o equipamento na mao. Abra **Calibracao de eixos** no gemeo digital e use inverter arfagem, rolagem ou guinada, ou trocar arfagem por rolagem se a placa estiver girada 90 graus. A mudanca e imediata, fica salva neste navegador e pode ser removida com **Voltar ao padrao**. A seta ciano no piso identifica a frente `+X` para comparacao com o caminhao real.
 

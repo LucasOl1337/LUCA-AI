@@ -24,7 +24,6 @@ export interface SompoSensorPose {
 
 export const SOMPO_EULER_ORDER: SompoEulerOrder;
 export const SOMPO_YAW_NOISE_FLOOR_DPS: number;
-export const SOMPO_YAW_RECENTER_PER_SECOND: number;
 export const DEFAULT_SOMPO_AXIS_CALIBRATION: Readonly<SompoAxisCalibration>;
 export function sensorReadingToPose(
   reading: SompoSensorPoseReading,

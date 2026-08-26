@@ -1,6 +1,5 @@
 export const SOMPO_EULER_ORDER = 'YZX';
 export const SOMPO_YAW_NOISE_FLOOR_DPS = 1.5;
-export const SOMPO_YAW_RECENTER_PER_SECOND = 1.2;
 
 export const DEFAULT_SOMPO_AXIS_CALIBRATION = Object.freeze({
   invertPitch: false,
@@ -23,10 +22,12 @@ export function sensorReadingToPose(reading, calibration = DEFAULT_SOMPO_AXIS_CA
   let yawRate = Number.isFinite(reading.yawRate) ? reading.yawRate : 0;
   yawRate = Math.max(-180, Math.min(180, yawRate));
   if (calibration.invertYaw) yawRate *= -1;
-  if (Math.abs(yawRate) <= SOMPO_YAW_NOISE_FLOOR_DPS) {
-    heading *= Math.exp(-SOMPO_YAW_RECENTER_PER_SECOND * deltaSeconds);
-    if (Math.abs(heading) < 1e-6) heading = 0;
-  } else {
+  // Zona morta: abaixo do piso de ruido o rumo NAO se mexe. E o que impede a
+  // deriva com o caminhao parado. O rumo tambem nao volta sozinho para zero:
+  // um gemeo que desfaz a curva alguns segundos depois de ela acontecer nao
+  // acompanha a direcao do caminhao fisico, que e justamente o que se pede
+  // dele. A deriva residual de curvas reais se corrige no botao de recentrar.
+  if (Math.abs(yawRate) > SOMPO_YAW_NOISE_FLOOR_DPS) {
     heading += toRadians(yawRate) * deltaSeconds;
   }
 

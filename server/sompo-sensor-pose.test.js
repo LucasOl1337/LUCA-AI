@@ -30,7 +30,7 @@ test('inversao espelha arfagem e troca permuta pitch com roll', () => {
   assert.ok(Math.abs(swapped.rotationX - (20 * Math.PI / 180)) < 1e-12);
 });
 
-test('ruido de guinada nao acumula e repouso recentra uma guinada existente', () => {
+test('ruido de guinada nao acumula rumo com o caminhao parado', () => {
   let heading = 0;
   for (let index = 0; index < 300; index += 1) {
     heading = sensorReadingToPose({
@@ -42,8 +42,35 @@ test('ruido de guinada nao acumula e repouso recentra uma guinada existente', ()
     }).rotationY;
   }
   assert.equal(heading, 0);
-  const recentered = sensorReadingToPose({ yawRate: 0, currentHeading: 0.5, deltaSeconds: 2 }).rotationY;
-  assert.ok(recentered > 0 && recentered < 0.05);
+});
+
+test('rumo de uma curva real fica onde parou em vez de voltar sozinho para zero', () => {
+  // O gemeo tem que apontar para onde o caminhao fisico aponta. Um
+  // recentramento automatico desfazia a curva poucos segundos depois dela
+  // acontecer — a tela deixava de acompanhar a direcao, que e o defeito.
+  const step = 1 / 60;
+  let heading = 0;
+  const advance = (yawRate, seconds) => {
+    for (let index = 0; index < Math.round(seconds / step); index += 1) {
+      heading = sensorReadingToPose({
+        pitch: 0, roll: 0, yawRate, currentHeading: heading, deltaSeconds: step,
+      }).rotationY;
+    }
+  };
+
+  advance(45, 2);
+  const afterTurn = heading * 180 / Math.PI;
+  assert.ok(Math.abs(afterTurn - 90) < 0.5, `curva de 90 graus (${afterTurn})`);
+
+  advance(0, 10);
+  const afterRest = heading * 180 / Math.PI;
+  assert.ok(Math.abs(afterRest - afterTurn) < 1e-9, `rumo mantido apos 10 s parado (${afterRest})`);
+});
+
+test('gemeo Firebase oferece recentrar guinada, que zera o rumo integrado', () => {
+  assert.match(simulatorSource, /Recentrar guinada/);
+  assert.match(simulatorSource, /recenterHeading\(\)\s*\{\s*liveHeading = 0;/);
+  assert.match(simulatorSource, /onRecenterHeading=\{\(\) => sceneApiRef\.current\?\.recenterHeading\(\)\}/);
 });
 
 test('gemeo Firebase expoe calibracao persistente, reset e referencia da frente', () => {

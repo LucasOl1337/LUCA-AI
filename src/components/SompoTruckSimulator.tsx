@@ -80,6 +80,7 @@ interface CollisionCaptureHandle {
 interface SceneApi {
   focus: (target: 'truck' | 'sensor') => void;
   adjust: (action: 'rotate-left' | 'rotate-right' | 'zoom-in' | 'zoom-out') => void;
+  recenterHeading: () => void;
 }
 
 const SCENARIO_IDS = Object.keys(SOMPO_SIMULATION_SCENARIOS) as SompoSimulationScenarioId[];
@@ -215,11 +216,13 @@ function LiveReadings({
   calibration,
   onCalibrationChange,
   onCalibrationReset,
+  onRecenterHeading,
 }: {
   telemetry: SompoTelemetrySnapshot;
   calibration: SompoAxisCalibration;
   onCalibrationChange: (key: keyof SompoAxisCalibration, value: boolean) => void;
   onCalibrationReset: () => void;
+  onRecenterHeading: () => void;
 }) {
   return (
     <aside className="sompo-simulator-controls sompo-simulator-live-readings" aria-label="Leituras que movimentam o gêmeo digital">
@@ -272,7 +275,11 @@ function LiveReadings({
 
       <details className="sompo-axis-calibration" data-sompo-axis-calibration>
         <summary>Calibração de eixos</summary>
-        <p>Incline o caminhão físico e ajuste até a tela seguir a mesma direção.</p>
+        <p>
+          Incline o caminhão físico e ajuste até a tela seguir a mesma direção. O rumo é integrado
+          do giroscópio e não tem norte: depois de várias curvas ele acumula erro — recentre com o
+          caminhão apontado para a seta ciano.
+        </p>
         <div>
           {([
             ['invertPitch', 'Inverter arfagem'],
@@ -290,7 +297,10 @@ function LiveReadings({
             </label>
           ))}
         </div>
-        <button type="button" onClick={onCalibrationReset}>Voltar ao padrão</button>
+        <div className="sompo-axis-calibration-actions">
+          <button type="button" onClick={onRecenterHeading}>Recentrar guinada</button>
+          <button type="button" onClick={onCalibrationReset}>Voltar ao padrão</button>
+        </div>
       </details>
 
       <p className="sompo-simulator-disclaimer">
@@ -697,8 +707,15 @@ export default function SompoTruckSimulator({
 
     let focusTarget: 'truck' | 'sensor' = 'truck';
     const focusPoint = new THREE.Vector3();
+    // O rumo integrado nao tem referencia absoluta (o firmware nao manda
+    // magnetometro): curvas reais deixam residuo. Recentrar e do operador.
+    let liveHeading = 0;
 
     sceneApiRef.current = {
+      recenterHeading() {
+        liveHeading = 0;
+        truckPoseGroup.rotation.y = 0;
+      },
       focus(target) {
         focusTarget = target;
         if (target === 'sensor') {
@@ -733,7 +750,6 @@ export default function SompoTruckSimulator({
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     let frameId = 0;
     let previousTime = performance.now();
-    let liveHeading = 0;
     let truckBaseHeight = SOMPO_TRUCK_PIVOT_Y + 0.05;
 
     function render(time: number) {
@@ -972,6 +988,7 @@ export default function SompoTruckSimulator({
             calibration={axisCalibration}
             onCalibrationChange={(key, value) => setAxisCalibration((current) => ({ ...current, [key]: value }))}
             onCalibrationReset={() => setAxisCalibration({ ...DEFAULT_SOMPO_AXIS_CALIBRATION })}
+            onRecenterHeading={() => sceneApiRef.current?.recenterHeading()}
           />
         ) : (
         <aside className="sompo-simulator-controls" aria-label="Controles do simulador">
