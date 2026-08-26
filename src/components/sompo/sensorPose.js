@@ -11,8 +11,10 @@ export const DEFAULT_SOMPO_AXIS_CALIBRATION = Object.freeze({
 const toRadians = (degrees) => degrees * (Math.PI / 180);
 
 export function sensorReadingToPose(reading, calibration = DEFAULT_SOMPO_AXIS_CALIBRATION) {
-  let pitch = Number.isFinite(reading.pitch) ? reading.pitch : 0;
-  let roll = Number.isFinite(reading.roll) ? reading.roll : 0;
+  // Firmware nomeia pitch/roll ao contrario do veiculo (medido com o caminhao
+  // na mao em 2026-08-26). Variaveis abaixo = eixos do caminhao.
+  let pitch = Number.isFinite(reading.roll) ? reading.roll : 0;
+  let roll = Number.isFinite(reading.pitch) ? reading.pitch : 0;
   const deltaSeconds = Math.max(0, Number.isFinite(reading.deltaSeconds) ? reading.deltaSeconds : 0);
   let heading = Number.isFinite(reading.currentHeading) ? reading.currentHeading : 0;
   if (calibration.swapPitchRoll) [pitch, roll] = [roll, pitch];

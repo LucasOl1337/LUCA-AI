@@ -97,7 +97,7 @@ function controlsForScenario(scenarioId: SompoSimulationScenarioId): SompoSimula
 const INITIAL_CONTROLS = controlsForScenario('normal');
 const SIMULATION_HISTORY_FLUSH_MS = 2_000;
 const SIMULATION_HISTORY_MAX_BATCH = 50;
-const SOMPO_AXIS_CALIBRATION_STORAGE_KEY = 'luca:sompo-axis-calibration:v1';
+const SOMPO_AXIS_CALIBRATION_STORAGE_KEY = 'luca:sompo-axis-calibration:v2';
 
 function loadAxisCalibration(): SompoAxisCalibration {
   try {
@@ -237,12 +237,12 @@ function LiveReadings({
       <div className="sompo-simulator-live-grid">
         <article>
           <span>Pitch</span>
-          <strong>{formatReading(telemetry.readings.pitch, '°')}</strong>
+          <strong>{formatReading(calibration.swapPitchRoll ? telemetry.readings.pitch : telemetry.readings.roll, '°')}</strong>
           <small>inclina frente / trás</small>
         </article>
         <article>
           <span>Roll</span>
-          <strong>{formatReading(telemetry.readings.roll, '°')}</strong>
+          <strong>{formatReading(calibration.swapPitchRoll ? telemetry.readings.roll : telemetry.readings.pitch, '°')}</strong>
           <small>inclina lateralmente</small>
         </article>
         <article className="is-wide">

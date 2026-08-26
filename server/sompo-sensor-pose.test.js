@@ -12,8 +12,17 @@ const simulatorSource = readFileSync(new URL('../src/components/SompoTruckSimula
 test('identidade aplica arfagem em Z e rolagem em X na ordem YZX', () => {
   const pose = sensorReadingToPose({ pitch: 20, roll: 5, yawRate: 0 });
   assert.equal(pose.order, SOMPO_EULER_ORDER);
-  assert.ok(Math.abs(pose.rotationZ - (20 * Math.PI / 180)) < 1e-12);
-  assert.ok(Math.abs(pose.rotationX - (5 * Math.PI / 180)) < 1e-12);
+  assert.ok(Math.abs(pose.rotationZ - (5 * Math.PI / 180)) < 1e-12);
+  assert.ok(Math.abs(pose.rotationX - (20 * Math.PI / 180)) < 1e-12);
+});
+
+test('firmware pitch vira rolagem em X e firmware roll vira arfagem em Z', () => {
+  const fromFirmwarePitch = sensorReadingToPose({ pitch: 20, yawRate: 0 });
+  const fromFirmwareRoll = sensorReadingToPose({ roll: 5, yawRate: 0 });
+  assert.ok(Math.abs(fromFirmwarePitch.rotationX - (20 * Math.PI / 180)) < 1e-12);
+  assert.ok(Math.abs(fromFirmwarePitch.rotationZ) < 1e-12);
+  assert.ok(Math.abs(fromFirmwareRoll.rotationZ - (5 * Math.PI / 180)) < 1e-12);
+  assert.ok(Math.abs(fromFirmwareRoll.rotationX) < 1e-12);
 });
 
 test('inversao espelha arfagem e troca permuta pitch com roll', () => {
@@ -26,8 +35,14 @@ test('inversao espelha arfagem e troca permuta pitch com roll', () => {
     { ...DEFAULT_SOMPO_AXIS_CALIBRATION, swapPitchRoll: true },
   );
   assert.ok(inverted.rotationZ < 0);
-  assert.ok(Math.abs(swapped.rotationZ - (5 * Math.PI / 180)) < 1e-12);
-  assert.ok(Math.abs(swapped.rotationX - (20 * Math.PI / 180)) < 1e-12);
+  assert.ok(Math.abs(inverted.rotationZ - (-5 * Math.PI / 180)) < 1e-12);
+  assert.ok(Math.abs(swapped.rotationZ - (20 * Math.PI / 180)) < 1e-12);
+  assert.ok(Math.abs(swapped.rotationX - (5 * Math.PI / 180)) < 1e-12);
+});
+
+test('calibracao persistente usa chave v2 para descartar swap antigo', () => {
+  assert.match(simulatorSource, /luca:sompo-axis-calibration:v2/);
+  assert.doesNotMatch(simulatorSource, /luca:sompo-axis-calibration:v1/);
 });
 
 test('ruido de guinada nao acumula rumo com o caminhao parado', () => {
