@@ -26,7 +26,11 @@ export const CLOUDFLARE_ACCESS_EMAILS = Object.freeze(
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean),
 );
-export const API_RATE_LIMIT_MAX = Number(process.env.API_RATE_LIMIT_MAX ?? 240);
+// O teto e por IP, e um unico operador gera trafego alto sozinho: cada aba com
+// missao rodando faz ~50 req/min so de polling de eventos, mais ~30/min do
+// flush do simulador e rajadas de upload de frame. Com 240 o proprio painel
+// batia no limite em uso normal com poucas abas e o usuario via 429.
+export const API_RATE_LIMIT_MAX = Number(process.env.API_RATE_LIMIT_MAX ?? 900);
 export const API_RATE_LIMIT_WINDOW_MS = Number(process.env.API_RATE_LIMIT_WINDOW_MS ?? 60000);
 
 // Catalogo fechado do 9Router. O nivel de esforco faz parte da propria rota;

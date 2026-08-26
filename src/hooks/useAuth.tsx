@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 export interface AuthUser {
   id: string;
@@ -61,6 +61,28 @@ const authMessages: Record<string, string> = {
   authentication_required: 'Faça login novamente.',
 };
 
+/** Espera entre tentativas quando o /session falha por transporte, não por sessão morta. */
+const SESSION_RETRY_DELAYS_MS = [1_000, 3_000, 8_000, 20_000];
+
+/** Erro de autenticação que carrega o status HTTP; status 0 = a resposta nem chegou. */
+export class AuthRequestError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'AuthRequestError';
+    this.status = status;
+  }
+}
+
+/**
+ * Só o servidor dizendo "não autenticado" prova que a sessão morreu. Rede fora,
+ * 429 do limitador e 5xx de reinício são falha de transporte com sessão viva.
+ */
+export function isSessionRejection(status: number): boolean {
+  return status === 401 || status === 403;
+}
+
 async function authRequest(path: string, body?: object) {
   let response: Response;
   try {
@@ -71,22 +93,26 @@ async function authRequest(path: string, body?: object) {
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new Error(
+    throw new AuthRequestError(
       typeof navigator !== 'undefined' && navigator.onLine === false
         ? 'Sem internet. O que você digitou continua no formulário — reconecte e tente de novo.'
         : 'O LUCA não respondeu. O que você digitou continua no formulário — tente de novo em instantes.',
+      0,
     );
   }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const code = String(payload?.error || 'auth_failed');
     if (response.status === 401 && !authMessages[code]) {
-      throw new Error('E-mail ou senha incorretos.');
+      throw new AuthRequestError('E-mail ou senha incorretos.', response.status);
     }
     if (response.status === 403 && !authMessages[code]) {
-      throw new Error('Esta conta não pode entrar. Peça acesso a um administrador.');
+      throw new AuthRequestError('Esta conta não pode entrar. Peça acesso a um administrador.', response.status);
     }
-    throw new Error(authMessages[code] || 'Não foi possível concluir a autenticação. Tente de novo — o que você digitou continua no formulário.');
+    throw new AuthRequestError(
+      authMessages[code] || 'Não foi possível concluir a autenticação. Tente de novo — o que você digitou continua no formulário.',
+      response.status,
+    );
   }
   return payload;
 }
@@ -115,15 +141,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [impersonation, setImpersonation] = useState<ImpersonationState | null>(null);
 
+  const retryTimerRef = useRef<number | null>(null);
+  const retryAttemptRef = useRef(0);
+  const hasUserRef = useRef(false);
+  hasUserRef.current = Boolean(user);
+
   const refreshSession = useCallback(async () => {
+    if (retryTimerRef.current !== null) {
+      window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
     try {
       const payload = await authRequest('/api/auth/session');
+      retryAttemptRef.current = 0;
       setUser(payload.user ?? null);
       setImpersonation(normalizeImpersonation(payload.impersonation));
-    } catch {
-      setUser(null);
-      setImpersonation(null);
-    } finally {
+      setLoading(false);
+      return;
+    } catch (error) {
+      const status = error instanceof AuthRequestError ? error.status : 0;
+      if (isSessionRejection(status)) {
+        retryAttemptRef.current = 0;
+        setUser(null);
+        setImpersonation(null);
+        setLoading(false);
+        return;
+      }
+      // Falha de transporte: a sessão no servidor continua viva. Derrubar o
+      // usuário aqui era o que fazia o painel cair na tela de login sozinho.
+      retryAttemptRef.current += 1;
+      const attempt = retryAttemptRef.current;
+      if (attempt <= SESSION_RETRY_DELAYS_MS.length) {
+        const delay = SESSION_RETRY_DELAYS_MS[attempt - 1];
+        retryTimerRef.current = window.setTimeout(() => {
+          retryTimerRef.current = null;
+          void refreshSession();
+        }, delay);
+        // Só segura a tela de carregamento enquanto ainda não sabemos quem é o
+        // usuário; com sessão já conhecida, o painel segue funcionando.
+        if (hasUserRef.current) setLoading(false);
+        return;
+      }
       setLoading(false);
     }
   }, []);
@@ -132,7 +190,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void refreshSession();
     const onFocus = () => void refreshSession();
     window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      if (retryTimerRef.current !== null) window.clearTimeout(retryTimerRef.current);
+    };
   }, [refreshSession]);
 
   const value = useMemo<AuthContextValue>(() => ({
