@@ -62,6 +62,7 @@ export interface SompoTelemetryHistoryStat {
 
 export interface SompoTelemetryHistorySample {
   id: number;
+  episodeId?: number | null;
   tractorId: string;
   sourceKind: SompoTelemetrySourceKind;
   scenarioLabel: string | null;
@@ -121,6 +122,77 @@ export interface SompoTelemetryHistoryResponse extends SompoTelemetryHistory {
 export interface SompoTelemetrySimulationRecordResponse {
   ok: boolean;
   recorded: number;
+  episodeId?: string;
+}
+
+export type SompoTelemetryEpisodeKind = 'colisao';
+export type SompoTelemetryEpisodeStatus = 'recording' | 'complete' | 'aborted';
+export type SompoTelemetryEpisodePhaseId = 'aproximacao' | 'impacto' | 'pos-impacto';
+
+export interface SompoTelemetryEpisode {
+  id: number;
+  publicId: string;
+  kind: string;
+  tractorId: string | null;
+  sourceKind: string | null;
+  scenarioLabel: string | null;
+  startedAt: string;
+  startedMs: number;
+  endedAt: string | null;
+  endedMs: number | null;
+  status: SompoTelemetryEpisodeStatus;
+  durationMs: number | null;
+}
+
+export interface SompoTelemetryEpisodePhase {
+  id: SompoTelemetryEpisodePhaseId | string;
+  label: string;
+  startIndex: number;
+  endIndex: number;
+  sampleCount: number;
+  startAt: string;
+  endAt: string;
+  startOffsetMs: number;
+  endOffsetMs: number;
+  durationMs: number;
+  riscoColisao: boolean;
+  riscoInclinacao: boolean;
+  stats: {
+    distancia: SompoTelemetryHistoryStat;
+    pitch: SompoTelemetryHistoryStat;
+    roll: SompoTelemetryHistoryStat;
+    accMagnitude: SompoTelemetryHistoryStat;
+  };
+}
+
+export interface SompoTelemetryEpisodeImpact {
+  index: number;
+  at: string;
+  offsetMs: number;
+  accMagnitude: number | null;
+}
+
+export interface SompoTelemetryEpisodeSummary extends SompoTelemetryHistorySummary {
+  impact: SompoTelemetryEpisodeImpact | null;
+  phases: SompoTelemetryEpisodePhase[];
+}
+
+export interface SompoTelemetryEpisodeStartResponse {
+  ok: boolean;
+  episode: SompoTelemetryEpisode;
+}
+
+export interface SompoTelemetryEpisodeFinishResponse {
+  ok: boolean;
+  episode: SompoTelemetryEpisode;
+  summary: SompoTelemetryEpisodeSummary;
+}
+
+export interface SompoTelemetryEpisodeResponse {
+  ok: boolean;
+  episode: SompoTelemetryEpisode;
+  samples: SompoTelemetryHistorySample[];
+  summary: SompoTelemetryEpisodeSummary;
 }
 
 export function normalizeSompoTelemetry(
@@ -132,4 +204,11 @@ export function buildSompoTelemetryMission(
   snapshot: SompoTelemetrySnapshot,
   teamLabel?: string,
   history?: SompoTelemetryHistory | null,
+): string;
+
+export function buildSompoEpisodeMission(
+  episode: SompoTelemetryEpisode,
+  samples: SompoTelemetryHistorySample[],
+  summary: SompoTelemetryEpisodeSummary,
+  teamLabel?: string,
 ): string;

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -7,8 +8,18 @@ export const SOMPO_TELEMETRY_HISTORY_DEFAULT_LIMIT = 2000;
 export const SOMPO_TELEMETRY_HISTORY_DEFAULT_WINDOW_MIN = 15;
 export const SOMPO_TELEMETRY_HISTORY_MAX_WINDOW_MIN = 240;
 export const SOMPO_TELEMETRY_SIMULATION_MAX_BATCH = 50;
+export const SOMPO_TELEMETRY_EPISODE_KINDS = Object.freeze(['colisao']);
+export const SOMPO_TELEMETRY_EPISODE_RECORDING_TIMEOUT_MS = 10 * 60_000;
+export const SOMPO_TELEMETRY_EPISODE_KEY_SAMPLES_MAX = 30;
 
 const SOURCE_KINDS = new Set(['firebase', 'simulation']);
+const EPISODE_KIND_SET = new Set(SOMPO_TELEMETRY_EPISODE_KINDS);
+const EPISODE_FINAL_STATUSES = new Set(['complete', 'aborted']);
+const EPISODE_PHASE_LABELS = Object.freeze({
+  aproximacao: 'Aproximação',
+  impacto: 'Impacto',
+  'pos-impacto': 'Pós-impacto',
+});
 const FONTE_TO_KIND = Object.freeze({
   firebase: 'firebase',
   simulacao: 'simulation',
@@ -50,7 +61,8 @@ function httpError(status, code, message) {
 }
 
 function isContractError(error) {
-  return String(error?.message || '').startsWith('sompo_telemetry_') || Number(error?.status) === 400;
+  const status = Number(error?.status);
+  return String(error?.message || '').startsWith('sompo_telemetry_') || (status >= 400 && status < 500);
 }
 
 function rethrowSqlite(error, action) {
@@ -71,6 +83,7 @@ function parseTimestampMs(value, label) {
 function mapSampleRow(row) {
   return {
     id: Number(row.id),
+    episodeId: row.episodeId === null || row.episodeId === undefined ? null : Number(row.episodeId),
     tractorId: String(row.tractorId),
     sourceKind: row.sourceKind,
     scenarioLabel: row.scenarioLabel ?? null,
@@ -248,6 +261,105 @@ function summarizeSamples(samples) {
   };
 }
 
+function medianOf(values) {
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
+}
+
+function episodePhaseSlice(id, samples, startIndex, endIndex) {
+  const slice = samples.slice(startIndex, endIndex + 1);
+  const originMs = samples[0].observedMs;
+  return {
+    id,
+    label: EPISODE_PHASE_LABELS[id] || id,
+    startIndex,
+    endIndex,
+    sampleCount: slice.length,
+    startAt: slice[0].observedAt,
+    endAt: slice.at(-1).observedAt,
+    startOffsetMs: slice[0].observedMs - originMs,
+    endOffsetMs: slice.at(-1).observedMs - originMs,
+    durationMs: slice.at(-1).observedMs - slice[0].observedMs,
+    riscoColisao: slice.some((sample) => Boolean(sample.riscoColisao)),
+    riscoInclinacao: slice.some((sample) => Boolean(sample.riscoInclinacao)),
+    stats: {
+      distancia: statOf(slice.map((sample) => sample.distancia)),
+      pitch: statOf(slice.map((sample) => sample.pitch)),
+      roll: statOf(slice.map((sample) => sample.roll)),
+      accMagnitude: statOf(slice.map((sample) => magnitude(sample.accX, sample.accY, sample.accZ))),
+    },
+  };
+}
+
+/**
+ * Resumo de episódio: além do resumo padrão, detecta fases por heurística
+ * determinística (impacto = amostra de pico de |aceleração|; fronteiras onde
+ * |acc| cruza a metade entre a mediana e o pico) e aplica decimação adaptativa
+ * nas amostras-chave (pico e vizinhança sempre presentes, teto de 30).
+ */
+export function summarizeSompoEpisodeSamples(samples) {
+  const base = summarizeSamples(samples);
+  if (samples.length === 0) return { ...base, impact: null, phases: [] };
+
+  const accSeries = samples.map((sample) => magnitude(sample.accX, sample.accY, sample.accZ));
+  let peakIndex = -1;
+  for (let index = 0; index < accSeries.length; index += 1) {
+    if (accSeries[index] === null) continue;
+    if (peakIndex === -1 || accSeries[index] > accSeries[peakIndex]) peakIndex = index;
+  }
+  if (peakIndex === -1) return { ...base, impact: null, phases: [] };
+
+  const median = medianOf(accSeries.filter((value) => value !== null));
+  const threshold = median + ((accSeries[peakIndex] - median) / 2);
+  let impactStart = peakIndex;
+  while (impactStart > 0 && accSeries[impactStart - 1] !== null && accSeries[impactStart - 1] >= threshold) {
+    impactStart -= 1;
+  }
+  let impactEnd = peakIndex;
+  while (
+    impactEnd < samples.length - 1
+    && accSeries[impactEnd + 1] !== null
+    && accSeries[impactEnd + 1] >= threshold
+  ) {
+    impactEnd += 1;
+  }
+
+  const phases = [];
+  if (impactStart > 0) phases.push(episodePhaseSlice('aproximacao', samples, 0, impactStart - 1));
+  phases.push(episodePhaseSlice('impacto', samples, impactStart, impactEnd));
+  if (impactEnd < samples.length - 1) {
+    phases.push(episodePhaseSlice('pos-impacto', samples, impactEnd + 1, samples.length - 1));
+  }
+
+  const required = new Set([0, samples.length - 1, peakIndex]);
+  for (const transition of collectFlagTransitions(samples)) required.add(transition.index);
+  for (const phase of phases) {
+    required.add(phase.startIndex);
+    required.add(phase.endIndex);
+  }
+  const denseStart = Math.max(0, impactStart - 2);
+  const denseEnd = Math.min(samples.length - 1, impactEnd + 2);
+  for (let index = denseStart; index <= denseEnd; index += 1) required.add(index);
+  const keyIndices = pickKeySampleIndices(
+    samples.length,
+    [...required],
+    SOMPO_TELEMETRY_EPISODE_KEY_SAMPLES_MAX,
+  );
+
+  return {
+    ...base,
+    keySamples: keyIndices.map((index) => samples[index]),
+    impact: {
+      index: peakIndex,
+      at: samples[peakIndex].observedAt,
+      offsetMs: samples[peakIndex].observedMs - samples[0].observedMs,
+      accMagnitude: roundAvg(accSeries[peakIndex]),
+    },
+    phases,
+  };
+}
+
 function parseFonte(value) {
   const raw = String(value ?? 'firebase').trim().toLowerCase() || 'firebase';
   const sourceKind = FONTE_TO_KIND[raw];
@@ -347,6 +459,28 @@ export function createSompoTelemetryHistory({ dbPath = defaultSompoTelemetryDbPa
       CREATE INDEX IF NOT EXISTS sompo_telemetry_samples_source_observed
         ON sompo_telemetry_samples (source_kind, observed_ms);
     `);
+    // Migração idempotente: o banco de produção nasceu sem episode_id.
+    const sampleColumns = db.prepare('PRAGMA table_info(sompo_telemetry_samples)').all();
+    if (!sampleColumns.some((column) => column.name === 'episode_id')) {
+      db.exec('ALTER TABLE sompo_telemetry_samples ADD COLUMN episode_id INTEGER NULL');
+    }
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS sompo_telemetry_samples_episode
+        ON sompo_telemetry_samples (episode_id);
+      CREATE TABLE IF NOT EXISTS sompo_telemetry_episodes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        public_id TEXT UNIQUE NOT NULL,
+        kind TEXT NOT NULL,
+        tractor_id TEXT NULL,
+        source_kind TEXT NULL,
+        scenario_label TEXT NULL,
+        started_at TEXT NOT NULL,
+        started_ms INTEGER NOT NULL,
+        ended_at TEXT NULL,
+        ended_ms INTEGER NULL,
+        status TEXT NOT NULL DEFAULT 'recording'
+      );
+    `);
   } catch (error) {
     rethrowSqlite(error, 'open');
   }
@@ -357,14 +491,73 @@ export function createSompoTelemetryHistory({ dbPath = defaultSompoTelemetryDbPa
       observed_at, observed_ms,
       distancia, temperatura, umidade, pitch, roll,
       acc_x, acc_y, acc_z, rot_x, rot_y, rot_z,
-      risco_colisao, risco_inclinacao
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      risco_colisao, risco_inclinacao, episode_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const insertEpisodeStatement = db.prepare(`
+    INSERT INTO sompo_telemetry_episodes (
+      public_id, kind, tractor_id, source_kind, scenario_label,
+      started_at, started_ms, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'recording')
+  `);
+
+  const episodeByPublicIdStatement = db.prepare(`
+    SELECT
+      id,
+      public_id AS publicId,
+      kind,
+      tractor_id AS tractorId,
+      source_kind AS sourceKind,
+      scenario_label AS scenarioLabel,
+      started_at AS startedAt,
+      started_ms AS startedMs,
+      ended_at AS endedAt,
+      ended_ms AS endedMs,
+      status
+    FROM sompo_telemetry_episodes
+    WHERE public_id = ?
+  `);
+
+  const finishEpisodeStatement = db.prepare(`
+    UPDATE sompo_telemetry_episodes
+    SET status = ?, ended_at = ?, ended_ms = ?
+    WHERE id = ? AND status = 'recording'
+  `);
+
+  const episodeSamplesStatement = db.prepare(`
+    SELECT
+      id,
+      episode_id AS episodeId,
+      tractor_id AS tractorId,
+      source_kind AS sourceKind,
+      scenario_label AS scenarioLabel,
+      device_timestamp AS deviceTimestamp,
+      observed_at AS observedAt,
+      observed_ms AS observedMs,
+      distancia,
+      temperatura,
+      umidade,
+      pitch,
+      roll,
+      acc_x AS accX,
+      acc_y AS accY,
+      acc_z AS accZ,
+      rot_x AS rotX,
+      rot_y AS rotY,
+      rot_z AS rotZ,
+      risco_colisao AS riscoColisao,
+      risco_inclinacao AS riscoInclinacao
+    FROM sompo_telemetry_samples
+    WHERE episode_id = ?
+    ORDER BY observed_ms ASC, id ASC
   `);
 
   const queryStatement = db.prepare(`
     SELECT * FROM (
       SELECT
         id,
+        episode_id AS episodeId,
         tractor_id AS tractorId,
         source_kind AS sourceKind,
         scenario_label AS scenarioLabel,
@@ -418,7 +611,7 @@ export function createSompoTelemetryHistory({ dbPath = defaultSompoTelemetryDbPa
     return lastChanged.get(key) ?? 0;
   }
 
-  function insertSnapshot(snapshot, pending) {
+  function insertSnapshot(snapshot, pending, episodeRowId = null) {
     if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
       throw new Error('sompo_telemetry_snapshot_required');
     }
@@ -450,6 +643,7 @@ export function createSompoTelemetryHistory({ dbPath = defaultSompoTelemetryDbPa
       row.rotZ,
       row.riscoColisao,
       row.riscoInclinacao,
+      episodeRowId,
     );
     pending.set(originKey(row.sourceKind, row.tractorId), changedMs);
     return true;
@@ -471,15 +665,18 @@ export function createSompoTelemetryHistory({ dbPath = defaultSompoTelemetryDbPa
     }
   }
 
-  function recordMany(snapshots) {
+  function recordMany(snapshots, { episodeId = null } = {}) {
     assertOpen();
     if (!Array.isArray(snapshots)) throw new Error('sompo_telemetry_samples_required');
+    const episode = episodeId === null || episodeId === undefined || episodeId === ''
+      ? null
+      : resolveRecordingEpisode(episodeId);
     const pending = new Map();
     db.exec('BEGIN IMMEDIATE');
     try {
       let recorded = 0;
       for (const snapshot of snapshots) {
-        if (insertSnapshot(snapshot, pending)) recorded += 1;
+        if (insertSnapshot(snapshot, pending, episode ? episode.id : null)) recorded += 1;
       }
       db.exec('COMMIT');
       commitPending(pending);
@@ -492,6 +689,146 @@ export function createSompoTelemetryHistory({ dbPath = defaultSompoTelemetryDbPa
       }
       rethrowSqlite(error, 'recordMany');
     }
+  }
+
+  function mapEpisodeRow(row) {
+    const startedMs = Number(row.startedMs);
+    const endedMs = row.endedMs === null || row.endedMs === undefined ? null : Number(row.endedMs);
+    return {
+      id: Number(row.id),
+      publicId: String(row.publicId),
+      kind: String(row.kind),
+      tractorId: row.tractorId ?? null,
+      sourceKind: row.sourceKind ?? null,
+      scenarioLabel: row.scenarioLabel ?? null,
+      startedAt: String(row.startedAt),
+      startedMs,
+      endedAt: row.endedAt ?? null,
+      endedMs,
+      status: String(row.status),
+      durationMs: endedMs === null ? null : Math.max(0, endedMs - startedMs),
+    };
+  }
+
+  function findEpisode(publicId) {
+    const id = String(publicId ?? '').trim();
+    if (!id) {
+      throw httpError(400, 'sompo_telemetry_episode_id_required', 'Informe o publicId do episódio.');
+    }
+    let row;
+    try {
+      row = episodeByPublicIdStatement.get(id);
+    } catch (error) {
+      rethrowSqlite(error, 'findEpisode');
+    }
+    return row ? mapEpisodeRow(row) : null;
+  }
+
+  function closeEpisodeRow(episode, status) {
+    const endedMs = now();
+    try {
+      finishEpisodeStatement.run(status, new Date(endedMs).toISOString(), endedMs, episode.id);
+    } catch (error) {
+      rethrowSqlite(error, 'closeEpisode');
+    }
+    return findEpisode(episode.publicId);
+  }
+
+  // Episódio 'recording' esquecido não fica pendurado: vira 'aborted' na leitura.
+  function abortIfStale(episode) {
+    if (episode.status !== 'recording') return episode;
+    if (now() - episode.startedMs <= SOMPO_TELEMETRY_EPISODE_RECORDING_TIMEOUT_MS) return episode;
+    return closeEpisodeRow(episode, 'aborted');
+  }
+
+  function resolveRecordingEpisode(publicId) {
+    const found = findEpisode(publicId);
+    if (!found) {
+      throw httpError(400, 'sompo_telemetry_episode_not_found', `Episódio ${String(publicId).trim()} não existe.`);
+    }
+    const episode = abortIfStale(found);
+    if (episode.status !== 'recording') {
+      throw httpError(
+        400,
+        'sompo_telemetry_episode_not_recording',
+        `Episódio ${episode.publicId} está '${episode.status}'; só episódios em gravação aceitam amostras.`,
+      );
+    }
+    return episode;
+  }
+
+  function startEpisode({ kind, tractorId = '001', sourceKind = 'simulation', scenarioLabel = null } = {}) {
+    assertOpen();
+    if (!EPISODE_KIND_SET.has(kind)) {
+      throw httpError(
+        400,
+        'sompo_telemetry_episode_kind_invalid',
+        `Kind de episódio inválido. Conhecidos: ${SOMPO_TELEMETRY_EPISODE_KINDS.join(', ')}.`,
+      );
+    }
+    if (!SOURCE_KINDS.has(sourceKind)) {
+      throw httpError(
+        400,
+        'sompo_telemetry_episode_source_kind_invalid',
+        'sourceKind de episódio inválido. Use firebase ou simulation.',
+      );
+    }
+    const startedMs = now();
+    const publicId = randomUUID();
+    try {
+      insertEpisodeStatement.run(
+        publicId,
+        kind,
+        String(tractorId || '001').trim() || '001',
+        sourceKind,
+        optionalText(scenarioLabel),
+        new Date(startedMs).toISOString(),
+        startedMs,
+      );
+    } catch (error) {
+      rethrowSqlite(error, 'startEpisode');
+    }
+    return findEpisode(publicId);
+  }
+
+  function requireEpisode(publicId) {
+    assertOpen();
+    const found = findEpisode(publicId);
+    if (!found) {
+      throw httpError(404, 'sompo_telemetry_episode_not_found', `Episódio ${String(publicId).trim()} não existe.`);
+    }
+    return abortIfStale(found);
+  }
+
+  function finishEpisode(publicId, { status = 'complete' } = {}) {
+    assertOpen();
+    if (!EPISODE_FINAL_STATUSES.has(status)) {
+      throw httpError(
+        400,
+        'sompo_telemetry_episode_status_invalid',
+        'Status final de episódio inválido. Use complete ou aborted.',
+      );
+    }
+    const episode = requireEpisode(publicId);
+    if (episode.status !== 'recording') {
+      throw httpError(
+        400,
+        'sompo_telemetry_episode_not_recording',
+        `Episódio ${episode.publicId} já está '${episode.status}'; não pode ser fechado de novo.`,
+      );
+    }
+    return closeEpisodeRow(episode, status);
+  }
+
+  function getEpisode(publicId) {
+    const episode = requireEpisode(publicId);
+    let samples;
+    try {
+      samples = episodeSamplesStatement.all(episode.id).map(mapSampleRow);
+    } catch (error) {
+      rethrowSqlite(error, 'episodeSamples');
+    }
+    return { episode, samples, summary: summarizeSompoEpisodeSamples(samples) };
   }
 
   function query({
@@ -532,6 +869,10 @@ export function createSompoTelemetryHistory({ dbPath = defaultSompoTelemetryDbPa
     recordMany,
     query,
     summarize: summarizeSamples,
+    summarizeEpisode: summarizeSompoEpisodeSamples,
+    startEpisode,
+    finishEpisode,
+    getEpisode,
     close,
     dbPath: resolvedPath,
   };
@@ -607,10 +948,73 @@ export function createSompoTelemetrySimulationHttpHandler(history, { now = Date.
         }
       }
 
-      const recorded = history.recordMany(snapshots);
-      res.json({ ok: true, recorded });
+      const rawEpisodeId = req.body?.episodeId;
+      const episodeId = rawEpisodeId === undefined || rawEpisodeId === null || rawEpisodeId === ''
+        ? null
+        : String(rawEpisodeId).trim();
+      const recorded = history.recordMany(snapshots, episodeId ? { episodeId } : {});
+      res.json({ ok: true, recorded, ...(episodeId ? { episodeId } : {}) });
     } catch (error) {
       sendHistoryError(res, error, 'Não foi possível gravar o histórico simulado.');
+    }
+  };
+}
+
+function sendEpisodeError(res, error, fallbackMessage) {
+  const status = Number(error?.status);
+  if (status === 400 || status === 404) {
+    res.status(status).json({
+      ok: false,
+      error: error.code || 'sompo_telemetry_episode_invalid',
+      message: error.message,
+    });
+    return;
+  }
+  console.error('[sompo-telemetry-history]', error);
+  res.status(500).json({
+    ok: false,
+    error: 'sompo_telemetry_episode_unavailable',
+    message: fallbackMessage,
+  });
+}
+
+export function createSompoTelemetryEpisodeStartHttpHandler(history) {
+  return async function sompoTelemetryEpisodeStartHttpHandler(req, res) {
+    try {
+      const body = req.body || {};
+      const episode = history.startEpisode({
+        kind: body.kind,
+        tractorId: body.trator,
+        sourceKind: 'simulation',
+        scenarioLabel: body.scenarioLabel,
+      });
+      res.json({ ok: true, episode });
+    } catch (error) {
+      sendEpisodeError(res, error, 'Não foi possível abrir o episódio de telemetria.');
+    }
+  };
+}
+
+export function createSompoTelemetryEpisodeFinishHttpHandler(history) {
+  return async function sompoTelemetryEpisodeFinishHttpHandler(req, res) {
+    try {
+      const status = req.body?.status === undefined ? 'complete' : req.body.status;
+      const finished = history.finishEpisode(req.params?.publicId, { status });
+      const { episode, summary } = history.getEpisode(finished.publicId);
+      res.json({ ok: true, episode, summary });
+    } catch (error) {
+      sendEpisodeError(res, error, 'Não foi possível fechar o episódio de telemetria.');
+    }
+  };
+}
+
+export function createSompoTelemetryEpisodeGetHttpHandler(history) {
+  return async function sompoTelemetryEpisodeGetHttpHandler(req, res) {
+    try {
+      const { episode, samples, summary } = history.getEpisode(req.params?.publicId);
+      res.json({ ok: true, episode, samples, summary });
+    } catch (error) {
+      sendEpisodeError(res, error, 'Não foi possível ler o episódio de telemetria.');
     }
   };
 }

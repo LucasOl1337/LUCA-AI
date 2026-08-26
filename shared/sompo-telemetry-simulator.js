@@ -87,6 +87,134 @@ export function getSompoSimulationScenario(scenarioId = DEFAULT_SCENARIO_ID) {
   return { ...profile };
 }
 
+/**
+ * Roteiro determinístico de colisão: aproximação (distância 210→20 cm),
+ * impacto (~1,5 s com pico de |aceleração| ~32-36 m/s²) e pós-impacto
+ * (parado a 12 cm). Todo o episódio é função pura do relógio do sim.
+ */
+export const SOMPO_COLLISION_SCRIPT = Object.freeze({
+  kind: 'colisao',
+  scenarioId: 'colisao-roteirizada',
+  label: 'Colisão frontal roteirizada',
+  description: 'Roteiro determinístico: o caminhão avança, colide com o obstáculo e para; o episódio inteiro vira um caso isolado no histórico.',
+  totalMs: 22_000,
+  sampleIntervalMs: 500,
+  phases: Object.freeze([
+    Object.freeze({ id: 'aproximacao', label: 'Aproximação', startMs: 0, endMs: 14_000 }),
+    Object.freeze({ id: 'impacto', label: 'Impacto', startMs: 14_000, endMs: 15_500 }),
+    Object.freeze({ id: 'pos-impacto', label: 'Pós-impacto', startMs: 15_500, endMs: 22_000 }),
+  ]),
+});
+
+export function getSompoCollisionScriptPhase(elapsedMs) {
+  const elapsed = clamp(finite(elapsedMs, 0), 0, SOMPO_COLLISION_SCRIPT.totalMs);
+  const phase = SOMPO_COLLISION_SCRIPT.phases.find((item) => elapsed < item.endMs)
+    || SOMPO_COLLISION_SCRIPT.phases.at(-1);
+  return phase.id;
+}
+
+export function createSompoCollisionScriptSnapshot(elapsedMs, {
+  observedAt = new Date().toISOString(),
+  connectedAt,
+} = {}) {
+  const elapsed = clamp(finite(elapsedMs, 0), 0, SOMPO_COLLISION_SCRIPT.totalMs);
+  const phaseId = getSompoCollisionScriptPhase(elapsed);
+  const t = elapsed / 1_000;
+
+  let distance;
+  let pitch;
+  let roll;
+  let acceleration;
+  let rotation;
+  let collisionRisk;
+  if (phaseId === 'aproximacao') {
+    const progress = elapsed / 14_000;
+    distance = 210 - (190 * progress);
+    pitch = 1.5 + (Math.sin(t * 1.7) * 0.4);
+    roll = 0.6 + (Math.sin((t * 1.3) + 0.4) * 0.3);
+    acceleration = vector(
+      0.35 + (Math.sin(t * 2.4) * 0.25),
+      Math.cos(t * 2.1) * 0.2,
+      9.81 + (Math.sin(t * 3.1) * 0.22),
+    );
+    rotation = vector(
+      Math.cos(t * 1.9) * 0.4,
+      Math.sin(t * 1.2) * 0.2,
+      Math.cos(t * 2.2) * 0.5,
+    );
+    collisionRisk = false;
+  } else if (phaseId === 'impacto') {
+    const tau = clamp((elapsed - 14_000) / 1_500, 0, 1);
+    const pulse = Math.sin(Math.PI * tau);
+    distance = 20 - (8 * tau);
+    pitch = 1.5 - (7.5 * pulse);
+    roll = 0.6 + (3.5 * pulse);
+    acceleration = vector(
+      -(30 * pulse) - 0.4,
+      4 * pulse,
+      9.81 + (9 * pulse),
+    );
+    rotation = vector(28 * pulse, -9 * pulse, 14 * pulse);
+    collisionRisk = true;
+  } else {
+    const tau = clamp((elapsed - 15_500) / 6_500, 0, 1);
+    const settle = Math.max(0, 1 - (tau * 2.5));
+    distance = 12;
+    pitch = 0.9 + (Math.sin(t * 5.2) * 0.6 * settle);
+    roll = 0.8 + (Math.sin(t * 4.4) * 0.4 * settle);
+    acceleration = vector(
+      Math.sin(t * 6.1) * 1.2 * settle,
+      Math.cos(t * 5.3) * 0.8 * settle,
+      9.81 + (Math.sin(t * 6.8) * 0.5 * settle),
+    );
+    rotation = vector(2 * settle, -1 * settle, 1.5 * settle);
+    collisionRisk = true;
+  }
+
+  const parsedObservedAt = Date.parse(observedAt);
+  const sessionConnectedAt = connectedAt || (
+    Number.isFinite(parsedObservedAt)
+      ? new Date(parsedObservedAt - elapsed).toISOString()
+      : observedAt
+  );
+
+  return {
+    tractorId: 'SIM-001',
+    observedAt,
+    changedAt: observedAt,
+    unchangedForMs: 0,
+    freshness: 'fresh',
+    connection: {
+      state: 'live',
+      connectedAt: sessionConnectedAt,
+      lastEventAt: observedAt,
+      retryAttempt: 0,
+    },
+    deviceTimestamp: Math.round(elapsed),
+    status: collisionRisk ? 'alert' : 'normal',
+    risks: {
+      collision: collisionRisk,
+      inclination: false,
+    },
+    readings: {
+      distance: round(distance),
+      temperature: round(27 + (Math.sin(t * 0.05) * 0.2), 1),
+      humidity: round(48 + (Math.cos(t * 0.04) * 0.4), 1),
+      pitch: round(pitch),
+      roll: round(roll),
+      acceleration,
+      rotation,
+    },
+    source: {
+      kind: 'simulation',
+      provider: 'Simulador 3D local',
+      path: 'simulation://sompo/caminhao/SIM-001/esp32',
+      scenarioId: SOMPO_COLLISION_SCRIPT.scenarioId,
+      scenarioLabel: SOMPO_COLLISION_SCRIPT.label,
+    },
+  };
+}
+
 export function createSompoSimulationSnapshot(controls = {}, {
   observedAt = new Date().toISOString(),
   elapsedMs = 0,

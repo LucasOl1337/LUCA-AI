@@ -383,6 +383,12 @@
   height: 13px;
 }
 
+.sompo-simulator-head-status > strong.is-live {
+  background: rgba(48, 209, 88, 0.1);
+  color: #82ed99;
+  box-shadow: inset 0 0 0 1px rgba(125, 255, 154, 0.2);
+}
+
 .sompo-simulator-history-offline {
   display: inline-flex;
   align-items: center;
@@ -601,6 +607,108 @@
   height: 15px;
 }
 
+.sompo-simulator-live-readings {
+  justify-content: flex-start;
+}
+
+.sompo-simulator-live-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sompo-simulator-live-grid article {
+  min-width: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.075);
+}
+
+.sompo-simulator-live-grid article.is-wide {
+  grid-column: 1 / -1;
+}
+
+.sompo-simulator-live-grid span,
+.sompo-simulator-live-grid strong,
+.sompo-simulator-live-grid small {
+  display: block;
+}
+
+.sompo-simulator-live-grid span {
+  color: rgba(210, 230, 215, 0.5);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sompo-simulator-live-grid strong {
+  margin-top: 5px;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sompo-simulator-live-grid small {
+  margin-top: 3px;
+  overflow: hidden;
+  color: rgba(220, 235, 225, 0.42);
+  font-size: 9.5px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+}
+
+.sompo-simulator-live-flags {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sompo-simulator-live-flags > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px 10px;
+  border-radius: 11px;
+  background: rgba(48, 209, 88, 0.07);
+  color: #83ef9b;
+  box-shadow: inset 0 0 0 1px rgba(125, 255, 154, 0.14);
+}
+
+.sompo-simulator-live-flags > div[data-alert='true'] {
+  background: rgba(255, 69, 58, 0.11);
+  color: #ff9189;
+  box-shadow: inset 0 0 0 1px rgba(255, 138, 130, 0.22);
+}
+
+.sompo-simulator-live-flags svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+.sompo-simulator-live-flags span,
+.sompo-simulator-live-flags small,
+.sompo-simulator-live-flags strong {
+  display: block;
+  min-width: 0;
+}
+
+.sompo-simulator-live-flags small {
+  color: currentColor;
+  font-size: 8.5px;
+  font-weight: 650;
+  opacity: 0.68;
+  text-transform: uppercase;
+}
+
+.sompo-simulator-live-flags strong {
+  margin-top: 2px;
+  font-size: 10px;
+}
+
 .sompo-simulator-presets {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -627,6 +735,70 @@
   background: rgba(201, 162, 39, 0.16);
   color: #f2d985;
   box-shadow: inset 0 0 0 1px rgba(232, 201, 106, 0.28);
+}
+
+.sompo-simulator-collision {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sompo-simulator-collision-run {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 5px 10px;
+  border-radius: 10px;
+  background: rgba(255, 69, 58, 0.11);
+  color: #ff9189;
+  font-size: 10.5px;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(255, 138, 130, 0.24);
+}
+
+.sompo-simulator-collision-run:hover:not(:disabled) {
+  background: rgba(255, 69, 58, 0.18);
+  color: #ffb0aa;
+}
+
+.sompo-simulator-collision-run:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.sompo-simulator-collision-run svg {
+  width: 15px;
+  height: 15px;
+}
+
+.sompo-simulator-collision-status {
+  padding: 7px 9px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(230, 240, 232, 0.72);
+  font-size: 10px;
+  line-height: 1.4;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.sompo-simulator-collision-status[data-sompo-collision-recording] {
+  background: rgba(255, 69, 58, 0.09);
+  color: #ffa39c;
+  box-shadow: inset 0 0 0 1px rgba(255, 138, 130, 0.2);
+}
+
+.sompo-simulator-collision-status.is-done {
+  background: rgba(48, 209, 88, 0.09);
+  color: #8bef9f;
+  box-shadow: inset 0 0 0 1px rgba(125, 255, 154, 0.2);
+}
+
+.sompo-simulator-collision-status.is-error {
+  background: rgba(255, 69, 58, 0.12);
+  color: #ff9189;
+  box-shadow: inset 0 0 0 1px rgba(255, 138, 130, 0.25);
 }
 
 .sompo-simulator-ranges {

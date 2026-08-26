@@ -96,6 +96,20 @@ test('modo SOMPO oferece simulador 3D local sem substituir nem escrever no Fireb
   assert.doesNotMatch(sompoSimulator, /firebaseio|setSompoTelemetry/);
 });
 
+test('modo Firebase acopla o snapshot em tempo real ao gêmeo 3D sem outro canal', () => {
+  assert.match(sompoPage, /source="firebase"/);
+  assert.match(sompoPage, /telemetry=\{firebaseTelemetry\}/);
+  assert.match(sompoSimulator, /data-sompo-simulator-source=\{source\}/);
+  assert.match(sompoSimulator, /previewRef\.current = telemetry/);
+  assert.match(sompoSimulator, /snapshot\.readings\.pitch/);
+  assert.match(sompoSimulator, /snapshot\.readings\.roll/);
+  assert.match(sompoSimulator, /snapshot\.readings\.rotation\?\.z/);
+  assert.match(sompoSimulator, /snapshot\.readings\.distance/);
+  assert.match(sompoSimulator, /ESP32 FÍSICO/);
+  assert.match(sompoSimulator, /Gêmeo digital/);
+  assert.doesNotMatch(sompoSimulator, /firebaseio|new WebSocket/);
+});
+
 test('página SOMPO usa grade com imagem e launch focado sem painel lateral fixo', () => {
   assert.match(sompoPage, /sompo-page\.css/);
   assert.match(sompoPage, /sompo-case-card/);

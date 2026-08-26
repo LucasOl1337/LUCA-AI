@@ -257,6 +257,136 @@ function buildTimelineLines(history) {
   return lines;
 }
 
+const EPISODE_KIND_LABELS = Object.freeze({
+  colisao: 'colisão',
+});
+
+const EPISODE_ASK_LINE = 'Avaliem o evento completo: severidade, causa provável, resposta recomendada e o que verificar no equipamento físico.';
+
+function episodeKindLabel(kind) {
+  return EPISODE_KIND_LABELS[kind] || String(kind || 'evento');
+}
+
+function formatOffsetSeconds(offsetMs) {
+  const text = formatPtNumber(Number(offsetMs) / 1_000);
+  return text === null ? 'não informado' : `t+${text}s`;
+}
+
+function episodeDurationSeconds(episode, summary) {
+  const duration = Number.isFinite(Number(episode?.durationMs))
+    ? Number(episode.durationMs)
+    : Number(summary?.spanMs);
+  return Number.isFinite(duration) ? formatPtNumber(duration / 1_000) : null;
+}
+
+function episodeImpactLine(summary) {
+  const impact = summary?.impact;
+  if (!impact || !Number.isFinite(Number(impact.offsetMs))) {
+    return 'Sem pico de aceleração identificado nas amostras';
+  }
+  const peak = formatPtNumber(impact.accMagnitude);
+  return `Impacto em ${formatOffsetSeconds(impact.offsetMs)} com pico de ${peak === null ? 'não informado' : `${peak} m/s²`}`;
+}
+
+function episodeDistanceLine(summary) {
+  const first = formatPtNumber(summary?.first?.distancia);
+  const last = formatPtNumber(summary?.last?.distancia);
+  if (first === null || last === null) return 'distância não informada';
+  const firstNumber = Number(summary.first.distancia);
+  const lastNumber = Number(summary.last.distancia);
+  if (lastNumber < firstNumber) return `distância caiu de ${first} cm para ${last} cm`;
+  if (lastNumber > firstNumber) return `distância subiu de ${first} cm para ${last} cm`;
+  return `distância estável em ${first} cm`;
+}
+
+function episodeFlagLine(summary) {
+  const transitions = Array.isArray(summary?.flagTransitions) ? summary.flagTransitions : [];
+  const turnedOn = transitions.some((item) => item.flag === 'riscoColisao' && item.to === true);
+  if (summary?.last?.riscoColisao && turnedOn) return 'risco de colisão ativo desde o impacto';
+  if (summary?.last?.riscoColisao) return 'risco de colisão ativo no episódio inteiro';
+  return 'sem flag de colisão ativa no fim do episódio';
+}
+
+function buildEpisodeHumanSummary(episode, summary) {
+  const kindLabel = episodeKindLabel(episode.kind);
+  const duration = episodeDurationSeconds(episode, summary);
+  const count = Number(summary?.count) || 0;
+  const statusSuffix = episode.status === 'complete' ? '' : ` (status ${episode.status}: gravação incompleta)`;
+  const headline = `[Ensaio no simulador] Episódio de ${kindLabel} registrado — ${duration === null ? 'duração não informada' : `${duration}s`}, ${count} amostra${count === 1 ? '' : 's'}.${statusSuffix}`;
+  const eventLine = `${episodeImpactLine(summary)}; ${episodeDistanceLine(summary)}; ${episodeFlagLine(summary)}.`;
+  return [headline, eventLine, EPISODE_ASK_LINE].join('\n');
+}
+
+function episodePhaseLines(summary) {
+  const phases = Array.isArray(summary?.phases) ? summary.phases : [];
+  if (phases.length === 0) return ['Fases: não identificadas (sem série de aceleração utilizável).'];
+  const lines = ['Fases detectadas (heurística determinística; impacto = amostra de pico de |aceleração|):'];
+  for (const phase of phases) {
+    lines.push(
+      `- ${phase.label}: ${formatOffsetSeconds(phase.startOffsetMs)} → ${formatOffsetSeconds(phase.endOffsetMs)} · ${phase.sampleCount} amostra${phase.sampleCount === 1 ? '' : 's'} · ${formatStat('dist', phase.stats?.distancia)} | ${formatStat('acc', phase.stats?.accMagnitude)} | ${formatStat('pitch', phase.stats?.pitch)} | ${formatStat('roll', phase.stats?.roll)} · riscoColisao=${Boolean(phase.riscoColisao)}`,
+    );
+  }
+  const impact = summary?.impact;
+  if (impact) {
+    lines.push(`Pico de impacto: ${formatOffsetSeconds(impact.offsetMs)} · |aceleração| ${reading(impact.accMagnitude)} m/s²`);
+  }
+  return lines;
+}
+
+export function buildSompoEpisodeMission(episode, samples, summary, teamLabel) {
+  if (!episode || typeof episode !== 'object') {
+    throw new Error('sompo_telemetry_episode_required');
+  }
+  if (!Array.isArray(samples)) {
+    throw new Error('sompo_telemetry_samples_required');
+  }
+  if (!summary || typeof summary !== 'object') {
+    throw new Error('sompo_telemetry_summary_required');
+  }
+
+  const kindLabel = episodeKindLabel(episode.kind);
+  const duration = episodeDurationSeconds(episode, summary);
+  const stats = summary.stats || {};
+  const transitions = Array.isArray(summary.flagTransitions) ? summary.flagTransitions : [];
+  const keySamples = Array.isArray(summary.keySamples) ? summary.keySamples : [];
+
+  const briefing = [
+    `[SIMULAÇÃO] Episódio SOMPO — ${kindLabel} — caminhão ${episode.tractorId || 'SIM-001'}`,
+    `Equipe selecionada para avaliar: ${teamLabel || 'equipe de risco agro'}`,
+    `Identificador do episódio: ${episode.publicId}`,
+    `Status: ${episode.status}`,
+    'Origem: Simulador 3D local (roteiro determinístico; dados sintéticos; não enviados ao Firebase)',
+    ...(episode.scenarioLabel ? [`Cenário: ${episode.scenarioLabel}`] : []),
+    `Início: ${episode.startedAt || 'não informado'} | Fim: ${episode.endedAt || 'não informado'} | Duração: ${duration === null ? 'não informada' : `${duration}s`}`,
+    `Amostras gravadas: ${Number(summary.count) || 0} (episódio completo, ordem cronológica)`,
+    '',
+    ...episodePhaseLines(summary),
+    '',
+    `Agregados do episódio: ${formatStat('dist', stats.distancia)} | ${formatStat('temp', stats.temperatura)} | ${formatStat('umid', stats.umidade)} | ${formatStat('pitch', stats.pitch)} | ${formatStat('roll', stats.roll)} | ${formatStat('acc', stats.accMagnitude)} | ${formatStat('rot', stats.rotMagnitude)}`,
+    ...(transitions.length === 0
+      ? ['Transições de flag: nenhuma no episódio.']
+      : [
+        'Transições de flag:',
+        ...transitions.map((item) => `- ${item.at} ${item.flag} ${Boolean(item.from)} → ${Boolean(item.to)}`),
+      ]),
+    ...(keySamples.length === 0
+      ? []
+      : [
+        'Amostras-chave (decimação adaptativa — mais densas ao redor do pico; primeira, última e transições sempre presentes):',
+        ...(() => {
+          const originMs = Number(keySamples[0].observedMs ?? Date.parse(keySamples[0].observedAt));
+          return keySamples.map((sample) => compactKeySample(sample, originMs));
+        })(),
+      ]),
+    '',
+    'Objetivo: avaliar o EVENTO em sua totalidade — dinâmica, sequência causal e severidade do episódio inteiro, não leituras isoladas — e recomendar a resposta operacional adequada.',
+    '',
+    'Regras: este é um ensaio sintético do roteiro de colisão no simulador. Analisem o evento completo (aproximação, impacto e pós-impacto) como sequência causal; não tratem amostras isoladas nem flags como evidência do equipamento físico, do firmware ou de sinistro real. Separem fatos do cenário, inferências e lacunas; validem qualquer conclusão em telemetria real antes de uma decisão operacional.',
+  ].join('\n');
+
+  return `${buildEpisodeHumanSummary(episode, summary)}\n\n${SOMPO_MISSION_DOSSIER_DELIMITER}\n${briefing}`;
+}
+
 export function buildSompoTelemetryMission(snapshot, teamLabel, history) {
   if (!snapshot || typeof snapshot !== 'object') {
     throw new Error('sompo_telemetry_snapshot_required');

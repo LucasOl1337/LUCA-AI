@@ -64,6 +64,7 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
         outbound: [
           endpoint('sompo-telemetry', 'GET', '/api/sompo/telemetry', 'snapshot normalizado da telemetria do trator 001 no Firebase, com risco e frescor do fluxo', 'local'),
           endpoint('sompo-telemetry-history', 'GET', '/api/sompo/telemetry/history', 'janela histórica SQLite da telemetria Firebase ou simulada, com agregados e amostras-chave', 'local'),
+          endpoint('sompo-telemetry-episode', 'GET', '/api/sompo/telemetry/episode/:publicId', 'episódio de telemetria completo (todas as amostras, fases e resumo) gravado pelo simulador 3D', 'local'),
         ],
         inbound: [
           endpoint(
@@ -98,7 +99,23 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
             '/api/sompo/telemetry/simulation',
             'recebe lote de amostras sintéticas do simulador 3D para o histórico SQL, sem escrever no Firebase',
             'local',
-            '{\n  "samples": [\n    {"trator":"001","timestamp":1000,"distancia":80,"temperatura":28,"umidade":40,"pitch":1,"roll":0,"aceleracaoX":0,"aceleracaoY":0,"aceleracaoZ":9.8,"rotacaoX":0,"rotacaoY":0,"rotacaoZ":0,"riscoColisao":false,"riscoInclinacao":false,"scenarioLabel":"Operação normal"}\n  ]\n}',
+            '{\n  "samples": [\n    {"trator":"001","timestamp":1000,"distancia":80,"temperatura":28,"umidade":40,"pitch":1,"roll":0,"aceleracaoX":0,"aceleracaoY":0,"aceleracaoZ":9.8,"rotacaoX":0,"rotacaoY":0,"rotacaoZ":0,"riscoColisao":false,"riscoInclinacao":false,"scenarioLabel":"Operação normal"}\n  ],\n  "episodeId": "opcional: publicId de episódio em gravação"\n}',
+          ),
+          endpoint(
+            'sompo-telemetry-episode-start',
+            'POST',
+            '/api/sompo/telemetry/episode',
+            'abre um episódio de telemetria (ex.: roteiro de colisão do simulador 3D) para gravar amostras como caso isolado',
+            'local',
+            '{\n  "kind": "colisao",\n  "trator": "SIM-001",\n  "scenarioLabel": "Colisão frontal roteirizada"\n}',
+          ),
+          endpoint(
+            'sompo-telemetry-episode-finish',
+            'POST',
+            '/api/sompo/telemetry/episode/:publicId/finish',
+            'fecha um episódio em gravação e devolve o resumo com fases e pico de impacto',
+            'local',
+            '{\n  "status": "complete"\n}',
           ),
         ],
       },

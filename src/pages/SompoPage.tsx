@@ -49,7 +49,7 @@ import {
   type SompoLaunchMode,
   type SompoProductLine,
 } from '@/lib/sompo-cases';
-import { buildSompoTelemetryMission } from '../../shared/sompo-telemetry.js';
+import { buildSompoEpisodeMission, buildSompoTelemetryMission } from '../../shared/sompo-telemetry.js';
 import { createSompoSimulationSnapshot } from '../../shared/sompo-telemetry-simulator.js';
 import '@/sompo-page.css';
 
@@ -121,6 +121,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
   const [simulatedTelemetry, setSimulatedTelemetry] = useState<SompoTelemetrySnapshot>(() => (
     createSompoSimulationSnapshot()
   ));
+  const [recordedEpisode, setRecordedEpisode] = useState<{ publicId: string; kind: string } | null>(null);
   const [teamMode, setTeamMode] = useState<SompoLaunchMode>('team');
   const [teamPresets, setTeamPresets] = useState<LucaTeamPreset[]>(LUCA_TEAM_PRESETS);
   const [individualPresets, setIndividualPresets] = useState<LucaIndividualPreset[]>(LUCA_INDIVIDUAL_PRESETS);
@@ -358,31 +359,48 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
     }
   }
 
+  const episodeReady = telemetrySourceMode === 'simulation' && recordedEpisode !== null;
+
   async function runTelemetryWithSquad() {
     if (!telemetry || !activeSquad || telemetryLaunching || sessionsBusy) return;
     setTelemetryLaunching(true);
     setTelemetryLaunchError(null);
     try {
+      let caseId: string;
+      let mission: string;
+      if (episodeReady && recordedEpisode) {
+        // Episódio registrado: a bancada analisa o evento completo, sem fallback silencioso.
+        const result = await lucaApi.getSompoTelemetryEpisode(recordedEpisode.publicId);
+        if (!result?.ok || !result.episode) {
+          setTelemetryLaunchError('O episódio registrado não pôde ser lido no servidor. Tente de novo ou grave outro roteiro.');
+          return;
+        }
+        caseId = `episodio-colisao-${result.episode.publicId}`;
+        mission = buildSompoEpisodeMission(result.episode, result.samples, result.summary, activeSquad.label);
+      } else {
+        let history = null;
+        try {
+          const fonte = telemetry.source.kind === 'simulation' ? 'simulacao' : 'firebase';
+          const result = await lucaApi.getSompoTelemetryHistory({
+            fonte,
+            janelaMin: 15,
+            trator: telemetry.tractorId,
+          });
+          if (result?.ok) history = result;
+        } catch {
+          history = null;
+        }
+        caseId = `${telemetry.source.kind === 'simulation' ? 'simulacao' : 'telemetria'}-trator-${telemetry.tractorId}-${telemetry.deviceTimestamp ?? 'snapshot'}`;
+        mission = buildSompoTelemetryMission(telemetry, activeSquad.label, history);
+      }
       const session = await createSession();
       if (!session) {
         setTelemetryLaunchError('Não foi possível abrir uma sessão limpa na bancada.');
         return;
       }
-      let history = null;
-      try {
-        const fonte = telemetry.source.kind === 'simulation' ? 'simulacao' : 'firebase';
-        const result = await lucaApi.getSompoTelemetryHistory({
-          fonte,
-          janelaMin: 15,
-          trator: telemetry.tractorId,
-        });
-        if (result?.ok) history = result;
-      } catch {
-        history = null;
-      }
       queueSompoLaunch({
-        caseId: `${telemetry.source.kind === 'simulation' ? 'simulacao' : 'telemetria'}-trator-${telemetry.tractorId}-${telemetry.deviceTimestamp ?? 'snapshot'}`,
-        mission: buildSompoTelemetryMission(telemetry, activeSquad.label, history),
+        caseId,
+        mission,
         mode: teamMode,
         presetId: activeSquad.id,
         presetLabel: activeSquad.label,
@@ -470,6 +488,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
                     onClick={() => {
                       navigate({ fonte: '' }, 'replace');
                       setTelemetryLaunchError(null);
+                      setRecordedEpisode(null);
                     }}
                   >
                     <Database />
@@ -495,15 +514,30 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
                 </div>
               </section>
 
-              {telemetrySourceMode === 'simulation' && (
-                <Suspense fallback={(
+              <Suspense fallback={(
+                <div className="sompo-simulator-loading" role="status">
+                  <Loader2 className="animate-spin" /> Preparando visualização 3D…
+                </div>
+              )}>
+                {telemetrySourceMode === 'simulation' ? (
+                  <SompoTruckSimulator
+                    key="simulation"
+                    source="simulation"
+                    onTelemetry={setSimulatedTelemetry}
+                    onEpisodeRecorded={setRecordedEpisode}
+                  />
+                ) : firebaseTelemetry ? (
+                  <SompoTruckSimulator
+                    key="firebase"
+                    source="firebase"
+                    telemetry={firebaseTelemetry}
+                  />
+                ) : (
                   <div className="sompo-simulator-loading" role="status">
-                    <Loader2 className="animate-spin" /> Preparando laboratório 3D…
+                    <Loader2 className="animate-spin" /> Aguardando a primeira leitura do Firebase…
                   </div>
-                )}>
-                  <SompoTruckSimulator onTelemetry={setSimulatedTelemetry} />
-                </Suspense>
-              )}
+                )}
+              </Suspense>
 
               <SompoTelemetryPanel
                 telemetry={telemetry}
@@ -515,11 +549,19 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
                   <aside className="sompo-telemetry-action" aria-label="Enviar telemetria para os agentes">
                     <div className="sompo-telemetry-action-copy">
                       <span>Próxima etapa</span>
-                      <h3>{telemetrySourceMode === 'simulation' ? 'Analisar este ensaio com a equipe' : 'Processar este snapshot com a equipe'}</h3>
+                      <h3>
+                        {episodeReady
+                          ? 'Analisar o episódio de colisão com a equipe'
+                          : telemetrySourceMode === 'simulation'
+                            ? 'Analisar este ensaio com a equipe'
+                            : 'Processar este snapshot com a equipe'}
+                      </h3>
                       <p>
-                        {telemetrySourceMode === 'simulation'
-                          ? 'O LUCA marca o briefing como simulação, registra os sinais do cenário e inicia uma sessão nova.'
-                          : 'O LUCA fecha a leitura real em um briefing, registra alertas e lacunas e inicia uma sessão nova.'}
+                        {episodeReady
+                          ? 'O episódio gravado vai inteiro para a bancada: fases, pico de impacto e amostras-chave do evento completo.'
+                          : telemetrySourceMode === 'simulation'
+                            ? 'O LUCA marca o briefing como simulação, registra os sinais do cenário e inicia uma sessão nova.'
+                            : 'O LUCA fecha a leitura real em um briefing, registra alertas e lacunas e inicia uma sessão nova.'}
                       </p>
                     </div>
                     <div className="sompo-telemetry-controls">
@@ -584,7 +626,11 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
                         ) : (
                           <>
                             <Play />
-                            {telemetrySourceMode === 'simulation' ? 'Analisar simulação' : 'Analisar na bancada'}
+                            {episodeReady
+                              ? 'Analisar colisão na bancada'
+                              : telemetrySourceMode === 'simulation'
+                                ? 'Analisar simulação'
+                                : 'Analisar na bancada'}
                             <ArrowRight />
                           </>
                         )}

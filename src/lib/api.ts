@@ -14,6 +14,9 @@ import type {
   PersonaAgentEntry,
   RouterModelsResponse,
   RuntimeEvent,
+  SompoTelemetryEpisodeFinishResponse,
+  SompoTelemetryEpisodeResponse,
+  SompoTelemetryEpisodeStartResponse,
   SompoTelemetryHistoryResponse,
   SompoTelemetryResponse,
   SompoTelemetrySimulationRecordResponse,
@@ -228,14 +231,39 @@ export const lucaApi = {
     ),
   postSompoTelemetrySimulation: (
     samples: Record<string, unknown>[],
+    episodeId?: string,
     base?: string,
     timeoutMs = ACTION_REQUEST_TIMEOUT_MS,
   ) =>
     apiPost<SompoTelemetrySimulationRecordResponse>(
       '/api/sompo/telemetry/simulation',
-      { samples },
+      { samples, ...(episodeId ? { episodeId } : {}) },
       base,
       timeoutMs,
+    ),
+  postSompoTelemetryEpisodeStart: (
+    body: { kind: string; trator?: string; scenarioLabel?: string },
+    base?: string,
+    timeoutMs = ACTION_REQUEST_TIMEOUT_MS,
+  ) =>
+    apiPost<SompoTelemetryEpisodeStartResponse>('/api/sompo/telemetry/episode', body, base, timeoutMs),
+  postSompoTelemetryEpisodeFinish: (
+    publicId: string,
+    status: 'complete' | 'aborted' = 'complete',
+    base?: string,
+    timeoutMs = ACTION_REQUEST_TIMEOUT_MS,
+  ) =>
+    apiPost<SompoTelemetryEpisodeFinishResponse>(
+      `/api/sompo/telemetry/episode/${encodeURIComponent(publicId)}/finish`,
+      { status },
+      base,
+      timeoutMs,
+    ),
+  getSompoTelemetryEpisode: (publicId: string, timeoutMs = 8_000, base?: string) =>
+    apiGet<SompoTelemetryEpisodeResponse>(
+      `/api/sompo/telemetry/episode/${encodeURIComponent(publicId)}`,
+      timeoutMs,
+      base,
     ),
   listTeamTemplates: (base?: string, timeoutMs = ACTION_REQUEST_TIMEOUT_MS) =>
     apiGet<LucaAiTeamTemplatesResponse>('/api/luca-ai/team-templates', timeoutMs, base),
