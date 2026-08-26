@@ -93,6 +93,7 @@ import {
   missionLedgerHasItems,
   type MissionLedger,
 } from '../../shared/mission-ledger.js';
+import { SOMPO_MISSION_DOSSIER_DELIMITER } from '../../shared/sompo-telemetry.js';
 
 const LUCA_AI_CLEAN_UI_VERSION = 'session-isolation-v2';
 const LUCA_AI_CLEAN_UI_STORAGE_KEY = 'luca.lucaAi.cleanUiVersion';
@@ -3331,6 +3332,80 @@ function lastOperatorMission(transcript: TeamTranscriptEntry[]): string {
   return '';
 }
 
+function splitSompoMissionLayers(text: string): { summary: string; dossier: string } {
+  const raw = String(text || '');
+  const at = raw.indexOf(SOMPO_MISSION_DOSSIER_DELIMITER);
+  if (at < 0) return { summary: raw, dossier: '' };
+  return {
+    summary: raw.slice(0, at).trim(),
+    dossier: raw.slice(at + SOMPO_MISSION_DOSSIER_DELIMITER.length).trim(),
+  };
+}
+
+function SompoMissionReadable({
+  text,
+  compact = false,
+}: {
+  text: string;
+  compact?: boolean;
+}) {
+  const theme = useTheme();
+  const { summary, dossier } = splitSompoMissionLayers(text);
+  if (!dossier) {
+    return compact ? (
+      <RichMessageBody content={text} compact />
+    ) : (
+      <p className="text-[15px] leading-relaxed luca-wrap luca-ai-selectable" style={{ color: theme.text }}>
+        {text}
+      </p>
+    );
+  }
+  return (
+    <div>
+      {compact ? (
+        <RichMessageBody content={summary} compact />
+      ) : (
+        <p className="whitespace-pre-wrap text-[15px] leading-relaxed luca-wrap luca-ai-selectable" style={{ color: theme.text }}>
+          {summary}
+        </p>
+      )}
+      <details className="luca-ai-mission-dossier">
+        <summary className="luca-ai-mission-dossier-summary">Dossiê técnico completo</summary>
+        <pre className="luca-ai-mission-dossier-body luca-pre">{dossier}</pre>
+      </details>
+    </div>
+  );
+}
+
+type TranscriptCluster =
+  | { kind: 'entry'; entry: TeamTranscriptEntry }
+  | { kind: 'stage'; id: string; stage: string; entries: TeamTranscriptEntry[] };
+
+function clusterTranscriptByStage(entries: TeamTranscriptEntry[], enabled: boolean): TranscriptCluster[] {
+  if (!enabled) return entries.map((entry) => ({ kind: 'entry' as const, entry }));
+  const clusters: TranscriptCluster[] = [];
+  for (const entry of entries) {
+    const stage = String(entry.stage || '').trim();
+    const groupable = entry.role === 'persona' && Boolean(stage);
+    if (!groupable) {
+      clusters.push({ kind: 'entry', entry });
+      continue;
+    }
+    const last = clusters[clusters.length - 1];
+    if (last?.kind === 'stage' && last.stage === stage) {
+      last.entries.push(entry);
+      continue;
+    }
+    clusters.push({
+      kind: 'stage',
+      id: `stage-${clusters.length}-${stage}`,
+      stage,
+      entries: [entry],
+    });
+  }
+  return clusters;
+}
+
 export function LucaMissionCanvas({
   transcript,
   finalResult,
@@ -3355,6 +3430,7 @@ export function LucaMissionCanvas({
   ledger?: MissionLedger | null;
 }) {
   const theme = useTheme();
+  const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>({});
   const headerStatus = running
     ? operationMode === 'individual' ? 'respostas individuais em andamento' : 'workflow em andamento'
     : finalResult
@@ -3375,6 +3451,36 @@ export function LucaMissionCanvas({
       && compactText(entry.content) === compactText(finalResult.content)
     ))
     : transcript;
+  const groupByStage = operationMode === 'team' && supportingTranscript.some((entry) => entry.role === 'persona' && String(entry.stage || '').trim());
+  const transcriptClusters = clusterTranscriptByStage(supportingTranscript, groupByStage);
+  const runningStageIndex = running
+    ? transcriptClusters.reduce((last, cluster, index) => (cluster.kind === 'stage' ? index : last), -1)
+    : -1;
+
+  function renderSupportingEntry(entry: TeamTranscriptEntry) {
+    if (entry.role === 'operator') {
+      return (
+        <div key={entry.id} className="block w-full min-w-0">
+          <TranscriptEntry entry={entry} persona={undefined} />
+        </div>
+      );
+    }
+    if (entry.role === 'persona') {
+      return (
+        <PersonaResponseCard
+          key={entry.id}
+          entry={entry}
+          persona={entry.slug ? personaBySlug.get(entry.slug) : undefined}
+          onInspect={onInspect}
+        />
+      );
+    }
+    return (
+      <button key={entry.id} type="button" className="block w-full min-w-0 text-left" onClick={() => onInspect(entry.slug || null)}>
+        <TranscriptEntry entry={entry} persona={entry.slug ? personaBySlug.get(entry.slug) : undefined} />
+      </button>
+    );
+  }
 
   return (
     <div ref={transcriptRef} className="luca-ai-chat-scroll">
@@ -3397,9 +3503,7 @@ export function LucaMissionCanvas({
             <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: theme.textGhost }}>
               {hasDraftOnlyMission ? 'Missão no compositor' : 'Pergunta original'}
             </p>
-            <p className="text-[15px] leading-relaxed luca-wrap luca-ai-selectable" style={{ color: theme.text }}>
-              {originalMission}
-            </p>
+            <SompoMissionReadable text={originalMission} />
           </div>
         )}
 
@@ -3429,24 +3533,39 @@ export function LucaMissionCanvas({
           </div>
         )}
 
-        {supportingTranscript.length ? supportingTranscript.map((entry) => (
-          entry.role === 'operator' ? (
-            <div key={entry.id} className="block w-full min-w-0">
-              <TranscriptEntry entry={entry} persona={undefined} />
-            </div>
-          ) : entry.role === 'persona' ? (
-            <PersonaResponseCard
-              key={entry.id}
-              entry={entry}
-              persona={entry.slug ? personaBySlug.get(entry.slug) : undefined}
-              onInspect={onInspect}
-            />
-          ) : (
-            <button key={entry.id} type="button" className="block w-full min-w-0 text-left" onClick={() => onInspect(entry.slug || null)}>
-              <TranscriptEntry entry={entry} persona={entry.slug ? personaBySlug.get(entry.slug) : undefined} />
-            </button>
-          )
-        )) : !finalResult && (
+        {supportingTranscript.length ? transcriptClusters.map((cluster, clusterIndex) => {
+          if (cluster.kind === 'entry') return renderSupportingEntry(cluster.entry);
+          const groupId = cluster.id;
+          const personaCount = new Set(cluster.entries.map((entry) => entry.slug || entry.name)).size;
+          const durationMs = cluster.entries.reduce((sum, entry) => (
+            sum + (Number.isFinite(entry.durationMs) ? Number(entry.durationMs) : 0)
+          ), 0);
+          const isRunningStage = running && clusterIndex === runningStageIndex;
+          const open = isRunningStage || Boolean(expandedStages[groupId]);
+          return (
+            <details
+              key={groupId}
+              className="luca-ai-stage-group"
+              open={open}
+              onToggle={(event) => {
+                const next = event.currentTarget.open;
+                setExpandedStages((prev) => (prev[groupId] === next ? prev : { ...prev, [groupId]: next }));
+              }}
+            >
+              <summary className="luca-ai-stage-group-summary" data-luca-stage-group>
+                <span className="min-w-0 flex-1 truncate">{cluster.stage}</span>
+                <span className="shrink-0">
+                  {personaCount} {personaCount === 1 ? 'persona' : 'personas'}
+                </span>
+                <span className="shrink-0 font-mono">{formatPersonaRunDuration(durationMs)}</span>
+                <ChevronDown className="luca-ai-stage-group-chevron h-4 w-4 shrink-0" />
+              </summary>
+              <div className="luca-ai-stage-group-body">
+                {cluster.entries.map((entry) => renderSupportingEntry(entry))}
+              </div>
+            </details>
+          );
+        }) : !finalResult && (
           <div
             className={`flex flex-col items-center justify-center gap-3 px-4 text-center sm:px-6 ${originalMission ? 'min-h-[28vh] py-8' : 'min-h-[48vh]'}`}
             data-luca-canvas-empty
@@ -4113,7 +4232,7 @@ function TranscriptEntry({ entry, persona }: { entry: TeamTranscriptEntry; perso
             className="luca-ai-operator-bubble luca-ai-selectable min-w-0 rounded-2xl px-4 py-3"
             style={{ background: 'rgba(255,255,255,0.06)', color: theme.text, border: '1px solid rgba(255,255,255,0.08)' }}
           >
-            <RichMessageBody content={entry.content} compact />
+            <SompoMissionReadable text={entry.content} compact />
             <AttachmentList attachments={entry.attachments} />
           </article>
           <span className="luca-ai-message-copy luca-ai-message-copy-operator">

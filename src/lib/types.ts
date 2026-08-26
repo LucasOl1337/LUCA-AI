@@ -6,8 +6,14 @@ import type { MissionDomain, MissionDomainSource } from '../../shared/mission-tr
 import type { MissionLedger } from '../../shared/mission-ledger.js';
 import type { SompoTelemetrySnapshot } from '../../shared/sompo-telemetry.js';
 export type {
+  SompoTelemetryFlagTransition,
   SompoTelemetryFreshness,
+  SompoTelemetryHistory,
+  SompoTelemetryHistoryResponse,
+  SompoTelemetryHistorySample,
+  SompoTelemetryHistorySummary,
   SompoTelemetryResponse,
+  SompoTelemetrySimulationRecordResponse,
   SompoTelemetrySnapshot,
   SompoTelemetryStatus,
   SompoTelemetryVector,

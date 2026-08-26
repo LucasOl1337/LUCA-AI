@@ -109,3 +109,73 @@ test('sem anexos o conteudo do usuario continua string simples', async () => {
 
   assert.equal(requests[0].messages[1].content, 'Missao sem anexo.');
 });
+
+test('nao continua resposta longa cortada por max_tokens', async () => {
+  const requests = [];
+  const long = 'GO restrito. '.repeat(80);
+  const result = await runAgentWithTools({
+    system: 'Analista.',
+    user: 'Decida.',
+    model: 'cx/gpt-5.6-sol-xhigh',
+    agentId: 'longo',
+    maxRounds: 3,
+    toolsEnabled: false,
+    callChat: async (request) => {
+      requests.push(request);
+      return { content: long, toolCalls: [], finishReason: 'length' };
+    },
+  });
+  assert.equal(requests.length, 1);
+  assert.equal(result.finishReason, 'length');
+  assert.match(result.content, /GO restrito/);
+});
+
+test('recupera length vazio pedindo resposta curta, nao continuacao longa', async () => {
+  const requests = [];
+  const result = await runAgentWithTools({
+    system: 'Analista.',
+    user: 'Decida.',
+    model: 'cx/gpt-5.6-sol-xhigh',
+    agentId: 'vazio',
+    maxRounds: 3,
+    toolsEnabled: false,
+    callChat: async (request) => {
+      requests.push(request);
+      if (requests.length === 1) {
+        return { content: '', toolCalls: [], finishReason: 'length' };
+      }
+      return { content: '- GO\n- checar telemetria', toolCalls: [], finishReason: 'stop' };
+    },
+  });
+  assert.equal(requests.length, 2);
+  const followUp = requests[1].messages.at(-1).content;
+  assert.match(followUp, /orcamento foi gasto sem texto util/i);
+  assert.doesNotMatch(followUp, /conclua todas as secoes pendentes/i);
+  assert.match(result.content, /GO/);
+});
+
+test('timeout do 9router tenta de novo sem ferramentas e com teto menor', async () => {
+  const requests = [];
+  const result = await runAgentWithTools({
+    system: 'Analista.',
+    user: 'Decida.',
+    model: 'cx/gpt-5.6-sol-xhigh',
+    agentId: 'timeout',
+    maxTokens: 900,
+    maxRounds: 3,
+    toolsEnabled: true,
+    tools: [{ type: 'function', function: { name: 'web_search' } }],
+    callChat: async (request) => {
+      requests.push(request);
+      if (requests.length === 1) {
+        throw new Error('9router_unreachable http://127.0.0.1:20129/v1/chat/completions: timeout de 120s');
+      }
+      return { content: 'GO restrito.', toolCalls: [], finishReason: 'stop' };
+    },
+  });
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].tools?.[0]?.function?.name, 'web_search');
+  assert.equal(requests[1].tools, undefined);
+  assert.equal(requests[1].maxTokens, 480);
+  assert.equal(result.content, 'GO restrito.');
+});

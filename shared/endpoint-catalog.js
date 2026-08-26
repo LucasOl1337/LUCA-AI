@@ -63,6 +63,7 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
         featured: true,
         outbound: [
           endpoint('sompo-telemetry', 'GET', '/api/sompo/telemetry', 'snapshot normalizado da telemetria do trator 001 no Firebase, com risco e frescor do fluxo', 'local'),
+          endpoint('sompo-telemetry-history', 'GET', '/api/sompo/telemetry/history', 'janela histórica SQLite da telemetria Firebase ou simulada, com agregados e amostras-chave', 'local'),
         ],
         inbound: [
           endpoint(
@@ -91,6 +92,14 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
           ),
           endpoint('mission-complete', 'POST', '/api/mission/complete', 'solicita encerramento manual da missão', 'local'),
           endpoint('mission-reset', 'POST', '/api/mission/reset', 'reseta a missão ativa e limpa o escopo atual', 'both'),
+          endpoint(
+            'sompo-telemetry-simulation',
+            'POST',
+            '/api/sompo/telemetry/simulation',
+            'recebe lote de amostras sintéticas do simulador 3D para o histórico SQL, sem escrever no Firebase',
+            'local',
+            '{\n  "samples": [\n    {"trator":"001","timestamp":1000,"distancia":80,"temperatura":28,"umidade":40,"pitch":1,"roll":0,"aceleracaoX":0,"aceleracaoY":0,"aceleracaoZ":9.8,"rotacaoX":0,"rotacaoY":0,"rotacaoZ":0,"riscoColisao":false,"riscoInclinacao":false,"scenarioLabel":"Operação normal"}\n  ]\n}',
+          ),
         ],
       },
       {

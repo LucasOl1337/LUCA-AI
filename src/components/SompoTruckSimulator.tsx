@@ -17,6 +17,7 @@ import {
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { SompoTelemetrySnapshot } from '@/lib/types';
+import { lucaApi } from '@/lib/api';
 import {
   SOMPO_SIMULATION_SCENARIOS,
   createSompoSimulationSnapshot,
@@ -46,6 +47,31 @@ function controlsForScenario(scenarioId: SompoSimulationScenarioId): SompoSimula
 }
 
 const INITIAL_CONTROLS = controlsForScenario('normal');
+const SIMULATION_HISTORY_FLUSH_MS = 2_000;
+const SIMULATION_HISTORY_MAX_BATCH = 50;
+
+function snapshotToSimulationRaw(snapshot: SompoTelemetrySnapshot): Record<string, unknown> {
+  const readings = snapshot.readings;
+  return {
+    trator: snapshot.tractorId,
+    timestamp: snapshot.deviceTimestamp,
+    distancia: readings.distance,
+    temperatura: readings.temperature,
+    umidade: readings.humidity,
+    pitch: readings.pitch,
+    roll: readings.roll,
+    aceleracaoX: readings.acceleration?.x,
+    aceleracaoY: readings.acceleration?.y,
+    aceleracaoZ: readings.acceleration?.z,
+    rotacaoX: readings.rotation?.x,
+    rotacaoY: readings.rotation?.y,
+    rotacaoZ: readings.rotation?.z,
+    riscoColisao: snapshot.risks.collision,
+    riscoInclinacao: snapshot.risks.inclination,
+    scenarioLabel: snapshot.source.scenarioLabel,
+    observedAt: snapshot.observedAt,
+  };
+}
 
 function disposeMaterial(material: THREE.Material) {
   const withMaps = material as THREE.Material & Record<string, unknown>;
@@ -103,6 +129,9 @@ export default function SompoTruckSimulator({ onTelemetry }: SompoTruckSimulator
   const [controls, setControls] = useState<SompoSimulationControls>(INITIAL_CONTROLS);
   const [preview, setPreview] = useState<SompoTelemetrySnapshot>(previewRef.current);
   const [webglError, setWebglError] = useState(false);
+  const [historyOffline, setHistoryOffline] = useState(false);
+  const pendingSamplesRef = useRef<Record<string, unknown>[]>([]);
+  const flushBusyRef = useRef(false);
 
   const activeScenario = useMemo(
     () => SOMPO_SIMULATION_SCENARIOS[controls.scenarioId],
@@ -130,12 +159,42 @@ export default function SompoTruckSimulator({ onTelemetry }: SompoTruckSimulator
       previewRef.current = snapshot;
       setPreview(snapshot);
       onTelemetryRef.current(snapshot);
+      pendingSamplesRef.current.push(snapshotToSimulationRaw(snapshot));
+      if (pendingSamplesRef.current.length > SIMULATION_HISTORY_MAX_BATCH) {
+        pendingSamplesRef.current = pendingSamplesRef.current.slice(-SIMULATION_HISTORY_MAX_BATCH);
+      }
     }
 
     emitSnapshot();
     const timer = window.setInterval(emitSnapshot, 250);
     return () => window.clearInterval(timer);
   }, [controls]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function flushHistory() {
+      if (flushBusyRef.current) return;
+      const batch = pendingSamplesRef.current.splice(0, SIMULATION_HISTORY_MAX_BATCH);
+      if (batch.length === 0) return;
+      flushBusyRef.current = true;
+      try {
+        await lucaApi.postSompoTelemetrySimulation(batch);
+        if (!cancelled) setHistoryOffline(false);
+      } catch {
+        if (!cancelled) setHistoryOffline(true);
+      } finally {
+        flushBusyRef.current = false;
+      }
+    }
+
+    const timer = window.setInterval(() => {
+      void flushHistory();
+    }, SIMULATION_HISTORY_FLUSH_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -458,7 +517,14 @@ export default function SompoTruckSimulator({ onTelemetry }: SompoTruckSimulator
           <h2 id="sompo-simulator-title">Caminhão + caixa ESP32 em Three.js</h2>
           <p>Dados sintéticos locais para testar a mesma leitura da telemetria sem o dispositivo físico.</p>
         </div>
-        <strong><Cpu /> Não envia ao Firebase</strong>
+        <div className="sompo-simulator-head-status">
+          <strong><Cpu /> Não envia ao Firebase</strong>
+          {historyOffline && (
+            <span className="sompo-simulator-history-offline" role="status" data-sompo-history-offline>
+              histórico offline
+            </span>
+          )}
+        </div>
       </header>
 
       <div className="sompo-simulator-workspace">

@@ -57,7 +57,8 @@ test('briefing da simulação não apresenta dados sintéticos como fatos físic
   });
   const mission = buildSompoTelemetryMission(snapshot, 'Risco Agro');
 
-  assert.match(mission, /^\[SIMULAÇÃO\] Telemetria SOMPO/);
+  assert.match(mission, /\[Ensaio no simulador\]/);
+  assert.match(mission, /\[SIMULAÇÃO\] Telemetria SOMPO/);
   assert.match(mission, /dados sintéticos; não enviados ao Firebase/);
   assert.match(mission, /Flags sintéticas selecionadas no cenário/);
   assert.match(mission, /Estado do gerador local: ativo no navegador/);

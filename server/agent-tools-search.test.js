@@ -215,7 +215,8 @@ test('loop orienta pesquisa e calculo e resume os novos resultados para a person
   const system = requests[0].messages[0].content;
   assert.match(system, /web_search/);
   assert.match(system, /calc/);
-  assert.match(system, /SEM URL conhecida.*web_search primeiro.*1-2 melhores fontes.*fetch_url/is);
+  assert.match(system, /SEM URL conhecida.*web_search.*abra 1 fonte.*fetch_url/is);
+  assert.match(system, /Ensaio sintetico\/local.*NAO busque a web/is);
   assert.match(system, /aritmetica nao trivial.*calc.*calcular de cabeca/is);
   assert.match(requests[1].messages[3].content, /Fonte principal[\s\S]*https:\/\/example\.com\/fonte[\s\S]*Trecho factual/);
   assert.match(requests[1].messages[4].content, /expression=7 \* 8[\s\S]*value=56/);

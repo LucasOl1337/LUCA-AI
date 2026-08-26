@@ -51,10 +51,18 @@ test('modo SOMPO Telemetria assina o Firebase em tempo real e fecha snapshot par
   assert.match(sompoTelemetryPanel, /risks\.collision/);
   assert.match(sompoTelemetryPanel, /risks\.inclination/);
   assert.match(api, /\/api\/sompo\/telemetry/);
+  assert.match(api, /\/api\/sompo\/telemetry\/history/);
+  assert.match(api, /\/api\/sompo\/telemetry\/simulation/);
   assert.match(serverIndex, /createSompoTelemetryHttpHandler/);
+  assert.match(serverIndex, /createSompoTelemetryHistoryHttpHandler/);
+  assert.match(serverIndex, /createSompoTelemetrySimulationHttpHandler/);
   assert.match(serverIndex, /sompoTelemetrySource\.start\(\)/);
   assert.match(serverIndex, /kind: 'sompo\.telemetry'/);
   assert.match(serverIndex, /app\.get\('\/api\/sompo\/telemetry'/);
+  assert.match(serverIndex, /app\.get\('\/api\/sompo\/telemetry\/history'/);
+  assert.match(serverIndex, /app\.post\('\/api\/sompo\/telemetry\/simulation'/);
+  assert.match(sompoPage, /getSompoTelemetryHistory/);
+  assert.match(sompoPage, /janelaMin: 15/);
   assert.match(sompoSource, /text\/event-stream/);
   assert.match(sompoSource, /eventName === 'put'/);
   assert.match(sompoSource, /eventName !== 'patch'/);
@@ -79,11 +87,13 @@ test('modo SOMPO oferece simulador 3D local sem substituir nem escrever no Fireb
   assert.match(sompoSimulator, /renderer\.dispose\(\)/);
   assert.match(sompoSimulator, /cancelAnimationFrame/);
   assert.match(sompoSimulator, /prefers-reduced-motion/);
+  assert.match(sompoSimulator, /postSompoTelemetrySimulation/);
+  assert.match(sompoSimulator, /histórico offline/);
   assert.match(sompoTelemetryPanel, /source\.kind === 'simulation'/);
   assert.match(sompoTelemetryPanel, /simulation \? 'off' : 'polite'/);
   assert.match(sompoCss, /\.sompo-simulator-workspace/);
   assert.match(packageJson, /"three":/);
-  assert.doesNotMatch(sompoSimulator, /fetch\(|lucaApi|setSompoTelemetry/);
+  assert.doesNotMatch(sompoSimulator, /firebaseio|setSompoTelemetry/);
 });
 
 test('página SOMPO usa grade com imagem e launch focado sem painel lateral fixo', () => {

@@ -1777,6 +1777,60 @@ a.luca-ai-attachment:focus-visible {
 .luca-ai-response-chevron { transition: transform 180ms ease; }
 .luca-ai-response[open] .luca-ai-response-chevron { transform: rotate(180deg); }
 
+.luca-ai-mission-dossier {
+  margin-top: 0.55rem;
+}
+.luca-ai-mission-dossier-summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--l-text-ghost);
+}
+.luca-ai-mission-dossier-summary::-webkit-details-marker { display: none; }
+.luca-ai-mission-dossier-summary:hover { color: var(--l-text-mute); }
+.luca-ai-mission-dossier-body {
+  margin: 0.5rem 0 0;
+  max-height: 16rem;
+  overflow: auto;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--l-border);
+  border-radius: 0.7rem;
+  background: var(--l-console);
+  color: var(--l-console-text);
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.luca-ai-stage-group {
+  margin-bottom: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+.luca-ai-stage-group > summary::-webkit-details-marker { display: none; }
+.luca-ai-stage-group-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  cursor: pointer;
+  list-style: none;
+  padding: 0.7rem 0.9rem;
+  font-size: 12px;
+  color: var(--l-text-mute);
+}
+.luca-ai-stage-group-summary:hover { background: rgba(255, 255, 255, 0.04); }
+.luca-ai-stage-group-chevron { transition: transform 180ms ease; color: var(--l-text-ghost); }
+.luca-ai-stage-group[open] .luca-ai-stage-group-chevron { transform: rotate(180deg); }
+.luca-ai-stage-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0 0.75rem 0.85rem;
+}
+
 /* Painel da equipe: coluna lateral no fluxo (não sobrepõe o chat) */
 .luca-ai-team-side {
   position: relative;

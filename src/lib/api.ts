@@ -14,7 +14,9 @@ import type {
   PersonaAgentEntry,
   RouterModelsResponse,
   RuntimeEvent,
+  SompoTelemetryHistoryResponse,
   SompoTelemetryResponse,
+  SompoTelemetrySimulationRecordResponse,
   YumePersonaSummary,
 } from './types';
 import { buildApiErrorMessage, requestJson } from './requestTimeout';
@@ -210,6 +212,31 @@ export const lucaApi = {
     apiGet<RouterModelsResponse>('/api/router/models', timeoutMs, base),
   getSompoTelemetry: (base?: string, timeoutMs = 8_000) =>
     apiGet<SompoTelemetryResponse>('/api/sompo/telemetry', timeoutMs, base),
+  getSompoTelemetryHistory: (
+    params: { fonte?: string; janelaMin?: number; trator?: string } = {},
+    timeoutMs = 8_000,
+    base?: string,
+  ) =>
+    apiGet<SompoTelemetryHistoryResponse>(
+      `/api/sompo/telemetry/history${queryString({
+        fonte: params.fonte,
+        janelaMin: params.janelaMin,
+        trator: params.trator,
+      })}`,
+      timeoutMs,
+      base,
+    ),
+  postSompoTelemetrySimulation: (
+    samples: Record<string, unknown>[],
+    base?: string,
+    timeoutMs = ACTION_REQUEST_TIMEOUT_MS,
+  ) =>
+    apiPost<SompoTelemetrySimulationRecordResponse>(
+      '/api/sompo/telemetry/simulation',
+      { samples },
+      base,
+      timeoutMs,
+    ),
   listTeamTemplates: (base?: string, timeoutMs = ACTION_REQUEST_TIMEOUT_MS) =>
     apiGet<LucaAiTeamTemplatesResponse>('/api/luca-ai/team-templates', timeoutMs, base),
   createTeamTemplate: (kind: 'team' | 'individual', template: Record<string, unknown>, base?: string) =>

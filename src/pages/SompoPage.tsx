@@ -368,9 +368,21 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
         setTelemetryLaunchError('Não foi possível abrir uma sessão limpa na bancada.');
         return;
       }
+      let history = null;
+      try {
+        const fonte = telemetry.source.kind === 'simulation' ? 'simulacao' : 'firebase';
+        const result = await lucaApi.getSompoTelemetryHistory({
+          fonte,
+          janelaMin: 15,
+          trator: telemetry.tractorId,
+        });
+        if (result?.ok) history = result;
+      } catch {
+        history = null;
+      }
       queueSompoLaunch({
         caseId: `${telemetry.source.kind === 'simulation' ? 'simulacao' : 'telemetria'}-trator-${telemetry.tractorId}-${telemetry.deviceTimestamp ?? 'snapshot'}`,
-        mission: buildSompoTelemetryMission(telemetry, activeSquad.label),
+        mission: buildSompoTelemetryMission(telemetry, activeSquad.label, history),
         mode: teamMode,
         presetId: activeSquad.id,
         presetLabel: activeSquad.label,

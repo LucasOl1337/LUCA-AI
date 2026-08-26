@@ -162,10 +162,12 @@ import {
   buildIndividualRevisionPrompt,
   buildPersonaTeamPrompt,
   cleanPersonaTeamOutput,
+  clipAccumulatedContext,
   collectPriorAttachmentIds,
   DEPTH_BUDGETS,
   normalizePersonaTeamRunInput,
   runIndividualResolution,
+  WORKFLOW_TEXT_MAX_TOKENS,
 } from './persona-team.js';
 import { buildConsensusTurnPrompt } from './persona-consensus.js';
 import {
@@ -200,6 +202,11 @@ import {
   createSompoTelemetryHttpHandler,
   sompoTelemetrySource,
 } from './sompo-telemetry-source.js';
+import {
+  createSompoTelemetryHistory,
+  createSompoTelemetryHistoryHttpHandler,
+  createSompoTelemetrySimulationHttpHandler,
+} from './sompo-telemetry-history.js';
 
 const app = express();
 const personaRunJobs = createPersonaRunJobStore();
@@ -575,7 +582,15 @@ function emitSompoTelemetry(telemetry) {
   }
 }
 
+const sompoTelemetryHistory = createSompoTelemetryHistory();
 sompoTelemetrySource.subscribe(emitSompoTelemetry);
+sompoTelemetrySource.subscribe((telemetry) => {
+  try {
+    sompoTelemetryHistory.record(telemetry);
+  } catch (error) {
+    console.error('[sompo-telemetry-history] falha ao gravar amostra do Firebase:', error?.message || error);
+  }
+});
 
 function publicStateSnapshot() {
   return buildPublicStateSnapshot(getState(), {
@@ -1947,7 +1962,7 @@ async function runLucaAiPersonaTeamMember({ slug, mission, teamNames, loaded, wo
       attachments,
       model,
       maxTokens,
-      maxRounds: 3,
+      maxRounds: 2,
     });
     const completedAt = new Date().toISOString();
     const durationMs = Date.now() - startedMs;
@@ -2043,7 +2058,7 @@ async function runLucaAiIndividualRevision({ slug, mission, originalReply, contr
       agentId: `luca-ai-revision-${slug}`,
       model,
       maxTokens,
-      maxRounds: 3,
+      maxRounds: 2,
     });
     const completedAt = new Date().toISOString();
     const durationMs = Date.now() - startedMs;
@@ -2150,7 +2165,7 @@ async function runLucaAiIndividualConsensusTurn({
       agentId: `luca-ai-consensus-${slug}`,
       model,
       maxTokens,
-      maxRounds: 3,
+      maxRounds: 2,
     });
     const completedAt = new Date().toISOString();
     const durationMs = Date.now() - startedMs;
@@ -2246,7 +2261,7 @@ export async function runLucaAiIndividualJudge({ slug, mission, replies, origina
       attachments,
       model,
       maxTokens,
-      maxRounds: 3,
+      maxRounds: 2,
     });
     const completedAt = new Date().toISOString();
     const durationMs = Date.now() - startedMs;
@@ -2331,7 +2346,7 @@ async function runLucaAiPersonaWorkflow({ mission, workflow, teamNames, loadedBy
       participantCount: (role.slugs || []).length,
       participants: (role.slugs || []).map((slug) => ({ slug })),
     });
-    const accumulatedContext = contextSections.join('\n\n');
+    const accumulatedContext = clipAccumulatedContext(contextSections.join('\n\n'));
     const participants = (role.slugs || []).map((slug) => {
       const entry = loadedBySlug.get(slug);
       return {
@@ -2395,7 +2410,7 @@ async function runLucaAiPersonaWorkflow({ mission, workflow, teamNames, loadedBy
           accumulatedContext,
           attachments,
           toolsEnabled: role.roleId === 'visual' ? false : toolsEnabled,
-          maxTokens: role.roleId === 'visual' ? 2200 : 900,
+          maxTokens: role.roleId === 'visual' ? 2200 : WORKFLOW_TEXT_MAX_TOKENS,
           traceId,
           conversationContext,
         });
@@ -2878,6 +2893,8 @@ app.get('/api/router/models', (_req, res) => {
 });
 
 app.get('/api/sompo/telemetry', createSompoTelemetryHttpHandler());
+app.get('/api/sompo/telemetry/history', createSompoTelemetryHistoryHttpHandler(sompoTelemetryHistory));
+app.post('/api/sompo/telemetry/simulation', createSompoTelemetrySimulationHttpHandler(sompoTelemetryHistory));
 
 app.get('/api/luca-ai/visual-artifacts/:traceId/:artifactId', (req, res) => {
   const ownerId = getWorkspaceUserId();

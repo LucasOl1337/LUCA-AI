@@ -6,7 +6,7 @@ import {
   extractUrlsFromText,
 } from './agent-tools.js';
 
-const DEFAULT_MAX_ROUNDS = Number(process.env.LUCA_AGENT_MAX_TOOL_ROUNDS || 3);
+const DEFAULT_MAX_ROUNDS = Number(process.env.LUCA_AGENT_MAX_TOOL_ROUNDS || 2);
 
 function safeJsonParse(value) {
   try {
@@ -70,13 +70,15 @@ Ferramentas disponiveis:
 - calc: calcula expressoes aritmeticas com seguranca
 
 Regras:
-1. Se houver URL na missao, use fetch_url antes de concluir.
-2. Se a missao depender de fato externo SEM URL conhecida, use web_search primeiro e depois abra as 1-2 melhores fontes com fetch_url.
-3. Para aritmetica nao trivial use calc em vez de calcular de cabeca.
-4. Nao diga que "nao consegue abrir o site" sem tentar a ferramenta.
-5. Nao invente conteudo de pagina que voce nao leu.
-6. Se a ferramenta falhar, diga o erro real e o que ainda e possivel fazer.
-7. Depois das ferramentas, entregue a resposta final util ao operador.`;
+1. Se puder responder com o que ja tem, responda direto — ferramenta e excecao.
+2. Ensaio sintetico/local ou dados ja fornecidos: NAO busque a web.
+3. Se houver URL na missao, use fetch_url antes de concluir.
+4. Se a missao depender de fato externo SEM URL conhecida, use web_search e depois abra 1 fonte com fetch_url.
+5. Para aritmetica nao trivial use calc em vez de calcular de cabeca.
+6. Nao diga que "nao consegue abrir o site" sem tentar a ferramenta.
+7. Nao invente conteudo de pagina que voce nao leu.
+8. Se a ferramenta falhar, diga o erro real e o que ainda e possivel fazer.
+9. Depois das ferramentas, entregue a resposta final curta e util ao operador.`;
 }
 
 const MAX_INLINED_ATTACHMENT_CHARS = 120_000;
@@ -134,7 +136,24 @@ function buildUserContent(user, attachments = []) {
   return [{ type: 'text', text: merged }, ...nativeParts];
 }
 
-export async function runAgentWithTools({
+export function isAgentRouterUnreachableError(error) {
+  return /9router_unreachable/i.test(String(error?.message || error || ''));
+}
+
+function retryMaxTokens(original) {
+  const n = Math.max(1, Number(original) || 1200);
+  if (n >= 1600) return Math.min(n, 1200);
+  return Math.min(n, 480);
+}
+
+function truncatedReplyMode(content) {
+  const text = String(content || '').trim();
+  if (!text) return 'empty';
+  if (text.length >= 500) return 'skip';
+  return 'continue';
+}
+
+async function runAgentWithToolsOnce({
   system,
   user,
   attachments = [],
@@ -162,6 +181,8 @@ export async function runAgentWithTools({
   const urlsInMission = toolsEnabled ? extractUrlsFromText(user) : [];
   let forcedBootstrap = false;
   let continuationUsed = false;
+  let lastContent = '';
+  let lastFinishReason = null;
 
   for (let round = 0; round < Math.max(1, maxRounds); round += 1) {
     const response = await callChat({
@@ -172,6 +193,9 @@ export async function runAgentWithTools({
       temperature: 0.2,
       ...(toolsEnabled ? { tools, toolChoice: 'auto' } : {}),
     });
+
+    lastContent = String(response.content || '').trim();
+    lastFinishReason = response.finishReason || null;
 
     const toolCalls = toolsEnabled && Array.isArray(response.toolCalls) ? response.toolCalls : [];
     if (toolCalls.length) {
@@ -221,9 +245,18 @@ export async function runAgentWithTools({
       continue;
     }
 
-    // Continuation: provider cut the reply at max_tokens; ask for the rest once
-    // instead of publishing a truncated verdict as if it were complete.
+    // Continuation: only recover empty/tiny length cuts. A long truncated
+    // reply is already too verbose for the operator — publish it.
     if (response.finishReason === 'length' && !continuationUsed) {
+      const mode = truncatedReplyMode(response.content);
+      if (mode === 'skip') {
+        return {
+          content: lastContent || 'Sem resposta textual da persona.',
+          toolTrace,
+          rounds: round + 1,
+          finishReason: 'length',
+        };
+      }
       continuationUsed = true;
       messages.push({
         role: 'assistant',
@@ -231,20 +264,30 @@ export async function runAgentWithTools({
       });
       messages.push({
         role: 'user',
-        content: 'Sua resposta foi cortada no limite de tokens. Continue exatamente de onde parou, sem repetir o que ja escreveu, e conclua todas as secoes pendentes.',
+        content: mode === 'empty'
+          ? 'O orcamento foi gasto sem texto util. Entregue AGORA a resposta em no maximo 6 bullets, direto ao ponto, sem preambulo e sem copiar o prompt.'
+          : 'Sua resposta foi cortada. Conclua em no maximo 4 linhas, sem repetir o que ja escreveu e sem novas secoes.',
       });
       continue;
     }
 
     return {
-      content: String(response.content || '').trim() || 'Sem resposta textual da persona.',
+      content: lastContent || 'Sem resposta textual da persona.',
       toolTrace,
       rounds: round + 1,
-      finishReason: response.finishReason || null,
+      finishReason: lastFinishReason,
     };
   }
 
-  // Final no-tools pass if we exhausted rounds mid-tooling.
+  if (lastContent && lastFinishReason !== 'tool_calls') {
+    return {
+      content: lastContent,
+      toolTrace,
+      rounds: Math.max(1, maxRounds),
+      finishReason: lastFinishReason || 'max_rounds',
+    };
+  }
+
   const final = await callChat({
     model,
     agentId: `${agentId}:final`,
@@ -252,7 +295,7 @@ export async function runAgentWithTools({
       ...messages,
       {
         role: 'user',
-        content: 'Encerre agora com a melhor resposta final possivel usando as evidencias ja obtidas. Nao chame mais ferramentas.',
+        content: 'Encerre agora com a melhor resposta final possivel usando as evidencias ja obtidas. Nao chame mais ferramentas. No maximo 8 linhas.',
       },
     ],
     tools: [],
@@ -266,4 +309,18 @@ export async function runAgentWithTools({
     rounds: Math.max(1, maxRounds),
     finishReason: final.finishReason || 'max_rounds',
   };
+}
+
+export async function runAgentWithTools(options = {}) {
+  try {
+    return await runAgentWithToolsOnce(options);
+  } catch (error) {
+    if (!isAgentRouterUnreachableError(error)) throw error;
+    return runAgentWithToolsOnce({
+      ...options,
+      toolsEnabled: false,
+      maxRounds: 1,
+      maxTokens: retryMaxTokens(options.maxTokens),
+    });
+  }
 }

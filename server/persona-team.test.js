@@ -7,14 +7,18 @@ import {
   buildIndividualRevisionPrompt,
   buildPersonaTeamPrompt,
   cleanPersonaTeamOutput,
+  clipAccumulatedContext,
   collectPriorAttachmentIds,
+  DEFAULT_MAX_ACCUMULATED_CONTEXT_CHARS,
   DEFAULT_MAX_CONVERSATION_CONTEXT_CHARS,
   DEPTH_BUDGETS,
   formatConversationContextForPrompt,
   normalizePersonaTeamRunInput,
   runIndividualResolution,
+  WORKFLOW_TEXT_MAX_TOKENS,
 } from './persona-team.js';
 import { normalizePersonaSlug } from '../shared/persona-workflow.js';
+import { SOMPO_MISSION_DOSSIER_DELIMITER } from '../shared/sompo-telemetry.js';
 
 test('normalizePersonaTeamRunInput exige missao e equipe de personas', () => {
   assert.deepEqual(normalizePersonaTeamRunInput({ mission: '', slugs: ['maestro'] }), {
@@ -410,7 +414,54 @@ test('buildPersonaTeamPrompt inclui papel e contexto do workflow', () => {
 
   assert.match(prompt.system, /Papel nesta rodada: Exibicao final/i);
   assert.match(prompt.user, /Supervisor: priorizar risco operacional/i);
-  assert.match(prompt.user, /Resumo, Decisao, Evidencias, Riscos, Proximas acoes/i);
+  assert.match(prompt.user, /Veredito:/);
+  assert.match(prompt.user, /no máximo 3 bullets curtos/);
+  assert.match(prompt.user, /Decisão/);
+  assert.match(prompt.user, /Evidências/);
+  assert.match(prompt.user, /Próximas ações/);
+});
+
+test('buildPersonaTeamPrompt display e executor exigem resposta direta', () => {
+  const display = buildPersonaTeamPrompt({
+    mission: 'Fechar a triagem',
+    personaName: 'Narrador',
+    personaSlug: 'narrador',
+    teamNames: ['Narrador'],
+    workflowRole: {
+      roleId: 'display',
+      roleLabel: 'Exibicao final',
+      instruction: 'Organize o resultado.',
+    },
+  });
+  assert.match(display.user, /Veredito: <1 frase direta>/);
+  assert.match(display.user, /no máximo 3 bullets/);
+  assert.doesNotMatch(display.user, /Resumo, Decisao, Evidencias/);
+
+  const executor = buildPersonaTeamPrompt({
+    mission: 'Auditar leads',
+    personaName: 'Pesquisador',
+    personaSlug: 'pesquisador',
+    teamNames: ['Pesquisador'],
+    workflowRole: {
+      roleId: 'execution',
+      roleLabel: 'Execucao',
+      instruction: 'Execute a parte pratica.',
+    },
+  });
+  assert.match(executor.user, /3 a 6 bullets/);
+  assert.match(executor.user, /Comece pela conclusão/);
+  assert.match(executor.user, /sem preâmbulo, sem recontar a missão/);
+});
+
+test('buildPersonaTeamPrompt com dossiê pede tendência da janela histórica', () => {
+  const prompt = buildPersonaTeamPrompt({
+    mission: `Resumo humano\n\n${SOMPO_MISSION_DOSSIER_DELIMITER}\nbriefing técnico`,
+    personaName: 'Maestro',
+    personaSlug: 'maestro',
+    teamNames: ['Maestro'],
+  });
+  assert.match(prompt.user, /O dossiê técnico está anexo abaixo do delimitador/);
+  assert.match(prompt.user, /analise TENDÊNCIA e mudanças na janela histórica/);
 });
 
 test('buildPersonaTeamPrompt da etapa visual exige JSON de artefatos', () => {
@@ -465,10 +516,45 @@ test('buildPersonaTeamPrompt pure model keeps free format and skips team contrac
   assert.equal(prompt.pure, true);
   assert.match(prompt.system, /PURE_MODEL_AGENT_V1/);
   assert.match(prompt.system, /Motor 9Router desta execucao: cc\/claude-fable-5/);
+  assert.match(prompt.system, /curto e direto ao ponto/i);
   assert.doesNotMatch(prompt.system, /postura de agente especialista/i);
   assert.doesNotMatch(prompt.user, /Equipe ativa/i);
   assert.doesNotMatch(prompt.user, /3 a 6 bullets/i);
   assert.match(prompt.user, /Explique trade-offs/);
+});
+
+test('buildPersonaTeamPrompt pure model em workflow pede resposta curta e compacta contexto', () => {
+  const prompt = buildPersonaTeamPrompt({
+    mission: 'Resuma o risco',
+    personaName: 'GPT 5.6 SOL',
+    personaSlug: 'pure-gpt-5-6-sol',
+    systemPrompt: 'PURE_MODEL_AGENT_V1\nYou are GPT.',
+    runtimeModel: 'cx/gpt-5.6-sol-xhigh',
+    workflowRole: {
+      roleId: 'mission',
+      roleLabel: 'Decisor da missao',
+      instruction: 'Converta o enquadramento em missao executavel.',
+    },
+    accumulatedContext: `fim-antigo\n${'x'.repeat(4000)}\n## Execucao\nAchado curto.`,
+  });
+
+  assert.equal(prompt.pure, true);
+  assert.match(prompt.user, /Resposta curta e direta/i);
+  assert.match(prompt.user, /contexto anterior compactado/i);
+  assert.doesNotMatch(prompt.user, /fim-antigo/);
+  assert.match(prompt.user, /Achado curto/);
+  assert.ok(prompt.user.length < 4500, 'contexto acumulado nao pode inflar o prompt');
+});
+
+test('clipAccumulatedContext preserva a cauda e declara o corte', () => {
+  assert.equal(DEFAULT_MAX_ACCUMULATED_CONTEXT_CHARS, 3500);
+  assert.equal(WORKFLOW_TEXT_MAX_TOKENS, 640);
+  assert.equal(clipAccumulatedContext('curto'), 'curto');
+  const huge = `${'a'.repeat(4000)}\n## Recente\nGO`;
+  const clipped = clipAccumulatedContext(huge);
+  assert.match(clipped, /contexto anterior compactado/);
+  assert.match(clipped, /GO/);
+  assert.ok(clipped.length <= DEFAULT_MAX_ACCUMULATED_CONTEXT_CHARS + 80);
 });
 
 test('buildIndividualJudgePrompt inclui motor do juiz e dos participantes', () => {

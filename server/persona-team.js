@@ -3,6 +3,7 @@ import {
   normalizePersonaSlug,
   resolvePersonaWorkflow,
 } from '../shared/persona-workflow.js';
+import { SOMPO_MISSION_DOSSIER_DELIMITER } from '../shared/sompo-telemetry.js';
 import { resolveMissionDomain } from '../shared/mission-triage.js';
 import { runConsensusRounds, formatNegotiationBoard } from './persona-consensus.js';
 
@@ -13,6 +14,10 @@ const DEFAULT_MAX_ATTACHMENTS = 4;
 /** Compact prior-turn context injected into persona prompts on follow-up. */
 export const DEFAULT_MAX_CONVERSATION_CONTEXT_CHARS = 3000;
 const DEFAULT_MAX_CONTEXT_ENTRY_CHARS = 1200;
+/** Tail cap for workflow context so later stages do not inherit a novel. */
+export const DEFAULT_MAX_ACCUMULATED_CONTEXT_CHARS = 3500;
+/** Text stages of Fluxo 5/5; visual keeps a larger JSON budget. */
+export const WORKFLOW_TEXT_MAX_TOKENS = 640;
 
 export const DEPTH_BUDGETS = Object.freeze({
   1: Object.freeze({ participant: 1100, judge: 1600 }),
@@ -154,6 +159,22 @@ function clipContextText(value, maxChars) {
   if (text.length <= maxChars) return text;
   return `${text.slice(0, Math.max(0, maxChars - 1))}…`;
 }
+
+export function clipAccumulatedContext(value, maxChars = DEFAULT_MAX_ACCUMULATED_CONTEXT_CHARS) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  const limit = Number.isInteger(maxChars) && maxChars > 0 ? maxChars : DEFAULT_MAX_ACCUMULATED_CONTEXT_CHARS;
+  if (text.length <= limit) return text;
+  const tail = text.slice(-limit);
+  const cut = tail.indexOf('\n');
+  const body = cut >= 0 && cut < 240 ? tail.slice(cut + 1) : tail;
+  return `[contexto anterior compactado]\n${body}`;
+}
+
+const BREVITY_CONTRACT = `Resposta curta e direta ao ponto.
+- Nao copie o prompt, o contrato da etapa, o contexto acumulado nem estas instrucoes.
+- Sem preambulo, sem relatorio longo, sem tabela.
+- Padrao: 3 a 6 bullets ou no maximo 8 linhas (exceto JSON da etapa visual).`;
 
 function isOperatorTranscriptEntry(entry) {
   return String(entry?.role || '').trim() === 'operator';
@@ -300,14 +321,19 @@ export function buildPersonaTeamPrompt({
     const role = workflowRole?.roleId ? getPersonaWorkflowRole(workflowRole.roleId) : null;
     const roleLabel = workflowRole?.roleLabel || role?.label || '';
     const roleInstruction = workflowRole?.instruction || role?.instruction || '';
-    const context = String(accumulatedContext || '').trim();
+    const context = clipAccumulatedContext(accumulatedContext);
     const visualJsonHint = role?.id === 'visual'
       ? 'Responda SOMENTE com JSON valido contendo summary, report, charts (ate 3, pie|tower|line), images (ate 2 prompts em pt-BR de infografico/explained-chart) e imageEngine (gpt-image|grok-imagine). Todos os campos legiveis e todo texto visivel solicitado nas imagens devem permanecer em pt-BR.'
+      : '';
+    const dossierHint = String(mission || '').includes(SOMPO_MISSION_DOSSIER_DELIMITER)
+      ? 'O dossiê técnico está anexo abaixo do delimitador; analise TENDÊNCIA e mudanças na janela histórica em vez de re-descrever leituras instantâneas.'
       : '';
     const extraUser = [
       historyBlock,
       roleLabel ? `Etapa: ${roleLabel}. ${roleInstruction}` : '',
       visualJsonHint,
+      dossierHint,
+      role?.id && role.id !== 'visual' ? BREVITY_CONTRACT : '',
       context ? `Contexto acumulado:\n${context}` : '',
     ].filter(Boolean).join('\n\n');
     return {
@@ -319,7 +345,7 @@ export function buildPersonaTeamPrompt({
 ${modelBlock}
 ${role?.id === 'visual'
     ? 'Nesta etapa o formato de saida e JSON de artefatos visuais (sem markdown fora do JSON). Escreva summary, report, titulos, rotulos, legendas, chamadas e prompts de imagem em pt-BR; todo texto visivel da arte deve estar em pt-BR.'
-    : 'Responda com liberdade de formato. Sem personagem fixo alem do que o system acima definir.'}`,
+    : `Responda com liberdade de formato, mas curto e direto ao ponto (no maximo 8 linhas). Nao copie o prompt nem o contexto. Sem personagem fixo alem do que o system acima definir.`}`,
       user: extraUser
         ? `${String(mission || '').trim()}\n\n${extraUser}`
         : String(mission || '').trim(),
@@ -330,7 +356,7 @@ ${role?.id === 'visual'
   const role = workflowRole?.roleId ? getPersonaWorkflowRole(workflowRole.roleId) : null;
   const roleLabel = workflowRole?.roleLabel || role?.label || '';
   const roleInstruction = workflowRole?.instruction || role?.instruction || '';
-  const context = String(accumulatedContext || '').trim();
+  const context = clipAccumulatedContext(accumulatedContext);
   const workflowSystem = roleLabel
     ? `\nPapel nesta rodada: ${roleLabel}.\nContrato do papel: ${roleInstruction}`
     : '';
@@ -345,8 +371,11 @@ ${role?.id === 'visual'
   ${context || 'Ainda nao ha contexto acumulado; esta e a primeira etapa.'}
   `
       : '';
+    const dossierHint = String(mission || '').includes(SOMPO_MISSION_DOSSIER_DELIMITER)
+      ? 'O dossiê técnico está anexo abaixo do delimitador; analise TENDÊNCIA e mudanças na janela histórica em vez de re-descrever leituras instantâneas.'
+      : '';
     const outputContract = role?.id === 'display'
-      ? 'Entregue a exibicao final em secoes curtas: Resumo, Decisao, Evidencias, Riscos, Proximas acoes.'
+      ? 'Comece com Veredito: <1 frase direta>. Depois, nesta ordem, seções Decisão, Evidências, Riscos, Próximas ações, cada uma com no máximo 3 bullets curtos. Proibido repetir dados brutos que não sustentam diretamente uma conclusão; proibido preâmbulo e meta-comentário sobre o processo.'
       : role?.id === 'visual'
         ? `Voce e a etapa final de artefatos da bancada. Com base no contexto acumulado (especialmente Aprovacao, Exibicao final ou veredito do juiz), produza SOMENTE JSON valido — sem markdown fora do JSON — neste formato:
 {
@@ -384,7 +413,7 @@ Regras:
 - Prompts de imagem em pt-BR, fieis aos achados: grafico/infografico bem explicado, tipografia legivel, contraste alto. Exija que todo texto visivel da arte (titulo, rotulos, eixos, legendas, chamadas e notas) permaneça em pt-BR e nao seja traduzido para ingles.
 - imageEngine preferir "gpt-image" (caminho Maestro/9Router); "grok-imagine" so como alternativa.
 - Nao mencione runtime interno, 9router, agents nem logs.`
-        : 'Entregue uma contribuicao objetiva em 3 a 6 bullets. Inclua uma decisao, uma acao imediata e um risco/observacao quando fizer sentido.';
+        : 'Entregue uma contribuicao objetiva em 3 a 6 bullets. Comece pela conclusão; sem preâmbulo, sem recontar a missão. Inclua uma decisao, uma acao imediata e um risco/observacao quando fizer sentido.';
 
     return {
       name,
@@ -396,7 +425,8 @@ Regras:
   ${modelBlock}
   Nao publique no chat global, nao acione agentes fixos do Operacional e nao assuma que existe uma missao ativa fora desta tela.
   Quando a missao depender de fato externo (URL, site, API), use as ferramentas operacionais do runtime antes de concluir.
-  Responda em pt-BR, com postura de agente especialista e foco em acao concreta.${workflowSystem}${individualSystem}`,
+  Responda em pt-BR, com postura de agente especialista e foco em acao concreta.
+  ${role?.id === 'visual' ? '' : BREVITY_CONTRACT}${workflowSystem}${individualSystem}`,
       user: `Missao desta bancada:
   ${mission}
 ${historyBlock ? `\n  ${historyBlock.replace(/\n/g, '\n  ')}\n` : ''}
@@ -404,7 +434,7 @@ ${historyBlock ? `\n  ${historyBlock.replace(/\n/g, '\n  ')}\n` : ''}
   Sua persona: ${name}${slug ? ` (${slug})` : ''}
   ${model ? `Motor 9Router: ${model}` : ''}
   ${workflowUser}
-
+${dossierHint ? `\n  ${dossierHint}\n` : ''}
   ${outputContract}`,
     };
   }
@@ -446,7 +476,7 @@ Motor LLM desta execucao nao foi declarado explicitamente.
     const author = `${reply?.name || reply?.slug || 'Participante'}${reply?.slug ? ` (${reply.slug})` : ''}`;
     const motor = reply?.model ? ` | motor 9Router: ${reply.model}` : '';
     const content = reply?.ok
-      ? cleanPersonaTeamOutput(reply.content)
+      ? clipContextText(cleanPersonaTeamOutput(reply.content), 1200)
       : `FALHA: ${String(reply?.error || 'sem resposta').trim()}`;
     return `${author}${motor}: ${content}`;
   }).join('\n\n');
@@ -482,14 +512,14 @@ divergencias:`;
 
 ---
 ${modelBlock}
-Voce avalia contribuicoes de outros agentes. Seja direto, livre de formato e sem personagem fixo.`,
+Voce avalia contribuicoes de outros agentes. Seja direto, compacto (no maximo 12 linhas) e sem personagem fixo.`,
       user: `Missao:
 ${mission}${historyAppendix}
 
 Contribuicoes:
 ${contributions || 'Nenhuma contribuicao utilizavel.'}${originalsAppendix}${consensusAppendix}
 
-Entregue seu julgamento final com liberdade de forma.${ledgerRequest}`,
+Entregue seu julgamento final em no maximo 12 linhas.${ledgerRequest}`,
     };
   }
 
@@ -504,7 +534,7 @@ Entregue seu julgamento final com liberdade de forma.${ledgerRequest}`,
   Nao produza uma resposta isolada antes de examinar todas as contribuicoes recebidas.
   Avalie evidencias, utilidade, consistencia e cobertura. Nao favoreca uma persona por identidade, inclusive se voce tambem participou da primeira rodada.
   Se a missao original depender de fato externo e as contribuicoes nao tiverem evidencia suficiente, voce tambem pode usar as ferramentas operacionais do runtime.
-  Responda em pt-BR.`,
+  Responda em pt-BR. Seja compacto: resposta livre em no maximo 5 linhas; demais secoes com no maximo 4 linhas cada.`,
       user: `Missao original:
   ${mission}
 ${historyBlock ? `\n  ${historyBlock.replace(/\n/g, '\n  ')}\n` : ''}
