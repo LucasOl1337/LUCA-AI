@@ -240,3 +240,24 @@ export function buildSompoEpisodeMission(
   teamLabel?: string,
   frames?: SompoTelemetryEpisodeMissionFrame[],
 ): string;
+
+export const SOMPO_EPISODE_VISUAL_DATA_MARKER: string;
+
+/** Série compacta do episódio para a peça visual: [tMs, distanciaCm|null, accMs2|null]. */
+export interface SompoEpisodeVisualData {
+  tipo: 'sompo-episodio-colisao';
+  duracaoMs: number;
+  impactoMs: number | null;
+  picoAccMs2: number | null;
+  flagMs: number | null;
+  flagDesdeInicio: boolean;
+  serie: [number, number | null, number | null][];
+}
+
+export function buildSompoEpisodeVisualData(
+  summary: SompoTelemetryEpisodeSummary,
+): SompoEpisodeVisualData | null;
+
+export function parseSompoEpisodeVisualData(
+  missionText: string,
+): SompoEpisodeVisualData | null;

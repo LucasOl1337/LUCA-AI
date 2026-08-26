@@ -8,6 +8,7 @@ import {
   sanitizeImageGenerationModel,
   VISUAL_PERSONA_SLUG,
 } from './config.js';
+import { parseSompoEpisodeVisualData } from '../shared/sompo-telemetry.js';
 
 export { VISUAL_PERSONA_SLUG };
 
@@ -248,10 +249,13 @@ export function parseVisualPlanOutput(output = '', { mission = '' } = {}) {
  * o runtime deve re-promptar a persona uma vez antes de aceitar degradação.
  * Também re-tenta quando o JSON veio sem images — a etapa visual precisa gerar imagem.
  */
-export function visualPlanNeedsRetry(plan) {
+export function visualPlanNeedsRetry(plan, { mission = '' } = {}) {
   if (!plan) return true;
   if (plan.source === 'text-fallback') return true;
   if (!plan.report && !plan.charts?.length && !plan.images?.length) return true;
+  // Missão de episódio SOMPO: a peça principal (linha do tempo) é desenhada pelo
+  // runtime com os dados reais — o plano não precisa trazer images[].
+  if (parseSompoEpisodeVisualData(mission)) return false;
   return !plan.images?.length;
 }
 
@@ -387,6 +391,258 @@ export function renderLocalInfographicSvg({
   return Buffer.from(svg, 'utf8');
 }
 
+const GRAVITY_MS2 = 9.80665;
+
+function ptFixed(value, decimals = 1) {
+  const factor = 10 ** decimals;
+  const rounded = Math.round(Number(value) * factor) / factor;
+  return String(rounded).replace('.', ',');
+}
+
+function offsetSecondsLabel(ms) {
+  return `t+${ptFixed(Number(ms) / 1_000, 1)}s`;
+}
+
+// Number(null) === 0: sem este guarda, flag ausente viraria marcador em t+0s.
+function finiteOrNull(value) {
+  if (value === null || value === undefined) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+/**
+ * A manchete é o achado, não a descrição: responde "o equipamento avisou a
+ * tempo?" direto do dado, sem depender do texto da persona.
+ */
+export function sompoEpisodeHeadline(data = {}) {
+  const impactoMs = finiteOrNull(data.impactoMs);
+  const flagMs = finiteOrNull(data.flagMs);
+  if (impactoMs !== null && flagMs !== null) {
+    const deltaMs = flagMs - impactoMs;
+    if (deltaMs > 100) return `O alerta chegou ${ptFixed(deltaMs / 1_000, 1)} s depois da batida`;
+    if (deltaMs < -100) return `O alerta disparou ${ptFixed(-deltaMs / 1_000, 1)} s antes da batida`;
+    return 'O alerta disparou no instante da batida';
+  }
+  if (impactoMs !== null && data.flagDesdeInicio) {
+    return 'A flag de risco já estava ativa antes da batida';
+  }
+  if (impactoMs !== null) return 'A batida aconteceu e o alerta nunca disparou';
+  return 'Linha do tempo do episódio';
+}
+
+function polylineSegments(points) {
+  const segments = [];
+  let current = [];
+  for (const point of points) {
+    if (point === null) {
+      if (current.length > 1) segments.push(current);
+      current = [];
+    } else {
+      current.push(point);
+    }
+  }
+  if (current.length > 1) segments.push(current);
+  return segments;
+}
+
+/**
+ * A peça principal do episódio de colisão: série temporal autoral em SVG,
+ * desenhada pelo runtime com os dados reais — distância (cm) e aceleração (g)
+ * ao longo dos segundos, com marcadores nomeados de início, IMPACTO e disparo
+ * da flag. A distância entre os dois últimos é o atraso do alerta, visível sem
+ * ler número nenhum. Sem barras de média por fase.
+ */
+export function renderSompoEpisodeTimelineSvg(data, { headline, subtitle } = {}) {
+  const serie = (Array.isArray(data?.serie) ? data.serie : [])
+    .filter((point) => Array.isArray(point) && Number.isFinite(Number(point[0])))
+    .map((point) => {
+      const accMs2 = finiteOrNull(point[2]);
+      return {
+        t: Number(point[0]),
+        dist: finiteOrNull(point[1]),
+        accG: accMs2 === null ? null : accMs2 / GRAVITY_MS2,
+      };
+    })
+    .sort((left, right) => left.t - right.t);
+  const maxT = Math.max(Number(data?.duracaoMs) || 0, serie.at(-1)?.t || 0, 1_000);
+  const impactoMs = finiteOrNull(data?.impactoMs);
+  const flagMs = finiteOrNull(data?.flagMs);
+  const picoAccMs2 = finiteOrNull(data?.picoAccMs2);
+
+  const plot = { x0: 90, x1: 1190, yTop: 216, yBottom: 566 };
+  const xFor = (t) => plot.x0 + ((Math.min(Math.max(t, 0), maxT) / maxT) * (plot.x1 - plot.x0));
+
+  // Escala em 4 divisões com passo redondo: teto múltiplo de 50 dava marca de
+  // eixo em 37,5 e 112,5, número que ninguém lê num gráfico.
+  const niceScale = (max, steps) => ((steps.find((step) => step >= max / 4) ?? steps.at(-1)) * 4);
+  const maxDist = Math.max(...serie.map((point) => point.dist ?? 0), 1);
+  const distScale = niceScale(maxDist, [5, 10, 20, 25, 40, 50, 100, 200, 250, 500, 1_000]);
+  // O pico do impacto entra na escala: o marcador usa picoAccMs2, que é maior
+  // que qualquer amostra decimada quando a decimação não pegou o topo — sem
+  // isto o ponto do impacto era desenhado fora da área do gráfico.
+  const maxG = Math.max(
+    ...serie.map((point) => point.accG ?? 0),
+    picoAccMs2 === null ? 0 : picoAccMs2 / GRAVITY_MS2,
+    0.5,
+  );
+  const gScale = niceScale(maxG, [0.25, 0.5, 1, 2, 2.5, 4, 5, 10, 20, 25]);
+  const yForDist = (value) => plot.yBottom - ((value / distScale) * (plot.yBottom - plot.yTop));
+  const yForG = (value) => plot.yBottom - ((value / gScale) * (plot.yBottom - plot.yTop));
+
+  const font = 'Segoe UI, Arial, sans-serif';
+  const parts = [];
+
+  // Grade + ticks do eixo X (segundos), passo escolhido para ≤8 marcas.
+  const totalSeconds = maxT / 1_000;
+  const step = [1, 2, 5, 10, 15, 30, 60].find((candidate) => totalSeconds / candidate <= 8) || 60;
+  for (let second = 0; second <= totalSeconds + 0.001; second += step) {
+    const x = xFor(second * 1_000);
+    parts.push(`<line x1="${x.toFixed(1)}" y1="${plot.yTop}" x2="${x.toFixed(1)}" y2="${plot.yBottom}" stroke="rgba(255,255,255,0.06)"/>`);
+    parts.push(`<text x="${x.toFixed(1)}" y="${plot.yBottom + 26}" fill="#8fa3b7" font-size="15" text-anchor="middle" font-family="${font}">${ptFixed(second, 0)}s</text>`);
+  }
+
+  // Ticks Y: distância (esquerda, cm) e aceleração (direita, g).
+  for (let division = 0; division <= 4; division += 1) {
+    const ratio = division / 4;
+    const y = plot.yBottom - (ratio * (plot.yBottom - plot.yTop));
+    parts.push(`<line x1="${plot.x0}" y1="${y.toFixed(1)}" x2="${plot.x1}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,0.05)"/>`);
+    parts.push(`<text x="${plot.x0 - 10}" y="${(y + 5).toFixed(1)}" fill="#64d2ff" font-size="14" text-anchor="end" font-family="${font}">${ptFixed(distScale * ratio, 0)}</text>`);
+    parts.push(`<text x="${plot.x1 + 10}" y="${(y + 5).toFixed(1)}" fill="#ff9f0a" font-size="14" text-anchor="start" font-family="${font}">${ptFixed(gScale * ratio, 1)}</text>`);
+  }
+
+  // Faixa do atraso: a distância visual entre IMPACTO e o disparo da flag.
+  if (impactoMs !== null && flagMs !== null && flagMs - impactoMs > 100) {
+    const xImpact = xFor(impactoMs);
+    const xFlag = xFor(flagMs);
+    parts.push(`<rect x="${xImpact.toFixed(1)}" y="${plot.yTop}" width="${(xFlag - xImpact).toFixed(1)}" height="${plot.yBottom - plot.yTop}" fill="rgba(255,93,82,0.12)"/>`);
+    // Rótulo acima da área do gráfico e preso às bordas: a faixa costuma ser
+    // mais estreita que o texto, e centrar dentro dela jogava "atraso de X s"
+    // por cima dos marcadores de IMPACTO e do alerta.
+    const labelX = Math.min(Math.max((xImpact + xFlag) / 2, plot.x0 + 80), plot.x1 - 80);
+    parts.push(`<text x="${labelX.toFixed(1)}" y="${plot.yTop - 12}" fill="#ff5d52" font-size="17" font-weight="700" text-anchor="middle" font-family="${font}">atraso de ${ptFixed((flagMs - impactoMs) / 1_000, 1)} s</text>`);
+  }
+
+  // Curvas: distância (azul) e aceleração em g (âmbar). A curva é a prova.
+  for (const segment of polylineSegments(serie.map((point) => (point.dist === null ? null : `${xFor(point.t).toFixed(1)},${yForDist(point.dist).toFixed(1)}`)))) {
+    parts.push(`<polyline points="${segment.join(' ')}" fill="none" stroke="#64d2ff" stroke-width="3" stroke-linejoin="round"/>`);
+  }
+  for (const segment of polylineSegments(serie.map((point) => (point.accG === null ? null : `${xFor(point.t).toFixed(1)},${yForG(point.accG).toFixed(1)}`)))) {
+    parts.push(`<polyline points="${segment.join(' ')}" fill="none" stroke="#ff9f0a" stroke-width="3" stroke-linejoin="round"/>`);
+  }
+
+  // Marcadores verticais nomeados.
+  parts.push(`<line x1="${plot.x0}" y1="${plot.yTop}" x2="${plot.x0}" y2="${plot.yBottom}" stroke="#8fa3b7" stroke-dasharray="4 5"/>`);
+  parts.push(`<text x="${plot.x0 + 6}" y="${plot.yTop + 22}" fill="#9fb4c8" font-size="15" font-family="${font}">Início da aproximação</text>`);
+  if (impactoMs !== null) {
+    const x = xFor(impactoMs);
+    parts.push(`<line x1="${x.toFixed(1)}" y1="${plot.yTop}" x2="${x.toFixed(1)}" y2="${plot.yBottom}" stroke="#ff5d52" stroke-width="2"/>`);
+    parts.push(`<text x="${x.toFixed(1)}" y="${plot.yTop + 22}" fill="#ff5d52" font-size="16" font-weight="700" text-anchor="middle" font-family="${font}">IMPACTO ${offsetSecondsLabel(impactoMs)}</text>`);
+    if (picoAccMs2 !== null) {
+      parts.push(`<circle cx="${x.toFixed(1)}" cy="${yForG(picoAccMs2 / GRAVITY_MS2).toFixed(1)}" r="6" fill="#ff5d52" stroke="#0b1220" stroke-width="2"/>`);
+    }
+  }
+  if (flagMs !== null) {
+    const x = xFor(flagMs);
+    parts.push(`<line x1="${x.toFixed(1)}" y1="${plot.yTop}" x2="${x.toFixed(1)}" y2="${plot.yBottom}" stroke="#ffd60a" stroke-width="2" stroke-dasharray="6 4"/>`);
+    parts.push(`<text x="${x.toFixed(1)}" y="${plot.yTop + 46}" fill="#ffd60a" font-size="16" font-weight="700" text-anchor="middle" font-family="${font}">Alerta disparou ${offsetSecondsLabel(flagMs)}</text>`);
+  } else if (data?.flagDesdeInicio) {
+    parts.push(`<text x="${plot.x0 + 6}" y="${plot.yTop + 46}" fill="#ffd60a" font-size="15" font-family="${font}">Flag de risco já ativa desde o início da gravação</text>`);
+  }
+
+  const heading = clip(headline || sompoEpisodeHeadline(data), 78);
+  const sub = clip(
+    subtitle || 'Distância frontal e força do impacto, segundo a segundo; os marcadores mostram a batida e o instante do alerta.',
+    140,
+  );
+  // Única menção a m/s² da peça: g é a unidade primária de impacto.
+  const accLegend = picoAccMs2 !== null
+    ? `Aceleração (g) — pico de ${ptFixed(picoAccMs2 / GRAVITY_MS2, 1)} g (${ptFixed(picoAccMs2, 1)} m/s²)`
+    : 'Aceleração (g)';
+
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="${escapeXml(heading)}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1220"/>
+      <stop offset="100%" stop-color="#152238"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <text x="90" y="58" fill="#64d2ff" font-size="15" letter-spacing="3" font-family="${font}">SOMPO · EPISÓDIO DE COLISÃO — LINHA DO TEMPO</text>
+  <text x="90" y="108" fill="#f4f8ff" font-size="38" font-weight="700" font-family="${font}">${escapeXml(heading)}</text>
+  <text x="90" y="142" fill="#9fb4c8" font-size="18" font-family="${font}">${escapeXml(sub)}</text>
+  <rect x="90" y="168" width="16" height="5" rx="2" fill="#64d2ff"/>
+  <text x="114" y="176" fill="#d7e6f5" font-size="15" font-family="${font}">Distância frontal (cm)</text>
+  <rect x="340" y="168" width="16" height="5" rx="2" fill="#ff9f0a"/>
+  <text x="364" y="176" fill="#d7e6f5" font-size="15" font-family="${font}">${escapeXml(accLegend)}</text>
+  ${parts.join('\n  ')}
+  <text x="90" y="632" fill="#9fb4c8" font-size="15" font-family="${font}">Sem velocidade registrada no episódio: a severidade física exata segue pendente.</text>
+  <text x="90" y="700" fill="#607588" font-size="13" font-family="${font}">linha do tempo desenhada a partir das amostras reais do episódio · simulador SOMPO</text>
+</svg>`;
+  return Buffer.from(svg, 'utf8');
+}
+
+/**
+ * Pack visual do episódio de colisão: no máximo DUAS peças — a linha do tempo
+ * (desenhada aqui, com os dados reais) e o cartão de decisão da persona. Os
+ * charts do plano são descartados de propósito: barra de média por fase e
+ * séries repetidas eram a redundância que o dono reprovou.
+ */
+function materializeSompoEpisodePack({ episodeData, plan, ownerId, traceId, retried }) {
+  const headline = sompoEpisodeHeadline(episodeData);
+  const errors = [];
+  let images = [];
+  try {
+    const svgBuffer = renderSompoEpisodeTimelineSvg(episodeData, { headline });
+    const artifactId = uniqueId('timeline');
+    const meta = writeBinaryArtifact(artifactsDir(ownerId, traceId), artifactId, svgBuffer, 'image/svg+xml');
+    images = [{
+      id: artifactId,
+      kind: 'image',
+      title: headline,
+      prompt: 'Linha do tempo desenhada pelo runtime a partir das amostras reais do episódio — sem geração por IA.',
+      aspectRatio: '16:9',
+      style: 'episode-timeline',
+      mimeType: meta.mimeType,
+      size: meta.size,
+      url: `/api/luca-ai/visual-artifacts/${encodeURIComponent(traceId)}/${encodeURIComponent(artifactId)}`,
+      model: 'episode-timeline',
+      status: 'ok',
+    }];
+  } catch (error) {
+    errors.push({ id: 'timeline', error: error instanceof Error ? error.message : String(error) });
+  }
+
+  const report = plan?.report
+    ? {
+        id: plan.report.id,
+        kind: 'report',
+        title: plan.report.title,
+        markdown: plan.report.markdown,
+        status: 'ok',
+      }
+    : null;
+
+  const hasContent = images.length > 0 || Boolean(report);
+  let status = 'failed';
+  if (hasContent && !errors.length) status = 'complete';
+  else if (hasContent) status = 'partial';
+
+  return {
+    status,
+    summary: plan?.summary || headline,
+    report,
+    charts: [],
+    images,
+    imageEngine: 'episode-timeline',
+    planSource: plan?.source || null,
+    sompoEpisodeTimeline: true,
+    retried: Boolean(retried),
+    errors,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
 export async function generateVisualImageWithFallback({
   callImage,
   engines = [],
@@ -489,6 +745,14 @@ export async function materializeVisualPack({
   retried = false,
 } = {}) {
   const plan = parseVisualPlanOutput(personaOutput, { mission });
+
+  // Episódio de colisão SOMPO: a peça principal é determinística (dados reais
+  // embutidos na missão), mesmo que a persona não tenha respondido nada.
+  const episodeData = parseSompoEpisodeVisualData(mission);
+  if (episodeData) {
+    return materializeSompoEpisodePack({ episodeData, plan, ownerId, traceId, retried });
+  }
+
   if (!plan) {
     return {
       status: 'skipped',

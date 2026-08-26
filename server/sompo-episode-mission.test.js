@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   SOMPO_MISSION_DOSSIER_DELIMITER,
   buildSompoEpisodeMission,
+  parseSompoEpisodeVisualData,
 } from '../shared/sompo-telemetry.js';
 import { summarizeSompoEpisodeSamples } from './sompo-telemetry-history.js';
 
@@ -124,6 +125,73 @@ test('missão de episódio com frames: seção "Evidência visual", anexos numer
   assert.match(mission, /a distância registrada no dado confere com a posição do caminhão no Anexo 3\?/);
   assert.match(mission, /Concluam com a severidade do evento para a seguradora e a ação de prevenção no momento exato/);
   assert.doesNotMatch(mission, /Sem evidência visual/);
+});
+
+/** Variante com alerta atrasado: pico em t+12,5s (índice 25), flag só liga em t+15s (índice 30). */
+function delayedAlertEpisodeFixture() {
+  const samples = Array.from({ length: 48 }, (_, index) => {
+    if (index < 25) {
+      return sample(index, { distancia: 210 - (index * 7.9), acc: 9.8, collision: false });
+    }
+    if (index === 25) return sample(index, { distancia: 14, acc: 32, collision: false });
+    return sample(index, { distancia: 12, acc: 9.8, collision: index >= 30 });
+  });
+  const episode = {
+    id: 8,
+    publicId: 'ep-alerta-atrasado',
+    kind: 'colisao',
+    tractorId: 'SIM-001',
+    sourceKind: 'simulation',
+    scenarioLabel: 'Colisão frontal roteirizada',
+    startedAt: new Date(BASE_MS).toISOString(),
+    startedMs: BASE_MS,
+    endedAt: new Date(BASE_MS + 24_000).toISOString(),
+    endedMs: BASE_MS + 24_000,
+    status: 'complete',
+    durationMs: 24_000,
+  };
+  return { episode, samples, summary: summarizeSompoEpisodeSamples(samples) };
+}
+
+test('missão de episódio: contrato da peça visual pede série temporal e proíbe barra de média por fase', () => {
+  const { episode, samples, summary } = delayedAlertEpisodeFixture();
+  const mission = buildSompoEpisodeMission(episode, samples, summary, 'Risco Agro');
+
+  assert.match(mission, /Contrato da peça visual \(etapa de artefatos da bancada\):/);
+  assert.match(mission, /linha do tempo do episódio — série temporal desenhada pelo runtime com os dados reais/);
+  assert.match(mission, /marcadores nomeados no início da aproximação, no IMPACTO e no instante em que a flag de risco disparou/);
+  assert.match(mission, /PROIBIDO: gráfico de barras com média por fase/);
+  assert.match(mission, /A manchete da peça é o ACHADO acionável/);
+  assert.match(mission, /cartão de decisão curto — veredito, severidade para a seguradora e o que fazer agora, em frases, SEM repetir números que já estão na linha do tempo/);
+  assert.match(mission, /impacto em g \(m\/s² no máximo uma vez, entre parênteses\)/);
+  assert.match(mission, /nada de "Δv", "piso\/saturação do sensor" ou "pulso único de contato"/);
+});
+
+test('missão de episódio: achado do alerta calculado e bloco de máquina parseável', () => {
+  const { episode, samples, summary } = delayedAlertEpisodeFixture();
+  const mission = buildSompoEpisodeMission(episode, samples, summary, 'Risco Agro');
+
+  // Pico em t+12,5s, flag em t+15s: o atraso de 2,5 s vira achado explícito.
+  assert.match(mission, /Achado do alerta: a flag riscoColisao disparou 2,5 s DEPOIS do pico de impacto \(impacto em t\+12,5s, alerta em t\+15s\) — o equipamento avisou tarde\./);
+
+  const data = parseSompoEpisodeVisualData(mission);
+  assert.ok(data, 'bloco de máquina presente e parseável');
+  assert.equal(data.tipo, 'sompo-episodio-colisao');
+  assert.equal(data.impactoMs, 12_500);
+  assert.equal(data.flagMs, 15_000);
+  assert.equal(data.picoAccMs2, 32);
+  assert.equal(data.flagDesdeInicio, false);
+  assert.ok(data.serie.length >= 2 && data.serie.length <= 30);
+  assert.deepEqual(data.serie[0], [0, 210, 9.8]);
+  assert.ok(data.serie.some(([t, , acc]) => t === 12_500 && acc === 32), 'pico presente na série');
+
+  // Fixture original: flag liga no mesmo tick do pico.
+  const sameInstant = collisionEpisodeFixture();
+  const sameMission = buildSompoEpisodeMission(sameInstant.episode, sameInstant.samples, sameInstant.summary, 'Risco Agro');
+  assert.match(sameMission, /Achado do alerta: a flag riscoColisao disparou no mesmo instante do pico de impacto \(t\+12,5s\)\./);
+
+  // Missão sem bloco não é episódio para a etapa visual.
+  assert.equal(parseSompoEpisodeVisualData('missão comum sem bloco'), null);
 });
 
 test('missão de episódio sem frames diz explicitamente que não há evidência visual', () => {

@@ -2511,6 +2511,7 @@ async function finalizeLucaAiVisualStage({
   let retried = false;
   const planIsUsable = (candidate) => !visualPlanNeedsRetry(
     parseVisualPlanOutput(candidate?.content || '', { mission: input.mission }),
+    { mission: input.mission },
   );
 
   if (reply?.ok && visualEntry?.loaded && !planIsUsable(reply)) {
