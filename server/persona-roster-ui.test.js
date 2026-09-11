@@ -8,13 +8,16 @@ const serverIndex = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
 const configPage = readFileSync(new URL('../src/pages/ConfiguracaoPage.tsx', import.meta.url), 'utf8');
 const layout = readFileSync(new URL('../src/components/Layout.tsx', import.meta.url), 'utf8');
 
-test('tela de personas explica Yume autoritativo e fallback do Persona Source', () => {
-  assert.match(personasPage, /Roster principal/);
+test('tela de personas exibe só o trio principal e personas ativadas na conta', () => {
+  assert.match(personasPage, /Personas principais/);
+  assert.match(personasPage, /Ativadas na sua conta/);
+  assert.match(personasPage, /gpt\|grok\|claude/);
+  assert.match(personasPage, /state\?\.personaAgents/);
   assert.match(personasPage, /Fonte editorial: oficiais do Yume/);
-  assert.match(personasPage, /Builtins LUCA/);
-  assert.match(personasPage, /aria-expanded=\{secondaryExpanded\}/);
+  assert.match(personasPage, /builtins LUCA/);
   assert.match(personasPage, /Gerenciar categoria no Yume/);
   assert.doesNotMatch(personasPage, /Adicionar ao LUCA|Remover do LUCA/);
+  assert.doesNotMatch(personasPage, /Disponíveis no Yume|secondaryExpanded|Roster principal/);
 });
 
 test('picker mostra oficiais e secundárias selecionáveis via cache local', () => {

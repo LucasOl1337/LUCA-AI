@@ -30,7 +30,7 @@ test('personas error state has recoverable CTA', () => {
 test('personas empty state has actionable CTA', () => {
   const start = source.indexOf('data-personas-empty');
   assert.ok(start >= 0, 'empty shell present');
-  const slice = source.slice(start, start + 2200);
+  const slice = source.slice(start, start + 3000);
   assert.ok(slice.includes('data-personas-clear-filters'), 'clear filters CTA');
   assert.ok(slice.includes('data-personas-open-yume'), 'open Yume CTA');
   assert.ok(slice.includes('data-personas-empty-reload'), 'secondary reload');

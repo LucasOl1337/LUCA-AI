@@ -1,14 +1,23 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, BadgeCheck, ChevronDown, ExternalLink, Layers3, Loader2, Plus, RefreshCw, Search, Sparkles, UsersRound } from 'lucide-react';
+import { AlertCircle, BadgeCheck, ExternalLink, Layers3, Loader2, Plus, RefreshCw, Search, Sparkles, UsersRound } from 'lucide-react';
 import { lucaApi } from '@/lib/api';
 import { pickFailureCopy } from '@/lib/surface-failure';
 import { useDeferredFlag } from '@/hooks/useDeferredFlag';
 import type { YumePersonaSummary } from '@/lib/types';
 import { useTheme } from '@/hooks/useTheme';
 import { useAppLocation } from '@/hooks/useAppLocation';
+import { useLuca } from '@/hooks/useLucaState';
 
-type FilterMode = 'all' | 'imported' | 'available';
+type FilterMode = 'all' | 'main' | 'activated';
+
+// Só o trio principal aparece por padrão. O resto do catálogo fica oculto
+// até a conta ativar a persona (slug presente em state.personaAgents).
+const MAIN_PERSONA_PATTERN = /\b(gpt|grok|claude)\b/i;
+
+function isMainPersona(persona: YumePersonaSummary): boolean {
+  return MAIN_PERSONA_PATTERN.test(`${persona.slug} ${persona.name}`);
+}
 
 const YUME_DASHBOARD_URL = import.meta.env.VITE_YUME_DASHBOARD_URL || 'http://57.156.59.165:2222';
 
@@ -29,17 +38,24 @@ function normalizePersonaAssetUrls(personas: YumePersonaSummary[], base: string 
 
 export default function PersonasPage() {
   const theme = useTheme();
+  const { state } = useLuca();
   const [personas, setPersonas] = useState<YumePersonaSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { location, navigate } = useAppLocation();
   const query = location.busca;
-  const filter: FilterMode = location.filtro === 'oficiais'
-    ? 'imported'
-    : location.filtro === 'secundarias'
-      ? 'available'
+  const filter: FilterMode = location.filtro === 'principais'
+    ? 'main'
+    : location.filtro === 'ativadas'
+      ? 'activated'
       : 'all';
-  const [secondaryOpen, setSecondaryOpen] = useState(false);
+
+  const activatedSlugs = useMemo(() => new Set(
+    (state?.personaAgents ?? [])
+      .filter((agent) => agent.enabled !== false)
+      .map((agent) => String(agent.slug || '').trim())
+      .filter(Boolean),
+  ), [state?.personaAgents]);
 
   function setQuery(value: string) {
     navigate({ busca: value }, 'replace');
@@ -47,7 +63,7 @@ export default function PersonasPage() {
 
   function setFilter(value: FilterMode) {
     navigate({
-      filtro: value === 'imported' ? 'oficiais' : value === 'available' ? 'secundarias' : 'all',
+      filtro: value === 'main' ? 'principais' : value === 'activated' ? 'ativadas' : 'all',
     }, 'replace');
   }
 
@@ -76,30 +92,28 @@ export default function PersonasPage() {
     void load();
   }, [load]);
 
-  useEffect(() => {
-    if (filter === 'available' || query.trim()) setSecondaryOpen(true);
-  }, [filter, query]);
+  const visiblePersonas = useMemo(() => personas.filter((persona) => (
+    isMainPersona(persona) || activatedSlugs.has(persona.slug)
+  )), [personas, activatedSlugs]);
+  const hiddenPersonaCount = personas.length - visiblePersonas.length;
 
   const searchedPersonas = useMemo(() => {
     const term = query.trim().toLowerCase();
-    return personas.filter((persona) => {
+    return visiblePersonas.filter((persona) => {
       if (!term) return true;
       return [persona.name, persona.slug, persona.description, persona.model]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(term));
     });
-  }, [personas, query]);
+  }, [visiblePersonas, query]);
 
-  const rosterPersonas = searchedPersonas.filter((persona) => persona.imported);
-  const secondaryPersonas = searchedPersonas.filter((persona) => !persona.imported);
-  const showRoster = filter !== 'available';
-  const showSecondary = filter !== 'imported';
-  const secondaryExpanded = secondaryOpen;
-  const visiblePersonaCount = (showRoster ? rosterPersonas.length : 0) + (showSecondary ? secondaryPersonas.length : 0);
+  const mainPersonas = searchedPersonas.filter(isMainPersona);
+  const activatedPersonas = searchedPersonas.filter((persona) => !isMainPersona(persona));
+  const showMain = filter !== 'activated';
+  const showActivated = filter !== 'main';
+  const visiblePersonaCount = (showMain ? mainPersonas.length : 0) + (showActivated ? activatedPersonas.length : 0);
 
   const showCatalogSkeleton = useDeferredFlag(loading && personas.length === 0);
-  const importedCount = personas.filter((persona) => persona.imported).length;
-  const availableCount = Math.max(0, personas.length - personas.filter((persona) => persona.imported).length);
 
   return (
     <div className="luca-page-shell h-full overflow-y-auto px-6 py-7 sm:px-8">
@@ -112,14 +126,14 @@ export default function PersonasPage() {
             </div>
             <h1 className="void-title text-3xl">Persona Cards</h1>
             <p className="mt-2 text-sm" style={{ color: theme.textMute }}>
-              Yume define o roster editorial; cache e builtins canônicos mantêm a execução disponível.
+              GPT, Grok e Claude ficam visíveis por padrão; o restante do catálogo aparece quando a persona é ativada na sua conta.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <Metric label="catalogo" value={personas.length} />
-            <Metric label="ativas" value={importedCount} />
-            <Metric label="secundarias" value={availableCount} />
+            <Metric label="exibidas" value={visiblePersonas.length} />
+            <Metric label="ocultas" value={hiddenPersonaCount} />
             <button type="button" className="btn-fleet inline-flex items-center gap-2" onClick={load} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               Recarregar
@@ -144,8 +158,8 @@ export default function PersonasPage() {
           <div className="flex rounded-lg border p-1" style={{ background: theme.input, borderColor: theme.border }}>
             {[
               ['all', 'Todas'],
-              ['imported', 'Oficiais'],
-              ['available', 'Secundarias'],
+              ['main', 'Principais'],
+              ['activated', 'Ativadas'],
             ].map(([id, label]) => {
               const active = filter === id;
               return (
@@ -191,32 +205,32 @@ export default function PersonasPage() {
           </div>
         ) : visiblePersonaCount > 0 ? (
           <div className="space-y-10">
-            {showRoster && (
-              <section aria-labelledby="luca-roster-title" className="space-y-4">
+            {showMain && (
+              <section aria-labelledby="luca-main-title" className="space-y-4">
                 <div className="flex flex-wrap items-end justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2">
                       <BadgeCheck className="h-4 w-4" style={{ color: theme.goldDeep }} aria-hidden="true" />
-                      <h2 id="luca-roster-title" className="text-sm font-semibold" style={{ color: theme.text }}>
-                        Roster principal
+                      <h2 id="luca-main-title" className="text-sm font-semibold" style={{ color: theme.text }}>
+                        Personas principais
                       </h2>
                       <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: theme.goldSoft, color: theme.goldDeep }}>
-                        {rosterPersonas.length}
+                        {mainPersonas.length}
                       </span>
                     </div>
                     <p className="mt-1 text-xs" style={{ color: theme.textMute }}>
-                      Fonte editorial: oficiais do Yume via Kamui. Builtins LUCA cobrem slugs canônicos ausentes e o cache sustenta outages.
+                      GPT, Grok e Claude: o trio visível por padrão. Fonte editorial: oficiais do Yume via Kamui; builtins LUCA e cache sustentam a execução.
                     </p>
                   </div>
                 </div>
 
-                {rosterPersonas.length > 0 ? (
+                {mainPersonas.length > 0 ? (
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
                   >
-                    {rosterPersonas.map((persona, index) => (
+                    {mainPersonas.map((persona, index) => (
                       <PersonaCard
                         key={persona.slug}
                         persona={persona}
@@ -226,60 +240,47 @@ export default function PersonasPage() {
                   </motion.div>
                 ) : (
                   <div className="rounded-xl border px-5 py-6 text-sm" style={{ borderColor: theme.border, color: theme.textMute }}>
-                    Nenhuma persona ativa está disponível nas fontes configuradas.
+                    Nenhuma persona principal corresponde à busca nas fontes configuradas.
                   </div>
                 )}
               </section>
             )}
 
-            {showSecondary && (
-              <section aria-labelledby="luca-secondary-title" className="space-y-4">
-                <button
-                  type="button"
-                  className="flex min-h-12 w-full items-center gap-3 rounded-xl border px-4 py-3 text-left active:scale-[0.96] motion-safe:transition-transform"
-                  style={{ background: theme.input, borderColor: theme.border, color: theme.text }}
-                  aria-expanded={secondaryExpanded}
-                  aria-controls="luca-secondary-panel"
-                  onClick={() => setSecondaryOpen((open) => !open)}
-                >
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: theme.goldSoft, color: theme.goldDeep }}>
-                    <Layers3 className="h-4 w-4" aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span id="luca-secondary-title" className="flex flex-wrap items-center gap-2 text-sm font-semibold">
-                      Disponíveis no Yume
-                      <span className="rounded-full px-2 py-0.5 text-[10px]" style={{ background: theme.surfaceHi, color: theme.textMute }}>
-                        {secondaryPersonas.length}
-                      </span>
+            {showActivated && (
+              <section aria-labelledby="luca-activated-title" className="space-y-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Layers3 className="h-4 w-4" style={{ color: theme.goldDeep }} aria-hidden="true" />
+                    <h2 id="luca-activated-title" className="text-sm font-semibold" style={{ color: theme.text }}>
+                      Ativadas na sua conta
+                    </h2>
+                    <span className="rounded-full px-2 py-0.5 text-[10px]" style={{ background: theme.surfaceHi, color: theme.textMute }}>
+                      {activatedPersonas.length}
                     </span>
-                    <span className="mt-0.5 block text-xs" style={{ color: theme.textMute }}>
-                      Fora do roster global e bloqueadas para execução. A promoção é feita no Yume.
-                    </span>
-                  </span>
-                  <ChevronDown
-                    className={`h-5 w-5 shrink-0 motion-safe:transition-transform ${secondaryExpanded ? 'rotate-180' : ''}`}
-                    style={{ color: theme.textMute }}
-                    aria-hidden="true"
-                  />
-                </button>
+                  </div>
+                  <p className="mt-1 text-xs" style={{ color: theme.textMute }}>
+                    Personas fora do trio principal ficam ocultas até você ativá-las na sua conta.
+                    {hiddenPersonaCount > 0 ? ` ${hiddenPersonaCount} do catálogo estão ocultas agora.` : ''} A ativação é gerenciada no Yume.
+                  </p>
+                </div>
 
-                {secondaryExpanded && (
+                {activatedPersonas.length > 0 || !query.trim() ? (
                   <motion.div
-                    id="luca-secondary-panel"
+                    id="luca-activated-panel"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
                   >
-                    {secondaryPersonas.map((persona, index) => (
+                    {activatedPersonas.map((persona, index) => (
                       <PersonaCard
                         key={persona.slug}
                         persona={persona}
                         delay={index * 0.025}
                       />
                     ))}
-                    {!query.trim() && <NewPersonaCard delay={secondaryPersonas.length * 0.025} />}
+                    {!query.trim() && <NewPersonaCard delay={activatedPersonas.length * 0.025} />}
                   </motion.div>
-                )}
+                ) : null}
               </section>
             )}
           </div>
@@ -295,12 +296,16 @@ export default function PersonasPage() {
               <p className="text-sm font-semibold" style={{ color: theme.textSoft }}>
                 {personas.length === 0
                   ? 'Nenhuma persona disponível.'
-                  : 'Nenhuma persona corresponde à busca ou filtro.'}
+                  : visiblePersonas.length === 0 && !query.trim() && filter === 'all'
+                    ? 'Todo o catálogo está oculto nesta conta.'
+                    : 'Nenhuma persona corresponde à busca ou filtro.'}
               </p>
               <p className="mt-2 max-w-[48ch] text-xs leading-relaxed" style={{ color: theme.textGhost }}>
                 {personas.length === 0
                   ? 'Recarregue as fontes; novas personas editoriais continuam sendo criadas no Yume.'
-                  : 'Limpe a busca e o filtro, ou recarregue o catálogo se o Yume acabou de sincronizar.'}
+                  : visiblePersonas.length === 0 && !query.trim() && filter === 'all'
+                    ? 'Personas fora do trio GPT, Grok e Claude só aparecem quando ativadas na sua conta. Abra o Yume para ativar.'
+                    : 'Limpe a busca e o filtro, ou recarregue o catálogo se o Yume acabou de sincronizar.'}
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2">
@@ -419,8 +424,8 @@ function PersonaCard({ persona, delay }: PersonaCardProps) {
         />
       )}
       <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 p-3">
-        <span className={persona.imported ? 'state-badge ok' : 'state-badge dormant'}>
-          {persona.imported ? 'Oficial' : 'Secundária'}
+        <span className={isMainPersona(persona) ? 'state-badge ok' : 'state-badge dormant'}>
+          {isMainPersona(persona) ? 'Principal' : 'Ativada'}
         </span>
         {persona.version !== null && persona.version !== undefined && (
           <span className="rounded-full px-2 py-1 text-[10px] font-mono" style={{ background: 'rgba(5,8,13,0.62)', color: theme.text }}>

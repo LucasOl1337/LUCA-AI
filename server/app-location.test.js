@@ -34,12 +34,12 @@ test('páginas viram path legível e path desconhecido não quebra', () => {
 test('valor padrão some; filtro e busca aparecem com nome de gente', () => {
   assert.equal(formatAppUrl({ page: 'personas', filtro: 'all', busca: '' }), '/personas');
   assert.equal(
-    formatAppUrl({ page: 'personas', filtro: 'oficiais', busca: 'juiz' }),
-    '/personas?busca=juiz&filtro=oficiais',
+    formatAppUrl({ page: 'personas', filtro: 'principais', busca: 'juiz' }),
+    '/personas?busca=juiz&filtro=principais',
   );
-  const parsed = parseAppLocation('/personas?busca=juiz&filtro=secundarias');
+  const parsed = parseAppLocation('/personas?busca=juiz&filtro=ativadas');
   assert.equal(parsed.busca, 'juiz');
-  assert.equal(parsed.filtro, 'secundarias');
+  assert.equal(parsed.filtro, 'ativadas');
 });
 
 test('SOMPO, admin, configuração e bancada serializam só o que não é default', () => {
@@ -69,9 +69,9 @@ test('toda tela alcançável redonda no parser sem perder o endereço', () => {
     ['/cadastro', '/cadastro'],
     ['/entrar', '/'],
     ['/personas', '/personas'],
-    ['/personas?filtro=oficiais', '/personas?filtro=oficiais'],
-    ['/personas?busca=juiz&filtro=oficiais', '/personas?busca=juiz&filtro=oficiais'],
-    ['/personas?filtro=secundarias', '/personas?filtro=secundarias'],
+    ['/personas?filtro=principais', '/personas?filtro=principais'],
+    ['/personas?busca=juiz&filtro=principais', '/personas?busca=juiz&filtro=principais'],
+    ['/personas?filtro=ativadas', '/personas?filtro=ativadas'],
     ['/configuracao', '/configuracao'],
     ['/configuracao?tipo=individual', '/configuracao?tipo=individual'],
     ['/configuracao?novo=1', '/configuracao?novo=1'],
@@ -117,7 +117,7 @@ test('leitura pública e cadastro continuam nos paths de ontem', () => {
 });
 
 test('trocar de página zera query da tela anterior', () => {
-  const from = parseAppLocation('/personas?busca=juiz&filtro=oficiais');
+  const from = parseAppLocation('/personas?busca=juiz&filtro=principais');
   const next = mergeAppLocation(from, { page: 'sompo' });
   assert.equal(next.page, 'sompo');
   assert.equal(next.busca, '');

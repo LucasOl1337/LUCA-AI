@@ -22,7 +22,7 @@ export const PAGE_PATHS = Object.freeze({
   admin: '/admin',
 });
 
-export const PERSONA_FILTRO = Object.freeze(['all', 'oficiais', 'secundarias']);
+export const PERSONA_FILTRO = Object.freeze(['all', 'principais', 'ativadas']);
 export const SOMPO_ABA = 'casos';
 export const LUCA_ABA = 'atividade';
 export const CONFIG_TIPO = Object.freeze(['team', 'individual']);
