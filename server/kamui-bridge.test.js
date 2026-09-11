@@ -68,7 +68,7 @@ test('kamuiGet envia x-sennin-internal-token quando KAMUI_INTERNAL_API_TOKEN exi
 });
 
 test('fetchYumePersonaSystemPrompt retorna o system_prompt do envelope', async () => {
-  const calls = installFetchMock(() => envelope({ slug: 'maestro', name: 'Maestro', model: 'cx/gpt-5.5', system_prompt: 'Voce e o Maestro.' }));
+  const calls = installFetchMock(() => envelope({ slug: 'maestro', name: 'Maestro', model: 'cx/gpt-5.6-sol(high)', system_prompt: 'Voce e o Maestro.' }));
   const data = await kamui.fetchYumePersonaSystemPrompt('maestro');
   assert.equal(data.system_prompt, 'Voce e o Maestro.');
   assert.match(calls[0].url, /\/kamui\/yume\/personas\/maestro\/system-prompt$/);

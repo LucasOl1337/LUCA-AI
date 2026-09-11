@@ -2946,7 +2946,6 @@ const ROUTER_PROFILE_GROUP_LABELS: Record<string, string> = {
   cc: 'Claude',
   cx: 'GPT',
   gcli: 'Grok',
-  kimi: 'Kimi',
 };
 
 function groupedRouterProfiles(profiles: RouterModelProfile[]): Array<{ label: string; profiles: RouterModelProfile[] }> {

@@ -33,31 +33,27 @@ export const CLOUDFLARE_ACCESS_EMAILS = Object.freeze(
 export const API_RATE_LIMIT_MAX = Number(process.env.API_RATE_LIMIT_MAX ?? 900);
 export const API_RATE_LIMIT_WINDOW_MS = Number(process.env.API_RATE_LIMIT_WINDOW_MS ?? 60000);
 
-// Catalogo fechado do 9Router. O nivel de esforco faz parte da propria rota;
-// o LUCA nao cria variants nem envia controles de raciocinio ao provider.
+// Catalogo fechado do 9Router. O nivel de esforco faz parte da propria rota
+// (sufixo "(effort)" no ID); o LUCA nao cria variants nem envia controles de
+// raciocinio ao provider.
 const NINE_ROUTER_PROFILE_DEFINITIONS = [
-  ['claude-fable-5', 'Claude Fable 5', 'cc/claude-fable-5'],
-  ['claude-opus-4-8-alto', 'Claude Opus 4.8 Alto', 'cc/claude-opus-4-8(max)'],
-  ['gpt-5-6-sol-normal', 'GPT 5.6 Sol Normal', 'cx/gpt-5.6-sol'],
-  ['gpt-5-6-sol-high', 'GPT 5.6 Sol High', 'cx/gpt-5.6-sol-high'],
-  ['gpt-5-6-sol-xhigh', 'GPT 5.6 Sol xhigh', 'cx/gpt-5.6-sol-xhigh'],
-  ['gpt-5-6-sol-ultra', 'GPT 5.6 Sol Ultra', 'cx/gpt-5.6-sol-xhigh'],
-  ['gpt-5-6-luna-xhigh', 'GPT 5.6 Luna xhigh', 'cx/gpt-5.6-luna-xhigh'],
-  ['gpt-5-6-luna-ultra', 'GPT 5.6 Luna Ultra', 'cx/gpt-5.6-luna-xhigh'],
-  ['gpt-5-5', 'GPT 5.5', 'cx/gpt-5.5'],
-  ['gpt-5-5-xhigh', 'GPT 5.5 xhigh', 'cx/gpt-5.5-xhigh'],
+  ['claude-fable-5-medium', 'Claude Fable 5 Medium', 'cc/claude-fable-5(medium)'],
+  ['claude-fable-5-high', 'Claude Fable 5 High', 'cc/claude-fable-5(high)'],
+  ['claude-fable-5-max', 'Claude Fable 5 Max', 'cc/claude-fable-5(max)'],
+  ['claude-opus-5-medium', 'Claude Opus 5 Medium', 'cc/claude-opus-5(medium)'],
+  ['claude-opus-5-high', 'Claude Opus 5 High', 'cc/claude-opus-5(high)'],
+  ['claude-opus-5-max', 'Claude Opus 5 Max', 'cc/claude-opus-5(max)'],
+  ['gpt-5-6-sol-medium', 'GPT 5.6 Sol Medium', 'cx/gpt-5.6-sol(medium)'],
+  ['gpt-5-6-sol-high', 'GPT 5.6 Sol High', 'cx/gpt-5.6-sol(high)'],
+  ['gpt-5-6-sol-max', 'GPT 5.6 Sol Max', 'cx/gpt-5.6-sol(max)'],
+  ['gpt-5-6-sol-ultra', 'GPT 5.6 Sol Ultra', 'cx/gpt-5.6-sol(max)'],
+  ['gpt-5-6-luna-medium', 'GPT 5.6 Luna Medium', 'cx/gpt-5.6-luna(medium)'],
+  ['gpt-5-6-luna-xhigh', 'GPT 5.6 Luna xhigh', 'cx/gpt-5.6-luna(xhigh)'],
+  ['gpt-5-6-luna-max', 'GPT 5.6 Luna Max', 'cx/gpt-5.6-luna(max)'],
+  ['gpt-5-6-luna-ultra', 'GPT 5.6 Luna Ultra', 'cx/gpt-5.6-luna(max)'],
   ['grok-4-6', 'Grok 4.6', 'gcli/grok-4.6'],
-  ['grok-4-6-high', 'Grok 4.6 High', 'gcli/grok-4.6-high'],
-  ['grok-4-6-medium', 'Grok 4.6 Medium', 'gcli/grok-4.6-medium'],
-  ['grok-4-6-low', 'Grok 4.6 Low', 'gcli/grok-4.6-low'],
-  ['grok-4-5', 'Grok 4.5', 'gcli/grok-4.5'],
-  ['grok-4-5-high', 'Grok 4.5 High', 'gcli/grok-4.5-high'],
-  ['grok-4-5-medium', 'Grok 4.5 Medium', 'gcli/grok-4.5-medium'],
-  ['grok-4-5-low', 'Grok 4.5 Low', 'gcli/grok-4.5-low'],
-  ['kimi-k3-general', 'Kimi K3 General', 'kimi/kimi-k3'],
-  ['kimi-k3-code', 'Kimi K3 Code', 'kimi/k3'],
-  ['kimi-k2-7-code', 'Kimi K2.7 Code', 'kimi/kimi-for-coding'],
-  ['kimi-k2-7-code-highspeed', 'Kimi K2.7 Code HighSpeed', 'kimi/kimi-for-coding-highspeed'],
+  ['grok-4-6-high', 'Grok 4.6 High', 'gcli/grok-4.6(high)'],
+  ['grok-4-5-high', 'Grok 4.5 High', 'gcli/grok-4.5(high)'],
 ];
 
 export const NINE_ROUTER_CAPABILITIES = Object.freeze({
@@ -84,8 +80,8 @@ export const NINE_ROUTER_ROUTE_IDS = Object.freeze([
 ]);
 
 const NINE_ROUTER_ROUTE_ID_SET = new Set(NINE_ROUTER_ROUTE_IDS);
-const DEFAULT_ROUTER_MODEL = 'cx/gpt-5.6-sol';
-const DEFAULT_SPECIALIST_MODEL = 'cx/gpt-5.5-xhigh';
+const DEFAULT_ROUTER_MODEL = 'cx/gpt-5.6-sol(high)';
+const DEFAULT_SPECIALIST_MODEL = 'cx/gpt-5.6-sol(max)';
 
 export function isAllowed9RouterModel(value) {
   return NINE_ROUTER_ROUTE_ID_SET.has(String(value || '').trim());
@@ -111,11 +107,9 @@ export const DESIGNER_MODEL = sanitize9RouterModel(process.env.DESIGNER_MODEL, D
 export const MAESTRO_MODEL = sanitize9RouterModel(process.env.MAESTRO_MODEL, DEFAULT_SPECIALIST_MODEL);
 
 // Geracao de imagem: mesmo caminho do Maestro/Sennin via 9Router POST /images/generations.
-// Primario confirmado em producao: cx/gpt-5.5-image (Codex); fallbacks iguais ao Maestro.
+// Primario do plano ChatGPT/Codex: cx/gpt-image-2; fallbacks xAI iguais ao Maestro.
 const IMAGE_GENERATION_PROFILE_DEFINITIONS = [
-  ['gpt-image', 'GPT Image 5.5', 'cx/gpt-5.5-image'],
-  ['gpt-image-5.4', 'GPT Image 5.4', 'cx/gpt-5.4-image'],
-  ['gpt-image-1', 'GPT Image 1', 'cx/gpt-image-1'],
+  ['gpt-image-2', 'GPT Image 2', 'cx/gpt-image-2'],
   ['grok-imagine', 'Grok Imagine', 'xai/grok-imagine-image'],
   ['grok-imagine-quality', 'Grok Imagine Quality', 'xai/grok-imagine-image-quality'],
 ];
@@ -151,15 +145,16 @@ const IMAGE_ENGINE_ALIASES = Object.freeze({
   'imagine-2': 'xai/grok-imagine-image',
   'grok': 'xai/grok-imagine-image',
   'grok-imagine-quality': 'xai/grok-imagine-image-quality',
-  'gpt-image': 'cx/gpt-5.5-image',
-  'gpt-5.5-image': 'cx/gpt-5.5-image',
-  'gpt-image-5.5': 'cx/gpt-5.5-image',
-  'gpt-5.4-image': 'cx/gpt-5.4-image',
-  'gpt-image-5.4': 'cx/gpt-5.4-image',
-  'gpt-image-1': 'cx/gpt-image-1',
-  'gpt': 'cx/gpt-5.5-image',
+  'gpt-image': 'cx/gpt-image-2',
+  'gpt-image-2': 'cx/gpt-image-2',
+  'gpt-5.5-image': 'cx/gpt-image-2',
+  'gpt-image-5.5': 'cx/gpt-image-2',
+  'gpt-5.4-image': 'cx/gpt-image-2',
+  'gpt-image-5.4': 'cx/gpt-image-2',
+  'gpt-image-1': 'cx/gpt-image-2',
+  'gpt': 'cx/gpt-image-2',
 });
-const DEFAULT_IMAGE_GENERATION_MODEL = 'cx/gpt-5.5-image';
+const DEFAULT_IMAGE_GENERATION_MODEL = 'cx/gpt-image-2';
 
 /** Mapa aspect_ratio → size no formato Maestro/OpenAI images. */
 const ASPECT_RATIO_TO_SIZE = Object.freeze({

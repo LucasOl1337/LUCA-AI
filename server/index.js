@@ -1197,7 +1197,7 @@ async function runMissionTransformer(agent, mission) {
     setMission(mission);
     setRunBriefing(output);
     setAgentStatus(agent.id, 'ready');
-    addHeartbeat(agent.id, 'ready', 'missao transformada com gpt-5.5');
+    addHeartbeat(agent.id, 'ready', 'missao transformada com gpt-5.6');
     appendAgentHeartbeatEvent(agent.id, 'done', 'missao transformada');
 
     const summary = summarizeFirstLine(output);

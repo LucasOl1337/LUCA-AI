@@ -6,11 +6,11 @@ Leia SOMENTE ao mudar roteador LLM, Kamui, personas Yume, anexos ou a publicacao
 
 `server/router-client.js` fala API OpenAI-compatible. Padrao em `server/config.js`: `http://127.0.0.1:20129/v1`. `20128` e nginx e devolve 403 — nao use. Override: `ROUTER_BASE_URL`. Credencial: `ROUTER_API_KEY` ou `NINE_ROUTER_API_KEY`.
 
-O catalogo fechado vive em `server/config.js`. Rota fora da lista nunca vai ao provider. Ultra e alias da rota `-xhigh`; o cliente nao envia campos de esforco.
+O catalogo fechado vive em `server/config.js`. Rota fora da lista nunca vai ao provider. O nivel de esforco vai embutido no ID da rota (`(medium)`, `(high)`, `(xhigh)`, `(max)`); Ultra e alias da rota `(max)` e o cliente nao envia campos de esforco.
 
 Chat usa `stream: true`. Timeout padrao 120s (`ROUTER_TIMEOUT_MS`): se o abort pegar SSE parcial, o cliente devolve o texto ja recebido em vez de falhar o turno. Sem tokens, o loop da persona tenta uma vez mais sem ferramentas e com teto menor. Contexto acumulado do Fluxo 5/5 e compactado (`DEFAULT_MAX_ACCUMULATED_CONTEXT_CHARS`).
 
-Imagem: `POST {ROUTER_BASE_URL}/images/generations` (`size` + `b64_json`). Default `IMAGE_GENERATION_MODEL=cx/gpt-5.5-image`. Catalogo de imagem e separado do de chat.
+Imagem: `POST {ROUTER_BASE_URL}/images/generations` (`size` + `b64_json`). Default `IMAGE_GENERATION_MODEL=cx/gpt-image-2`. Catalogo de imagem e separado do de chat.
 
 ## Yume e Kamui
 

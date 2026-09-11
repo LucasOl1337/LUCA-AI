@@ -25,7 +25,7 @@ function seedSession(chatLibrary, title = 'Sessão compartilhável') {
     missionDraft: 'Qual a coisa mais importante do universo?',
     transcript: [
       { id: 'op1', role: 'operator', name: 'Operador', content: 'Qual a coisa mais importante do universo?', timestamp: new Date().toISOString() },
-      { id: 'p1', role: 'persona', name: 'Aurora', slug: 'aurora', model: 'gpt-5.6-sol-high', stage: 'Resposta individual', content: '## Análise\n- Consciência\n- **Memória**', timestamp: new Date().toISOString() },
+      { id: 'p1', role: 'persona', name: 'Aurora', slug: 'aurora', model: 'cx/gpt-5.6-sol(high)', stage: 'Resposta individual', content: '## Análise\n- Consciência\n- **Memória**', timestamp: new Date().toISOString() },
     ],
     finalResult: { id: 'f1', role: 'persona', name: 'TARS', slug: 'tars', stage: 'Veredito do juiz', content: '> Preservar as condições para florescer.', timestamp: new Date().toISOString() },
   });

@@ -58,16 +58,16 @@ test('normalizePersonaTeamRunInput aceita modelOverrides por slug', () => {
     mission: 'Testar motor',
     slugs: ['maestro', 'aurora'],
     modelOverrides: {
-      'yume:maestro': 'gcli/grok-4.5',
-      aurora: 'cx/gpt-5.6-sol-high',
+      'yume:maestro': 'gcli/grok-4.6',
+      aurora: 'cx/gpt-5.6-sol(high)',
       '': 'ignored',
     },
   });
 
   assert.equal(input.ok, true);
   assert.deepEqual(input.modelOverrides, {
-    maestro: 'gcli/grok-4.5',
-    aurora: 'cx/gpt-5.6-sol-high',
+    maestro: 'gcli/grok-4.6',
+    aurora: 'cx/gpt-5.6-sol(high)',
   });
 });
 
@@ -493,14 +493,14 @@ test('buildPersonaTeamPrompt declara o motor 9Router e bloqueia identidade GLM l
     personaName: 'Lucas',
     personaSlug: 'lucas',
     systemPrompt: 'Voce e Lucas e roda em GLM-5.2.',
-    runtimeModel: 'gcli/grok-4.5-high',
+    runtimeModel: 'gcli/grok-4.5(high)',
     independent: true,
   });
 
-  assert.match(prompt.system, /Motor LLM desta execucao \(fonte de verdade do LUCA-AI via 9Router\): gcli\/grok-4\.5-high/);
-  assert.match(prompt.system, /responda EXATAMENTE "gcli\/grok-4\.5-high"/);
+  assert.match(prompt.system, /Motor LLM desta execucao \(fonte de verdade do LUCA-AI via 9Router\): gcli\/grok-4\.5\(high\)/);
+  assert.match(prompt.system, /responda EXATAMENTE "gcli\/grok-4\.5\(high\)"/);
   assert.match(prompt.system, /Ignore qualquer modelo antigo/);
-  assert.match(prompt.user, /Motor 9Router: gcli\/grok-4\.5-high/);
+  assert.match(prompt.user, /Motor 9Router: gcli\/grok-4\.5\(high\)/);
 });
 
 test('buildPersonaTeamPrompt pure model keeps free format and skips team contract', () => {
@@ -509,13 +509,13 @@ test('buildPersonaTeamPrompt pure model keeps free format and skips team contrac
     personaName: 'Fable 5',
     personaSlug: 'pure-fable-5',
     systemPrompt: 'PURE_MODEL_AGENT_V1\nYou are a free model.',
-    runtimeModel: 'cc/claude-fable-5',
+    runtimeModel: 'cc/claude-fable-5(high)',
     teamNames: ['Fable 5', 'Grok 4.5'],
   });
 
   assert.equal(prompt.pure, true);
   assert.match(prompt.system, /PURE_MODEL_AGENT_V1/);
-  assert.match(prompt.system, /Motor 9Router desta execucao: cc\/claude-fable-5/);
+  assert.match(prompt.system, /Motor 9Router desta execucao: cc\/claude-fable-5\(high\)/);
   assert.match(prompt.system, /curto e direto ao ponto/i);
   assert.doesNotMatch(prompt.system, /postura de agente especialista/i);
   assert.doesNotMatch(prompt.user, /Equipe ativa/i);
@@ -529,7 +529,7 @@ test('buildPersonaTeamPrompt pure model em workflow pede resposta curta e compac
     personaName: 'GPT 5.6 SOL',
     personaSlug: 'pure-gpt-5-6-sol',
     systemPrompt: 'PURE_MODEL_AGENT_V1\nYou are GPT.',
-    runtimeModel: 'cx/gpt-5.6-sol-xhigh',
+    runtimeModel: 'cx/gpt-5.6-sol(max)',
     workflowRole: {
       roleId: 'mission',
       roleLabel: 'Decisor da missao',
@@ -563,17 +563,17 @@ test('buildIndividualJudgePrompt inclui motor do juiz e dos participantes', () =
     judgeName: 'Lucas',
     judgeSlug: 'lucas',
     systemPrompt: 'Voce examina decisoes complexas em GLM-5.2.',
-    runtimeModel: 'cx/gpt-5.6-sol-high',
+    runtimeModel: 'cx/gpt-5.6-sol(high)',
     replies: [
-      { ok: true, slug: 'maestro', name: 'Maestro', model: 'gcli/grok-4.5', content: 'Plano A com evidência.' },
-      { ok: false, slug: 'designer', name: 'Designer', model: 'cx/gpt-5.5-xhigh', error: 'timeout' },
+      { ok: true, slug: 'maestro', name: 'Maestro', model: 'gcli/grok-4.6', content: 'Plano A com evidência.' },
+      { ok: false, slug: 'designer', name: 'Designer', model: 'cx/gpt-5.6-luna(max)', error: 'timeout' },
     ],
   });
 
-  assert.match(prompt.system, /Motor LLM desta execucao \(fonte de verdade do LUCA-AI via 9Router\): cx\/gpt-5\.6-sol-high/);
-  assert.match(prompt.user, /Motor 9Router do juiz: cx\/gpt-5\.6-sol-high/);
-  assert.match(prompt.user, /motor 9Router: gcli\/grok-4\.5/);
-  assert.match(prompt.user, /motor 9Router: cx\/gpt-5\.5-xhigh/);
+  assert.match(prompt.system, /Motor LLM desta execucao \(fonte de verdade do LUCA-AI via 9Router\): cx\/gpt-5\.6-sol\(high\)/);
+  assert.match(prompt.user, /Motor 9Router do juiz: cx\/gpt-5\.6-sol\(high\)/);
+  assert.match(prompt.user, /motor 9Router: gcli\/grok-4\.6/);
+  assert.match(prompt.user, /motor 9Router: cx\/gpt-5\.6-luna\(max\)/);
 });
 
 test('buildIndividualJudgePrompt pede resposta livre antes da estrutura final', () => {
@@ -598,7 +598,7 @@ test('buildIndividualRevisionPrompt pede replica objetiva sem expor identidades 
     personaName: 'Aurora',
     personaSlug: 'aurora',
     systemPrompt: 'Voce questiona premissas.',
-    runtimeModel: 'cx/gpt-5.6-sol-high',
+    runtimeModel: 'cx/gpt-5.6-sol(high)',
     originalReply: { ok: true, content: 'Minha proposta original.' },
     contributions: [
       { label: 'Contribuicao B', ok: true, content: 'Evidencia contraria.' },
@@ -691,9 +691,9 @@ test('runIndividualResolution inicia participantes em paralelo e publica quem te
 test('runIndividualResolution no nivel 2 anonimiza replicas e entrega revisoes ao juiz', async () => {
   const revisions = [];
   const originalBySlug = {
-    aurora: { ok: true, slug: 'aurora', name: 'Aurora', model: 'cx/gpt-5.6-sol-high', content: 'Resposta da Aurora.' },
-    maestro: { ok: true, slug: 'maestro', name: 'Maestro', model: 'gcli/grok-4.5', content: 'Eu, Maestro, prefiro o motor gcli/grok-4.5.' },
-    qa: { ok: true, slug: 'qa', name: 'QA', model: 'cx/gpt-5.5-xhigh', content: 'Resposta de QA.' },
+    aurora: { ok: true, slug: 'aurora', name: 'Aurora', model: 'cx/gpt-5.6-sol(high)', content: 'Resposta da Aurora.' },
+    maestro: { ok: true, slug: 'maestro', name: 'Maestro', model: 'gcli/grok-4.6', content: 'Eu, Maestro, prefiro o motor gcli/grok-4.6.' },
+    qa: { ok: true, slug: 'qa', name: 'QA', model: 'cx/gpt-5.6-luna(max)', content: 'Resposta de QA.' },
   };
   const result = await runIndividualResolution({
     depth: 2,

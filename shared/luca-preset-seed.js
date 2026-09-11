@@ -2,27 +2,28 @@
 // Frontend mapeia `icon` → Lucide; server grava no workspace no primeiro GET.
 
 export const VISUAL_PERSONA_SLUG = 'especialista-visual';
-export const VISUAL_PERSONA_MODEL = 'gcli/grok-4.6-high';
+export const VISUAL_PERSONA_MODEL = 'cc/claude-fable-5(high)';
 export const MAX_PARTICIPANTS = 5;
 export const PRESET_ICON_IDS = ['sprout', 'hardhat', 'briefcase', 'swords', 'crown', 'stethoscope', 'users'];
 
 // Alterna famílias e rotas do catálogo fechado para reduzir erro correlacionado
-// e falso consenso. A etapa visual usa um default fixo próprio.
+// e falso consenso. A etapa visual usa um default fixo próprio. Não incluir
+// STRONGEST_JUDGE_MODEL aqui: o juiz precisa ser uma rota distinta das demais.
 const DIVERSE_MODELS = [
-  'cc/claude-opus-4-8(max)',
-  'gcli/grok-4.6-high',
-  'kimi/k3',
-  'cx/gpt-5.6-luna-xhigh',
-  'cc/claude-fable-5',
-  'cx/gpt-5.5-xhigh',
-  'kimi/kimi-k3',
-  'cx/gpt-5.6-sol-xhigh',
-  'cx/gpt-5.6-sol-high',
+  'cc/claude-opus-5(max)',
+  'gcli/grok-4.6(high)',
+  'cx/gpt-5.6-luna(xhigh)',
+  'cc/claude-fable-5(medium)',
+  'cx/gpt-5.6-sol(medium)',
+  'gcli/grok-4.5(high)',
+  'cc/claude-fable-5(max)',
+  'cx/gpt-5.6-luna(max)',
+  'cc/claude-opus-5(high)',
   'gcli/grok-4.6',
 ];
-// Sol xhigh é a rota de maior esforço da família GPT 5.6 mais nova; o perfil
+// Sol (max) é a rota de maior esforço da família GPT 5.6 mais nova; o perfil
 // Ultra aponta para o mesmo ID, portanto não oferece capacidade adicional.
-const STRONGEST_JUDGE_MODEL = 'cx/gpt-5.6-sol-xhigh';
+const STRONGEST_JUDGE_MODEL = 'cx/gpt-5.6-sol(max)';
 
 function modelsFor(slugs) {
   return Object.fromEntries(slugs.map((slug, index) => [

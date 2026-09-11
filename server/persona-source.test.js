@@ -7,7 +7,7 @@ const BUILTIN = {
   slug: 'especialista-visual',
   name: 'Especialista Visual',
   is_official: true,
-  model: 'cx/gpt-5.6-sol',
+  model: 'cx/gpt-5.6-sol(high)',
   system_prompt: 'PROMPT BUILTIN VISUAL',
   luca_builtin: true,
 };
@@ -58,8 +58,8 @@ function sourceFixture({ catalog = [], prompts = {}, versions = {}, initial = []
 test('Persona Source preserva precedencia autoritativa do Yume sobre builtin com a mesma slug', async () => {
   const { source, cache } = sourceFixture({
     catalog: [
-      { ...BUILTIN, name: 'Visual do Yume', model: 'gcli/grok-4.5', luca_builtin: undefined },
-      { slug: 'aurora', name: 'Aurora', model: 'kimi/k3', is_official: true },
+      { ...BUILTIN, name: 'Visual do Yume', model: 'gcli/grok-4.6', luca_builtin: undefined },
+      { slug: 'aurora', name: 'Aurora', model: 'gcli/grok-4.6(high)', is_official: true },
     ],
   });
 
@@ -73,7 +73,7 @@ test('Persona Source preserva precedencia autoritativa do Yume sobre builtin com
 
 test('Persona Source injeta e resolve builtin ausente sem round-trip de prompt no Kamui', async () => {
   const { source, calls } = sourceFixture({
-    catalog: [{ slug: 'aurora', name: 'Aurora', model: 'kimi/k3', is_official: true }],
+    catalog: [{ slug: 'aurora', name: 'Aurora', model: 'gcli/grok-4.6(high)', is_official: true }],
   });
 
   const available = await source.listAvailable();
@@ -99,7 +99,7 @@ test('Persona Source mantem cache executavel e builtin quando catalogo Yume fica
       source: 'yume',
       isOfficial: true,
       model: '',
-      yumeModel: 'kimi/k3',
+      yumeModel: 'gcli/grok-4.6',
       enabled: true,
       cachedVersion: 7,
       cachedSystemPrompt: 'PROMPT CACHE AURORA',
@@ -126,9 +126,9 @@ test('Persona Source mantem cache executavel e builtin quando catalogo Yume fica
 
 test('Persona Source concentra cache de prompt e precedencia de modelo', async () => {
   const { source, calls } = sourceFixture({
-    catalog: [{ slug: 'aurora', name: 'Aurora', model: 'gcli/grok-4.5', is_official: true }],
+    catalog: [{ slug: 'aurora', name: 'Aurora', model: 'gcli/grok-4.6', is_official: true }],
     prompts: {
-      aurora: { name: 'Aurora', model: 'gcli/grok-4.5', system_prompt: 'PROMPT YUME', version: 9 },
+      aurora: { name: 'Aurora', model: 'gcli/grok-4.6', system_prompt: 'PROMPT YUME', version: 9 },
     },
     versions: { aurora: 9 },
     initial: [{
@@ -137,8 +137,8 @@ test('Persona Source concentra cache de prompt e precedencia de modelo', async (
       name: 'Aurora',
       source: 'yume',
       isOfficial: true,
-      model: 'cx/gpt-5.6-sol-high',
-      yumeModel: 'gcli/grok-4.5',
+      model: 'cx/gpt-5.6-sol(high)',
+      yumeModel: 'gcli/grok-4.6',
       enabled: true,
       cachedVersion: null,
       cachedSystemPrompt: null,
@@ -147,14 +147,14 @@ test('Persona Source concentra cache de prompt e precedencia de modelo', async (
   });
 
   const first = await source.loadMany(['aurora'], {
-    modelOverrides: { aurora: 'kimi/k3' },
+    modelOverrides: { aurora: 'cc/claude-fable-5(max)' },
   });
-  assert.equal(first.entries[0].loaded.model, 'kimi/k3');
+  assert.equal(first.entries[0].loaded.model, 'cc/claude-fable-5(max)');
   assert.equal(first.entries[0].loaded.systemPrompt, 'PROMPT YUME');
   assert.equal(first.entries[0].loaded.cached, false);
 
   const second = await source.resolve('aurora');
-  assert.equal(second.model, 'cx/gpt-5.6-sol-high');
+  assert.equal(second.model, 'cx/gpt-5.6-sol(high)');
   assert.equal(second.cached, true);
   assert.deepEqual(calls.prompt, ['aurora']);
 });
@@ -162,8 +162,8 @@ test('Persona Source concentra cache de prompt e precedencia de modelo', async (
 test('Persona Source importa e remove somente secundaria; oficial permanece', async () => {
   const { source, cache } = sourceFixture({
     catalog: [
-      { slug: 'aurora', name: 'Aurora', model: 'kimi/k3', is_official: true },
-      { slug: 'jinx', name: 'Jinx', model: 'cx/gpt-5.6-sol', is_official: false },
+      { slug: 'aurora', name: 'Aurora', model: 'gcli/grok-4.6(high)', is_official: true },
+      { slug: 'jinx', name: 'Jinx', model: 'cx/gpt-5.6-sol(high)', is_official: false },
     ],
   });
 

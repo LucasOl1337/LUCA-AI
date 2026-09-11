@@ -13,7 +13,7 @@ import {
 } from './config.js';
 
 const pageSource = fs.readFileSync(new URL('../src/pages/LucaAiPage.tsx', import.meta.url), 'utf8');
-const STRONGEST_JUDGE_ROUTE = 'cx/gpt-5.6-sol-xhigh';
+const STRONGEST_JUDGE_ROUTE = 'cx/gpt-5.6-sol(max)';
 
 function teamSlugs(preset) {
   return Object.values(preset.assignments).flat();
@@ -24,7 +24,7 @@ test('templates seed atribuem uma rota válida e diversa a cada persona', () => 
     const slugs = teamSlugs(preset);
     const nonVisualSlugs = slugs.filter((slug) => slug !== VISUAL_PERSONA_SLUG);
     assert.deepEqual(Object.keys(preset.models).sort(), [...slugs].sort(), `${preset.id}: cobertura de modelos`);
-    assert.equal(preset.models[VISUAL_PERSONA_SLUG], VISUAL_PERSONA_MODEL, `${preset.id}: visual usa Grok 4.6`);
+    assert.equal(preset.models[VISUAL_PERSONA_SLUG], VISUAL_PERSONA_MODEL, `${preset.id}: visual usa a rota visual default`);
     assert.equal(
       new Set(nonVisualSlugs.map((slug) => preset.models[slug])).size,
       nonVisualSlugs.length,
@@ -41,7 +41,7 @@ test('templates seed atribuem uma rota válida e diversa a cada persona', () => 
     const nonVisualSlugs = [...preset.participants, preset.judge];
     const slugs = [...nonVisualSlugs, VISUAL_PERSONA_SLUG];
     assert.deepEqual(Object.keys(preset.models).sort(), [...slugs].sort(), `${preset.id}: cobertura de modelos`);
-    assert.equal(preset.models[VISUAL_PERSONA_SLUG], VISUAL_PERSONA_MODEL, `${preset.id}: visual usa Grok 4.6`);
+    assert.equal(preset.models[VISUAL_PERSONA_SLUG], VISUAL_PERSONA_MODEL, `${preset.id}: visual usa a rota visual default`);
     assert.equal(
       new Set(nonVisualSlugs.map((slug) => preset.models[slug])).size,
       nonVisualSlugs.length,
@@ -49,7 +49,7 @@ test('templates seed atribuem uma rota válida e diversa a cada persona', () => 
     );
     assert.equal(
       new Set(nonVisualSlugs.map((slug) => preset.models[slug].split('/')[0])).size,
-      Math.min(nonVisualSlugs.length, 4),
+      Math.min(nonVisualSlugs.length, 3),
       `${preset.id}: máxima diversidade de famílias`,
     );
     assert.equal(preset.models[preset.judge], STRONGEST_JUDGE_ROUTE, `${preset.id}: juiz usa rota mais forte`);

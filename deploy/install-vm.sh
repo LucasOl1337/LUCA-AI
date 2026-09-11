@@ -52,8 +52,8 @@ env_tmp="$(mktemp /etc/sennin/luca-ai.env.XXXXXX)"
 chmod 600 "$env_tmp"
 printf '%s\n' \
   'ROUTER_BASE_URL=http://127.0.0.1:20129/v1' \
-  'ROUTER_MODEL=cx/gpt-5.6-sol-high' \
-  'IMAGE_GENERATION_MODEL=cx/gpt-5.5-image' \
+  'ROUTER_MODEL=cx/gpt-5.6-sol(high)' \
+  'IMAGE_GENERATION_MODEL=cx/gpt-image-2' \
   'KAMUI_BASE=http://127.0.0.1:1338' \
   'LUCA_ADMIN_EMAILS=lucasplays2000@gmail.com' \
   "ROUTER_API_KEY=$YUME_9ROUTER_API_KEY" \

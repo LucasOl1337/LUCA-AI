@@ -166,7 +166,7 @@ test('materializeVisualPack preserva pt-BR no texto visivel da imagem', async ()
     callImage: async ({ prompt }) => {
       prompts.push(prompt);
       return {
-        model: 'cx/gpt-5.5-image',
+        model: 'cx/gpt-image-2',
         images: [{ b64Json: tinyPng.toString('base64'), url: null }],
       };
     },

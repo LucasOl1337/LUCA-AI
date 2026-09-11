@@ -142,7 +142,7 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
             '/api/agent/config',
             'altera modelo e habilitação de um agente',
             'local',
-            '{\n  "agentId": "pesquisador",\n  "enabled": true,\n  "model": "cx/gpt-5.6-sol"\n}',
+            '{\n  "agentId": "pesquisador",\n  "enabled": true,\n  "model": "cx/gpt-5.6-sol(high)"\n}',
           ),
           endpoint(
             'agent-run',

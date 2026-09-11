@@ -64,11 +64,11 @@ test('call9Router envia somente a rota pronta, sem controles de esforco', async 
     const output = await call9Router({
       system: 'Sistema',
       user: 'Responda OK',
-      model: 'cx/gpt-5.6-sol-xhigh',
+      model: 'cx/gpt-5.6-sol(max)',
       maxTokens: 16,
     });
     assert.equal(output, 'OK');
-    assert.equal(requestBody.model, 'cx/gpt-5.6-sol-xhigh');
+    assert.equal(requestBody.model, 'cx/gpt-5.6-sol(max)');
     assert.equal(requestBody.stream, true);
     assert.equal(
       Object.keys(requestBody).some((key) => /reason|thinking|effort/i.test(key)),
@@ -94,11 +94,11 @@ test('call9RouterImageGeneration usa /images/generations com modelo da whitelist
   try {
     const result = await call9RouterImageGeneration({
       prompt: 'A cinematic wheat field at golden hour',
-      model: 'cx/gpt-5.5-image',
+      model: 'cx/gpt-image-2',
       aspectRatio: '16:9',
     });
     assert.match(requestUrl, /\/images\/generations$/);
-    assert.equal(requestBody.model, 'cx/gpt-5.5-image');
+    assert.equal(requestBody.model, 'cx/gpt-image-2');
     assert.equal(requestBody.size, '1536x1024');
     assert.equal(requestBody.response_format, 'b64_json');
     assert.equal(result.images[0].b64Json.length > 8, true);
@@ -214,7 +214,7 @@ test('call9RouterChat cai para JSON se o 9Router recusar stream', async () => {
     const result = await call9RouterChat({
       system: 'Sistema',
       user: 'Decida',
-      model: 'cx/gpt-5.6-sol',
+      model: 'cx/gpt-5.6-sol(high)',
       maxTokens: 16,
     });
     assert.equal(bodies.length, 2);
@@ -249,7 +249,7 @@ test('call9RouterChat devolve SSE parcial quando o timeout aborta a leitura', as
     const result = await call9RouterChat({
       system: 'Sistema',
       user: 'Decida',
-      model: 'cx/gpt-5.6-sol-xhigh',
+      model: 'cx/gpt-5.6-sol(max)',
       maxTokens: 16,
       timeoutMs: 40,
     });

@@ -89,7 +89,7 @@ const MAX_INLINED_ATTACHMENT_CHARS = 120_000;
  * confident and wrong), while `image_url` works everywhere. Text-like files are
  * already plain text on our side, so we inline them into the prompt where every
  * model can read them, and keep only images as native multimodal parts.
- * Verified against cx/gpt-5.6-sol, gcli/grok-4.5 and cc/claude-fable-5.
+ * Verified against cx/gpt-5.6-sol(high), gcli/grok-4.6 and cc/claude-fable-5(high).
  */
 function buildUserContent(user, attachments = []) {
   const text = String(user || '');
