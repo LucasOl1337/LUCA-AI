@@ -1,0 +1,12 @@
+{
+  "id": "mission_log",
+  "name": "TARS - Mission Log",
+  "category": "tars",
+  "kind": "data_lookup",
+  "provider": "tars",
+  "source": "tars-mission-log-pattern",
+  "description": "Consulta o log de missoes do TARS.",
+  "capabilities": ["data_in"],
+  "tags": ["tars", "missions"],
+  "invoke": { "type": "http_proxy", "service": "tars", "method": "GET", "endpoint": "/api/missions" }
+}

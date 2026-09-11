@@ -8,7 +8,8 @@ import { dirname, join } from 'node:path';
 const root = dirname(fileURLToPath(import.meta.url));
 const css = readFileSync(join(root, '../src/index.css'), 'utf8');
 const start = css.indexOf('/* Autenticação e administração');
-const end = css.indexOf('@media (max-width: 900px) {', start);
+// A seção tem @media próprios no meio; o fim é o próximo comentário de seção.
+const end = css.indexOf('/* Admin chat inspect', start);
 assert.ok(start >= 0 && end > start, 'auth/admin CSS block present');
 const section = css.slice(start, end);
 

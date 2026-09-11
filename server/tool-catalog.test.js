@@ -3,8 +3,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { buildToolCatalog, loadToolCatalogFromDir } from './tool-catalog.js';
+// Catálogos irmãos resolvem no import do módulo; aponta para fixtures
+// herméticas porque o checkout do TARS pode não existir nesta máquina.
+const here = path.dirname(fileURLToPath(import.meta.url));
+process.env.LUCA_TARS_CATALOG_DIR = path.join(here, 'test-fixtures', 'tars-ferramentas');
+process.env.LUCA_YUME_CATALOG_DIR = path.join(here, 'test-fixtures', 'yume-ferramentas');
+
+const { buildToolCatalog, loadToolCatalogFromDir } = await import('./tool-catalog.js');
 
 test('buildToolCatalog expõe ferramentas operacionais locais do LUCA', () => {
   const catalog = buildToolCatalog();

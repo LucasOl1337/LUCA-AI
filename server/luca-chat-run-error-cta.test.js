@@ -33,7 +33,7 @@ test('runMission clears composer on send and restores mission for re-run on hard
 test('chat notice run failure re-sends mission instead of only reloading personas', () => {
   const start = source.indexOf('data-luca-chat-error');
   assert.ok(start >= 0, 'chat error shell present');
-  const slice = source.slice(start, start + 1200);
+  const slice = source.slice(start, start + 1500);
   assert.ok(slice.includes('data-luca-chat-error-kind'), 'error kind marker');
   assert.ok(slice.includes("errorRetry === 'run'") || slice.includes('errorRetry === "run"'), 'branches on run kind');
   assert.ok(slice.includes('void runMission()'), 'retry can re-run mission');

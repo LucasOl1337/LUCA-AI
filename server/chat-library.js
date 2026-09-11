@@ -743,9 +743,15 @@ export function createChatSession({ title, folderId, seedFromActive = false } = 
     const live = liveSessions(library);
     if (live.length >= MAX_SESSIONS) {
       // Soft-delete sessões vivas mais antigas (sem transcript) para liberar slot; conteúdo fica no archive.
+      // sessions é newest-first: em createdAt empatado (mesmo ms), o índice maior é o mais antigo.
+      const liveOrder = new Map(live.map((item, index) => [item.id, index]));
       const sortedLive = live
         .slice()
-        .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+        .sort((a, b) => {
+          const byCreatedAt = String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+          if (byCreatedAt !== 0) return byCreatedAt;
+          return (liveOrder.get(b.id) || 0) - (liveOrder.get(a.id) || 0);
+        });
       let freed = 0;
       for (const item of sortedLive) {
         if (live.length - freed <= MAX_SESSIONS - 1) break;

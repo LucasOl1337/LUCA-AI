@@ -1,0 +1,12 @@
+{
+  "id": "nexarq.agenda",
+  "name": "Nexarq - Agenda",
+  "category": "nexarq",
+  "kind": "data_lookup",
+  "provider": "nexarq",
+  "source": "https://api.nexarq.app/api/v1/services/agenda",
+  "description": "Lista os proximos compromissos da agenda do escritorio no Nexarq.",
+  "capabilities": ["data_in"],
+  "tags": ["nexarq", "agenda"],
+  "invoke": { "type": "http_proxy", "service": "nexarq", "method": "GET", "endpoint": "/api/v1/services/agenda" }
+}
