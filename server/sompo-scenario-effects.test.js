@@ -3,10 +3,28 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import * as THREE from 'three';
-import { SOMPO_SCENARIO_EFFECTS, getSompoScenarioEffects } from '../shared/sompo-scenario-effects.js';
+import { SOMPO_SCENARIO_EFFECTS, getSompoScenarioEffects, getSompoAnimalPose } from '../shared/sompo-scenario-effects.js';
 import { SOMPO_SIMULATION_SCENARIOS, SOMPO_COLLISION_SCRIPT, getSompoRuralFrame } from '../shared/sompo-telemetry-simulator.js';
 
 const cue = (id, time, effect) => getSompoScenarioEffects(id, time).cues.find((item) => item.effect === effect);
+
+test('Nelore tem escala de animal adulto, sai completamente da pista e encerra fora da câmera', () => {
+  const initial = getSompoAnimalPose(-6, 0);
+  assert.ok(initial.length <= 2.4 && initial.height <= 1.7 && initial.width <= 1);
+  assert.equal(initial.yaw, -Math.PI / 2);
+  let previousX = 7;
+  for (const time of [5000, 7000, 8000, 10000, 12999]) {
+    const pose = getSompoAnimalPose(getSompoRuralFrame('animal-crossing', time).animalZ, time);
+    assert.ok(pose.visible); assert.ok(pose.x >= previousX); previousX = pose.x;
+    assert.deepEqual(pose, getSompoAnimalPose(getSompoRuralFrame('animal-crossing', time).animalZ, time));
+    if (time >= 8000) assert.ok(pose.z - pose.length / 2 > 2.05, 'Entire body has cleared the paved road');
+  }
+  const end = getSompoAnimalPose(7, 13000);
+  assert.equal(end.visible, false); assert.ok(end.x >= 24);
+  assert.equal(cue('animal-crossing', 13000, 'animal'), undefined);
+  assert.equal(getSompoScenarioEffects('animal-crossing', 13000).focusX, 0);
+  assert.deepEqual(getSompoAnimalPose(NaN, Infinity), initial);
+});
 
 test('cada preset e colisão tem coreografia explícita, congelada e determinística', () => {
   assert.deepEqual(Object.keys(SOMPO_SCENARIO_EFFECTS).sort(), [...Object.keys(SOMPO_SIMULATION_SCENARIOS), SOMPO_COLLISION_SCRIPT.scenarioId].sort());

@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { restoreSompoTextures, useSompoExternalTextures } from './restoreSompoTextures';
+import { getSompoAnimalPose } from '../../../shared/sompo-scenario-effects.js';
 
 /** Locally generated Nelore, image → Hunyuan3D-2.1. Exact source/settings ship beside the GLB. */
 export function createSompoAnimal(parent: THREE.Group) {
@@ -7,23 +9,29 @@ export function createSompoAnimal(parent: THREE.Group) {
   const abort = new AbortController(); let disposed = false;
   const fallbackMap = new THREE.TextureLoader().load('/models/sompo/generated-nelore-source.png');
   fallbackMap.colorSpace = THREE.SRGBColorSpace;
-  const fallback = new THREE.Mesh(new THREE.PlaneGeometry(2.65, 1.85), new THREE.MeshStandardMaterial({ map: fallbackMap, alphaTest: 0.4, side: THREE.DoubleSide, roughness: 1 }));
-  fallback.position.y = 0.925; root.add(fallback); fallback.visible = false;
+  const sizeLimit = getSompoAnimalPose(-6);
+  const fallback = new THREE.Mesh(new THREE.PlaneGeometry(sizeLimit.length, sizeLimit.height), new THREE.MeshStandardMaterial({ map: fallbackMap, alphaTest: 0.4, side: THREE.DoubleSide, roughness: 1 }));
+  fallback.position.y = sizeLimit.height / 2; root.add(fallback); fallback.visible = false;
   let model: THREE.Group | null = null;
   let body: THREE.Mesh | undefined; let rest: Float32Array | undefined;
   const animated: number[] = [];
-  void fetch('/models/sompo/generated-nelore.glb', { signal: abort.signal }).then(async (response) => {
+  const ready = fetch('/models/sompo/generated-nelore.glb', { signal: abort.signal }).then(async (response) => {
     if (!response.ok) throw new Error(`Nelore HTTP ${response.status}`);
-    return new GLTFLoader().parseAsync(await response.arrayBuffer(), '/models/sompo/');
+    const gltf = await useSompoExternalTextures(new GLTFLoader()).parseAsync(await response.arrayBuffer(), '/models/sompo/');
+    try { await restoreSompoTextures(gltf, '/models/sompo/generated-nelore.glb', abort.signal); }
+    catch (error) { release(gltf.scene); throw error; }
+    return gltf;
   }).then((gltf) => {
     if (disposed) { release(gltf.scene); return; }
     model = gltf.scene;
     model.updateMatrixWorld(true);
     const bounds = new THREE.Box3().setFromObject(model); const size = bounds.getSize(new THREE.Vector3());
-    const scale = Math.min(2.65 / size.x, 1.90 / size.y);
-    model.scale.setScalar(scale); model.position.set(-(bounds.min.x + bounds.max.x) / 2 * scale, -bounds.min.y * scale, -(bounds.min.z + bounds.max.z) / 2 * scale);
+    const scale = Math.min(sizeLimit.length / size.x, sizeLimit.height / size.y);
+    // Single-view reconstruction exaggerated the animal's depth; bound its width too.
+    const widthScale = Math.min(scale, sizeLimit.width / size.z);
+    model.scale.set(scale, scale, widthScale); model.position.set(-(bounds.min.x + bounds.max.x) / 2 * scale, -bounds.min.y * scale, -(bounds.min.z + bounds.max.z) / 2 * widthScale);
     root.add(model);
-    model.updateMatrixWorld(true);
+    root.updateWorldMatrix(true, true);
     // Bake the reconstruction's node axes to animal-local +X forward, +Y up before gait.
     const meshes: THREE.Mesh[] = [];
     model.traverse((node) => { if ((node as THREE.Mesh).isMesh) meshes.push(node as THREE.Mesh); });
@@ -49,12 +57,14 @@ export function createSompoAnimal(parent: THREE.Group) {
     for (const material of materials) { for (const value of Object.values(material)) if (value instanceof THREE.Texture) value.dispose(); material.dispose(); }
   }
   return {
+    ready,
     update(visible: boolean, z: number, elapsedMs: number, reducedMotion: boolean) {
-      root.visible = visible; if (!visible) return;
+      const pose = getSompoAnimalPose(z, elapsedMs);
+      root.visible = visible && pose.visible; if (!root.visible) return;
       const moving = elapsedMs < 13000 && !reducedMotion;
       const t = moving ? elapsedMs / 1000 : 0;
-      root.position.set(7.0, moving ? Math.sin(t * 6) * 0.022 : 0, z);
-      root.rotation.y = -Math.PI / 2; // Animal +X faces the direction of crossing, world +Z.
+      root.position.set(pose.x, moving ? Math.sin(t * 6) * 0.022 : 0, pose.z);
+      root.rotation.y = pose.yaw;
       fallback.visible = !model && !!fallbackMap.image;
       if (body && rest) {
         const p = body.geometry.attributes.position as THREE.BufferAttribute;

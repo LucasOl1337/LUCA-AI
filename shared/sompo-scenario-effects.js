@@ -21,7 +21,7 @@ export const SOMPO_SCENARIO_EFFECTS = Object.freeze({
   'hot-weather': scene([track('heat-haze'), track('engine-steam', 3000, null, 0.25, 3000)]),
   rollover: scene([track('shoulder-dust', 2400, 7800), track('impact-dust', 7100, 11100, 1, 40), track('debris', 7100, null, 1, 0), track('hazard-lights', 7100)]),
   'tire-blowout': scene([track('tire-damage', 2800, null, 1, 120), track('rubber-shards', 2800, null, 1, 0), track('blowout-dust', 2800, 5100, 1, 25), track('skid-marks', 2900), track('hazard-lights', 3000)]),
-  'animal-crossing': scene([track('animal'), track('brake-lights', 2200), track('tire-smoke', 3000, 4900, 0.35)], 'asphalt', 'road', 2.8),
+  'animal-crossing': scene([track('animal', 0, 13000), track('brake-lights', 2200), track('tire-smoke', 3000, 4900, 0.35)], 'asphalt', 'road', 2.8),
   aquaplaning: scene([track('wheel-spray'), track('rain'), track('running-lights'), track('hazard-lights', 3000, 11000)], 'wet'),
   'brake-failure': scene([track('brake-smoke', 3800, null, 1, 3000), track('brake-glow', 3800, null, 1, 4000), track('brake-lights'), track('hazard-lights', 6000)]),
   'engine-fire': scene([track('engine-smoke', 1800, null, 1, 5000), track('engine-fire', 4300, null, 1, 2300), track('hazard-lights', 4300)]),
@@ -39,12 +39,30 @@ export function getSompoScenarioEffects(scenarioId, elapsedMs = 0) {
   return {
     surface: definition.surface,
     setting: definition.setting,
-    focusX: definition.focusX,
+    focusX: scenarioId === 'animal-crossing' ? definition.focusX * Math.max(0, Math.min(1, (13000 - atMs) / 3000)) : definition.focusX,
     cues: definition.tracks.filter((cue) => atMs >= cue.startMs && (cue.endMs === null || atMs < cue.endMs)).map((cue) => {
       const ageMs = atMs - cue.startMs;
       const attack = cue.attackMs ? Math.min(1, ageMs / cue.attackMs) : 1;
       const release = cue.endMs === null ? 1 : Math.min(1, (cue.endMs - atMs) / 700);
       return { ...cue, ageMs, intensity: cue.strength * attack * release };
     }),
+  };
+}
+
+/** Metres, +X along the road and +Z across it. After clearing the shoulder the
+ * Nelore turns into the pasture, away from the inspection camera, then exits.
+ * This only controls staging; the telemetric script and snapshot remain intact. */
+export function getSompoAnimalPose(animalZ, elapsedMs = 0) {
+  const atMs = Number.isFinite(elapsedMs) ? Math.max(0, elapsedMs) : 0;
+  const z = Number.isFinite(animalZ) ? animalZ : -6;
+  const departure = Math.max(0, Math.min(1, (z - 2.8) / 4.2));
+  return {
+    x: 7 + 18 * departure * departure,
+    z,
+    yaw: -Math.atan2(1, 36 * departure / 4.2),
+    visible: atMs < 13000,
+    length: 2.35,
+    height: 1.65,
+    width: 0.95,
   };
 }

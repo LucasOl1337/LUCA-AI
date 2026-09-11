@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createSompoAnimal } from './createSompoAnimal';
+import { createSompoVegetation } from './createSompoVegetation';
 import { createSompoRoadDetails, varySompoSurface, wornRoadPaint } from './createSompoRoadDetails';
 import type { SompoEffectFrame } from '../../../shared/sompo-scenario-effects.js';
 import { createSompoEnvironmentAssets } from './createSompoEnvironmentAssets';
@@ -119,31 +120,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   posts.castShadow = true; root.add(posts);
   const wire = new THREE.MeshStandardMaterial({ color: 0x5f6460, roughness: 0.7, metalness: 0.65 });
   for (const z of [6, -10]) for (const y of [0.45, 0.9]) mesh(root, new THREE.CylinderGeometry(0.004, 0.004, 225, 4), wire, [0, y, z]).rotation.z = Math.PI / 2;
-  const treeBatches: { mesh: THREE.InstancedMesh; placements: { x: number; z: number; scale: number }[] }[] = [];
-  const localCamera = new THREE.Vector3();
-  // Three transparent views rendered locally from Poly Haven's CC0 Tree Small 02.
-  // Sparse instancing avoids loading millions of source triangles on each client.
-  for (let variant = 0; variant < 5; variant += 1) {
-    const foliage = new THREE.MeshBasicMaterial({ map: assets.treeMap(variant), alphaTest: 0.28, side: THREE.DoubleSide });
-    const trees = new THREE.InstancedMesh(new THREE.PlaneGeometry(6, 6), foliage, 12);
-    trees.visible = false;
-    trees.name = `rural-tree-billboards-${variant}`;
-    const placements: { x: number; z: number; scale: number }[] = [];
-    for (let i = 0; i < 12; i += 1) {
-      const index = i * 5 + variant;
-      const nearRoad = [[-12, -12], [12, -14], [25, 9], [-23, 10], [6, 6.8]][variant];
-      const x = i === 0 ? nearRoad[0] : ((index * 31) % 180) - 90;
-      const z = i === 0 ? nearRoad[1] : (index % 2 ? -1 : 1) * (22 + (index * 17) % 42);
-      const scale = (i === 0 ? 1.6 : 0.95 + (index % 5) * 0.16) * (variant === 4 ? 0.32 : variant === 3 ? 1.12 : 1);
-      placements.push({ x, z, scale });
-      transform.position.set(x, 3 * scale - 0.025, z);
-      transform.rotation.y = 0.65 + (index % 3 - 1) * 0.28;
-      transform.scale.set(scale, scale, scale); transform.updateMatrix(); trees.setMatrixAt(i, transform.matrix);
-    }
-    trees.castShadow = true;
-    root.add(trees);
-    treeBatches.push({ mesh: trees, placements });
-  }
+  const vegetation = createSompoVegetation(root, camera);
 
   const puddles = new THREE.Group(); root.add(puddles);
   const water = new THREE.MeshPhysicalMaterial({ color: 0x192426, roughness: 0.18, metalness: 0, transparent: true, opacity: 0.32, clearcoat: 0.55, clearcoatRoughness: 0.12, envMapIntensity: 0.35, depthWrite: false });
@@ -174,18 +151,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       const t = elapsed / 1000;
       const effects = new Map(effectFrame.cues.map((cue) => [cue.effect, cue.intensity]));
       root.rotation.z = slope;
-      camera.getWorldPosition(localCamera); root.worldToLocal(localCamera);
-      for (const batch of treeBatches) {
-        // A missing/offline billboard must never become an opaque white card.
-        batch.mesh.visible = !!(batch.mesh.material as THREE.MeshBasicMaterial).map?.image;
-        batch.placements.forEach(({ x, z, scale }, index) => {
-          transform.position.set(x, 3 * scale - 0.025, z);
-          transform.rotation.set(0, Math.atan2(localCamera.x - x, localCamera.z - z), 0);
-          transform.scale.setScalar(scale); transform.updateMatrix(); batch.mesh.setMatrixAt(index, transform.matrix);
-        });
-        batch.mesh.instanceMatrix.needsUpdate = true;
-        (batch.mesh.material as THREE.MeshBasicMaterial).color.setScalar((frame?.rain ?? 0) > 0 ? 0.65 : 1);
-      }
+      vegetation.update((frame?.rain ?? 0) > 0);
       if (!reduceMotion) traveled += speed / 3.6 * delta * (frame?.direction ?? 1);
       dashes.position.x = -(traveled % 5);
       for (const map of new Set([asphalt.map, asphalt.normalMap, asphalt.roughnessMap, asphalt.aoMap])) {
@@ -225,6 +191,6 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       rainPositions.needsUpdate = true;
     },
     get hasHdri() { return assets.hasHdri; },
-    dispose() { animal.dispose(); details.dispose(); assets.dispose(); asphalt.dispose(); unpaved.dispose(); clearSky.dispose(); rainSky.dispose(); },
+    dispose() { vegetation.dispose(); animal.dispose(); details.dispose(); assets.dispose(); asphalt.dispose(); unpaved.dispose(); clearSky.dispose(); rainSky.dispose(); },
   };
 }

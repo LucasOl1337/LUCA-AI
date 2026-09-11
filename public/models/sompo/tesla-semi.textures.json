@@ -1,0 +1,9 @@
+{
+  "images": [
+    "tesla-semi-body-normal.png",
+    "tesla-semi-body-occlusion-metallicroughness.png",
+    "tesla-semi-tire-normal.png",
+    "tesla-semi-tire-occlusion-metallicroughness.png",
+    "tesla-semi-lights.png"
+  ]
+}

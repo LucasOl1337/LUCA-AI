@@ -1,0 +1,59 @@
+{
+  "asset": "generated-jacaranda.glb",
+  "generatedBy": "LUCA-AI",
+  "createdAt": "2026-09-11",
+  "sourceImage": "generated-jacaranda-source.png",
+  "backgroundRemoval": "White-background chroma mask preserving fine foliage (U2Net masks were rejected)",
+  "sourceImageSha256": "f2785f562ee649db55c76e01a0f4fd5d48852eeb20415af0a71bdec172423a3e",
+  "sourcePrompt": "Photorealistic botanical specimen, a single COMPLETE mature tree isolated on seamless plain white studio background, full trunk roots base and entire canopy inside image with generous margin. Real three-dimensional tree structure with clearly visible trunk and branches, open irregular crown with gaps between small leaf clusters so the sky would be visible between branches. Detailed natural bark texture and individually recognizable foliage. Soft even daylight, botanical photogrammetry reference, three-quarter front view, entire tree from ground to crown. No pot, no people, no grass, no terrain, no props, no text, no stylization, no cartoon, no dense spherical topiary canopy.  Brazilian Jacaranda mimosifolia, branching brown trunk, broad irregular spreading canopy, sparse violet purple flowers among fine green feathery leaves. Medium tree five metres tall with two main forked branches.",
+  "imageModel": "cx/gpt-image-2 via local 9Router",
+  "reconstruction": "Tencent Hunyuan3D-2.1",
+  "shape": {
+    "steps": 50,
+    "guidance": 5,
+    "octreeResolution": 384,
+    "seed": 43,
+    "memoryMode": "CPU streamed transformer blocks; token-wise feed-forward chunks of 256; VAE chunks 8000"
+  },
+  "texture": {
+    "views": 6,
+    "viewResolution": 512,
+    "requestedAtlasResolution": 2048,
+    "exportedImageDimensions": [
+      [
+        1024,
+        1024
+      ],
+      [
+        1024,
+        1024
+      ]
+    ],
+    "externalManifest": "generated-jacaranda.textures.json",
+    "memoryMode": "sequential CPU offload"
+  },
+  "triangles": 18000,
+  "adaptations": [
+    "Quadric reduction before painting, preserving boundaries and normals",
+    "Original UV atlas retained; external byte-identical maps loaded via HTMLImageElement",
+    "Nonmetallic bark and foliage; invalid upstream specular extension removed",
+    "Shared mesh instances at roadside; source-image impostor only beyond 65m"
+  ],
+  "limitations": [
+    "Single-image reconstruction; rear surfaces and fine leaves are inferred",
+    "Foliage clusters are reconstructed surfaces, not individually rigged botanical leaves"
+  ],
+  "generationMetrics": {
+    "shape": {
+      "seconds": 159.70851302146912,
+      "sourceTriangles": 1599156,
+      "triangles": 18000,
+      "peak_vram_gb": 1.542306816
+    },
+    "paint": {
+      "seconds": 58.276214361190796,
+      "peak_vram_gb": 3.04400128
+    }
+  },
+  "sha256": "550d2f479d34fe322270d7b442e232082706b398393b8e584bec7d4f71e22532"
+}

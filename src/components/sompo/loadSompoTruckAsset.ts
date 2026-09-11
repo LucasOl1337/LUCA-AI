@@ -1,9 +1,7 @@
 import * as THREE from 'three';
 import { splitGeneratedTruckParts } from './splitGeneratedTruckParts';
+import { restoreSompoTextures, useSompoExternalTextures } from './restoreSompoTextures';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
-import dracoWrapperUrl from 'three/addons/libs/draco/gltf/draco_wasm_wrapper.js?url';
-import dracoWasmUrl from 'three/addons/libs/draco/gltf/draco_decoder.wasm?url';
 import { SOMPO_TRUCK_FRONT_X, SOMPO_TRUCK_HALF_SIZE, type SompoTruckModel } from './createSompoTruckModel';
 
 // Main model: local image → Hunyuan3D-2.1 reconstruction, with generated PBR textures.
@@ -16,7 +14,8 @@ export const SOMPO_TRUCK_ASSET_URL = '/models/sompo/generated-rural-truck.glb';
 // License: https://creativecommons.org/licenses/by/4.0/ (see public/models/sompo/LICENSE.txt).
 // Adaptations: remove display props, align/shorten the trailer, calibrate wheel pivots,
 // tune materials and attach the ESP32. The source GLB has no animation clips.
-export const SOMPO_TESLA_ASSET_URL = '/models/sompo/tesla-semi.glb';
+// Bust previously cached Draco bytes: this revision can load under the existing CSP.
+export const SOMPO_TESLA_ASSET_URL = '/models/sompo/tesla-semi.glb?geometry=plain-v1';
 
 function disposeAsset(root: THREE.Object3D) {
   const materials = new Set<THREE.Material>();
@@ -71,7 +70,7 @@ function tuneMaterials(mesh: THREE.Mesh) {
 function weatherContainer(mesh: THREE.Mesh) {
   const canvas = document.createElement('canvas');
   canvas.width = 512; canvas.height = 256;
-  const context = canvas.getContext('2d');
+  const context = canvas.getContext('2d', { willReadFrequently: true });
   if (!context) return;
   let seed = 713;
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
@@ -131,17 +130,18 @@ function mountWheel(mesh: THREE.Mesh, parent: THREE.Group) {
 async function readTruckAsset(url: string, signal: AbortSignal) {
   const response = await fetch(url, { signal });
   if (!response.ok) throw new Error(`Truck asset: HTTP ${response.status}`);
-  // Bundle both decoder files with Vite: no external CDN/network dependency after installation.
-  const decoder = new DRACOLoader().setDecoderPath({ js: dracoWrapperUrl, wasm: dracoWasmUrl }).setWorkerLimit(2);
-  let gltf;
-  try {
-    gltf = await new GLTFLoader().setDRACOLoader(decoder).parseAsync(await response.arrayBuffer(), '/models/sompo/');
-  } finally {
-    decoder.dispose();
-  }
+  // Tesla geometry is expanded offline: production CSP disallows blob workers/WASM.
+  const gltf = await useSompoExternalTextures(new GLTFLoader()).parseAsync(await response.arrayBuffer(), '/models/sompo/');
   if (signal.aborted) {
     disposeAsset(gltf.scene);
     return null;
+  }
+  try {
+    await restoreSompoTextures(gltf, url, signal);
+  } catch (error) {
+    disposeAsset(gltf.scene);
+    if (signal.aborted) return null;
+    throw error;
   }
   return gltf;
 }

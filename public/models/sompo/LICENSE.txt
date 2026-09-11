@@ -44,7 +44,8 @@ shortened the trailer; replaced the train bogies with detailed rear tandem tyres
 normalized wheel pivots and the calibrated vehicle envelope; adjusted material
 response, added container weathering and attached the ESP32 sensor. Original tire and light textures retained.
 
-The Draco decoder bundled from Three.js is licensed under Apache License 2.0:
+Tesla geometry was expanded offline using the Draco decoder from Three.js
+(Apache License 2.0), so loading no longer requires blob workers or runtime WASM:
 https://github.com/google/draco/blob/master/LICENSE
 
 Generated Nelore — generated-nelore.glb
@@ -54,3 +55,28 @@ Tencent Hunyuan3D-2.1. Same tool license terms preserved above.
 Adaptations: mesh reduced to 65,000 triangles; nonmetallic hide; calibrated
 animal size and procedural leg/tail movement. Not an anatomically rigged scan.
 Source image and full parameters: generated-nelore.provenance.json.
+
+External texture copies (Chrome compatibility):
+The *.textures.json manifests bind byte-identical JPEG/PNG copies extracted
+from each GLB to their original glTF image indices. TextureLoader loads those
+files through HTMLImageElement after parsing, with glTF UV orientation and
+sRGB only for color/emissive maps. Original asset credits and terms also apply
+to the extracted Tesla images; extraction does not change their license.
+
+Generated trees — generated-jacaranda.glb, generated-eucalyptus.glb,
+and generated-cerrado.glb (ipê/cerrado reference).
+Created locally for LUCA-AI, 2026-09-11. Botanical source images generated
+with cx/gpt-image-2 through local 9Router; shape and PBR textures generated
+with Tencent Hunyuan3D-2.1 under the same preserved tool license above.
+Each mesh is reduced to 18,000 triangles before texture baking. Source
+images, generation parameters, limits and hashes accompany each GLB as
+*.provenance.json. Textures also ship separately through *.textures.json.
+Roadside instances share the real mesh and atlas; image impostors are used
+only beyond 65 metres. Fine foliage and unseen surfaces are inferred from
+one reference image, rather than an individually modelled botanical scan.
+
+CSP compatibility: glTF parsing constructs temporary texture slots instead of
+fetching embedded blob URLs (blocked by production connect-src). External
+maps replace those slots before the asset is attached. No CSP relaxation is
+needed. Tesla geometry expansion preserves the decoded data and original
+embedded image bytes; source/result hashes: tesla-semi.provenance.json.

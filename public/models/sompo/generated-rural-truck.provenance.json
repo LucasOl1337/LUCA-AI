@@ -96,5 +96,6 @@
       "p95_frame_ms": 33.3
     },
     "scope": "Short local samples; not a guarantee for other hardware. Earlier SwiftShader previews were not used to estimate GPU performance."
-  }
+  },
+  "externalTexturesManifest": "generated-rural-truck.textures.json"
 }

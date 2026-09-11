@@ -1,0 +1,13 @@
+{
+  "asset": "tesla-semi.glb",
+  "source": "https://raw.githubusercontent.com/pakagronglb/tesla-3d-showcase/main/public/models/semi_scene.glb",
+  "credit": "Tesla Semi \u00a9 2018 Oleksii Rozumnyi \u00b7 CC BY 4.0",
+  "sourceSha256": "d7138e200a70c9dc40ec20401556f92f6fbccc88649ece15d077830e869cad71",
+  "adaptations": [
+    "Expanded Draco geometry offline using the bundled Apache-2.0 Draco decoder, to avoid CSP-blocked blob workers and runtime WASM",
+    "Original nodes, materials, images, UVs and decoded vertex/index data retained",
+    "External byte-identical image copies via tesla-semi.textures.json"
+  ],
+  "decodedPrimitives": 24,
+  "sha256": "455a95523ab983afc58d5f9f6f5bf1146f36dc37d047ee3e5c9f8146f2be068d"
+}
