@@ -3,7 +3,9 @@ import type { SompoTelemetrySnapshot } from './sompo-telemetry.js';
 export type SompoSimulationScenarioId =
   | 'normal' | 'obstacle' | 'inclination' | 'rough-road'
   | 'hard-braking' | 'steep-climb' | 'steep-descent'
-  | 'yard-maneuver' | 'shifted-load' | 'hot-weather';
+  | 'yard-maneuver' | 'shifted-load' | 'hot-weather'
+  | 'rollover' | 'tire-blowout' | 'animal-crossing' | 'aquaplaning' | 'brake-failure'
+  | 'engine-fire' | 'tight-reverse' | 'bogged-down' | 'driver-drowsiness' | 'fast-corner';
 
 export interface SompoSimulationControls {
   scenarioId: SompoSimulationScenarioId;
@@ -102,3 +104,27 @@ export function getSompoBrakingScriptState(
   elapsedMs: number,
   initialSpeedKph?: number,
 ): SompoBrakingScriptState;
+
+export interface SompoRuralFrame extends SompoSimulationScenario {
+  atMs: number;
+  phaseLabel: string;
+  yaw: number;
+  lateral: number;
+  rain: number;
+  smoke: number;
+  sink: number;
+  animalZ: number;
+  wheelSpeedKph: number | null;
+  direction: number;
+  accelerationX: number;
+  yawRate: number;
+  pitchRate: number;
+  rollRate: number;
+  lateralAcceleration: number;
+}
+export const SOMPO_RURAL_SCRIPTS: Readonly<Partial<Record<SompoSimulationScenarioId, Readonly<{
+  scenarioId: SompoSimulationScenarioId;
+  totalMs: number;
+  keyframes: readonly Readonly<Omit<SompoRuralFrame, 'accelerationX' | 'yawRate' | 'pitchRate' | 'rollRate' | 'lateralAcceleration'>>[];
+}>>>>;
+export function getSompoRuralFrame(scenarioId: string, elapsedMs?: number): SompoRuralFrame | null;

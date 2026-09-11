@@ -23,10 +23,10 @@ test('simulador tem roteiro de colisão com gravação, sucesso e erro visíveis
 });
 
 test('durante o roteiro os controles manuais ficam travados e o gerador normal pausa', () => {
-  const rangeDisables = simulator.match(/type="range"[\s\S]{0,220}?disabled=\{collisionActive\}/g) || [];
+  const rangeDisables = simulator.match(/type="range"[\s\S]{0,220}?disabled=\{collisionActive(?: \|\| scenarioScripted)?\}/g) || [];
   assert.equal(rangeDisables.length, 5, 'os 5 sliders travam durante o roteiro');
   assert.match(simulator, /if \(isFirebase \|\| collisionActive\) return undefined;/);
-  assert.match(simulator, /disabled=\{collisionActive\}\s*\n\s*onClick=\{\(\) => selectScenario/);
+  assert.match(simulator, /<select[^>]+disabled=\{collisionActive\}[^>]+onChange=\{\(event\) => selectScenario/);
 });
 
 test('falha de rede no episódio aborta com aviso e mantém o simulador vivo', () => {

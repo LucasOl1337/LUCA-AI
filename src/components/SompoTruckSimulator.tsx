@@ -18,6 +18,8 @@ import {
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { loadSompoTruckAsset } from './sompo/loadSompoTruckAsset';
+import { createSompoRoadScene } from './sompo/createSompoRoadScene';
 import type { SompoTelemetrySnapshot } from '@/lib/types';
 import { lucaApi } from '@/lib/api';
 import {
@@ -33,6 +35,8 @@ import {
   type SompoAxisCalibration,
 } from './sompo/sensorPose.js';
 import {
+  SOMPO_RURAL_SCRIPTS,
+  getSompoRuralFrame,
   SOMPO_BRAKING_SCRIPT,
   getSompoBrakingScriptState,
   SOMPO_COLLISION_FRAME_MOMENTS,
@@ -122,14 +126,21 @@ function dampAngle(current: number, target: number, factor: number) {
   return current + (shortestTurn * factor);
 }
 
-function truckGroundHeight(rotation: THREE.Euler) {
+function truckGroundHeight(rotation: THREE.Euler, support?: Float32Array) {
   const matrix = new THREE.Matrix4().makeRotationFromEuler(rotation).elements;
+  if (support) {
+    let minimum = Infinity;
+    for (let i = 0; i < support.length; i += 3) {
+      minimum = Math.min(minimum, matrix[1] * support[i] + matrix[5] * (support[i + 1] - SOMPO_TRUCK_PIVOT_Y) + matrix[9] * support[i + 2]);
+    }
+    return 0.05 - minimum;
+  }
   const verticalExtent = (
     Math.abs(matrix[1]) * SOMPO_TRUCK_HALF_SIZE.x
     + Math.abs(matrix[5]) * SOMPO_TRUCK_HALF_SIZE.y
     + Math.abs(matrix[9]) * SOMPO_TRUCK_HALF_SIZE.z
   );
-  return Math.max(SOMPO_TRUCK_PIVOT_Y + 0.05, verticalExtent + 0.08);
+  return verticalExtent + 0.05;
 }
 const COLLISION_TICK_MS = 250;
 const COLLISION_START_DISTANCE_CM = 210;
@@ -335,6 +346,7 @@ export default function SompoTruckSimulator({
   const startedAtRef = useRef(performance.now());
   const connectedAtRef = useRef(new Date().toISOString());
   const [webglError, setWebglError] = useState(false);
+  const [modelStatus, setModelStatus] = useState<'loading' | 'gltf' | 'fallback'>('loading');
   const [historyOffline, setHistoryOffline] = useState(false);
   const [collisionRun, setCollisionRun] = useState<CollisionRunState>({ status: 'idle' });
   const [collisionElapsedSec, setCollisionElapsedSec] = useState(0);
@@ -601,15 +613,15 @@ export default function SompoTruckSimulator({
     }
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x08110d, 0.045);
-    const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-    camera.position.set(10.8, 6.9, 12.6);
+
+    const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 240);
+    camera.position.set(11.8, 6.3, 13.8);
 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.setClearColor(0x07100c, 0);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMappingExposure = 0.94;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.domElement.setAttribute('aria-hidden', 'true');
@@ -620,7 +632,7 @@ export default function SompoTruckSimulator({
     const pmrem = new THREE.PMREMGenerator(renderer);
     const environment = pmrem.fromScene(environmentScene, 0.04);
     scene.environment = environment.texture;
-    scene.environmentIntensity = 0.65;
+    scene.environmentIntensity = 0.4;
     environmentScene.dispose();
     pmrem.dispose();
 
@@ -633,37 +645,19 @@ export default function SompoTruckSimulator({
     orbit.maxPolarAngle = Math.PI * 0.49;
     orbit.target.set(0, 1.5, 0);
 
-    scene.add(new THREE.HemisphereLight(0xcce9dc, 0x172219, 2.2));
-    const keyLight = new THREE.DirectionalLight(0xffe6a0, 3.8);
-    keyLight.position.set(5, 9, 7);
+    scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x776346, 1.35));
+    const keyLight = new THREE.DirectionalLight(0xffefcd, 2.4);
+    keyLight.position.set(9, 18, 7);
     keyLight.castShadow = true;
-    keyLight.shadow.mapSize.set(1024, 1024);
-    keyLight.shadow.radius = 4;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -18; keyLight.shadow.camera.right = 18;
+    keyLight.shadow.camera.top = 18; keyLight.shadow.camera.bottom = -18;
+    keyLight.shadow.camera.near = 0.5; keyLight.shadow.camera.far = 65;
+    keyLight.shadow.normalBias = 0.035;
+    keyLight.shadow.bias = -0.0001;
+    keyLight.shadow.radius = 2;
     scene.add(keyLight);
-    const rimLight = new THREE.PointLight(0x57ff8a, 18, 15, 2);
-    rimLight.position.set(-3, 3.5, -4);
-    scene.add(rimLight);
-
-    const roadMaterial = new THREE.MeshStandardMaterial({ color: 0x101814, roughness: 0.94, metalness: 0.05 });
-    const road = new THREE.Mesh(new THREE.PlaneGeometry(32, 18), roadMaterial);
-    road.rotation.x = -Math.PI / 2;
-    road.position.y = -0.02;
-    road.receiveShadow = true;
-    scene.add(road);
-
-    const grid = new THREE.GridHelper(32, 32, 0x56634e, 0x263029);
-    grid.position.y = 0.01;
-    const gridMaterials = Array.isArray(grid.material) ? grid.material : [grid.material];
-    gridMaterials.forEach((material) => {
-      material.transparent = true;
-      material.opacity = 0.28;
-    });
-    scene.add(grid);
-
-    const centerLineMaterial = new THREE.MeshBasicMaterial({ color: 0xc9a227, transparent: true, opacity: 0.5 });
-    for (let x = -13; x < 14; x += 3) {
-      addBox(scene, [1.4, 0.025, 0.08], [x, 0.025, -3.15], centerLineMaterial);
-    }
+    const roadScene = createSompoRoadScene(scene);
     const frontArrow = new THREE.ArrowHelper(
       new THREE.Vector3(1, 0, 0),
       new THREE.Vector3(1.4, 0.06, -2.25),
@@ -673,6 +667,7 @@ export default function SompoTruckSimulator({
       0.22,
     );
     frontArrow.name = 'frente-caminhao-mais-x';
+    frontArrow.visible = isFirebase;
     scene.add(frontArrow);
 
     const truckPoseGroup = new THREE.Group();
@@ -695,6 +690,11 @@ export default function SompoTruckSimulator({
     } = truckModel;
     truckGroup.position.y = -SOMPO_TRUCK_PIVOT_Y;
     truckPoseGroup.add(truckGroup);
+    const assetAbort = new AbortController();
+    setModelStatus('loading');
+    void loadSompoTruckAsset(truckModel, assetAbort.signal)
+      .then((loaded) => { if (!assetAbort.signal.aborted) setModelStatus(loaded ? 'gltf' : 'fallback'); })
+      .catch(() => { if (!assetAbort.signal.aborted) setModelStatus('fallback'); });
 
     const obstacleGroup = new THREE.Group();
     scene.add(obstacleGroup);
@@ -735,7 +735,7 @@ export default function SompoTruckSimulator({
           orbit.target.set(4.48, 1.68, 0);
           orbit.minDistance = 2.5;
         } else {
-          camera.position.set(10.8, 6.9, 12.6);
+          camera.position.set(11.8, 6.3, 13.8);
           orbit.target.set(0, 1.9, 0);
           orbit.minDistance = 6;
         }
@@ -763,12 +763,16 @@ export default function SompoTruckSimulator({
     let frameId = 0;
     let previousTime = performance.now();
     let truckBaseHeight = SOMPO_TRUCK_PIVOT_Y + 0.05;
+    const relativeGroundRotation = new THREE.Euler();
 
     function render(time: number) {
       const delta = Math.min(0.04, Math.max(0, (time - previousTime) / 1_000));
       previousTime = time;
       const settings = controlsRef.current;
       const snapshot = previewRef.current;
+      const ruralFrame = !isFirebase && !collisionVisualRef.current
+        ? getSompoRuralFrame(settings.scenarioId, time - startedAtRef.current)
+        : null;
       const sensorPose = sensorReadingToPose({
         pitch: snapshot.readings.pitch,
         roll: snapshot.readings.roll,
@@ -793,17 +797,27 @@ export default function SompoTruckSimulator({
         liveHeading = sensorPose.rotationY;
         truckPoseGroup.rotation.y = liveHeading;
       }
+      if (!isFirebase) {
+        truckPoseGroup.rotation.y = dampAngle(truckPoseGroup.rotation.y, THREE.MathUtils.degToRad(ruralFrame?.yaw ?? 0), reduceMotion.matches ? 1 : 0.12);
+        truckPoseGroup.position.z = ruralFrame?.lateral ?? 0;
+      }
       const brakingState = !isFirebase && !collisionVisualRef.current && settings.scenarioId === SOMPO_BRAKING_SCRIPT.scenarioId
         ? getSompoBrakingScriptState(time - startedAtRef.current, settings.speedKph)
         : null;
       const liveActivity = isFirebase
         ? THREE.MathUtils.clamp((snapshot.readings.rotation?.magnitude || 0) * 0.012, 0, 0.1)
-        : settings.roughness * 0.008 * (brakingState ? Math.min(1, brakingState.speedKph / 8) : 1);
-      const targetHeight = truckGroundHeight(truckPoseGroup.rotation);
+        : (ruralFrame?.roughness ?? settings.roughness) * 0.008 * (brakingState ? Math.min(1, brakingState.speedKph / 8) : 1);
+      const slope = !isFirebase && ['steep-climb', 'steep-descent', 'brake-failure'].includes(settings.scenarioId)
+        ? THREE.MathUtils.degToRad(settings.pitch) : 0;
+      relativeGroundRotation.copy(truckPoseGroup.rotation);
+      relativeGroundRotation.z -= slope;
+      const targetHeight = slope
+        ? truckGroundHeight(relativeGroundRotation, truckGroup.userData.groundSupport) / Math.cos(slope)
+        : truckGroundHeight(truckPoseGroup.rotation, truckGroup.userData.groundSupport);
       truckBaseHeight = reduceMotion.matches
         ? targetHeight
         : THREE.MathUtils.lerp(truckBaseHeight, targetHeight, 0.12);
-      truckPoseGroup.position.y = truckBaseHeight
+      truckPoseGroup.position.y = truckBaseHeight - (ruralFrame?.sink ?? 0)
         + (reduceMotion.matches ? 0 : Math.sin(time * 0.008) * liveActivity);
       if (focusTarget === 'sensor') {
         sensorGroup.getWorldPosition(focusPoint);
@@ -812,11 +826,31 @@ export default function SompoTruckSimulator({
       }
       orbit.target.lerp(focusPoint, reduceMotion.matches ? 1 : 0.08);
       const collisionVisual = collisionVisualRef.current;
+      const drivingSpeed = collisionVisual ? (snapshot.risks.collision ? 0 : 16)
+        : (ruralFrame?.speedKph ?? brakingState?.speedKph ?? settings.speedKph);
       if (!isFirebase && !reduceMotion.matches) {
         // No roteiro de colisão a roda para junto com o caminhão (flag ativa = impacto/parado).
-        const wheelSpeed = collisionVisual ? (snapshot.risks.collision ? 0 : 16) : (brakingState?.speedKph ?? settings.speedKph);
-        for (const wheel of wheels) wheel.rotation.y -= delta * wheelSpeed * 0.12;
+        const wheelSpeed = (ruralFrame?.wheelSpeedKph ?? drivingSpeed) * (ruralFrame?.direction ?? 1);
+        for (const wheel of wheels) wheel.rotation.y -= delta * wheelSpeed / (3.6 * 0.60);
       }
+      for (const wheel of wheels) {
+        const intact = wheel.userData.intactTirePositions as Float32Array | undefined;
+        if (!intact) continue;
+        const pressure = settings.scenarioId === 'tire-blowout' && !isFirebase
+          ? 1 - Math.min(1, Math.max(0, ((time - startedAtRef.current) - 2500) / 600)) * 0.5 : 1;
+        if (wheel.userData.pressure === pressure) continue;
+        wheel.userData.pressure = pressure;
+        const positions = wheel.geometry.attributes.position as THREE.BufferAttribute;
+        for (let i = 0; i < positions.count; i += 1) {
+          // Imported axle mesh contains both tires; only the exposed left tire deflates.
+          const factor = intact[i * 3 + 1] > 0 ? pressure : 1;
+          positions.setXYZ(i, intact[i * 3] * factor, intact[i * 3 + 1], intact[i * 3 + 2] * factor);
+        }
+        positions.needsUpdate = true;
+      }
+      roadScene.update(isFirebase ? 'normal' : settings.scenarioId, ruralFrame, isFirebase ? 0 : drivingSpeed, time - startedAtRef.current, truckPoseGroup.position, reduceMotion.matches, delta, slope);
+      keyLight.intensity = (ruralFrame?.rain ?? 0) > 0 ? 0.75 : 2.4;
+      obstacleGroup.visible = isFirebase || !!collisionVisual || settings.scenarioId === 'obstacle' || settings.scenarioId === 'brake-failure';
       const rangeLength = rangeForDistance(snapshot.readings.distance);
       rayGroup.scale.x = rangeLength;
       if (collisionVisual) {
@@ -834,6 +868,7 @@ export default function SompoTruckSimulator({
             : THREE.MathUtils.lerp(truckPoseGroup.position.x, 0, 0.06);
         }
       }
+      obstacleGroup.position.y = Math.tan(slope) * obstacleGroup.position.x;
       rayMaterial.color.set(snapshot.risks.collision ? 0xff5d52 : 0x7dff9a);
       rayMaterial.opacity = snapshot.risks.collision ? 1 : 0.68;
       ledMaterial.color.set(snapshot.status === 'alert' ? 0xff5d52 : 0x7dff9a);
@@ -878,6 +913,8 @@ export default function SompoTruckSimulator({
     frameId = window.requestAnimationFrame(render);
 
     return () => {
+      assetAbort.abort();
+      roadScene.dispose();
       window.cancelAnimationFrame(frameId);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       resizeObserver.disconnect();
@@ -929,6 +966,10 @@ export default function SompoTruckSimulator({
   const brakingPreview = !isFirebase && !collisionActive && controls.scenarioId === SOMPO_BRAKING_SCRIPT.scenarioId
     ? getSompoBrakingScriptState(preview.deviceTimestamp ?? 0, controls.speedKph)
     : null;
+  const ruralPreview = !isFirebase && !collisionActive
+    ? getSompoRuralFrame(controls.scenarioId, preview.deviceTimestamp ?? 0)
+    : null;
+  const scenarioScripted = !!SOMPO_RURAL_SCRIPTS[controls.scenarioId];
   const firebaseLive = preview.connection.state === 'live';
   const firebaseStatusLabel = firebaseLive
     ? preview.freshness === 'stale' ? 'Conectado · leitura parada' : 'Firebase ao vivo'
@@ -940,12 +981,13 @@ export default function SompoTruckSimulator({
       aria-labelledby="sompo-simulator-title"
       data-sompo-simulator
       data-sompo-simulator-source={source}
+      data-sompo-model={modelStatus}
     >
       <header className="sompo-simulator-head">
         <div>
           <span><BoxIcon /> {isFirebase ? 'Gêmeo digital' : 'Laboratório virtual'}</span>
           <h2 id="sompo-simulator-title">
-            {isFirebase ? 'Caminhão 3D acoplado ao dispositivo físico' : 'Caminhão + caixa ESP32 em Three.js'}
+            {isFirebase ? 'Caminhão 3D acoplado ao dispositivo físico' : 'Estrada rural · laboratório de sinistros'}
           </h2>
           <p>
             {isFirebase
@@ -998,7 +1040,13 @@ export default function SompoTruckSimulator({
               <Focus /> Focar ESP32
             </button>
           </div>
-          <p className="sompo-simulator-hint">Seta ciano no piso = frente (+X) · arraste para girar · setas para navegar</p>
+          <p className="sompo-simulator-hint">Arraste para girar · use as setas para navegar</p>
+          <p className="sompo-simulator-credit">
+            {modelStatus === 'gltf' ? <>
+              <a href="https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CesiumMilkTruck" target="_blank" rel="noreferrer">Cesium Milk Truck © 2017 Cesium</a>
+              {' · '}<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a> · adaptado com sensor
+            </> : modelStatus === 'loading' ? 'Carregando caminhão detalhado…' : 'Modelo simplificado · arquivo detalhado indisponível'}
+          </p>
         </div>
 
         {isFirebase ? (
@@ -1028,22 +1076,25 @@ export default function SompoTruckSimulator({
             </button>
           </div>
 
-          <div className="sompo-simulator-presets" role="group" aria-label="Cenários de teste">
-            {SCENARIO_IDS.map((scenarioId) => {
-              const scenario = SOMPO_SIMULATION_SCENARIOS[scenarioId];
-              return (
-                <button
-                  key={scenarioId}
-                  type="button"
-                  aria-pressed={controls.scenarioId === scenarioId}
-                  disabled={collisionActive}
-                  onClick={() => selectScenario(scenarioId)}
-                >
-                  {scenario.label}
-                </button>
-              );
-            })}
-          </div>
+          <label className="sompo-scenario-select">
+            <span>Escolha entre {SCENARIO_IDS.length} cenários</span>
+            <select value={controls.scenarioId} disabled={collisionActive} onChange={(event) => selectScenario(event.target.value as SompoSimulationScenarioId)}>
+              <optgroup label="Sinistros e emergências · roteiros">
+                {SCENARIO_IDS.filter((id) => !!SOMPO_RURAL_SCRIPTS[id]).map((id) => <option key={id} value={id}>{SOMPO_SIMULATION_SCENARIOS[id].label}</option>)}
+              </optgroup>
+              <optgroup label="Operação, terreno e manobras">
+                {SCENARIO_IDS.filter((id) => !SOMPO_RURAL_SCRIPTS[id]).map((id) => <option key={id} value={id}>{SOMPO_SIMULATION_SCENARIOS[id].label}</option>)}
+              </optgroup>
+            </select>
+          </label>
+          {ruralPreview && (
+            <div className="sompo-scenario-phase">
+              <span role="status">{ruralPreview.phaseLabel}</span>
+              <strong>{formatReading(ruralPreview.speedKph, ' km/h')}{ruralPreview.direction < 0 ? ' · ré' : ''}</strong>
+              <progress max={SOMPO_RURAL_SCRIPTS[controls.scenarioId]?.totalMs} value={Math.min(preview.deviceTimestamp ?? 0, SOMPO_RURAL_SCRIPTS[controls.scenarioId]?.totalMs ?? 1)} />
+              <small>O roteiro conduz os valores abaixo. Use ↻ para repetir.</small>
+            </div>
+          )}
 
           <div className="sompo-simulator-collision" data-sompo-collision-panel>
             <button
@@ -1100,62 +1151,62 @@ export default function SompoTruckSimulator({
               </p>
             )}
             <label>
-              <span>Distância frontal <strong>{controls.distance} cm</strong></span>
+              <span>Distância frontal <strong>{scenarioScripted ? (preview.readings.distance ?? controls.distance) : controls.distance} cm</strong></span>
               <input
                 type="range"
                 min="5"
                 max="300"
                 step="1"
-                value={controls.distance}
-                disabled={collisionActive}
+                value={scenarioScripted ? (preview.readings.distance ?? controls.distance) : controls.distance}
+                disabled={collisionActive || scenarioScripted}
                 onChange={(event) => updateNumber('distance', Number(event.target.value))}
               />
             </label>
             <label>
-              <span>Pitch <strong>{controls.pitch}°</strong></span>
+              <span>Pitch <strong>{scenarioScripted ? (preview.readings.pitch ?? controls.pitch) : controls.pitch}°</strong></span>
               <input
                 type="range"
                 min="-25"
                 max="25"
                 step="0.5"
-                value={controls.pitch}
-                disabled={collisionActive}
+                value={scenarioScripted ? (preview.readings.pitch ?? controls.pitch) : controls.pitch}
+                disabled={collisionActive || scenarioScripted}
                 onChange={(event) => updateNumber('pitch', Number(event.target.value))}
               />
             </label>
             <label>
-              <span>Roll <strong>{controls.roll}°</strong></span>
+              <span>Roll <strong>{scenarioScripted ? (preview.readings.roll ?? controls.roll) : controls.roll}°</strong></span>
               <input
                 type="range"
                 min="-25"
-                max="25"
+                max={scenarioScripted ? 90 : 25}
                 step="0.5"
-                value={controls.roll}
-                disabled={collisionActive}
+                value={scenarioScripted ? (preview.readings.roll ?? controls.roll) : controls.roll}
+                disabled={collisionActive || scenarioScripted}
                 onChange={(event) => updateNumber('roll', Number(event.target.value))}
               />
             </label>
             <label>
-              <span>Temperatura <strong>{controls.temperature} °C</strong></span>
+              <span>Temperatura <strong>{scenarioScripted ? (preview.readings.temperature ?? controls.temperature) : controls.temperature} °C</strong></span>
               <input
                 type="range"
                 min="-10"
                 max="70"
                 step="1"
-                value={controls.temperature}
-                disabled={collisionActive}
+                value={scenarioScripted ? (preview.readings.temperature ?? controls.temperature) : controls.temperature}
+                disabled={collisionActive || scenarioScripted}
                 onChange={(event) => updateNumber('temperature', Number(event.target.value))}
               />
             </label>
             <label>
-              <span>Umidade <strong>{controls.humidity}%</strong></span>
+              <span>Umidade <strong>{scenarioScripted ? (preview.readings.humidity ?? controls.humidity) : controls.humidity}%</strong></span>
               <input
                 type="range"
                 min="0"
                 max="100"
                 step="1"
-                value={controls.humidity}
-                disabled={collisionActive}
+                value={scenarioScripted ? (preview.readings.humidity ?? controls.humidity) : controls.humidity}
+                disabled={collisionActive || scenarioScripted}
                 onChange={(event) => updateNumber('humidity', Number(event.target.value))}
               />
             </label>
@@ -1164,21 +1215,21 @@ export default function SompoTruckSimulator({
           <div className="sompo-simulator-flags" role="group" aria-label="Flags sintéticas do cenário">
             <button
               type="button"
-              aria-pressed={controls.collisionRisk}
-              disabled={collisionActive}
+              aria-pressed={scenarioScripted ? preview.risks.collision : controls.collisionRisk}
+              disabled={collisionActive || scenarioScripted}
               onClick={() => setControls((current) => ({ ...current, collisionRisk: !current.collisionRisk }))}
             >
-              {controls.collisionRisk ? <ShieldAlert /> : <ShieldCheck />}
-              Colisão {controls.collisionRisk ? 'ativa' : 'livre'}
+              {(scenarioScripted ? preview.risks.collision : controls.collisionRisk) ? <ShieldAlert /> : <ShieldCheck />}
+              Colisão {(scenarioScripted ? preview.risks.collision : controls.collisionRisk) ? 'ativa' : 'livre'}
             </button>
             <button
               type="button"
-              aria-pressed={controls.inclinationRisk}
-              disabled={collisionActive}
+              aria-pressed={scenarioScripted ? preview.risks.inclination : controls.inclinationRisk}
+              disabled={collisionActive || scenarioScripted}
               onClick={() => setControls((current) => ({ ...current, inclinationRisk: !current.inclinationRisk }))}
             >
-              {controls.inclinationRisk ? <ShieldAlert /> : <ShieldCheck />}
-              Inclinação {controls.inclinationRisk ? 'ativa' : 'livre'}
+              {(scenarioScripted ? preview.risks.inclination : controls.inclinationRisk) ? <ShieldAlert /> : <ShieldCheck />}
+              Inclinação {(scenarioScripted ? preview.risks.inclination : controls.inclinationRisk) ? 'ativa' : 'livre'}
             </button>
           </div>
           <p className="sompo-simulator-disclaimer">

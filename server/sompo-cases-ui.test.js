@@ -114,7 +114,7 @@ test('modo Firebase acopla o snapshot em tempo real ao gêmeo 3D sem outro canal
 test('gêmeo 3D gira pelo centro e permanece acima do piso até de ponta-cabeça', () => {
   assert.match(sompoSimulator, /const truckPoseGroup = new THREE\.Group\(\)/);
   assert.match(sompoSimulator, /truckGroup\.position\.y = -SOMPO_TRUCK_PIVOT_Y/);
-  assert.match(sompoSimulator, /truckGroundHeight\(truckPoseGroup\.rotation\)/);
+  assert.match(sompoSimulator, /truckGroundHeight\(truckPoseGroup\.rotation[,)]/);
   assert.match(sompoSimulator, /Math\.atan2\(Math\.sin\(target - current\), Math\.cos\(target - current\)\)/);
   assert.match(sompoSimulator, /truckPoseGroup\.rotation\.z = dampAngle/);
   assert.match(sompoSimulator, /truckPoseGroup\.rotation\.x = dampAngle/);
