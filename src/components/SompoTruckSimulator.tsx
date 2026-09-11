@@ -621,7 +621,7 @@ export default function SompoTruckSimulator({
     renderer.setClearColor(0x07100c, 0);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.94;
+    renderer.toneMappingExposure = 0.88;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.domElement.setAttribute('aria-hidden', 'true');
@@ -632,7 +632,7 @@ export default function SompoTruckSimulator({
     const pmrem = new THREE.PMREMGenerator(renderer);
     const environment = pmrem.fromScene(environmentScene, 0.04);
     scene.environment = environment.texture;
-    scene.environmentIntensity = 0.4;
+    scene.environmentIntensity = 0.55;
     environmentScene.dispose();
     pmrem.dispose();
 
@@ -831,7 +831,7 @@ export default function SompoTruckSimulator({
       if (!isFirebase && !reduceMotion.matches) {
         // No roteiro de colisão a roda para junto com o caminhão (flag ativa = impacto/parado).
         const wheelSpeed = (ruralFrame?.wheelSpeedKph ?? drivingSpeed) * (ruralFrame?.direction ?? 1);
-        for (const wheel of wheels) wheel.rotation.y -= delta * wheelSpeed / (3.6 * 0.60);
+        for (const wheel of wheels) wheel.rotation.y -= delta * wheelSpeed / (3.6 * (wheel.userData.radius ?? 0.60));
       }
       for (const wheel of wheels) {
         const intact = wheel.userData.intactTirePositions as Float32Array | undefined;
@@ -1043,7 +1043,7 @@ export default function SompoTruckSimulator({
           <p className="sompo-simulator-hint">Arraste para girar · use as setas para navegar</p>
           <p className="sompo-simulator-credit">
             {modelStatus === 'gltf' ? <>
-              <a href="https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CesiumMilkTruck" target="_blank" rel="noreferrer">Cesium Milk Truck © 2017 Cesium</a>
+              <a href="https://sketchfab.com/3d-models/tesla-semi-39ffc7c746184e0c9ebd5bbcd0b405dd" target="_blank" rel="noreferrer">Tesla Semi © 2018 Oleksii Rozumnyi</a>
               {' · '}<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a> · adaptado com sensor
             </> : modelStatus === 'loading' ? 'Carregando caminhão detalhado…' : 'Modelo simplificado · arquivo detalhado indisponível'}
           </p>
