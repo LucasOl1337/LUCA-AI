@@ -10,6 +10,7 @@ export const APP_PAGES = Object.freeze([
   'personas',
   'configuracao',
   'sompo',
+  'monitoramento',
   'admin',
 ]);
 
@@ -19,6 +20,7 @@ export const PAGE_PATHS = Object.freeze({
   personas: '/personas',
   configuracao: '/configuracao',
   sompo: '/sompo',
+  monitoramento: '/monitoramento',
   admin: '/admin',
 });
 
@@ -207,7 +209,7 @@ export function formatAppUrl(location) {
     if (loc.novo) params.set('novo', '1');
   }
 
-  if (page === 'sompo') {
+  if (page === 'sompo' || page === 'monitoramento') {
     if (loc.aba === SOMPO_ABA) params.set('aba', SOMPO_ABA);
     setIfPresent(params, 'busca', loc.busca);
     setIfPresent(params, 'produto', loc.produto);

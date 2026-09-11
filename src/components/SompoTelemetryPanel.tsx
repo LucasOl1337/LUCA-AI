@@ -25,6 +25,7 @@ interface SompoTelemetryPanelProps {
   error: string | null;
   onRefresh?: () => void;
   children?: ReactNode;
+  controlsOnly?: boolean;
 }
 
 function number(value: number | null | undefined, maximumFractionDigits = 2): string {
@@ -45,7 +46,8 @@ function age(value: number): string {
   return `${Math.floor(seconds / 60)}min ${seconds % 60}s`;
 }
 
-function riskValue(active: boolean, safeLabel: string, stale: boolean): string {
+function riskValue(active: boolean | null, safeLabel: string, stale: boolean): string {
+  if (active === null) return 'Não informado';
   if (active) return stale ? 'Detectado no snapshot' : 'Detectado';
   return stale ? `Último valor: ${safeLabel.toLowerCase()}` : safeLabel;
 }
@@ -57,19 +59,22 @@ export default function SompoTelemetryPanel({
   error,
   onRefresh,
   children,
+  controlsOnly = false,
 }: SompoTelemetryPanelProps) {
   const showInitialWait = useDeferredFlag(loading && !telemetry);
   const stale = telemetry?.freshness === 'stale';
   const simulation = telemetry?.source.kind === 'simulation';
   const connectionState = telemetry?.connection.state || 'connecting';
   const live = connectionState === 'live';
-  const historical = stale || !live;
+  const historical = telemetry?.freshness !== 'fresh' || !live;
   const connectionWarning = simulation ? null : error
     || (connectionState === 'reconnecting'
       ? `Canal com o Firebase caiu; reconexão automática em andamento (tentativa ${telemetry?.connection.retryAttempt || 1}).`
       : connectionState === 'stopped'
         ? 'O canal em tempo real foi interrompido no runtime.'
         : null);
+
+  if (controlsOnly) return <section className="sompo-bench-controls">{children}</section>;
 
   return (
     <section
@@ -121,16 +126,16 @@ export default function SompoTelemetryPanel({
           <div className="sompo-telemetry-head">
             <div className="sompo-telemetry-identity">
               <span className={`sompo-telemetry-risk-icon ${telemetry.status}`}>
-                {telemetry.status === 'alert' ? <ShieldAlert /> : <ShieldCheck />}
+                {telemetry.status === 'alert' ? <ShieldAlert /> : historical || telemetry.status === 'unknown' ? <TriangleAlert /> : <ShieldCheck />}
               </span>
               <div>
                 <div className="sompo-telemetry-eyebrow">
                   {simulation ? 'ESP32 virtual · Caminhão' : 'ESP32 · Trator'} {telemetry.tractorId}
                 </div>
                 <h2>
-                  {telemetry.status === 'alert'
+                  {telemetry.status === 'unknown' ? 'Condição não confirmada' : telemetry.status === 'alert'
                     ? simulation ? 'Cenário com flags de risco' : historical ? 'Alerta registrado' : 'Alerta ativo'
-                    : simulation ? 'Ensaio sem flags de risco' : 'Operação sem flags de risco'}
+                    : historical ? 'Última leitura · condição atual desconhecida' : simulation ? 'Ensaio sem flags de risco' : 'Operação sem flags de risco'}
                 </h2>
               </div>
             </div>
@@ -164,6 +169,7 @@ export default function SompoTelemetryPanel({
             </div>
           </div>
 
+          {telemetry.status === 'alert' && <div className="sompo-operational-alert" role="alert"><ShieldAlert /><div><strong>{historical ? 'Alerta no último snapshot' : simulation ? 'Alerta simulado · verifique o cenário' : 'Atenção imediata ao equipamento'}</strong><p>{historical ? 'O canal não confirma a condição atual. Verifique a comunicação e a máquina.' : 'Confira o entorno e siga o procedimento de segurança da operação. O painel não comanda o veículo nem comprova o acionamento do buzzer.'}</p></div></div>}
           {connectionWarning && (
             <p className="sompo-telemetry-warning" role="status">
               <TriangleAlert /> Último snapshot preservado. {connectionWarning}
@@ -175,18 +181,18 @@ export default function SompoTelemetryPanel({
             role="group"
             aria-label={simulation ? 'Flags sintéticas do cenário' : 'Flags do firmware'}
           >
-            <article data-active={telemetry.risks.collision}>
+            <article data-active={telemetry.risks.collision} data-unknown={historical || telemetry.risks.collision === null}>
               <ShieldAlert />
               <div>
                 <span>Risco de colisão</span>
-                <strong>{riskValue(telemetry.risks.collision, 'Livre', historical)}</strong>
+                <strong>{riskValue(telemetry.risks.collision, 'Sem flag ativa', historical)}</strong>
               </div>
             </article>
-            <article data-active={telemetry.risks.inclination}>
+            <article data-active={telemetry.risks.inclination} data-unknown={historical || telemetry.risks.inclination === null}>
               <Gauge />
               <div>
                 <span>Risco de inclinação</span>
-                <strong>{riskValue(telemetry.risks.inclination, 'Estável', historical)}</strong>
+                <strong>{riskValue(telemetry.risks.inclination, 'Sem flag ativa', historical)}</strong>
               </div>
             </article>
           </div>

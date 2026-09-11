@@ -33,6 +33,7 @@ import {
   type SompoAxisCalibration,
 } from './sompo/sensorPose.js';
 import {
+  sompoCollisionSampleOffsets,
   SOMPO_BRAKING_SCRIPT,
   getSompoBrakingScriptState,
   SOMPO_COLLISION_FRAME_MOMENTS,
@@ -64,6 +65,7 @@ type CollisionRunState =
 interface CollisionRunHandle {
   publicId: string;
   startedAt: number;
+  observedStartMs: number;
   queue: Record<string, unknown>[];
   lastSampleMs: number;
 }
@@ -233,7 +235,7 @@ function LiveReadings({
         <div>
           <span>Telemetria acoplada</span>
           <strong>Trator {telemetry.tractorId}</strong>
-          <p>Cada evento recebido atualiza diretamente a cena, sem escrever comandos no equipamento.</p>
+          <p>{telemetry.freshness === 'fresh' && telemetry.connection.state === 'live' ? 'Cena atualizada pelo snapshot; nenhum comando é enviado ao equipamento.' : 'Último snapshot preservado. Movimento interrompido até confirmar a atualização dos sensores.'}</p>
         </div>
       </div>
 
@@ -267,12 +269,12 @@ function LiveReadings({
 
       <div className="sompo-simulator-live-flags" aria-label="Alertas do dispositivo">
         <div data-alert={telemetry.risks.collision}>
-          {telemetry.risks.collision ? <ShieldAlert /> : <ShieldCheck />}
-          <span><small>Colisão</small><strong>{telemetry.risks.collision ? 'Alerta ativo' : 'Livre'}</strong></span>
+          {telemetry.freshness !== 'fresh' || telemetry.risks.collision === null ? <Siren /> : telemetry.risks.collision ? <ShieldAlert /> : <ShieldCheck />}
+          <span><small>Colisão</small><strong>{telemetry.freshness !== 'fresh' || telemetry.connection.state !== 'live' ? 'Último snapshot' : telemetry.risks.collision === null ? 'Não informado' : telemetry.risks.collision ? 'Alerta ativo' : 'Sem flag ativa'}</strong></span>
         </div>
         <div data-alert={telemetry.risks.inclination}>
-          {telemetry.risks.inclination ? <ShieldAlert /> : <ShieldCheck />}
-          <span><small>Inclinação</small><strong>{telemetry.risks.inclination ? 'Alerta ativo' : 'Estável'}</strong></span>
+          {telemetry.freshness !== 'fresh' || telemetry.risks.inclination === null ? <Siren /> : telemetry.risks.inclination ? <ShieldAlert /> : <ShieldCheck />}
+          <span><small>Inclinação</small><strong>{telemetry.freshness !== 'fresh' || telemetry.connection.state !== 'live' ? 'Último snapshot' : telemetry.risks.inclination === null ? 'Não informado' : telemetry.risks.inclination ? 'Alerta ativo' : 'Sem flag ativa'}</strong></span>
         </div>
       </div>
 
@@ -451,6 +453,7 @@ export default function SompoTruckSimulator({
 
     let settled = false;
     let flushBusy = false;
+    let inFlight: Promise<unknown> | null = null;
 
     function stopTimers() {
       window.clearInterval(tickTimer);
@@ -473,15 +476,20 @@ export default function SompoTruckSimulator({
     // mas o painel avisa que a análise seguirá sem evidência visual.
     async function uploadCapturedFrames() {
       const frames = collisionCaptureRef.current?.frames ?? [];
+      if (frames.length < SOMPO_COLLISION_FRAME_MOMENTS.length) {
+        setCollisionFramesWarning(`${frames.length}/${SOMPO_COLLISION_FRAME_MOMENTS.length} quadros capturados. O episódio mantém as amostras; quadros ausentes não serão inventados.`);
+      }
       if (frames.length === 0) return;
+      let uploaded = 0;
       try {
         // Um frame por request para ficar folgado no limite de body do servidor.
         for (const frame of frames) {
           await lucaApi.postSompoTelemetryEpisodeFrames(run.publicId, [frame]);
+          uploaded += 1;
         }
       } catch {
         setCollisionFramesWarning(
-          'Falha ao enviar os frames do simulador — o episódio foi gravado, mas a análise seguirá sem evidência visual.',
+          `Falha ao enviar os frames do simulador — ${uploaded}/${frames.length} enviados. A bancada usará somente os quadros disponíveis.`,
         );
       }
     }
@@ -492,6 +500,7 @@ export default function SompoTruckSimulator({
       stopTimers();
       setCollisionRun({ status: 'finishing', publicId: run.publicId });
       try {
+        if (inFlight) await inFlight;
         while (run.queue.length > 0) {
           await lucaApi.postSompoTelemetrySimulation(
             run.queue.splice(0, SIMULATION_HISTORY_MAX_BATCH),
@@ -520,6 +529,14 @@ export default function SompoTruckSimulator({
 
     const tickTimer = window.setInterval(() => {
       const elapsed = performance.now() - run.startedAt;
+      for (const offset of sompoCollisionSampleOffsets(run.lastSampleMs, elapsed)) {
+        const sample = createSompoCollisionScriptSnapshot(offset, {
+          observedAt: new Date(run.observedStartMs + offset).toISOString(),
+          connectedAt: connectedAtRef.current,
+        });
+        run.queue.push(snapshotToSimulationRaw(sample));
+        run.lastSampleMs = offset;
+      }
       if (elapsed >= SOMPO_COLLISION_SCRIPT.totalMs) {
         void finishRun();
         return;
@@ -531,10 +548,6 @@ export default function SompoTruckSimulator({
       setPreview(snapshot);
       onTelemetryRef.current?.(snapshot);
       setCollisionElapsedSec(Math.floor(elapsed / 1_000));
-      if (elapsed - run.lastSampleMs >= SOMPO_COLLISION_SCRIPT.sampleIntervalMs) {
-        run.lastSampleMs = elapsed;
-        run.queue.push(snapshotToSimulationRaw(snapshot));
-      }
     }, COLLISION_TICK_MS);
 
     const flushTimer = window.setInterval(() => {
@@ -542,7 +555,8 @@ export default function SompoTruckSimulator({
       const batch = run.queue.splice(0, SIMULATION_HISTORY_MAX_BATCH);
       if (batch.length === 0) return;
       flushBusy = true;
-      lucaApi.postSompoTelemetrySimulation(batch, run.publicId)
+      inFlight = lucaApi.postSompoTelemetrySimulation(batch, run.publicId);
+      void inFlight
         .catch(() => abortRun('Falha de rede ao gravar o episódio — gravação abortada. O simulador continua ativo.'))
         .finally(() => {
           flushBusy = false;
@@ -576,9 +590,17 @@ export default function SompoTruckSimulator({
     collisionRunRef.current = {
       publicId,
       startedAt: performance.now(),
+      observedStartMs: Date.now(),
       queue: [],
       lastSampleMs: Number.NEGATIVE_INFINITY,
     };
+    const firstSnapshot = createSompoCollisionScriptSnapshot(0, {
+      observedAt: new Date(collisionRunRef.current.observedStartMs).toISOString(),
+      connectedAt: connectedAtRef.current,
+    });
+    previewRef.current = firstSnapshot;
+    setPreview(firstSnapshot);
+    onTelemetryRef.current?.(firstSnapshot);
     collisionVisualRef.current = { baseRange: rangeForDistance(COLLISION_START_DISTANCE_CM) };
     collisionCaptureRef.current = { nextIndex: 0, frames: [] };
     setCollisionFrameCount(0);
@@ -769,18 +791,20 @@ export default function SompoTruckSimulator({
       previousTime = time;
       const settings = controlsRef.current;
       const snapshot = previewRef.current;
+      const physicalCurrent = snapshot.freshness === 'fresh' && snapshot.connection.state === 'live';
+      const attitudeKnown = Number.isFinite(snapshot.readings.pitch) && Number.isFinite(snapshot.readings.roll);
       const sensorPose = sensorReadingToPose({
         pitch: snapshot.readings.pitch,
         roll: snapshot.readings.roll,
         yawRate: snapshot.readings.rotation?.z,
         currentHeading: liveHeading,
-        deltaSeconds: reduceMotion.matches ? 0 : delta,
+        deltaSeconds: reduceMotion.matches || (isFirebase && !physicalCurrent) ? 0 : delta,
       }, axisCalibrationRef.current);
       const pitch = isFirebase
-        ? sensorPose.rotationZ
+        ? attitudeKnown ? sensorPose.rotationZ : truckPoseGroup.rotation.z
         : THREE.MathUtils.degToRad(snapshot.readings.pitch ?? settings.pitch);
       const roll = isFirebase
-        ? sensorPose.rotationX
+        ? attitudeKnown ? sensorPose.rotationX : truckPoseGroup.rotation.x
         : THREE.MathUtils.degToRad(snapshot.readings.roll ?? settings.roll);
       if (reduceMotion.matches) {
         truckPoseGroup.rotation.z = pitch;
@@ -797,7 +821,7 @@ export default function SompoTruckSimulator({
         ? getSompoBrakingScriptState(time - startedAtRef.current, settings.speedKph)
         : null;
       const liveActivity = isFirebase
-        ? THREE.MathUtils.clamp((snapshot.readings.rotation?.magnitude || 0) * 0.012, 0, 0.1)
+        ? physicalCurrent ? THREE.MathUtils.clamp((snapshot.readings.rotation?.magnitude || 0) * 0.012, 0, 0.1) : 0
         : settings.roughness * 0.008 * (brakingState ? Math.min(1, brakingState.speedKph / 8) : 1);
       const targetHeight = truckGroundHeight(truckPoseGroup.rotation);
       truckBaseHeight = reduceMotion.matches
@@ -834,10 +858,13 @@ export default function SompoTruckSimulator({
             : THREE.MathUtils.lerp(truckPoseGroup.position.x, 0, 0.06);
         }
       }
-      rayMaterial.color.set(snapshot.risks.collision ? 0xff5d52 : 0x7dff9a);
+      const uncertain = isFirebase && (!physicalCurrent || snapshot.status === 'unknown');
+      obstacleGroup.visible = Number.isFinite(snapshot.readings.distance);
+      rayGroup.visible = obstacleGroup.visible;
+      rayMaterial.color.set(uncertain ? 0xc9ad74 : snapshot.risks.collision ? 0xff5d52 : 0x7dff9a);
       rayMaterial.opacity = snapshot.risks.collision ? 1 : 0.68;
-      ledMaterial.color.set(snapshot.status === 'alert' ? 0xff5d52 : 0x7dff9a);
-      ledMaterial.emissive.set(snapshot.status === 'alert' ? 0xff2d22 : 0x2dff6b);
+      ledMaterial.color.set(uncertain ? 0xc9ad74 : snapshot.status === 'alert' ? 0xff5d52 : 0x7dff9a);
+      ledMaterial.emissive.set(uncertain ? 0x473d20 : snapshot.status === 'alert' ? 0xff2d22 : 0x2dff6b);
       ledMaterial.emissiveIntensity = reduceMotion.matches ? 2.4 : 2.2 + (Math.sin(time * 0.007) * 1.1);
       orbit.update();
       renderer.render(scene, camera);
@@ -856,9 +883,9 @@ export default function SompoTruckSimulator({
           if (!dataUrl) continue;
           capture.frames.push({
             dataUrl,
-            offsetMs: moment.offsetMs,
-            fase: moment.fase,
-            label: moment.label,
+            offsetMs: Math.round(snapshot.deviceTimestamp ?? elapsedMs),
+            fase: getSompoCollisionScriptPhase(snapshot.deviceTimestamp ?? elapsedMs),
+            label: moment.fase === 'impacto' ? 'Janela do impacto (quadro renderizado)' : moment.label,
           });
           setCollisionFrameCount(capture.frames.length);
         }

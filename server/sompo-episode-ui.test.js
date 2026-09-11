@@ -42,7 +42,7 @@ test('simulador captura frames nos momentos do roteiro e sobe 1 por request sem 
   assert.match(simulator, /COLLISION_FRAME_LATE_TOLERANCE_MS/);
   assert.match(simulator, /postSompoTelemetryEpisodeFrames\(run\.publicId, \[frame\]\)/);
   assert.match(simulator, /data-sompo-collision-frames-warning/);
-  assert.match(simulator, /Falha ao enviar os frames do simulador — o episódio foi gravado, mas a análise seguirá sem evidência visual\./);
+  assert.match(simulator, /Falha ao enviar os frames do simulador — \$\{uploaded\}\/\$\{frames.length\} enviados\. A bancada usará somente os quadros disponíveis\./);
   assert.match(simulator, /frames: \{collisionFrameCount\}\/\{SOMPO_COLLISION_FRAME_MOMENTS\.length\}/);
 });
 

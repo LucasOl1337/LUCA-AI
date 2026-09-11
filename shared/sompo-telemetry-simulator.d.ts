@@ -75,6 +75,7 @@ export function createSompoCollisionScriptSnapshot(
   elapsedMs: number,
   options?: { observedAt?: string; connectedAt?: string },
 ): SompoTelemetrySnapshot;
+export function sompoCollisionSampleOffsets(lastMs: number, elapsedMs: number): number[];
 
 export type SompoBrakingScriptPhaseId = 'deslocamento' | 'frenagem' | 'repouso';
 

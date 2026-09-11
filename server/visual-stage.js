@@ -426,6 +426,7 @@ export function sompoEpisodeHeadline(data = {}) {
   if (impactoMs !== null && data.flagDesdeInicio) {
     return 'A flag de risco já estava ativa antes da batida';
   }
+  if (data.flagsIncompletas) return 'Flags incompletas: disparo do alerta não confirmado';
   if (impactoMs !== null) return 'A batida aconteceu e o alerta nunca disparou';
   return 'Linha do tempo do episódio';
 }

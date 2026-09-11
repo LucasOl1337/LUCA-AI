@@ -1,5 +1,13 @@
 const DEFAULT_SCENARIO_ID = 'normal';
 
+// Synthetic script only: catch up scheduled points when browser timers are delayed.
+export function sompoCollisionSampleOffsets(lastMs, elapsedMs) {
+  const offsets = [];
+  const end = Math.min(SOMPO_COLLISION_SCRIPT.totalMs, elapsedMs);
+  for (let offset = Number.isFinite(lastMs) ? lastMs + SOMPO_COLLISION_SCRIPT.sampleIntervalMs : 0; offset <= end; offset += SOMPO_COLLISION_SCRIPT.sampleIntervalMs) offsets.push(offset);
+  return offsets;
+}
+
 export const SOMPO_SIMULATION_SCENARIOS = Object.freeze({
   normal: Object.freeze({
     scenarioId: 'normal',

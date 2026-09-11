@@ -31,7 +31,7 @@ test('SOMPO aparece na navegação e no App', () => {
 });
 
 test('página SOMPO escolhe caso + equipe e dispara run', () => {
-  assert.match(sompoPage, /SOMPO · campo \+ agentes/);
+  assert.match(sompoPage, /Challenge Sompo · equipamentos agrícolas/);
   assert.match(sompoPage, /queueSompoLaunch/);
   assert.match(sompoPage, /Rodar avaliação na bancada/);
   assert.match(sompoPage, /teamMode/);

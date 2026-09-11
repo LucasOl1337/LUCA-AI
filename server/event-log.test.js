@@ -2,9 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
+import { after } from 'node:test';
 
 const repoRoot = process.cwd();
-const stateDir = path.join(repoRoot, '.luca');
+const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-event-log-test-'));
+process.env.LUCA_DATA_DIR = stateDir;
+after(() => fs.rmSync(stateDir, { recursive: true, force: true }));
 const logPath = path.join(stateDir, 'runtime-events.jsonl');
 
 test('event log appende e lista eventos mais recentes primeiro', async () => {

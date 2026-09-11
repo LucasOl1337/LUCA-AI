@@ -36,3 +36,12 @@ tmp-live-ui/
 .codex-tmp/
 .grok-fable/
 
+# Local GIS data: Fairfax County restricts redistribution.
+public/datasets/frying-pan-farm/mapa.geojson
+public/datasets/frying-pan-farm/source-*.geojson
+public/datasets/frying-pan-farm/source-elevation-metadata.xml
+public/datasets/frying-pan-farm/terrain-2022-5m.json
+public/datasets/frying-pan-farm/dtm-2022-5m.tif
+public/datasets/frying-pan-farm/elevation-validation.json
+docs/audit/farm/
+

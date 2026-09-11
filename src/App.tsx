@@ -5,6 +5,7 @@ import LucaAiPage from '@/pages/LucaAiPage';
 import PersonasPage from '@/pages/PersonasPage';
 import ConfiguracaoPage from '@/pages/ConfiguracaoPage';
 import SompoPage from '@/pages/SompoPage';
+import LaboratorioPage from '@/pages/LaboratorioPage';
 import AdminPage from '@/pages/AdminPage';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppLocation } from '@/hooks/useAppLocation';
@@ -33,7 +34,8 @@ export default function App() {
       case 'luca-ai':     return <LucaAiPage onNavigate={goToPage} />;
       case 'personas':    return <PersonasPage />;
       case 'configuracao': return <ConfiguracaoPage />;
-      case 'sompo':       return <SompoPage onNavigate={goToPage} />;
+      case 'sompo':       return <LaboratorioPage key={user?.id} />;
+      case 'monitoramento': return <SompoPage onNavigate={goToPage} />;
       case 'admin':       return <AdminPage />;
     }
   };

@@ -1,3 +1,5 @@
+import SompoRiskPanel from '@/components/SompoRiskPanel';
+import { assessSompoRisk, sompoRiskBriefing, type SompoRiskContext } from '../../shared/sompo-risk.js';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
@@ -6,6 +8,7 @@ import {
   Box as BoxIcon,
   Building2,
   Database,
+  Download,
   Filter,
   Loader2,
   MapPin,
@@ -25,6 +28,7 @@ import { useAppLocation } from '@/hooks/useAppLocation';
 import { useLuca } from '@/hooks/useLucaState';
 import { GRAVIDADE_VALUES, PRODUTO_PARAM, PRODUTO_VALUE, SOMPO_ABA } from '../../shared/app-location.js';
 import { lucaApi } from '@/lib/api';
+import { downloadFile } from '@/lib/lab-client';
 import { pickFailureCopy } from '@/lib/surface-failure';
 import type {
   LucaAiChatAttachment,
@@ -53,7 +57,7 @@ import {
   type SompoLaunchMode,
   type SompoProductLine,
 } from '@/lib/sompo-cases';
-import { buildSompoEpisodeMission, buildSompoTelemetryMission } from '../../shared/sompo-telemetry.js';
+import { currentSompoTelemetry, buildSompoEpisodeMission, buildSompoTelemetryMission } from '../../shared/sompo-telemetry.js';
 import { createSompoSimulationSnapshot } from '../../shared/sompo-telemetry-simulator.js';
 import '@/sompo-page.css';
 
@@ -130,6 +134,7 @@ function defaultIndividualPresetId(list: LucaIndividualPreset[]): string {
 
 export default function SompoPage({ onNavigate }: SompoPageProps) {
   const theme = useTheme();
+  const [riskContext, setRiskContext] = useState<SompoRiskContext>({});
   const { createSession, busy: sessionsBusy } = useChatLibrary();
   const { sompoTelemetry: streamedTelemetry } = useLuca();
   const { location, navigate } = useAppLocation();
@@ -150,7 +155,18 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
   const [simulatedTelemetry, setSimulatedTelemetry] = useState<SompoTelemetrySnapshot>(() => (
     createSompoSimulationSnapshot()
   ));
-  const [recordedEpisode, setRecordedEpisode] = useState<{ publicId: string; kind: string } | null>(null);
+  const [recordedEpisode, setRecordedEpisode] = useState<{ publicId: string; kind: string } | null>(() => {
+    try {
+      const saved = JSON.parse(window.sessionStorage.getItem('luca:sompo:last-episode') || 'null');
+      return saved && typeof saved.publicId === 'string' && /^[a-zA-Z0-9-]+$/.test(saved.publicId) && saved.kind === 'colisao' ? saved : null;
+    } catch { return null; }
+  });
+  useEffect(() => {
+    try {
+      if (recordedEpisode) window.sessionStorage.setItem('luca:sompo:last-episode', JSON.stringify(recordedEpisode));
+      else window.sessionStorage.removeItem('luca:sompo:last-episode');
+    } catch { /* The server evidence remains retrievable by its public ID. */ }
+  }, [recordedEpisode]);
   const [teamMode, setTeamMode] = useState<SompoLaunchMode>('team');
   const [teamPresets, setTeamPresets] = useState<LucaTeamPreset[]>(LUCA_TEAM_PRESETS);
   const [individualPresets, setIndividualPresets] = useState<LucaIndividualPreset[]>(LUCA_INDIVIDUAL_PRESETS);
@@ -168,6 +184,10 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
   const [telemetryError, setTelemetryError] = useState<string | null>(null);
   const [telemetryLaunching, setTelemetryLaunching] = useState(false);
   const [telemetryLaunchError, setTelemetryLaunchError] = useState<string | null>(null);
+  const [exportWindowMinutes, setExportWindowMinutes] = useState(15);
+  const [telemetryExporting, setTelemetryExporting] = useState<'json' | 'csv' | null>(null);
+  const [telemetryExportMessage, setTelemetryExportMessage] = useState<string | null>(null);
+  const [telemetryExportError, setTelemetryExportError] = useState<string | null>(null);
   const telemetryRequestBusyRef = useRef(false);
 
   const loadTelemetry = useCallback(async (kind: 'initial' | 'manual' = 'manual') => {
@@ -272,7 +292,13 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
     });
   }, [productFilter, query, severityFilter]);
 
-  const firebaseTelemetry = streamedTelemetry || bootstrapTelemetry;
+  const [telemetryClock, setTelemetryClock] = useState(Date.now);
+  useEffect(() => {
+    if (telemetrySourceMode !== 'firebase') return;
+    const timer = window.setInterval(() => setTelemetryClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [telemetrySourceMode]);
+  const firebaseTelemetry = currentSompoTelemetry(streamedTelemetry || bootstrapTelemetry, telemetryClock);
   const telemetry = telemetrySourceMode === 'simulation' ? simulatedTelemetry : firebaseTelemetry;
   const visibleTelemetryError = telemetrySourceMode === 'firebase' && !streamedTelemetry ? telemetryError : null;
 
@@ -390,6 +416,51 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
 
   const episodeReady = telemetrySourceMode === 'simulation' && recordedEpisode !== null;
 
+  async function exportTelemetry(format: 'json' | 'csv') {
+    if (telemetryExporting) return;
+    setTelemetryExporting(format);
+    setTelemetryExportMessage(null);
+    setTelemetryExportError(null);
+    const source = telemetrySourceMode === 'simulation' ? 'simulacao' : 'firebase';
+    const tractorId = telemetry?.tractorId || '001';
+    const params = new URLSearchParams({ fonte: source, trator: tractorId, format });
+    if (episodeReady && recordedEpisode) params.set('episodeId', recordedEpisode.publicId);
+    else params.set('janelaMin', String(exportWindowMinutes));
+    try {
+      const response = await fetch(`/api/sompo/telemetry/export?${params}`, {
+        credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(30_000),
+      });
+      const content = await response.text();
+      if (!response.ok) {
+        let message = response.status === 401
+          ? 'Entre novamente para exportar o histórico.'
+          : response.status === 403
+            ? 'Esta conta não tem acesso à exportação da telemetria.'
+            : 'Não foi possível exportar este recorte. Tente novamente.';
+        try {
+          const failure = JSON.parse(content);
+          if (typeof failure?.message === 'string') message = failure.message;
+        } catch { /* A borda pode responder HTML; preserve a mensagem legível. */ }
+        throw new Error(message);
+      }
+      if (!content.trim()) throw new Error('Nenhuma amostra gravada neste recorte. Amplie a janela ou aguarde novas leituras.');
+      const expectedType = format === 'csv' ? 'text/csv' : 'application/json';
+      if (!response.headers.get('content-type')?.includes(expectedType)) throw new Error('O servidor não retornou um dataset válido. Entre novamente ou tente exportar outra vez.');
+      const scope = episodeReady && recordedEpisode ? recordedEpisode.publicId : `${exportWindowMinutes}min`;
+      const filename = `sompo-${source}-${tractorId.replace(/[^a-zA-Z0-9_-]/g, '_')}-${scope}-${new Date().toISOString().replace(/[:.]/g, '-')}.${format}`;
+      downloadFile(content, filename, format === 'csv' ? 'text/csv;charset=utf-8' : 'application/json;charset=utf-8');
+      setTelemetryExportMessage(`${filename} baixado. Abra o Laboratório e selecione o arquivo em Importar.`);
+    } catch (error) {
+      setTelemetryExportError(error instanceof Error && error.name === 'TimeoutError'
+        ? 'A exportação demorou demais. Tente uma janela menor.'
+        : error instanceof TypeError
+          ? 'Sem conexão com o servidor. Reconecte e tente exportar novamente.'
+          : error instanceof Error ? error.message : 'Não foi possível exportar o histórico.');
+    } finally {
+      setTelemetryExporting(null);
+    }
+  }
+
   async function runTelemetryWithSquad() {
     if (!telemetry || !activeSquad || telemetryLaunching || sessionsBusy) return;
     setTelemetryLaunching(true);
@@ -469,7 +540,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
           history = null;
         }
         caseId = `${telemetry.source.kind === 'simulation' ? 'simulacao' : 'telemetria'}-trator-${telemetry.tractorId}-${telemetry.deviceTimestamp ?? 'snapshot'}`;
-        mission = buildSompoTelemetryMission(telemetry, activeSquad.label, history);
+        mission = buildSompoTelemetryMission(telemetry, activeSquad.label, history) + '\n\n' + sompoRiskBriefing(assessSompoRisk(telemetry, riskContext));
       }
       const session = launchSession ?? await createSession();
       if (!session) {
@@ -510,12 +581,11 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
             <div>
               <div className="sompo-kicker">
                 <Wheat className="h-3.5 w-3.5" />
-                SOMPO · campo + agentes
+                Challenge Sompo · equipamentos agrícolas
               </div>
-              <h1 className="sompo-title">SOMPO</h1>
+              <h1 className="sompo-title">Risco em campo</h1>
               <p className="sompo-lead">
-                Acompanhe o ESP32 pelo Firebase ou teste cenários com o caminhão virtual,
-                sempre com a origem do snapshot preservada para a equipe de agentes.
+                Acompanhe os sinais da máquina, avalie o contexto da operação e registre evidências para a análise técnica.
               </p>
             </div>
             <div className="sompo-metrics">
@@ -541,7 +611,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
               onClick={() => setViewMode('telemetry')}
             >
               <Activity />
-              <span><strong>Telemetria</strong><small>Firebase + simulador 3D</small></span>
+              <span><strong>Equipamento e risco</strong><small>Sinais, contexto e evidências</small></span>
             </button>
             <button
               type="button"
@@ -549,7 +619,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
               onClick={() => setViewMode('cases')}
             >
               <Wheat />
-              <span><strong>Casos agrícolas</strong><small>Cenários para avaliação</small></span>
+              <span><strong>Casos complementares</strong><small>Exemplos sintéticos de seguro rural</small></span>
             </button>
           </section>
 
@@ -558,7 +628,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
               <section className="sompo-source-switch" aria-label="Origem dos dados da telemetria">
                 <div className="sompo-source-switch-label">
                   <span>Origem dos dados</span>
-                  <small>O Firebase continua ativo quando o simulador é aberto.</small>
+                  <small>Escolha a origem. As amostras e avaliações ficam separadas.</small>
                 </div>
                 <div className="sompo-source-switch-options">
                   <button
@@ -566,14 +636,15 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
                     aria-pressed={telemetrySourceMode === 'firebase'}
                     onClick={() => {
                       navigate({ fonte: '' }, 'replace');
+                      setRiskContext({});
                       setTelemetryLaunchError(null);
                       setRecordedEpisode(null);
                     }}
                   >
                     <Database />
                     <span>
-                      <strong>Firebase</strong>
-                      <small>Dispositivo físico · fonte principal</small>
+                      <strong>Equipamento físico</strong>
+                      <small>ESP32 via Firebase · leitura</small>
                     </span>
                   </button>
                   <button
@@ -581,18 +652,23 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
                     aria-pressed={telemetrySourceMode === 'simulation'}
                     onClick={() => {
                       navigate({ fonte: 'simulacao' }, 'replace');
+                      setRiskContext({});
                       setTelemetryLaunchError(null);
                     }}
                   >
                     <BoxIcon />
                     <span>
                       <strong>Simulador 3D</strong>
-                      <small>Three.js · ensaio local</small>
+                      <small>Dados sintéticos · sem equipamento</small>
                     </span>
                   </button>
                 </div>
               </section>
 
+              <div className="sompo-section-heading"><span>01 / Acompanhar equipamento</span><h2>Sinais e alertas da operação</h2><p>Alertas do painel não confirmam acionamento de LED ou buzzer. O modelo 3D de caminhão representa o protótipo de bancada; não é uma máquina agrícola homologada.</p></div>
+              <SompoTelemetryPanel telemetry={telemetry} loading={telemetrySourceMode === 'firebase' && telemetryLoading} refreshing={telemetryRefreshing} error={visibleTelemetryError} onRefresh={telemetrySourceMode === 'firebase' ? () => void loadTelemetry('manual') : undefined} />
+              <SompoRiskPanel key={`${telemetrySourceMode}:${telemetry?.tractorId || 'empty'}`} telemetry={telemetry} context={riskContext} onContext={setRiskContext} />
+              <div className="sompo-section-heading"><span>03 / Reconstruir e analisar</span><h2>Da telemetria à evidência</h2><p>Observe a atitude do protótipo ou grave um episódio sintético. A bancada recebe a origem, a linha do tempo e os quadros disponíveis.</p></div>
               <Suspense fallback={(
                 <div className="sompo-simulator-loading" role="status">
                   <Loader2 className="animate-spin" /> Preparando visualização 3D…
@@ -613,12 +689,47 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
                   />
                 ) : (
                   <div className="sompo-simulator-loading" role="status">
-                    <Loader2 className="animate-spin" /> Aguardando a primeira leitura do Firebase…
+                    <Database /> Visualização 3D indisponível até receber telemetria. Para demonstrar sem equipamento, selecione Simulador 3D.
                   </div>
                 )}
               </Suspense>
 
+              <section className="sompo-telemetry-export" aria-labelledby="sompo-export-title" aria-busy={telemetryExporting !== null}>
+                <div>
+                  <h3 id="sompo-export-title">Levar o histórico ao Laboratório</h3>
+                  <p>
+                    {telemetrySourceMode === 'simulation' ? 'Simulação' : 'Equipamento físico'} · Máquina {telemetry?.tractorId || '001'}.
+                    {' '}{episodeReady
+                      ? `Exportação do episódio ${recordedEpisode?.publicId}, com todas as suas amostras.`
+                      : 'Exportação das leituras gravadas na janela selecionada.'}
+                  </p>
+                  <p>O JSON preserva o registro do dispositivo; o CSV leva os sinais ao replay. Os dois podem ser importados no Laboratório.</p>
+                </div>
+                <div className="sompo-telemetry-export-actions">
+                  {episodeReady ? (
+                    <button type="button" disabled={telemetryExporting !== null} onClick={() => setRecordedEpisode(null)}>Usar janela recente</button>
+                  ) : (
+                    <label>
+                      <span>Janela do histórico</span>
+                      <select value={exportWindowMinutes} disabled={telemetryExporting !== null} onChange={event => setExportWindowMinutes(Number(event.target.value))}>
+                        {[15, 30, 60, 240].map(minutes => <option key={minutes} value={minutes}>Últimos {minutes} minutos</option>)}
+                      </select>
+                    </label>
+                  )}
+                  <button type="button" disabled={telemetryExporting !== null} data-sompo-export-json onClick={() => void exportTelemetry('json')}>
+                    {telemetryExporting === 'json' ? <Loader2 className="animate-spin" /> : <Download />} {telemetryExporting === 'json' ? 'Exportando JSON…' : 'Baixar JSON'}
+                  </button>
+                  <button type="button" disabled={telemetryExporting !== null} data-sompo-export-csv onClick={() => void exportTelemetry('csv')}>
+                    {telemetryExporting === 'csv' ? <Loader2 className="animate-spin" /> : <Download />} {telemetryExporting === 'csv' ? 'Convertendo CSV…' : 'Baixar CSV para o Lab'}
+                  </button>
+                  <button type="button" onClick={() => onNavigate('sompo')}>Abrir Laboratório <ArrowRight /></button>
+                </div>
+                {telemetryExportMessage && <p role="status">{telemetryExportMessage}</p>}
+                {telemetryExportError && <p role="alert" className="sompo-launch-error">{telemetryExportError}</p>}
+              </section>
+
               <SompoTelemetryPanel
+                controlsOnly
                 telemetry={telemetry}
                 loading={telemetrySourceMode === 'firebase' && telemetryLoading}
                 refreshing={telemetrySourceMode === 'firebase' && telemetryRefreshing}
@@ -643,6 +754,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
                             : 'O LUCA fecha a leitura real em um briefing, registra alertas e lacunas e inicia uma sessão nova.'}
                       </p>
                     </div>
+                    {episodeReady && <p className="sompo-episode-selection">Episódio selecionado: <code>{recordedEpisode?.publicId}</code>. A bancada relê a evidência no servidor. <button type="button" onClick={() => setRecordedEpisode(null)}>Usar leitura atual</button></p>}
                     <div className="sompo-telemetry-controls">
                       <div className="sompo-mode-switch" role="group" aria-label="Modo da equipe para telemetria">
                         <button

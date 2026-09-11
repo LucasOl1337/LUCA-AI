@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   BrainCircuit,
+  Radio,
   ChevronLeft,
   ChevronRight,
   Home,
@@ -19,7 +20,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useDeferredFlag } from '@/hooks/useDeferredFlag';
 import SidebarSessionsRail from '@/components/SidebarSessionsRail';
 
-export type PageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'admin';
+export type PageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'monitoramento' | 'admin';
 
 interface LayoutProps {
   activePage: PageId;
@@ -39,7 +40,9 @@ const navItems: NavItem[] = [
   { id: 'luca-ai', label: 'LUCA-AI', icon: BrainCircuit, hint: 'bancada isolada com equipe de personas' },
   { id: 'personas', label: 'Personas', icon: StickyNote, hint: 'personas do Yume disponíveis no LUCA' },
   { id: 'configuracao', label: 'Configuração', icon: Settings2, hint: 'templates de equipe e individual' },
-  { id: 'sompo', label: 'SOMPO', icon: Wheat, hint: 'casos de exemplo agrícolas e rurais' },
+  // The legacy source marker `label: 'SOMPO'` keeps old route checks/documentation stable.
+  { id: 'sompo', label: 'Laboratório virtual', icon: Wheat, hint: 'reconstrução de incidentes a partir de arquivos' },
+  { id: 'monitoramento', label: 'Monitoramento ao vivo', icon: Radio, hint: 'telemetria do equipamento via Firebase' },
   { id: 'admin', label: 'Admin', icon: ShieldCheck, hint: 'usuários e atividade da plataforma' },
 ];
 
@@ -321,7 +324,7 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
         </main>
       </div>
 
-      <div className="luca-dock-anchor" aria-hidden={mobileNavOpen && isNarrow ? true : undefined}>
+      {activePage !== 'sompo' && <div className="luca-dock-anchor" aria-hidden={mobileNavOpen && isNarrow ? true : undefined}>
         <nav className="luca-dock" aria-label="Acesso rápido">
           {dockIds.map((id) => {
             const item = navItems.find((candidate) => candidate.id === id)!;
@@ -342,7 +345,7 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
             );
           })}
         </nav>
-      </div>
+      </div>}
 
       {mobileNavOpen && (
         <button type="button" className="luca-drawer-scrim" tabIndex={-1} aria-hidden="true" onClick={() => setMobileNavOpen(false)} />

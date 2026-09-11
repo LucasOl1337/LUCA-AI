@@ -74,6 +74,7 @@ function wait(delayMs) {
 }
 
 export function createSompoTelemetrySource({
+  enabled = true,
   fetchImpl = globalThis.fetch,
   now = Date.now,
   initialWaitMs = 5_000,
@@ -252,7 +253,7 @@ export function createSompoTelemetrySource({
   }
 
   function start() {
-    if (running) return;
+    if (!enabled || running) return;
     running = true;
     reconnectAttempt = 0;
     void run();
@@ -285,6 +286,7 @@ export function createSompoTelemetrySource({
     },
 
     async read() {
+      if (!enabled) throw new Error('sompo_telemetry_disabled');
       const snapshot = materializeSnapshot();
       if (snapshot) return snapshot;
       if (!running) start();
@@ -311,7 +313,7 @@ export function createSompoTelemetrySource({
   };
 }
 
-export const sompoTelemetrySource = createSompoTelemetrySource();
+export const sompoTelemetrySource = createSompoTelemetrySource({ enabled: process.env.LUCA_SOMPO_OFFLINE !== 'true' });
 
 export function createSompoTelemetryHttpHandler(source = sompoTelemetrySource) {
   return async function sompoTelemetryHttpHandler(_req, res) {

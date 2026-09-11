@@ -1,5 +1,7 @@
 # SOMPO
 
+Fazenda real no Laboratório (`/sompo`): [dados, licenças, uso, outra fazenda e limites do relevo](./laboratorio-fazendas.md).
+
 Leia SOMENTE ao mudar telemetria SOMPO, contrato ESP32/Firebase ou o painel do trator.
 
 ## Contrato
@@ -53,3 +55,19 @@ O sinal e a montagem fisica do ESP32 so podem ser confirmados com o equipamento 
 ## Pegadinha
 
 O no ja aceitou escrita REST anonima. Nao faca PUT/PATCH de prova no Firebase real sem combinar: um PUT substitui o snapshot e aparece no painel na hora.
+
+## Score contextual e qualidade dos dados (auditoria de setembro/2026)
+
+`shared/sompo-risk.js` porta a regra explícita de `risco.py` da entrega acadêmica, versão `academic-context-v1`: operacional 60%, ambiental 40%. Tipo de operação, condição da região e incidentes são declarados no painel; temperatura ambiente e umidade vêm da origem selecionada. Dados ausentes, inválidos, desatualizados ou desconectados não produzem score. A regra não incorpora flags de colisão/inclinação e não é probabilidade atuarial; flags continuam visíveis independentemente do número.
+
+`POST /api/sompo/risk` recebe `sourceKind`, `context` e, somente para simulação, `raw` no contrato dos sensores. A origem física é relida pelo servidor. O backend recalcula e grava em `sompo_risk_assessments` snapshot, avaliação, versão e cobertura pendente, associados à conta. `GET /api/sompo/risk?trator=...&fonte=firebase|simulacao` retorna as últimas 20 avaliações daquela conta/equipamento/origem. A interface permite recuperar e exportar o JSON após reload.
+
+Campos numéricos desconhecidos permanecem null no painel, no histórico e nos dados visuais; flags passam a aceitar null. Colunas aditivas `collision_known` e `inclination_known` preservam a distinção: registros anteriores sem metadado de presença não são promovidos a confirmação de segurança. Nenhuma tabela antiga é removida.
+
+O cliente marca o snapshot físico como stale após 15 segundos sem atualização e na queda do WebSocket. O gêmeo para de integrar a guinada quando o sinal não é atual; distância desconhecida oculta obstáculo/raio, atitude incompleta preserva a pose. Eixos, sinais e controles de calibração foram mantidos.
+
+O roteiro sintético recupera pontos agendados caso o temporizador do navegador atrase: 45 amostras de 0 a 22 s. O fechamento aguarda os envios em voo. Quadros registram o instante do snapshot renderizado, não um instante ideal de captura; perdas/atrasos e uploads parciais são informados. O último episódio selecionado sobrevive ao reload na mesma sessão do navegador; não é catálogo permanente de episódios.
+
+Para operação isolada, `LUCA_SOMPO_OFFLINE=true` desliga a fonte Firebase inclusive em `read()`. O roteiro e os limites de validação estão em [sompo-demo.md](./sompo-demo.md).
+
+A deduplicação das amostras é por origem/equipamento/**episódio**. Episódios distintos podem conter o mesmo instante, preservando a independência de ensaios simultâneos. Reabrir o banco reconstitui essas chaves sem misturar as gravações.

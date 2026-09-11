@@ -503,7 +503,7 @@ export function buildSompoCaseMission(caseItem: SompoExampleCase, teamLabel?: st
     ? `Equipe selecionada para avaliar: ${teamLabel}`
     : null;
   return [
-    `Caso SOMPO: ${caseItem.title}`,
+    `[SIMULAÇÃO · caso de exemplo] Caso SOMPO: ${caseItem.title}`,
     `Cultura/região: ${caseItem.culture} — ${caseItem.region}`,
     `Produto: ${caseItem.productLabel} | Estágio: ${caseItem.stageLabel} | Evento: ${caseItem.riskEvent}`,
     teamLine,
@@ -526,7 +526,7 @@ export function buildSompoCaseMission(caseItem: SompoExampleCase, teamLabel?: st
     '',
     `Objetivo executivo: ${caseItem.decisionGoal.trim()}`,
     '',
-    'Regras: não invente dados financeiros; marque como pendente quando faltar. Não use linguagem de material fictício. Trate como caso operacional realista de seguro agrícola/rural.',
+    'Regras: não invente dados financeiros; marque como pendente quando faltar. Dados sintéticos do briefing, não evidências de campo. Separe fatos do cenário, hipóteses, evidências e lacunas. Cobertura pendente: nenhuma apólice foi fornecida. Não concluir cobertura ou indenização.',
     `Nota de padrão setorial: ${caseItem.patternNote}`,
   ].filter((line) => line !== null).join('\n');
 }

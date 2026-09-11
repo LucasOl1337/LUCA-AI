@@ -1,0 +1,103 @@
+# Inventário de referências e versões
+
+Comparação SHA-256; igualdade de bytes não comprova execução.
+
+- `28dc41d92fb4041830b9160af13abc85c79c4bd446f3b45d468184b56d469399`: `SOMPO\2026 Apresentação Institucional Sompo - Challenge FIAP.pdf`
+- `8cb1f12fed02c3c5a9e7cfbec7f9a85f4a838f7179dc9a6be6cdc49f2dd7abdd`: `SOMPO\SOMPO 2026 - 1TIAPF+1TIAPG+1TIAPY+1TIAPZ.pdf`
+- `1d3ab78ebb77982d2bb06c36e1911687a7ff7898325609f6a49020e84d2c9f8b`: `sp1\contexto_enunciados_sp1_otimizado.md`
+- `199782f213d6ddb0dfee3fd503e8a05254e04ededed6e6017f5e68037a44e214`: `sp1\SOMPO_Rede_Neural_Colab.ipynb`
+- `1b59e0258d31115313f9f654648c7cf716e9f10b88e39f93ca953a26b6d203f9`: `sp1\Sprint1)SOMPO_DATASCIENCE.pdf`
+- `b433bd793e9efd900f15a857290c3c2669ab57e1dc1a7130a4885d8e91d08bde`: `sp1\aiChallenge\a.pdf`
+- `9ea9358cd350a3c8862f3c67593358739efd35cc49a3c69c85c701813524919c`: `sp1\aula01-esp32-exemplos\README.md`; `sp2\sen2\aula01-esp32-exemplos\README.md`
+- `10662abe4d85297d3d2fb79a94590de6150d7b04caa68aa65c55bbb7b6cd48ff`: `sp1\aula01-esp32-exemplos\.pio\libdeps\esp32\Adafruit Unified Sensor\README.md`; `sp2\sen2\aula01-esp32-exemplos\.pio\libdeps\esp32\Adafruit Unified Sensor\README.md`
+- `472213230418b04ae01bd884b631fb34af497061f8fe5e2e933ff08945b0c0d4`: `sp1\aula01-esp32-exemplos\.pio\libdeps\esp32\Adafruit Unified Sensor\examples\sensortest\sensortest.ino`; `sp2\sen2\aula01-esp32-exemplos\.pio\libdeps\esp32\Adafruit Unified Sensor\examples\sensortest\sensortest.ino`
+- `ac59b5fda90f64a09b9db5a4aea0288cabc930e503802fa568f5c48ffe07a6aa`: `sp1\aula01-esp32-exemplos\.pio\libdeps\esp32\DHT sensor library\code-of-conduct.md`; `sp2\sen2\aula01-esp32-exemplos\.pio\libdeps\esp32\DHT sensor library\code-of-conduct.md`
+- `b00e0676c653cd109ed21655910e530c19cfa5d348460751856ac9eb4e88b277`: `sp1\aula01-esp32-exemplos\.pio\libdeps\esp32\DHT sensor library\CONTRIBUTING.md`; `sp2\sen2\aula01-esp32-exemplos\.pio\libdeps\esp32\DHT sensor library\CONTRIBUTING.md`
+- `e6cb9c429a334754319514fada735c1e3bcda65b8ff86045cba2a8fa03276401`: `sp1\aula01-esp32-exemplos\.pio\libdeps\esp32\DHT sensor library\README.md`; `sp2\sen2\aula01-esp32-exemplos\.pio\libdeps\esp32\DHT sensor library\README.md`
+- `60387287586189ad227cf94cea78ae09939007ad7cb01572b8ebcd148cb86aee`: `sp1\aula01-esp32-exemplos\.pio\libdeps\esp32\DHT sensor library\.github\ISSUE_TEMPLATE.md`; `sp2\sen2\aula01-esp32-exemplos\.pio\libdeps\esp32\DHT sensor library\.github\ISSUE_TEMPLATE.md`
+- `750454b578623fc9db1fb59060c702a1eb1fe0bc9b12153d79b9dd48dd530596`: `sp1\aula01-esp32-exemplos\.pio\libdeps\esp32\DHT sensor library\.github\PULL_REQUEST_TEMPLATE.md`; `sp2\sen2\aula01-esp32-exemplos\.pio\libdeps\esp32\DHT sensor library\.github\PULL_REQUEST_TEMPLATE.md`
+- `0bbc4b5d69879c38c4fb3ce0bf7d7601b7a67b5cd882b9bba0a395748998640b`: `sp1\aula01-esp32-exemplos\.pio\libdeps\esp32\DHT sensor library\examples\DHTtester\DHTtester.ino`; `sp2\sen2\aula01-esp32-exemplos\.pio\libdeps\esp32\DHT sensor library\examples\DHTtester\DHTtester.ino`
+- `1ca27ca31f57cf492f5fc1bf1ea21eea1b72dc0369554ec6bbd9326e21bbce37`: `sp1\aula01-esp32-exemplos\.pio\libdeps\esp32\DHT sensor library\examples\DHT_Unified_Sensor\DHT_Unified_Sensor.ino`; `sp2\sen2\aula01-esp32-exemplos\.pio\libdeps\esp32\DHT sensor library\examples\DHT_Unified_Sensor\DHT_Unified_Sensor.ino`
+- `9d5389212085443f04083cd00d10f9aedd726976893527298d899db9fcc18cfd`: `sp1\aula01-esp32-exemplos\src\esp32-exemplos.ino`
+- `f2a08e32aecb8412251ce51da4cb0fa16acf988f4b792a6fbd1220761c0dff29`: `sp1\cybersec\Etapa1.pdf`
+- `6ac90061f9c1d7a00f09677001e15f58d751e74192fc07a59b71a6c279d3a19f`: `sp1\cybersec\etapa2.pdf`
+- `24184fb9b35efdf9d74f8efc1b25a3e5a38a6d8117e65ccc950f3616ce793d82`: `sp1\cybersec\etapa3.pdf`
+- `92393c4f73e9360ac0c8bcd1f646e142b75cb0b7ad8009f785e6933c9a76c571`: `sp1\cybersec\etapa4.pdf`
+- `973bd7f0c4fa45b2435c171493d3e4ad84cc4be7b0e7bbf34368a0615dbb7564`: `sp1\MLSSOMPO\dados_sompo_sinteticos.csv`; `entregaveis final\01-redes-sprint-3\dados_sompo_sinteticos.csv`
+- `e5302f3895a0f837b1c60a6da1e62239c839d4948047a8b0b4c2dae6f58ca672`: `sp1\MLSSOMPO\sompo_2026_risco_sinistro_ml.ipynb`
+- `debec6c64b458c8435bcc15f72b0078b5d4e750bd72ba742be86e551aae2127b`: `sp1\sprintpy\dados_sompo.csv`; `sp2\dataScience\sp2\sprintpy\dados_sompo.csv`; `sp3\SPRINT3_Python\dados_sompo.csv`; `entregaveis final\08-python-backend\dados_sompo.csv`
+- `697a5af5d6a96db0e475311a15d11d4278dc969f704c479c9648d2b270320d4d`: `sp1\sprintpy\script.py`; `sp2\dataScience\sp2\sprintpy\script.py`
+- `81337ecb45ce0daf0ddf40b1c2c00516ea2c3f52eca5eaf276ee189c474b1cec`: `sp1\sprintpy\sompo_risco.py`
+- `e0170fc0781e1ae6240fddd0e8ea1d65301b95ac2030a177bb67c3fc34ec4ca0`: `sp1\sprintSompoCloud\app.py`
+- `3fd6bc5fb21a3ef0b0764f624f6eb3a624c9ec59b116d0695f6035ea578541e2`: `sp1\sprintSompoCloud\comandos.md`
+- `d3c28025c26e8d7ba39297a00065e1bf71be45ad66fd4a02a4e03e871b9f4f07`: `sp1\sprintSompoCloud\README_ENTREGA.md`
+- `e90f5df1413e7348db1e8c9399c2b17d826edf4c87f08747935e6be5eda88a45`: `sp1\sprintSompoCloud\RELATORIO_FINAL_PROFESSOR.md`
+- `f5cd9bbcd2fc8c1bc0dcdbed82f636170cf9081b7b6cc603cef79f865fdb7c76`: `sp1\sprintSompoCloud\relatorio_sprint_sompo_cloud.md`
+- `f4f0d63f60423db58d70bbaa3ad25dc24d29e61908d99d74852d268a09dc6812`: `sp1\spt1\analise_frequencias.py`
+- `9e46eae47937bf2334a083ddf9929bfa12157011531fd923eae052fafed00e88`: `sp1\spt1\Relatorio.pdf`
+- `c3892ced9ae70d4ff87f6fa847b76cade0ab0f2b938f641bcad6747938be98e0`: `sp2\Challenge_Sprint2_Prototipo_Inicial_Validacao_Tecnica.pdf`
+- `211ff083978887d6deaad98be2b5fd6033fae9d10a1ccbb1d955580b9332a6cb`: `sp2\contexto_enunciados_sp2_otimizado.md`
+- `22616197df6525da844f0fa12fc81f9de959b5f23fcfffcff4cc0651980e52ef`: `sp2\dataScience\Controles_Acesso_Autenticacao_Sompo.pdf`
+- `9a3533922156cfffef4844487a7147c3e2a72e783cfbc930b97b20ee721f7759`: `sp2\dataScience\Logical.pdf`
+- `9de4b0cb2126e5df076f95c2d812cb2386130e75dfebf4cac999d648bdd2c9b1`: `sp2\dataScience\Relational_1.pdf`
+- `095338163356144defeaf42e2a899f52320d5e91e851a38b59f822e46de52304`: `sp2\dataScience\sprint2_sompo.docx`
+- `9965c67b6fc48e863342e58604bec9a1ea5a423fdb336d7603725cd18917918f`: `sp2\dataScience\aws\app.py`
+- `3fb1e0dfca30706d974115dca3b00e2dd6cf1c381a439683310c6a8c0d3f3344`: `sp2\dataScience\aws\rds_connection_test.py`
+- `c2d35e175d78b2d958d1f6de5d841af645614c242a849c9130d702072293d913`: `sp2\dataScience\aws\Relatorio_EC2_Flask_RDS_Postgres.pdf`
+- `f2c3db4c9807a9be23ed822d10cc85311359159fe1543f84830daad511b50410`: `sp2\dataScience\aws\schema_rds_postgres.sql`
+- `836721cdc8a38a439cbea6da22f85f1f80420b733bcc0f136591fcb158d48428`: `sp2\dataScience\ml\EDA_INSIGHTS.md`
+- `8fbe10ec28cc4da5220ff7818a7ccbfdb9dffda67bd30140c70845fcb2eae06b`: `sp2\dataScience\ml\README.md`
+- `3ac954345cbd0a5d850574c921716c1e37b6489ed1a6c5ad604e9001a0a83d47`: `sp2\dataScience\ml\Sompo_Risco_Equipamentos_EDA.ipynb`
+- `c7d02b46261ce4c1904673cb42741d6126d188dea75782961c64a58d23d20f4e`: `sp2\dataScience\ml\Sompo_Risco_Equipamentos_EDA_executado.ipynb`
+- `9d4e5fedad35e5cd2723677281856bc520156446d25fc4763d091b93589394a3`: `sp2\dataScience\ml\sompo_risco_equipamentos_simulado.csv`
+- `c6457a797753232bdf8e98a548c3931b260bec71a3bbec3fb657893986e10b9e`: `sp2\dataScience\Rede neural sprint 2\dataset_sompo_sintetico.csv`
+- `49e3d2b21c68ec9c559608f193a7f6e43c3572289f93942c39be9c8ab6583fad`: `sp2\dataScience\Rede neural sprint 2\Sprint_2_Rede_Neural_SOMPO.ipynb`
+- `adde6fea25dd6bd058ec716c7f7e8fa7bb2c8adc5f998b3212710bdb6dbcf71f`: `sp2\dataScience\sp2\sprintpy\sompo_risco.py`
+- `36aad4397089473e39bce9e81c22c3e224bababe3273599268c42a9862695745`: `sp2\dataScience\sp2R\analise_estatistica_iris.py`
+- `dba33cea1b9812933867021e256ec6b9fe486b330fbbe8dc2f4a5df14284def8`: `sp2\dataScience\sp2R\relatorio_tecnico_analise_iris.pdf`
+- `e4b5721251d490f75f9dd2c49c82748997b60cac189b7c82e8e9c7c08c2e2b36`: `sp2\sen2\aula01-esp32-exemplos\src\esp32-exemplos.ino`
+- `49ba33e7d675be9a24bf5e4465776a03a46f30dc108f0c721890a467168da450`: `sp3\enunciados_sp3_otimizado.md`
+- `e7c5af5d8227cb80ff78693d2dab50366a99b0d94dccaf6c910a8eacedddc60a`: `sp3\generate_ai_challenge_sp3.py`
+- `fac16eeb5258c26bf7bfc8a0f5d7743d7b867d84820e79232e19fa12e6a118a9`: `sp3\SPRINT3_Python\dashboard.py`; `entregaveis final\08-python-backend\dashboard.py`
+- `dfd5417df3ed80e54d8342e98d7f56458387ed044791a4634bf9b62197fb0c37`: `sp3\SPRINT3_Python\entrada.py`; `entregaveis final\08-python-backend\entrada.py`
+- `1623a7311cecb257cc4f1cfe56372626158bf899718a2f0e5a3174e786866e83`: `sp3\SPRINT3_Python\main.py`; `entregaveis final\08-python-backend\main.py`
+- `9be2031a3b89ceabacadb2e69a1f73bf83969dd3da01b19d8194291cb9d77977`: `sp3\SPRINT3_Python\processamento.py`; `entregaveis final\08-python-backend\processamento.py`
+- `6dcff30b3c8485f32b5f8abb9ff9fd6c14794f524e3ab3a01588abf021e778d6`: `sp3\SPRINT3_Python\README.md`; `entregaveis final\08-python-backend\README.md`
+- `ee7542eb5b050e0a78aa80e6b6f6195a8df0aeb32ce85c1b66aaf04950bbfa7c`: `sp3\SPRINT3_Python\risco.py`; `entregaveis final\08-python-backend\risco.py`
+- `6e97e30e217227cd57111126f0548a494f500a6aa1151b92dad8456efb733fb3`: `sp3\SPRINT3_Python\saida.py`; `entregaveis final\08-python-backend\saida.py`
+- `a86c5c9ed85be3a4f6c4d500120abd57a7541a22341346a26c7efcbdb7ed9bf9`: `entregaveis\LEIA-ME.md`
+- `19b39902ac77012143c233b95ad105fbf3f04e62bb1873b58312bf94ac923fd6`: `entregaveis\limpeza-github-lucai.md`
+- `89e92d9fa0b51dd7567814ed47033367900e49f33877c7c85d88fe93aae1bb15`: `entregaveis\roteiro-video-rede-neural.md`
+- `c1b4c71e30a54103782de050a98de1414685572bb654a7253011b1d6beae9dd5`: `entregaveis\sensores-luca-ai.md`
+- `84beec2b441a596e57e1132a2a5f197bee96aa114617eb851567c089349ed59f`: `entregaveis\01-redes-sprint-2\sprint2_rede_neural_iris.ipynb`; `entregaveis final\01-redes-sprint-3\historico_sprint2_iris\sprint2_rede_neural_iris.ipynb`
+- `47e49e9623582be02e085475e4d20fd3d0a997c6ded9898a08cf5d4ebac956eb`: `entregaveis\02-data-science-ddl\mer_modelo_fisico_sompo.pdf`
+- `d0e247a46963cc782f049aee9fc13ba27db7955aa037ad705f5c3acd1ebb1322`: `entregaveis\02-data-science-ddl\script_ddl_sompo_luca.sql`; `entregaveis final\02-data-science-ddl\script_ddl_sompo_luca.sql`
+- `08e12ebd334d8d993b57ac6d52cf20399aa4d85fb1a044ce82b59edeaabf65e2`: `entregaveis\03-cognitive-cybersecurity\atividade1_protecao_privacidade.pdf`; `entregaveis final\03-cognitive-cybersecurity\atividade1_protecao_privacidade.pdf`
+- `3c7075f44100272307da94d0a0ee849be42de2d0b52b9f325ce06e5a71daf846`: `entregaveis\03-cognitive-cybersecurity\atividade2_monitoramento_auditoria.pdf`; `entregaveis final\03-cognitive-cybersecurity\atividade2_monitoramento_auditoria.pdf`
+- `f14a589bf7f37ca608aa74798fc27184197bc76b5ef185d1951bfd74fac5c7bb`: `entregaveis\03-cognitive-cybersecurity\atividade3_resposta_incidentes.pdf`; `entregaveis final\03-cognitive-cybersecurity\atividade3_resposta_incidentes.pdf`
+- `1369d56e0615dc5f7db4959612bcf18999548be706ab30665c7862f1c063aaba`: `entregaveis\03-cognitive-cybersecurity\atividade4_pipeline_seguro.pdf`; `entregaveis final\03-cognitive-cybersecurity\atividade4_pipeline_seguro.pdf`
+- `f58b74c88b92b074600d2e35a69069aa6186823cabd451c861a80ebe1eedf39e`: `entregaveis\03-cognitive-cybersecurity\sprint3_cognitive_cybersecurity_completo.pdf`; `entregaveis final\03-cognitive-cybersecurity\sprint3_cognitive_cybersecurity_completo.pdf`
+- `1ba0467dfacb9edb4acdbab1d4454052b21fb5249071f5a542f442bd4bd217dd`: `entregaveis\04-computacao-estatistica\entrega-challenge-sprint-3.pdf`; `entregaveis final\04-computacao-estatistica\entrega-challenge-sprint-3.pdf`
+- `e5d5e59d4ea20a4b284848e87f4be02eee3571e1ae2526c58de80b23e8348d81`: `entregaveis\05-cloud-lambda-rds\entrega-cloud-sprint-3.pdf`; `entregaveis final\05-cloud-lambda-rds\entrega-cloud-sprint-3.pdf`
+- `24a43b3dfcee7503b0772b7d81d1ccab84822e417df274e37f18962e52666bec`: `entregaveis\06-sompo-risco-ml\ENTREGA.md`; `entregaveis final\06-sompo-risco-ml\ENTREGA.md`
+- `e7ca0a2c2b9273d60d082f4843a000d119f3fe9e473c4ebdf25e814af01f7302`: `entregaveis\06-sompo-risco-ml\Sompo_Risco_Equipamentos_ML.ipynb`; `entregaveis final\06-sompo-risco-ml\Sompo_Risco_Equipamentos_ML.ipynb`
+- `af01328bdcc79ab7b4efb53a7b97c05cd53276ff567e8ae51da42c7debed56ce`: `entregaveis\06-sompo-risco-ml\sompo_risco_equipamentos_simulado.csv`; `entregaveis final\06-sompo-risco-ml\sompo_risco_equipamentos_simulado.csv`
+- `2967386e1358947f1d331299424a0e8a09a0b8b00419b0e22be92ad17c21a03e`: `entregaveis\07-sp3-luca-ai\entrega-sp3-luca-ai.pdf`
+- `1916861ed1178d900ef96f045ad8aa907dfe2e282a9f01c46a8bbe0c6648e552`: `entregaveis\07-sp3-luca-ai\feedback-sompo-luca.md`
+- `00fee72e0cdd6acf597c14579ed18bf29d8e042ae349f91cadbad1426172aa6e`: `entregaveis\07-sp3-luca-ai\indice-evidencias.md`
+- `b3bde989704f93455fd2238d2ec5c445ddf8ab09df4be4e016f0d0956be39b17`: `entregaveis\07-sp3-luca-ai\matriz-us-evidencias.md`
+- `36f9ffac7c509e0611edc47bb2e8edb730161b62d8e6141d17f4e4138f3f9cdb`: `entregaveis final\LEIA-ME.md`
+- `8aaa71173c42582712fcf8fd3a873af38e9784e7c823deada0c176e5fb76897a`: `entregaveis final\01-redes-sprint-3\apresentacao_redes_neurais_sp3.pdf`
+- `e9b811664b9cfd146629906df1ac2f0494e7486f58ef4392b22bb4711c6b6de6`: `entregaveis final\01-redes-sprint-3\RESUMO_EVOLUCAO_REDES.md`
+- `9a48574c8bbeeaf075d0ccc4594f3ce6f126b7ac061117f480d5bf9ba591d23b`: `entregaveis final\01-redes-sprint-3\Sprint3_Rede_Neural_SOMPO_Evolucao.ipynb`
+- `da3ef46f28fa9439e09a2eb5497edda554686a47fb07f8f82f03b95b827db5d4`: `entregaveis final\01-redes-sprint-3\interface_streamlit\app.py`
+- `44863cd8a2045a993ac33b27364972c0247dcf0f12064354878b530a305f94cf`: `entregaveis final\01-redes-sprint-3\interface_streamlit\README.md`
+- `9b2d1229151248195331124fec7ff8c8f3ebf1a1b789cff892921a44597bdb36`: `entregaveis final\02-data-science-ddl\Logical.pdf`
+- `eb5ea165a18fb711afa51c6aa6fbf2037a1c5d79eabeb120f8a594869fd0c0ea`: `entregaveis final\02-data-science-ddl\Relational_1.pdf`
+- `c4fe5b7c14f4150f6a47825230412cc8ebfee8dd6d4620f752f8e68609c15f88`: `entregaveis final\07-sp3-luca-ai\feedback-sompo-luca.md`
+- `7aa32f1dfa4c81d3209c716b67519554f5445d93d1e988becc9ca237f96ffeab`: `entregaveis final\07-sp3-luca-ai\indice-evidencias.md`
+- `9a2cc70b315b8cf189c2f0845ce9577dd7c73643995cc7eb63b446bce940f924`: `entregaveis final\07-sp3-luca-ai\matriz-us-evidencias.md`
+- `b8cf6d711565268e2c0d3446e61679c32a0dd10815125707d695da2d81545376`: `entregaveis final\07-sp3-luca-ai\Relatorio_SP3_AIC.pdf`
+- `c4d5ca8ede677d0c9b18a64e719072dc327117ba778de0480c4c9148c9d521d6`: `entregaveis final\09-iot-esp32\firmware_esp32_sompo.ino`
+- `db3a5bae5b1b4908304bb5ee4dae5823bc37a88d80788985e4e97ded78243fb0`: `entregaveis final\09-iot-esp32\README.md`
+- `1fb724f76c49715f154629d60861c49b85867703aaef3c145082acc8e64ff513`: `entregaveis final\09-iot-esp32\telemetria_sensores_exemplo.csv`

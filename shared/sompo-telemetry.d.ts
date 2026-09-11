@@ -1,8 +1,9 @@
 export const SOMPO_TELEMETRY_PATH: '/trator/001/sensores';
 export const SOMPO_MISSION_DOSSIER_DELIMITER: '--- DOSSIÊ TÉCNICO ---';
+export function currentSompoTelemetry(snapshot: SompoTelemetrySnapshot | null, nowMs?: number): SompoTelemetrySnapshot | null;
 
 export type SompoTelemetryFreshness = 'checking' | 'fresh' | 'stale';
-export type SompoTelemetryStatus = 'normal' | 'alert';
+export type SompoTelemetryStatus = 'normal' | 'alert' | 'unknown';
 export type SompoTelemetryConnectionState = 'connecting' | 'live' | 'reconnecting' | 'stopped';
 export type SompoTelemetrySourceKind = 'firebase' | 'simulation';
 
@@ -28,8 +29,8 @@ export interface SompoTelemetrySnapshot {
   deviceTimestamp: number | null;
   status: SompoTelemetryStatus;
   risks: {
-    collision: boolean;
-    inclination: boolean;
+    collision: boolean | null;
+    inclination: boolean | null;
   };
   readings: {
     distance: number | null;
@@ -80,8 +81,8 @@ export interface SompoTelemetryHistorySample {
   rotX: number | null;
   rotY: number | null;
   rotZ: number | null;
-  riscoColisao: boolean;
-  riscoInclinacao: boolean;
+  riscoColisao: boolean | null;
+  riscoInclinacao: boolean | null;
 }
 
 export interface SompoTelemetryFlagTransition {
@@ -155,8 +156,8 @@ export interface SompoTelemetryEpisodePhase {
   startOffsetMs: number;
   endOffsetMs: number;
   durationMs: number;
-  riscoColisao: boolean;
-  riscoInclinacao: boolean;
+  riscoColisao: boolean | null;
+  riscoInclinacao: boolean | null;
   stats: {
     distancia: SompoTelemetryHistoryStat;
     pitch: SompoTelemetryHistoryStat;
