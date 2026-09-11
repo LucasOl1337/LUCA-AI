@@ -55,7 +55,8 @@ function createLabelTexture(label: string) {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 128;
-  const context = canvas.getContext('2d');
+  // A CPU-backed canvas also uploads text/strokes reliably with Chromium's Vulkan backend.
+  const context = canvas.getContext('2d', { willReadFrequently: true });
   if (context) {
     context.fillStyle = 'rgba(4, 12, 16, 0.92)';
     context.fillRect(8, 8, 496, 112);

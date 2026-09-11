@@ -20,6 +20,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { loadSompoTruckAsset } from './sompo/loadSompoTruckAsset';
 import { createSompoRoadScene } from './sompo/createSompoRoadScene';
+import { createSompoPostProcessing } from './sompo/createSompoPostProcessing';
 import type { SompoTelemetrySnapshot } from '@/lib/types';
 import { lucaApi } from '@/lib/api';
 import {
@@ -150,7 +151,7 @@ const COLLISION_FRAME_JPEG_QUALITY = 0.7;
 const COLLISION_FRAME_LATE_TOLERANCE_MS = 1_000;
 
 /**
- * Captura síncrona logo após renderer.render — o buffer WebGL ainda está
+ * Captura síncrona após o pós-processamento — o buffer WebGL ainda está
  * preenchido no mesmo rAF, então não precisamos de preserveDrawingBuffer.
  * Reduz para ~640px num canvas 2D antes de serializar em JPEG.
  */
@@ -347,6 +348,7 @@ export default function SompoTruckSimulator({
   const connectedAtRef = useRef(new Date().toISOString());
   const [webglError, setWebglError] = useState(false);
   const [modelStatus, setModelStatus] = useState<'loading' | 'gltf' | 'fallback'>('loading');
+  const [modelAsset, setModelAsset] = useState<string | null>(null);
   const [historyOffline, setHistoryOffline] = useState(false);
   const [collisionRun, setCollisionRun] = useState<CollisionRunState>({ status: 'idle' });
   const [collisionElapsedSec, setCollisionElapsedSec] = useState(0);
@@ -614,20 +616,20 @@ export default function SompoTruckSimulator({
 
     const scene = new THREE.Scene();
 
-    const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 240);
-    camera.position.set(11.8, 6.3, 13.8);
+    const camera = new THREE.PerspectiveCamera(37, 1, 0.1, 360);
+    camera.position.set(9.7, 4.3, 11.2);
 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.setClearColor(0x07100c, 0);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.88;
+    renderer.toneMappingExposure = 1.0;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.domElement.setAttribute('aria-hidden', 'true');
     mount.appendChild(renderer.domElement);
 
-    // Procedural reflections give the metallic paint, glass and rims readable highlights.
+    // Small local fallback while the rural HDRIs load; the real HDRIs replace this IBL.
     const environmentScene = new RoomEnvironment();
     const pmrem = new THREE.PMREMGenerator(renderer);
     const environment = pmrem.fromScene(environmentScene, 0.04);
@@ -645,19 +647,20 @@ export default function SompoTruckSimulator({
     orbit.maxPolarAngle = Math.PI * 0.49;
     orbit.target.set(0, 1.5, 0);
 
-    scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x776346, 1.35));
+    scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x776346, 0.3));
     const keyLight = new THREE.DirectionalLight(0xffefcd, 2.4);
-    keyLight.position.set(9, 18, 7);
+    keyLight.position.set(-10, 12, 9);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.set(2048, 2048);
-    keyLight.shadow.camera.left = -18; keyLight.shadow.camera.right = 18;
-    keyLight.shadow.camera.top = 18; keyLight.shadow.camera.bottom = -18;
+    keyLight.shadow.camera.left = -12; keyLight.shadow.camera.right = 12;
+    keyLight.shadow.camera.top = 12; keyLight.shadow.camera.bottom = -12;
     keyLight.shadow.camera.near = 0.5; keyLight.shadow.camera.far = 65;
-    keyLight.shadow.normalBias = 0.035;
+    keyLight.shadow.normalBias = 0.018;
     keyLight.shadow.bias = -0.0001;
     keyLight.shadow.radius = 2;
     scene.add(keyLight);
-    const roadScene = createSompoRoadScene(scene);
+    const roadScene = createSompoRoadScene(scene, renderer, camera);
+    const postProcessing = createSompoPostProcessing(renderer, scene, camera);
     const frontArrow = new THREE.ArrowHelper(
       new THREE.Vector3(1, 0, 0),
       new THREE.Vector3(1.4, 0.06, -2.25),
@@ -692,8 +695,14 @@ export default function SompoTruckSimulator({
     truckPoseGroup.add(truckGroup);
     const assetAbort = new AbortController();
     setModelStatus('loading');
+    setModelAsset(null);
     void loadSompoTruckAsset(truckModel, assetAbort.signal)
-      .then((loaded) => { if (!assetAbort.signal.aborted) setModelStatus(loaded ? 'gltf' : 'fallback'); })
+      .then((loaded) => {
+        if (!assetAbort.signal.aborted) {
+          setModelAsset(loaded ? truckModel.root.userData.asset : null);
+          setModelStatus(loaded ? 'gltf' : 'fallback');
+        }
+      })
       .catch(() => { if (!assetAbort.signal.aborted) setModelStatus('fallback'); });
 
     const obstacleGroup = new THREE.Group();
@@ -711,6 +720,7 @@ export default function SompoTruckSimulator({
       renderer.setSize(safeWidth, safeHeight, false);
       camera.aspect = safeWidth / safeHeight;
       camera.updateProjectionMatrix();
+      postProcessing.resize(safeWidth, safeHeight);
     }
 
     const resizeObserver = new ResizeObserver(resize);
@@ -732,10 +742,10 @@ export default function SompoTruckSimulator({
         focusTarget = target;
         if (target === 'sensor') {
           camera.position.set(7.4, 4.7, 4.1);
-          orbit.target.set(4.48, 1.68, 0);
+          sensorGroup.getWorldPosition(orbit.target);
           orbit.minDistance = 2.5;
         } else {
-          camera.position.set(11.8, 6.3, 13.8);
+          camera.position.set(9.7, 4.3, 11.2);
           orbit.target.set(0, 1.9, 0);
           orbit.minDistance = 6;
         }
@@ -849,7 +859,7 @@ export default function SompoTruckSimulator({
         positions.needsUpdate = true;
       }
       roadScene.update(isFirebase ? 'normal' : settings.scenarioId, ruralFrame, isFirebase ? 0 : drivingSpeed, time - startedAtRef.current, truckPoseGroup.position, reduceMotion.matches, delta, slope);
-      keyLight.intensity = (ruralFrame?.rain ?? 0) > 0 ? 0.75 : 2.4;
+      keyLight.intensity = (ruralFrame?.rain ?? 0) > 0 ? 0.25 : roadScene.hasHdri ? 1.8 : 2.4;
       obstacleGroup.visible = isFirebase || !!collisionVisual || settings.scenarioId === 'obstacle' || settings.scenarioId === 'brake-failure';
       const rangeLength = rangeForDistance(snapshot.readings.distance);
       rayGroup.scale.x = rangeLength;
@@ -875,7 +885,7 @@ export default function SompoTruckSimulator({
       ledMaterial.emissive.set(snapshot.status === 'alert' ? 0xff2d22 : 0x2dff6b);
       ledMaterial.emissiveIntensity = reduceMotion.matches ? 2.4 : 2.2 + (Math.sin(time * 0.007) * 1.1);
       orbit.update();
-      renderer.render(scene, camera);
+      postProcessing.render(delta);
       // Captura síncrona no mesmo rAF do render: o framebuffer WebGL ainda está
       // válido sem precisar de preserveDrawingBuffer.
       const capture = collisionCaptureRef.current;
@@ -928,6 +938,7 @@ export default function SompoTruckSimulator({
           materials.forEach(disposeMaterial);
         }
       });
+      postProcessing.dispose();
       environment.dispose();
       renderer.dispose();
       renderer.domElement.remove();
@@ -982,6 +993,7 @@ export default function SompoTruckSimulator({
       data-sompo-simulator
       data-sompo-simulator-source={source}
       data-sompo-model={modelStatus}
+      data-sompo-asset={modelAsset ?? undefined}
     >
       <header className="sompo-simulator-head">
         <div>
@@ -1042,7 +1054,7 @@ export default function SompoTruckSimulator({
           </div>
           <p className="sompo-simulator-hint">Arraste para girar · use as setas para navegar</p>
           <p className="sompo-simulator-credit">
-            {modelStatus === 'gltf' ? <>
+            {modelAsset === 'GeneratedRuralTruck' ? 'Caminhão rural · imagem → 3D por LUCA-AI · adaptado com sensor' : modelStatus === 'gltf' ? <>
               <a href="https://sketchfab.com/3d-models/tesla-semi-39ffc7c746184e0c9ebd5bbcd0b405dd" target="_blank" rel="noreferrer">Tesla Semi © 2018 Oleksii Rozumnyi</a>
               {' · '}<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a> · adaptado com sensor
             </> : modelStatus === 'loading' ? 'Carregando caminhão detalhado…' : 'Modelo simplificado · arquivo detalhado indisponível'}

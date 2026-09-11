@@ -37,7 +37,7 @@ test('falha de rede no episódio aborta com aviso e mantém o simulador vivo', (
 
 test('simulador captura frames nos momentos do roteiro e sobe 1 por request sem derrubar o episódio', () => {
   assert.match(simulator, /SOMPO_COLLISION_FRAME_MOMENTS/);
-  assert.match(simulator, /renderer\.render\(scene, camera\);\s*\n\s*\/\/ Captura síncrona no mesmo rAF do render/);
+  assert.match(simulator, /postProcessing\.render\(delta\);\s*\n\s*\/\/ Captura síncrona no mesmo rAF do render/);
   assert.match(simulator, /toDataURL\('image\/jpeg', COLLISION_FRAME_JPEG_QUALITY\)/);
   assert.match(simulator, /COLLISION_FRAME_LATE_TOLERANCE_MS/);
   assert.match(simulator, /postSompoTelemetryEpisodeFrames\(run\.publicId, \[frame\]\)/);

@@ -1,0 +1,98 @@
+{
+  "created_at": "2026-09-11",
+  "created_for": "LUCA-AI",
+  "source_image": {
+    "file": "generated-rural-truck-source.png",
+    "sha256": "5fef96915054567f39e70de39167212ac72dbfcb17eb45b36802e720711e558e",
+    "generator": "cx/gpt-5.5-image",
+    "endpoint": "local 9Router /v1/images/generations",
+    "dimensions": [
+      1536,
+      1024
+    ],
+    "variations": 3,
+    "selected": 1,
+    "prompt": "Photorealistic industrial product photograph for accurate 3D reconstruction. One complete Brazilian heavy rigid box truck, European cab-over design inspired by a modern Scania R or Volvo FH, THREE AXLES total, two rear axles with dual tires. A rigid straight chassis with a large rectangular refrigerated aluminum cargo box directly behind the cab, not a tractor with a separate trailer. Realistic Brazilian commercial vehicle proportions: overall length about 9 meters, width 2.5 meters, cab height 3.5 meters. Entire vehicle including every bumper, mirror, roof, box and all wheels fully inside frame with generous empty margin. Front three-quarter view, truck nose toward the right, camera at about 1.6 meters height, 50 mm product lens. Clear separation of cab, cargo box, black chassis, treaded rubber tires and metallic rims. Accurate headlights, windshield wipers, black grille, side mirrors, door seams, handles, access steps, mudguards, fuel tank, underbody axles and Brazilian license plate. Clean unbranded vehicle without text or logos. Plain uniform very light gray seamless studio background and ground, soft neutral studio illumination, barely visible contact shadow only, no environment, no scenery, no people. Sharp focus over the entire vehicle, realistic photographic materials, subtle wear, no illustration, no toy, no stylization, no lens flare. Cab painted rich deep navy blue with realistic automotive metallic finish; silver corrugated aluminum refrigerated box; utilitarian work truck, clean but a little road dust on tires."
+  },
+  "reconstruction": {
+    "engine": "Tencent Hunyuan3D-2.1",
+    "repository": "https://github.com/Tencent-Hunyuan/Hunyuan3D-2.1",
+    "revision": "82920d643c0dc2f7bfd7255f45f62d386edfe60c",
+    "weights_revision": "0b94677654c57bb9a6b6845cd7b704ccf551d327",
+    "shape": {
+      "seed": 42,
+      "steps": 50,
+      "guidance_scale": 5,
+      "octree_resolution": 512,
+      "num_chunks": 4000,
+      "faces_before_decimation": 1038708,
+      "faces": 160000,
+      "seconds": 125,
+      "peak_vram_gb": 6.924
+    },
+    "paint": {
+      "seed": 0,
+      "views": 6,
+      "view_resolution": 512,
+      "render_resolution": 1024,
+      "texture_resolution": 2048,
+      "steps": 15,
+      "scheduler": "UniPCMultistepScheduler",
+      "seconds": 55.427,
+      "peak_vram_gb": 7.164
+    },
+    "environment": {
+      "python": "3.11.16",
+      "torch": "2.5.1+cu124",
+      "gpu": "RTX 4070 Ti SUPER 16GB",
+      "compiler": "GCC 13.4 / CUDA 12.4",
+      "bpy": "4.3.0",
+      "onnxruntime": "1.20.1"
+    },
+    "compatibility_changes": [
+      "Python 3.11 used because upstream pinned binary packages lack Python 3.12 wheels",
+      "ONNX updated to avoid executable-stack failure on host Linux",
+      "Shape components mapping and execution device supplied for Accelerate offload",
+      "Paint VAE inputs and learned text embeddings moved to execution device",
+      "DINO offloaded independently; VAE sliced/tiled; RealESRGAN tiles 256px",
+      "Setuptools 80.9 retains pkg_resources for old Lightning; torchvision import redirected to current functional module"
+    ]
+  },
+  "asset": {
+    "file": "generated-rural-truck.glb",
+    "sha256": "781144cd39718bae41d8bea48b20164165da1282c2f5e8b611fd098dbdf7b358",
+    "bytes": 6673960,
+    "fixed_wheels": true,
+    "support_hull_vertices": 886,
+    "adaptations": [
+      "Remove invalid upstream specularColorFactor=2",
+      "Metallic multiplier 0.65, preserve generated texture maps",
+      "Embed local convex-hull support vertices for efficient exact contact",
+      "Uniform runtime fit into existing simulation envelope; front +X"
+    ]
+  },
+  "limitations": [
+    "Single image: hidden surfaces and mechanical details are inferred",
+    "Tyres cannot spin or deform independently; telemetry and vehicle motion remain active",
+    "Fine geometry and generated textures have reconstruction artifacts"
+  ],
+  "browser_validation": {
+    "browser": "Isolated headless Chrome, ANGLE Vulkan on NVIDIA RTX 4070 Ti SUPER",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "duration_seconds_per_sample": 4,
+    "normal": {
+      "frames": 172,
+      "median_frame_ms": 16.7,
+      "p95_frame_ms": 33.4
+    },
+    "rain": {
+      "frames": 229,
+      "median_frame_ms": 16.7,
+      "p95_frame_ms": 33.3
+    },
+    "scope": "Short local samples; not a guarantee for other hardware. Earlier SwiftShader previews were not used to estimate GPU performance."
+  }
+}

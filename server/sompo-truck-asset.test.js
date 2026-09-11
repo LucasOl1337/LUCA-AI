@@ -20,6 +20,7 @@ const assetSource = readFileSync(new URL('../src/components/sompo/loadSompoTruck
   .replace("import dracoWasmUrl from 'three/addons/libs/draco/gltf/draco_decoder.wasm?url';", `const dracoWasmUrl = ${JSON.stringify(import.meta.resolve('three/addons/libs/draco/gltf/draco_decoder.wasm'))};`)
   .replace("'./createSompoTruckModel'", JSON.stringify(modelUrl));
 const assetBytes = readFileSync(new URL('../public/models/sompo/tesla-semi.glb', import.meta.url));
+const generatedBytes = readFileSync(new URL('../public/models/sompo/generated-rural-truck.glb', import.meta.url));
 
 test('GLB real substitui a carroceria, preserva sensor/feixe e gira nos nós das rodas', async () => {
   const THREE = await import('three');
@@ -48,12 +49,48 @@ ${source}`, { eval: true });
   };
   const fetchAsset = (input, options) => {
     const url = typeof input === 'string' ? input : input.url;
+    if (url === '/models/sompo/generated-rural-truck.glb') return Promise.resolve(new Response('not available', { status: 503 }));
     if (url === '/models/sompo/tesla-semi.glb') return Promise.resolve(new Response(assetBytes));
     if (url.startsWith('file:')) return Promise.resolve(new Response(readFileSync(new URL(url))));
     return saved.fetch(input, options);
   };
   globalThis.fetch = fetchAsset;
   try {
+    globalThis.fetch = (input, options) => input === '/models/sompo/generated-rural-truck.glb'
+      ? Promise.resolve(new Response(generatedBytes)) : fetchAsset(input, options);
+    const generated = createSompoTruckModel({ sensorLabel: 'GERADO' });
+    const generatedSensor = generated.sensorGroup; const generatedRay = generated.rayGroup; const generatedWheels = generated.wheels;
+    assert.equal(await loadSompoTruckAsset(generated, new AbortController().signal), true);
+    assert.equal(generated.root.userData.asset, 'GeneratedRuralTruck');
+    assert.equal(generated.sensorGroup, generatedSensor); assert.equal(generated.rayGroup, generatedRay);
+    assert.equal(generated.wheels, generatedWheels); assert.equal(generatedWheels.length, 0, 'Monolithic tyres stay fixed');
+    assert.equal(generatedSensor.parent, generatedRay.parent);
+    assert.match(generatedSensor.parent.name, /chassis/);
+    const body = generated.root.getObjectByName('generated-rural-truck-body');
+    generated.root.updateMatrixWorld(true);
+    const generatedBounds = new THREE.Box3().setFromObject(body);
+    assert.ok(generatedBounds.max.x <= 4.39 && generatedBounds.min.x >= -4.48);
+    assert.ok(generatedBounds.max.y <= 3.84 && generatedBounds.min.y >= -1e-6);
+    assert.ok(generatedBounds.min.z >= -1.38 && generatedBounds.max.z <= 1.38);
+    assert.ok(Math.abs(generatedRay.getWorldPosition(new THREE.Vector3()).x - 4.62) < 1e-8);
+    const hull = generated.root.userData.groundSupport;
+    assert.ok(hull.length >= 12 && hull.length < 10000, 'Use the convex hull instead of scanning the render mesh each frame');
+    const surfaces = []; body.traverse((node) => { if (node.isMesh) surfaces.push(node); });
+    assert.ok(surfaces.every((node) => node.material.map && node.material.metalnessMap && node.material.roughnessMap));
+    for (const rotation of [new THREE.Euler(), new THREE.Euler(82 * Math.PI / 180, 0.15, 0.03), new THREE.Euler(0.1, 0.3, -0.4)]) {
+      const transform = new THREE.Matrix4().makeRotationFromEuler(rotation);
+      const vertex = new THREE.Vector3(); let renderMinimum = Infinity; let hullMinimum = Infinity;
+      for (const surface of surfaces) {
+        const matrix = new THREE.Matrix4().multiplyMatrices(transform, surface.matrixWorld);
+        const positions = surface.geometry.attributes.position;
+        for (let i = 0; i < positions.count; i += 1) renderMinimum = Math.min(renderMinimum, vertex.fromBufferAttribute(positions, i).applyMatrix4(matrix).y);
+      }
+      for (let i = 0; i < hull.length; i += 3) hullMinimum = Math.min(hullMinimum, vertex.fromArray(hull, i).applyMatrix4(transform).y);
+      assert.ok(Math.abs(renderMinimum - hullMinimum) < 1e-5, 'Tipping support must match the rendered geometry');
+    }
+
+    // A missing generated asset must transparently use the real Tesla asset.
+    globalThis.fetch = fetchAsset;
     const model = createSompoTruckModel({ sensorLabel: 'TESTE' });
     const sensor = model.sensorGroup; const ray = model.rayGroup; const wheels = model.wheels;
     assert.equal(await loadSompoTruckAsset(model, new AbortController().signal), true);
@@ -98,6 +135,13 @@ ${source}`, { eval: true });
     assert.equal(failed.root.getObjectByName('cab-assembly').visible, true);
     assert.equal(failed.wheels.length, 10);
 
+    // A corrupt generated GLB must also fall back to Tesla, not just an HTTP failure.
+    globalThis.fetch = (input, options) => input === '/models/sompo/generated-rural-truck.glb'
+      ? Promise.resolve(new Response('invalid generated model')) : fetchAsset(input, options);
+    const recovered = createSompoTruckModel({ sensorLabel: 'RECUPERADO' });
+    assert.equal(await loadSompoTruckAsset(recovered, new AbortController().signal), true);
+    assert.equal(recovered.root.userData.asset, 'TeslaSemi');
+
     globalThis.fetch = async () => new Response('invalid glb');
     await assert.rejects(loadSompoTruckAsset(failed, new AbortController().signal));
     assert.equal(failed.root.getObjectByName('cab-assembly').visible, true);
@@ -131,4 +175,6 @@ test('Tesla Semi tem fonte e licença atribuídas no canvas e no asset', () => {
     assert.match(text, /adaptado com sensor/);
     assert.doesNotMatch(text, /Cesium|cesium-milk-truck/);
   }
+  assert.match(simulator, /modelAsset === 'GeneratedRuralTruck'/);
+  assert.match(license, /generated-rural-truck\.glb/);
 });

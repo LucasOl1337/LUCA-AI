@@ -5,13 +5,17 @@ import dracoWrapperUrl from 'three/addons/libs/draco/gltf/draco_wasm_wrapper.js?
 import dracoWasmUrl from 'three/addons/libs/draco/gltf/draco_decoder.wasm?url';
 import { SOMPO_TRUCK_FRONT_X, SOMPO_TRUCK_HALF_SIZE, type SompoTruckModel } from './createSompoTruckModel';
 
-// Tesla Semi © 2018 Oleksii Rozumnyi · CC BY 4.0 · adaptado com sensor.
+// Main model: local image → Hunyuan3D-2.1 reconstruction, with generated PBR textures.
+// Exact inputs, parameters and limitations: public/models/sompo/generated-rural-truck.provenance.json.
+export const SOMPO_TRUCK_ASSET_URL = '/models/sompo/generated-rural-truck.glb';
+
+// Fallback: Tesla Semi © 2018 Oleksii Rozumnyi · CC BY 4.0 · adaptado com sensor.
 // Original: https://sketchfab.com/3d-models/tesla-semi-39ffc7c746184e0c9ebd5bbcd0b405dd
 // GLB: https://raw.githubusercontent.com/pakagronglb/tesla-3d-showcase/main/public/models/semi_scene.glb
 // License: https://creativecommons.org/licenses/by/4.0/ (see public/models/sompo/LICENSE.txt).
 // Adaptations: remove display props, align/shorten the trailer, calibrate wheel pivots,
 // tune materials and attach the ESP32. The source GLB has no animation clips.
-export const SOMPO_TRUCK_ASSET_URL = '/models/sompo/tesla-semi.glb';
+export const SOMPO_TESLA_ASSET_URL = '/models/sompo/tesla-semi.glb';
 
 function disposeAsset(root: THREE.Object3D) {
   const materials = new Set<THREE.Material>();
@@ -123,9 +127,8 @@ function mountWheel(mesh: THREE.Mesh, parent: THREE.Group) {
   parent.add(mesh);
 }
 
-/** Keeps the synchronous procedural model usable while fetching; failed/aborted loads never replace it. */
-export async function loadSompoTruckAsset(model: SompoTruckModel, signal: AbortSignal): Promise<boolean> {
-  const response = await fetch(SOMPO_TRUCK_ASSET_URL, { signal });
+async function readTruckAsset(url: string, signal: AbortSignal) {
+  const response = await fetch(url, { signal });
   if (!response.ok) throw new Error(`Truck asset: HTTP ${response.status}`);
   // Bundle both decoder files with Vite: no external CDN/network dependency after installation.
   const decoder = new DRACOLoader().setDecoderPath({ js: dracoWrapperUrl, wasm: dracoWasmUrl }).setWorkerLimit(2);
@@ -137,8 +140,89 @@ export async function loadSompoTruckAsset(model: SompoTruckModel, signal: AbortS
   }
   if (signal.aborted) {
     disposeAsset(gltf.scene);
-    return false;
+    return null;
   }
+  return gltf;
+}
+
+/** Generated image → Hunyuan3D mesh with baked PBR. Provenance: public/models/sompo/LICENSE.txt. */
+async function loadGeneratedTruck(model: SompoTruckModel, signal: AbortSignal): Promise<boolean> {
+  const gltf = await readTruckAsset(SOMPO_TRUCK_ASSET_URL, signal);
+  if (!gltf) return false;
+  const body = gltf.scene;
+  body.name = 'generated-rural-truck-body';
+  body.rotation.y = Math.PI / 2; // Generated vehicle faces +Z; telemetry faces +X.
+  body.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(body);
+  const size = bounds.getSize(new THREE.Vector3());
+  if (![size.x, size.y, size.z].every((value) => Number.isFinite(value) && value > 0.01)) {
+    disposeAsset(body);
+    throw new Error('Generated truck has invalid bounds');
+  }
+  const scale = Math.min((SOMPO_TRUCK_HALF_SIZE.x * 2 - 0.20) / size.x,
+    (SOMPO_TRUCK_HALF_SIZE.y * 2 - 0.10) / size.y, (SOMPO_TRUCK_HALF_SIZE.z * 2 - 0.10) / size.z);
+  const asset = new THREE.Group();
+  asset.name = 'generated-rural-truck';
+  asset.add(body);
+  body.scale.setScalar(scale);
+  body.position.set(SOMPO_TRUCK_FRONT_X - 0.24 - bounds.max.x * scale, -bounds.min.y * scale, -(bounds.min.z + bounds.max.z) * scale / 2);
+  body.updateMatrixWorld(true);
+  const support: number[] = [];
+  const point = new THREE.Vector3();
+  body.traverse((object) => {
+    const mesh = object as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    mesh.castShadow = mesh.receiveShadow = true;
+    for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      if (!(material instanceof THREE.MeshStandardMaterial)) continue;
+      material.envMapIntensity = 0.85;
+      for (const value of Object.values(material)) if (value instanceof THREE.Texture) value.anisotropy = 8;
+    }
+    // The offline export includes convex-hull vertices: exact support under any pitch/roll,
+    // without scanning the 160k-triangle render mesh on every animation frame.
+    const hull = mesh.userData.groundSupport as number[] | undefined;
+    if (Array.isArray(hull) && hull.length >= 12 && hull.length % 3 === 0 && hull.every(Number.isFinite)) {
+      for (let i = 0; i < hull.length; i += 3) {
+        point.fromArray(hull, i).applyMatrix4(mesh.matrixWorld);
+        support.push(point.x, point.y, point.z);
+      }
+    } else {
+      const positions = mesh.geometry.attributes.position;
+      for (let i = 0; i < positions.count; i += 1) {
+        point.fromBufferAttribute(positions, i).applyMatrix4(mesh.matrixWorld);
+        support.push(point.x, point.y, point.z);
+      }
+    }
+  });
+  if (!support.length) { disposeAsset(asset); throw new Error('Generated truck has no geometry'); }
+  for (const child of model.root.children) {
+    if (child !== model.sensorGroup && child !== model.rayGroup) child.visible = false;
+  }
+  model.root.add(asset);
+  const socket = new THREE.Group();
+  socket.name = 'generated-esp32-chassis-mount';
+  asset.add(socket);
+  socket.add(model.sensorGroup, model.rayGroup);
+  // A compact bracket on the front chassis keeps the sensor visible without dwarfing the cab.
+  model.sensorGroup.scale.setScalar(0.45);
+  model.sensorGroup.position.set(SOMPO_TRUCK_FRONT_X - 0.22 * 0.45, 0.78, 0);
+  model.rayGroup.position.set(SOMPO_TRUCK_FRONT_X, 0.78, 0);
+  model.rayGroup.scale.z = 0.45;
+  const label = model.sensorGroup.getObjectByName('sensor-label');
+  if (label) { label.position.set(-0.95, 6.3, 0); label.scale.set(3.2, 0.8, 1); }
+  const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.08, 0.52), new THREE.MeshStandardMaterial({ color: 0x20272a, metalness: 0.65, roughness: 0.5 }));
+  bracket.position.set(4.42, 0.62, 0); bracket.castShadow = true; socket.add(bracket);
+  // The generated tyres are part of the single reconstructed shell; preserve their textured
+  // silhouette. Rotating the monolithic mesh or covering it with unrelated wheels looks worse.
+  model.wheels.splice(0, model.wheels.length);
+  model.root.userData.asset = 'GeneratedRuralTruck';
+  model.root.userData.groundSupport = new Float32Array(support);
+  return true;
+}
+
+async function loadTeslaTruck(model: SompoTruckModel, signal: AbortSignal): Promise<boolean> {
+  const gltf = await readTruckAsset(SOMPO_TESLA_ASSET_URL, signal);
+  if (!gltf) return false;
   const cab = gltf.scene.getObjectByName('Sketchfab_model');
   const container = gltf.scene.getObjectByName('Wagon_Container');
   const trailerWheels = ['Wheels3', 'Wheels4'].map((name) => gltf.scene.getObjectByName(name));
@@ -266,4 +350,19 @@ export async function loadSompoTruckAsset(model: SompoTruckModel, signal: AbortS
   });
   model.root.userData.groundSupport = new Float32Array(support);
   return true;
+}
+
+/** Generated → Tesla → existing synchronous procedural model. Never replace a valid fallback on error. */
+export async function loadSompoTruckAsset(model: SompoTruckModel, signal: AbortSignal): Promise<boolean> {
+  if (signal.aborted) return false;
+  try {
+    return await loadGeneratedTruck(model, signal);
+  } catch (generatedError) {
+    if (signal.aborted) return false;
+    try { return await loadTeslaTruck(model, signal); }
+    catch (teslaError) {
+      if (signal.aborted) return false;
+      throw Object.assign(new Error('Detailed truck assets unavailable'), { causes: [generatedError, teslaError] });
+    }
+  }
 }

@@ -1,0 +1,23 @@
+Rural scenery assets from Poly Haven — CC0 1.0 Universal.
+https://polyhaven.com/license
+https://creativecommons.org/publicdomain/zero/1.0/
+
+HDRIs:
+Kloppenheim 06 — Greg Zaal
+https://polyhaven.com/a/kloppenheim_06
+Farmland Overcast
+https://polyhaven.com/a/farmland_overcast
+
+PBR textures (original albedo, OpenGL normal, packed AO/roughness/metalness):
+Asphalt 02 — https://polyhaven.com/a/asphalt_02
+Dirt Aerial 02 — https://polyhaven.com/a/dirt_aerial_02
+Leafy Grass — https://polyhaven.com/a/leafy_grass
+Downloaded originals and checksums are recorded in sources.json.
+
+Vegetation:
+Tree Small 02 — Rico Cilliers — https://polyhaven.com/a/tree_small_02
+The three transparent tree-*.png billboards were rendered locally by LUCA-AI
+from the CC0 glTF model using its bark, branch, leaf and leaf-alpha textures.
+They are not the website's copyrighted preview renders.
+Adaptations: three camera angles, lighting and reduced-resolution rasterization
+for instanced roadside vegetation.

@@ -1,0 +1,64 @@
+{
+  "license": "CC0-1.0",
+  "assets": [
+    {
+      "file": "kloppenheim_06_2k.hdr",
+      "source": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/kloppenheim_06_2k.hdr",
+      "md5": "86deab62942f3ba6004fda4377769bf7"
+    },
+    {
+      "file": "farmland_overcast_2k.hdr",
+      "source": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/farmland_overcast_2k.hdr",
+      "md5": "2a2d209d4329d68c8bb7eacc7b6ea5e1"
+    },
+    {
+      "file": "asphalt-color.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_02/asphalt_02_diff_2k.jpg",
+      "md5": "336af399fd98a39ab986d8b3bf73b4ff"
+    },
+    {
+      "file": "asphalt-normal.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_02/asphalt_02_nor_gl_2k.jpg",
+      "md5": "77ebd1cc0b020ccaa1c6b58f103d1f75"
+    },
+    {
+      "file": "asphalt-arm.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_02/asphalt_02_arm_2k.jpg",
+      "md5": "152c0fb79ad6f33040b79779fea98664"
+    },
+    {
+      "file": "dirt-color.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirt_aerial_02/dirt_aerial_02_diff_1k.jpg",
+      "md5": "fa7ac6aa4b3be031c6f1648c4a2880d6"
+    },
+    {
+      "file": "dirt-normal.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirt_aerial_02/dirt_aerial_02_nor_gl_1k.jpg",
+      "md5": "75dff8d842cc18fa44939fc2f9b6258b"
+    },
+    {
+      "file": "dirt-arm.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirt_aerial_02/dirt_aerial_02_arm_1k.jpg",
+      "md5": "8dc016c95f10c3e151b6218f7aa79aaa"
+    },
+    {
+      "file": "grass-color.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leafy_grass/leafy_grass_diff_1k.jpg",
+      "md5": "0dbc071e91d6905edfcfbe8eb785a1ab"
+    },
+    {
+      "file": "grass-normal.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leafy_grass/leafy_grass_nor_gl_1k.jpg",
+      "md5": "8279e096e204ea326d57a318869f99df"
+    },
+    {
+      "file": "grass-arm.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leafy_grass/leafy_grass_arm_1k.jpg",
+      "md5": "44fb4e40ef0f3425a7d1a14bc328e4d8"
+    }
+  ],
+  "vegetationSource": {
+    "source": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/tree_small_02/tree_small_02_1k.gltf",
+    "method": "three transparent views rendered locally from the CC0 glTF, leaf alpha map applied without vertical flip"
+  }
+}

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createSompoEnvironmentAssets } from './createSompoEnvironmentAssets';
 import type { SompoRuralFrame } from '../../../shared/sompo-telemetry-simulator.js';
 
 function texture(width: number, height: number, draw: (context: CanvasRenderingContext2D) => void, color = true) {
@@ -65,7 +66,7 @@ function makeCow() {
   return cow;
 }
 
-export function createSompoRoadScene(scene: THREE.Scene) {
+export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
   const root = new THREE.Group();
   root.name = 'rural-road-environment';
   scene.add(root);
@@ -78,16 +79,29 @@ export function createSompoRoadScene(scene: THREE.Scene) {
   });
   const clearSky = sky(false); const rainSky = sky(true);
   scene.background = clearSky;
-  scene.fog = new THREE.Fog(0xcbd8cd, 48, 145);
+  scene.fog = new THREE.Fog(0xbebca9, 75, 220);
+  const assets = createSompoEnvironmentAssets(scene, renderer);
   const earthMap = groundTexture('earth');
-  const earth = new THREE.MeshStandardMaterial({ map: earthMap, roughness: 1, color: 0xc5b588 });
+  const earth = new THREE.MeshStandardMaterial({ map: earthMap, roughness: 1, color: 0xffffff });
   const terrain = mesh(root, new THREE.PlaneGeometry(240, 240), earth, [0, -0.055, 0]);
   terrain.rotation.x = -Math.PI / 2;
+  assets.surface(earth, 'dirt', 30, 30);
   const roadMap = groundTexture('road');
   const asphalt = new THREE.MeshStandardMaterial({ map: roadMap, roughness: 0.90, metalness: 0.03 });
   const road = mesh(root, new THREE.PlaneGeometry(240, 8.2), asphalt, [0, 0, -2.05]);
   road.rotation.x = -Math.PI / 2;
-  const shoulderMaterial = new THREE.MeshStandardMaterial({ map: earthMap, color: 0xb9a17d, roughness: 1 });
+  assets.surface(asphalt, 'asphalt', 60, 2.05);
+  // Broad, soft ambient contact below the chassis complements the tyre-level GTAO.
+  const contactMap = texture(256, 64, (context) => {
+    context.scale(4, 1);
+    const fade = context.createRadialGradient(32, 32, 4, 32, 32, 32);
+    fade.addColorStop(0, 'rgba(0,0,0,.55)'); fade.addColorStop(0.55, 'rgba(0,0,0,.28)'); fade.addColorStop(1, 'rgba(0,0,0,0)');
+    context.fillStyle = fade; context.fillRect(0, 0, 64, 64);
+  });
+  const contact = new THREE.Mesh(new THREE.PlaneGeometry(9.2, 2.8), new THREE.MeshBasicMaterial({ map: contactMap, transparent: true, depthWrite: false, opacity: 0.6 }));
+  contact.name = 'truck-ambient-contact'; contact.rotation.x = -Math.PI / 2; root.add(contact);
+  const shoulderMaterial = new THREE.MeshStandardMaterial({ map: earthMap, color: 0xe1c9aa, roughness: 1 });
+  assets.surface(shoulderMaterial, 'dirt', 60, 0.375);
   for (const z of [2.72, -6.82]) {
     const shoulder = mesh(root, new THREE.PlaneGeometry(240, 1.5), shoulderMaterial, [0, -0.015, z]);
     shoulder.rotation.x = -Math.PI / 2;
@@ -100,67 +114,52 @@ export function createSompoRoadScene(scene: THREE.Scene) {
   const transform = new THREE.Object3D();
   for (let i = 0; i < 48; i += 1) { transform.position.set(i * 5 - 120, 0.017, -2.05); transform.updateMatrix(); dashes.setMatrixAt(i, transform.matrix); }
   markings.add(dashes);
-  const fields = new THREE.MeshStandardMaterial({ color: 0x536945, roughness: 1 });
-  const crop = new THREE.MeshStandardMaterial({ color: 0x465737, roughness: 1 });
+  const fields = new THREE.MeshStandardMaterial({ color: 0x9caf80, roughness: 1 });
+  assets.surface(fields, 'grass', 70, 20);
   for (const side of [-1, 1]) {
     const field = mesh(root, new THREE.PlaneGeometry(220, 58), fields, [0, -0.035, side * 39]); field.rotation.x = -Math.PI / 2;
-    for (let row = 0; row < 16; row += 1) mesh(root, new THREE.BoxGeometry(200, 0.045, 0.22), crop, [0, 0.01, side * (11 + row * 2.8)]);
+
   }
   const wood = new THREE.MeshStandardMaterial({ color: 0x70614b, roughness: 1 });
   const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.11, 1.2, 0.12), wood, 100);
   for (let i = 0; i < 100; i += 1) { transform.position.set((i % 50) * 4.5 - 112, 0.58, i < 50 ? 6 : -10); transform.updateMatrix(); posts.setMatrixAt(i, transform.matrix); }
   posts.castShadow = true; root.add(posts);
   for (const z of [6, -10]) for (const y of [0.45, 0.9]) mesh(root, new THREE.BoxGeometry(225, 0.028, 0.028), wood, [0, y, z]);
-  const treeMap = texture(256, 384, (context) => {
-    let seed = 27183;
-    const random = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return (seed >>> 0) / 4294967296; };
-    context.strokeStyle = '#61523d'; context.lineWidth = 9;
-    context.beginPath(); context.moveTo(128, 380); context.lineTo(127, 117); context.stroke();
-    for (let branch = 0; branch < 12; branch += 1) {
-      context.lineWidth = 2 + random() * 3;
-      context.beginPath(); context.moveTo(128, 280 - branch * 14);
-      context.lineTo(40 + random() * 175, 45 + random() * 210); context.stroke();
+  const treeBatches: { mesh: THREE.InstancedMesh; placements: { x: number; z: number; scale: number }[] }[] = [];
+  const localCamera = new THREE.Vector3();
+  // Three transparent views rendered locally from Poly Haven's CC0 Tree Small 02.
+  // Sparse instancing avoids loading millions of source triangles on each client.
+  for (let variant = 0; variant < 3; variant += 1) {
+    const foliage = new THREE.MeshBasicMaterial({ map: assets.treeMap(variant), alphaTest: 0.28, side: THREE.DoubleSide });
+    const trees = new THREE.InstancedMesh(new THREE.PlaneGeometry(6, 6), foliage, 12);
+    trees.visible = false;
+    trees.name = `rural-tree-billboards-${variant}`;
+    const placements: { x: number; z: number; scale: number }[] = [];
+    for (let i = 0; i < 12; i += 1) {
+      const index = i * 3 + variant;
+      const nearRoad = [[-12, -12], [12, -14], [25, 9]][variant];
+      const x = i === 0 ? nearRoad[0] : ((index * 31) % 180) - 90;
+      const z = i === 0 ? nearRoad[1] : (index % 2 ? -1 : 1) * (22 + (index * 17) % 42);
+      const scale = i === 0 ? 1.6 : 0.95 + (index % 5) * 0.16;
+      placements.push({ x, z, scale });
+      transform.position.set(x, 3 * scale - 0.025, z);
+      transform.rotation.y = 0.65 + (index % 3 - 1) * 0.28;
+      transform.scale.set(scale, scale, scale); transform.updateMatrix(); trees.setMatrixAt(i, transform.matrix);
     }
-    for (let leaf = 0; leaf < 2800; leaf += 1) {
-      const angle = random() * Math.PI * 2; const radius = Math.sqrt(random());
-      const x = 128 + Math.cos(angle) * radius * 103;
-      const y = 159 + Math.sin(angle) * radius * 128;
-      const tone = Math.floor(random() * 4);
-      context.fillStyle = ['#29412d', '#36573b', '#456748', '#607b50'][tone];
-      context.beginPath(); context.ellipse(x, y, 2 + random() * 9, 2 + random() * 7, angle, 0, Math.PI * 2); context.fill();
-    }
-  });
-  const foliage = new THREE.MeshStandardMaterial({ map: treeMap, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 1 });
-  const trees = new THREE.InstancedMesh(new THREE.PlaneGeometry(6.0, 8.8), foliage, 80);
-  for (let i = 0; i < 40; i += 1) {
-    const x = ((i * 31) % 190) - 95;
-    const z = (i % 2 ? -1 : 1) * (16 + (i * 17) % 37);
-    const scale = 0.65 + (i % 4) * 0.14;
-    for (let cross = 0; cross < 2; cross += 1) {
-      transform.position.set(x, 4.4 * scale - 0.05, z);
-      transform.rotation.y = i * 0.8 + cross * Math.PI / 2;
-      transform.scale.set(scale, scale, scale); transform.updateMatrix(); trees.setMatrixAt(i * 2 + cross, transform.matrix);
-    }
-  }
-  trees.castShadow = true; root.add(trees);
-  const hillMaterial = new THREE.MeshStandardMaterial({ color: 0x667a62, roughness: 1 });
-  for (const side of [-1, 1]) {
-    const hillGeometry = new THREE.PlaneGeometry(300, 90, 60, 24);
-    hillGeometry.rotateX(-Math.PI / 2);
-    const vertices = hillGeometry.attributes.position as THREE.BufferAttribute;
-    for (let i = 0; i < vertices.count; i += 1) {
-      const x = vertices.getX(i); const z = vertices.getZ(i);
-      const ridge = Math.sin((z + 45) / 90 * Math.PI);
-      vertices.setY(i, -1 + ridge * (7 + Math.sin(x * 0.038) * 3 + Math.sin(x * 0.09 + 2) * 1.5));
-    }
-    hillGeometry.computeVertexNormals();
-    mesh(root, hillGeometry, hillMaterial, [0, 0, side * 98]);
+    trees.castShadow = true;
+    root.add(trees);
+    treeBatches.push({ mesh: trees, placements });
   }
 
   const puddles = new THREE.Group(); root.add(puddles);
-  const water = new THREE.MeshPhysicalMaterial({ color: 0x647f8a, roughness: 0.08, metalness: 0.35, transparent: true, opacity: 0.6, clearcoat: 1 });
+  const water = new THREE.MeshPhysicalMaterial({ color: 0x192426, roughness: 0.18, metalness: 0, transparent: true, opacity: 0.32, clearcoat: 0.55, clearcoatRoughness: 0.12, envMapIntensity: 0.35, depthWrite: false });
   for (let i = 0; i < 12; i += 1) {
     const patch = mesh(puddles, new THREE.CircleGeometry(1, 24), water, [i * 4 - 20, 0.025, (i % 3) * 2.5 - 4.5], [1.2 + i % 3, 0.4 + i % 2 * 0.5, 1]);
+    const vertices = patch.geometry.attributes.position as THREE.BufferAttribute;
+    for (let vertex = 1; vertex < vertices.count; vertex += 1) {
+      const wobble = 1 + Math.sin(vertex * 1.7 + i * 2) * 0.15;
+      vertices.setXY(vertex, vertices.getX(vertex) * wobble, vertices.getY(vertex) * wobble);
+    }
     patch.rotation.x = -Math.PI / 2;
   }
   const shed = new THREE.Group(); root.add(shed); shed.position.set(-7, 0, 5.4);
@@ -193,17 +192,38 @@ export function createSompoRoadScene(scene: THREE.Scene) {
     update(scenarioId: string, frame: SompoRuralFrame | null, speed: number, elapsed: number, truck: THREE.Vector3, reduceMotion: boolean, delta: number, slope: number) {
       const t = elapsed / 1000;
       root.rotation.z = slope;
+      camera.getWorldPosition(localCamera); root.worldToLocal(localCamera);
+      for (const batch of treeBatches) {
+        // A missing/offline billboard must never become an opaque white card.
+        batch.mesh.visible = !!(batch.mesh.material as THREE.MeshBasicMaterial).map?.image;
+        batch.placements.forEach(({ x, z, scale }, index) => {
+          transform.position.set(x, 3 * scale - 0.025, z);
+          transform.rotation.set(0, Math.atan2(localCamera.x - x, localCamera.z - z), 0);
+          transform.scale.setScalar(scale); transform.updateMatrix(); batch.mesh.setMatrixAt(index, transform.matrix);
+        });
+        batch.mesh.instanceMatrix.needsUpdate = true;
+        (batch.mesh.material as THREE.MeshBasicMaterial).color.setScalar((frame?.rain ?? 0) > 0 ? 0.65 : 1);
+      }
       if (!reduceMotion) traveled += speed / 3.6 * delta * (frame?.direction ?? 1);
       dashes.position.x = -(traveled % 5);
-      roadMap.offset.x = (traveled / 240 * 36) % 1;
+      for (const map of new Set([asphalt.map, asphalt.normalMap, asphalt.roughnessMap, asphalt.aoMap])) {
+        if (map) map.offset.x = (traveled / 240 * map.repeat.x) % 1;
+      }
       const wet = (frame?.rain ?? 0) > 0;
+      contact.position.set(truck.x, 0.008, truck.z);
+      contact.rotation.z = -THREE.MathUtils.degToRad(frame?.yaw ?? 0);
       const mud = scenarioId === 'bogged-down';
       const gravel = scenarioId === 'rough-road';
-      scene.background = wet ? rainSky : clearSky;
+      if (!assets.hasHdri) scene.background = wet ? rainSky : clearSky;
+      assets.update(wet);
       const fog = scene.fog as THREE.Fog;
-      fog.color.set(wet ? 0x9cabae : 0xcbd8cd); fog.near = wet ? 27 : 48; fog.far = wet ? 90 : 145;
-      asphalt.color.set(mud ? 0x604331 : gravel ? 0x998467 : wet ? 0x61717b : 0xffffff);
-      asphalt.roughness = wet && !mud ? 0.22 : 0.9;
+      fog.color.set(wet ? 0x919b9c : 0xbebca9); fog.near = wet ? 55 : 100; fog.far = wet ? 220 : 260;
+      earth.color.setScalar(wet ? 0.58 : 1);
+      shoulderMaterial.color.set(wet ? 0x96856c : 0xe1c9aa);
+      fields.color.set(wet ? 0x758765 : 0x9caf80);
+      asphalt.color.set(mud ? 0x604331 : gravel ? 0x998467 : wet ? 0x687882 : 0xffffff);
+      asphalt.roughness = wet && !mud ? 0.2 : 0.95;
+      asphalt.normalScale.setScalar(wet ? 0.20 : 0.65);
       markings.visible = !mud && !gravel;
       puddles.visible = wet;
       shed.visible = scenarioId === 'tight-reverse' || scenarioId === 'yard-maneuver';
@@ -236,6 +256,7 @@ export function createSompoRoadScene(scene: THREE.Scene) {
       }
       rainPositions.needsUpdate = true;
     },
-    dispose() { clearSky.dispose(); rainSky.dispose(); },
+    get hasHdri() { return assets.hasHdri; },
+    dispose() { assets.dispose(); clearSky.dispose(); rainSky.dispose(); },
   };
 }

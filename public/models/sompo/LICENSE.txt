@@ -1,3 +1,24 @@
+Generated rural truck — generated-rural-truck.glb
+Created locally for LUCA-AI, 2026-09-11.
+Source image: generated-rural-truck-source.png, selected from three variations
+created with cx/gpt-5.5-image through the local 9Router API.
+Geometry and PBR textures: Tencent Hunyuan3D-2.1, local CUDA inference.
+https://github.com/Tencent-Hunyuan/Hunyuan3D-2.1
+This is generated output, not a redistributed ML model or model weights.
+No Tesla/CC-BY attribution applies to this generated truck.
+Generation remains subject to the Hunyuan3D-2.1 Community License terms,
+including its geographic restrictions; the tool license is preserved in
+HUNYUAN-COMMUNITY-LICENSE.txt. The generated output is not labelled CC0.
+
+Adaptations: quadric mesh reduction to 160,000 triangles, embedded generated
+albedo and metallic/roughness maps, physically bounded specular response,
+convex-hull support vertices for ground contact, calibrated scale/orientation,
+and ESP32/chassis mount. Wheels remain part of a fixed monolithic mesh.
+The opposite side and fine mechanical details are inferred from one image;
+this is an experimental reconstruction, not an exact Scania/Volvo CAD model.
+Exact parameters and source hashes: generated-rural-truck.provenance.json.
+
+Immediate fallback (displayed attribution only while this asset is active):
 Tesla Semi © 2018 Oleksii Rozumnyi · CC BY 4.0 · sketchfab.com/3d-models/tesla-semi-39ffc7c746184e0c9ebd5bbcd0b405dd · adaptado com sensor
 
 Original model: Tesla Semi by Oleksii Rozumnyi (also credited as Aleksei Rozumnyi).
