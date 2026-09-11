@@ -1,4 +1,5 @@
 // File-backed laboratory telemetry. No Firebase, wall clock, or expected-event fixture.
+import { computeGeofenceEpisodes } from './lab-geofence.js';
 const EARTH_RADIUS_M = 6378137;
 const RAD = Math.PI / 180;
 const FIELDS = [
@@ -32,6 +33,7 @@ const TITLES = {
   gnss_unavailable: ['Posição GPS indisponível', 'Posição GPS recuperada'],
   device_collision_warning: ['Alerta de colisão do dispositivo', 'Alerta de colisão do dispositivo desativado'],
   device_inclination_warning: ['Alerta de inclinação do dispositivo', 'Alerta de inclinação do dispositivo desativado'],
+  hazard_band: ['Entrada em faixa de proximidade', 'Saída da faixa de proximidade'],
 };
 
 function fail(message) { throw new Error(message); }
@@ -138,6 +140,29 @@ function validateManifest(manifest) {
   const coolant = manifest.rules?.coolant_warning_c;
   if (water != null && (!finite(water) || water < 0)) fail('A distância de aviso da água deve ser um número em metros, maior ou igual a zero.');
   if (coolant != null && (!finite(coolant) || coolant < -273.15)) fail('O limite de arrefecimento deve ser um número válido em °C.');
+  const hazards = manifest.rules?.hazards;
+  if (hazards != null) {
+    if (!Array.isArray(hazards) || !hazards.length) fail('Regras: hazards deve ser uma lista com pelo menos um perigo.');
+    const seen = new Set();
+    for (const [index, hazard] of hazards.entries()) {
+      const where = `Regras: perigo ${index + 1}`;
+      if (!object(hazard) || !['water', 'hazard'].includes(hazard.role)) fail(`${where}: role deve ser water ou hazard.`);
+      if (hazard.role === 'hazard' && (typeof hazard.category !== 'string' || !hazard.category.trim())) fail(`${where}: informe category (por exemplo slope) para role hazard.`);
+      const kind = [hazard.role, hazard.category].filter(Boolean).join('/');
+      if (seen.has(kind)) fail(`${where}: perigo ${kind} repetido; use uma entrada por papel e categoria.`);
+      seen.add(kind);
+      const bands = hazard.bands_m;
+      if (!Array.isArray(bands) || !bands.length) fail(`${where}: bands_m deve ser uma lista com pelo menos uma faixa.`);
+      const ids = new Set();
+      for (const [j, band] of bands.entries()) {
+        if (!object(band) || typeof band.id !== 'string' || !band.id.trim() || !finite(band.max_m) || band.max_m < 0) fail(`${where}, faixa ${j + 1}: informe id e max_m em metros, maior ou igual a zero.`);
+        if (j && band.max_m <= bands[j - 1].max_m) fail(`${where}: bands_m deve estar em ordem crescente de max_m (faixa "${band.id}" com ${band.max_m} m depois de ${bands[j - 1].max_m} m).`);
+        if (ids.has(band.id)) fail(`${where}: id de faixa "${band.id}" repetido.`);
+        ids.add(band.id);
+      }
+      if (hazard.role === 'water' && water != null && bands.at(-1).max_m !== water) fail(`${where}: com faixas de água, water_warning_distance_m (${water} m) deve ser igual ao max_m da faixa mais externa (${bands.at(-1).max_m} m).`);
+    }
+  }
   if (manifest.files != null && (!Array.isArray(manifest.files) || manifest.files.some(file => !object(file) || typeof file.file !== 'string' || !Number.isInteger(file.samples) || file.samples < 1))) fail('Lista de arquivos inválida no manifesto.');
 }
 
@@ -179,7 +204,9 @@ function buildPolygons(map, origin, warnings) {
   for (const [index, feature] of map.features.entries()) {
     if (feature?.type !== 'Feature' || !object(feature.properties) || !object(feature.geometry)) fail(`Mapa: feição ${index + 1} inválida.`);
     const role = feature.properties.role;
-    if (!['property_boundary', 'allowed_area', 'water'].includes(role)) { warnings.push(`Feição ${index + 1} sem papel property_boundary, allowed_area ou water: não participa das regras.`); continue; }
+    if (!['property_boundary', 'allowed_area', 'water', 'hazard'].includes(role)) { warnings.push(`Feição ${index + 1} sem papel property_boundary, allowed_area, water ou hazard: não participa das regras.`); continue; }
+    const category = feature.properties.category;
+    if (role === 'hazard' && (typeof category !== 'string' || !category.trim())) fail(`Mapa: a feição ${index + 1} com papel hazard precisa de properties.category (por exemplo slope).`);
     const geometry = feature.geometry;
     if (!['Polygon', 'MultiPolygon'].includes(geometry.type) || !Array.isArray(geometry.coordinates)) fail(`Mapa: a área ${index + 1} deve ser Polygon ou MultiPolygon.`);
     const parts = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
@@ -195,7 +222,7 @@ function buildPolygons(map, origin, warnings) {
         if (Math.abs(area) < 1e-6) fail(`Mapa: a área ${index + 1} tem geometria sem superfície.`);
         return projected;
       });
-      polygons.push({ id: `${feature.properties.id || `area-${index + 1}`}${parts.length > 1 ? `-${partIndex}` : ''}`, role, rings });
+      polygons.push({ id: `${feature.properties.id || `area-${index + 1}`}${parts.length > 1 ? `-${partIndex}` : ''}`, role, rings, ...(role === 'hazard' ? { category } : {}) });
     }
   }
   if (!polygons.some(p => p.role === 'allowed_area')) warnings.push('Mapa sem área permitida: eventos de cerca indisponíveis.');
@@ -228,7 +255,7 @@ export function associateLabSite(manifest, site) {
   return { manifest: result, map: site.map };
 }
 
-function segmentDistance(point, a, b) {
+export function segmentDistance(point, a, b) {
   const dx = b.x - a.x, dz = b.z - a.z;
   const length = dx * dx + dz * dz;
   const t = length ? Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.z - a.z) * dz) / length)) : 0;
@@ -245,7 +272,7 @@ function ringContains(point, ring) {
   return inside ? 1 : -1;
 }
 
-function polygonContains(point, polygon) {
+export function polygonContains(point, polygon) {
   const outer = ringContains(point, polygon.rings[0]);
   if (outer <= 0) return outer === 0;
   for (const hole of polygon.rings.slice(1)) {
@@ -256,16 +283,17 @@ function polygonContains(point, polygon) {
   return true;
 }
 
-function polygonDistance(point, polygon) {
+export function polygonDistance(point, polygon) {
   if (polygonContains(point, polygon)) return 0;
   let distance = Infinity;
   for (const ring of polygon.rings) for (let i = 1; i < ring.length; i++) distance = Math.min(distance, segmentDistance(point, ring[i - 1], ring[i]));
   return distance;
 }
 
-function hasPosition(sample) { return sample.gnss_fix === '3d' && sample.x !== null && sample.z !== null; }
+export function hasPosition(sample) { return sample.gnss_fix === '3d' && sample.x !== null && sample.z !== null; }
 
-function detectEvents(samples, polygons, rules, caseId) {
+// skipNearWater: com rules.hazards de água, as faixas (hazard_band) substituem o evento near_water.
+function detectEvents(samples, polygons, rules, caseId, skipNearWater = false) {
   const allowed = polygons.filter(p => p.role === 'allowed_area');
   const water = polygons.filter(p => p.role === 'water');
   const previous = {};
@@ -275,7 +303,7 @@ function detectEvents(samples, polygons, rules, caseId) {
     const waterDistance = gps && water.length ? Math.min(...water.map(p => polygonDistance(sample, p))) : null;
     const conditions = {
       outside_fence: gps && allowed.length ? !allowed.some(p => polygonContains(sample, p)) : null,
-      near_water: waterDistance === null ? null : waterDistance <= rules.water_warning_distance_m,
+      near_water: skipNearWater || waterDistance === null ? null : waterDistance <= rules.water_warning_distance_m,
       coolant_warning: sample.coolant_temp_c === null ? null : sample.coolant_temp_c >= rules.coolant_warning_c,
       gnss_unavailable: !gps,
       device_collision_warning: sample.collision_warning_active,
@@ -309,7 +337,7 @@ function detectEvents(samples, polygons, rules, caseId) {
   return events;
 }
 
-function hashText(text) {
+export function hashText(text) {
   let hash = 2166136261;
   for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
   return (hash >>> 0).toString(16).padStart(8, '0');
@@ -379,14 +407,20 @@ export function parseLabCase(rawCsv, { fileName = 'caso.csv', manifest = null, m
   const inconsistentWarnings = samples.filter(s => s.coolant_temp_c !== null && s.coolant_warning_active !== null && s.coolant_warning_active !== (s.coolant_temp_c >= (manifest?.rules?.coolant_warning_c ?? 105))).length;
   if (inconsistentWarnings) warnings.push(`${inconsistentWarnings} amostra(s) com aviso ECU diferente da comparação térmica; o evento usa a leitura e o limite documentado, sem substituir o sinal original.`);
   warnings.push(...site.warnings);
-  const rules = { water_warning_distance_m: manifest?.rules?.water_warning_distance_m ?? 20, coolant_warning_c: manifest?.rules?.coolant_warning_c ?? 105 };
+  const rules = { ...manifest?.rules, water_warning_distance_m: manifest?.rules?.water_warning_distance_m ?? 20, coolant_warning_c: manifest?.rules?.coolant_warning_c ?? 105 };
   const id = `lab:${first.machine_id}:${first.timeMs}:${last.timeMs}:${hashText(rawCsv)}`;
+  const geofence = computeGeofenceEpisodes(samples, polygons, rules, id);
+  // Sem rules.hazards a faixa derivada só alimenta geofence.episodes; a linha do tempo continua com near_water (PR intacta).
+  const events = [
+    ...detectEvents(samples, polygons, rules, id, Boolean(rules.hazards?.some(hazard => hazard.role === 'water'))),
+    ...(rules.hazards ? geofence.events : []),
+  ].sort((a, b) => a.elapsedMs - b.elapsedMs);
   const knownTitles = { '01-operacao-normal.csv': 'Operação normal', '02-cerca-e-agua.csv': 'Cerca e proximidade da água', '03-aquecimento-e-falha-gps.csv': 'Aquecimento e falha de GPS' };
   return {
     id, title: knownTitles[fileName] || fileName.replace(/\.csv$/i, ''), fileName, rawCsv,
     machineId: first.machine_id, synthetic: first.synthetic, hasEsp32: columns.some(name => LAB_ESP32_COLUMNS.includes(name)), samples,
     startedAt: first.timestamp, durationMs: last.elapsedMs, sampleIntervalMs,
-    events: detectEvents(samples, polygons, rules, id), warnings, manifest, map, schema, origin, polygons,
+    events, geofence: geofence.summary, warnings, manifest, map, schema, origin, polygons,
   };
 }
 
@@ -406,11 +440,12 @@ export function getReplayFrame(labCase, requestedElapsedMs) {
   const active = new Map();
   for (const event of labCase.events) {
     if (event.elapsedMs > elapsedMs) break;
-    if (event.transition === 'start') active.set(event.type, event);
-    else active.delete(event.type);
+    const key = event.type === 'hazard_band' ? `${event.type}:${event.evidence.hazard}` : event.type; // Um episódio ativo por perigo.
+    if (event.transition === 'start') active.set(key, event);
+    else active.delete(key);
   }
   const activeEvents = [...active.values()].filter(event => !recordingGap
-    && (hasGps || !['outside_fence', 'near_water'].includes(event.type))
+    && (hasGps || !['outside_fence', 'near_water', 'hazard_band'].includes(event.type))
     && (!DEVICE_WARNING_FIELDS[event.type] || sample[DEVICE_WARNING_FIELDS[event.type]] === true));
   return { elapsedMs, sample, sampleIndex: low, position: hasGps ? { x: sample.x, z: sample.z } : null, hasGps, gap: gpsGap || recordingGap, gpsGap, recordingGap, activeEvents };
 }

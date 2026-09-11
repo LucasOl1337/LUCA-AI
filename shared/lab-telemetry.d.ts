@@ -40,7 +40,8 @@ export interface LabSample {
   x: number | null;
   z: number | null;
 }
-export type LabEventType = 'outside_fence' | 'near_water' | 'coolant_warning' | 'gnss_unavailable' | 'device_collision_warning' | 'device_inclination_warning';
+import type { GeofenceSummary, LabHazardRule } from './lab-geofence.js';
+export type LabEventType = 'outside_fence' | 'near_water' | 'coolant_warning' | 'gnss_unavailable' | 'device_collision_warning' | 'device_inclination_warning' | 'hazard_band';
 export interface LabEvent {
   id: string;
   type: LabEventType;
@@ -52,7 +53,7 @@ export interface LabEvent {
   evidence: Record<string, string | number | boolean | null>;
 }
 export interface LabPoint { x: number; z: number }
-export interface LabPolygon { id: string; role: 'property_boundary' | 'allowed_area' | 'water'; rings: LabPoint[][] }
+export interface LabPolygon { id: string; role: 'property_boundary' | 'allowed_area' | 'water' | 'hazard'; category?: string; rings: LabPoint[][] }
 export interface LabManifest {
   version?: string | number;
   synthetic?: boolean;
@@ -65,7 +66,7 @@ export interface LabManifest {
   site?: { id: string; name: string; [key: string]: unknown };
   satellite?: { url: string; bbox: [number, number, number, number]; attribution: string; crs?: 'EPSG:4326'; resolution_m?: number; [key: string]: unknown };
   terrain?: import('./lab-terrain.js').LabTerrainReference;
-  rules?: { water_warning_distance_m?: number; coolant_warning_c?: number; purpose?: string };
+  rules?: { water_warning_distance_m?: number; coolant_warning_c?: number; purpose?: string; hazards?: LabHazardRule[] };
   files?: { file: string; samples: number; sha256?: string }[];
   [key: string]: unknown;
 }
@@ -101,6 +102,7 @@ export interface LabCase {
   durationMs: number;
   sampleIntervalMs: number;
   events: LabEvent[];
+  geofence: GeofenceSummary;
   warnings: string[];
   manifest: LabManifest | null;
   map: LabMap | null;
@@ -128,3 +130,8 @@ export function associateLabSite(manifest: unknown, site: LabSite): { manifest: 
 export function getReplayFrame(labCase: LabCase, elapsedMs: number): LabReplayFrame;
 export function formatLabTime(ms: number): string;
 export function toLocalCoordinate(longitude: number, latitude: number, origin: [number, number]): LabPoint;
+export function segmentDistance(point: LabPoint, a: LabPoint, b: LabPoint): number;
+export function polygonContains(point: LabPoint, polygon: LabPolygon): boolean;
+export function polygonDistance(point: LabPoint, polygon: LabPolygon): number;
+export function hasPosition(sample: Pick<LabSample, 'gnss_fix' | 'x' | 'z'>): boolean;
+export function hashText(text: string): string;
