@@ -1,6 +1,9 @@
 import type { SompoTelemetrySnapshot } from './sompo-telemetry.js';
 
-export type SompoSimulationScenarioId = 'normal' | 'obstacle' | 'inclination' | 'rough-road';
+export type SompoSimulationScenarioId =
+  | 'normal' | 'obstacle' | 'inclination' | 'rough-road'
+  | 'hard-braking' | 'steep-climb' | 'steep-descent'
+  | 'yard-maneuver' | 'shifted-load' | 'hot-weather';
 
 export interface SompoSimulationControls {
   scenarioId: SompoSimulationScenarioId;
@@ -72,3 +75,30 @@ export function createSompoCollisionScriptSnapshot(
   elapsedMs: number,
   options?: { observedAt?: string; connectedAt?: string },
 ): SompoTelemetrySnapshot;
+
+export type SompoBrakingScriptPhaseId = 'deslocamento' | 'frenagem' | 'repouso';
+
+export const SOMPO_BRAKING_SCRIPT: Readonly<{
+  scenarioId: 'hard-braking';
+  totalMs: number;
+  phases: readonly Readonly<{
+    id: SompoBrakingScriptPhaseId;
+    label: string;
+    startMs: number;
+    endMs: number;
+  }>[];
+}>;
+
+export interface SompoBrakingScriptState {
+  phaseId: SompoBrakingScriptPhaseId;
+  phaseLabel: string;
+  speedKph: number;
+  accelerationX: number;
+  pitchOffset: number;
+  pitchRate: number;
+}
+
+export function getSompoBrakingScriptState(
+  elapsedMs: number,
+  initialSpeedKph?: number,
+): SompoBrakingScriptState;

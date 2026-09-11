@@ -57,6 +57,90 @@ export const SOMPO_SIMULATION_SCENARIOS = Object.freeze({
     collisionRisk: false,
     inclinationRisk: false,
   }),
+  'hard-braking': Object.freeze({
+    scenarioId: 'hard-braking',
+    label: 'Frenagem brusca',
+    description: 'Em 12 s: deslocamento, frenagem de 28 km/h até parar e repouso. Pulso de desaceleração e mergulho da cabine; sem impacto. Reinicie para repetir.',
+    speedKph: 28,
+    distance: 260,
+    temperature: 29,
+    humidity: 54,
+    pitch: 1,
+    roll: 0.5,
+    roughness: 0.35,
+    collisionRisk: false,
+    inclinationRisk: false,
+  }),
+  'steep-climb': Object.freeze({
+    scenarioId: 'steep-climb',
+    label: 'Aclive severo',
+    description: 'Subida rural de 21° em baixa velocidade, frente elevada e alerta sintético de inclinação.',
+    speedKph: 6,
+    distance: 180,
+    temperature: 33,
+    humidity: 46,
+    pitch: 21,
+    roll: 3,
+    roughness: 1.1,
+    collisionRisk: false,
+    inclinationRisk: true,
+  }),
+  'steep-descent': Object.freeze({
+    scenarioId: 'steep-descent',
+    label: 'Declive severo',
+    description: 'Descida rural de 22° com piso úmido, velocidade reduzida e alerta sintético de inclinação.',
+    speedKph: 8,
+    distance: 170,
+    temperature: 23,
+    humidity: 89,
+    pitch: -22,
+    roll: -4,
+    roughness: 1.3,
+    collisionRisk: false,
+    inclinationRisk: true,
+  }),
+  'yard-maneuver': Object.freeze({
+    scenarioId: 'yard-maneuver',
+    label: 'Manobra no terreiro',
+    description: 'Avanço a 3 km/h em espaço estreito junto ao galpão. Sensor frontal a 55 cm e alerta sintético de proximidade.',
+    speedKph: 3,
+    distance: 55,
+    temperature: 28,
+    humidity: 58,
+    pitch: 2,
+    roll: -2,
+    roughness: 0.45,
+    collisionRisk: true,
+    inclinationRisk: false,
+  }),
+  'shifted-load': Object.freeze({
+    scenarioId: 'shifted-load',
+    label: 'Carga deslocada',
+    description: 'Carga assimétrica mantém a carroceria inclinada a 19° mesmo em marcha lenta; alerta sintético de inclinação.',
+    speedKph: 4,
+    distance: 190,
+    temperature: 31,
+    humidity: 52,
+    pitch: 2,
+    roll: 19,
+    roughness: 0.8,
+    collisionRisk: false,
+    inclinationRisk: true,
+  }),
+  'hot-weather': Object.freeze({
+    scenarioId: 'hot-weather',
+    label: 'Calor intenso',
+    description: 'Operação sob calor de 43 °C e baixa umidade. Temperatura ambiente do sensor; não mede o motor nem cria uma flag térmica.',
+    speedKph: 12,
+    distance: 230,
+    temperature: 43,
+    humidity: 19,
+    pitch: 2,
+    roll: 1,
+    roughness: 0.65,
+    collisionRisk: false,
+    inclinationRisk: false,
+  }),
 });
 
 function finite(value, fallback) {
@@ -70,7 +154,7 @@ function clamp(value, minimum, maximum) {
 
 function round(value, digits = 2) {
   const factor = 10 ** digits;
-  return Math.round(value * factor) / factor;
+  return Math.round(value * factor) / factor || 0;
 }
 
 function vector(x, y, z) {
@@ -85,6 +169,40 @@ function vector(x, y, z) {
 export function getSompoSimulationScenario(scenarioId = DEFAULT_SCENARIO_ID) {
   const profile = SOMPO_SIMULATION_SCENARIOS[scenarioId] || SOMPO_SIMULATION_SCENARIOS[DEFAULT_SCENARIO_ID];
   return { ...profile };
+}
+
+/** Sequência local de frenagem, sem criar um episódio de colisão no histórico. */
+export const SOMPO_BRAKING_SCRIPT = Object.freeze({
+  scenarioId: 'hard-braking',
+  totalMs: 12_000,
+  phases: Object.freeze([
+    Object.freeze({ id: 'deslocamento', label: 'Deslocamento', startMs: 0, endMs: 3_000 }),
+    Object.freeze({ id: 'frenagem', label: 'Frenagem', startMs: 3_000, endMs: 5_000 }),
+    Object.freeze({ id: 'repouso', label: 'Parado, sem impacto', startMs: 5_000, endMs: 12_000 }),
+  ]),
+});
+
+/**
+ * Função pura compartilhada pela telemetria e animação. O perfil de velocidade
+ * tem derivada contínua: integral do pulso de desaceleração = velocidade inicial.
+ * Após o roteiro, mantém repouso até o operador reiniciar (não faz loop oculto).
+ */
+export function getSompoBrakingScriptState(elapsedMs, initialSpeedKph = 28) {
+  const elapsed = clamp(finite(elapsedMs, 0), 0, SOMPO_BRAKING_SCRIPT.totalMs);
+  const speed = clamp(finite(initialSpeedKph, 28), 0, 60);
+  const phase = SOMPO_BRAKING_SCRIPT.phases.find((item) => elapsed < item.endMs)
+    || SOMPO_BRAKING_SCRIPT.phases.at(-1);
+  const progress = clamp((elapsed - 3_000) / 2_000, 0, 1);
+  const pulse = phase.id === 'frenagem' ? Math.sin(Math.PI * progress) : 0;
+  const speedFactor = (1 + Math.cos(Math.PI * progress)) / 2;
+  return {
+    phaseId: phase.id,
+    phaseLabel: phase.label,
+    speedKph: speed * speedFactor,
+    accelerationX: -(speed / 3.6) * Math.PI / 4 * pulse,
+    pitchOffset: -5 * pulse * (speed / 28),
+    pitchRate: phase.id === 'frenagem' ? -5 * Math.PI / 2 * Math.cos(Math.PI * progress) * (speed / 28) : 0,
+  };
 }
 
 /**
@@ -243,22 +361,27 @@ export function createSompoSimulationSnapshot(controls = {}, {
   const rollBase = clamp(finite(controls.roll, profile.roll), -25, 25);
   const temperatureBase = clamp(finite(controls.temperature, profile.temperature), -10, 70);
   const humidityBase = clamp(finite(controls.humidity, profile.humidity), 0, 100);
-  const motionFactor = speedKph / 30;
+  const braking = scenarioId === SOMPO_BRAKING_SCRIPT.scenarioId
+    ? getSompoBrakingScriptState(elapsed, speedKph)
+    : null;
+  const motionFactor = (braking?.speedKph ?? speedKph) / 30;
+  // Somente a frenagem tem repouso roteirizado; os presets antigos mantêm seu sinal.
+  const vibration = braking ? roughness * Math.min(1, braking.speedKph / 8) : roughness;
 
-  const distance = round(clamp(distanceBase + (Math.sin(phase * 0.7) * Math.min(2.5, roughness)), 5, 400));
-  const pitch = round(pitchBase + (Math.sin(phase * 2.1) * roughness * 0.28));
-  const roll = round(rollBase + (Math.sin((phase * 2.7) + 0.6) * roughness * 0.34));
-  const temperature = round(temperatureBase + (Math.sin(phase * 0.08) * 0.2), 1);
+  const distance = round(clamp(distanceBase + (Math.sin(phase * 0.7) * Math.min(2.5, vibration)), 5, 400));
+  const pitch = round(clamp(pitchBase + (braking?.pitchOffset ?? 0) + (Math.sin(phase * 2.1) * vibration * 0.28), -25, 25));
+  const roll = round(clamp(rollBase + (Math.sin((phase * 2.7) + 0.6) * vibration * 0.34), -25, 25));
+  const temperature = round(clamp(temperatureBase + (Math.sin(phase * 0.08) * 0.2), -10, 70), 1);
   const humidity = round(clamp(humidityBase + (Math.cos(phase * 0.06) * 0.3), 0, 100), 1);
   const acceleration = vector(
-    (Math.sin(phase * 3.4) * roughness * 0.48) + (motionFactor * 0.08),
-    Math.cos((phase * 2.9) + 0.4) * roughness * 0.42,
-    9.81 + (Math.sin(phase * 4.2) * roughness * 0.36),
+    (braking?.accelerationX ?? 0) + (Math.sin(phase * 3.4) * vibration * 0.48) + (motionFactor * 0.08),
+    Math.cos((phase * 2.9) + 0.4) * vibration * 0.42,
+    9.81 + (Math.sin(phase * 4.2) * vibration * 0.36),
   );
   const rotation = vector(
-    Math.cos(phase * 2.1) * roughness * 0.7,
-    Math.sin(phase * 1.4) * roughness * 0.28,
-    Math.cos((phase * 2.7) + 0.6) * roughness * 0.82,
+    Math.cos(phase * 2.1) * vibration * 0.7,
+    (braking?.pitchRate ?? 0) + Math.sin(phase * 1.4) * vibration * 0.28,
+    Math.cos((phase * 2.7) + 0.6) * vibration * 0.82,
   );
   const collisionRisk = typeof controls.collisionRisk === 'boolean'
     ? controls.collisionRisk

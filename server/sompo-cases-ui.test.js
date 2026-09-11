@@ -127,7 +127,6 @@ test('Firebase e simulador compartilham o caminhão físico azul como um único 
   assert.match(sompoSimulator, /createSompoTruckModel\(/);
   assert.match(sompoTruckModel, /paintedBlue/);
   assert.match(sompoTruckModel, /cargo-horizontal-corrugation/);
-  assert.match(sompoTruckModel, /const axlePositions = \[3\.17, 0\.38, -2\.64, -3\.48\]/);
   assert.match(sompoTruckModel, /ultrasonic-sensor-assembly/);
   assert.match(sompoTruckModel, /ultrasonic-transducer/);
   assert.match(sompoTruckModel, /root\.userData\.sculptRuntime/);

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import type { SompoTelemetrySnapshot } from '@/lib/types';
 import { lucaApi } from '@/lib/api';
 import {
@@ -32,6 +33,8 @@ import {
   type SompoAxisCalibration,
 } from './sompo/sensorPose.js';
 import {
+  SOMPO_BRAKING_SCRIPT,
+  getSompoBrakingScriptState,
   SOMPO_COLLISION_FRAME_MOMENTS,
   SOMPO_COLLISION_SCRIPT,
   SOMPO_SIMULATION_SCENARIOS,
@@ -612,6 +615,15 @@ export default function SompoTruckSimulator({
     renderer.domElement.setAttribute('aria-hidden', 'true');
     mount.appendChild(renderer.domElement);
 
+    // Procedural reflections give the metallic paint, glass and rims readable highlights.
+    const environmentScene = new RoomEnvironment();
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const environment = pmrem.fromScene(environmentScene, 0.04);
+    scene.environment = environment.texture;
+    scene.environmentIntensity = 0.65;
+    environmentScene.dispose();
+    pmrem.dispose();
+
     const orbit = new OrbitControls(camera, renderer.domElement);
     orbit.enableDamping = true;
     orbit.dampingFactor = 0.07;
@@ -766,10 +778,10 @@ export default function SompoTruckSimulator({
       }, axisCalibrationRef.current);
       const pitch = isFirebase
         ? sensorPose.rotationZ
-        : THREE.MathUtils.degToRad(settings.pitch);
+        : THREE.MathUtils.degToRad(snapshot.readings.pitch ?? settings.pitch);
       const roll = isFirebase
         ? sensorPose.rotationX
-        : THREE.MathUtils.degToRad(settings.roll);
+        : THREE.MathUtils.degToRad(snapshot.readings.roll ?? settings.roll);
       if (reduceMotion.matches) {
         truckPoseGroup.rotation.z = pitch;
         truckPoseGroup.rotation.x = roll;
@@ -781,9 +793,12 @@ export default function SompoTruckSimulator({
         liveHeading = sensorPose.rotationY;
         truckPoseGroup.rotation.y = liveHeading;
       }
+      const brakingState = !isFirebase && !collisionVisualRef.current && settings.scenarioId === SOMPO_BRAKING_SCRIPT.scenarioId
+        ? getSompoBrakingScriptState(time - startedAtRef.current, settings.speedKph)
+        : null;
       const liveActivity = isFirebase
         ? THREE.MathUtils.clamp((snapshot.readings.rotation?.magnitude || 0) * 0.012, 0, 0.1)
-        : settings.roughness * 0.008;
+        : settings.roughness * 0.008 * (brakingState ? Math.min(1, brakingState.speedKph / 8) : 1);
       const targetHeight = truckGroundHeight(truckPoseGroup.rotation);
       truckBaseHeight = reduceMotion.matches
         ? targetHeight
@@ -799,7 +814,7 @@ export default function SompoTruckSimulator({
       const collisionVisual = collisionVisualRef.current;
       if (!isFirebase && !reduceMotion.matches) {
         // No roteiro de colisão a roda para junto com o caminhão (flag ativa = impacto/parado).
-        const wheelSpeed = collisionVisual ? (snapshot.risks.collision ? 0 : 16) : settings.speedKph;
+        const wheelSpeed = collisionVisual ? (snapshot.risks.collision ? 0 : 16) : (brakingState?.speedKph ?? settings.speedKph);
         for (const wheel of wheels) wheel.rotation.y -= delta * wheelSpeed * 0.12;
       }
       const rangeLength = rangeForDistance(snapshot.readings.distance);
@@ -876,6 +891,7 @@ export default function SompoTruckSimulator({
           materials.forEach(disposeMaterial);
         }
       });
+      environment.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };
@@ -910,6 +926,9 @@ export default function SompoTruckSimulator({
     sceneApiRef.current?.adjust(action);
   }
 
+  const brakingPreview = !isFirebase && !collisionActive && controls.scenarioId === SOMPO_BRAKING_SCRIPT.scenarioId
+    ? getSompoBrakingScriptState(preview.deviceTimestamp ?? 0, controls.speedKph)
+    : null;
   const firebaseLive = preview.connection.state === 'live';
   const firebaseStatusLabel = firebaseLive
     ? preview.freshness === 'stale' ? 'Conectado · leitura parada' : 'Firebase ao vivo'
@@ -1074,6 +1093,12 @@ export default function SompoTruckSimulator({
           </div>
 
           <div className="sompo-simulator-ranges">
+            {brakingPreview && (
+              <p role="status">
+                {brakingPreview.phaseLabel}
+                {' · '}{formatReading(brakingPreview.speedKph, ' km/h')}
+              </p>
+            )}
             <label>
               <span>Distância frontal <strong>{controls.distance} cm</strong></span>
               <input
