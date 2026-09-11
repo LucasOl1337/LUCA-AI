@@ -12,13 +12,17 @@ const modelSource = readFileSync(new URL('../src/components/sompo/createSompoTru
   .replace("'three'", JSON.stringify(import.meta.resolve('three')))
   .replace("'three/addons/geometries/RoundedBoxGeometry.js'", JSON.stringify(import.meta.resolve('three/addons/geometries/RoundedBoxGeometry.js')));
 const modelUrl = moduleUrl(modelSource);
+const partsSource = readFileSync(new URL('../src/components/sompo/splitGeneratedTruckParts.ts', import.meta.url), 'utf8')
+  .replace("'three'", JSON.stringify(import.meta.resolve('three')));
+const partsUrl = moduleUrl(partsSource);
 const assetSource = readFileSync(new URL('../src/components/sompo/loadSompoTruckAsset.ts', import.meta.url), 'utf8')
   .replace("'three'", JSON.stringify(import.meta.resolve('three')))
   .replace("'three/addons/loaders/GLTFLoader.js'", JSON.stringify(import.meta.resolve('three/addons/loaders/GLTFLoader.js')))
   .replace("'three/addons/loaders/DRACOLoader.js'", JSON.stringify(import.meta.resolve('three/addons/loaders/DRACOLoader.js')))
   .replace("import dracoWrapperUrl from 'three/addons/libs/draco/gltf/draco_wasm_wrapper.js?url';", `const dracoWrapperUrl = ${JSON.stringify(import.meta.resolve('three/addons/libs/draco/gltf/draco_wasm_wrapper.js'))};`)
   .replace("import dracoWasmUrl from 'three/addons/libs/draco/gltf/draco_decoder.wasm?url';", `const dracoWasmUrl = ${JSON.stringify(import.meta.resolve('three/addons/libs/draco/gltf/draco_decoder.wasm'))};`)
-  .replace("'./createSompoTruckModel'", JSON.stringify(modelUrl));
+  .replace("'./createSompoTruckModel'", JSON.stringify(modelUrl))
+  .replace("'./splitGeneratedTruckParts'", JSON.stringify(partsUrl));
 const assetBytes = readFileSync(new URL('../public/models/sompo/tesla-semi.glb', import.meta.url));
 const generatedBytes = readFileSync(new URL('../public/models/sompo/generated-rural-truck.glb', import.meta.url));
 
@@ -63,7 +67,9 @@ ${source}`, { eval: true });
     assert.equal(await loadSompoTruckAsset(generated, new AbortController().signal), true);
     assert.equal(generated.root.userData.asset, 'GeneratedRuralTruck');
     assert.equal(generated.sensorGroup, generatedSensor); assert.equal(generated.rayGroup, generatedRay);
-    assert.equal(generated.wheels, generatedWheels); assert.equal(generatedWheels.length, 0, 'Monolithic tyres stay fixed');
+    assert.equal(generated.wheels, generatedWheels); assert.equal(generatedWheels.length, 6, 'Reconstructed tyres are separated with their original texture');
+    assert.equal(generatedWheels.filter((wheel) => wheel.userData.blowoutTarget).length, 1);
+    assert.ok(generatedWheels.every((wheel) => wheel.geometry.attributes.uv.count > 100 && wheel.userData.radius > 0.4));
     assert.equal(generatedSensor.parent, generatedRay.parent);
     assert.match(generatedSensor.parent.name, /chassis/);
     const body = generated.root.getObjectByName('generated-rural-truck-body');
@@ -87,6 +93,17 @@ ${source}`, { eval: true });
       }
       for (let i = 0; i < hull.length; i += 3) hullMinimum = Math.min(hullMinimum, vertex.fromArray(hull, i).applyMatrix4(transform).y);
       assert.ok(Math.abs(renderMinimum - hullMinimum) < 1e-5, 'Tipping support must match the rendered geometry');
+    }
+
+    const triangleCount = surfaces.reduce((sum, mesh) => sum + mesh.geometry.index.count / 3, 0);
+    assert.equal(triangleCount, 160000, 'Spatial separation neither duplicates nor drops source triangles');
+    for (const wheel of generatedWheels) {
+      const center = wheel.getWorldPosition(new THREE.Vector3());
+      wheel.rotation.y += 0.8;
+      assert.ok(center.distanceTo(wheel.getWorldPosition(new THREE.Vector3())) < 1e-8);
+      const axis = new THREE.Vector3(0, 1, 0).applyQuaternion(wheel.getWorldQuaternion(new THREE.Quaternion()));
+      assert.ok(Math.abs(axis.z) > 0.999, 'Wheel axis remains across the truck');
+      wheel.rotation.y = 0;
     }
 
     // A missing generated asset must transparently use the real Tesla asset.

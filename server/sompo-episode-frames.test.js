@@ -292,7 +292,7 @@ test('frame do episódio vira anexo de chat e chega ao modelo como image_url', a
     system: 'Persona de risco agro.',
     user: 'Cruze o Anexo 1 com a telemetria do impacto.',
     attachments: resolved.map((item) => item.part),
-    model: 'cc/claude-fable-5',
+    model: 'cc/claude-fable-5(high)',
     agentId: 'sompo-frame',
     maxRounds: 1,
     tools: [],

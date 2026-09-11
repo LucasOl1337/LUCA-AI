@@ -19,6 +19,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { loadSompoTruckAsset } from './sompo/loadSompoTruckAsset';
+import { createSompoScenarioEffects } from './sompo/createSompoScenarioEffects';
+import { getSompoScenarioEffects } from '../../shared/sompo-scenario-effects.js';
 import { createSompoRoadScene } from './sompo/createSompoRoadScene';
 import { createSompoPostProcessing } from './sompo/createSompoPostProcessing';
 import type { SompoTelemetrySnapshot } from '@/lib/types';
@@ -693,6 +695,7 @@ export default function SompoTruckSimulator({
     } = truckModel;
     truckGroup.position.y = -SOMPO_TRUCK_PIVOT_Y;
     truckPoseGroup.add(truckGroup);
+    const scenarioEffects = createSompoScenarioEffects(scene, truckModel, camera);
     const assetAbort = new AbortController();
     setModelStatus('loading');
     setModelAsset(null);
@@ -780,6 +783,10 @@ export default function SompoTruckSimulator({
       previousTime = time;
       const settings = controlsRef.current;
       const snapshot = previewRef.current;
+      const collisionVisual = collisionVisualRef.current;
+      const visualScenario = isFirebase ? 'normal' : collisionVisual ? SOMPO_COLLISION_SCRIPT.scenarioId : settings.scenarioId;
+      const visualElapsed = time - (collisionVisual && collisionRunRef.current ? collisionRunRef.current.startedAt : startedAtRef.current);
+      const effectFrame = getSompoScenarioEffects(visualScenario, visualElapsed);
       const ruralFrame = !isFirebase && !collisionVisualRef.current
         ? getSompoRuralFrame(settings.scenarioId, time - startedAtRef.current)
         : null;
@@ -832,10 +839,9 @@ export default function SompoTruckSimulator({
       if (focusTarget === 'sensor') {
         sensorGroup.getWorldPosition(focusPoint);
       } else {
-        focusPoint.set(truckPoseGroup.position.x, truckPoseGroup.position.y, truckPoseGroup.position.z);
+        focusPoint.set(truckPoseGroup.position.x + effectFrame.focusX, truckPoseGroup.position.y, truckPoseGroup.position.z);
       }
       orbit.target.lerp(focusPoint, reduceMotion.matches ? 1 : 0.08);
-      const collisionVisual = collisionVisualRef.current;
       const drivingSpeed = collisionVisual ? (snapshot.risks.collision ? 0 : 16)
         : (ruralFrame?.speedKph ?? brakingState?.speedKph ?? settings.speedKph);
       if (!isFirebase && !reduceMotion.matches) {
@@ -843,22 +849,7 @@ export default function SompoTruckSimulator({
         const wheelSpeed = (ruralFrame?.wheelSpeedKph ?? drivingSpeed) * (ruralFrame?.direction ?? 1);
         for (const wheel of wheels) wheel.rotation.y -= delta * wheelSpeed / (3.6 * (wheel.userData.radius ?? 0.60));
       }
-      for (const wheel of wheels) {
-        const intact = wheel.userData.intactTirePositions as Float32Array | undefined;
-        if (!intact) continue;
-        const pressure = settings.scenarioId === 'tire-blowout' && !isFirebase
-          ? 1 - Math.min(1, Math.max(0, ((time - startedAtRef.current) - 2500) / 600)) * 0.5 : 1;
-        if (wheel.userData.pressure === pressure) continue;
-        wheel.userData.pressure = pressure;
-        const positions = wheel.geometry.attributes.position as THREE.BufferAttribute;
-        for (let i = 0; i < positions.count; i += 1) {
-          // Imported axle mesh contains both tires; only the exposed left tire deflates.
-          const factor = intact[i * 3 + 1] > 0 ? pressure : 1;
-          positions.setXYZ(i, intact[i * 3] * factor, intact[i * 3 + 1], intact[i * 3 + 2] * factor);
-        }
-        positions.needsUpdate = true;
-      }
-      roadScene.update(isFirebase ? 'normal' : settings.scenarioId, ruralFrame, isFirebase ? 0 : drivingSpeed, time - startedAtRef.current, truckPoseGroup.position, reduceMotion.matches, delta, slope);
+      roadScene.update(effectFrame, ruralFrame, isFirebase ? 0 : drivingSpeed, visualElapsed, truckPoseGroup.position, reduceMotion.matches, delta, slope);
       keyLight.intensity = (ruralFrame?.rain ?? 0) > 0 ? 0.25 : roadScene.hasHdri ? 1.8 : 2.4;
       obstacleGroup.visible = isFirebase || !!collisionVisual || settings.scenarioId === 'obstacle' || settings.scenarioId === 'brake-failure';
       const rangeLength = rangeForDistance(snapshot.readings.distance);
@@ -884,6 +875,7 @@ export default function SompoTruckSimulator({
       ledMaterial.color.set(snapshot.status === 'alert' ? 0xff5d52 : 0x7dff9a);
       ledMaterial.emissive.set(snapshot.status === 'alert' ? 0xff2d22 : 0x2dff6b);
       ledMaterial.emissiveIntensity = reduceMotion.matches ? 2.4 : 2.2 + (Math.sin(time * 0.007) * 1.1);
+      if (!isFirebase) scenarioEffects.update(effectFrame, visualElapsed, visualScenario, drivingSpeed, reduceMotion.matches, slope);
       orbit.update();
       postProcessing.render(delta);
       // Captura síncrona no mesmo rAF do render: o framebuffer WebGL ainda está
@@ -925,6 +917,7 @@ export default function SompoTruckSimulator({
     return () => {
       assetAbort.abort();
       roadScene.dispose();
+      scenarioEffects.dispose();
       window.cancelAnimationFrame(frameId);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       resizeObserver.disconnect();

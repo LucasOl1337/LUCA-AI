@@ -13,52 +13,171 @@
     },
     {
       "file": "asphalt-color.jpg",
-      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_02/asphalt_02_diff_2k.jpg",
-      "md5": "336af399fd98a39ab986d8b3bf73b4ff"
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/asphalt_02/asphalt_02_diff_4k.jpg",
+      "resolution": "4k",
+      "sourceMd5": "c77ab7e6b6ffc7f50d572cd3fc4ffeb5",
+      "sha256": "31725475b1d19a54bd1e2a964ec8d68f170d72f92b5087a21156bafdb7e99366",
+      "encoding": "JPEG re-encoded for delivery, original pixel dimensions retained",
+      "dimensions": [
+        4096,
+        4096
+      ]
     },
     {
       "file": "asphalt-normal.jpg",
-      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_02/asphalt_02_nor_gl_2k.jpg",
-      "md5": "77ebd1cc0b020ccaa1c6b58f103d1f75"
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/asphalt_02/asphalt_02_nor_gl_4k.jpg",
+      "resolution": "4k",
+      "sourceMd5": "10f5f0a3cab9d4714dedd524687aea6c",
+      "sha256": "44203db02ac0d81f7120f3cf9e0fddd27596bc776ac8da51699b23f789270f5b",
+      "encoding": "JPEG re-encoded for delivery, original pixel dimensions retained",
+      "dimensions": [
+        4096,
+        4096
+      ]
     },
     {
       "file": "asphalt-arm.jpg",
-      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_02/asphalt_02_arm_2k.jpg",
-      "md5": "152c0fb79ad6f33040b79779fea98664"
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/asphalt_02/asphalt_02_arm_4k.jpg",
+      "resolution": "4k",
+      "sourceMd5": "7f46f10e49a0beb1b0e39b167907b01b",
+      "sha256": "8d4fdea9e31895f84c142558caacaf20fb7c2170973e9e017ba81c875d1dac2b",
+      "encoding": "JPEG re-encoded for delivery, original pixel dimensions retained",
+      "dimensions": [
+        4096,
+        4096
+      ]
     },
     {
       "file": "dirt-color.jpg",
-      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirt_aerial_02/dirt_aerial_02_diff_1k.jpg",
-      "md5": "fa7ac6aa4b3be031c6f1648c4a2880d6"
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/dirt_aerial_02/dirt_aerial_02_diff_4k.jpg",
+      "resolution": "4k",
+      "sourceMd5": "cee40a38c6a1b4aa9f2ecaeb35077963",
+      "sha256": "1e229389738eb7b3326727f6e5382f3e28c60a01c67fdf7b1b367aaa78659f04",
+      "encoding": "JPEG re-encoded for delivery, original pixel dimensions retained",
+      "dimensions": [
+        4096,
+        4096
+      ]
     },
     {
       "file": "dirt-normal.jpg",
-      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirt_aerial_02/dirt_aerial_02_nor_gl_1k.jpg",
-      "md5": "75dff8d842cc18fa44939fc2f9b6258b"
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/dirt_aerial_02/dirt_aerial_02_nor_gl_4k.jpg",
+      "resolution": "4k",
+      "sourceMd5": "ce9db546aa4ef0e0e3e69bfb6651abb0",
+      "sha256": "4459cd565078f6dac3ca8e0cd52115c823b5ffbbc53de0c391fd2b776536ae14",
+      "encoding": "JPEG re-encoded for delivery, original pixel dimensions retained",
+      "dimensions": [
+        4096,
+        4096
+      ]
     },
     {
       "file": "dirt-arm.jpg",
-      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirt_aerial_02/dirt_aerial_02_arm_1k.jpg",
-      "md5": "8dc016c95f10c3e151b6218f7aa79aaa"
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/dirt_aerial_02/dirt_aerial_02_arm_4k.jpg",
+      "resolution": "4k",
+      "sourceMd5": "19ee02831841371be7b85a71d5af99aa",
+      "sha256": "59b7a8a9bd797e42584d2226b9cbf6b70adf456caca112c5072905f52366568b",
+      "encoding": "JPEG re-encoded for delivery, original pixel dimensions retained",
+      "dimensions": [
+        4096,
+        4096
+      ]
     },
     {
       "file": "grass-color.jpg",
-      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leafy_grass/leafy_grass_diff_1k.jpg",
-      "md5": "0dbc071e91d6905edfcfbe8eb785a1ab"
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/leafy_grass/leafy_grass_diff_4k.jpg",
+      "resolution": "4k",
+      "sourceMd5": "d991caaf9c2e333a5a684faab488cbb9",
+      "sha256": "4993dc430ddc580d0d57fbb41ae793a788416d91a7b29417a29c91d16f0804aa",
+      "encoding": "JPEG re-encoded for delivery, original pixel dimensions retained",
+      "dimensions": [
+        4096,
+        4096
+      ]
     },
     {
       "file": "grass-normal.jpg",
-      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leafy_grass/leafy_grass_nor_gl_1k.jpg",
-      "md5": "8279e096e204ea326d57a318869f99df"
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/leafy_grass/leafy_grass_nor_gl_4k.jpg",
+      "resolution": "4k",
+      "sourceMd5": "de86cbc9e3fad8674b007b3c5d0c34cb",
+      "sha256": "f8b9c9f73349fd00ba32834f8209ccab90a1c684dac993d4d2a9cc4d0c41b7c7",
+      "encoding": "JPEG re-encoded for delivery, original pixel dimensions retained",
+      "dimensions": [
+        4096,
+        4096
+      ]
     },
     {
       "file": "grass-arm.jpg",
-      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leafy_grass/leafy_grass_arm_1k.jpg",
-      "md5": "44fb4e40ef0f3425a7d1a14bc328e4d8"
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/leafy_grass/leafy_grass_arm_4k.jpg",
+      "resolution": "4k",
+      "sourceMd5": "916b87840bd6f53fe78c99ce8370162b",
+      "sha256": "6237f77aa292b907e8eaf9a731bc5ccc6e7d80aa44d86c2ce2686dd8a466494d",
+      "encoding": "JPEG re-encoded for delivery, original pixel dimensions retained",
+      "dimensions": [
+        4096,
+        4096
+      ]
+    },
+    {
+      "file": "wood-color.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rough_wood/rough_wood_diff_2k.jpg",
+      "resolution": "2k",
+      "sourceMd5": "f5f9c55696f047ceaa49dc97c5aa5526",
+      "sha256": "65dc2faa9c644bb200ff0e6f0e7d9eb4c25acb14462e345654b5b1a4baed943a",
+      "encoding": "JPEG re-encoded for delivery, original pixel dimensions retained",
+      "dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "file": "wood-normal.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rough_wood/rough_wood_nor_gl_2k.jpg",
+      "resolution": "2k",
+      "sourceMd5": "62594f2d00eb246581b9d4fde30209f1",
+      "sha256": "4b41f0ce5e65bc978b9d0b0fccc93ff653e29f0386671bee5c9e39217b40bf06",
+      "encoding": "JPEG re-encoded for delivery, original pixel dimensions retained",
+      "dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "file": "wood-arm.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rough_wood/rough_wood_arm_2k.jpg",
+      "resolution": "2k",
+      "sourceMd5": "2f6ee37ee8810aeeb72a14a7d345ba9f",
+      "sha256": "2f2544b024d33eb4d583c3eb5b1cdae6e4856655fb3e98d9c2670d46acb93e72",
+      "encoding": "JPEG re-encoded for delivery, original pixel dimensions retained",
+      "dimensions": [
+        2048,
+        2048
+      ]
     }
   ],
   "vegetationSource": {
     "source": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/tree_small_02/tree_small_02_1k.gltf",
     "method": "three transparent views rendered locally from the CC0 glTF, leaf alpha map applied without vertical flip"
-  }
+  },
+  "detailVegetationSources": [
+    {
+      "asset": "jacaranda_tree",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/jacaranda_tree/jacaranda_tree_1k.gltf",
+      "output": "tree-3.png",
+      "method": "local transparent orthographic render from CC0 glTF, original alpha maps, 1024px"
+    },
+    {
+      "asset": "shrub_02",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/shrub_02/shrub_02_1k.gltf",
+      "output": "tree-4.png",
+      "method": "local transparent orthographic render from CC0 glTF, original alpha maps, 1024px"
+    },
+    {
+      "asset": "grass_bermuda_01",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/grass_bermuda_01/grass_bermuda_01_1k.gltf",
+      "output": "grass-tuft.png",
+      "method": "local transparent orthographic render from CC0 glTF, original alpha maps, 1024px"
+    }
+  ]
 }

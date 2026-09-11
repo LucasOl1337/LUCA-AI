@@ -62,19 +62,21 @@
     "file": "generated-rural-truck.glb",
     "sha256": "781144cd39718bae41d8bea48b20164165da1282c2f5e8b611fd098dbdf7b358",
     "bytes": 6673960,
-    "fixed_wheels": true,
+    "fixed_wheels": false,
     "support_hull_vertices": 886,
     "adaptations": [
       "Remove invalid upstream specularColorFactor=2",
       "Metallic multiplier 0.65, preserve generated texture maps",
       "Embed local convex-hull support vertices for efficient exact contact",
-      "Uniform runtime fit into existing simulation envelope; front +X"
-    ]
+      "Uniform runtime fit into existing simulation envelope; front +X",
+      "Runtime spatial partition of the monolithic shell into cab/chassis, cargo box and six textured wheel meshes; all 160000 source triangles retained"
+    ],
+    "runtime_wheel_parts": 6
   },
   "limitations": [
     "Single image: hidden surfaces and mechanical details are inferred",
-    "Tyres cannot spin or deform independently; telemetry and vehicle motion remain active",
-    "Fine geometry and generated textures have reconstruction artifacts"
+    "Fine geometry and generated textures have reconstruction artifacts",
+    "Wheel segmentation uses calibrated spatial cuts; it is not a CAD rig and the reconstructed tyres are slightly irregular"
   ],
   "browser_validation": {
     "browser": "Isolated headless Chrome, ANGLE Vulkan on NVIDIA RTX 4070 Ti SUPER",

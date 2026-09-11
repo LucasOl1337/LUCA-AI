@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { splitGeneratedTruckParts } from './splitGeneratedTruckParts';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import dracoWrapperUrl from 'three/addons/libs/draco/gltf/draco_wasm_wrapper.js?url';
@@ -212,9 +213,9 @@ async function loadGeneratedTruck(model: SompoTruckModel, signal: AbortSignal): 
   if (label) { label.position.set(-0.95, 6.3, 0); label.scale.set(3.2, 0.8, 1); }
   const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.08, 0.52), new THREE.MeshStandardMaterial({ color: 0x20272a, metalness: 0.65, roughness: 0.5 }));
   bracket.position.set(4.42, 0.62, 0); bracket.castShadow = true; socket.add(bracket);
-  // The generated tyres are part of the single reconstructed shell; preserve their textured
-  // silhouette. Rotating the monolithic mesh or covering it with unrelated wheels looks worse.
-  model.wheels.splice(0, model.wheels.length);
+  const parts = splitGeneratedTruckParts(body);
+  model.wheels.splice(0, model.wheels.length, ...parts.wheels);
+  model.root.userData.cargoBody = parts.cargo;
   model.root.userData.asset = 'GeneratedRuralTruck';
   model.root.userData.groundSupport = new Float32Array(support);
   return true;

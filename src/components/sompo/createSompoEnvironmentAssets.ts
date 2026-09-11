@@ -3,7 +3,7 @@ import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 
 // Poly Haven CC0 assets, downloaded locally. Exact sources/credits: public/environments/sompo/LICENSE.txt.
 const ASSET_ROOT = '/environments/sompo/';
-type Surface = 'asphalt' | 'dirt' | 'grass';
+type Surface = 'asphalt' | 'dirt' | 'grass' | 'wood';
 
 /** Async upgrades keep the scene usable if an HDRI or texture is unavailable. */
 export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
@@ -70,6 +70,10 @@ export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE
         material.normalScale.setScalar(surface === 'asphalt' ? 0.65 : 0.75);
         material.needsUpdate = true;
       }).catch(() => { /* Retain procedural fallback maps until all PBR channels are ready. */ });
+    },
+    grassMap() {
+      const map = retain(loader.load(`${ASSET_ROOT}grass-tuft.png`));
+      map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = anisotropy; return map;
     },
     treeMap(index: number) {
       const map = retain(loader.load(`${ASSET_ROOT}tree-${index}.png`));

@@ -1,0 +1,32 @@
+{
+  "asset": "generated-nelore.glb",
+  "generatedBy": "LUCA-AI",
+  "sourceImage": "generated-nelore-source.png",
+  "imageModel": "cx/gpt-5.5-image via local 9Router",
+  "reconstruction": "Tencent Hunyuan3D-2.1",
+  "shape": {
+    "steps": 50,
+    "guidance": 5,
+    "octreeResolution": 512,
+    "seed": 42,
+    "seconds": 150,
+    "peakVramGB": 6.924
+  },
+  "texture": {
+    "views": 6,
+    "viewResolution": 512,
+    "atlasResolution": 2048,
+    "seconds": 47.79,
+    "peakVramGB": 7.136
+  },
+  "triangles": 65000,
+  "adaptations": [
+    "Decimation preserving boundaries and normals",
+    "Nonmetallic hide, invalid upstream specular extension removed",
+    "Runtime gait and tail deformation"
+  ],
+  "sha256": "aaee0dc130b9426ef2031f5a5dd858726f5592777010015b67d4b47916ee437c",
+  "sourcePrompt": "Photorealistic full body Brazilian Nelore cow, adult female zebu cattle. Anatomically accurate single animal standing naturally with all four legs clearly separated, complete hooves and tail inside image. Entire animal with ample margin. Broadside three-quarter view, head toward the right, camera at shoulder height. White/light silver short hair, darker charcoal neck folds and muzzle, characteristic Nelore shoulder hump, long dewlap, modest upward curved horns, large drooping ears, black nose, dark eyes, naturally irregular skin folds, small udder. Beautifully detailed true photographic animal anatomy and realistic fur texture. Thin tail hanging down and curled slightly away from rear leg, black tuft visible. Neutral seamless light gray studio background and floor, soft even photographic studio light, minimal contact shadow. Single isolated complete animal only, no grass, no objects, no people, no other animals, no labels or text. Professional wildlife specimen photograph for 3D reconstruction, no stylization, no toy, no cartoon. Head turned 15 degrees toward the camera, four legs clearly visible, healthy adult female Nelore.",
+  "sourceVariations": 2,
+  "weightsRevision": "0b94677654c57bb9a6b6845cd7b704ccf551d327"
+}

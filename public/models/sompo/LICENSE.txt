@@ -13,7 +13,8 @@ HUNYUAN-COMMUNITY-LICENSE.txt. The generated output is not labelled CC0.
 Adaptations: quadric mesh reduction to 160,000 triangles, embedded generated
 albedo and metallic/roughness maps, physically bounded specular response,
 convex-hull support vertices for ground contact, calibrated scale/orientation,
-and ESP32/chassis mount. Wheels remain part of a fixed monolithic mesh.
+and ESP32/chassis mount. Runtime spatial separation preserves the original
+wheel UVs while enabling rotation and persistent tyre damage.
 The opposite side and fine mechanical details are inferred from one image;
 this is an experimental reconstruction, not an exact Scania/Volvo CAD model.
 Exact parameters and source hashes: generated-rural-truck.provenance.json.
@@ -45,3 +46,11 @@ response, added container weathering and attached the ESP32 sensor. Original tir
 
 The Draco decoder bundled from Three.js is licensed under Apache License 2.0:
 https://github.com/google/draco/blob/master/LICENSE
+
+Generated Nelore — generated-nelore.glb
+Created locally for LUCA-AI, 2026-09-11. Source image generated with
+cx/gpt-5.5-image through local 9Router; shape and PBR generated locally with
+Tencent Hunyuan3D-2.1. Same tool license terms preserved above.
+Adaptations: mesh reduced to 65,000 triangles; nonmetallic hide; calibrated
+animal size and procedural leg/tail movement. Not an anatomically rigged scan.
+Source image and full parameters: generated-nelore.provenance.json.
