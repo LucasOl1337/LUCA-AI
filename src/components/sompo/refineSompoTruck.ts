@@ -90,6 +90,32 @@ export function refineSompoTruck(model: SompoTruckModel) {
   delete root.userData.sculptRuntime;
   const materials = new Set<THREE.MeshStandardMaterial>();
   root.traverse(node => { const mesh = node as THREE.Mesh; if (mesh.isMesh && mesh.material instanceof THREE.MeshStandardMaterial) materials.add(mesh.material); });
+  // Película de estrada: poeira acumulada nas partes baixas e filetes finos de
+  // água/sujeira escorrendo no baú. É o que separa pintura real de plástico.
+  const wearTruck = (material: THREE.MeshStandardMaterial) => {
+    const box = material.name === 'Painéis do baú' || material.name === 'Alumínio do baú';
+    const paint = material.name === 'Pintura da cabine' || material.name === 'Acabamentos da cabine';
+    if (!box && !paint) return;
+    const compile = material.onBeforeCompile;
+    material.onBeforeCompile = (shader, renderer) => {
+      compile?.call(material, shader, renderer);
+      shader.vertexShader = 'varying vec3 truckW;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+        truckW = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
+      shader.fragmentShader = `varying vec3 truckW;
+        float truckHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+        float truckNoise(vec2 p){vec2 i=floor(p),f=fract(p);f*=f*(3.-2.*f);
+          return mix(mix(truckHash(i),truckHash(i+vec2(1,0)),f.x),mix(truckHash(i+vec2(0,1)),truckHash(i+vec2(1,1)),f.x),f.y);}\n` + shader.fragmentShader
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          float truckDust = smoothstep(1.9, .35, truckW.y) * (.4 + .6 * truckNoise(truckW.xz * 1.9));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.42, .35, .24), clamp(truckDust, 0., 1.) * ${paint ? '.3' : '.42'});
+          ${box ? `float streak = truckNoise(vec2(truckW.z * 14.0 + truckW.x * 9.0, truckW.y * .6));
+          diffuseColor.rgb *= 1.0 - smoothstep(.55, .95, streak) * .09 * smoothstep(3.7, 2.4, truckW.y);` : ''}`)
+        .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+          roughnessFactor = mix(roughnessFactor, .92, clamp(truckDust, 0., 1.) * .5);`);
+    };
+    material.customProgramCacheKey = () => `sompo-truck-wear-v1-${box}`;
+  };
+  materials.forEach(wearTruck);
   const axisY = new THREE.Vector3(0, 1, 0), axle = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
   const steering = new THREE.Quaternion(), spin = new THREE.Quaternion();
   let finishKey = '';

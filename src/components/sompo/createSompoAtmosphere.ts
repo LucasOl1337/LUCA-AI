@@ -145,7 +145,7 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
         // Névoa de distância esfria e perde saturação: serras ficam azuladas
         // em camadas como na referência em vez de virarem uma parede âmbar.
         scene.fog.color.set(night ? '#172733' : mode === 'overcast' ? '#a9b2ae' : '#bcb4a0');
-        scene.fog.near = wet ? 70 : 115; scene.fog.far = wet ? 260 : 400;
+        scene.fog.near = wet ? 70 : 128; scene.fog.far = wet ? 260 : 420;
       }
     },
     dispose() { sky.removeFromParent(); sky.geometry.dispose(); material.dispose(); },

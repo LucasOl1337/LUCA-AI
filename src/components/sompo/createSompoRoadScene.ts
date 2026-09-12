@@ -84,9 +84,21 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const details = createSompoRoadDetails(root);
   const roadMap = groundTexture('road');
   const asphalt = new THREE.MeshStandardMaterial({ map: roadMap, roughness: 0.90, metalness: 0.03 });
+  // Asfalto fotográfico com agregado/trincas: a faixa de brita das bordas corre
+  // no sentido longitudinal (u da textura atravessa a pista, v repete a cada 4m).
+  if (typeof document !== 'undefined') {
+    const detail = new THREE.TextureLoader().load('/sompo/gen/asfalto-detalhe.webp');
+    detail.colorSpace = THREE.SRGBColorSpace;
+    detail.wrapS = detail.wrapT = THREE.RepeatWrapping;
+    detail.center.set(0.5, 0.5);
+    detail.rotation = Math.PI / 2;
+    detail.repeat.set(65, 1);
+    detail.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    asphalt.map = detail;
+  }
   const road = mesh(root, new THREE.PlaneGeometry(260, 8.2), asphalt, [0, 0, -2.05]);
   road.rotation.x = -Math.PI / 2;
-  assets.surface(asphalt, 'asphalt', 65, 2.05);
+  assets.surface(asphalt, 'asphalt', 65, 2.05, { keepMap: true, normalScale: 1.0 });
   varySompoSurface(asphalt, 0.24);
   const unpaved = new THREE.MeshStandardMaterial({ map: earthMap, roughness: 1, color: 0xb09b7e });
   assets.surface(unpaved, 'dirt', 65, 2.05);
@@ -164,7 +176,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   // rasante devolve o reflexo do céu (Fresnel), como no lago da referência.
   const lakeWater = new THREE.Mesh(
     new THREE.CircleGeometry(1, 48),
-    new THREE.MeshStandardMaterial({ color: 0x274550, roughness: 0.16, metalness: 0.02, envMapIntensity: 0.95 }),
+    new THREE.MeshStandardMaterial({ color: 0x14425c, roughness: 0.12, metalness: 0, envMapIntensity: 0.9, fog: false }),
   );
   lakeWater.name = 'valley-lake-water';
   lakeWater.geometry.scale(SOMPO_LAKE.radius * 1.15, SOMPO_LAKE.radius * 0.6, 1);
@@ -236,7 +248,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       shoulderMaterial.color.set(wet ? 0x96856c : 0xe1c9aa);
       asphalt.color.set(mud ? 0x604331 : gravel ? 0x998467 : wet ? 0x687882 : 0xffffff);
       asphalt.roughness = wet && !mud ? 0.2 : 0.95;
-      asphalt.normalScale.setScalar(wet ? 0.20 : 0.65);
+      asphalt.normalScale.setScalar(wet ? 0.20 : 1.0);
       markings.visible = !mud && !gravel;
       puddles.visible = wet;
       shed.visible = effectFrame.setting === 'yard';

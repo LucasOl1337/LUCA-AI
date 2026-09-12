@@ -51,11 +51,14 @@ function grassTuftGeometry(blades: number, seed: number, tall = false) {
     blade.translate(0, height / 2, 0);
     const positions = blade.attributes.position as THREE.BufferAttribute;
     const bend = dry ? 0.6 + rand(seed + i * 7 + 3) * 0.55 : 0.12 + rand(seed + i * 7 + 3) * 0.3;
+    const bladeT = new Float32Array(positions.count);
     for (let v = 0; v < positions.count; v += 1) {
       const t = positions.getY(v) / height;
+      bladeT[v] = t;
       positions.setX(v, positions.getX(v) * (1 - t * 0.78));
       positions.setZ(v, positions.getZ(v) + t * t * bend * height * (dry ? 3 : 1.8));
     }
+    blade.setAttribute('bladeT', new THREE.BufferAttribute(bladeT, 1));
     blade.rotateY((i / blades) * Math.PI * 2 + rand(seed + i) * 0.9);
     const spread = rand(seed + i * 13) * (tall ? 0.16 : 0.075);
     const angle = rand(seed + i * 11) * Math.PI * 2;
@@ -84,7 +87,7 @@ function cropPlantGeometry() {
   const leafParts: THREE.BufferGeometry[] = [];
   for (let leaf = 0; leaf < 9; leaf += 1) {
     const wide = leaf % 3 !== 2;
-    const bladePart = new THREE.PlaneGeometry(wide ? 0.34 : 0.2, 0.72, 1, 3);
+    const bladePart = new THREE.PlaneGeometry(wide ? 0.44 : 0.26, 0.8, 1, 3);
     bladePart.translate(0, 0.36, 0);
     const positions = bladePart.attributes.position as THREE.BufferAttribute;
     for (let v = 0; v < positions.count; v += 1) {
@@ -181,20 +184,42 @@ export function createSompoRoadDetails(parent: THREE.Group) {
     material.onBeforeCompile = (shader) => {
       shader.uniforms.grassTime = time;
       shader.uniforms.grassWind = wind;
-      shader.vertexShader = 'uniform float grassTime; uniform float grassWind;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\ntransformed.x += sin(grassTime * 1.3 + instanceMatrix[3].x * 0.6) * position.y * position.y * grassWind * ${strength.toFixed(3)};`);
+      shader.vertexShader = 'uniform float grassTime; uniform float grassWind;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\ntransformed.x += (sin(grassTime * 1.3 + instanceMatrix[3].x * 0.6) + sin(grassTime * 0.83 + instanceMatrix[3].z * 1.1) * 0.6) * position.y * position.y * grassWind * ${strength.toFixed(3)};`);
     };
     material.customProgramCacheKey = () => `sompo-wind-${strength}`;
+  };
+  // Rampa calibrada da técnica sylva (inner-green-3d, MIT): verde fundo no
+  // pé da lâmina, ponta quente iluminada, sombreado por profundidade — o que
+  // separa gramado real de veludo verde chapado. bladeT = altura na lâmina.
+  const grassRamp = (material: THREE.MeshStandardMaterial) => {
+    const prev = material.onBeforeCompile;
+    material.onBeforeCompile = (shader, renderer) => {
+      prev(shader, renderer);
+      shader.vertexShader = 'attribute float bladeT; varying float vBladeT; varying float vGTone;\n' + shader.vertexShader
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          vBladeT = bladeT;
+          vGTone = fract(sin(instanceMatrix[3].x * 12.9 + instanceMatrix[3].z * 7.7) * 43758.5453);`);
+      shader.fragmentShader = 'varying float vBladeT; varying float vGTone;\n' + shader.fragmentShader
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          vec3 gRamp = mix(vec3(.030,.048,.008), vec3(.11,.17,.028), smoothstep(0., .6, vBladeT));
+          gRamp = mix(gRamp, vec3(.26,.40,.068), smoothstep(.4, 1., vBladeT) * (.4 + .6 * vGTone));
+          gRamp = mix(gRamp, vec3(.55,.8,.16), smoothstep(.78, 1., vBladeT) * vGTone * .5);
+          // diffuseColor chega como instanceColor (matiz seco/verde por tufo).
+          diffuseColor.rgb = gRamp * (diffuseColor.rgb * 2.3 + .3);`);
+    };
+    material.customProgramCacheKey = () => `sompo-grass-ramp-v1`;
   };
 
   // Gramado de beira de pista: tufos baixos e densos sobre faixa já coberta
   // pelo pasto — lê como capim contínuo, não como espinhos em terra pelada.
   const tuftGeometry = grassTuftGeometry(10, 11);
-  const grassMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide, color: 0xffffff });
+  const grassMaterial = new THREE.MeshStandardMaterial({ vertexColors: false, roughness: 1, side: THREE.DoubleSide, color: 0xffffff });
   windify(grassMaterial, 0.055);
-  const grass = new THREE.InstancedMesh(tuftGeometry, grassMaterial, 2600);
+  grassRamp(grassMaterial);
+  const grass = new THREE.InstancedMesh(tuftGeometry, grassMaterial, 4200);
   grass.name = 'near-road-grass-tufts'; grass.receiveShadow = true; root.add(grass);
   const grassSlots: InstanceSlot[] = [];
-  for (let i = 0; i < 2600; i += 1) {
+  for (let i = 0; i < 4200; i += 1) {
     const band = rand(i + 55);
     // Maioria na margem norte; sul entre acostamento e cerca; alguns no
     // acostamento de terra colado no asfalto, onde o capim invade de verdade.
@@ -223,6 +248,7 @@ export function createSompoRoadDetails(parent: THREE.Group) {
 
   const clumpMaterial = grassMaterial.clone();
   windify(clumpMaterial, 0.075);
+  grassRamp(clumpMaterial);
   const clumps = new THREE.InstancedMesh(grassTuftGeometry(11, 57, true), clumpMaterial, 300);
   clumps.name = 'pasture-grass-clumps'; clumps.receiveShadow = true; root.add(clumps);
   const clumpSlots: InstanceSlot[] = [];
@@ -273,18 +299,18 @@ export function createSompoRoadDetails(parent: THREE.Group) {
     map.center.set(0.5, 0.5); map.rotation = -0.3; map.repeat.set(0.95, 0.95);
     cropLeafMaterial.map = map; cropLeafMaterial.alphaTest = 0.42; cropLeafMaterial.needsUpdate = true;
   });
-  const cropRows = 26;
-  const cropCols = 190;
+  const cropRows = 30;
+  const cropCols = 215;
   const crops = new THREE.InstancedMesh(cropPlantGeometry(), [cropStalkMaterial, cropLeafMaterial], cropRows * cropCols);
   crops.name = 'row-crop-field'; crops.receiveShadow = true; root.add(crops);
   const cropSlots: InstanceSlot[] = [];
   for (let row = 0; row < cropRows; row += 1) {
     for (let column = 0; column < cropCols; column += 1) {
       const i = row * cropCols + column;
-      const z = -11.9 - row * 1.42 + (rand(i + 401) - 0.5) * 0.34;
-      const size = 1.15 + rand(i + 403) * 0.85;
+      const z = -11.9 - row * 1.22 + (rand(i + 401) - 0.5) * 0.3;
+      const size = 1.3 + rand(i + 403) * 0.9;
       cropSlots.push({
-        x: column * 1.22 - 115.9 + (rand(i + 402) - 0.5) * 0.62,
+        x: column * 1.08 - 115.9 + (rand(i + 402) - 0.5) * 0.55,
         z,
         rotation: rand(i + 404) * Math.PI * 2,
         tilt: (rand(i + 407) - 0.5) * 0.14,

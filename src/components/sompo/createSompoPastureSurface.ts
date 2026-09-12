@@ -34,24 +34,48 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
     tilledTexture.wrapS = tilledTexture.wrapT = THREE.MirroredRepeatWrapping;
     tilledTexture.anisotropy = 8;
   }
+  const bladeReady = { value: 0 };
+  const bladeTexture = load('/sompo/gen/grama-laminas.webp', map => {
+    if (disposed) { map.dispose(); return; }
+    bladeReady.value = 1;
+  });
+  bladeTexture.colorSpace = THREE.SRGBColorSpace;
+  bladeTexture.wrapS = bladeTexture.wrapT = THREE.MirroredRepeatWrapping;
+  bladeTexture.anisotropy = 8;
+  const canopyReady = { value: 0 };
+  const canopyTexture = field ? soilTexture : load('/sompo/gen/lavoura-densa.webp', map => {
+    if (disposed) { map.dispose(); return; }
+    canopyReady.value = 1;
+  });
+  if (!field) {
+    canopyTexture.colorSpace = THREE.SRGBColorSpace;
+    canopyTexture.wrapS = canopyTexture.wrapT = THREE.MirroredRepeatWrapping;
+    canopyTexture.anisotropy = 8;
+  }
   const compile = material.onBeforeCompile;
   material.onBeforeCompile = (shader, renderer) => {
     compile(shader, renderer);
     shader.uniforms.pastureMap = { value: texture }; shader.uniforms.pastureReady = ready;
     shader.uniforms.soilMap = { value: soilTexture }; shader.uniforms.soilReady = soilReady;
     shader.uniforms.tilledMap = { value: tilledTexture }; shader.uniforms.tilledReady = tilledReady;
-    shader.fragmentShader = 'uniform sampler2D pastureMap; uniform float pastureReady;\nuniform sampler2D soilMap; uniform float soilReady;\nuniform sampler2D tilledMap; uniform float tilledReady;\n' + shader.fragmentShader;
+    shader.uniforms.bladeMap = { value: bladeTexture }; shader.uniforms.bladeReady = bladeReady;
+    shader.uniforms.canopyMap = { value: canopyTexture }; shader.uniforms.canopyReady = canopyReady;
+    shader.fragmentShader = 'uniform sampler2D pastureMap; uniform float pastureReady;\nuniform sampler2D soilMap; uniform float soilReady;\nuniform sampler2D tilledMap; uniform float tilledReady;\nuniform sampler2D bladeMap; uniform float bladeReady;\nuniform sampler2D canopyMap; uniform float canopyReady;\n' + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', `
       float pasture = ${field ? 'smoothstep(11.0,18.0,abs(ruralWorld.z))' : 'smoothstep(4.1,7.2,abs(ruralWorld.z+2.05))'};
       vec3 grassland = mix(vec3(.10,.135,.04), texture2D(pastureMap,ruralWorld.xz*.23).rgb, pastureReady);
-      // Segunda oitava de detalhe: de perto a trama fina segura a textura.
-      grassland = mix(grassland, grassland * texture2D(pastureMap, ruralWorld.xz*1.63 + 7.7).rgb * 2.1, .28 * pastureReady);
+      // Oitava fina com foto de lâminas: só perto da câmera, senão o horizonte suja.
+      float bladeNear = (1.0 - smoothstep(9.0, 34.0, distance(cameraPosition, ruralWorld))) * bladeReady;
+      grassland = mix(grassland, grassland * texture2D(bladeMap, ruralWorld.xz*1.63 + 7.7).rgb * 2.1, .3 * bladeNear);
       grassland *= .64 + macro * .48;
       // Solo de preparo sob a lavoura em fileiras (z −15…−42): terra escura
       // faz o verde das fileiras saltar, como na referência.
       ${field ? '' : `
       float fieldSoil = smoothstep(11.4, 14.5, -ruralWorld.z) * (1.0 - smoothstep(48.0, 54.0, -ruralWorld.z));
       vec3 tilled = mix(vec3(.28, .21, .125), texture2D(soilMap, ruralWorld.xz * .38).rgb * vec3(.82, .72, .62), soilReady);
+      // Sombra de copa: sob milho denso o chão lê verde-escuro, não barro claro.
+      vec3 canopyFloor = mix(tilled, texture2D(canopyMap, ruralWorld.xz * .14).rgb * vec3(.42, .5, .38), .55 * canopyReady);
+      tilled = mix(tilled, canopyFloor, .6);
       tilled *= .72 + macro * .56;
       grassland = mix(grassland, tilled, fieldSoil * .85);`}
       // Mosaic de talhões nas encostas: parcelas de trigo, verde e terra virada.
@@ -78,6 +102,6 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       diffuseColor.rgb = mix(diffuseColor.rgb, tilled, fieldZone);` : ''}
       #include <roughnessmap_fragment>`);
   };
-  material.customProgramCacheKey = () => `sompo-pasture-albedo-v3-${field}`;
-  return { dispose() { disposed = true; texture.dispose(); soilTexture.dispose(); if (field) tilledTexture.dispose(); } };
+  material.customProgramCacheKey = () => `sompo-pasture-albedo-v4-${field}`;
+  return { dispose() { disposed = true; texture.dispose(); soilTexture.dispose(); bladeTexture.dispose(); if (field) tilledTexture.dispose(); else canopyTexture.dispose(); } };
 }

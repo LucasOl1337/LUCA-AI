@@ -50,14 +50,14 @@ export function createSompoCropRows(groundHeight: (x: number, z: number) => numb
       .replace('#include <begin_vertex>', `
         // Os dois quads trazem a largura em eixos diferentes (x num, z no outro):
         // afunila e gira o par inteiro como uma folha dupla do pé.
-        float leafW=(.6+.16*fract(phase*.731))*max(.05,1.-h*.72)*max(.35,${height.toFixed(2)});
+        float leafW=(.6+.16*fract(phase*.731))*max(.3,1.-h*.42)*max(.35,${height.toFixed(2)});
         vec2 flatPos=position.xz*leafW;
         vec2 spun=vec2(flatPos.x*ca-flatPos.y*sa,flatPos.x*sa+flatPos.y*ca);
         vec3 transformed=vec3(spun.x+bend,h*(1.-harvested*.74),spun.y+bend*.54);
         transformed.xz*=1.-harvested*.3;`);
     shader.fragmentShader = 'varying float cropHeight; varying float cropTint; varying float cropStubble;\n' + shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       #ifdef USE_MAP
-        diffuseColor.rgb*=mix(vec3(.52,.68,.4),vec3(.98,.94,.62),pow(max(cropHeight,.001),1.1));
+        diffuseColor.rgb*=mix(vec3(.5,.64,.38),vec3(.86,.8,.5),pow(max(cropHeight,.001),1.1));
       #else
         diffuseColor.rgb*=mix(vec3(.12,.2,.05),vec3(.55,.52,.2),pow(max(cropHeight,.001),1.2));
       #endif

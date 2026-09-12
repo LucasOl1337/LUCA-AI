@@ -133,7 +133,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     keyLight.shadow.camera.near = 0.5; keyLight.shadow.camera.far = 110;
     keyLight.shadow.normalBias = 0.018;
     keyLight.shadow.bias = -0.0001;
-    keyLight.shadow.radius = 2;
+    keyLight.shadow.radius = 4;
     scene.add(keyLight);
     // A sombra acompanha o caminhão pelo mundo: luz e alvo transladam juntos.
     scene.add(keyLight.target);
