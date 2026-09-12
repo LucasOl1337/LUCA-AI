@@ -15,6 +15,8 @@ const partsSource = readFileSync(new URL('../src/components/sompo/splitGenerated
 const partsUrl = moduleUrl(partsSource);
 const texturesUrl = moduleUrl(readFileSync(new URL('../src/components/sompo/restoreSompoTextures.ts', import.meta.url), 'utf8')
   .replace("'three'", JSON.stringify(import.meta.resolve('three'))));
+const terrainUrl = moduleUrl(readFileSync(new URL('../src/components/sompo/createSompoTerrain.ts', import.meta.url), 'utf8')
+  .replace("'three'", JSON.stringify(import.meta.resolve('three'))));
 const assetSource = readFileSync(new URL('../src/components/sompo/loadSompoTruckAsset.ts', import.meta.url), 'utf8')
   .replace("'three'", JSON.stringify(import.meta.resolve('three')))
   .replace("'three/addons/loaders/GLTFLoader.js'", JSON.stringify(import.meta.resolve('three/addons/loaders/GLTFLoader.js')))
@@ -158,6 +160,7 @@ test('GLBs reais recuperam texturas sem ImageBitmap, preservam sensores/rodas e 
     const vegetationUrl = moduleUrl(readFileSync(new URL('../src/components/sompo/createSompoVegetation.ts', import.meta.url), 'utf8')
       .replace("'three'", JSON.stringify(import.meta.resolve('three')))
       .replace("'three/addons/loaders/GLTFLoader.js'", JSON.stringify(import.meta.resolve('three/addons/loaders/GLTFLoader.js')))
+      .replace("'./createSompoTerrain'", JSON.stringify(terrainUrl))
       .replace("'./restoreSompoTextures'", JSON.stringify(texturesUrl)));
     const { createSompoVegetation } = await import(vegetationUrl);
     const landscape = new THREE.Group(); const camera = new THREE.PerspectiveCamera();
@@ -165,7 +168,7 @@ test('GLBs reais recuperam texturas sem ImageBitmap, preservam sensores/rodas e 
     const trees = landscape.getObjectByName('rural-3d-vegetation');
     await vegetation.ready;
     assert.equal(trees.userData.loadedSpecies, 3, 'All three real tree assets recover through the Image element loader');
-    assert.equal(trees.children.length, 27, 'Finite LOD population');
+    assert.equal(trees.children.length, 59, 'Finite LOD population');
     const geometries = new Set();
     trees.traverse((node) => { if (node.isMesh && node.geometry.type !== 'PlaneGeometry') geometries.add(node.geometry); });
     assert.equal(geometries.size, 3, 'Instances share each species geometry');

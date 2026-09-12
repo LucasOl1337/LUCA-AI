@@ -7,7 +7,21 @@ const repo = resolve(process.env.SOMPO_PREVIEW_ROOT || resolve(dirname(fileURLTo
 const port = Number(process.env.SOMPO_PREVIEW_PORT || 5197);
 const output = resolve(process.env.SOMPO_PREVIEW_OUTPUT || `${repo}/.sompo-preview`);
 mkdirSync(output, { recursive: true });
-await build({ absWorkingDir: repo, entryPoints: [`${repo}/scripts/sompo-preview/preview.tsx`], outfile: `${output}/preview.js`, bundle: true, format: 'esm', minify: true, define: { 'process.env.NODE_ENV': '"production"' }, alias: { '@': `${repo}/src` } });
+const inspect = process.env.SOMPO_PREVIEW_INSPECT === '1' ? [{ name: 'fixture-scene-probe', setup(build) {
+  build.onLoad({ filter: /\/sompoStage\.ts$/ }, args => ({ loader: 'ts', contents: readFileSync(args.path, 'utf8').replace('return { renderer, budget };', `
+    const draw = renderer.render.bind(renderer);
+    renderer.render = (scene, camera) => {
+      const fixture = (window as any).__sompoPreview;
+      draw(scene, camera);
+      // Environment-map preprocessing also calls render. Observe only the stage.
+      if (scene.getObjectByName('sompo-rural-machine') || scene.getObjectByName('sompo-agri-machine')) {
+        fixture.scene = scene; fixture.camera = camera;
+        fixture.onFrame?.(scene, camera, renderer);
+      }
+    };
+    return { renderer, budget };`) }));
+} }] : [];
+if (process.env.SOMPO_PREVIEW_SKIP_BUILD !== '1') await build({ absWorkingDir: repo, entryPoints: [`${repo}/scripts/sompo-preview/preview.tsx`], outfile: `${output}/preview.js`, bundle: true, format: 'esm', minify: true, plugins: inspect, define: { 'process.env.NODE_ENV': '"production"' }, alias: { '@': `${repo}/src` } });
 writeFileSync(`${output}/instrument.js`, readFileSync(`${repo}/scripts/sompo-preview/instrument.js`));
 writeFileSync(`${output}/index.html`, '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SOMPO · prévia isolada</title><link rel="stylesheet" href="/preview.css"><div id="root"></div><script src="/instrument.js"></script><script type="module" src="/preview.js"></script></html>');
 const csp = readFileSync(`${repo}/server/index.js`, 'utf8').match(/res\.setHeader\('Content-Security-Policy', "([^"]+)"\)/)?.[1];

@@ -6,7 +6,7 @@ const ASSET_ROOT = '/environments/sompo/';
 type Surface = 'asphalt' | 'dirt' | 'wood';
 
 /** Async upgrades keep the scene usable if an HDRI or texture is unavailable. */
-export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE.WebGLRenderer, options: { background?: boolean; intensity?: number; initialWet?: boolean } = {}) {
+export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE.WebGLRenderer, options: { background?: boolean; intensity?: number; initialWet?: boolean; onHdri?: (kind: 'dry' | 'wet', texture: THREE.Texture) => void } = {}) {
   let disposed = false;
   let wet = options.initialWet ?? false;
   const owned = new Set<THREE.Texture>();
@@ -42,6 +42,7 @@ export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE
       texture.mapping = THREE.EquirectangularReflectionMapping;
       hdris[kind] = texture;
       updateLighting();
+      options.onHdri?.(kind, texture);
     }).catch(() => { /* The existing environment remains available. */ });
   }
   loadHdri(wet ? 'wet' : 'dry');

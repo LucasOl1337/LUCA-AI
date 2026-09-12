@@ -12,6 +12,7 @@ function disposeObject(root: THREE.Object3D) {
   const textures = new Set<THREE.Texture>();
   root.traverse((node) => {
     const mesh = node as THREE.Mesh;
+    if ((mesh as THREE.InstancedMesh).isInstancedMesh) (mesh as THREE.InstancedMesh).dispose();
     if (mesh.geometry) geometries.add(mesh.geometry);
     if (!mesh.material) return;
     for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
@@ -52,7 +53,9 @@ export async function loadSompoAgriAsset(equipmentId: SompoAgriEquipmentId, sign
 
   const model = gltf.scene;
   model.name = `sompo-agri-${equipmentId}-asset`;
-  model.rotation.y = Math.PI / 2; // Hunyuan reference faces +Z; Sompo forward is +X.
+  // Authored axes differ: tractor hood +Y, harvester header -X (mesh space).
+  // Both GLBs already contain a quarter turn around X in their node transform.
+  model.rotation.y = equipmentId === 'tractor' ? Math.PI / 2 : Math.PI;
   model.updateMatrixWorld(true);
   const bounds = new THREE.Box3().setFromObject(model);
   const size = bounds.getSize(new THREE.Vector3());
@@ -96,4 +99,3 @@ export async function loadSompoAgriAsset(equipmentId: SompoAgriEquipmentId, sign
 export function disposeSompoAgriAsset(root: THREE.Object3D) {
   disposeObject(root);
 }
-

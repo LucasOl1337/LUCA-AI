@@ -97,3 +97,4 @@ export const SOMPO_AGRI_SCENARIOS: Readonly<Record<SompoAgriScenarioId, Readonly
 export function getSompoAgriScenario(scenarioId?: string): Readonly<SompoAgriScenario>;
 export function getSompoAgriFrame(scenarioId: string, elapsedMs?: number, outcomeId?: string): SompoAgriVisualFrame;
 export function toSompoSimulationControls(frame: SompoAgriVisualFrame): Omit<SompoSimulationControls, 'scenarioId'> & { scenarioId: SompoAgriScenarioId };
+export function getSompoAgriKeyframes(scenarioId: string, outcomeId?: string): readonly Readonly<SompoAgriVisualFrame>[];

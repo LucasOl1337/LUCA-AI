@@ -1,13 +1,27 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { restoreSompoTextures, useSompoExternalTextures } from './restoreSompoTextures';
+import { sompoLakeDistance } from './createSompoTerrain';
 
 // Locally reconstructed botanical references, 18k triangles/species with PBR atlases.
 // Inputs, generation settings and hashes are in public/models/sompo/*.provenance.json.
+// Posições com |z| alto viram bosques na crista da serra (sempre impostores, >32 m).
 export const SOMPO_TREE_SPECIES = [
-  { asset: 'generated-jacaranda', height: 7, placements: [[-12, -13], [30, 12], [-42, 17], [62, -24], [-84, -38], [92, 38], [4, 26], [-58, -30], [76, 14]] },
-  { asset: 'generated-eucalyptus', height: 10, placements: [[14, -16], [-30, -19], [46, 18], [-66, 26], [80, -36], [-96, 34], [-8, 33], [38, -32], [-100, -14]] },
-  { asset: 'generated-cerrado', height: 5, placements: [[-22, 12], [26, -12], [-48, -23], [60, 28], [-78, 38], [94, -30], [10, -36], [-90, 20], [50, 36]] },
+  {
+    asset: 'generated-jacaranda', height: 7,
+    placements: [[-12, -13], [30, 12], [-42, 17], [62, -24], [-84, -38], [92, 38], [4, 26], [-58, -30], [76, 14],
+      [-25, -66], [18, -72], [-70, -80], [96, -78], [-105, -68], [-40, -88], [112, -95], [-16, 78], [55, 84], [-88, 92]],
+  },
+  {
+    asset: 'generated-eucalyptus', height: 10,
+    placements: [[14, -16], [-30, -19], [46, 18], [-66, 26], [80, -36], [-96, 34], [-8, 33], [38, -32], [-100, -14],
+      [-50, -70], [8, -80], [-90, -88], [72, -68], [-118, -76], [120, -84], [34, -98], [-55, 72], [20, 88], [85, 96], [-110, 82]],
+  },
+  {
+    asset: 'generated-cerrado', height: 5,
+    placements: [[-22, 12], [26, -12], [-48, -23], [60, 28], [-78, 38], [94, -30], [10, -36], [-90, 20], [50, 36],
+      [-35, -60], [64, -74], [-98, -62], [30, -66], [-60, -92], [108, -66], [-75, 68], [40, 78], [-30, 95], [100, 88], [-120, 60]],
+  },
 ] as const;
 
 /** Período da trilha infinita das árvores: cada LOD recicla à frente do caminhão. */
@@ -90,7 +104,10 @@ export function createSompoVegetation(parent: THREE.Group, camera: THREE.Camera,
         mesh.castShadow = mesh.receiveShadow = true;
         mesh.userData.sompoTree = true;
         for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-          if (material instanceof THREE.MeshStandardMaterial) { material.metalness = 0; material.roughness = 0.95; material.envMapIntensity = 0.65; }
+          if (material instanceof THREE.MeshStandardMaterial) {
+            material.metalness = 0; material.roughness = 0.95; material.envMapIntensity = 0.42;
+            material.color.setHex(0x7c9458); // atlas gerado é claro; multiplica pra verde de verdade
+          }
         }
       });
       retain(model);
@@ -114,14 +131,14 @@ export function createSompoVegetation(parent: THREE.Group, camera: THREE.Camera,
         center.copy(lod.position); center.y += 4;
         const t = THREE.MathUtils.clamp(projected.copy(center).sub(localCamera).dot(sight) / Math.max(1, sight.lengthSq()), 0, 1);
         const distance = center.distanceTo(projected.copy(localCamera).addScaledVector(sight, t));
-        lod.visible = !(t > 0 && t < 1 && distance < 4.5);
+        lod.visible = !(t > 0 && t < 1 && distance < 4.5) && sompoLakeDistance(x, setback) > 30;
       }
       for (const { mesh, lod } of cards) {
         const image = mesh.material.map?.image as HTMLImageElement | undefined;
         mesh.visible = !!image?.naturalWidth;
         if (image?.naturalWidth) mesh.scale.x = image.naturalWidth / image.naturalHeight;
         mesh.rotation.y = Math.atan2(localCamera.x - lod.position.x, localCamera.z - lod.position.z) - lod.rotation.y;
-        mesh.material.color.set(wet ? 0x637057 : 0x91a67e);
+        mesh.material.color.set(wet ? 0x4a5840 : 0x637750);
       }
     },
     dispose() {

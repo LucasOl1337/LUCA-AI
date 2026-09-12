@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ConvexHull } from 'three/addons/math/ConvexHull.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { SompoTruckModel } from './createSompoTruckModel';
 import type { SompoStudioConfig } from './sompoStudioConfig';
@@ -69,6 +70,22 @@ export function refineSompoTruck(model: SompoTruckModel) {
   const wheels = model.wheels.map(wheel => ({ wheel, position: wheel.position.clone(), spin: 0 }));
   for (const { wheel } of wheels) batchAssembly(wheel);
   for (const assembly of [cab, cargo, chassis]) batchAssembly(assembly);
+  root.updateMatrixWorld(true);
+  const inverseRoot = root.matrixWorld.clone().invert();
+  const supportPoints: THREE.Vector3[] = [];
+  for (const part of [cab, cargo, chassis, ...model.wheels]) part.traverse(node => {
+    const mesh = node as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const matrix = new THREE.Matrix4().multiplyMatrices(inverseRoot, mesh.matrixWorld);
+    const positions = mesh.geometry.attributes.position;
+    for (let i = 0; i < positions.count; i++) supportPoints.push(new THREE.Vector3().fromBufferAttribute(positions, i).applyMatrix4(matrix));
+  });
+  const hullPoints = new Set<THREE.Vector3>();
+  for (const face of new ConvexHull().setFromPoints(supportPoints).faces) {
+    let edge = face.edge;
+    do { hullPoints.add(edge.head().point); edge = edge.next; } while (edge !== face.edge);
+  }
+  root.userData.groundSupport = Float32Array.from([...hullPoints].flatMap(point => point.toArray()));
   // Remove editor references to parts that have been baked and retired.
   delete root.userData.sculptRuntime;
   const materials = new Set<THREE.MeshStandardMaterial>();
@@ -77,7 +94,7 @@ export function refineSompoTruck(model: SompoTruckModel) {
   const steering = new THREE.Quaternion(), spin = new THREE.Quaternion();
   let finishKey = '';
   return {
-    update(config: SompoStudioConfig, elapsed: number, travel: number, yaw: number, roughness: number, rain: number, reduced: boolean) {
+    update(config: SompoStudioConfig, elapsed: number, wheelTravel: number, steerAngle: number, roughness: number, rain: number, reduced: boolean, speedKph = 0) {
       const key = `${config.paint}:${config.cargo}:${config.roughness}:${config.wireframe}`;
       if (key !== finishKey) {
         finishKey = key;
@@ -90,15 +107,15 @@ export function refineSompoTruck(model: SompoTruckModel) {
         }
       }
       const explode = config.exploded;
-      cab.position.set(explode * 1.8, explode * 0.7 + (reduced ? 0 : Math.sin(elapsed * .013) * roughness * .012), 0);
+      cab.position.set(explode * 1.8, explode * 0.7 + (reduced ? 0 : (Math.sin(wheelTravel * 2.7) + Math.sin(wheelTravel * 5.1) * .35) * roughness * .008 * Math.min(1, Math.abs(speedKph) / 3)), 0);
       cargo.position.x = -explode * 1.2; cargo.position.y = explode * 2;
       for (const { wheel, position } of wheels) {
         wheel.position.copy(position); wheel.position.z += Math.sign(position.z) * explode * 1.3;
-        const steer = position.x > 2 ? THREE.MathUtils.clamp(-yaw * Math.PI / 180 * 0.65, -.35, .35) : 0;
-        steering.setFromAxisAngle(axisY, steer); spin.setFromAxisAngle(axisY, reduced ? 0 : -travel / .58);
+        const steer = position.x > 2 ? steerAngle : 0;
+        steering.setFromAxisAngle(axisY, steer); spin.setFromAxisAngle(axisY, reduced ? 0 : -wheelTravel / .58);
         wheel.quaternion.copy(steering).multiply(axle).multiply(spin);
       }
-      for (const [i, pivot] of wipers.entries()) pivot.rotation.x = reduced || !rain ? 0 : (Math.sin(elapsed * .006 + i * .18) * .5 + .15) * rain;
+      for (const pivot of wipers) pivot.rotation.x = reduced || !rain ? 0 : (1 - Math.cos(elapsed * .0055)) * .42 * Math.min(1, rain * 2);
     },
   };
 }

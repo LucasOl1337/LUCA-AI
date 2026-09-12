@@ -830,11 +830,14 @@ export function getSompoRuralFrame(scenarioId, elapsedMs = 0, outcomeId) {
   const derivative = duration ? 6 * progress * (1 - progress) / (duration / 1000) : 0;
   const frame = { ...from };
   for (const key of Object.keys(from)) {
-    if (typeof from[key] === 'number' && typeof to[key] === 'number') frame[key] = from[key] + (to[key] - from[key]) * blend;
+    if (key !== 'direction' && typeof from[key] === 'number' && typeof to[key] === 'number') frame[key] = from[key] + (to[key] - from[key]) * blend;
   }
+  frame.wheelSpeedKph = (from.wheelSpeedKph ?? from.speedKph)
+    + ((to.wheelSpeedKph ?? to.speedKph) - (from.wheelSpeedKph ?? from.speedKph)) * blend;
   frame.phaseLabel = from.phaseLabel;
   frame.accelerationX = (to.speedKph - from.speedKph) / 3.6 * derivative;
   frame.yawRate = (to.yaw - from.yaw) * derivative;
+  frame.animalRate = (to.animalZ - from.animalZ) * derivative;
   frame.pitchRate = (to.pitch - from.pitch) * derivative;
   frame.rollRate = (to.roll - from.roll) * derivative;
   frame.lateralAcceleration = frame.speedKph / 3.6 * frame.yawRate * Math.PI / 180;

@@ -121,7 +121,8 @@ test('gêmeo 3D gira pelo centro e permanece acima do piso até de ponta-cabeça
   assert.match(sompoSimulator, /Math\.atan2\(Math\.sin\(target - current\), Math\.cos\(target - current\)\)/);
   assert.match(sompoSimulator, /truckPoseGroup\.rotation\.z = dampAngle/);
   assert.match(sompoSimulator, /truckPoseGroup\.rotation\.x = dampAngle/);
-  assert.match(sompoSimulator, /orbit\.target\.lerp\(focusPoint/);
+  assert.match(sompoSimulator, /cameraShift\.copy\(focusPoint\)\.sub\(orbit\.target\)/);
+  assert.match(sompoSimulator, /camera\.position\.add\(cameraShift\)/);
   assert.match(sompoSimulator, /sensorGroup\.getWorldPosition\(focusPoint\)/);
   assert.doesNotMatch(sompoSimulator, /truckGroup\.rotation\.[xz] = THREE\.MathUtils\.lerp/);
 });

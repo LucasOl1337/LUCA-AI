@@ -1,48 +1,67 @@
-# Oficina local do simulador SOMPO
+# Oficina 3D SOMPO
 
-A prévia usa o **mesmo componente React e os mesmos palcos do produto**, com APIs substituídas por fixtures em memória. Não inicia Express, SQLite, WebSocket, Firebase, Mosquitto ou agentes da bancada. Nenhum dado da prévia é persistido no histórico real. Os arquivos e texturas são servidos com a CSP do produto, restringindo ainda `connect-src` a `'self'`.
+No produto: **SOMPO → Telemetria → Simulador 3D → Oficina 3D** (`/sompo/?aba=telemetria`). A oficina usa o mesmo palco e o mesmo relógio do simulador. Não exige abrir outro aplicativo.
 
-```bash
-node scripts/sompo-preview/serve.mjs
-# Abrir http://127.0.0.1:5197/
-```
+## O que é possível criar
 
-O relógio normal roda por padrão. Todos os cenários, desfechos, controles e gravação funcionam na fixture; recarregar a página apaga as amostras e os episódios. `?source=firebase` usa um snapshot físico **fictício e fixo**, para verificar somente a interface de calibração, sem conexão a equipamento.
+- Caminhão modular com pintura da cabine, cor do baú, acabamento, inspeção de malha e separação de cabine, baú, chassi e rodas. As rodas giram pelo deslocamento; as dianteiras esterçam e os limpadores acompanham a chuva.
+- Variações com nome, equipamento e luz (dia, fim de tarde, nublado), exposição e intensidade do vento. A biblioteca fica no `localStorage` deste navegador; **não é uma biblioteca compartilhada no servidor**.
+- Preset JSON importável/exportável, PNG do render atual e GLB do equipamento na pose atual. O GLB contém geometria e materiais; não contém o cenário, o shader de vegetação nem clipes de animação.
+- Caminhão reconstruído, trator e colheitadeira originais continuam acessíveis na seleção de equipamentos. Seus atlas são preservados; pintura por peças está disponível no caminhão modular.
 
-Entradas: código do checkout atual, `public/models/sompo/` e `public/environments/sompo/`. Saída: `.sompo-preview/` (bundle temporário, ignorado pelo Git). Configure `SOMPO_PREVIEW_ROOT`, `SOMPO_PREVIEW_PORT` ou `SOMPO_PREVIEW_OUTPUT` para usar outro checkout/porta/diretório. O servidor escuta exclusivamente em `127.0.0.1`, bloqueia `/api/` e métodos diferentes de GET e retorna 404 para arquivos ausentes.
+Ao sair da oficina, a montagem e a visualização de malha voltam ao modo normal; pintura e luz permanecem na sessão. **Salvar variação** também define a configuração inicial para a próxima visita. JSON aceita somente valores conhecidos, cores hexadecimais e números limitados; não aceita scripts ou URLs de assets.
 
-Para inspecionar somente os dois GLBs agrícolas, a oficina anterior continua disponível em `node scripts/sompo-agri/preview-server.mjs`. Ela aceita as mesmas três variáveis e usa a porta 5190 por padrão. Geração e empacotamento não são disparados por nenhuma das prévias. Os scripts de geração existentes e os pesos locais permanecem independentes; suas saídas devem manter UVs, manifestos externos e proveniência antes de substituir qualquer GLB.
+Pausa, reprodução a 0,5×/1×/2× e controle de instante usam um relógio compartilhado entre cena e telemetria sintética. Durante gravações, os controles de edição/replay ficam bloqueados e o episódio usa tempo real. Edição, pausa, velocidades alternativas e replay por busca não acrescentam amostras comuns ao histórico. Gravações mantêm o fluxo de episódios existente. O Firebase mantém seu modelo e calibração físicos.
 
-## Validação reproduzível
+## Aproveitamento das referências
+
+| Referência filtrada | Uso concreto |
+| --- | --- |
+| [ThreeUI Landscape](https://github.com/MengTo/threeui/blob/main/public/landscape.html) | Adaptação do mecanismo de lâminas instanciadas e vento no vertex shader em `createSompoCropRows.ts`: raízes fixas, fase espacial, flexão crescente até a ponta, variação de cor. Adaptado ao relógio do episódio, orçamento móvel e restolho após passagem. Licença MIT preservada em `public/sompo/studio/THREEUI-LICENSE.txt`. |
+| [Dream Loop](https://github.com/achimala/dream-loop) / referência de Anshu | Imagem-alvo → render real → inspeção → correções de composição e materiais. Nesta rodada, revisão feita pessoalmente, sem agente avaliador. A imagem-alvo é identificada como referência e nunca conta como evidência do simulador. |
+| [Tripo 3D Prompts](https://www.tripo3d.ai/3d-prompts) | Seleção de técnicas úteis às cenas agrícolas: luz/céu/névoa coerentes, vento controlável e reprodução. Sem importar o catálogo inteiro ou conectar um gerador pago à interface. |
+| Image generation | `pasture-albedo.webp`: textura nova de pastagem usada no terreno, 1254×1254, WebP qualidade 82. Metadados e hash em arquivo `.provenance.json`. A textura fornece cor; relevo, perspectiva, luz e sombra continuam sendo calculados em Three.js. |
+
+Os GLBs existentes e as texturas PBR/HDRI Poly Haven mantêm seus arquivos e créditos. A oficina de geração por scripts (`scripts/sompo-agri/`) continua separada da criação de variações no produto. Esta interface não promete gerar um GLB novo a partir de texto.
+
+## Estrutura e custo
+
+- `SompoStudio.tsx` e `sompoStudioConfig.ts`: interface, biblioteca e formato de preset.
+- `sompoPlayback.ts`: relógio de reprodução.
+- `refineSompoTruck.ts`: agrupamento de peças estáticas por material, pivôs de animação, acabamento e exportação.
+- `createSompoAtmosphere.ts`: céu, nuvens, sol, névoa e exposição coordenados.
+- `createSompoPastureSurface.ts`: textura de pastagem aplicada no espaço do mundo, transição de solo e variação em escala maior.
+- `createSompoCropRows.ts`: lavoura instanciada, vento na GPU e corte visual determinístico. Corte visual não é simulação de produtividade nem contato físico de lâminas.
+- Os dois módulos `*Stage.ts` continuam donos do renderer, câmera e descarte. `SompoTruckSimulator.tsx` continua dono dos dados e episódios.
+
+O caminhão modular é o padrão na simulação, dispensando baixar o GLB reconstruído para iniciar. Subpeças estáticas são agrupadas por material. Postes só reenviam matrizes quando são reciclados; árvores distantes usam impostores e árvores que ocultam o veículo são retiradas da linha de visão. O render usa um passe de cor com PBR e sombras, sem os passes adicionais de AO/bloom. Desktop: DPR máximo 1,5 e sombra 2048; móvel: DPR máximo 1 e sombra 1024. A lavoura reduz instâncias em telas compactas.
+
+## Verificação técnica
 
 ```bash
 npm run typecheck
 node --test server/sompo-*.test.js
 npm run build
+node scripts/sompo-preview/studio-check.mjs
 ```
 
-A captura automatizada usa uma instância Chrome dedicada com CDP em `127.0.0.1:9347` e a dependência Playwright já instalada. Exemplo de inicialização sem perfil pessoal:
+Os testes gráficos desta sessão abrem com a classe `sompo-studio-qa`, encaminhada silenciosamente ao workspace 7. Não abrem no monitor do jogo nem mudam a janela ativa.
 
-```bash
-google-chrome-stable --headless=new --user-data-dir=/tmp/sompo-review-chrome --remote-debugging-port=9347 --no-first-run --disable-background-networking --enable-gpu --ignore-gpu-blocklist --use-angle=gl-egl about:blank
-node scripts/sompo-preview/capture.mjs after 5197
-node scripts/sompo-preview/smoke.mjs
-```
+O último comando executa uma fixture técnica com APIs em memória e Chrome dedicado, fecha os processos ao terminar e grava renders/JSONs em `.scratch/sompo-round2/evidence`. Não é uma publicação nem faz requisições autenticadas ao produto. Requer Chrome com GPU NVIDIA no ambiente usado na rodada; `SOMPO_CHROME` altera o executável e `SOMPO_QA_OUTPUT` altera a saída.
 
-`smoke.mjs` espera a prévia final em **5198**, para distinguir do baseline em 5197. O script escreve evidências em `delivery/smoke/`. A captura aceita rótulo e porta e escreve `delivery/<rótulo>/`; `SOMPO_CAPTURE_CASES=normal,fire` limita a rodada. Encerre apenas a instância Chrome dedicada e os processos locais de prévia ao terminar.
+Para execução no workspace oculto, `offscreen=1` mantém o render ativo por um timer de 16 ms apenas na fixture: não permite concluir FPS de apresentação. A rodada nativa anterior e a rodada por timer são identificadas nos JSONs; não compare CPU entre agendadores.
 
-`?benchmark=1` ativa exclusivamente na prévia um relógio controlado: as animações avançam em passos de 1/60 s por callback até o instante solicitado e ficam nesse estado. O relógio real mede a duração do callback e o intervalo entre frames. Após aquecimento, cada caso usa 300 frames. O cache é desativado por CDP. JSON inclui renderer, viewport, DPR, tamanho do canvas, chamadas WebGL, triângulos (incluindo sombras e pós-processamento), recursos vivos, heap e Resource Timing por URL. `loadedBytes` soma os corpos codificados; `transferBytes` inclui os cabeçalhos informados pelo navegador. Não equivalem ao tamanho de todo o diretório de assets.
+A medição usa cache desligado, uma aba, GPU identificada, aquecimento e avanço de 2 a 10 segundos no relógio lógico. Cada callback medido movimenta a cena. CPU é duração do callback, não tempo de GPU; viewport móvel no PC não substitui telefone físico. Scripts anteriores que mediam frames depois de congelar o relógio não são prova de desempenho em movimento.
 
-Os números móveis são de **viewport móvel na GPU do PC**; não comprovam desempenho em telefone. A cadência de 60 Hz pode esconder margem de GPU: `cpuMs` mede CPU do callback, não tempo de GPU. Não use SwiftShader como benchmark de hardware. Screenshots são renders reais; não são imagens-alvo geradas.
+Limites: os arquivos GLB agrícolas originais não contêm rig; a articulação visual é construída na carga, conforme a revisão abaixo. Defeitos de reconstrução permanecem nos atlas e nas malhas. O cereal é estilizado. Não foram validadas colisões em todas as poses extremas. A exportação GLB não comprime a malha com Draco/Meshopt e pode ser maior que os arquivos da biblioteca original.
 
-## Responsabilidades e limites
+## Animações e articulação — revisão de 12/09/2026
 
-- `SompoTruckSimulator.tsx`: controles, snapshot, histórico, gravação e frames. O hook de captura é chamado no mesmo rAF do render dos dois palcos.
-- `createSompoRuralStage.ts` e `createSompoAgriStage.ts`: câmera, renderer, animação e descarte de cada ambiente.
-- `sompoStage.ts`: criação do renderer, orçamento por dispositivo e descarte de geometrias, materiais, texturas, instâncias e sombras.
-- `createSompoCropRows.ts`: cereal estilizado em faixas instanciadas, com disposição determinística e vento pelo tempo do episódio. Corredor central permite ler a máquina; não simula produtividade nem corte físico da cultura.
-- `createSompoEnvironmentAssets.ts`: PBR/HDRI locais, fallback e propriedade dos recursos; o palco agrícola usa HDRI apenas para iluminação e preserva seu céu.
+- A colheitadeira usa a orientação própria do seu GLB (frente original −X), diferente da frente do trator (+Y antes da transformação do nó). Ambas avançam em +X na cena.
+- `shared/sompo-motion.js` integra a rotação das rodas e do molinete pelo relógio do cenário. Rodas seguem `wheelSpeedKph`, incluindo patinagem; marcha é discreta. Pausa, seek e taxas de reprodução não acumulam rotação.
+- `rigSompoAgriAsset.ts` particiona os triângulos dos GLBs existentes em corpo, quatro rodas e implemento/plataforma. Preserva UVs e atlas. Acrescenta molinete aberto e cilindros hidráulicos articulados. Os arquivos originais continuam intactos.
+- O percurso agrícola integra velocidade e guinada. Apoio no terreno usa vértices dos envoltórios convexos das peças articuladas, com afundamento explícito para lama. É uma aproximação visual de contato; não é solver de colisão.
+- A pose sintética e a distância visual são amostradas por quadro, separadas da atualização de 250 ms do painel. O gêmeo Firebase mantém suavização das leituras físicas.
+- Poeira ganha envelhecimento por partícula, rastros respeitam a ré e o corte segue o percurso da colheitadeira. O bovino usa passada por distância, sem reinicializar patas em pausa.
 
-Em telas até 700 px ou ponteiro principal grosseiro, o orçamento inicial usa DPR máximo 1, sombra 1024 e cena rural direta sem AO/bloom. Demais dispositivos: DPR máximo 1,5, sombra 2048 e pós-processamento em meia resolução. O perfil é escolhido na montagem e permanece estável durante resize; abrir novamente a cena aplica o perfil correspondente ao novo dispositivo. A lavoura compacta reduz instâncias. Na estrada, copas a mais de 30 m da câmera permanecem na cena/sombra e são omitidas apenas do pré-passe de AO.
-
-As máquinas geradas continuam sem rig agrícola. A melhoria não valida a física, implementa corte de cultura ou articula rodas/implementos. Não há novos assets binários, serviços, integrações ou dependências. Texturas/HDRIs Poly Haven mantêm os créditos CC0 em `public/environments/sompo/LICENSE.txt`; GLBs e seus manifestos não mudaram. As referências filtradas inspiraram o método e técnicas gerais, sem incorporar código de coleções externas.
+Regressões: `node --test server/sompo-motion.test.js server/sompo-agri-assets.test.js`. Verificação de movimento no navegador: `node scripts/sompo-preview/motion-check.mjs`, que mantém seu Chrome no workspace 7 e usa APIs locais em memória. Vídeos são buffers WebGL reais amostrados a 30 quadros lógicos/s; não medem FPS de apresentação no workspace oculto.

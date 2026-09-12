@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
+import { build } from 'esbuild';
+import { getSompoAgriFrame, getSompoAgriKeyframes } from '../shared/sompo-agri-scenarios.js';
+import { integrateSompoMotion } from '../shared/sompo-motion.js';
 
 const root = new URL('../public/models/sompo/', import.meta.url);
 
@@ -61,6 +64,10 @@ test('loader agrícola recupera PBR externo e ajusta os dois modelos ao chão', 
     .replace("'../../../shared/sompo-agri-scenarios.js'", JSON.stringify(catalogUrl))
     .replace("'./restoreSompoTextures'", JSON.stringify(textureUrl));
   const { disposeSompoAgriAsset, loadSompoAgriAsset } = await import(moduleUrl(loaderSource));
+  const compiled = await build({ entryPoints: [new URL('../src/components/sompo/rigSompoAgriAsset.ts', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'esm', plugins: [{ name: 'shared-three', setup(build) {
+    build.onResolve({ filter: /^three(?:\/|$)/ }, args => ({ path: import.meta.resolve(args.path), external: true }));
+  } }] });
+  const { rigSompoAgriAsset } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].contents).toString('base64')}`);
   const saved = { document: globalThis.document, self: globalThis.self, fetch: globalThis.fetch };
   const imageRequests = [];
   globalThis.document = {
@@ -97,6 +104,14 @@ test('loader agrícola recupera PBR externo e ajusta os dois modelos ao chão', 
       assert.equal(model.name, `sompo-agri-${equipmentId}-asset`);
       assert.equal(model.userData.equipmentId, equipmentId);
       model.updateMatrixWorld(true);
+      // Landmarks inspected in the actual generated meshes: tractor hood +Y,
+      // harvester header -X, before the authored node's quarter turn around X.
+      const authored = model.getObjectByName(equipmentId === 'tractor' ? 'tractor-textured' : 'harvester-textured');
+      if (authored) {
+        const front = equipmentId === 'tractor' ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(-1, 0, 0);
+        const heading = authored.localToWorld(front).sub(authored.localToWorld(new THREE.Vector3())).normalize();
+        assert.ok(heading.x > 0.999, `${equipmentId}: front must follow +X travel, got ${heading.toArray()}`);
+      }
       const bounds = new THREE.Box3().setFromObject(model);
       assert.ok(Math.abs(bounds.min.y) < 1e-5, `${equipmentId}: ground contact`);
       assert.ok(bounds.max.x - bounds.min.x <= (equipmentId === 'tractor' ? 5.8 : 9.2) + 1e-5);
@@ -104,7 +119,39 @@ test('loader agrícola recupera PBR externo e ajusta os dois modelos ao chão', 
       model.traverse((node) => { if (node.isMesh) surfaces.push(node); });
       assert.ok(surfaces.length > 0);
       assert.ok(surfaces.every((mesh) => mesh.material.map && mesh.material.metalnessMap === mesh.material.roughnessMap));
-      disposeSompoAgriAsset(model);
+      const sourceTriangles = surfaces.reduce((sum, mesh) => sum + (mesh.geometry.index?.count ?? mesh.geometry.attributes.position.count) / 3, 0);
+      const rig = rigSompoAgriAsset(model, equipmentId);
+      assert.equal(rig.root.userData.sourceTriangles, sourceTriangles);
+      let partitionTriangles = 0;
+      rig.root.traverse(node => { if (node.isMesh && node.name.endsWith('-surface')) {
+        partitionTriangles += node.geometry.index.count / 3;
+        assert.ok(node.material.map && node.geometry.attributes.uv, 'partition preserves authored atlas and UVs');
+      } });
+      assert.equal(partitionTriangles, sourceTriangles, 'every source triangle assigned exactly once');
+      assert.equal(rig.wheels.length, 4);
+      assert.ok(rig.wheels.every(wheel => wheel.spin.children[0]?.geometry.attributes.position.count > 200));
+      const scenarioId = equipmentId === 'tractor' ? 'agri-hydraulic-failure' : 'agri-harvest-dust';
+      const frames = getSompoAgriKeyframes(scenarioId);
+      const update = t => rig.update(getSompoAgriFrame(scenarioId, t), integrateSompoMotion(frames, t) / 3.6, integrateSompoMotion(frames, t, 'headerSpeed', false) * .8, false);
+      update(4000); const wheelPose = rig.wheels[0].spin.rotation.z, implementPose = rig.implement.rotation.toArray(), reelPose = rig.rotor.rotation.z;
+      update(4500); assert.notEqual(rig.wheels[0].spin.rotation.z, wheelPose);
+      if (equipmentId === 'harvester') assert.notEqual(rig.rotor.rotation.z, reelPose);
+      else assert.notDeepEqual(rig.implement.rotation.toArray(), implementPose);
+      update(4000); assert.equal(rig.wheels[0].spin.rotation.z, wheelPose); assert.deepEqual(rig.implement.rotation.toArray(), implementPose);
+      const parent = new THREE.Group(); parent.add(rig.root);
+      for (const roll of [0, 17, 45, 88]) {
+        parent.rotation.set(roll * Math.PI / 180, .35, .04, 'YZX');
+        parent.position.y = rig.supportHeight(parent.rotation, 0, 0, () => 0);
+        parent.updateMatrixWorld(true);
+        let minimum = Infinity; const vertex = new THREE.Vector3();
+        rig.root.traverse(node => {
+          if (!node.isMesh || !node.name.endsWith('-surface')) return;
+          const p = node.geometry.attributes.position;
+          for (let i = 0; i < p.count; i++) minimum = Math.min(minimum, vertex.fromBufferAttribute(p, i).applyMatrix4(node.matrixWorld).y);
+        });
+        assert.ok(minimum >= -.00001 && minimum < .016, `${equipmentId}: contact at roll ${roll}: ${minimum}`);
+      }
+      disposeSompoAgriAsset(rig.root);
     }
     assert.ok(imageRequests.some((url) => /generated-agri-tractor-basecolor\.jpg$/.test(url)));
     assert.ok(imageRequests.some((url) => /generated-agri-harvester-metallicroughness\.png$/.test(url)));

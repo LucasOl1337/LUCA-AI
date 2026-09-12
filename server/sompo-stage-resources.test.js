@@ -23,7 +23,8 @@ test('crop layout stays deterministic, grounded and within both geometry budgets
   assert.ok(total<=120000);assert.ok(reduced<total*.65);
   const shader={uniforms:{},vertexShader:'#include <begin_vertex>',fragmentShader:'#include <color_fragment>'};full.root.children[0].material.onBeforeCompile(shader);
   full.update(3000,new THREE.Vector3(),false,.4,new THREE.Vector3(6,0,1),1);
-  assert.deepEqual(shader.uniforms.cropCut.value.toArray(),[9,1,1]);
+  assert.ok(Math.abs(shader.uniforms.cropCut.value.x - 10.28) < 1e-8, 'cut begins at the measured cutter bar, ahead of the wheels');
+  assert.deepEqual(shader.uniforms.cropCut.value.toArray().slice(1),[1,1]);
   assert.equal(shader.uniforms.cropWind.value,.4);
   const before=full.root.children[0].instanceMatrix.array.slice();
   full.update(9000,new THREE.Vector3(),false);assert.equal(shader.uniforms.cropTime.value,9);

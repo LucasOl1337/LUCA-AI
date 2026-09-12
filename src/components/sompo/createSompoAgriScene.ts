@@ -15,11 +15,16 @@ export const SOMPO_AGRI_ENVIRONMENTS = Object.freeze({
 export type SompoAgriEnvironmentId = keyof typeof SOMPO_AGRI_ENVIRONMENTS;
 
 function terrainHeight(x: number, z: number, slope: number) {
-  return (z * slope) + (Math.sin(x * 0.075) * 0.18) + (Math.cos(z * 0.11) * 0.1);
+  const base = (z * slope) + (Math.sin(x * 0.075) * 0.18) + (Math.cos(z * 0.11) * 0.1);
+  // Anel de morros: o talhão termina num relevo de borda, não num corte reto.
+  const rim = Math.max(Math.abs(x) / 150, Math.abs(z) / 110);
+  const rise = Math.max(0, rim - 0.55) ** 2 * 30;
+  const roll = Math.sin(x * 0.031 + 1.7) * Math.cos(z * 0.043 + 0.6);
+  return base + rise * (0.72 + roll * 0.28);
 }
 
 function createTerrain(environment: (typeof SOMPO_AGRI_ENVIRONMENTS)[SompoAgriEnvironmentId]) {
-  const geometry = new THREE.PlaneGeometry(180, 120, 90, 60);
+  const geometry = new THREE.PlaneGeometry(300, 220, 150, 110);
   geometry.rotateX(-Math.PI / 2);
   const positions = geometry.attributes.position;
   for (let index = 0; index < positions.count; index += 1) {
@@ -84,6 +89,7 @@ function createDust() {
   const count = 160;
   const geometry = new THREE.BufferGeometry();
   const positions = new Float32Array(count * 3);
+  const alpha = new THREE.BufferAttribute(new Float32Array(count), 1);
   for (let index = 0; index < count; index += 1) {
     const angle = index * 2.399963;
     const radius = 0.35 + ((index % 23) / 23) * 4.6;
@@ -92,19 +98,25 @@ function createDust() {
     positions[(index * 3) + 2] = Math.sin(angle) * radius * 0.55;
   }
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('particleAlpha', alpha);
   const material = new THREE.PointsMaterial({ color: 0xc6ad80, size: 0.75, map: dustMap(), transparent: true, opacity: 0, depthWrite: false });
+  material.onBeforeCompile = shader => {
+    shader.vertexShader = 'attribute float particleAlpha; varying float dustAlpha;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\ndustAlpha=particleAlpha;');
+    shader.fragmentShader = 'varying float dustAlpha;\n' + shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.a *= dustAlpha;');
+  };
   const dust = new THREE.Points(geometry, material);
+  dust.frustumCulled = false;
   dust.name = 'sompo-agri-dust';
   return dust;
 }
 
-export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAgriEnvironmentId, compact = false) {
+export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAgriEnvironmentId, compact = false, equipmentId: 'tractor' | 'harvester' = 'harvester') {
   const definition = SOMPO_AGRI_ENVIRONMENTS[environmentId] || SOMPO_AGRI_ENVIRONMENTS['row-crop-field'];
   const root = new THREE.Group();
   root.name = `sompo-agri-environment-${environmentId}`;
   const terrain = createTerrain(definition);
   root.add(terrain);
-  const crops = definition.barn ? null : createSompoCropRows((x,z)=>terrainHeight(x,z,definition.slope), compact);
+  const crops = definition.barn ? null : createSompoCropRows((x,z)=>terrainHeight(x,z,definition.slope), compact, equipmentId === 'tractor' ? .32 : 1);
   if (crops) root.add(crops.root);
   if (definition.barn) root.add(createBarn());
 
@@ -132,23 +144,37 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
   const sun = new THREE.DirectionalLight(definition.night ? 0x91b4dd : 0xfff1cf, definition.night ? 0.6 : 2.1);
   sun.position.set(-24, 34, 18);
   sun.castShadow = true;
-  root.add(ambient, sun);
+  root.add(ambient, sun, sun.target);
   parent.add(root);
 
   return {
     root, terrain, mud, sun, placeMud,
+    setHarvestPath(points: readonly { x: number; z: number }[]) { crops?.setHarvestPath(points); },
     groundHeight(x: number, z: number) {
       return terrainHeight(x, z, definition.slope);
     },
-    update(frame: SompoAgriVisualFrame, machinePosition = new THREE.Vector3(), cameraPosition = new THREE.Vector3(), reducedMotion = false, wind = 0.65) {
-      crops?.update(frame.atMs, cameraPosition, reducedMotion, wind, machinePosition, frame.equipmentId === 'harvester' ? frame.cropCut : 0);
+    update(frame: SompoAgriVisualFrame, machinePosition = new THREE.Vector3(), cameraPosition = new THREE.Vector3(), reducedMotion = false, wind = 0.65, elapsedMs = frame.atMs) {
+      crops?.update(elapsedMs, cameraPosition, reducedMotion, wind, machinePosition, frame.equipmentId === 'harvester' ? frame.cropCut : 0);
       dust.position.copy(machinePosition);
       dust.rotation.y = THREE.MathUtils.degToRad(frame.yaw);
       const material = dust.material as THREE.PointsMaterial;
       material.opacity = Math.min(0.32, Math.max(0, frame.dust) * 0.28);
       dust.visible = material.opacity > 0.01;
 
-      dust.scale.setScalar(0.8 + (frame.dust * 0.65));
+      if (reducedMotion) dust.visible = false;
+      if (dust.visible && !reducedMotion) {
+        const p = dust.geometry.attributes.position, alpha = dust.geometry.attributes.particleAlpha;
+        for (let i = 0; i < p.count; i++) {
+          const life = 1.4 + (i % 7) * .18;
+          const age = ((elapsedMs / 1000) + i * .137) % life;
+          const progress = age / life;
+          p.setXYZ(i, -frame.direction * (.8 + age * (.65 + frame.speedKph / 3.6)),
+            .12 + age * (.18 + (i % 5) * .045),
+            Math.sin(i * 2.399963) * (.5 + age * .5) + age * wind * .25);
+          alpha.setX(i, Math.sin(Math.PI * progress) * (.3 + (i % 3) * .2));
+        }
+        p.needsUpdate = alpha.needsUpdate = true;
+      }
 
     },
     dispose() {
