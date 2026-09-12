@@ -2,8 +2,8 @@
 // Puro desenho: polígonos, faixas e percurso vêm de shared/*; a mesma grade de 2 m que pinta o chão da cena 3D pinta aqui.
 // Por cima, só a máquina no instante atual e o trecho já percorrido.
 import { useEffect, useMemo, useRef } from 'react';
-import { getSompoAgriFrame, getSompoAgriScenario, SOMPO_AGRI_EQUIPMENT } from '../../../shared/sompo-agri-scenarios.js';
-import { getSompoAgriStartX, getSompoAgriTravelMeters } from '../../../shared/sompo-agri-brief.js';
+import { getSompoAgriScenario, SOMPO_AGRI_EQUIPMENT } from '../../../shared/sompo-agri-scenarios.js';
+import { getSompoAgriPosition } from '../../../shared/sompo-agri-brief.js';
 import { getSompoGeofenceSite } from '../../../shared/sompo-geofence-sites.js';
 import { bandGrid, resolveHazards, type LabGeofenceRules } from '../../../shared/lab-geofence.js';
 import type { LabPolygon } from '../../../shared/lab-telemetry.js';
@@ -25,9 +25,7 @@ interface StaticMap {
 
 function buildStaticMap(scenarioId: string, outcomeId: string): StaticMap | null {
   const scenario = getSompoAgriScenario(scenarioId);
-  const totalTravel = getSompoAgriTravelMeters(scenarioId, scenario.totalMs, outcomeId);
-  const startX = getSompoAgriStartX(scenarioId, outcomeId);
-  const site = getSompoGeofenceSite(scenario.environmentId, totalTravel);
+  const site = getSompoGeofenceSite(scenario.environmentId, Math.abs(2 * getSompoAgriPosition(scenarioId, 0, outcomeId).x));
   if (!site) return null;
   const polygons = site.polygons as LabPolygon[];
   const rules = site.manifestRules as unknown as LabGeofenceRules;
@@ -36,7 +34,8 @@ function buildStaticMap(scenarioId: string, outcomeId: string): StaticMap | null
 
   const path: StaticMap['path'] = [];
   for (let t = 0; t <= scenario.totalMs; t += STEP_MS) {
-    path.push({ t, x: startX + getSompoAgriTravelMeters(scenarioId, t, outcomeId), z: getSompoAgriFrame(scenarioId, t, outcomeId).lateral });
+    const point = getSompoAgriPosition(scenarioId, t, outcomeId);
+    path.push({ t, x: point.x, z: point.z });
   }
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (const polygon of polygons) for (const ring of polygon.rings) for (const point of ring) {

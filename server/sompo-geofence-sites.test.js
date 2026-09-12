@@ -70,7 +70,7 @@ test('segue até a faixa crítica: mesma corrida, deriva para o córrego e termi
   assert.equal(run.at(-1), 'water:critica');
   const last = samples('segue-ate-critica').at(-1);
   assert.ok(last.geofence.nearest.distanceM < 5 && last.geofence.nearest.distanceM > 0);
-  assert.match(describeGeofence(last.geofence), /^Proximidade crítica · Córrego sintético a \d+ m à (direita|frente)/);
+  assert.match(describeGeofence(last.geofence), /^Proximidade crítica · Córrego sintético a \d+ m à (direita|frente|esquerda)/);
 });
 
 test('declive além do limite: só este desfecho cruza o limite da colheitadeira (15°) e para dentro do declive', () => {

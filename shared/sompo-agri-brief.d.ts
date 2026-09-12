@@ -9,6 +9,7 @@ export type SompoAgriSimulationSnapshot = SompoTelemetrySnapshot & {
   risks: SompoTelemetrySnapshot['risks'] & { proximity: boolean };
 };
 export function getSompoAgriStartX(scenarioId: string, outcomeId?: string): number;
+export function getSompoAgriPosition(scenarioId: string, elapsedMs?: number, outcomeId?: string): { x: number; z: number; headingDeg: number };
 export function describeGeofence(result: SompoGeofenceResult | null | undefined): string;
 export function describeMachineLimit(hit: SompoMachineHit | null | undefined): string;
 

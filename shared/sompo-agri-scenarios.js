@@ -352,10 +352,10 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
         [23_000, { speedKph: 0, headerSpeed: 0.3, brakeLights: 1, dust: 0.2 }],
         [24_000, { speedKph: 0, headerSpeed: 0, dust: 0 }],
       ]),
-      outcome('segue-ate-critica', 'Segue até a faixa crítica', 'A máquina deriva para o lado do córrego e chega à faixa crítica sem reduzir.', [
+      outcome('segue-ate-critica', 'Segue até a faixa crítica', 'A máquina vira para o lado do córrego e chega à faixa crítica sem reduzir.', [
         [0, { headerSpeed: 1, cropCut: 0.3, dust: 0.35 }],
-        [14_000, { cropCut: 0.7, dust: 0.6, lateral: 0 }],
-        [24_000, { lateral: 10, yaw: -12, dust: 0.7 }],
+        [14_000, { cropCut: 0.7, dust: 0.6, yaw: 0 }],
+        [24_000, { yaw: -70, dust: 0.7 }],
       ]),
       outcome('declive-alem-do-limite', 'Declive além do limite da máquina', 'Dentro do declive mapeado a inclinação passa do limite declarado para a colheitadeira e a máquina para.', [
         [0, { headerSpeed: 1, cropCut: 0.3, dust: 0.35 }],

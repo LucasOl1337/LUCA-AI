@@ -11,6 +11,7 @@ import {
   getSompoAgriScenario,
 } from './sompo-agri-scenarios.js';
 import { createSompoSimulationSnapshot, sompoEpisodeFrameMoments } from './sompo-telemetry-simulator.js';
+import { createSompoMotionPath } from './sompo-motion.js';
 import { evaluateGeofence } from './sompo-geofence.js';
 import { getSompoGeofenceSite } from './sompo-geofence-sites.js';
 export { describeGeofence, describeMachineLimit } from './sompo-geofence.js';
@@ -91,6 +92,27 @@ export function getSompoAgriStartX(scenarioId, outcomeId) {
   return -getSompoAgriTravelMeters(scenarioId, getSompoAgriScenario(scenarioId).totalMs, outcomeId) / 2;
 }
 
+// Mesma posição que o palco 3D (createSompoAgriStage): rumo integrado por createSompoMotionPath, e o
+// deslocamento lateral explícito só no tombamento do trator, como lá. Tabela de 60 Hz construída uma vez por desfecho.
+const motionPaths = new Map();
+function motionPath(scenarioId, outcomeId) {
+  const scenario = getSompoAgriScenario(scenarioId);
+  const outcome = resolveOutcome(scenario, outcomeId);
+  const key = `${scenario.scenarioId}:${outcome.id}`;
+  if (!motionPaths.has(key)) motionPaths.set(key, createSompoMotionPath(at => getSompoAgriFrame(scenario.scenarioId, at, outcome.id), scenario.totalMs));
+  return motionPaths.get(key);
+}
+/** Posição da máquina em metros de cena no instante: x leste, z sul, rumo 0 = norte / 90 = leste. Igual à cena 3D. */
+export function getSompoAgriPosition(scenarioId, elapsedMs = 0, outcomeId) {
+  const scenario = getSompoAgriScenario(scenarioId);
+  const outcome = resolveOutcome(scenario, outcomeId);
+  const path = motionPath(scenario.scenarioId, outcome.id);
+  const total = path.sample(scenario.totalMs, { x: 0, z: 0 });
+  const point = path.sample(elapsedMs, { x: 0, z: 0 });
+  const frame = getSompoAgriFrame(scenario.scenarioId, elapsedMs, outcome.id);
+  return { x: -total.x / 2 + point.x, z: point.z + (outcome.id === 'side-rollover' ? frame.lateral : 0), headingDeg: 90 - frame.yaw };
+}
+
 /** Snapshot agrícola com proveniência, posição de cena e radar sintético. */
 export function createSompoAgriSimulationSnapshot(scenarioId, outcomeId, {
   observedAt = new Date().toISOString(),
@@ -116,14 +138,9 @@ export function createSompoAgriSimulationSnapshot(scenarioId, outcomeId, {
       outcomeLabel: frame.outcomeLabel,
     },
   });
-  const startX = getSompoAgriStartX(scenarioId, outcomeId);
-  const position = {
-    x: startX + getSompoAgriTravelMeters(scenarioId, elapsedMs, outcomeId),
-    z: frame.lateral,
-    headingDeg: 90 - frame.yaw,
-  };
   const scenario = getSompoAgriScenario(scenarioId);
-  const site = getSompoGeofenceSite(scenario.environmentId, -2 * startX);
+  const position = getSompoAgriPosition(scenarioId, elapsedMs, outcomeId);
+  const site = getSompoGeofenceSite(scenario.environmentId, Math.abs(2 * getSompoAgriPosition(scenarioId, 0, outcomeId).x));
   // Só o cenário de geofencing tem talhão; nos demais o snapshot leva position e geofence = null (campos só adicionados).
   const geofence = site ? evaluateGeofence({ ...position, speedKph: frame.speedKph, rollDeg: frame.roll }, site.manifestRules, site.polygons, SOMPO_AGRI_EQUIPMENT[scenario.equipmentId]) : null;
   return { ...snapshot, position, geofence, risks: { ...snapshot.risks, proximity: !!geofence?.nearest } };
