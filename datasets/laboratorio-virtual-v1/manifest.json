@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "synthetic": true,
+  "machine": {
+    "id": "TRATOR-DEMO-001",
+    "model": "Trator genérico diesel 90 kW, sem marca",
+    "implement": "Grade de arrasto sem PTO"
+  },
+  "duration_s": 600,
+  "export_rate_hz": 10,
+  "coordinate_reference": "WGS84 / GeoJSON longitude,latitude",
+  "local_origin": [
+    -47.65,
+    -22.7
+  ],
+  "map_warning": "Origem geográfica apenas para ancoragem. Campo, água e trajetórias são fictícios; não representam a propriedade ou água reais nessa coordenada. Sem imagem de satélite fornecida.",
+  "rules": {
+    "water_warning_distance_m": 20,
+    "coolant_warning_c": 105,
+    "purpose": "Limites didáticos, não limites homologados do fabricante; distância horizontal ao polígono de água; fence inclui borda."
+  },
+  "resampling": "GNSS/INS 10Hz; ECU e ambiente 1Hz mantidos até próxima aquisição (zero-order hold). Exportação a 10Hz não significa sensor ambiente a 10Hz.",
+  "causal_labels": "Nenhuma causa mecânica ou culpa de operador é fornecida como verdade. Eventos esperados são separados da telemetria.",
+  "files": [
+    {
+      "file": "01-operacao-normal.csv",
+      "samples": 6001,
+      "sha256": "1d05022c66bf7e4757a0c5591e986c65b7e7362acbfbccd8f06c31fa567c0299"
+    },
+    {
+      "file": "02-cerca-e-agua.csv",
+      "samples": 6001,
+      "sha256": "858f06ab208dfc9272f1b7c4309de79740a17aab790ca2b9b81e894f637afcd5"
+    },
+    {
+      "file": "03-aquecimento-e-falha-gps.csv",
+      "samples": 6001,
+      "sha256": "eb3b55d00ad80cb96cc43425d9a0c369b82af9990785003bb268c3316840c36a"
+    }
+  ]
+}

@@ -104,6 +104,8 @@ export function sompoEpisodeFrameMoments(
   max?: number,
 ): SompoEpisodeFrameMoment[];
 
+export function sompoEpisodeSampleOffsets(lastMs: number, elapsedMs: number, intervalMs: number, totalMs: number): number[];
+
 export function getSompoEpisodePlan(scenarioId: string, outcomeId?: string | null): SompoEpisodePlan | null;
 
 export interface SompoScenarioRunBriefPhase {

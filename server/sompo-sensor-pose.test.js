@@ -7,6 +7,7 @@ import {
   sensorReadingToPose,
 } from '../src/components/sompo/sensorPose.js';
 
+const ruralStageSource = readFileSync(new URL('../src/components/sompo/createSompoRuralStage.ts', import.meta.url), 'utf8');
 const simulatorSource = readFileSync(new URL('../src/components/SompoTruckSimulator.tsx', import.meta.url), 'utf8');
 
 test('identidade aplica arfagem em Z e rolagem em X na ordem YZX', () => {
@@ -84,7 +85,7 @@ test('rumo de uma curva real fica onde parou em vez de voltar sozinho para zero'
 
 test('gemeo Firebase oferece recentrar guinada, que zera o rumo integrado', () => {
   assert.match(simulatorSource, /Recentrar guinada/);
-  assert.match(simulatorSource, /recenterHeading\(\)\s*\{\s*liveHeading = 0;/);
+  assert.match(ruralStageSource, /recenterHeading\(\)\s*\{\s*liveHeading = 0;/);
   assert.match(simulatorSource, /onRecenterHeading=\{\(\) => sceneApiRef\.current\?\.recenterHeading\(\)\}/);
 });
 
@@ -94,6 +95,6 @@ test('gemeo Firebase expoe calibracao persistente, reset e referencia da frente'
   assert.match(simulatorSource, /Trocar arfagem ↔ rolagem/);
   assert.match(simulatorSource, /localStorage\.setItem\(SOMPO_AXIS_CALIBRATION_STORAGE_KEY/);
   assert.match(simulatorSource, /Voltar ao padrão/);
-  assert.match(simulatorSource, /truckPoseGroup\.rotation\.order = isFirebase \? SOMPO_EULER_ORDER : 'XYZ'/);
-  assert.match(simulatorSource, /frente-caminhao-mais-x/);
+  assert.match(ruralStageSource, /truckPoseGroup\.rotation\.order = isFirebase \? SOMPO_EULER_ORDER : 'XYZ'/);
+  assert.match(ruralStageSource, /frente-caminhao-mais-x/);
 });

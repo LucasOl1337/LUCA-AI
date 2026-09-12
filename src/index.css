@@ -2269,6 +2269,10 @@ a.luca-ai-attachment:focus-visible {
 .luca-account-summary svg { width: 14px; height: 14px; }
 
 .admin-page { height: 100%; overflow-y: auto; padding: 30px; color: var(--l-text); }
+.admin-tabs { display: flex; gap: 6px; margin: 0 0 22px; padding: 4px; border: 1px solid var(--l-border); border-radius: 12px; background: rgba(17,22,30,.6); width: fit-content; }
+.admin-tab { min-height: 36px; padding: 0 16px; border-radius: 8px; color: var(--l-text-mute); font-size: 12px; font-weight: 650; }
+.admin-tab:hover { color: var(--l-text-soft); }
+.admin-tab.active { background: var(--l-surface); color: var(--l-text); box-shadow: var(--l-shadow-card); }
 .admin-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .admin-heading span { color: var(--l-gold-bright); font-size: 9px; font-weight: 750; letter-spacing: .18em; }
 .admin-heading h1 { margin: 7px 0 5px; font-size: 30px; letter-spacing: -.035em; }

@@ -1,6 +1,6 @@
 # LUCA-AI
 
-Painel para criar, acompanhar e revisar missoes executadas por agentes de IA.
+Painel para criar, acompanhar e revisar missoes executadas por agentes de IA. Inclui o modulo SOMPO (`/sompo`, telemetria e gêmeo digital do ESP32) e o Laboratorio Virtual (`/laboratorio`, replay e investigacao de incidentes a partir de arquivos CSV/JSON de telemetria, com cena 3D e relatorio). Veja [`docs/laboratorio-fazendas.md`](docs/laboratorio-fazendas.md) para os limites da reconstrucao geografica.
 
 **Status:** producao real na VM `sennin-kvm` (Hostinger); `sennin-azure` e shadow e nao aparece na borda. Interface React + runtime Express. Dominio publico `https://luca-ai.com.br` via proxy de borda (`deploy/luca-ai-vm-proxy.js`) e Cloudflare Tunnel. `worker/` e legado e nao faz parte da producao.
 

@@ -1,4 +1,4 @@
-export type AppPageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'admin';
+export type AppPageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'laboratorio' | 'admin';
 export type AppLocationKind = 'app' | 'auth' | 'leitura';
 
 export interface AppLocation {
@@ -29,6 +29,7 @@ export const SOMPO_ABA: 'casos';
 export const SOMPO_TELEMETRY_ABA: 'telemetria';
 export function getSompoView(location: Partial<AppLocation>): 'welcome' | 'cases' | 'telemetry';
 export const LUCA_ABA: 'atividade';
+export const ADMIN_ABAS: readonly string[];
 export const CONFIG_TIPO: readonly string[];
 export const ORDEM_PARAM: Record<string, string>;
 export const ORDEM_API: Record<string, string>;

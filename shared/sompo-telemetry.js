@@ -1,6 +1,15 @@
 export const SOMPO_TELEMETRY_PATH = '/trator/001/sensores';
 export const SOMPO_MISSION_DOSSIER_DELIMITER = '--- DOSSIÊ TÉCNICO ---';
 
+export function currentSompoTelemetry(snapshot, nowMs = Date.now()) {
+  if (!snapshot || snapshot.source?.kind === 'simulation') return snapshot;
+  const changedMs = Date.parse(snapshot.changedAt);
+  if (!Number.isFinite(changedMs) || nowMs - changedMs >= 15_000) {
+    return { ...snapshot, freshness: 'stale', unchangedForMs: Number.isFinite(changedMs) ? Math.max(0, nowMs - changedMs) : 0 };
+  }
+  return snapshot;
+}
+
 const READING_KEYS = [
   'distancia',
   'temperatura',
@@ -16,12 +25,15 @@ const READING_KEYS = [
 ];
 
 function finiteNumber(value) {
+  if (value === null || value === undefined || typeof value === 'boolean' || (typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') return null;
   const number = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(number) ? number : null;
 }
 
 function sensorFlag(value) {
-  return value === true || value === 1 || String(value).toLowerCase() === 'true';
+  if (value === true || value === 1 || value === 'true') return true;
+  if (value === false || value === 0 || value === 'false') return false;
+  return null;
 }
 
 function vector(x, y, z) {
@@ -72,7 +84,7 @@ export function normalizeSompoTelemetry(raw, { observedAt = new Date().toISOStri
       retryAttempt: 0,
     },
     deviceTimestamp: finiteNumber(raw.timestamp),
-    status: collision || inclination ? 'alert' : 'normal',
+    status: collision || inclination ? 'alert' : collision === null || inclination === null ? 'unknown' : 'normal',
     risks: {
       collision,
       inclination,
@@ -134,6 +146,7 @@ const EMPTY_TIMELINE = 'Linha do tempo: sem histórico persistido nesta janela �
 const ASK_LINE = 'Avaliem a condição operacional, priorizem risco e recomendem próximas ações de campo.';
 
 function formatPtNumber(value) {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
   const number = Number(value);
   if (!Number.isFinite(number)) return null;
   const rounded = Math.round(number * 100) / 100;
@@ -148,7 +161,7 @@ function humanRiskLine(risks = {}) {
   if (collision && inclination) return 'ALERTA: risco de colisão e inclinação detectados';
   if (collision) return 'ALERTA: risco de colisão detectado';
   if (inclination) return 'ALERTA: risco de inclinação detectado';
-  return 'Sem flags de risco ativas';
+  return risks.collision == null || risks.inclination == null ? 'Flags de risco incompletas; condição não confirmada' : 'Sem flags de risco ativas';
 }
 
 function humanWhatLine(snapshot, simulation) {
@@ -366,7 +379,7 @@ function episodePhaseLines(summary) {
   const lines = ['Fases detectadas (heurística determinística sobre as amostras; "pico" = amostra de maior |aceleração|, não necessariamente uma batida):'];
   for (const phase of phases) {
     lines.push(
-      `- ${phase.label}: ${formatOffsetSeconds(phase.startOffsetMs)} → ${formatOffsetSeconds(phase.endOffsetMs)} · ${phase.sampleCount} amostra${phase.sampleCount === 1 ? '' : 's'} · ${formatStat('dist', phase.stats?.distancia)} | ${formatStat('acc', phase.stats?.accMagnitude)} | ${formatStat('pitch', phase.stats?.pitch)} | ${formatStat('roll', phase.stats?.roll)} · riscoColisao=${Boolean(phase.riscoColisao)}`,
+      `- ${phase.label}: ${formatOffsetSeconds(phase.startOffsetMs)} → ${formatOffsetSeconds(phase.endOffsetMs)} · ${phase.sampleCount} amostra${phase.sampleCount === 1 ? '' : 's'} · ${formatStat('dist', phase.stats?.distancia)} | ${formatStat('acc', phase.stats?.accMagnitude)} | ${formatStat('pitch', phase.stats?.pitch)} | ${formatStat('roll', phase.stats?.roll)} · riscoColisao=${reading(phase.riscoColisao)}`,
     );
   }
   const impact = summary?.impact;
@@ -412,7 +425,7 @@ function episodeVisualEvidenceLines(frames) {
 export const SOMPO_EPISODE_VISUAL_DATA_MARKER = '[SERIE-DO-EPISODIO-PARA-A-PECA-VISUAL]';
 
 function sampleAccMagnitude(sample) {
-  const values = [sample?.accX, sample?.accY, sample?.accZ].map(Number);
+  const values = [sample?.accX, sample?.accY, sample?.accZ].map(finiteNumber);
   if (!values.every((value) => Number.isFinite(value))) return null;
   return Math.round(Math.sqrt((values[0] ** 2) + (values[1] ** 2) + (values[2] ** 2)) * 100) / 100;
 }
@@ -443,6 +456,7 @@ function episodeAlertFindingLine(summary) {
     return 'Achado do alerta: a flag riscoColisao já estava ativa desde o início da gravação — não há instante de disparo para comparar com o pico.';
   }
   const flagMs = episodeFlagOffsetMs(summary);
+  if (flagMs === null && summary?.unknownCollisionCount > 0) return 'Achado do alerta: flags de colisão ausentes em parte do episódio; não é possível confirmar se houve disparo.';
   if (flagMs === null) {
     return `Achado do alerta: a flag riscoColisao NUNCA disparou neste episódio, mesmo com o pico de aceleração em ${formatOffsetSeconds(impact.offsetMs)}.`;
   }
@@ -467,7 +481,7 @@ export function buildSompoEpisodeVisualData(summary) {
   if (!Number.isFinite(originMs)) return null;
   const serie = keySamples.map((sample) => [
     Math.max(0, Math.round(Number(sample.observedMs) - originMs)),
-    Number.isFinite(Number(sample.distancia)) ? Math.round(Number(sample.distancia) * 10) / 10 : null,
+    finiteNumber(sample.distancia) !== null ? Math.round(Number(sample.distancia) * 10) / 10 : null,
     sampleAccMagnitude(sample),
   ]);
   const impact = summary?.impact;
@@ -478,6 +492,7 @@ export function buildSompoEpisodeVisualData(summary) {
     impactoMs: impact && Number.isFinite(Number(impact.offsetMs)) ? Math.round(Number(impact.offsetMs)) : null,
     picoAccMs2: impact && Number.isFinite(Number(impact.accMagnitude)) ? Number(impact.accMagnitude) : null,
     flagMs: flagMs === null ? null : Math.round(flagMs),
+    flagsIncompletas: (summary?.unknownCollisionCount || 0) > 0,
     flagDesdeInicio: Boolean(summary?.first?.riscoColisao),
     serie,
   };
@@ -589,6 +604,7 @@ export function buildSompoEpisodeMission(episode, samples, summary, teamLabel, f
     'Objetivo: avaliar o EVENTO em sua totalidade — dinâmica, sequência causal e severidade do episódio inteiro, não leituras isoladas — e recomendar a resposta operacional adequada.',
     '',
     'Regras: este é um ensaio sintético de roteiro gravado no simulador — o desfecho selecionado decide o que acontece no evento. Analisem o episódio completo (preparação, evento e pós-evento) como sequência causal; não tratem amostras isoladas nem flags como evidência do equipamento físico, do firmware ou de sinistro real. Separem fatos do cenário, inferências e lacunas; validem qualquer conclusão em telemetria real antes de uma decisão operacional.',
+    'Cobertura pendente: nenhuma apólice foi fornecida neste fluxo. Não concluir cobertura, exclusão, indenização ou sinistro evitado.',
     ...episodeVisualContractLines(visualData),
   ].join('\n');
 
@@ -647,8 +663,8 @@ export function buildSompoTelemetryMission(snapshot, teamLabel, history, scenari
     timestampLine,
     '',
     alertHeading,
-    `- riscoColisao=${Boolean(risks.collision)}`,
-    `- riscoInclinacao=${Boolean(risks.inclination)}`,
+    `- riscoColisao=${reading(risks.collision)}`,
+    `- riscoInclinacao=${reading(risks.inclination)}`,
     '',
     'Leituras do snapshot:',
     `- distancia=${reading(readings.distance)}`,
@@ -661,6 +677,7 @@ export function buildSompoTelemetryMission(snapshot, teamLabel, history, scenari
     '',
     ...buildTimelineLines(history),
     '',
+    'Cobertura pendente: nenhuma apólice foi fornecida neste fluxo. Não concluir cobertura, exclusão ou indenização. Separar fatos, hipóteses, evidências, lacunas e ações por responsável.',
     objective,
     '',
     rules,

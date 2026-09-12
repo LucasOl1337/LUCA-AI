@@ -924,6 +924,17 @@ export function sompoEpisodeFrameMoments(points, totalMs, finalPhase, max = SOMP
   ];
 }
 
+// Amostragem determinística de episódio: quando o timer do navegador atrasa,
+// recupera todos os pontos programados cruzados em vez de perder amostras.
+export function sompoEpisodeSampleOffsets(lastMs, elapsedMs, intervalMs, totalMs) {
+  const offsets = [];
+  const end = Math.min(totalMs, elapsedMs);
+  for (let offset = Number.isFinite(lastMs) ? lastMs + intervalMs : 0; offset <= end; offset += intervalMs) {
+    offsets.push(offset);
+  }
+  return offsets;
+}
+
 /**
  * Plano de episódio para um desfecho do catálogo convencional (rural).
  * Retorna null para desfechos manuais — sem roteiro não há episódio.

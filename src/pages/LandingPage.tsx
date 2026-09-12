@@ -9,6 +9,7 @@ import {
   UsersRound,
 } from 'lucide-react';
 import { useLuca } from '@/hooks/useLucaState';
+import { useAuth } from '@/hooks/useAuth';
 import { useDeferredFlag } from '@/hooks/useDeferredFlag';
 import { useAppLocation } from '@/hooks/useAppLocation';
 import type { PageId } from '@/components/Layout';
@@ -67,6 +68,7 @@ function ModeArtwork({ mode }: { mode: HomeEntryMode }) {
 
 export default function LandingPage({ onNavigate }: LandingPageProps) {
   const reduceMotion = useReducedMotion();
+  const { user } = useAuth();
   const { navigate } = useAppLocation();
   const {
     backendReady,
@@ -178,9 +180,11 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
               <h2>Personas especializadas. Uma entrega só.</h2>
               <p>Você escolhe quem pensa. O LUCA organiza como cada persona participa.</p>
             </div>
-            <button type="button" data-landing-cta="personas" onClick={() => onNavigate('personas')}>
-              Ver catálogo de personas <ArrowRight aria-hidden="true" />
-            </button>
+            {user?.role === 'admin' && (
+              <button type="button" data-landing-cta="personas" onClick={() => onNavigate('personas')}>
+                Ver catálogo de personas <ArrowRight aria-hidden="true" />
+              </button>
+            )}
           </div>
           <div className="home-a-agent-grid">
             <AgentPortrait agent={AGENTS[0]} className="home-a-agent-lead" />

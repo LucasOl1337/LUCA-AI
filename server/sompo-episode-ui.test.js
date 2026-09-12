@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const simulator = readFileSync(join(root, '../src/components/SompoTruckSimulator.tsx'), 'utf8');
+const ruralStage = readFileSync(join(root, '../src/components/sompo/createSompoRuralStage.ts'), 'utf8');
 const page = readFileSync(join(root, '../src/pages/SompoPage.tsx'), 'utf8');
 
 test('simulador grava o episódio do cenário selecionado, com sucesso e erro visíveis', () => {
@@ -45,8 +46,8 @@ test('falha de rede no episódio aborta com aviso e mantém o simulador vivo', (
 
 test('simulador captura frames nos momentos do plano e sobe 1 por request sem derrubar o episódio', () => {
   assert.match(simulator, /run\.plan\.frameMoments/);
-  assert.match(simulator, /postProcessing\.render\(delta\);\s*\n\s*\/\/ Captura síncrona no mesmo rAF do render/);
-  assert.match(simulator, /captureDueEpisodeFrames\(renderer\.domElement\)/);
+  assert.match(ruralStage, /postProcessing\.render\(delta\);\s*\n\s*\/\/ Captura síncrona no mesmo rAF do render/);
+  assert.match(ruralStage, /onAfterRender\(renderer\.domElement\)/);
   assert.match(simulator, /onAfterRender: captureDueEpisodeFrames/);
   assert.match(simulator, /toDataURL\('image\/jpeg', EPISODE_FRAME_JPEG_QUALITY\)/);
   assert.match(simulator, /EPISODE_FRAME_LATE_TOLERANCE_MS/);

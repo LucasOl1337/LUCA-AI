@@ -71,6 +71,7 @@ import {
   type LucaTeamPreset,
 } from '@/lib/lucaPresets';
 import { useChatLibrary } from '@/hooks/useChatLibrary';
+import { useAuth } from '@/hooks/useAuth';
 import { useAppLocation } from '@/hooks/useAppLocation';
 import { useTheme } from '@/hooks/useTheme';
 import { LUCA_ABA } from '../../shared/app-location.js';
@@ -611,6 +612,10 @@ function plannedRuntimeEvents(traceId: string, mission: string, assignments: Wor
 
 export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const { runtimeMode, refresh } = useLuca();
+  const { user } = useAuth();
+  // Catálogo livre, edição de equipe e modelos ficam restritos ao admin;
+  // usuário comum roda exatamente os presets configurados na plataforma.
+  const presetsOnly = user?.role !== 'admin';
   const { location, navigate } = useAppLocation();
   const modoRef = useRef(location.modo);
   modoRef.current = location.modo;
@@ -1849,7 +1854,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       <LucaAiStartState
         state="loading"
         onReload={loadPersonas}
-        onOpenPersonas={() => onNavigate('personas')}
+        onOpenPersonas={presetsOnly ? undefined : () => onNavigate('personas')}
       />
     );
   }
@@ -1860,7 +1865,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
         state="error"
         message={error}
         onReload={loadPersonas}
-        onOpenPersonas={() => onNavigate('personas')}
+        onOpenPersonas={presetsOnly ? undefined : () => onNavigate('personas')}
       />
     );
   }
@@ -1870,7 +1875,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       <LucaAiStartState
         state="empty"
         onReload={loadPersonas}
-        onOpenPersonas={() => onNavigate('personas')}
+        onOpenPersonas={presetsOnly ? undefined : () => onNavigate('personas')}
       />
     );
   }
@@ -2104,7 +2109,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
                 onSetModel={setPersonaModel}
                 onDepthChange={setIndividualDepth}
                 onApplyPreset={(preset) => void applyIndividualPreset(preset)}
-                onOpenPersonas={() => onNavigate('personas')}
+                onOpenPersonas={presetsOnly ? undefined : () => onNavigate('personas')}
+                locked={presetsOnly}
                 onClose={() => setTeamPanelOpen(false)}
               />
             ) : (
@@ -2129,7 +2135,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
                 onOpenPicker={(id) => setPickerTarget({ mode: 'team', id })}
                 onSetModel={setPersonaModel}
                 onApplyPreset={(preset) => void applyTeamPreset(preset)}
-                onOpenPersonas={() => onNavigate('personas')}
+                onOpenPersonas={presetsOnly ? undefined : () => onNavigate('personas')}
+                locked={presetsOnly}
                 onClose={() => setTeamPanelOpen(false)}
               />
             )}
@@ -2250,7 +2257,7 @@ function LucaAiStartState({
   state: 'loading' | 'empty' | 'error';
   message?: string;
   onReload: () => void | Promise<void>;
-  onOpenPersonas: () => void;
+  onOpenPersonas?: () => void;
 }) {
   const theme = useTheme();
   const loading = state === 'loading';
@@ -2331,25 +2338,29 @@ function LucaAiStartState({
                   >
                     Tentar novamente
                   </button>
-                  <button
-                    type="button"
-                    className="btn-fleet"
-                    data-luca-start-open-personas
-                    onClick={onOpenPersonas}
-                  >
-                    Abrir Personas
-                  </button>
+                  {onOpenPersonas && (
+                    <button
+                      type="button"
+                      className="btn-fleet"
+                      data-luca-start-open-personas
+                      onClick={onOpenPersonas}
+                    >
+                      Abrir Personas
+                    </button>
+                  )}
                 </>
               ) : (
                 <>
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    data-luca-start-open-personas
-                    onClick={onOpenPersonas}
-                  >
-                    Abrir Personas
-                  </button>
+                  {onOpenPersonas && (
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      data-luca-start-open-personas
+                      onClick={onOpenPersonas}
+                    >
+                      Abrir Personas
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="btn-fleet"
@@ -2390,6 +2401,7 @@ function LucaIndividualPanel({
   onSetModel,
   onDepthChange,
   onOpenPersonas,
+  locked = false,
   onClose,
   activePresetId,
   applyingPresetId,
@@ -2415,7 +2427,8 @@ function LucaIndividualPanel({
   onOpenPicker: (id: IndividualPickerId) => void;
   onSetModel: (slug: string, model: string) => void | Promise<void>;
   onDepthChange: (depth: LucaAiIndividualDepth) => void;
-  onOpenPersonas: () => void;
+  onOpenPersonas?: () => void;
+  locked?: boolean;
   onClose: () => void;
   activePresetId: string | null;
   applyingPresetId: string | null;
@@ -2468,6 +2481,7 @@ function LucaIndividualPanel({
             selectedSlugs={assignments.judge ? [assignments.judge] : []}
             activeSlug={activeSlug}
             disabled={running}
+            locked={locked}
             busySlug={busySlug}
             onOpen={() => onOpenPicker('judge')}
             onRemove={onClearJudge}
@@ -2481,6 +2495,7 @@ function LucaIndividualPanel({
             selectedSlugs={assignments.participants}
             activeSlug={activeSlug}
             disabled={running}
+            locked={locked}
             busySlug={busySlug}
             onOpen={() => onOpenPicker('participants')}
             onRemove={onRemoveParticipant}
@@ -2511,6 +2526,7 @@ function LucaIndividualPanel({
                     : 'desligado — a rodada termina no juiz'}
                 </span>
               </span>
+              {!locked && (
               <button
                 type="button"
                 role="switch"
@@ -2530,6 +2546,7 @@ function LucaIndividualPanel({
                   }}
                 />
               </button>
+              )}
             </div>
             {assignments.visualEnabled && (
               <div className="mt-2">
@@ -2540,6 +2557,7 @@ function LucaIndividualPanel({
                   selectedSlugs={assignments.visual ? [assignments.visual] : []}
                   activeSlug={activeSlug}
                   disabled={running}
+                  locked={locked}
                   busySlug={busySlug}
                   onOpen={() => onOpenPicker('visual')}
                   onRemove={onClearVisual}
@@ -2608,8 +2626,12 @@ function LucaIndividualPanel({
       </div>
 
       <footer className="grid grid-cols-2 gap-2 border-t p-3" style={{ borderColor: theme.border }}>
-        <button type="button" className="btn-fleet !px-3 text-xs" onClick={onOpenPersonas} disabled={running}>Catálogo</button>
-        <button type="button" className="btn-fleet !px-3 text-xs" onClick={onClear} disabled={running || configuredCount === 0}>Limpar seleção</button>
+        {onOpenPersonas && (
+          <button type="button" className="btn-fleet !px-3 text-xs" onClick={onOpenPersonas} disabled={running}>Catálogo</button>
+        )}
+        {!locked && (
+          <button type="button" className="btn-fleet !px-3 text-xs" onClick={onClear} disabled={running || configuredCount === 0}>Limpar seleção</button>
+        )}
         <button type="button" className="col-span-2 inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] transition" onClick={() => void onReload()} disabled={loading || running} style={{ color: theme.textMute }}>
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
           Atualizar {personas.length} personas
@@ -2638,6 +2660,7 @@ function LucaWorkflowPanel({
   onOpenPicker,
   onSetModel,
   onOpenPersonas,
+  locked = false,
   onClose,
   activePresetId,
   applyingPresetId,
@@ -2660,7 +2683,8 @@ function LucaWorkflowPanel({
   onInspect: (slug: string | null) => void;
   onOpenPicker: (roleId: WorkflowRoleId) => void;
   onSetModel: (slug: string, model: string) => void | Promise<void>;
-  onOpenPersonas: () => void;
+  onOpenPersonas?: () => void;
+  locked?: boolean;
   onClose: () => void;
   activePresetId: string | null;
   applyingPresetId: string | null;
@@ -2722,6 +2746,7 @@ function LucaWorkflowPanel({
               selectedSlugs={assignments[role.id]}
               activeSlug={activeSlug}
               disabled={running}
+              locked={locked}
               busySlug={busySlug}
               onOpen={() => onOpenPicker(role.id)}
               onRemove={(slug) => onRemove(role.id, slug)}
@@ -2733,8 +2758,12 @@ function LucaWorkflowPanel({
       </div>
 
       <footer className="grid grid-cols-2 gap-2 border-t p-3" style={{ borderColor: theme.border }}>
-        <button type="button" className="btn-fleet !px-3 text-xs" onClick={onOpenPersonas} disabled={running}>Catálogo</button>
-        <button type="button" className="btn-fleet !px-3 text-xs" onClick={onClearWorkflow} disabled={running || assignedCount === 0}>Limpar fluxo</button>
+        {onOpenPersonas && (
+          <button type="button" className="btn-fleet !px-3 text-xs" onClick={onOpenPersonas} disabled={running}>Catálogo</button>
+        )}
+        {!locked && (
+          <button type="button" className="btn-fleet !px-3 text-xs" onClick={onClearWorkflow} disabled={running || assignedCount === 0}>Limpar fluxo</button>
+        )}
         <button type="button" className="col-span-2 inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] transition" onClick={() => void onReload()} disabled={loading || running} style={{ color: theme.textMute }}>
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
           Atualizar {personas.length} personas
@@ -2846,6 +2875,7 @@ function WorkflowRoleRow({
   selectedSlugs,
   activeSlug,
   disabled,
+  locked = false,
   busySlug,
   onOpen,
   onRemove,
@@ -2858,6 +2888,7 @@ function WorkflowRoleRow({
   selectedSlugs: string[];
   activeSlug: string | null;
   disabled: boolean;
+  locked?: boolean;
   busySlug: string | null;
   onOpen: () => void;
   onRemove: (slug: string) => void;
@@ -2897,9 +2928,11 @@ function WorkflowRoleRow({
               : role.multiple ? `até ${role.maxSlugs} personas` : 'uma persona'}
           </span>
         </span>
-        <button type="button" className="rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition" onClick={onOpen} disabled={disabled} style={{ background: theme.goldSoft, borderColor: theme.border, color: theme.goldDeep }}>
-          {selectedSlugs.length ? role.multiple ? 'Adicionar' : 'Trocar' : 'Escolher'}
-        </button>
+        {!locked && (
+          <button type="button" className="rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition" onClick={onOpen} disabled={disabled} style={{ background: theme.goldSoft, borderColor: theme.border, color: theme.goldDeep }}>
+            {selectedSlugs.length ? role.multiple ? 'Adicionar' : 'Trocar' : 'Escolher'}
+          </button>
+        )}
       </div>
 
       {selectedItems.length ? (
@@ -2909,20 +2942,26 @@ function WorkflowRoleRow({
               <div className="flex items-center gap-2">
                 {persona ? <PersonaAvatar persona={persona} size="xs" /> : <span className="h-7 w-7 rounded-lg" style={{ background: theme.goldSoft }} />}
                 <button type="button" className="min-w-0 flex-1 truncate text-left text-[11px] font-medium" onClick={() => onInspect(slug)} style={{ color: theme.textSoft }}>{persona?.name || slug}</button>
-                <button type="button" className="grid h-7 w-7 place-items-center rounded-md transition" onClick={() => !disabled && onRemove(slug)} disabled={disabled} aria-label={`Remover ${persona?.name || slug} de ${role.label}`} style={{ color: theme.textGhost }}><X className="h-3.5 w-3.5" /></button>
+                {!locked && (
+                  <button type="button" className="grid h-7 w-7 place-items-center rounded-md transition" onClick={() => !disabled && onRemove(slug)} disabled={disabled} aria-label={`Remover ${persona?.name || slug} de ${role.label}`} style={{ color: theme.textGhost }}><X className="h-3.5 w-3.5" /></button>
+                )}
               </div>
-              <div className="mt-1.5 flex items-center gap-2 pl-9">
-                <PersonaModelSelect
-                  slug={slug}
-                  persona={persona}
-                  profiles={routerProfiles}
-                  disabled={disabled || busySlug === slug}
-                  onChange={onSetModel}
-                />
-              </div>
+              {!locked && (
+                <div className="mt-1.5 flex items-center gap-2 pl-9">
+                  <PersonaModelSelect
+                    slug={slug}
+                    persona={persona}
+                    profiles={routerProfiles}
+                    disabled={disabled || busySlug === slug}
+                    onChange={onSetModel}
+                  />
+                </div>
+              )}
             </div>
           ))}
         </div>
+      ) : locked ? (
+        <p className="mt-2 px-2 py-1 text-[10px]" style={{ color: theme.textGhost }}>Definido pelo preset da equipe.</p>
       ) : (
         <button type="button" className="mt-2 flex w-full items-center gap-2 rounded-lg border border-dashed px-2.5 py-2 text-left text-[10px] transition" onClick={onOpen} disabled={disabled} style={{ borderColor: theme.border, color: theme.textGhost }}>
           <Plus className="h-3.5 w-3.5" /> Nenhuma persona atribuída

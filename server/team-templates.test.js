@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,7 +15,7 @@ async function loadModule(dataDir) {
   return { workspace, templates };
 }
 
-test('seed no primeiro toque e isolamento por conta', async () => {
+test('seed no primeiro toque, catálogo global e escrita só com admin', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-templates-'));
   const { workspace, templates } = await loadModule(dataDir);
 
@@ -29,8 +28,9 @@ test('seed no primeiro toque e isolamento por conta', async () => {
   assert.ok(Object.keys(snapA.team[0].models).length >= 1);
   assert.ok(Object.keys(snapA.individual[0].models).length >= 1);
 
+  // Usuário comum lê o catálogo, mas não escreve.
   workspace.runWithWorkspaceUser('user-a', () => {
-    templates.createTeamTemplate('team', {
+    assert.throws(() => templates.createTeamTemplate('team', {
       label: 'Só A',
       description: 'conta A',
       icon: 'users',
@@ -42,18 +42,32 @@ test('seed no primeiro toque e isolamento por conta', async () => {
         display: ['relator-executivo-risco'],
         visual: ['especialista-visual'],
       },
+    }), /administradores/);
+  });
+
+  // Admin escreve uma vez e todos os usuários veem o mesmo catálogo.
+  workspace.runWithWorkspaceUser('admin-1', () => {
+    templates.createTeamTemplate('team', {
+      label: 'Global',
+      description: 'catálogo da plataforma',
+      icon: 'users',
+      assignments: {
+        supervisor: ['aurora'],
+        mission: ['lucas'],
+        execution: ['tars'],
+        approval: ['curador-personas'],
+        display: ['relator-executivo-risco'],
+        visual: ['especialista-visual'],
+      },
     });
-  });
+  }, 'admin');
 
-  workspace.runWithWorkspaceUser('user-b', () => {
-    const snapB = templates.getTeamTemplatesSnapshot();
-    assert.equal(snapB.team.some((item) => item.label === 'Só A'), false);
-  });
-
-  workspace.runWithWorkspaceUser('user-a', () => {
-    const snap = templates.getTeamTemplatesSnapshot();
-    assert.equal(snap.team.some((item) => item.label === 'Só A'), true);
-  });
+  for (const user of ['user-a', 'user-b']) {
+    workspace.runWithWorkspaceUser(user, () => {
+      const snap = templates.getTeamTemplatesSnapshot();
+      assert.equal(snap.team.some((item) => item.label === 'Global'), true);
+    });
+  }
 });
 
 test('modelos do template são sanitizados e formato legado continua válido', async () => {
@@ -102,7 +116,7 @@ test('modelos do template são sanitizados e formato legado continua válido', a
       label: `${seeded.label} editado`,
     });
     assert.deepEqual(updated.models, seeded.models, 'editor legado não apaga hints existentes');
-  });
+  }, 'admin');
 });
 
 test('templates sempre incluem o especialista visual com a rota visual default', async () => {
@@ -125,15 +139,14 @@ test('templates sempre incluem o especialista visual com a rota visual default',
 
     const individual = templates.getTeamTemplatesSnapshot().individual[0];
     assert.equal(individual.models['especialista-visual'], 'cc/claude-fable-5(high)');
-  });
+  }, 'admin');
 });
 
 test('store legado migra o modelo visual de todos os templates para a rota default', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-templates-visual-migration-'));
   const { workspace, templates } = await loadModule(dataDir);
   const userId = 'legacy-template-user';
-  const safeUserDir = createHash('sha256').update(userId).digest('hex').slice(0, 32);
-  const storePath = path.join(dataDir, 'workspaces', safeUserDir, 'team-templates.json');
+  const storePath = path.join(dataDir, 'team-templates.json');
   fs.mkdirSync(path.dirname(storePath), { recursive: true });
   fs.writeFileSync(storePath, JSON.stringify({
     version: 1,
@@ -201,5 +214,5 @@ test('create update delete reorder', async () => {
       templates.getTeamTemplatesSnapshot().individual.some((item) => item.id === created.id),
       false,
     );
-  });
+  }, 'admin');
 });

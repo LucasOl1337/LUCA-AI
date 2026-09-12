@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "samples": 18003,
+  "cases": 3,
+  "fields": 23,
+  "checks": [
+    "CSV read-back",
+    "unique timestamps",
+    "100 ms cadence",
+    "GPS gap exactly 30 samples",
+    "position versus speed <0.12 km/h residual",
+    "expected events by scenario",
+    "heading and load ranges"
+  ],
+  "limitations": "Fixture plausível e simplificada; não é modelo físico calibrado, registro real ou homologação."
+}

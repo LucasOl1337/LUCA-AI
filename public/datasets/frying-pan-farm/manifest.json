@@ -1,0 +1,77 @@
+{
+  "version": "1.0",
+  "coordinate_reference": "WGS84 / GeoJSON longitude,latitude",
+  "local_origin": [
+    -77.4069,
+    38.9375
+  ],
+  "site": {
+    "id": "frying-pan-farm-fairfax-v1",
+    "name": "Frying Pan Farm Park",
+    "location": "Herndon, Virginia, EUA",
+    "source_url": "https://www.fairfaxcounty.gov/parks/frying-pan-park/on-your-own",
+    "boundary_kind": "Limite administrativo cartográfico do parque/fazenda; não cadastral certificado",
+    "mapped_area_acres": 135.6,
+    "operational_area": "Não fornecida; operação não autorizada por este mapa",
+    "water_coverage": "Quatro lagoas da base 2017; não inclui todos os cursos estreitos ou água temporária",
+    "vector_attribution": "© Fairfax County, Virginia — County Parks / Water Features polys",
+    "vector_license": "Reprodução para uso interno/pessoal. Publicação e distribuição pública exigem reavaliar permissão.",
+    "vector_license_url": "https://www.fairfaxcounty.gov/maps/disclaimer",
+    "retrieved_at": "2026-09-10"
+  },
+  "map_warning": "Limite da fazenda é cartográfico, não cadastral certificado nem área operacional. Área operacional não fornecida: eventos de cerca indisponíveis. Água mapeada em 2017 é parcial. Associar esta área não comprova a presença do ESP32 no local.",
+  "satellite": {
+    "url": "/datasets/frying-pan-farm/naip-2023.jpg",
+    "bbox": [
+      -77.4145,
+      38.9318,
+      -77.3993,
+      38.9432
+    ],
+    "crs": "EPSG:4326",
+    "north_up": true,
+    "width_px": 2195,
+    "height_px": 2115,
+    "resolution_m": 0.6,
+    "acquired_at": "2023-10-11",
+    "attribution": "USDA NAIP / USGS The National Map · 11/10/2023 · 0,6 m · domínio público",
+    "license": "Public domain",
+    "source_url": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox=-77.4145,38.9318,-77.3993,38.9432&bboxSR=4326&imageSR=4326&size=2195,2115&adjustAspectRatio=false&format=jpg&interpolation=RSP_BilinearInterpolation&renderingRule=%7B%22rasterFunction%22%3A%22NaturalColor%22%7D&mosaicRule=%7B%22mosaicMethod%22%3A%22esriMosaicLockRaster%22%2C%22lockRasterIds%22%3A%5B202373%2C202375%5D%2C%22mosaicOperation%22%3A%22MT_FIRST%22%7D&f=json",
+    "source_raster_ids": [
+      202373,
+      202375
+    ],
+    "processing": "RGB NaturalColor, bilinear, JPEG com perdas. Bbox confirmado pelo exportImage; não fornece alturas.",
+    "sha256": "85646bfbd1403d54e47869de52df367fa7c4ae1a18efa056bd0ccf4bdfca339f"
+  },
+  "elevation": {
+    "implemented": true,
+    "status": "Recorte DTM validado, visualização 3D a 1:1; opção de mapa plano",
+    "source": "Fairfax County 2022 LiDAR Digital Terrain Model",
+    "source_url": "https://www.fairfaxcounty.gov/gisimagery/rest/services/LiDAR/2022_LiDAR_Digital_Terrain_Model/ImageServer",
+    "report_url": "https://www.arcgis.com/sharing/rest/content/items/33a4f317ae464b158814a9c7bb8508da/data",
+    "acquisition": "2022-12-09 a 2022-12-28",
+    "grid": "2 pés no raster; serviço anuncia 0,609601 unidades métricas em EPSG:3857. Grade não é precisão.",
+    "vertical_reference": "NAVD88 / GEOID18; Foot_US convertido para metros pelo fator 1200/3937, sem conversão para altura elipsoidal",
+    "limitations": "DTM de solo interpolado e hidroachatado; sem árvores, prédios ou batimetria. Épocas diferentes de foto e água.",
+    "pending": "Pontos de controle locais e levantamento atual de superfície/objetos para reconstrução fiel."
+  },
+  "terrain": {
+    "url": "/datasets/frying-pan-farm/terrain-2022-5m.json",
+    "sha256": "0742b7d4996c580e0446cd16b195b3c458f372e8039abcdcd37ebe251a2e435f",
+    "bbox": [-77.4145, 38.9318, -77.3993, 38.9432],
+    "vertical_datum": "NAVD88 / GEOID18",
+    "resolution_m": 5.1,
+    "attribution": "© Fairfax County · LiDAR 2022 · uso interno/pessoal",
+    "license_url": "https://www.fairfaxcounty.gov/maps/disclaimer",
+    "processing": "Grade 257×249 em EPSG:4326, amostras no centro do pixel, bilinear. Original de 2 pés (0,6096 m); exibição reamostrada ~5,1 m. Zero da cena = mínimo do recorte; escala vertical 1:1. Sem NoData neste recorte.",
+    "validation_file": "/datasets/frying-pan-farm/elevation-validation.json"
+  },
+  "provenance": {
+    "boundary_url": "https://services1.arcgis.com/ioennV6PpG5Xodq0/ArcGIS/rest/services/OpenData_A1/FeatureServer/5/query?where=OBJECTID%3D419&outFields=OBJECTID,PARK_NAME,GIS_ESTIMATED_ACREAGE&outSR=4326&f=geojson",
+    "boundary_sha256": "befb21de38a0bf995b0498fb3ce4360bafa5a4fba4556ff8dffd2977d476536a",
+    "water_url": "https://services1.arcgis.com/ioennV6PpG5Xodq0/arcgis/rest/services/Water_Features_polys/FeatureServer/0/query?objectIds=12765,12766,12767,12768&outFields=OBJECTID,NAME,TYPE,VISIBLE,SOURCE,EFFECTIVE_DATE&outSR=4326&f=geojson",
+    "water_sha256": "1fd5441a014239e51501508904c475d3a16d611f3311a0eb0c26e5b78ddc2b2f",
+    "processing": "GeoJSON WGS84 reprojetado pelo servidor a partir de EPSG:2283. Coordenadas preservadas; apenas roles, ids e fontes adicionados. Sem KML."
+  }
+}

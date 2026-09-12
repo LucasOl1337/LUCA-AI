@@ -4,12 +4,11 @@ import {
   BrainCircuit,
   ChevronLeft,
   ChevronRight,
+  FlaskConical,
   Home,
   LogOut,
   Menu,
-  Settings2,
   ShieldCheck,
-  StickyNote,
   Wheat,
   X,
 } from 'lucide-react';
@@ -19,7 +18,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useDeferredFlag } from '@/hooks/useDeferredFlag';
 import SidebarSessionsRail from '@/components/SidebarSessionsRail';
 
-export type PageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'admin';
+export type PageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'laboratorio' | 'admin';
 
 interface LayoutProps {
   activePage: PageId;
@@ -37,13 +36,12 @@ interface NavItem {
 const navItems: NavItem[] = [
   { id: 'inicio', label: 'Início', icon: Home, hint: 'visão geral do LUCA-AI' },
   { id: 'luca-ai', label: 'LUCA-AI', icon: BrainCircuit, hint: 'bancada isolada com equipe de personas' },
-  { id: 'personas', label: 'Personas', icon: StickyNote, hint: 'personas do Yume disponíveis no LUCA' },
-  { id: 'configuracao', label: 'Configuração', icon: Settings2, hint: 'templates de equipe e individual' },
   { id: 'sompo', label: 'SOMPO', icon: Wheat, hint: 'casos de exemplo agrícolas e rurais' },
-  { id: 'admin', label: 'Admin', icon: ShieldCheck, hint: 'usuários e atividade da plataforma' },
+  { id: 'laboratorio', label: 'Laboratório', icon: FlaskConical, hint: 'replay de incidentes a partir de arquivos' },
+  { id: 'admin', label: 'Admin', icon: ShieldCheck, hint: 'usuários, personas e configuração' },
 ];
 
-const dockIds: PageId[] = ['inicio', 'luca-ai', 'personas', 'configuracao', 'sompo'];
+const dockIds: PageId[] = ['inicio', 'luca-ai', 'sompo', 'laboratorio'];
 
 export default function Layout({ activePage, onPageChange, children }: LayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -90,7 +88,9 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
     ? showChecking ? 'conectando 9router' : runtimeOnline ? '9router online' : confirmOffline ? '9router offline' : '9router'
     : showChecking ? 'checando sistema' : backendReady ? 'sistema online' : confirmOffline ? 'sistema offline' : 'sistema';
   const statusBadge = showChecking ? 'conectando' : runtimeOnline ? 'online' : confirmOffline ? 'offline' : 'online';
-  const activeItem = navItems.find((item) => item.id === activePage) ?? navItems[0];
+  // Personas e Configuração vivem dentro da área admin: marcam Admin como item ativo.
+  const navPage: PageId = activePage === 'personas' || activePage === 'configuracao' ? 'admin' : activePage;
+  const activeItem = navItems.find((item) => item.id === navPage) ?? navItems[0];
 
   async function retryShellConnection() {
     await refresh();
@@ -144,7 +144,7 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
             )}
             {navItems.filter((item) => item.id !== 'admin' || user?.role === 'admin').map((item) => {
               const Icon = item.icon;
-              const selected = activePage === item.id;
+              const selected = navPage === item.id;
               return (
                 <button
                   type="button"

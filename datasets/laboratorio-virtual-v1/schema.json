@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "missing_value": "empty CSV cell",
+  "delimiter": ",",
+  "decimal": ".",
+  "encoding": "UTF-8",
+  "fields": [
+    {
+      "name": "timestamp",
+      "unit": "UTC ISO8601",
+      "origin": "logger",
+      "real_acquisition": "Relógio do registrador sincronizado por GNSS",
+      "meaning": "Instante na grade de exportação de 100 ms"
+    },
+    {
+      "name": "machine_id",
+      "unit": "texto",
+      "origin": "cadastro",
+      "real_acquisition": "Cadastro de ativo",
+      "meaning": "Identificador fictício TRATOR-DEMO-001"
+    },
+    {
+      "name": "synthetic",
+      "unit": "boolean",
+      "origin": "metadado",
+      "real_acquisition": "Manifesto do arquivo",
+      "meaning": "Sempre true; não é sensor"
+    },
+    {
+      "name": "latitude_deg",
+      "unit": "graus",
+      "origin": "GNSS",
+      "real_acquisition": "Receptor GNSS no trator",
+      "meaning": "Latitude WGS84; vazio sem fix"
+    },
+    {
+      "name": "longitude_deg",
+      "unit": "graus",
+      "origin": "GNSS",
+      "real_acquisition": "Receptor GNSS no trator",
+      "meaning": "Longitude WGS84; vazio sem fix"
+    },
+    {
+      "name": "gnss_fix",
+      "unit": "texto",
+      "origin": "GNSS",
+      "real_acquisition": "Mensagem de estado do receptor",
+      "meaning": "3d ou no_fix; não declara RTK"
+    },
+    {
+      "name": "gnss_horizontal_accuracy_m",
+      "unit": "m",
+      "origin": "GNSS",
+      "real_acquisition": "Estimativa de precisão horizontal do receptor",
+      "meaning": "0.8 m assumido; estimativa, não garantia"
+    },
+    {
+      "name": "ground_speed_kmh",
+      "unit": "km/h",
+      "origin": "GNSS",
+      "real_acquisition": "Velocidade sobre solo estimada pelo receptor",
+      "meaning": "Vazia sem fix; não é velocidade de roda"
+    },
+    {
+      "name": "heading_deg",
+      "unit": "graus",
+      "origin": "GNSS_INS",
+      "real_acquisition": "GNSS de duas antenas + IMU e fusão INS",
+      "meaning": "Norte=0; leste=90; orientação mantida pela INS na falha curta"
+    },
+    {
+      "name": "roll_deg",
+      "unit": "graus",
+      "origin": "IMU_AHRS",
+      "real_acquisition": "Acelerômetro + giroscópio e fusão AHRS",
+      "meaning": "Positivo lado direito desce; referencial corpo x frente y direita z baixo"
+    },
+    {
+      "name": "pitch_deg",
+      "unit": "graus",
+      "origin": "IMU_AHRS",
+      "real_acquisition": "Acelerômetro + giroscópio e fusão AHRS",
+      "meaning": "Positivo nariz sobe"
+    },
+    {
+      "name": "yaw_rate_deg_s",
+      "unit": "graus/s",
+      "origin": "giroscopio",
+      "real_acquisition": "Giroscópio instalado no chassi",
+      "meaning": "Componente vertical; curva positiva à direita"
+    },
+    {
+      "name": "engine_rpm",
+      "unit": "rpm",
+      "origin": "ECU_CAN",
+      "real_acquisition": "Sensor de posição/rotação do virabrequim via ECU",
+      "meaning": "CAN transporta o valor; não é sensor"
+    },
+    {
+      "name": "engine_load_pct",
+      "unit": "%",
+      "origin": "ECU_CAN_estimativa",
+      "real_acquisition": "Estimativa de carga da ECU do motor",
+      "meaning": "Percentual ilustrativo; conferir definição/escala do fabricante"
+    },
+    {
+      "name": "coolant_temp_c",
+      "unit": "°C",
+      "origin": "ECU_CAN",
+      "real_acquisition": "Sensor de temperatura do líquido de arrefecimento",
+      "meaning": "Não confundir com temperatura ambiente DHT"
+    },
+    {
+      "name": "oil_pressure_kpa",
+      "unit": "kPa",
+      "origin": "ECU_CAN",
+      "real_acquisition": "Transdutor de pressão no circuito de lubrificação",
+      "meaning": "Necessita transdutor; interruptor simples não fornece pressão contínua"
+    },
+    {
+      "name": "fuel_rate_l_h",
+      "unit": "L/h",
+      "origin": "ECU_CAN_estimativa",
+      "real_acquisition": "ECU a partir de comando/calibração de injeção",
+      "meaning": "Estimativa de consumo; não pressupõe medidor de vazão"
+    },
+    {
+      "name": "battery_voltage_v",
+      "unit": "V",
+      "origin": "ECU_CAN",
+      "real_acquisition": "Conversor ADC da ECU na alimentação elétrica",
+      "meaning": "Tensão do sistema de carga"
+    },
+    {
+      "name": "ambient_temp_c",
+      "unit": "°C",
+      "origin": "sensor_ambiente",
+      "real_acquisition": "Termômetro digital protegido do sol e calor do motor",
+      "meaning": "Sensor externo; não mede motor"
+    },
+    {
+      "name": "relative_humidity_pct",
+      "unit": "%",
+      "origin": "sensor_ambiente",
+      "real_acquisition": "Sensor capacitivo de umidade protegido",
+      "meaning": "Umidade relativa ambiente"
+    },
+    {
+      "name": "brake_pressed",
+      "unit": "boolean",
+      "origin": "ECU_CAN",
+      "real_acquisition": "Interruptor/sensor do pedal de freio",
+      "meaning": "false neste percurso; não prova ausência de mau uso"
+    },
+    {
+      "name": "pto_engaged",
+      "unit": "boolean",
+      "origin": "ECU_CAN",
+      "real_acquisition": "Estado de engate da tomada de potência na ECU",
+      "meaning": "false: implemento de arrasto sem PTO"
+    },
+    {
+      "name": "coolant_warning_active",
+      "unit": "boolean",
+      "origin": "ECU_CAN",
+      "real_acquisition": "Estado de aviso do controlador do motor",
+      "meaning": "Simulado com limite didático de 105°C; sem DTC inventado"
+    }
+  ]
+}

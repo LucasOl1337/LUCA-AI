@@ -6,7 +6,7 @@ Este checkout contem o painel React e o runtime Express (local e producao na VM)
 
 ## Regras
 
-1. Commit, push e deploy so com ordem explicita do dono.
+1. Commit, push e deploy na sennin-kvm sao o fluxo padrao ao concluir trabalho (ordem permanente do dono); so segure se o dono pedir explicitamente ou se houver risco real de quebrar producao.
 2. Nao use `git clean`, `git reset --hard`, `git checkout --` nem `git stash`; preserve alteracoes alheias na arvore compartilhada.
 3. Nao rode testes mutantes nem limpeza contra a producao (`luca-ai.com.br`, origem Tunnel da VM, Durable Object legado em `app.luca-ai.com.br`).
 4. Nunca escreva no Yume; leia personas pelo GET do Kamui em `server/kamui-client.js`.

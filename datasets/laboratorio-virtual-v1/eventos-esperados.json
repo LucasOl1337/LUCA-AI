@@ -1,0 +1,130 @@
+[
+  {
+    "case": "02-cerca-e-agua",
+    "timestamp": "2026-09-09T13:00:00.000Z",
+    "elapsed_s": 0.0,
+    "event": "outside_fence",
+    "transition": "start",
+    "synthetic": true
+  },
+  {
+    "case": "02-cerca-e-agua",
+    "timestamp": "2026-09-09T13:00:15.200Z",
+    "elapsed_s": 15.2,
+    "event": "outside_fence",
+    "transition": "end",
+    "synthetic": true
+  },
+  {
+    "case": "02-cerca-e-agua",
+    "timestamp": "2026-09-09T13:02:08.500Z",
+    "elapsed_s": 128.5,
+    "event": "near_water",
+    "transition": "start",
+    "synthetic": true
+  },
+  {
+    "case": "02-cerca-e-agua",
+    "timestamp": "2026-09-09T13:02:14.900Z",
+    "elapsed_s": 134.9,
+    "event": "outside_fence",
+    "transition": "start",
+    "synthetic": true
+  },
+  {
+    "case": "02-cerca-e-agua",
+    "timestamp": "2026-09-09T13:02:45.200Z",
+    "elapsed_s": 165.2,
+    "event": "outside_fence",
+    "transition": "end",
+    "synthetic": true
+  },
+  {
+    "case": "02-cerca-e-agua",
+    "timestamp": "2026-09-09T13:02:51.600Z",
+    "elapsed_s": 171.6,
+    "event": "near_water",
+    "transition": "end",
+    "synthetic": true
+  },
+  {
+    "case": "02-cerca-e-agua",
+    "timestamp": "2026-09-09T13:04:44.900Z",
+    "elapsed_s": 284.9,
+    "event": "outside_fence",
+    "transition": "start",
+    "synthetic": true
+  },
+  {
+    "case": "02-cerca-e-agua",
+    "timestamp": "2026-09-09T13:05:15.200Z",
+    "elapsed_s": 315.2,
+    "event": "outside_fence",
+    "transition": "end",
+    "synthetic": true
+  },
+  {
+    "case": "02-cerca-e-agua",
+    "timestamp": "2026-09-09T13:07:08.500Z",
+    "elapsed_s": 428.5,
+    "event": "near_water",
+    "transition": "start",
+    "synthetic": true
+  },
+  {
+    "case": "02-cerca-e-agua",
+    "timestamp": "2026-09-09T13:07:14.900Z",
+    "elapsed_s": 434.9,
+    "event": "outside_fence",
+    "transition": "start",
+    "synthetic": true
+  },
+  {
+    "case": "02-cerca-e-agua",
+    "timestamp": "2026-09-09T13:07:45.200Z",
+    "elapsed_s": 465.2,
+    "event": "outside_fence",
+    "transition": "end",
+    "synthetic": true
+  },
+  {
+    "case": "02-cerca-e-agua",
+    "timestamp": "2026-09-09T13:07:51.600Z",
+    "elapsed_s": 471.6,
+    "event": "near_water",
+    "transition": "end",
+    "synthetic": true
+  },
+  {
+    "case": "02-cerca-e-agua",
+    "timestamp": "2026-09-09T13:09:44.900Z",
+    "elapsed_s": 584.9,
+    "event": "outside_fence",
+    "transition": "start",
+    "synthetic": true
+  },
+  {
+    "case": "03-aquecimento-e-falha-gps",
+    "timestamp": "2026-09-09T14:04:00.000Z",
+    "elapsed_s": 240.0,
+    "event": "gnss_unavailable",
+    "transition": "start",
+    "synthetic": true
+  },
+  {
+    "case": "03-aquecimento-e-falha-gps",
+    "timestamp": "2026-09-09T14:04:03.000Z",
+    "elapsed_s": 243.0,
+    "event": "gnss_unavailable",
+    "transition": "end",
+    "synthetic": true
+  },
+  {
+    "case": "03-aquecimento-e-falha-gps",
+    "timestamp": "2026-09-09T14:06:23.000Z",
+    "elapsed_s": 383.0,
+    "event": "coolant_warning",
+    "transition": "start",
+    "synthetic": true
+  }
+]

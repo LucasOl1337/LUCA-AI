@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { createHash, randomBytes } from 'node:crypto';
-import { getWorkspaceUserId, requireWorkspaceUserId } from './workspace-context.js';
+import { randomBytes } from 'node:crypto';
+import { isWorkspaceAdmin } from './workspace-context.js';
 import { isAllowed9RouterModel, sanitizeAgentModel } from './config.js';
 import {
   LUCA_INDIVIDUAL_PRESET_SEED,
@@ -17,22 +17,23 @@ import {
 } from '../shared/persona-workflow.js';
 
 const rootStateDir = path.resolve(process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'));
-const workspacesRoot = path.join(rootStateDir, 'workspaces');
 const MAX_TEMPLATES_PER_KIND = 40;
 const ICON_SET = new Set(PRESET_ICON_IDS);
 const TEMPLATE_STORE_VERSION = 4;
 
-/** @type {Map<string, any>} */
-const cache = new Map();
+let cachedStore = null;
 
-function safeUserDir(userId) {
-  const clean = String(userId || '').trim();
-  if (!clean) throw new Error('workspace_user_required');
-  return createHash('sha256').update(clean).digest('hex').slice(0, 32);
+// Catálogo de presets é da plataforma: todos leem o mesmo arquivo e só admin escreve.
+function storePath() {
+  return path.join(rootStateDir, 'team-templates.json');
 }
 
-function storePathFor(userId) {
-  return path.join(workspacesRoot, safeUserDir(userId), 'team-templates.json');
+function requireTemplateWriter() {
+  if (!isWorkspaceAdmin()) {
+    const error = new Error('Somente administradores editam o catálogo de equipes.');
+    error.code = 'admin_required';
+    throw error;
+  }
 }
 
 function uniqueSlugs(values, limit = Number.POSITIVE_INFINITY) {
@@ -166,11 +167,9 @@ function normalizeStore(raw) {
   return { version: TEMPLATE_STORE_VERSION, team, individual };
 }
 
-function loadStore(userId) {
-  const id = String(userId || '').trim();
-  if (!id) throw new Error('workspace_user_required');
-  if (cache.has(id)) return cache.get(id);
-  const filePath = storePathFor(id);
+function loadStore() {
+  if (cachedStore) return cachedStore;
+  const filePath = storePath();
   let store;
   let created = false;
   let migrated = false;
@@ -182,13 +181,13 @@ function loadStore(userId) {
     store = seedStore();
     created = true;
   }
-  cache.set(id, store);
-  if (created || migrated) persistStore(id, store);
+  cachedStore = store;
+  if (created || migrated) persistStore(store);
   return store;
 }
 
-function persistStore(userId, store) {
-  const filePath = storePathFor(userId);
+function persistStore(store) {
+  const filePath = storePath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(store, null, 2));
@@ -196,10 +195,10 @@ function persistStore(userId, store) {
 }
 
 function withStore(mutator) {
-  const userId = requireWorkspaceUserId();
-  const store = loadStore(userId);
+  requireTemplateWriter();
+  const store = loadStore();
   const result = mutator(store);
-  persistStore(userId, store);
+  persistStore(store);
   return result;
 }
 
@@ -218,9 +217,7 @@ function ensureUniqueId(list, id) {
 }
 
 export function getTeamTemplatesSnapshot() {
-  const userId = getWorkspaceUserId();
-  if (!userId) return seedStore();
-  return loadStore(userId);
+  return loadStore();
 }
 
 export function createTeamTemplate(kind, template) {
@@ -298,5 +295,5 @@ export function reorderTeamTemplates(kind, ids) {
 
 /** Test helper: drop in-memory cache between cases. */
 export function _resetTeamTemplatesCacheForTests() {
-  cache.clear();
+  cachedStore = null;
 }

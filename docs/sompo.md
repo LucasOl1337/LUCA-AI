@@ -53,3 +53,7 @@ O sinal e a montagem fisica do ESP32 so podem ser confirmados com o equipamento 
 ## Pegadinha
 
 O no ja aceitou escrita REST anonima. Nao faca PUT/PATCH de prova no Firebase real sem combinar: um PUT substitui o snapshot e aparece no painel na hora.
+
+## Oficina do simulador
+
+Para renderizar com fixtures, comparar cenários e verificar GPU sem abrir o backend ou o Firebase, veja [sompo-oficina.md](./sompo-oficina.md).

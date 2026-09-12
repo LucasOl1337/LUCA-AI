@@ -10,6 +10,7 @@ export const APP_PAGES = Object.freeze([
   'personas',
   'configuracao',
   'sompo',
+  'laboratorio',
   'admin',
 ]);
 
@@ -19,6 +20,7 @@ export const PAGE_PATHS = Object.freeze({
   personas: '/personas',
   configuracao: '/configuracao',
   sompo: '/sompo',
+  laboratorio: '/laboratorio',
   admin: '/admin',
 });
 
@@ -26,6 +28,7 @@ export const PERSONA_FILTRO = Object.freeze(['all', 'principais', 'ativadas']);
 export const SOMPO_ABA = 'casos';
 export const SOMPO_TELEMETRY_ABA = 'telemetria';
 export const LUCA_ABA = 'atividade';
+export const ADMIN_ABAS = Object.freeze(['personas', 'configuracao']);
 export const CONFIG_TIPO = Object.freeze(['team', 'individual']);
 
 export const ORDEM_PARAM = Object.freeze({
@@ -119,7 +122,7 @@ function parseQuery(search) {
     ? (ORDEM_PARAM[ordemRaw] ? ordemRaw : ORDEM_API[ordemRaw])
     : '';
   const abaRaw = readParam(search, 'aba');
-  const aba = [SOMPO_ABA, SOMPO_TELEMETRY_ABA, LUCA_ABA].includes(abaRaw) ? abaRaw : '';
+  const aba = [SOMPO_ABA, SOMPO_TELEMETRY_ABA, LUCA_ABA, ...ADMIN_ABAS].includes(abaRaw) ? abaRaw : '';
 
   return {
     busca: readParam(search, 'busca'),
@@ -227,6 +230,13 @@ export function formatAppUrl(location) {
     if (loc.ordem && loc.ordem !== 'recente') params.set('ordem', loc.ordem);
     setIfPresent(params, 'conta', loc.conta);
     setIfPresent(params, 'sessao', loc.sessao);
+    if (ADMIN_ABAS.includes(loc.aba)) params.set('aba', loc.aba);
+    if (loc.aba === 'personas' && loc.filtro && loc.filtro !== 'all') params.set('filtro', loc.filtro);
+    if (loc.aba === 'configuracao') {
+      if (loc.tipo === 'individual') params.set('tipo', 'individual');
+      setIfPresent(params, 'modelo', loc.modelo);
+      if (loc.novo) params.set('novo', '1');
+    }
   }
 
   if (page === 'luca-ai') {

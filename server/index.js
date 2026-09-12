@@ -208,10 +208,13 @@ import {
   createSompoTelemetryEpisodeFramesHttpHandler,
   createSompoTelemetryEpisodeGetHttpHandler,
   createSompoTelemetryEpisodeStartHttpHandler,
+  createSompoTelemetryExportHttpHandler,
   createSompoTelemetryHistory,
   createSompoTelemetryHistoryHttpHandler,
   createSompoTelemetrySimulationHttpHandler,
 } from './sompo-telemetry-history.js';
+import { registerSompoRiskRoutes } from './sompo-risk.js';
+import { registerLabCaseRoutes } from './lab-cases.js';
 
 const app = express();
 const personaRunJobs = createPersonaRunJobStore();
@@ -261,6 +264,7 @@ app.use((req, res, next) => {
   }
   next();
 });
+app.use('/api/lab', express.json({ limit: '8mb' }));
 app.use(express.json({ limit: '1mb' }));
 
 const rateBuckets = new Map();
@@ -367,8 +371,9 @@ app.use('/api', (req, res, next) => {
     return;
   }
   ensureWorkspace(userId);
-  runWithWorkspaceUser(userId, () => next());
+  runWithWorkspaceUser(userId, () => next(), req.auth?.user?.role);
 });
+registerLabCaseRoutes(app);
 authService.registerAdminRoutes(app, {
   getUserChatLibrary: getChatLibrarySnapshotForUser,
   getUserChatSession: getChatSessionForUser,
@@ -461,7 +466,7 @@ function repoContextForPrompt() {
 }
 
 function startHeartbeatMonitor() {
-  if (heartbeatProcess) return;
+  if (process.env.LUCA_SOMPO_OFFLINE === 'true' || heartbeatProcess) return;
   const pythonCmd = process.platform === 'win32' ? 'py' : 'python3';
   const pythonArgs = process.platform === 'win32'
     ? ['-3', 'heartbeat_monitor.py', heartbeatReportPath]
@@ -480,6 +485,10 @@ function startHeartbeatMonitor() {
     const lines = String(chunk).split(/\r?\n/).filter(Boolean);
     for (const line of lines) appendHeartbeatLog(`[stderr] ${line}`);
     emitState();
+  });
+  heartbeatProcess.on('error', () => {
+    appendHeartbeatLog('[heartbeat] Python indisponível; monitor não iniciado');
+    heartbeatProcess = null;
   });
   heartbeatProcess.on('exit', () => {
     appendHeartbeatLog('[heartbeat] stopped');
@@ -2898,8 +2907,10 @@ app.get('/api/router/models', (_req, res) => {
   });
 });
 
+registerSompoRiskRoutes(app, sompoTelemetryHistory, sompoTelemetrySource);
 app.get('/api/sompo/telemetry', createSompoTelemetryHttpHandler());
 app.get('/api/sompo/telemetry/history', createSompoTelemetryHistoryHttpHandler(sompoTelemetryHistory));
+app.get('/api/sompo/telemetry/export', createSompoTelemetryExportHttpHandler(sompoTelemetryHistory));
 app.post('/api/sompo/telemetry/simulation', createSompoTelemetrySimulationHttpHandler(sompoTelemetryHistory));
 app.post('/api/sompo/telemetry/episode', createSompoTelemetryEpisodeStartHttpHandler(sompoTelemetryHistory));
 app.get('/api/sompo/telemetry/episode/:publicId', createSompoTelemetryEpisodeGetHttpHandler(sompoTelemetryHistory));
@@ -3293,6 +3304,7 @@ function teamTemplatesError(res, error) {
   const code = error?.code || error?.message || 'template_error';
   const status = (
     code === 'template_not_found' ? 404
+      : code === 'admin_required' ? 403
       : code === 'template_limit_reached' || code === 'template_order_mismatch'
         || code === 'invalid_template_kind' || code === 'template_id_required' ? 400
         : Number(error?.status) || 500
@@ -4285,6 +4297,7 @@ app.post('/api/agents/clear', (_req, res) => {
 });
 
 app.use('/icons', express.static(path.resolve(process.cwd(), 'public', 'icons')));
+app.use('/datasets', express.static(path.resolve(process.cwd(), 'datasets')));
 
 if (fs.existsSync(indexPath)) {
   app.use(express.static(distPath));

@@ -5,23 +5,27 @@ import LucaAiPage from '@/pages/LucaAiPage';
 import PersonasPage from '@/pages/PersonasPage';
 import ConfiguracaoPage from '@/pages/ConfiguracaoPage';
 import SompoPage from '@/pages/SompoPage';
+import LaboratorioPage from '@/pages/LaboratorioPage';
 import AdminPage from '@/pages/AdminPage';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppLocation } from '@/hooks/useAppLocation';
 import { ChatLibraryProvider, useChatLibrary } from '@/hooks/useChatLibrary';
 import { isAppPage } from '../shared/app-location.js';
 
+const ADMIN_PAGES: PageId[] = ['personas', 'configuracao', 'admin'];
+
 export default function App() {
   const { user } = useAuth();
   const { location, navigate } = useAppLocation();
   const activePage: PageId = isAppPage(location.page) ? location.page : 'inicio';
-  const authorizedPage: PageId = activePage === 'admin' && user?.role !== 'admin' ? 'inicio' : activePage;
+  const needsAdmin = ADMIN_PAGES.includes(activePage);
+  const authorizedPage: PageId = needsAdmin && user?.role !== 'admin' ? 'inicio' : activePage;
 
   useEffect(() => {
-    if (activePage === 'admin' && user?.role !== 'admin') {
+    if (needsAdmin && user?.role !== 'admin') {
       navigate({ page: 'inicio' }, 'replace');
     }
-  }, [activePage, navigate, user?.role]);
+  }, [needsAdmin, navigate, user?.role]);
 
   function goToPage(page: PageId) {
     if (page === 'sompo') {
@@ -38,6 +42,7 @@ export default function App() {
       case 'personas':    return <PersonasPage />;
       case 'configuracao': return <ConfiguracaoPage />;
       case 'sompo':       return <SompoPage />;
+      case 'laboratorio': return <LaboratorioPage />;
       case 'admin':       return <AdminPage />;
     }
   };

@@ -1,8 +1,13 @@
 export const SOMPO_TELEMETRY_PATH: '/trator/001/sensores';
 export const SOMPO_MISSION_DOSSIER_DELIMITER: '--- DOSSIÊ TÉCNICO ---';
 
+export function currentSompoTelemetry(
+  snapshot: SompoTelemetrySnapshot | null | undefined,
+  nowMs?: number,
+): SompoTelemetrySnapshot | null | undefined;
+
 export type SompoTelemetryFreshness = 'checking' | 'fresh' | 'stale';
-export type SompoTelemetryStatus = 'normal' | 'alert';
+export type SompoTelemetryStatus = 'normal' | 'alert' | 'unknown';
 export type SompoTelemetryConnectionState = 'connecting' | 'live' | 'reconnecting' | 'stopped';
 export type SompoTelemetrySourceKind = 'firebase' | 'simulation';
 
@@ -28,8 +33,8 @@ export interface SompoTelemetrySnapshot {
   deviceTimestamp: number | null;
   status: SompoTelemetryStatus;
   risks: {
-    collision: boolean;
-    inclination: boolean;
+    collision: boolean | null;
+    inclination: boolean | null;
   };
   readings: {
     distance: number | null;

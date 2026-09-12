@@ -22,6 +22,8 @@ import { useAppLocation } from '@/hooks/useAppLocation';
 import { useDeferredFlag } from '@/hooks/useDeferredFlag';
 import { pickFailureCopy } from '@/lib/surface-failure';
 import AdminChatViewer from '@/components/AdminChatViewer';
+import PersonasPage from '@/pages/PersonasPage';
+import ConfiguracaoPage from '@/pages/ConfiguracaoPage';
 import { ORDEM_PARAM } from '../../shared/app-location.js';
 import type {
   LucaAiChatFolder as ChatFolder,
@@ -228,6 +230,7 @@ function stubAccount(id: string, existing?: TrackedUser | null): TrackedUser {
 export default function AdminPage() {
   const { user, impersonateUser } = useAuth();
   const { location, navigate } = useAppLocation();
+  const adminTab = location.aba === 'personas' || location.aba === 'configuracao' ? location.aba : 'console';
   const search = location.busca;
   const sort = ORDEM_PARAM[location.ordem] || 'activity_desc';
   const [searchDraft, setSearchDraft] = useState(location.busca);
@@ -399,8 +402,35 @@ export default function AdminPage() {
     }
   }
 
+  function selectAdminTab(tab: 'console' | 'personas' | 'configuracao') {
+    navigate({
+      aba: tab === 'console' ? '' : tab,
+      busca: '', filtro: 'all', tipo: 'team', modelo: '', novo: false,
+      conta: '', sessao: '', ordem: '',
+    }, 'push');
+  }
+
   return (
     <div className="admin-page luca-page-shell" data-admin-console>
+      <nav className="admin-tabs" aria-label="Áreas do console">
+        {([
+          ['console', 'Console'],
+          ['personas', 'Personas'],
+          ['configuracao', 'Configuração'],
+        ] as const).map(([tab, label]) => (
+          <button
+            type="button"
+            key={tab}
+            className={`admin-tab ${adminTab === tab ? 'active' : ''}`}
+            aria-current={adminTab === tab ? 'page' : undefined}
+            onClick={() => selectAdminTab(tab)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+      {adminTab === 'personas' ? <PersonasPage /> : adminTab === 'configuracao' ? <ConfiguracaoPage /> : (
+      <>
       <header className="admin-heading">
         <div>
           <span>ADMINISTRAÇÃO</span>
@@ -678,6 +708,8 @@ export default function AdminPage() {
           document.body,
         )
         : null}
+      </>
+      )}
     </div>
   );
 }

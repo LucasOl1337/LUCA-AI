@@ -10,7 +10,8 @@ const layout = readFileSync(new URL('../src/components/Layout.tsx', import.meta.
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const sompoPage = readFileSync(new URL('../src/pages/SompoPage.tsx', import.meta.url), 'utf8');
 const sompoTelemetryPanel = readFileSync(new URL('../src/components/SompoTelemetryPanel.tsx', import.meta.url), 'utf8');
-const sompoSimulator = readFileSync(new URL('../src/components/SompoTruckSimulator.tsx', import.meta.url), 'utf8');
+const sompoSimulator = ['../src/components/SompoTruckSimulator.tsx', '../src/components/sompo/createSompoRuralStage.ts', '../src/components/sompo/sompoStage.ts']
+  .map(path => readFileSync(new URL(path, import.meta.url), 'utf8')).join('\n');
 const sompoTruckModel = readFileSync(new URL('../src/components/sompo/createSompoTruckModel.ts', import.meta.url), 'utf8');
 const packageJson = readFileSync(new URL('../package.json', import.meta.url), 'utf8');
 const sompoCases = readFileSync(new URL('../src/lib/sompo-cases.ts', import.meta.url), 'utf8');
@@ -86,7 +87,7 @@ test('modo SOMPO abre no simulador 3.2 local e mantém o Firebase como fonte sec
   assert.match(sompoSimulator, /OrbitControls/);
   assert.match(sompoSimulator, /data-sompo-simulator/);
   assert.match(sompoSimulator, /ESP32 VIRTUAL/);
-  assert.match(sompoSimulator, /Não envia ao Firebase/);
+  assert.match(sompoSimulator, /Telemetria sintética/);
   assert.match(sompoSimulator, /renderer\.dispose\(\)/);
   assert.match(sompoSimulator, /cancelAnimationFrame/);
   assert.match(sompoSimulator, /prefers-reduced-motion/);

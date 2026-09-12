@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { normalizeSompoTelemetry } from '../shared/sompo-telemetry.js';
+import { convertSompoDataset, SOMPO_EXPORT_MAX_SAMPLES, SOMPO_EXPORT_MAX_JSON_BYTES } from '../shared/sompo-lab-export.js';
 import { inferredImageMime } from './image-signature.js';
 
 export const SOMPO_TELEMETRY_HISTORY_DEFAULT_LIMIT = 2000;
@@ -94,11 +95,12 @@ function parseEpisodeFrame(raw, index) {
   };
 }
 
-function originKey(sourceKind, tractorId) {
-  return `${sourceKind}:${tractorId}`;
+function originKey(sourceKind, tractorId, episodeId = null) {
+  return JSON.stringify([sourceKind, tractorId, episodeId]);
 }
 
 function finiteNumber(value) {
+  if (value === null || value === undefined || typeof value === 'boolean' || (typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') return null;
   const number = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(number) ? number : null;
 }
@@ -166,8 +168,8 @@ function mapSampleRow(row) {
     rotX: finiteNumber(row.rotX),
     rotY: finiteNumber(row.rotY),
     rotZ: finiteNumber(row.rotZ),
-    riscoColisao: Boolean(row.riscoColisao),
-    riscoInclinacao: Boolean(row.riscoInclinacao),
+    riscoColisao: row.collisionKnown ? Boolean(row.riscoColisao) : null,
+    riscoInclinacao: row.inclinationKnown ? Boolean(row.riscoInclinacao) : null,
   };
 }
 
@@ -216,7 +218,7 @@ function collectFlagTransitions(samples) {
   for (let index = 1; index < samples.length; index += 1) {
     const previous = samples[index - 1];
     const current = samples[index];
-    if (Boolean(previous.riscoColisao) !== Boolean(current.riscoColisao)) {
+    if (previous.riscoColisao != null && current.riscoColisao != null && previous.riscoColisao !== current.riscoColisao) {
       transitions.push({
         at: current.observedAt,
         flag: 'riscoColisao',
@@ -225,7 +227,7 @@ function collectFlagTransitions(samples) {
         index,
       });
     }
-    if (Boolean(previous.riscoInclinacao) !== Boolean(current.riscoInclinacao)) {
+    if (previous.riscoInclinacao != null && current.riscoInclinacao != null && previous.riscoInclinacao !== current.riscoInclinacao) {
       transitions.push({
         at: current.observedAt,
         flag: 'riscoInclinacao',
@@ -308,6 +310,7 @@ function summarizeSamples(samples) {
   );
 
   return {
+    unknownCollisionCount: samples.filter(sample => sample.riscoColisao == null).length,
     count: samples.length,
     spanMs: Math.max(0, samples.at(-1).observedMs - samples[0].observedMs),
     first: samples[0],
@@ -346,8 +349,8 @@ function episodePhaseSlice(id, samples, startIndex, endIndex) {
     startOffsetMs: slice[0].observedMs - originMs,
     endOffsetMs: slice.at(-1).observedMs - originMs,
     durationMs: slice.at(-1).observedMs - slice[0].observedMs,
-    riscoColisao: slice.some((sample) => Boolean(sample.riscoColisao)),
-    riscoInclinacao: slice.some((sample) => Boolean(sample.riscoInclinacao)),
+    riscoColisao: slice.some((sample) => sample.riscoColisao === true) ? true : slice.every((sample) => sample.riscoColisao === false) ? false : null,
+    riscoInclinacao: slice.some((sample) => sample.riscoInclinacao === true) ? true : slice.every((sample) => sample.riscoInclinacao === false) ? false : null,
     stats: {
       distancia: statOf(slice.map((sample) => sample.distancia)),
       pitch: statOf(slice.map((sample) => sample.pitch)),
@@ -534,7 +537,11 @@ export function createSompoTelemetryHistory({
     if (!sampleColumns.some((column) => column.name === 'episode_id')) {
       db.exec('ALTER TABLE sompo_telemetry_samples ADD COLUMN episode_id INTEGER NULL');
     }
+    for (const column of ['collision_known', 'inclination_known']) {
+      if (!sampleColumns.some((item) => item.name === column)) db.exec(`ALTER TABLE sompo_telemetry_samples ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`);
+    }
     db.exec(`
+      CREATE TABLE IF NOT EXISTS sompo_risk_assessments (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, tractor_id TEXT NOT NULL, source_kind TEXT NOT NULL, created_at TEXT NOT NULL, evidence_json TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS sompo_telemetry_samples_episode
         ON sompo_telemetry_samples (episode_id);
       CREATE TABLE IF NOT EXISTS sompo_telemetry_episodes (
@@ -574,8 +581,8 @@ export function createSompoTelemetryHistory({
       observed_at, observed_ms,
       distancia, temperatura, umidade, pitch, roll,
       acc_x, acc_y, acc_z, rot_x, rot_y, rot_z,
-      risco_colisao, risco_inclinacao, episode_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      risco_colisao, risco_inclinacao, episode_id, collision_known, inclination_known
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const insertEpisodeStatement = db.prepare(`
@@ -641,7 +648,7 @@ export function createSompoTelemetryHistory({
     WHERE episode_id = ? AND seq = ?
   `);
 
-  const episodeSamplesStatement = db.prepare(`
+  const sampleSelect = `
     SELECT
       id,
       episode_id AS episodeId,
@@ -663,53 +670,40 @@ export function createSompoTelemetryHistory({
       rot_y AS rotY,
       rot_z AS rotZ,
       risco_colisao AS riscoColisao,
-      risco_inclinacao AS riscoInclinacao
+      risco_inclinacao AS riscoInclinacao,
+      collision_known AS collisionKnown, inclination_known AS inclinationKnown
     FROM sompo_telemetry_samples
-    WHERE episode_id = ?
+  `;
+  const episodeSamplesStatement = db.prepare(`${sampleSelect} WHERE episode_id = ?
     ORDER BY observed_ms ASC, id ASC
   `);
 
   const queryStatement = db.prepare(`
     SELECT * FROM (
-      SELECT
-        id,
-        episode_id AS episodeId,
-        tractor_id AS tractorId,
-        source_kind AS sourceKind,
-        scenario_label AS scenarioLabel,
-        device_timestamp AS deviceTimestamp,
-        observed_at AS observedAt,
-        observed_ms AS observedMs,
-        distancia,
-        temperatura,
-        umidade,
-        pitch,
-        roll,
-        acc_x AS accX,
-        acc_y AS accY,
-        acc_z AS accZ,
-        rot_x AS rotX,
-        rot_y AS rotY,
-        rot_z AS rotZ,
-        risco_colisao AS riscoColisao,
-        risco_inclinacao AS riscoInclinacao
-      FROM sompo_telemetry_samples
+      ${sampleSelect}
       WHERE source_kind = ? AND tractor_id = ? AND observed_ms >= ?
-      ORDER BY observed_ms DESC
+      ORDER BY observed_ms DESC, id DESC
       LIMIT ?
     ) AS recent
-    ORDER BY observedMs ASC
+    ORDER BY observedMs ASC, id ASC
+  `);
+  const exportWindowStatement = db.prepare(`${sampleSelect}
+    WHERE source_kind = ? AND tractor_id = ? AND observed_ms >= ? AND observed_ms <= ?
+    ORDER BY observed_ms ASC, id ASC LIMIT ?
+  `);
+  const exportEpisodeStatement = db.prepare(`${sampleSelect}
+    WHERE episode_id = ? ORDER BY observed_ms ASC, id ASC LIMIT ?
   `);
 
   const lastChanged = new Map();
   try {
     const rows = db.prepare(`
-      SELECT source_kind AS sourceKind, tractor_id AS tractorId, MAX(observed_ms) AS lastMs
+      SELECT source_kind AS sourceKind, tractor_id AS tractorId, episode_id AS episodeId, MAX(observed_ms) AS lastMs
       FROM sompo_telemetry_samples
-      GROUP BY source_kind, tractor_id
+      GROUP BY source_kind, tractor_id, episode_id
     `).all();
     for (const row of rows) {
-      lastChanged.set(originKey(row.sourceKind, row.tractorId), Number(row.lastMs) || 0);
+      lastChanged.set(originKey(row.sourceKind, row.tractorId, row.episodeId), Number(row.lastMs) || 0);
     }
   } catch (error) {
     rethrowSqlite(error, 'loadLastChanged');
@@ -721,8 +715,8 @@ export function createSompoTelemetryHistory({
     if (closed) throw new Error('sompo_telemetry_history_closed');
   }
 
-  function lookupLastMs(sourceKind, tractorId, pending) {
-    const key = originKey(sourceKind, tractorId);
+  function lookupLastMs(sourceKind, tractorId, pending, episodeId = null) {
+    const key = originKey(sourceKind, tractorId, episodeId);
     if (pending?.has(key)) return pending.get(key);
     return lastChanged.get(key) ?? 0;
   }
@@ -737,7 +731,7 @@ export function createSompoTelemetryHistory({
       throw new Error('sompo_telemetry_timestamp_invalid:changedAt');
     }
     const row = snapshotToRow(snapshot, observedMs);
-    const lastMs = lookupLastMs(row.sourceKind, row.tractorId, pending);
+    const lastMs = lookupLastMs(row.sourceKind, row.tractorId, pending, episodeRowId);
     if (changedMs <= lastMs) return false;
     insertStatement.run(
       row.tractorId,
@@ -760,8 +754,10 @@ export function createSompoTelemetryHistory({
       row.riscoColisao,
       row.riscoInclinacao,
       episodeRowId,
+      typeof snapshot.risks?.collision === 'boolean' ? 1 : 0,
+      typeof snapshot.risks?.inclination === 'boolean' ? 1 : 0,
     );
-    pending.set(originKey(row.sourceKind, row.tractorId), changedMs);
+    pending.set(originKey(row.sourceKind, row.tractorId, episodeRowId), changedMs);
     return true;
   }
 
@@ -1102,10 +1098,54 @@ export function createSompoTelemetryHistory({
     db.close();
   }
 
+  function exportDataset({ sourceKind, tractorId, windowMin = SOMPO_TELEMETRY_HISTORY_DEFAULT_WINDOW_MIN, episodeId } = {}) {
+    assertOpen();
+    const endMs = now();
+    const episode = episodeId ? requireEpisode(episodeId) : null;
+    const kind = sourceKind ?? episode?.sourceKind ?? 'firebase';
+    const tractor = String(tractorId ?? episode?.tractorId ?? '001').trim();
+    if (!SOURCE_KINDS.has(kind) || !tractor) throw httpError(400, 'sompo_export_invalid_origin', 'Informe uma máquina e origem válidas.');
+    if (!Number.isFinite(windowMin) || windowMin < 1 || windowMin > SOMPO_TELEMETRY_HISTORY_MAX_WINDOW_MIN) throw httpError(400, 'sompo_export_invalid_window', 'janelaMin deve estar entre 1 e 240 minutos.');
+    if (episode && (episode.sourceKind !== kind || episode.tractorId !== tractor)) throw httpError(400, 'sompo_export_episode_origin_mismatch', 'O episódio não corresponde à máquina/origem selecionadas.');
+    const startMs = endMs - windowMin * 60_000;
+    let samples;
+    try {
+      samples = (episode
+        ? exportEpisodeStatement.all(episode.id, SOMPO_EXPORT_MAX_SAMPLES + 1)
+        : exportWindowStatement.all(kind, tractor, startMs, endMs, SOMPO_EXPORT_MAX_SAMPLES + 1)).map(mapSampleRow);
+    } catch (error) {
+      rethrowSqlite(error, 'exportDataset');
+    }
+    if (samples.length > SOMPO_EXPORT_MAX_SAMPLES) throw httpError(413, 'sompo_export_too_large', `A gravação excede ${SOMPO_EXPORT_MAX_SAMPLES} amostras. Exporte uma janela menor; nenhuma amostra foi truncada.`);
+    if (!samples.length) throw httpError(400, 'sompo_export_empty', 'Nenhuma amostra registrada para a máquina/origem neste período. Amplie a janela ou inicie a telemetria.');
+    const dataset = {
+      schemaVersion: 'sompo-telemetry-v1', sourceKind: kind, tractorId: tractor,
+      synthetic: kind === 'simulation', timestampBasis: kind === 'firebase' ? 'server_received' : 'simulator_observed',
+      description: 'Histórico normalizado do servidor SOMPO; não é payload bruto do firmware. Unidades físicas seguem a convenção SOMPO; IMU preservada na unidade de origem.',
+      exportedAt: new Date(endMs).toISOString(),
+      window: episode ? { startAt: episode.startedAt, endAt: episode.endedAt ?? new Date(endMs).toISOString(), episodeId: episode.publicId }
+        : { startAt: new Date(startMs).toISOString(), endAt: new Date(endMs).toISOString(), windowMin },
+      count: samples.length, samples,
+      ...(episode ? { episode } : {}),
+    };
+    if (Buffer.byteLength(JSON.stringify(dataset)) > SOMPO_EXPORT_MAX_JSON_BYTES) throw httpError(413, 'sompo_export_too_large', 'O dataset excede 8 MiB. Exporte uma janela menor; nenhuma amostra foi truncada.');
+    return dataset;
+  }
+
   return {
+    saveAssessment(userId, evidence) {
+      const id = randomUUID();
+      const result = { ...evidence, id, createdAt: new Date(now()).toISOString() };
+      db.prepare('INSERT INTO sompo_risk_assessments VALUES (?, ?, ?, ?, ?, ?)').run(id, userId, evidence.snapshot.tractorId, evidence.snapshot.source.kind, result.createdAt, JSON.stringify(result));
+      return result;
+    },
+    listAssessments(userId, tractorId, sourceKind) {
+      return db.prepare('SELECT evidence_json FROM sompo_risk_assessments WHERE user_id = ? AND tractor_id = ? AND source_kind = ? ORDER BY created_at DESC LIMIT 20').all(userId, tractorId, sourceKind).map(row => JSON.parse(row.evidence_json));
+    },
     record,
     recordMany,
     query,
+    exportDataset,
     summarize: summarizeSamples,
     summarizeEpisode: summarizeSompoEpisodeSamples,
     startEpisode,
@@ -1138,6 +1178,41 @@ export function createSompoTelemetryHistoryHttpHandler(history) {
       });
     } catch (error) {
       sendHistoryError(res, error, 'Não foi possível ler o histórico de telemetria.');
+    }
+  };
+}
+
+export function createSompoTelemetryExportHttpHandler(history) {
+  return async function sompoTelemetryExportHttpHandler(req, res) {
+    try {
+      const format = req.query?.format ?? 'json';
+      if (!['json', 'csv'].includes(format)) throw httpError(400, 'sompo_export_invalid_format', 'Formato inválido. Use format=json ou format=csv.');
+      const rawWindow = req.query?.janelaMin;
+      if (rawWindow != null && (!Number.isFinite(Number(rawWindow)) || Number(rawWindow) < 1 || Number(rawWindow) > 240)) throw httpError(400, 'sompo_export_invalid_window', 'janelaMin deve estar entre 1 e 240 minutos.');
+      const dataset = history.exportDataset({
+        sourceKind: req.query?.fonte == null ? undefined : parseFonte(req.query.fonte),
+        tractorId: req.query?.trator,
+        windowMin: rawWindow == null ? SOMPO_TELEMETRY_HISTORY_DEFAULT_WINDOW_MIN : Number(rawWindow),
+        episodeId: req.query?.episodeId,
+      });
+      res.setHeader('Cache-Control', 'private, no-store');
+      if (format === 'csv') {
+        const converted = convertSompoDataset(dataset);
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${converted.fileName}"`);
+        res.send(converted.csv);
+      } else {
+        const safeId = dataset.tractorId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80);
+        res.setHeader('Content-Disposition', `attachment; filename="sompo-${safeId}-${dataset.sourceKind}.json"`);
+        res.json(dataset);
+      }
+    } catch (error) {
+      if ([400, 404, 413].includes(Number(error?.status))) {
+        res.status(error.status).json({ ok: false, error: error.code || 'sompo_export_invalid_dataset', message: error.message });
+      } else {
+        console.error('[sompo-telemetry-export]', error);
+        res.status(500).json({ ok: false, error: 'sompo_export_unavailable', message: 'Não foi possível exportar o histórico de telemetria.' });
+      }
     }
   };
 }
