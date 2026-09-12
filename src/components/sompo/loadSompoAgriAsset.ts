@@ -52,7 +52,9 @@ export async function loadSompoAgriAsset(equipmentId: SompoAgriEquipmentId, sign
 
   const model = gltf.scene;
   model.name = `sompo-agri-${equipmentId}-asset`;
-  model.rotation.y = Math.PI / 2; // Hunyuan reference faces +Z; Sompo forward is +X.
+  // Hunyuan reference faces +Z; Sompo forward is +X. A colheitadeira foi reconstruída com a plataforma
+  // de corte voltada para -X do modelo (andava de lado): meia-volta a mais deixa a plataforma na frente.
+  model.rotation.y = equipmentId === 'harvester' ? Math.PI : Math.PI / 2;
   model.updateMatrixWorld(true);
   const bounds = new THREE.Box3().setFromObject(model);
   const size = bounds.getSize(new THREE.Vector3());
