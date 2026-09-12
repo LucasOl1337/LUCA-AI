@@ -106,7 +106,8 @@ function buildStaticMap(scenarioId: string, outcomeId: string): StaticMap | null
     const anchor = polygonContains(centroid, polygon) ? centroid
       : ring.reduce((near, p) => Math.hypot(p.x - centroid.x, p.z - centroid.z) < Math.hypot(near.x - centroid.x, near.z - centroid.z) ? p : near);
     const text = POLYGON_NAMES[polygon.id] ?? hazards.find(hazard => hazard.polygon === polygon)?.label ?? polygon.id;
-    const x = px(anchor.x), y = py(anchor.z), width = ctx.measureText(text).width + 14;
+    // 5 m acima do ponto de ancoragem: o percurso (z ≈ 0) cruza o centro do declive e riscava o texto.
+    const x = px(anchor.x), y = py(anchor.z) - 5 * SCALE, width = ctx.measureText(text).width + 14;
     ctx.fillStyle = LABEL_BG; ctx.fillRect(x - width / 2, y - 11, width, 22);
     ctx.fillStyle = '#2b2a24'; ctx.fillText(text, x, y);
   }
