@@ -1,0 +1,69 @@
+{
+  "asset": "generated-agri-tractor.glb",
+  "generatedBy": "LUCA-AI",
+  "createdAt": "2026-09-11",
+  "sourceImage": "generated-agri-tractor-source.png",
+  "sourceImageSha256": "7f6033821b1dfdd696118da61798f8c5aff21845116897c8ea80c8a47baf96c5",
+  "sourcePrompt": "Photorealistic industrial product photograph for accurate single-image 3D reconstruction. One complete modern high-horsepower Brazilian row-crop farm tractor, design language broadly inspired by contemporary Valtra and John Deere machines but entirely unbranded, no logos, no letters, no readable text. Long sculpted dark forest-green engine hood with warm yellow accent panels, enclosed panoramic black-glass cab, four large deeply treaded agricultural tires with the rear pair substantially larger than the front pair, yellow steel wheel rims, front ballast block, exhaust stack, side steps, mirrors, work lights, rear three-point hitch and hydraulic connections visibly distinct. Correct plausible machinery proportions and clean continuous silhouette. Front-left three-quarter view with the tractor nose pointing toward the right side of the image, camera at axle height, 55 mm product lens. Entire tractor including all tires, mirrors, exhaust and hitch fully inside the frame with generous empty margin. Plain uniform very light gray seamless studio background and floor, diffuse neutral illumination, soft contact shadow only. Sharp focus throughout, realistic painted metal, rubber, glass and lightly dusty working surfaces. No field, no crop, no mud spray, no people, no other vehicle, no detached parts, no illustration, no miniature, no toy, no dramatic lighting.",
+  "imageModel": "cx/gpt-image-2 via local 9Router /v1/images/generations",
+  "imageDimensions": [
+    1536,
+    1024
+  ],
+  "backgroundRemoval": "Hunyuan3D U2Net BackgroundRemover; generated original is preserved beside the GLB",
+  "reconstruction": "Tencent Hunyuan3D-2.1",
+  "reconstructionRevision": "82920d643c0dc2f7bfd7255f45f62d386edfe60c",
+  "weightsRevision": "0b94677654c57bb9a6b6845cd7b704ccf551d327",
+  "shape": {
+    "steps": 50,
+    "guidance": 5,
+    "octreeResolution": 384,
+    "seed": 142,
+    "retopologyTargetTriangles": 28000,
+    "metrics": {
+      "seconds": 165.492,
+      "sourceTriangles": 645140,
+      "triangles": 28000,
+      "peakVramGb": 1.542,
+      "offload": "streamed transformer blocks; CPU-offloaded conditioner and VAE"
+    }
+  },
+  "texture": {
+    "views": 6,
+    "viewResolution": 512,
+    "atlasResolution": 2048,
+    "exportedImageDimensions": [
+      [
+        1024,
+        1024
+      ],
+      [
+        1024,
+        1024
+      ]
+    ],
+    "externalManifest": "generated-agri-tractor.textures.json",
+    "metrics": {
+      "seconds": 61.167,
+      "peakVramGb": 3.06,
+      "offload": "sequential diffusion offload; independently offloaded DINO; tiled VAE and upscaler"
+    }
+  },
+  "triangles": 28000,
+  "adaptations": [
+    "Quadric edge-collapse retopology before UV unwrap and PBR painting",
+    "Boundary and normals preservation enabled during reduction",
+    "Invalid upstream KHR_materials_specular values removed",
+    "Byte-identical embedded images extracted for CSP-safe restoreSompoTextures loading",
+    "Runtime loader rotates generated +Z forward axis to Sompo +X and fits nominal dimensions"
+  ],
+  "limitations": [
+    "Single source image: hidden surfaces and mechanical details are inferred",
+    "The reconstructed shell is not CAD-accurate and is not separated into independently articulated parts",
+    "Fine handrails, header teeth, hydraulic lines and tire lugs may contain reconstruction artifacts"
+  ],
+  "license": "SOMPO-AGRI-ASSET-LICENSE.txt",
+  "hunyuanLicense": "HUNYUAN-COMMUNITY-LICENSE.txt",
+  "sha256": "a875614c2775a9afd5e55e7579d9fac119bfa4387ab2eef66bf952221b159573",
+  "bytes": 2264596
+}

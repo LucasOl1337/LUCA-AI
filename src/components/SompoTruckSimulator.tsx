@@ -38,16 +38,34 @@ import {
   type SompoAxisCalibration,
 } from './sompo/sensorPose.js';
 import {
+  SOMPO_AGRI_SCENARIOS,
+  getSompoAgriFrame,
+  getSompoAgriScenario,
+  type SompoAgriScenarioId,
+} from '../../shared/sompo-agri-scenarios.js';
+import {
+  createSompoAgriSimulationSnapshot,
+  getSompoAgriOutcomes,
+  isSompoAgriScenarioId,
+} from '../../shared/sompo-agri-brief.js';
+import { mountSompoAgriStage } from './sompo/createSompoAgriStage';
+import {
   SOMPO_RURAL_SCRIPTS,
   getSompoRuralFrame,
   SOMPO_BRAKING_SCRIPT,
   getSompoBrakingScriptState,
+  getSompoBrakingTravelMeters,
   SOMPO_COLLISION_FRAME_MOMENTS,
+  SOMPO_COLLISION_OUTCOMES,
   SOMPO_COLLISION_SCRIPT,
   SOMPO_SIMULATION_SCENARIOS,
   createSompoCollisionScriptSnapshot,
   createSompoSimulationSnapshot,
-  getSompoCollisionScriptPhase,
+  getSompoCollisionOutcome,
+  getSompoCollisionVisualPose,
+  getSompoRuralTravelMeters,
+  getSompoScenarioOutcomes,
+  getSompoScenarioScript,
   getSompoSimulationScenario,
   type SompoSimulationControls,
   type SompoSimulationScenarioId,
@@ -57,7 +75,7 @@ interface SompoTruckSimulatorProps {
   source: 'firebase' | 'simulation';
   telemetry?: SompoTelemetrySnapshot | null;
   onTelemetry?: (snapshot: SompoTelemetrySnapshot) => void;
-  onEpisodeRecorded?: (episode: { publicId: string; kind: string }) => void;
+  onEpisodeRecorded?: (episode: { publicId: string; kind: string; outcomeId?: string; outcomeLabel?: string }) => void;
 }
 
 type CollisionRunState =
@@ -73,6 +91,9 @@ interface CollisionRunHandle {
   startedAt: number;
   queue: Record<string, unknown>[];
   lastSampleMs: number;
+  outcomeId: string;
+  outcomeLabel: string;
+  frameMoments: readonly Readonly<{ offsetMs: number; fase: string; label: string }>[];
 }
 
 interface CollisionFrameCapture {
@@ -94,14 +115,22 @@ interface SceneApi {
 }
 
 const SCENARIO_IDS = Object.keys(SOMPO_SIMULATION_SCENARIOS) as SompoSimulationScenarioId[];
+const AGRI_SCENARIO_IDS = Object.keys(SOMPO_AGRI_SCENARIOS) as SompoAgriScenarioId[];
 
-function controlsForScenario(scenarioId: SompoSimulationScenarioId): SompoSimulationControls {
+interface SompoAgriRun {
+  scenarioId: SompoAgriScenarioId;
+  outcomeId: string;
+}
+
+function controlsForScenario(scenarioId: SompoSimulationScenarioId, outcomeId?: string): SompoSimulationControls {
   const {
     label: _label,
     description: _description,
     ...controls
   } = getSompoSimulationScenario(scenarioId);
-  return controls;
+  const outcomes = getSompoScenarioOutcomes(scenarioId);
+  const outcome = outcomes.find((item) => item.id === outcomeId) || outcomes[0];
+  return { ...controls, outcomeId: outcome.id };
 }
 
 const INITIAL_CONTROLS = controlsForScenario('normal');
@@ -335,6 +364,7 @@ export default function SompoTruckSimulator({
 }: SompoTruckSimulatorProps) {
   const isFirebase = source === 'firebase';
   const [controls, setControls] = useState<SompoSimulationControls>(INITIAL_CONTROLS);
+  const [agriRun, setAgriRun] = useState<SompoAgriRun | null>(null);
   const [axisCalibration, setAxisCalibration] = useState<SompoAxisCalibration>(loadAxisCalibration);
   const [preview, setPreview] = useState<SompoTelemetrySnapshot>(() => (
     telemetry || createSompoSimulationSnapshot(INITIAL_CONTROLS, { elapsedMs: 0 })
@@ -357,7 +387,13 @@ export default function SompoTruckSimulator({
   const pendingSamplesRef = useRef<Record<string, unknown>[]>([]);
   const flushBusyRef = useRef(false);
   const collisionRunRef = useRef<CollisionRunHandle | null>(null);
-  const collisionVisualRef = useRef<{ baseRange: number } | null>(null);
+  const collisionVisualRef = useRef<{
+    baseRange: number;
+    startX: number | null;
+    outcomeId: string;
+    lastAdvance: number;
+  } | null>(null);
+  const [collisionOutcomeId, setCollisionOutcomeId] = useState(SOMPO_COLLISION_OUTCOMES[0].id);
   const collisionCaptureRef = useRef<CollisionCaptureHandle | null>(null);
   const [collisionFrameCount, setCollisionFrameCount] = useState(0);
   const [collisionFramesWarning, setCollisionFramesWarning] = useState<string | null>(null);
@@ -367,14 +403,16 @@ export default function SompoTruckSimulator({
     || collisionRun.status === 'finishing';
 
   const activeScenario = useMemo(
-    () => SOMPO_SIMULATION_SCENARIOS[controls.scenarioId],
-    [controls.scenarioId],
+    () => (agriRun ? getSompoAgriScenario(agriRun.scenarioId) : SOMPO_SIMULATION_SCENARIOS[controls.scenarioId]),
+    [agriRun, controls.scenarioId],
   );
 
   const collisionPhaseLabel = useMemo(() => {
-    const phaseId = getSompoCollisionScriptPhase(collisionElapsedSec * 1_000);
-    return SOMPO_COLLISION_SCRIPT.phases.find((phase) => phase.id === phaseId)?.label || phaseId;
-  }, [collisionElapsedSec]);
+    const plan = getSompoCollisionOutcome(collisionOutcomeId);
+    const elapsedMs = collisionElapsedSec * 1_000;
+    const phase = plan.phases.find((item) => elapsedMs < item.endMs) || plan.phases[plan.phases.length - 1];
+    return phase?.label || '';
+  }, [collisionElapsedSec, collisionOutcomeId]);
 
   useEffect(() => {
     controlsRef.current = controls;
@@ -408,10 +446,15 @@ export default function SompoTruckSimulator({
     if (isFirebase || collisionActive) return undefined;
 
     function emitSnapshot() {
-      const snapshot = createSompoSimulationSnapshot(controls, {
-        elapsedMs: performance.now() - startedAtRef.current,
-        connectedAt: connectedAtRef.current,
-      });
+      const snapshot = agriRun
+        ? createSompoAgriSimulationSnapshot(agriRun.scenarioId, agriRun.outcomeId, {
+          elapsedMs: performance.now() - startedAtRef.current,
+          connectedAt: connectedAtRef.current,
+        })
+        : createSompoSimulationSnapshot(controls, {
+          elapsedMs: performance.now() - startedAtRef.current,
+          connectedAt: connectedAtRef.current,
+        });
       previewRef.current = snapshot;
       setPreview(snapshot);
       onTelemetryRef.current?.(snapshot);
@@ -424,7 +467,7 @@ export default function SompoTruckSimulator({
     emitSnapshot();
     const timer = window.setInterval(emitSnapshot, 250);
     return () => window.clearInterval(timer);
-  }, [collisionActive, controls, isFirebase]);
+  }, [agriRun, collisionActive, controls, isFirebase]);
 
   useEffect(() => {
     if (isFirebase) {
@@ -521,7 +564,12 @@ export default function SompoTruckSimulator({
         collisionRunRef.current = null;
         collisionCaptureRef.current = null;
         setCollisionRun({ status: 'done', publicId: run.publicId });
-        onEpisodeRecordedRef.current?.({ publicId: run.publicId, kind: SOMPO_COLLISION_SCRIPT.kind });
+        onEpisodeRecordedRef.current?.({
+          publicId: run.publicId,
+          kind: SOMPO_COLLISION_SCRIPT.kind,
+          outcomeId: run.outcomeId,
+          outcomeLabel: run.outcomeLabel,
+        });
       } catch {
         collisionVisualRef.current = null;
         collisionRunRef.current = null;
@@ -542,6 +590,7 @@ export default function SompoTruckSimulator({
       }
       const snapshot = createSompoCollisionScriptSnapshot(elapsed, {
         connectedAt: connectedAtRef.current,
+        outcomeId: run.outcomeId,
       });
       previewRef.current = snapshot;
       setPreview(snapshot);
@@ -571,14 +620,15 @@ export default function SompoTruckSimulator({
   }, [collisionRun.status]);
 
   async function startCollisionRun() {
-    if (isFirebase || collisionActive) return;
+    if (isFirebase || collisionActive || agriRun) return;
+    const plan = getSompoCollisionOutcome(collisionOutcomeId);
     setCollisionRun({ status: 'starting' });
     let publicId = '';
     try {
       const result = await lucaApi.postSompoTelemetryEpisodeStart({
         kind: SOMPO_COLLISION_SCRIPT.kind,
         trator: 'SIM-001',
-        scenarioLabel: SOMPO_COLLISION_SCRIPT.label,
+        scenarioLabel: plan.scenarioLabel,
       });
       if (!result?.ok || !result.episode?.publicId) throw new Error('sompo_episode_start_failed');
       publicId = result.episode.publicId;
@@ -594,8 +644,16 @@ export default function SompoTruckSimulator({
       startedAt: performance.now(),
       queue: [],
       lastSampleMs: Number.NEGATIVE_INFINITY,
+      outcomeId: plan.id,
+      outcomeLabel: plan.label,
+      frameMoments: plan.frameMoments,
     };
-    collisionVisualRef.current = { baseRange: rangeForDistance(COLLISION_START_DISTANCE_CM) };
+    collisionVisualRef.current = {
+      baseRange: rangeForDistance(COLLISION_START_DISTANCE_CM),
+      startX: null,
+      outcomeId: plan.id,
+      lastAdvance: 0,
+    };
     collisionCaptureRef.current = { nextIndex: 0, frames: [] };
     setCollisionFrameCount(0);
     setCollisionFramesWarning(null);
@@ -606,6 +664,31 @@ export default function SompoTruckSimulator({
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return undefined;
+
+    // Palco agrícola: renderer independente (campo + equipamento gerado),
+    // montado no mesmo canvas sem tocar no fluxo do caminhão rural.
+    if (agriRun) {
+      setModelStatus('loading');
+      setModelAsset(null);
+      const stage = mountSompoAgriStage({
+        mount,
+        scenarioId: agriRun.scenarioId,
+        outcomeId: agriRun.outcomeId,
+        startedAtRef,
+        onModelStatus: (status, asset) => {
+          setModelStatus(status);
+          setModelAsset(asset);
+        },
+        onWebglError: () => setWebglError(true),
+      });
+      if (!stage) return undefined;
+      setWebglError(false);
+      sceneApiRef.current = stage;
+      return () => {
+        sceneApiRef.current = null;
+        stage.dispose();
+      };
+    }
 
     let renderer: THREE.WebGLRenderer;
     try {
@@ -661,6 +744,8 @@ export default function SompoTruckSimulator({
     keyLight.shadow.bias = -0.0001;
     keyLight.shadow.radius = 2;
     scene.add(keyLight);
+    // A sombra acompanha o caminhão pelo mundo: luz e alvo transladam juntos.
+    scene.add(keyLight.target);
     const roadScene = createSompoRoadScene(scene, renderer, camera);
     const postProcessing = createSompoPostProcessing(renderer, scene, camera);
     const frontArrow = new THREE.ArrowHelper(
@@ -744,12 +829,12 @@ export default function SompoTruckSimulator({
       focus(target) {
         focusTarget = target;
         if (target === 'sensor') {
-          camera.position.set(7.4, 4.7, 4.1);
           sensorGroup.getWorldPosition(orbit.target);
+          camera.position.set(orbit.target.x + 3, 4.7, 4.1);
           orbit.minDistance = 2.5;
         } else {
-          camera.position.set(9.7, 4.3, 11.2);
-          orbit.target.set(0, 1.9, 0);
+          orbit.target.set(truckPoseGroup.position.x, 1.9, truckPoseGroup.position.z);
+          camera.position.set(truckPoseGroup.position.x + 9.7, 4.3, 11.2);
           orbit.minDistance = 6;
         }
         orbit.update();
@@ -778,6 +863,35 @@ export default function SompoTruckSimulator({
     let truckBaseHeight = SOMPO_TRUCK_PIVOT_Y + 0.05;
     const relativeGroundRotation = new THREE.Euler();
 
+    // Deslocamento REAL: a posição X do caminhão no mundo é forma fechada do
+    // relógio do cenário (roteiro, frenagem ou velocidade constante), então
+    // seek/replay são determinísticos e o reinício continua estrada adiante.
+    let lastTruckWorldX = 0;
+    let runStamp = -1;
+    let runOriginX = 0;
+    let animalAnchorX = 9;
+    let wasCollisionVisual = false;
+    const REBASE_DISTANCE = 4096;
+
+    function scenarioTravelMeters(settings: SompoSimulationControls, elapsedMs: number) {
+      const scripted = getSompoRuralTravelMeters(settings.scenarioId, elapsedMs, settings.outcomeId);
+      if (scripted !== null) return scripted;
+      if (settings.scenarioId === SOMPO_BRAKING_SCRIPT.scenarioId) {
+        return getSompoBrakingTravelMeters(elapsedMs, settings.speedKph);
+      }
+      return (settings.speedKph / 3.6) * (elapsedMs / 1000);
+    }
+
+    /** O bovino é ancorado no ponto do mundo onde o roteiro fecha a menor distância. */
+    function animalAnchorFor(settings: SompoSimulationControls, originX: number) {
+      const script = getSompoScenarioScript(settings.scenarioId, settings.outcomeId);
+      if (!script) return originX + 9;
+      let closest = script.keyframes[0];
+      for (const keyframe of script.keyframes) if (keyframe.distance < closest.distance) closest = keyframe;
+      return originX + scenarioTravelMeters(settings, closest.atMs)
+        + SOMPO_TRUCK_FRONT_X + rangeForDistance(closest.distance);
+    }
+
     function render(time: number) {
       const delta = Math.min(0.04, Math.max(0, (time - previousTime) / 1_000));
       previousTime = time;
@@ -786,10 +900,54 @@ export default function SompoTruckSimulator({
       const collisionVisual = collisionVisualRef.current;
       const visualScenario = isFirebase ? 'normal' : collisionVisual ? SOMPO_COLLISION_SCRIPT.scenarioId : settings.scenarioId;
       const visualElapsed = time - (collisionVisual && collisionRunRef.current ? collisionRunRef.current.startedAt : startedAtRef.current);
-      const effectFrame = getSompoScenarioEffects(visualScenario, visualElapsed);
+      const effectOutcomeId = collisionVisual ? collisionVisual.outcomeId : settings.outcomeId;
+      const effectFrame = getSompoScenarioEffects(visualScenario, visualElapsed, effectOutcomeId);
+      const scenarioElapsed = time - startedAtRef.current;
       const ruralFrame = !isFirebase && !collisionVisualRef.current
-        ? getSompoRuralFrame(settings.scenarioId, time - startedAtRef.current)
+        ? getSompoRuralFrame(settings.scenarioId, scenarioElapsed, settings.outcomeId)
         : null;
+
+      // ── Deslocamento real no mundo ────────────────────────────────────────
+      if (runStamp !== startedAtRef.current) {
+        // Novo cenário, desfecho ou reinício: o caminhão segue estrada adiante
+        // a partir de onde está, sem teleporte para a origem.
+        runStamp = startedAtRef.current;
+        runOriginX = lastTruckWorldX;
+        animalAnchorX = animalAnchorFor(settings, runOriginX);
+      }
+      if (wasCollisionVisual && !collisionVisual) {
+        // Roteiro de colisão terminou: o gerador do cenário volta a mandar no
+        // relógio; realinha a origem para não haver salto de posição.
+        runOriginX = lastTruckWorldX - (reduceMotion.matches ? 0 : scenarioTravelMeters(settings, scenarioElapsed));
+      }
+      wasCollisionVisual = !!collisionVisual;
+      let truckWorldX = lastTruckWorldX;
+      let collisionPose: { advance: number; lateral: number; yaw: number } | null = null;
+      let collisionSpeedKph = 0;
+      if (collisionVisual && collisionRunRef.current) {
+        if (collisionVisual.startX === null) collisionVisual.startX = lastTruckWorldX;
+        collisionPose = getSompoCollisionVisualPose(visualElapsed, collisionVisual.outcomeId);
+        truckWorldX = collisionVisual.startX + (reduceMotion.matches ? 0 : collisionPose.advance);
+        collisionSpeedKph = delta > 0
+          ? Math.max(0, ((collisionPose.advance - collisionVisual.lastAdvance) / delta) * 3.6)
+          : 0;
+        collisionVisual.lastAdvance = collisionPose.advance;
+      } else if (!isFirebase && !reduceMotion.matches) {
+        truckWorldX = runOriginX + scenarioTravelMeters(settings, scenarioElapsed);
+      }
+      if (truckWorldX > REBASE_DISTANCE) {
+        // Recentra o mundo para preservar a precisão de float32 em corridas longas.
+        runOriginX -= REBASE_DISTANCE;
+        truckWorldX -= REBASE_DISTANCE;
+        lastTruckWorldX -= REBASE_DISTANCE;
+        animalAnchorX -= REBASE_DISTANCE;
+        camera.position.x -= REBASE_DISTANCE;
+        orbit.target.x -= REBASE_DISTANCE;
+        if (collisionVisual?.startX != null) collisionVisual.startX -= REBASE_DISTANCE;
+        scenarioEffects.rebase(REBASE_DISTANCE);
+      }
+      truckPoseGroup.position.x = truckWorldX;
+      lastTruckWorldX = truckWorldX;
       const sensorPose = sensorReadingToPose({
         pitch: snapshot.readings.pitch,
         roll: snapshot.readings.roll,
@@ -815,17 +973,23 @@ export default function SompoTruckSimulator({
         truckPoseGroup.rotation.y = liveHeading;
       }
       if (!isFirebase) {
-        truckPoseGroup.rotation.y = dampAngle(truckPoseGroup.rotation.y, THREE.MathUtils.degToRad(ruralFrame?.yaw ?? 0), reduceMotion.matches ? 1 : 0.12);
-        truckPoseGroup.position.z = ruralFrame?.lateral ?? 0;
+        const targetYaw = collisionPose ? collisionPose.yaw : (ruralFrame?.yaw ?? 0);
+        const targetLateral = collisionPose ? collisionPose.lateral : (ruralFrame?.lateral ?? 0);
+        truckPoseGroup.rotation.y = dampAngle(truckPoseGroup.rotation.y, THREE.MathUtils.degToRad(targetYaw), reduceMotion.matches ? 1 : 0.12);
+        truckPoseGroup.position.z = targetLateral;
       }
-      const brakingState = !isFirebase && !collisionVisualRef.current && settings.scenarioId === SOMPO_BRAKING_SCRIPT.scenarioId
-        ? getSompoBrakingScriptState(time - startedAtRef.current, settings.speedKph)
+      const brakingState = !isFirebase && !collisionVisualRef.current && !ruralFrame && settings.scenarioId === SOMPO_BRAKING_SCRIPT.scenarioId
+        ? getSompoBrakingScriptState(scenarioElapsed, settings.speedKph)
         : null;
       const liveActivity = isFirebase
         ? THREE.MathUtils.clamp((snapshot.readings.rotation?.magnitude || 0) * 0.012, 0, 0.1)
         : (ruralFrame?.roughness ?? settings.roughness) * 0.008 * (brakingState ? Math.min(1, brakingState.speedKph / 8) : 1);
+      // Rampas roteirizadas ("vence a rampa", "desce controlado") mudam o perfil
+      // do terreno junto com o pitch do roteiro; a cabine (mergulho de frenagem)
+      // não gira o mundo — por isso brake-failure usa o pitch fixo do preset.
       const slope = !isFirebase && ['steep-climb', 'steep-descent', 'brake-failure'].includes(settings.scenarioId)
-        ? THREE.MathUtils.degToRad(settings.pitch) : 0;
+        ? THREE.MathUtils.degToRad(settings.scenarioId === 'brake-failure' ? settings.pitch : (ruralFrame?.pitch ?? settings.pitch))
+        : 0;
       relativeGroundRotation.copy(truckPoseGroup.rotation);
       relativeGroundRotation.z -= slope;
       const targetHeight = slope
@@ -841,41 +1005,43 @@ export default function SompoTruckSimulator({
       } else {
         focusPoint.set(truckPoseGroup.position.x + effectFrame.focusX, truckPoseGroup.position.y, truckPoseGroup.position.z);
       }
+      // A câmera acompanha o deslocamento: o alvo persegue o caminhão e a câmera
+      // translada junto, preservando o ângulo escolhido pelo operador no orbit.
+      const targetXBefore = orbit.target.x;
       orbit.target.lerp(focusPoint, reduceMotion.matches ? 1 : 0.08);
-      const drivingSpeed = collisionVisual ? (snapshot.risks.collision ? 0 : 16)
+      camera.position.x += orbit.target.x - targetXBefore;
+      const drivingSpeed = collisionVisual ? collisionSpeedKph
         : (ruralFrame?.speedKph ?? brakingState?.speedKph ?? settings.speedKph);
       if (!isFirebase && !reduceMotion.matches) {
-        // No roteiro de colisão a roda para junto com o caminhão (flag ativa = impacto/parado).
+        // Rodas giram coerentes com a velocidade real sobre o solo (ou patinam
+        // quando o roteiro manda wheelSpeedKph diferente do avanço).
         const wheelSpeed = (ruralFrame?.wheelSpeedKph ?? drivingSpeed) * (ruralFrame?.direction ?? 1);
         for (const wheel of wheels) wheel.rotation.y -= delta * wheelSpeed / (3.6 * (wheel.userData.radius ?? 0.60));
       }
-      roadScene.update(effectFrame, ruralFrame, isFirebase ? 0 : drivingSpeed, visualElapsed, truckPoseGroup.position, reduceMotion.matches, delta, slope);
+      roadScene.update(effectFrame, ruralFrame, isFirebase ? 0 : drivingSpeed, visualElapsed, truckPoseGroup.position, reduceMotion.matches, delta, slope, { animalAnchorX });
+      keyLight.position.set(truckWorldX - 10, 12, 9);
+      keyLight.target.position.set(truckWorldX, 0, truckPoseGroup.position.z);
       keyLight.intensity = (ruralFrame?.rain ?? 0) > 0 ? 0.25 : roadScene.hasHdri ? 1.8 : 2.4;
       obstacleGroup.visible = isFirebase || !!collisionVisual || settings.scenarioId === 'obstacle' || settings.scenarioId === 'brake-failure';
       const rangeLength = rangeForDistance(snapshot.readings.distance);
       rayGroup.scale.x = rangeLength;
       if (collisionVisual) {
-        // Obstáculo fixo no mundo; o caminhão avança até fechar a distância do roteiro.
-        obstacleGroup.position.x = SOMPO_TRUCK_FRONT_X + collisionVisual.baseRange;
-        truckPoseGroup.position.x = Math.max(0, collisionVisual.baseRange - rangeLength);
+        // Obstáculo fixo no mundo; o caminhão avança de verdade até o desfecho.
+        obstacleGroup.position.x = (collisionVisual.startX ?? truckWorldX) + SOMPO_TRUCK_FRONT_X + collisionVisual.baseRange;
         if (snapshot.risks.collision && (snapshot.readings.acceleration?.magnitude || 0) > 15) {
           truckPoseGroup.position.y += reduceMotion.matches ? 0 : Math.sin(time * 0.09) * 0.05;
         }
       } else {
-        obstacleGroup.position.x = SOMPO_TRUCK_FRONT_X + rangeLength;
-        if (truckPoseGroup.position.x !== 0) {
-          truckPoseGroup.position.x = Math.abs(truckPoseGroup.position.x) < 0.01
-            ? 0
-            : THREE.MathUtils.lerp(truckPoseGroup.position.x, 0, 0.06);
-        }
+        // Alvo do feixe ultrassônico: anotação de sensor à frente do caminhão.
+        obstacleGroup.position.x = truckWorldX + SOMPO_TRUCK_FRONT_X + rangeLength;
       }
-      obstacleGroup.position.y = Math.tan(slope) * obstacleGroup.position.x;
+      obstacleGroup.position.y = Math.tan(slope) * (obstacleGroup.position.x - truckWorldX);
       rayMaterial.color.set(snapshot.risks.collision ? 0xff5d52 : 0x7dff9a);
       rayMaterial.opacity = snapshot.risks.collision ? 1 : 0.68;
       ledMaterial.color.set(snapshot.status === 'alert' ? 0xff5d52 : 0x7dff9a);
       ledMaterial.emissive.set(snapshot.status === 'alert' ? 0xff2d22 : 0x2dff6b);
       ledMaterial.emissiveIntensity = reduceMotion.matches ? 2.4 : 2.2 + (Math.sin(time * 0.007) * 1.1);
-      if (!isFirebase) scenarioEffects.update(effectFrame, visualElapsed, visualScenario, drivingSpeed, reduceMotion.matches, slope);
+      if (!isFirebase) scenarioEffects.update(effectFrame, visualElapsed, visualScenario, drivingSpeed, reduceMotion.matches, slope, effectOutcomeId ?? '', truckWorldX);
       orbit.update();
       postProcessing.render(delta);
       // Captura síncrona no mesmo rAF do render: o framebuffer WebGL ainda está
@@ -884,8 +1050,8 @@ export default function SompoTruckSimulator({
       const activeRun = collisionRunRef.current;
       if (capture && activeRun && collisionVisual) {
         const elapsedMs = performance.now() - activeRun.startedAt;
-        while (capture.nextIndex < SOMPO_COLLISION_FRAME_MOMENTS.length) {
-          const moment = SOMPO_COLLISION_FRAME_MOMENTS[capture.nextIndex];
+        while (capture.nextIndex < activeRun.frameMoments.length) {
+          const moment = activeRun.frameMoments[capture.nextIndex];
           if (elapsedMs < moment.offsetMs) break;
           capture.nextIndex += 1;
           if (elapsedMs - moment.offsetMs > COLLISION_FRAME_LATE_TOLERANCE_MS) continue;
@@ -936,12 +1102,19 @@ export default function SompoTruckSimulator({
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [isFirebase]);
+  }, [agriRun, isFirebase]);
 
-  function selectScenario(scenarioId: SompoSimulationScenarioId) {
+  function selectScenario(scenarioId: SompoSimulationScenarioId | SompoAgriScenarioId, outcomeId?: string) {
     startedAtRef.current = performance.now();
     connectedAtRef.current = new Date().toISOString();
-    setControls(controlsForScenario(scenarioId));
+    if (isSompoAgriScenarioId(scenarioId)) {
+      const outcomes = getSompoAgriOutcomes(scenarioId);
+      const outcome = outcomes.find((item) => item.id === outcomeId) || outcomes[0];
+      setAgriRun({ scenarioId, outcomeId: outcome.id });
+      return;
+    }
+    setAgriRun(null);
+    setControls(controlsForScenario(scenarioId, outcomeId));
   }
 
   function updateNumber(
@@ -952,7 +1125,8 @@ export default function SompoTruckSimulator({
   }
 
   function restartScenario() {
-    selectScenario(controls.scenarioId);
+    if (agriRun) selectScenario(agriRun.scenarioId, agriRun.outcomeId);
+    else selectScenario(controls.scenarioId, controls.outcomeId);
   }
 
   function handleCameraKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
@@ -967,13 +1141,21 @@ export default function SompoTruckSimulator({
     sceneApiRef.current?.adjust(action);
   }
 
-  const brakingPreview = !isFirebase && !collisionActive && controls.scenarioId === SOMPO_BRAKING_SCRIPT.scenarioId
+  const agriPreview = !isFirebase && !collisionActive && agriRun
+    ? getSompoAgriFrame(agriRun.scenarioId, preview.deviceTimestamp ?? 0, agriRun.outcomeId)
+    : null;
+  const ruralPreview = !isFirebase && !collisionActive && !agriRun
+    ? getSompoRuralFrame(controls.scenarioId, preview.deviceTimestamp ?? 0, controls.outcomeId)
+    : null;
+  const brakingPreview = !isFirebase && !collisionActive && !agriRun && !ruralPreview && controls.scenarioId === SOMPO_BRAKING_SCRIPT.scenarioId
     ? getSompoBrakingScriptState(preview.deviceTimestamp ?? 0, controls.speedKph)
     : null;
-  const ruralPreview = !isFirebase && !collisionActive
-    ? getSompoRuralFrame(controls.scenarioId, preview.deviceTimestamp ?? 0)
-    : null;
-  const scenarioScripted = !!SOMPO_RURAL_SCRIPTS[controls.scenarioId];
+  const activeScript = agriRun ? null : getSompoScenarioScript(controls.scenarioId, controls.outcomeId);
+  const scenarioScripted = agriRun ? true : !!activeScript;
+  const scenarioTotalMs = agriRun ? getSompoAgriScenario(agriRun.scenarioId).totalMs : activeScript?.totalMs;
+  const scenarioOutcomes = agriRun ? getSompoAgriOutcomes(agriRun.scenarioId) : getSompoScenarioOutcomes(controls.scenarioId);
+  const activeOutcomeId = agriRun ? agriRun.outcomeId : controls.outcomeId;
+  const activeOutcome = scenarioOutcomes.find((item) => item.id === activeOutcomeId) || scenarioOutcomes[0];
   const firebaseLive = preview.connection.state === 'live';
   const firebaseStatusLabel = firebaseLive
     ? preview.freshness === 'stale' ? 'Conectado · leitura parada' : 'Firebase ao vivo'
@@ -1023,7 +1205,9 @@ export default function SompoTruckSimulator({
             onKeyDown={handleCameraKeyDown}
             aria-label={webglError
               ? undefined
-              : `Modelo 3D interativo de um caminhão com caixa ESP32 ${isFirebase ? 'movido pela telemetria física' : 'virtual'}. Setas esquerda e direita giram; setas para cima e para baixo controlam o zoom.`}
+              : agriRun
+                ? `Modelo 3D interativo de ${activeScenario.label.toLowerCase()} com telemetria virtual. Setas esquerda e direita giram; setas para cima e para baixo controlam o zoom.`
+                : `Modelo 3D interativo de um caminhão com caixa ESP32 ${isFirebase ? 'movido pela telemetria física' : 'virtual'}. Setas esquerda e direita giram; setas para cima e para baixo controlam o zoom.`}
           >
             {webglError && (
               <div className="sompo-simulator-webgl" role="status">
@@ -1047,7 +1231,11 @@ export default function SompoTruckSimulator({
           </div>
           <p className="sompo-simulator-hint">Arraste para girar · use as setas para navegar</p>
           <p className="sompo-simulator-credit">
-            {modelAsset === 'GeneratedRuralTruck' ? 'Caminhão rural · imagem → 3D por LUCA-AI · adaptado com sensor' : modelStatus === 'gltf' ? <>
+            {agriRun ? (
+              modelStatus === 'gltf'
+                ? `${modelAsset ?? 'Equipamento agrícola'} · imagem → 3D por LUCA-AI`
+                : modelStatus === 'loading' ? 'Carregando equipamento agrícola…' : 'Silhueta nominal · GLB agrícola indisponível'
+            ) : modelAsset === 'GeneratedRuralTruck' ? 'Caminhão rural · imagem → 3D por LUCA-AI · adaptado com sensor' : modelStatus === 'gltf' ? <>
               <a href="https://sketchfab.com/3d-models/tesla-semi-39ffc7c746184e0c9ebd5bbcd0b405dd" target="_blank" rel="noreferrer">Tesla Semi © 2018 Oleksii Rozumnyi</a>
               {' · '}<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a> · adaptado com sensor
             </> : modelStatus === 'loading' ? 'Carregando caminhão detalhado…' : 'Modelo simplificado · arquivo detalhado indisponível'}
@@ -1082,26 +1270,59 @@ export default function SompoTruckSimulator({
           </div>
 
           <label className="sompo-scenario-select">
-            <span>Escolha entre {SCENARIO_IDS.length} cenários</span>
-            <select value={controls.scenarioId} disabled={collisionActive} onChange={(event) => selectScenario(event.target.value as SompoSimulationScenarioId)}>
+            <span>Escolha entre {SCENARIO_IDS.length + AGRI_SCENARIO_IDS.length} cenários</span>
+            <select value={agriRun ? agriRun.scenarioId : controls.scenarioId} disabled={collisionActive} onChange={(event) => selectScenario(event.target.value as SompoSimulationScenarioId | SompoAgriScenarioId)}>
               <optgroup label="Sinistros e emergências · roteiros">
                 {SCENARIO_IDS.filter((id) => !!SOMPO_RURAL_SCRIPTS[id]).map((id) => <option key={id} value={id}>{SOMPO_SIMULATION_SCENARIOS[id].label}</option>)}
               </optgroup>
               <optgroup label="Operação, terreno e manobras">
                 {SCENARIO_IDS.filter((id) => !SOMPO_RURAL_SCRIPTS[id]).map((id) => <option key={id} value={id}>{SOMPO_SIMULATION_SCENARIOS[id].label}</option>)}
               </optgroup>
+              <optgroup label="Operações agrícolas · trator e colheitadeira">
+                {AGRI_SCENARIO_IDS.map((id) => <option key={id} value={id}>{SOMPO_AGRI_SCENARIOS[id].label}</option>)}
+              </optgroup>
             </select>
           </label>
-          {ruralPreview && (
+          {scenarioOutcomes.length > 1 && (
+            <label className="sompo-scenario-select sompo-outcome-select">
+              <span>Desfecho do cenário</span>
+              <select
+                value={activeOutcomeId}
+                disabled={collisionActive}
+                data-sompo-outcome
+                onChange={(event) => selectScenario(agriRun ? agriRun.scenarioId : controls.scenarioId, event.target.value)}
+              >
+                {scenarioOutcomes.map((item) => (
+                  <option key={item.id} value={item.id}>{item.label}</option>
+                ))}
+              </select>
+              {activeOutcome && <small>{activeOutcome.description}</small>}
+            </label>
+          )}
+          {(ruralPreview || agriPreview) && (
             <div className="sompo-scenario-phase">
-              <span role="status">{ruralPreview.phaseLabel}</span>
-              <strong>{formatReading(ruralPreview.speedKph, ' km/h')}{ruralPreview.direction < 0 ? ' · ré' : ''}</strong>
-              <progress max={SOMPO_RURAL_SCRIPTS[controls.scenarioId]?.totalMs} value={Math.min(preview.deviceTimestamp ?? 0, SOMPO_RURAL_SCRIPTS[controls.scenarioId]?.totalMs ?? 1)} />
+              <span role="status">{(ruralPreview ?? agriPreview)!.phaseLabel}</span>
+              <strong>{formatReading((ruralPreview ?? agriPreview)!.speedKph, ' km/h')}{(ruralPreview ?? agriPreview)!.direction < 0 ? ' · ré' : ''}</strong>
+              <progress max={scenarioTotalMs} value={Math.min(preview.deviceTimestamp ?? 0, scenarioTotalMs ?? 1)} />
               <small>O roteiro conduz os valores abaixo. Use ↻ para repetir.</small>
             </div>
           )}
 
+          {!agriRun && (
           <div className="sompo-simulator-collision" data-sompo-collision-panel>
+            <label className="sompo-scenario-select sompo-collision-outcome">
+              <span>Desfecho do roteiro de colisão</span>
+              <select
+                value={collisionOutcomeId}
+                disabled={collisionActive}
+                data-sompo-collision-outcome
+                onChange={(event) => setCollisionOutcomeId(event.target.value)}
+              >
+                {SOMPO_COLLISION_OUTCOMES.map((item) => (
+                  <option key={item.id} value={item.id}>{item.label}</option>
+                ))}
+              </select>
+            </label>
             <button
               type="button"
               className="sompo-simulator-collision-run"
@@ -1147,6 +1368,7 @@ export default function SompoTruckSimulator({
               </p>
             )}
           </div>
+          )}
 
           <div className="sompo-simulator-ranges">
             {brakingPreview && (

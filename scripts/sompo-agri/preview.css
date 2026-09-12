@@ -1,0 +1,6 @@
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #acc9cf; }
+canvas { display: block; width: 100%; height: 100%; }
+.caption { position: fixed; left: 28px; bottom: 24px; padding: 14px 18px; color: #f6f2e7; background: #102219d9; border: 1px solid #d8bd6688; border-radius: 8px; font: 500 14px/1.45 system-ui, sans-serif; letter-spacing: .01em; backdrop-filter: blur(8px); }
+.caption strong { display: block; color: #efd67d; font-size: 19px; }
+body[data-error]::after { content: attr(data-error); position: fixed; inset: 20px; color: #fff; background: #6e1e1e; padding: 20px; font: 16px monospace; }
+

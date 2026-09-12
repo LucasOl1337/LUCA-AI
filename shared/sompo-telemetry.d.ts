@@ -46,6 +46,8 @@ export interface SompoTelemetrySnapshot {
     path: string;
     scenarioId?: string;
     scenarioLabel?: string;
+    outcomeId?: string;
+    outcomeLabel?: string;
   };
 }
 
@@ -231,6 +233,7 @@ export function buildSompoTelemetryMission(
   snapshot: SompoTelemetrySnapshot,
   teamLabel?: string,
   history?: SompoTelemetryHistory | null,
+  scenarioRun?: (Omit<import('./sompo-telemetry-simulator.js').SompoScenarioRunBrief, 'scenarioId'> & { scenarioId: string }) | null,
 ): string;
 
 export function buildSompoEpisodeMission(
@@ -239,6 +242,7 @@ export function buildSompoEpisodeMission(
   summary: SompoTelemetryEpisodeSummary,
   teamLabel?: string,
   frames?: SompoTelemetryEpisodeMissionFrame[],
+  options?: { outcomeId?: string; outcomeLabel?: string },
 ): string;
 
 export const SOMPO_EPISODE_VISUAL_DATA_MARKER: string;

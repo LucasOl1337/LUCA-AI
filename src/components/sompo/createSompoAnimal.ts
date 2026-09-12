@@ -58,12 +58,16 @@ export function createSompoAnimal(parent: THREE.Group) {
   }
   return {
     ready,
-    update(visible: boolean, z: number, elapsedMs: number, reducedMotion: boolean) {
-      const pose = getSompoAnimalPose(z, elapsedMs);
+    update(visible: boolean, z: number, elapsedMs: number, reducedMotion: boolean, anchorX?: number, walking = true) {
+      // A trilha "animal" da cena decide quando o bovino sai de quadro; o corte
+      // fixo de 13 s vale só para quem chama sem âncora (compatibilidade).
+      const pose = getSompoAnimalPose(z, elapsedMs, anchorX === undefined ? 13000 : null);
       root.visible = visible && pose.visible; if (!root.visible) return;
-      const moving = elapsedMs < 13000 && !reducedMotion;
+      const moving = walking && !reducedMotion;
       const t = moving ? elapsedMs / 1000 : 0;
-      root.position.set(pose.x, moving ? Math.sin(t * 6) * 0.022 : 0, pose.z);
+      // Ancorado no mundo: o caminhão se aproxima do animal, não o contrário.
+      const worldX = (anchorX ?? 0) + (pose.x - 7);
+      root.position.set(anchorX === undefined ? pose.x : worldX, moving ? Math.sin(t * 6) * 0.022 : 0, pose.z);
       root.rotation.y = pose.yaw;
       fallback.visible = !model && !!fallbackMap.image;
       if (body && rest) {

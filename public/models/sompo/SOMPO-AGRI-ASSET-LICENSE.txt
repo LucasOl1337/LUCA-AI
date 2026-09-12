@@ -1,0 +1,23 @@
+Sompo agricultural machine assets
+=================================
+
+Files covered:
+- generated-agri-tractor-source.png and generated-agri-tractor.glb, including
+  the external texture images named in generated-agri-tractor.textures.json
+- generated-agri-harvester-source.png and generated-agri-harvester.glb,
+  including the external texture images named in
+  generated-agri-harvester.textures.json
+
+The source images were generated for LUCA-AI through the locally authorized
+9Router route cx/gpt-image-2 on 2026-09-11. The prompts intentionally request
+unbranded equipment and are recorded verbatim in each provenance JSON. Use of
+those generated images remains subject to the applicable image-provider terms.
+
+The geometry and PBR atlases were reconstructed locally with Tencent
+Hunyuan3D-2.1. Redistribution and use of the reconstructed output remains
+subject to the Tencent Hunyuan 3D 2.1 Community License preserved in this
+directory as HUNYUAN-COMMUNITY-LICENSE.txt.
+
+Each .provenance.json records the exact source hash, model route, reconstruction
+revision, parameters, measured triangle count, output hash and known limits.
+

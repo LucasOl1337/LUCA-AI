@@ -5,18 +5,23 @@ import { restoreSompoTextures, useSompoExternalTextures } from './restoreSompoTe
 // Locally reconstructed botanical references, 18k triangles/species with PBR atlases.
 // Inputs, generation settings and hashes are in public/models/sompo/*.provenance.json.
 export const SOMPO_TREE_SPECIES = [
-  { asset: 'generated-jacaranda', height: 7, placements: [[-12, -13], [30, 12], [-42, 17], [62, -24], [-84, -38], [92, 38]] },
-  { asset: 'generated-eucalyptus', height: 10, placements: [[14, -16], [-30, -19], [46, 18], [-66, 26], [80, -36], [-96, 34]] },
-  { asset: 'generated-cerrado', height: 5, placements: [[-22, 12], [26, -12], [-48, -23], [60, 28], [-78, 38], [94, -30]] },
+  { asset: 'generated-jacaranda', height: 7, placements: [[-12, -13], [30, 12], [-42, 17], [62, -24], [-84, -38], [92, 38], [4, 26], [-58, -30], [76, 14]] },
+  { asset: 'generated-eucalyptus', height: 10, placements: [[14, -16], [-30, -19], [46, 18], [-66, 26], [80, -36], [-96, 34], [-8, 33], [38, -32], [-100, -14]] },
+  { asset: 'generated-cerrado', height: 5, placements: [[-22, 12], [26, -12], [-48, -23], [60, 28], [-78, 38], [94, -30], [10, -36], [-90, 20], [50, 36]] },
 ] as const;
 
+/** Período da trilha infinita das árvores: cada LOD recicla à frente do caminhão. */
+const TREE_WRAP_SPAN = 212;
+const wrapTreeX = (baseX: number, truckX: number) => baseX + (TREE_WRAP_SPAN * Math.round((truckX - baseX) / TREE_WRAP_SPAN));
+
 /** True geometry beside the road; image impostors only beyond 65 metres. */
-export function createSompoVegetation(parent: THREE.Group, camera: THREE.Camera) {
+export function createSompoVegetation(parent: THREE.Group, camera: THREE.Camera, heightAt?: (x: number, z: number) => number) {
   const root = new THREE.Group(); root.name = 'rural-3d-vegetation'; parent.add(root);
   const abort = new AbortController();
   const pending: Promise<void>[] = [];
   const localCamera = new THREE.Vector3();
   const cards: { mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>; lod: THREE.LOD }[] = [];
+  const lods: { lod: THREE.LOD; baseX: number; z: number }[] = [];
   const geometries = new Set<THREE.BufferGeometry>();
   const materials = new Set<THREE.Material>();
   const textures = new Set<THREE.Texture>();
@@ -51,6 +56,7 @@ export function createSompoVegetation(parent: THREE.Group, camera: THREE.Camera)
     for (const [index, [x, z]] of species.placements.entries()) {
       const lod = new THREE.LOD(); lod.name = `${species.asset}-${index}`;
       lod.position.set(x, -0.03, z);
+      lods.push({ lod, baseX: x, z });
       lod.rotation.y = speciesIndex * 1.7 + index * 2.4;
       lod.scale.setScalar(0.86 + ((index * 3 + speciesIndex) % 5) * 0.075);
       const near = new THREE.Group(); near.name = 'near-3d-tree'; nearGroups.push(near);
@@ -94,8 +100,13 @@ export function createSompoVegetation(parent: THREE.Group, camera: THREE.Camera)
   retain(root);
   return {
     ready: Promise.all(pending),
-    update(wet: boolean) {
+    update(wet: boolean, truckX = 0) {
       camera.getWorldPosition(localCamera); parent.worldToLocal(localCamera);
+      // Trilha infinita: cada árvore recicla à frente e assenta no relevo local.
+      for (const { lod, baseX, z } of lods) {
+        const x = wrapTreeX(baseX, truckX);
+        lod.position.set(x, heightAt ? heightAt(x, z) - 0.06 : -0.03, z);
+      }
       for (const { mesh, lod } of cards) {
         const image = mesh.material.map?.image as HTMLImageElement | undefined;
         mesh.visible = !!image?.naturalWidth;

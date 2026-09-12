@@ -54,7 +54,8 @@ import {
   type SompoProductLine,
 } from '@/lib/sompo-cases';
 import { buildSompoEpisodeMission, buildSompoTelemetryMission } from '../../shared/sompo-telemetry.js';
-import { createSompoSimulationSnapshot } from '../../shared/sompo-telemetry-simulator.js';
+import { buildSompoScenarioRunBrief, createSompoSimulationSnapshot } from '../../shared/sompo-telemetry-simulator.js';
+import { buildSompoAgriRunBrief, isSompoAgriScenarioId } from '../../shared/sompo-agri-brief.js';
 import '@/sompo-page.css';
 
 const SompoTruckSimulator = lazy(() => import('@/components/SompoTruckSimulator'));
@@ -150,7 +151,12 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
   const [simulatedTelemetry, setSimulatedTelemetry] = useState<SompoTelemetrySnapshot>(() => (
     createSompoSimulationSnapshot()
   ));
-  const [recordedEpisode, setRecordedEpisode] = useState<{ publicId: string; kind: string } | null>(null);
+  const [recordedEpisode, setRecordedEpisode] = useState<{
+    publicId: string;
+    kind: string;
+    outcomeId?: string;
+    outcomeLabel?: string;
+  } | null>(null);
   const [teamMode, setTeamMode] = useState<SompoLaunchMode>('team');
   const [teamPresets, setTeamPresets] = useState<LucaTeamPreset[]>(LUCA_TEAM_PRESETS);
   const [individualPresets, setIndividualPresets] = useState<LucaIndividualPreset[]>(LUCA_INDIVIDUAL_PRESETS);
@@ -454,6 +460,7 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
           result.summary,
           activeSquad.label,
           missionFrames,
+          { outcomeId: recordedEpisode.outcomeId, outcomeLabel: recordedEpisode.outcomeLabel },
         );
       } else {
         let history = null;
@@ -469,7 +476,14 @@ export default function SompoPage({ onNavigate }: SompoPageProps) {
           history = null;
         }
         caseId = `${telemetry.source.kind === 'simulation' ? 'simulacao' : 'telemetria'}-trator-${telemetry.tractorId}-${telemetry.deviceTimestamp ?? 'snapshot'}`;
-        mission = buildSompoTelemetryMission(telemetry, activeSquad.label, history);
+        // Ensaio completo na bancada: fases do roteiro, desfecho e flags previstas
+        // (catálogo rural ou agrícola, conforme a proveniência do snapshot).
+        const scenarioRun = telemetry.source.kind === 'simulation' && telemetry.source.scenarioId
+          ? isSompoAgriScenarioId(telemetry.source.scenarioId)
+            ? buildSompoAgriRunBrief(telemetry.source.scenarioId, telemetry.source.outcomeId, telemetry.deviceTimestamp ?? 0)
+            : buildSompoScenarioRunBrief(telemetry.source.scenarioId, telemetry.source.outcomeId, telemetry.deviceTimestamp ?? 0)
+          : null;
+        mission = buildSompoTelemetryMission(telemetry, activeSquad.label, history, scenarioRun);
       }
       const session = launchSession ?? await createSession();
       if (!session) {

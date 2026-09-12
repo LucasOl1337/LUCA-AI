@@ -165,12 +165,20 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
     damagedWheel.userData.destroyed = amount > 0.9;
   }
 
+  const truckWorld = new THREE.Vector3();
   return {
-    update(frame: SompoEffectFrame, elapsed: number, scenarioId: string, speed: number, reducedMotion: boolean, slope: number) {
+    /** Desloca âncoras de mundo quando a cena re-centra a origem (trilha longa). */
+    rebase(shift: number) {
+      for (const origin of origins.values()) origin.x -= shift;
+    },
+    update(frame: SompoEffectFrame, elapsed: number, scenarioId: string, speed: number, reducedMotion: boolean, slope: number, outcomeKey = '', slopePivotX = 0) {
       refreshModel(); root.visible = attachments.visible = true;
-      if (scenarioId !== previousScenario || elapsed < previousTime) origins.clear();
-      previousScenario = scenarioId; previousTime = elapsed;
+      const runKey = `${scenarioId} ${outcomeKey}`;
+      if (runKey !== previousScenario || elapsed < previousTime) origins.clear();
+      previousScenario = runKey; previousTime = elapsed;
       camera.getWorldQuaternion(cameraRotation); model.root.updateWorldMatrix(true, true);
+      model.root.getWorldPosition(truckWorld);
+      const floorAt = (x: number) => Math.tan(slope) * (x - slopePivotX);
       const cues = new Map(frame.cues.map((cue) => [cue.effect, cue]));
       const intensity = (name: SompoVisualEffect) => cues.get(name)?.intensity ?? 0;
       const clock = reducedMotion ? 0 : elapsed / 1000;
@@ -185,7 +193,7 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
           const particleAge = style.burst ? age - rand(i) * 0.12 : (age + rand(i + 237) * life) % life;
           const progress = clamp(particleAge / life, 0, 1);
           const emitter = worldOrigin(style, i);
-          if (style.motion === 'mud') emitter.y = Math.max(emitter.y, Math.tan(slope) * emitter.x + 0.08);
+          if (style.motion === 'mud') emitter.y = Math.max(emitter.y, floorAt(emitter.x) + 0.08);
           if (style.burst) {
             if (!origins.has(name)) origins.set(name, emitter.clone());
             point.copy(origins.get(name)!);
@@ -200,14 +208,16 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
             point.z += Math.sin(theta) * particleAge * (1 + rand(i + 3) * 2);
             point.y += particleAge * (0.35 + rand(i + 4) * 0.65);
           } else {
-            point.x -= particleAge * (0.45 + Math.abs(speed) / 22) + rand(i) * 0.2;
+            // Com deslocamento real, o rastro recua na velocidade verdadeira (m/s)
+            // e fica para trás no mundo em vez de acompanhar o caminhão.
+            point.x -= particleAge * (0.45 + Math.abs(speed) / 3.6) + rand(i) * 0.2;
             point.y += particleAge * (style.motion === 'smoke' ? 0.8 : 0.3);
             point.z += (rand(i + 6) - 0.5) * particleAge * 0.9;
           }
           const size = style.size * (0.55 + rand(i + 7) * 0.5) * (style.motion === 'spray' || style.motion === 'mud' ? 1 : 0.5 + progress * 1.5);
           transform.position.copy(point); transform.quaternion.copy(cameraRotation);
           transform.scale.set(size, style.motion === 'spray' ? size * 2.5 : size, 1); transform.updateMatrix(); pool.mesh.setMatrixAt(i, transform.matrix);
-          const visibility = particleAge < 0 || particleAge > life || point.y < Math.tan(slope) * point.x + 0.015 ? 0 : 1;
+          const visibility = particleAge < 0 || particleAge > life || point.y < floorAt(point.x) + 0.015 ? 0 : 1;
           pool.alpha.setX(i, visibility * cue.intensity * (style.opacity ?? 0.3) * Math.sin(Math.PI * progress) ** 0.6);
         }
         pool.mesh.instanceMatrix.needsUpdate = true; pool.alpha.needsUpdate = true;
@@ -243,7 +253,7 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
           const t = reducedMotion ? 2 : Math.min(3, pieces.ageMs / 1000);
           const angle = rand(i + 25) * Math.PI * 2; const spread = (rubber ? 1.8 : 2.4) * (0.5 + rand(i));
           point.copy(anchor); point.x += Math.cos(angle) * t * spread; point.z += Math.sin(angle) * t * spread;
-          const floor = Math.tan(slope) * point.x + 0.035;
+          const floor = floorAt(point.x) + 0.035;
           point.y = Math.max(floor, anchor.y + t * (1.6 + rand(i + 1) * 2.4) - 4.9 * t * t);
           const landed = point.y <= floor;
           transform.position.copy(point); transform.rotation.set(landed ? 0 : t * (4 + rand(i)), angle + t, landed ? 0 : t * 6);
@@ -253,17 +263,22 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
       }
       const skid = cues.get('skid-marks'); marks.visible = !!skid;
       if (skid) {
-        const length = Math.min(10, skid.ageMs / 1000 * 3.0);
+        // A marca nasce onde a frenagem começou e se estende até onde o caminhão
+        // realmente chegou: deslocamento de mundo, não relógio.
         const origin = origins.get('skid-marks') ?? model.root.localToWorld(new THREE.Vector3(front.x, 0, 0)).clone(); origins.set('skid-marks', origin);
+        const frontNowX = model.root.localToWorld(point.set(front.x, 0, 0)).x;
+        const length = clamp(Math.max(frontNowX - origin.x, skid.ageMs / 1000 * 0.4), 0.6, 45);
         for (let i = 0; i < 64; i += 1) {
-          const along = Math.floor(i / 2) / 31; const x = origin.x - along * length;
+          const along = Math.floor(i / 2) / 31; const x = origin.x + along * length;
           const curve = scenarioId === 'fast-corner' ? along * along * 1.3 : scenarioId === 'tire-blowout' ? -along * 0.55 : 0;
-          transform.position.set(x, Math.tan(slope) * x + 0.029, origin.z + (i % 2 ? 1 : -1) * 1.01 + curve);
+          transform.position.set(x, floorAt(x) + 0.029, origin.z + (i % 2 ? 1 : -1) * 1.01 + curve);
           transform.rotation.set(-Math.PI / 2, 0, curve * 0.1); transform.scale.set(length / 31 * (0.86 + rand(i) * 0.14), 0.20 + rand(i + 1) * 0.06, 1); transform.updateMatrix(); marks.setMatrixAt(i, transform.matrix);
         }
         marks.instanceMatrix.needsUpdate = true;
       }
       mudRuts.visible = intensity('mud-ruts') > 0; mudRuts.scale.y = intensity('mud-ruts');
+      mudRuts.position.x = truckWorld.x;
+      guides.position.x = truckWorld.x;
       const mudClumps = intensity('mud-spray') > 0;
       gravel.visible = (intensity('gravel') > 0 || mudClumps) && !reducedMotion;
       (gravel.material as THREE.MeshStandardMaterial).color.set(mudClumps ? 0x5e4228 : 0x857963);

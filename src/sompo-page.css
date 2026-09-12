@@ -2369,6 +2369,9 @@
   width: 100%; padding: 13px 10px; border: 1px solid #536954;
   border-radius: 8px; background: #182b20; color: #f1f5ec; font: inherit; font-size: 13px;
 }
+.sompo-outcome-select select, .sompo-collision-outcome select { padding: 9px 10px; }
+.sompo-outcome-select small { font-size: 10px; line-height: 1.4; color: #9dac9f; }
+.sompo-collision-outcome { margin-bottom: 8px; }
 .sompo-scenario-phase { display: grid; gap: 8px; padding: 13px; border-left: 3px solid #e6c769; background: #e6c7690d; }
 .sompo-scenario-phase > span { font-size: 12px; color: #e9cc7c; }
 .sompo-scenario-phase strong { font-size: 22px; color: #f3f5ef; }

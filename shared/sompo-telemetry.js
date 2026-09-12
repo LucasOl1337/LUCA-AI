@@ -257,6 +257,44 @@ function buildTimelineLines(history) {
   return lines;
 }
 
+/**
+ * Linhas do roteiro do ensaio (cenário + desfecho selecionado no simulador):
+ * fases, transições de flag previstas e deslocamento real até o instante do envio.
+ */
+function scenarioRunLines(run) {
+  if (!run || typeof run !== 'object') return [];
+  const lines = [
+    `Roteiro do ensaio: cenário "${run.scenarioLabel}" com desfecho selecionado "${run.outcomeLabel}".`,
+    `Desfecho: ${run.outcomeDescription}`,
+  ];
+  if (run.scripted) {
+    const totalSec = Number(run.totalMs) ? Math.round(run.totalMs / 100) / 10 : null;
+    lines.push(`Execução: ${run.completed ? 'roteiro completo' : 'em andamento'} — ${Math.round((run.elapsedMs || 0) / 100) / 10}s de ${totalSec ?? '?'}s${Number.isFinite(run.travelMeters) ? `, ${run.travelMeters} m percorridos no mundo 3D` : ''}.`);
+    if (Array.isArray(run.phases) && run.phases.length > 0) {
+      lines.push('Fases do roteiro:');
+      for (const phase of run.phases) {
+        const details = [
+          Number.isFinite(phase.speedKph) ? `${phase.speedKph} km/h` : null,
+          Number.isFinite(phase.distance) ? `dist ${phase.distance} cm` : null,
+          phase.collisionRisk ? 'riscoColisao ativo' : null,
+          phase.inclinationRisk ? 'riscoInclinacao ativo' : null,
+        ].filter(Boolean).join(', ');
+        lines.push(`- t+${Math.round(phase.atMs / 100) / 10}s ${phase.label}${details ? ` (${details})` : ''}`);
+      }
+    }
+    const transitions = Array.isArray(run.flagTransitions) ? run.flagTransitions : [];
+    lines.push(transitions.length === 0
+      ? 'Flags previstas pelo roteiro: sem transição (estado constante do preset).'
+      : 'Flags previstas pelo roteiro:');
+    for (const item of transitions) {
+      lines.push(`- t+${Math.round(item.atMs / 100) / 10}s ${item.flag} ${Boolean(item.from)} → ${Boolean(item.to)}`);
+    }
+  } else {
+    lines.push('Execução: cenário de controles manuais (sem roteiro); as leituras acima refletem os ajustes do operador.');
+  }
+  return lines;
+}
+
 const EPISODE_KIND_LABELS = Object.freeze({
   colisao: 'colisão',
 });
@@ -487,7 +525,7 @@ function episodeVisualContractLines(visualData) {
   ];
 }
 
-export function buildSompoEpisodeMission(episode, samples, summary, teamLabel, frames = []) {
+export function buildSompoEpisodeMission(episode, samples, summary, teamLabel, frames = [], options = {}) {
   if (!episode || typeof episode !== 'object') {
     throw new Error('sompo_telemetry_episode_required');
   }
@@ -513,6 +551,10 @@ export function buildSompoEpisodeMission(episode, samples, summary, teamLabel, f
     `Status: ${episode.status}`,
     'Origem: Simulador 3D local (roteiro determinístico; dados sintéticos; não enviados ao Firebase)',
     ...(episode.scenarioLabel ? [`Cenário: ${episode.scenarioLabel}`] : []),
+    ...(options.outcomeLabel ? [`Desfecho selecionado do roteiro: ${options.outcomeLabel}`] : []),
+    ...(options.outcomeId && options.outcomeId !== 'impacto'
+      ? ['Atenção: neste desfecho NÃO há impacto físico — o pico de |aceleração| que o resumo automático rotula como "impacto" corresponde à manobra/frenagem de emergência, não a uma batida.']
+      : []),
     `Início: ${episode.startedAt || 'não informado'} | Fim: ${episode.endedAt || 'não informado'} | Duração: ${duration === null ? 'não informada' : `${duration}s`}`,
     `Amostras gravadas: ${Number(summary.count) || 0} (episódio completo, ordem cronológica)`,
     '',
@@ -547,7 +589,7 @@ export function buildSompoEpisodeMission(episode, samples, summary, teamLabel, f
   return `${buildEpisodeHumanSummary(episode, summary, frames)}\n\n${SOMPO_MISSION_DOSSIER_DELIMITER}\n${briefing}`;
 }
 
-export function buildSompoTelemetryMission(snapshot, teamLabel, history) {
+export function buildSompoTelemetryMission(snapshot, teamLabel, history, scenarioRun) {
   if (!snapshot || typeof snapshot !== 'object') {
     throw new Error('sompo_telemetry_snapshot_required');
   }
@@ -609,6 +651,7 @@ export function buildSompoTelemetryMission(snapshot, teamLabel, history) {
     `- pitch=${reading(readings.pitch)} | roll=${reading(readings.roll)}`,
     `- aceleracao: x=${reading(acceleration.x)}, y=${reading(acceleration.y)}, z=${reading(acceleration.z)}, magnitude=${reading(acceleration.magnitude)}`,
     `- rotacao: x=${reading(rotation.x)}, y=${reading(rotation.y)}, z=${reading(rotation.z)}, magnitude=${reading(rotation.magnitude)}`,
+    ...(simulation && scenarioRun ? ['', ...scenarioRunLines(scenarioRun)] : []),
     '',
     ...buildTimelineLines(history),
     '',
