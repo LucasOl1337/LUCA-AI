@@ -12,6 +12,8 @@ import {
 } from '../../../shared/sompo-agri-scenarios.js';
 import { getSompoAgriStartX, getSompoAgriTravelMeters } from '../../../shared/sompo-agri-brief.js';
 import { getSompoGeofenceSite } from '../../../shared/sompo-geofence-sites.js';
+import { bandGrid, resolveHazards } from '../../../shared/lab-geofence.js';
+import { suggestSafeLane } from '../../../shared/sompo-geofence.js';
 import { frameDamping } from './frameDamping.js';
 import { createSompoRenderer, sompoRenderBudget, disposeSompoObject, type SompoStageApi } from './sompoStage';
 import { createSompoEnvironmentAssets } from './createSompoEnvironmentAssets';
@@ -138,6 +140,67 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   const geofenceLayer = new THREE.Group();
   geofenceLayer.name = 'sompo-geofence-synthetic';
   worldRoot.add(geofenceLayer);
+  const hazards = resolveHazards(site.manifestRules, site.polygons);
+  const grid = bandGrid(site.polygons, hazards, 2);
+  if (grid && hazards.length) {
+    const { cols, rows, cellM, minX, minZ } = grid;
+    const rgba = new Uint8Array(cols * rows * 4);
+    const colors = hazards.map(hazard => {
+      const ramp = hazard.polygon?.role === 'water' ? ['#1b5e8a', '#3f8fbf', '#9ac8e2'] : ['#8b4a1a', '#c9823e', '#e7c39a'];
+      return hazard.bands.map((_, i) => parseInt(ramp[Math.round(i * (ramp.length - 1) / Math.max(1, hazard.bands.length - 1))].slice(1), 16));
+    });
+    for (let row = 0; row < rows; row += 1) for (let col = 0; col < cols; col += 1) {
+      const cell = row * cols + col;
+      if (!grid.inside[cell]) continue;
+      let bestMax = Infinity, color: number | null = null;
+      for (let h = 0; h < hazards.length; h += 1) {
+        const band = grid.bands[h][cell];
+        if (band >= 0 && hazards[h].bands[band].max_m < bestMax) {
+          bestMax = hazards[h].bands[band].max_m;
+          color = colors[h][band];
+        }
+      }
+      if (color === null) continue;
+      // v=0 cai em +Z após a rotação do plano: inverte as linhas da grade.
+      const at = ((rows - 1 - row) * cols + col) * 4;
+      rgba[at] = color >> 16 & 255; rgba[at + 1] = color >> 8 & 255; rgba[at + 2] = color & 255; rgba[at + 3] = 107;
+    }
+    // O map é liberado por disposeSompoObject(scene) junto com os materiais.
+    const texture = new THREE.DataTexture(rgba, cols, rows, THREE.RGBAFormat);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.magFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
+    const width = cols * cellM, depth = rows * cellM;
+    const centerX = minX + width / 2, centerZ = minZ + depth / 2;
+    const geometry = new THREE.PlaneGeometry(width, depth, cols, rows);
+    const vertices = geometry.attributes.position;
+    for (let i = 0; i < vertices.count; i += 1) {
+      vertices.setZ(i, field.groundHeight(centerX + vertices.getX(i), centerZ - vertices.getY(i)));
+    }
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false }));
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(centerX, 0.05, centerZ);
+    mesh.renderOrder = 1;
+    geofenceLayer.add(mesh);
+  }
+  const safeLane: { z: number; points: { x: number; z: number }[] } | null = suggestSafeLane({ xStart: startX, xEnd: startX + totalTravel, preferredZ: 0, maxOffsetM: 60 }, site.manifestRules, site.polygons);
+  if (safeLane) {
+    const points: THREE.Vector3[] = [];
+    for (let i = 1; i < safeLane.points.length; i += 1) {
+      const a = safeLane.points[i - 1], b = safeLane.points[i];
+      const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 5));
+      for (let step = 0; step <= steps; step += 1) {
+        const x = THREE.MathUtils.lerp(a.x, b.x, step / steps);
+        const z = THREE.MathUtils.lerp(a.z, b.z, step / steps);
+        points.push(new THREE.Vector3(x, field.groundHeight(x, z) + 0.08, z));
+      }
+    }
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineDashedMaterial({ color: '#17614b', dashSize: 2, gapSize: 1.2 }));
+    line.computeLineDistances();
+    line.renderOrder = 2;
+    geofenceLayer.add(line);
+    geofenceLayer.userData.safeLaneZ = safeLane.z;
+  }
   for (const polygon of site.polygons) {
     const ring = polygon.rings[0];
     const color = polygon.role === 'water' ? 0x79b9c0 : polygon.role === 'hazard' ? 0xe6ad52 : 0x73c48c;

@@ -44,6 +44,7 @@ import {
   isSompoAgriScenarioId,
 } from '../../shared/sompo-agri-brief.js';
 import { mountSompoAgriStage } from './sompo/createSompoAgriStage';
+import SompoGeofenceMap from './sompo/SompoGeofenceMap';
 import {
   SOMPO_RURAL_SCRIPTS,
   getSompoRuralFrame,
@@ -319,7 +320,7 @@ export default function SompoTruckSimulator({
   const [controls, setControls] = useState<SompoSimulationControls>(INITIAL_CONTROLS);
   const [agriRun, setAgriRun] = useState<SompoAgriRun | null>(() => !isFirebase && ['tractor', 'harvester'].includes(studioConfig.equipment) ? { scenarioId: studioConfig.equipment === 'harvester' ? 'agri-harvest-dust' : 'agri-field-bogging', outcomeId: studioConfig.equipment === 'harvester' ? 'clean-pass' : getSompoAgriOutcomes('agri-field-bogging')[0].id } : null);
   const [axisCalibration, setAxisCalibration] = useState<SompoAxisCalibration>(loadAxisCalibration);
-  const [preview, setPreview] = useState<SompoTelemetrySnapshot & Partial<Pick<SompoAgriSimulationSnapshot, 'geofence'>>>(() => (
+  const [preview, setPreview] = useState<SompoTelemetrySnapshot & Partial<Pick<SompoAgriSimulationSnapshot, 'geofence' | 'position'>>>(() => (
     telemetry || createSompoSimulationSnapshot(INITIAL_CONTROLS, { elapsedMs: 0 })
   ));
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -908,6 +909,14 @@ export default function SompoTruckSimulator({
                 </div>
               )}
             </div>
+          )}
+          {!isFirebase && agriRun && (
+            <SompoGeofenceMap
+              scenarioId={agriRun.scenarioId}
+              outcomeId={agriRun.outcomeId}
+              elapsedMs={preview.deviceTimestamp ?? 0}
+              position={preview.position ?? null}
+            />
           )}
           <div className="sompo-simulator-camera" role="group" aria-label="Controles da câmera 3D">
             <button type="button" onClick={() => sceneApiRef.current?.focus('truck')}>
