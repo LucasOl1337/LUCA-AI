@@ -42,6 +42,7 @@ export function evaluateGeofence({ x, z, headingDeg = null, speedKph = 0 }, rule
   const speedMs = Math.max(0, speedKph) / 3.6;
   const all = [];
   for (const hazard of hazards) {
+    if (!hazard.polygon) continue; // Perigo de máquina (inclinação) não tem geometria; o radar é espacial.
     const nearest = closestPointOnPolygon({ x, z }, hazard.polygon);
     const band = classifyBand(nearest.distance, hazard.bands);
     if (!band) continue;

@@ -84,6 +84,21 @@ const ALLOWED = { sw: [PROPERTY.sw[0] + 15, PROPERTY.sw[1] + 15], ne: [PROPERTY.
 // hazard/slope 80x60 m dentro do allowed_area, afastado do rio (lado norte).
 const HAZARD = { sw: [210, 350], ne: [290, 410] };
 
+// Relevo sintético (definido aqui porque o CSV 02 lê a inclinação do terreno na posição).
+const TERRAIN = { sw: [-170, 40], ne: [510, 540], cellM: 4 };            // cobre propriedade, percursos e margem
+const TERRAIN_COLS = (TERRAIN.ne[0] - TERRAIN.sw[0]) / TERRAIN.cellM;    // 170
+const TERRAIN_ROWS = (TERRAIN.ne[1] - TERRAIN.sw[1]) / TERRAIN.cellM;    // 125
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const smooth = v => { const t = clamp01(v); return t * t * (3 - 2 * t); };
+// Altura fictícia (m): sobe suavemente ao se afastar do rio (sul) e tem uma encosta de 12 m dentro do polígono de declive.
+function syntheticHeight(x, yNorth) {
+  const base = 478 + (yNorth - TERRAIN.sw[1]) * 0.016;
+  const lateral = 1 - smooth((Math.max(HAZARD.sw[0] - x, 0, x - HAZARD.ne[0])) / 20);
+  const hill = 12 * smooth((yNorth - HAZARD.sw[1]) / (HAZARD.ne[1] - HAZARD.sw[1])) * lateral;
+  const ripple = 0.3 * Math.sin(x / 23) * Math.cos(yNorth / 17);
+  return Math.round((base + hill + ripple) * 100) / 100;
+}
+
 function segmentDistance([px, py], [ax, ay], [bx, by]) {
   const dx = bx - ax, dy = by - ay;
   const len = dx * dx + dy * dy;
@@ -233,10 +248,15 @@ function buildSample01(i) {
 }
 
 // ---------- 5. Percurso do CSV 02 (declive e tombamento, 4 min a 10 Hz, 2401 amostras) ----------
-const ENTRY_S = 120; // entra no declive aos 2 min
-const RAMP_S = 4;
+// Perfil da máquina (demonstração): o limite é declarado, não medido pelo fabricante. Trocar a máquina troca as zonas.
+const MACHINE_PROFILE = { max_roll_deg: 15, platform_width_m: 9, operating_speed_kmh: SPEED_KMH, reaction_time_s: 1.5 };
+// Inclinação lateral do terreno na posição, para quem anda para leste (rumo 90): derivada da altura em y (norte).
+function terrainRollDeg(x, y) { return Math.atan((syntheticHeight(x, y + 1) - syntheticHeight(x, y - 1)) / 2) * 180 / Math.PI; }
 const START02 = [10, 380];
-const ENTRY02 = [210, 380];
+const TIP02 = [250, 380];                                  // tomba no meio da encosta, onde o terreno passa do limite da máquina
+const ENTRY_S = (TIP02[0] - START02[0]) / SPEED_MS;       // 144 s até o ponto de tombamento
+const RAMP_S = 4;
+const ENTRY02 = TIP02;
 function sample02Position(t) {
   if (t <= ENTRY_S) {
     const x = START02[0] + SPEED_MS * t;
@@ -247,10 +267,12 @@ function sample02Position(t) {
   return [x, ENTRY02[1]];
 }
 function sample02Kinematics(t) {
-  if (t < ENTRY_S) return { speed: SPEED_KMH, roll: 4 + noise(Math.round(t * HZ), 0.3, 53) };
+  const [x, y] = sample02Position(t);
+  const terrainRoll = 4 + Math.abs(terrainRollDeg(x, y)); // 4° de folga da própria máquina + inclinação lateral do terreno
+  if (t < ENTRY_S) return { speed: SPEED_KMH, roll: terrainRoll + noise(Math.round(t * HZ), 0.3, 53) };
   if (t < ENTRY_S + RAMP_S) {
     const frac = (t - ENTRY_S) / RAMP_S;
-    return { speed: SPEED_KMH * (1 - frac), roll: 4 + (82 - 4) * frac };
+    return { speed: SPEED_KMH * (1 - frac), roll: terrainRoll + (82 - terrainRoll) * frac };
   }
   return { speed: 0, roll: 82 + noise(Math.round(t * HZ), 0.3, 53) };
 }
@@ -305,19 +327,6 @@ function sha256(filePath) { return crypto.createHash('sha256').update(fs.readFil
 // O laboratório só constrói a malha 3D do terreno como base da imagem aérea e exige o mesmo bbox nas duas
 // (validateManifest). Sem ortofoto licenciada de Piracicaba, os dois arquivos são gerados aqui, determinísticos,
 // e marcados como simulados: datum vertical "SIMULADO" e atribuição explícita. Não representam levantamento.
-const TERRAIN = { sw: [-170, 40], ne: [510, 540], cellM: 4 };            // cobre propriedade, percursos e margem
-const TERRAIN_COLS = (TERRAIN.ne[0] - TERRAIN.sw[0]) / TERRAIN.cellM;    // 170
-const TERRAIN_ROWS = (TERRAIN.ne[1] - TERRAIN.sw[1]) / TERRAIN.cellM;    // 125
-const clamp01 = v => Math.max(0, Math.min(1, v));
-const smooth = v => { const t = clamp01(v); return t * t * (3 - 2 * t); };
-// Altura fictícia (m): sobe suavemente ao se afastar do rio (sul) e tem uma encosta de 12 m dentro do polígono de declive.
-function syntheticHeight(x, yNorth) {
-  const base = 478 + (yNorth - TERRAIN.sw[1]) * 0.016;
-  const lateral = 1 - smooth((Math.max(HAZARD.sw[0] - x, 0, x - HAZARD.ne[0])) / 20);
-  const hill = 12 * smooth((yNorth - HAZARD.sw[1]) / (HAZARD.ne[1] - HAZARD.sw[1])) * lateral;
-  const ripple = 0.3 * Math.sin(x / 23) * Math.cos(yNorth / 17);
-  return Math.round((base + hill + ripple) * 100) / 100;
-}
 const terrainValues = [];
 for (let r = 0; r < TERRAIN_ROWS; r++) for (let c = 0; c < TERRAIN_COLS; c++) {
   terrainValues.push(syntheticHeight(TERRAIN.sw[0] + (c + 0.5) * TERRAIN.cellM, TERRAIN.ne[1] - (r + 0.5) * TERRAIN.cellM));
@@ -349,8 +358,9 @@ const pixels = Buffer.alloc(IMG_W * IMG_H * 3);
 const inRect = (x, y, rect) => x >= rect.sw[0] && x <= rect.ne[0] && y >= rect.sw[1] && y <= rect.ne[1];
 for (let py = 0; py < IMG_H; py++) for (let px = 0; px < IMG_W; px++) {
   const x = TERRAIN.sw[0] + px + 0.5, y = TERRAIN.ne[1] - py - 0.5;
-  let rgb = inRect(x, y, ALLOWED) ? [112, 152, 72] : inRect(x, y, PROPERTY) ? [150, 141, 96] : [124, 137, 88];
-  if (inRect(x, y, ALLOWED)) { const row = 10 * Math.sin(y / 1.5 * Math.PI); rgb = [rgb[0] + row, rgb[1] + row, rgb[2] + row * 0.6]; } // fileiras de cana
+  const grain = 6 * Math.sin(x * 0.9) * Math.cos(y * 1.1) + 4 * Math.sin((x + y) * 0.23); // textura suave, determinística
+  let rgb = inRect(x, y, ALLOWED) ? [98 + grain, 140 + grain, 66 + grain * 0.5] : inRect(x, y, PROPERTY) ? [126 + grain, 132 + grain, 84] : [118 + grain, 134 + grain, 86];
+  if (inRect(x, y, ALLOWED)) { const row = 5 * Math.sin(y / 1.5 * Math.PI); rgb = [rgb[0] + row, rgb[1] + row, rgb[2] + row * 0.6]; } // fileiras de cana, sutis
   const shade = 1 + 0.06 * (syntheticHeight(x, y + 4) - syntheticHeight(x, y - 4)); // sombreado pela inclinação norte-sul
   const at = (py * IMG_W + px) * 3;
   for (let k = 0; k < 3; k++) pixels[at + k] = Math.max(0, Math.min(255, Math.round(rgb[k] * shade)));
@@ -375,7 +385,7 @@ const manifest = {
     retrieved_at: '2026-09-11',
   },
   map_warning: 'Água conforme OpenStreetMap (ODbL); limite de propriedade, área permitida e declive são fictícios, desenhados sobre o talhão de cana para fins de demonstração. Não representam cadastro real nem levantamento de campo.',
-  machine: { id: 'COLH-DEMO-01', model: 'Colheitadeira (demonstração)' },
+  machine: { id: 'COLH-DEMO-01', model: 'Colheitadeira (demonstração)', profile: MACHINE_PROFILE },
   satellite: { url: '/datasets/piracicaba-artemis/imagem-aerea-sintetica.png', bbox: terrainBbox, attribution: SYNTHETIC_IMAGE_ATTRIBUTION, crs: 'EPSG:4326', resolution_m: 1, synthetic: true },
   terrain: { url: '/datasets/piracicaba-artemis/relevo-sintetico.json', sha256: sha256(path.join(OUT_DIR, 'relevo-sintetico.json')), bbox: terrainBbox, vertical_datum: 'SIMULADO', attribution: SYNTHETIC_TERRAIN_ATTRIBUTION, resolution_m: TERRAIN.cellM, synthetic: true },
   export_rate_hz: 10,
@@ -398,6 +408,14 @@ const manifest = {
           { id: 'borda', label: 'Borda do declive', max_m: 10 },
         ],
         justification: 'Polígono fictício para demonstração.',
+      },
+      {
+        role: 'machine', metric: 'roll_deg', label: 'Limite de inclinação da máquina',
+        bands_m: [
+          { id: 'acima', label: 'Acima do limite', max_m: 0 },
+          { id: 'proximo', label: 'Próximo do limite', max_m: 5 },
+        ],
+        justification: 'Limite declarado em machine.profile.max_roll_deg (demonstração); faixas em graus de margem até o limite.',
       },
     ],
   },

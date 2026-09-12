@@ -18,18 +18,36 @@ function boundingBox(polygon) {
 
 // Limite inferior barato: fora do alcance da faixa mais externa não precisa medir as arestas.
 // ponytail: O(arestas) por amostra (~2,5 s para 6 mil amostras contra o rio do OSM); índice espacial das arestas se incomodar.
-function hazardDistance(point, hazard) {
+// Perigo de máquina (metric): a "distância" é a margem em graus até o limite do perfil; 0 = limite atingido ou passado.
+function hazardDistance(sample, hazard) {
+  if (hazard.metric) return Math.max(0, hazard.limit - Math.abs(sample[hazard.metric]));
   const { box } = hazard;
-  const dx = Math.max(box.minX - point.x, 0, point.x - box.maxX);
-  const dz = Math.max(box.minZ - point.z, 0, point.z - box.maxZ);
-  return Math.hypot(dx, dz) > hazard.reach ? Infinity : polygonDistance(point, hazard.polygon);
+  const dx = Math.max(box.minX - sample.x, 0, sample.x - box.maxX);
+  const dz = Math.max(box.minZ - sample.z, 0, sample.z - box.maxZ);
+  return Math.hypot(dx, dz) > hazard.reach ? Infinity : polygonDistance(sample, hazard.polygon);
+}
+// Amostra "medida" para o perigo: posição (perigos do mapa) ou o sinal do perfil (perigos de máquina).
+function measured(sample, hazard) {
+  return hazard.metric ? typeof sample[hazard.metric] === 'number' && Number.isFinite(sample[hazard.metric]) : hasPosition(sample);
 }
 
 // Sem rules.hazards, uma faixa única reproduz water_warning_distance_m (comportamento da PR).
-export function resolveHazards(rules, polygons) {
+// machine = manifest.machine: o perigo de role "machine" lê o limite em profile (ex.: max_roll_deg), salvo se a regra fixar limit_deg.
+export function resolveHazards(rules, polygons, machine = null) {
   const list = rules?.hazards ?? [{ role: 'water', label: 'Água mapeada', bands_m: [{ id: 'aviso', label: 'Aviso de proximidade', max_m: rules?.water_warning_distance_m ?? 20 }] }];
   const hazards = [], warnings = [], keys = new Set();
   for (const rule of list) {
+    if (rule.role === 'machine') {
+      const metric = rule.metric ?? 'roll_deg';
+      const profileKey = metric === 'roll_deg' ? 'max_roll_deg' : `max_${metric}`;
+      const limit = Number.isFinite(rule.limit_deg) ? rule.limit_deg : machine?.profile?.[profileKey];
+      if (!Number.isFinite(limit) || limit <= 0) { warnings.push(`Regra "${rule.label || 'máquina'}" sem limite: informe limit_deg na regra ou ${profileKey} em machine.profile.`); continue; }
+      const key = `machine:${metric}`;
+      if (keys.has(key)) continue;
+      keys.add(key);
+      hazards.push({ key, label: rule.label || `Limite da máquina (${metric})`, justification: rule.justification ?? null, bands: rule.bands_m, reach: rule.bands_m.at(-1).max_m, polygon: null, box: null, metric, limit, unit: 'deg' });
+      continue;
+    }
     const matches = polygons.filter(polygon => polygon.role === rule.role && (rule.role !== 'hazard' || polygon.category === rule.category));
     if (!matches.length && rules?.hazards) warnings.push(`Regra "${rule.label || rule.role}" sem polígono correspondente no mapa (${[rule.role, rule.category].filter(Boolean).join('/')}).`);
     for (const polygon of matches) {
@@ -43,7 +61,7 @@ export function resolveHazards(rules, polygons) {
       hazards.push({
         key,
         label: rule.label || polygon.id, justification: rule.justification ?? null,
-        bands: rule.bands_m, reach: rule.bands_m.at(-1).max_m, polygon, box: boundingBox(polygon),
+        bands: rule.bands_m, reach: rule.bands_m.at(-1).max_m, polygon, box: boundingBox(polygon), metric: null, limit: null, unit: 'm',
       });
     }
   }
@@ -55,41 +73,47 @@ function quality(episode) {
 }
 
 function bandEvent(episode, hazard, band, sample, distance, transition) {
-  const label = `"${band.label}" (até ${band.max_m} m)`;
-  const shown = Number.isFinite(distance) ? `${distance.toFixed(1)} m` : 'indisponível';
+  const unit = hazard.unit === 'deg' ? '°' : ' m';
+  const label = `"${band.label}" (até ${band.max_m}${unit})`;
+  const shown = Number.isFinite(distance) ? `${distance.toFixed(1)}${unit}` : 'indisponível';
+  const machine = !!hazard.metric;
+  const measure = machine
+    ? `Inclinação registrada: ${Math.abs(sample[hazard.metric]).toFixed(1)}°; margem até o limite da máquina (${hazard.limit}°): ${shown}`
+    : `Distância horizontal calculada até ${hazard.label}: ${shown}`;
   return {
     id: `${episode.id}:${transition}`, type: 'hazard_band', transition, elapsedMs: sample.elapsedMs, timestamp: sample.timestamp,
-    title: transition === 'start' ? 'Entrada em faixa de proximidade' : 'Saída da faixa de proximidade',
+    title: transition === 'start' ? (machine ? 'Inclinação perto do limite da máquina' : 'Entrada em faixa de proximidade') : (machine ? 'Inclinação de volta abaixo da faixa' : 'Saída da faixa de proximidade'),
     description: transition === 'start'
-      ? `Distância horizontal calculada até ${hazard.label}: ${shown}; faixa ${label}. Isso não comprova contato com o perigo.`
-      : `Distância horizontal calculada até ${hazard.label}: ${shown}; fora da faixa ${label}.`,
+      ? `${measure}; faixa ${label}. ${machine ? 'O limite é o declarado no perfil da máquina, não uma medição do fabricante.' : 'Isso não comprova contato com o perigo.'}`
+      : `${measure}; fora da faixa ${label}.`,
     evidence: {
       gnss_fix: sample.gnss_fix, latitude_deg: sample.latitude_deg, longitude_deg: sample.longitude_deg,
       hazard: hazard.key, hazard_label: hazard.label, band: band.id, band_label: band.label,
       distance_m: Number.isFinite(distance) ? distance : null, threshold_m: band.max_m,
+      ...(machine ? { metric: hazard.metric, value_deg: sample[hazard.metric], limit_deg: hazard.limit, unit: 'deg' } : {}),
     },
   };
 }
 
 // sampleIntervalMs: intervalo sem amostras acima de 1,5× o esperado é lacuna de gravação (mesma regra de getReplayFrame), não exposição.
-export function computeGeofenceEpisodes(samples, polygons, rules, caseId, sampleIntervalMs = 0) {
-  const hazards = resolveHazards(rules, polygons);
+export function computeGeofenceEpisodes(samples, polygons, rules, caseId, sampleIntervalMs = 0, machine = null) {
+  const hazards = resolveHazards(rules, polygons, machine);
   const episodes = [], events = [];
   for (const hazard of hazards) {
     let open = null, openBand = null;
     for (const [index, sample] of samples.entries()) {
-      const gps = hasPosition(sample);
+      const gps = measured(sample, hazard);
       if (open && index) {
         const dt = sample.elapsedMs - samples[index - 1].elapsedMs;
         const recorded = !sampleIntervalMs || dt <= sampleIntervalMs * 1.5;
-        if (gps && recorded && hasPosition(samples[index - 1])) open.observedMs += dt; else open.gapMs += dt;
+        if (gps && recorded && measured(samples[index - 1], hazard)) open.observedMs += dt; else open.gapMs += dt;
       }
-      if (!gps) continue; // Sem posição, sem faixa: não abre nem fecha episódio.
+      if (!gps) continue; // Sem posição (ou sem o sinal do perfil), sem faixa: não abre nem fecha episódio.
       const distance = hazardDistance(sample, hazard);
       const band = classifyBand(distance, hazard.bands);
       if (open && band?.id !== open.bandId) {
         open.endMs = sample.elapsedMs; open.quality = quality(open);
-        events.push(bandEvent(open, hazard, openBand, sample, Number.isFinite(distance) ? distance : polygonDistance(sample, hazard.polygon), 'end'));
+        events.push(bandEvent(open, hazard, openBand, sample, Number.isFinite(distance) || !hazard.polygon ? distance : polygonDistance(sample, hazard.polygon), 'end'));
         open = null;
       }
       if (band && !open) {
@@ -146,6 +170,7 @@ export function bandGrid(polygons, hazards, cellM = 2) {
   const grid = { minX, minZ, cellM, cols, rows, inside: new Uint8Array(cols * rows), bands: [] };
   for (const polygon of allowed) rasterize(polygon, grid, cell => { grid.inside[cell] = 1; });
   for (const hazard of hazards) {
+    if (!hazard.polygon) { grid.bands.push(new Int16Array(cols * rows).fill(-1)); continue; } // Perigo de máquina: sem polígono, zona vem do relevo na interface.
     const { reach } = hazard;
     const distance = new Float64Array(cols * rows).fill(Infinity);
     rasterize(hazard.polygon, grid, cell => { distance[cell] = 0; }); // Dentro do perigo: distância 0.
@@ -176,7 +201,7 @@ function areaFromGrid(grid, hazards) {
   const { cellM } = grid;
   const cellArea = cellM * cellM;
   const allowedM2 = grid.inside.reduce((sum, value) => sum + value, 0) * cellArea;
-  return hazards.flatMap((hazard, h) => hazard.bands.map((band, b) => {
+  return hazards.flatMap((hazard, h) => hazard.polygon === null ? [] : hazard.bands.map((band, b) => {
     let cells = 0;
     for (const value of grid.bands[h]) if (value === b) cells += 1; // Cada célula conta numa única faixa: sem dupla contagem.
     return { hazardKey: hazard.key, bandId: band.id, areaM2: cells * cellArea, shareOfAllowed: allowedM2 ? cells * cellArea / allowedM2 : 0, method: `grade ${cellM} m` };

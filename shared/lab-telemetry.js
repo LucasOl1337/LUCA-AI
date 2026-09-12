@@ -132,6 +132,11 @@ function validateManifest(manifest) {
     if (image.resolution_m != null && (!finite(image.resolution_m) || image.resolution_m <= 0)) fail('Imagem aérea: resolução deve ser positiva, em metros por pixel.');
   }
   if (manifest.machine != null && (!object(manifest.machine) || typeof manifest.machine.id !== 'string' || !manifest.machine.id.trim())) fail('Identificação de máquina inválida no manifesto.');
+  if (manifest.machine?.profile != null) {
+    const profile = manifest.machine.profile;
+    if (!object(profile)) fail('Perfil de máquina inválido: machine.profile deve ser um objeto.');
+    for (const [key, value] of Object.entries(profile)) if (value != null && (!finite(value) || value < 0)) fail(`Perfil de máquina: ${key} deve ser um número maior ou igual a zero.`);
+  }
   for (const field of ['duration_s', 'export_rate_hz']) {
     if (manifest[field] != null && (!finite(manifest[field]) || manifest[field] <= 0)) fail(`Metadado ${field} deve ser um número positivo.`);
   }
@@ -146,7 +151,11 @@ function validateManifest(manifest) {
     const seen = new Set();
     for (const [index, hazard] of hazards.entries()) {
       const where = `Regras: perigo ${index + 1}`;
-      if (!object(hazard) || !['water', 'hazard'].includes(hazard.role)) fail(`${where}: role deve ser water ou hazard.`);
+      if (!object(hazard) || !['water', 'hazard', 'machine'].includes(hazard.role)) fail(`${where}: role deve ser water, hazard ou machine.`);
+      if (hazard.role === 'machine') {
+        if (hazard.metric != null && hazard.metric !== 'roll_deg' && hazard.metric !== 'pitch_deg') fail(`${where}: metric de máquina deve ser roll_deg ou pitch_deg.`);
+        if (hazard.limit_deg != null && (!finite(hazard.limit_deg) || hazard.limit_deg <= 0)) fail(`${where}: limit_deg deve ser um número positivo em graus.`);
+      }
       if (hazard.role === 'hazard' && (typeof hazard.category !== 'string' || !hazard.category.trim())) fail(`${where}: informe category (por exemplo slope) para role hazard.`);
       const kind = [hazard.role, hazard.category].filter(Boolean).join('/');
       if (seen.has(kind)) fail(`${where}: perigo ${kind} repetido; use uma entrada por papel e categoria.`);
@@ -409,7 +418,7 @@ export function parseLabCase(rawCsv, { fileName = 'caso.csv', manifest = null, m
   warnings.push(...site.warnings);
   const rules = { ...manifest?.rules, water_warning_distance_m: manifest?.rules?.water_warning_distance_m ?? 20, coolant_warning_c: manifest?.rules?.coolant_warning_c ?? 105 };
   const id = `lab:${first.machine_id}:${first.timeMs}:${last.timeMs}:${hashText(rawCsv)}`;
-  const geofence = computeGeofenceEpisodes(samples, polygons, rules, id, sampleIntervalMs);
+  const geofence = computeGeofenceEpisodes(samples, polygons, rules, id, sampleIntervalMs, manifest?.machine ?? null);
   // Sem rules.hazards a faixa derivada só alimenta geofence.episodes; a linha do tempo continua com near_water (PR intacta).
   const events = [
     ...detectEvents(samples, polygons, rules, id, Boolean(rules.hazards?.some(hazard => hazard.role === 'water'))),

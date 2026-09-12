@@ -55,3 +55,14 @@ test('dataset Piracicaba: declive registra entrada no polígono e o alerta de in
   assert.equal(inside.endMs, null, 'máquina parada dentro do declive: episódio aberto no fim');
   assert.equal(inside.quality, 'aberto-no-fim');
 });
+
+test('dataset Piracicaba: a máquina passa do limite de inclinação do perfil antes do alerta do dispositivo e dentro da encosta', () => {
+  const labCase = parse('02-declive-tombamento.csv');
+  assert.equal(manifest.machine.profile.max_roll_deg, 15);
+  const above = labCase.geofence.episodes.find((episode) => episode.hazardKey === 'machine:roll_deg' && episode.bandId === 'acima');
+  const near = labCase.geofence.episodes.find((episode) => episode.hazardKey === 'machine:roll_deg' && episode.bandId === 'proximo');
+  assert.ok(near && above && near.startMs < above.startMs, 'próximo do limite vem antes de acima do limite');
+  const warning = labCase.events.find((event) => event.type === 'device_inclination_warning' && event.transition === 'start');
+  assert.ok(warning && above.startMs < warning.elapsedMs, 'o limite do perfil é cruzado antes do alerta de 25° do dispositivo');
+  assert.equal(above.endMs, null, 'tombada dentro da encosta: episódio aberto no fim');
+});

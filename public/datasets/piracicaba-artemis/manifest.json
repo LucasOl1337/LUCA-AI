@@ -18,7 +18,13 @@
   "map_warning": "Água conforme OpenStreetMap (ODbL); limite de propriedade, área permitida e declive são fictícios, desenhados sobre o talhão de cana para fins de demonstração. Não representam cadastro real nem levantamento de campo.",
   "machine": {
     "id": "COLH-DEMO-01",
-    "model": "Colheitadeira (demonstração)"
+    "model": "Colheitadeira (demonstração)",
+    "profile": {
+      "max_roll_deg": 15,
+      "platform_width_m": 9,
+      "operating_speed_kmh": 6,
+      "reaction_time_s": 1.5
+    }
   },
   "satellite": {
     "url": "/datasets/piracicaba-artemis/imagem-aerea-sintetica.png",
@@ -90,6 +96,24 @@
           }
         ],
         "justification": "Polígono fictício para demonstração."
+      },
+      {
+        "role": "machine",
+        "metric": "roll_deg",
+        "label": "Limite de inclinação da máquina",
+        "bands_m": [
+          {
+            "id": "acima",
+            "label": "Acima do limite",
+            "max_m": 0
+          },
+          {
+            "id": "proximo",
+            "label": "Próximo do limite",
+            "max_m": 5
+          }
+        ],
+        "justification": "Limite declarado em machine.profile.max_roll_deg (demonstração); faixas em graus de margem até o limite."
       }
     ]
   },
@@ -103,7 +127,7 @@
     {
       "file": "02-declive-tombamento.csv",
       "samples": 2401,
-      "sha256": "d327bb35ed6cb1c568110c9c2f38ffbf508eab4aaa1980743458b94f8f744762"
+      "sha256": "98a8e2debcce9a5a394f8fb6131dc82a4366f75148e0aa512ac855fcba41af5a"
     }
   ]
 }

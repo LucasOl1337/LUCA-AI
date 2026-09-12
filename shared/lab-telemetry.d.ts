@@ -57,7 +57,7 @@ export interface LabPolygon { id: string; role: 'property_boundary' | 'allowed_a
 export interface LabManifest {
   version?: string | number;
   synthetic?: boolean;
-  machine?: { id: string; model?: string; implement?: string };
+  machine?: { id: string; model?: string; implement?: string; profile?: { max_roll_deg?: number; max_pitch_deg?: number; platform_width_m?: number; operating_speed_kmh?: number; reaction_time_s?: number; [key: string]: number | undefined } };
   duration_s?: number;
   export_rate_hz?: number;
   coordinate_reference?: string;

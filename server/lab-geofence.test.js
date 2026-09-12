@@ -130,7 +130,7 @@ test('manifesto rejeita hazards mal formados com mensagens legíveis', () => {
   const parse = hazards => parseLabCase(source, { fileName: '02-cerca-e-agua.csv', manifest: withRules(hazards), map });
   assert.throws(() => parse([{ role: 'water', bands_m: [{ id: 'b', max_m: 20 }, { id: 'a', max_m: 5 }] }]), /ordem crescente de max_m/);
   assert.throws(() => parse([{ role: 'water', bands_m: [{ id: 'a', max_m: 5 }, { id: 'a', max_m: 20 }] }]), /repetido/);
-  assert.throws(() => parse([{ role: 'lava', bands_m: [{ id: 'a', max_m: 5 }] }]), /water ou hazard/);
+  assert.throws(() => parse([{ role: 'lava', bands_m: [{ id: 'a', max_m: 5 }] }]), /water, hazard ou machine/);
   assert.throws(() => parse([{ role: 'hazard', bands_m: [{ id: 'a', max_m: 5 }] }]), /category/);
   assert.throws(() => parse([{ role: 'water', bands_m: [] }]), /pelo menos uma faixa/);
   assert.throws(() => parse([{ role: 'water', bands_m: [{ id: 'a', max_m: 35 }] }]), /water_warning_distance_m/);
@@ -177,4 +177,22 @@ test('bandGrid por arestas coincide célula a célula com a distância exata, in
   }
   assert.deepEqual(Array.from(grid.bands[0]), expected);
   assert.ok(expected.includes(0) && expected.includes(2) && expected.includes(-1), 'a fixture cobre dentro, faixa externa e ilha');
+});
+
+test('perigo de máquina: margem em graus até o limite do perfil abre/fecha faixas; sem roll não abre nem fecha; sem perfil vira aviso', () => {
+  const machineRules = { hazards: [{ role: 'machine', metric: 'roll_deg', label: 'Limite de inclinação', bands_m: [{ id: 'acima', label: 'Acima do limite', max_m: 0 }, { id: 'proximo', label: 'Próximo do limite', max_m: 5 }] }] };
+  const rolls = [4, 12, 16, null, 15, 8];
+  const samples = samplesAt(rolls.map(() => 50)).map((s, i) => ({ ...s, roll_deg: rolls[i] }));
+  const { summary, events } = computeGeofenceEpisodes(samples, [allowed, water], machineRules, 'c', 1000, { profile: { max_roll_deg: 15 } });
+  assert.deepEqual(summary.episodes.map(e => [e.bandId, e.startMs, e.endMs, e.gapMs]), [['proximo', 1000, 2000, 0], ['acima', 2000, 5000, 2000]]); // a amostra sem roll tira os dois intervalos vizinhos do observado (mesma regra do GNSS)
+  assert.equal(summary.episodes[1].minDistanceM, 0);
+  assert.ok(events.every(e => e.evidence.unit === 'deg' && e.evidence.limit_deg === 15));
+  assert.equal(summary.affectedArea.length, 0, 'perigo de máquina não tem área por grade');
+  assert.equal(summary.grid.bands.length, 1, 'grade acompanha a lista de perigos');
+  const noProfile = resolveHazards(machineRules, [allowed, water], null);
+  assert.equal(noProfile.length, 0);
+  assert.match(noProfile.warnings[0], /max_roll_deg/);
+  const fixed = resolveHazards({ hazards: [{ ...machineRules.hazards[0], limit_deg: 20 }] }, [allowed, water], { profile: { max_roll_deg: 15 } });
+  assert.equal(fixed[0].limit, 20, 'limit_deg na regra prevalece sobre o perfil');
+  assert.doesNotMatch(JSON.stringify(events), /seguro|acidente/i);
 });

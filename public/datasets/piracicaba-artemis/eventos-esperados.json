@@ -75,7 +75,22 @@
     {
       "type": "hazard_band",
       "transition": "start",
+      "elapsedMs": 112200
+    },
+    {
+      "type": "hazard_band",
+      "transition": "start",
       "elapsedMs": 114100
+    },
+    {
+      "type": "hazard_band",
+      "transition": "end",
+      "elapsedMs": 114700
+    },
+    {
+      "type": "hazard_band",
+      "transition": "start",
+      "elapsedMs": 114700
     },
     {
       "type": "hazard_band",
@@ -90,7 +105,7 @@
     {
       "type": "device_inclination_warning",
       "transition": "start",
-      "elapsedMs": 121100
+      "elapsedMs": 144300
     }
   ]
 }
