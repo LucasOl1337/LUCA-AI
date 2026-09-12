@@ -96,7 +96,15 @@ function buildStaticMap(scenarioId: string, outcomeId: string): StaticMap | null
     canvas, minX, minZ, path, label: site.label,
     hazards: [...new Map(hazards.map(hazard => [hazard.label, hazard])).values()].map(hazard => ({
       label: hazard.label,
-      bands: hazard.bands.map(band => band.max_m === 0 ? (band.label ?? band.id) : `${band.label ?? band.id} até ${band.max_m}${hazard.metric ? '°' : ' m'}`).join(' · '),
+      // Intervalos exclusivos: "até 5 m · de 5 a 15 m", para "até 15 m" não parecer que engloba "até 5 m".
+      bands: hazard.bands.map((band, index) => {
+        const name = band.label ?? band.id;
+        if (band.max_m === 0) return name;
+        const unit = hazard.metric ? '°' : ' m';
+        const previous = hazard.bands[index - 1]?.max_m ?? 0;
+        const range = previous > 0 ? `de ${previous} a ${band.max_m}${unit}` : `até ${band.max_m}${unit}`;
+        return hazard.metric ? `${name}: margem ${range}` : `${name}: ${range}`;
+      }).join(' · '),
       justification: hazard.justification,
     })),
   };
@@ -160,6 +168,7 @@ export default function SompoGeofenceMap({ scenarioId, outcomeId, elapsedMs, pos
         <li><i style={{ background: BAND_RAMP[2] }} />Atenção</li>
         <li><i style={{ background: '#6b7a6f' }} />Percurso do cenário</li>
       </ul>
+      <p className="sompo-geofence-map-note">As cores indicam a faixa de cada perigo, não uma gravidade equivalente entre perigos. Nenhuma faixa é rótulo de segurança.</p>
       <dl className="sompo-geofence-map-rules">
         {map.hazards.map(hazard => (
           <div key={hazard.label}>

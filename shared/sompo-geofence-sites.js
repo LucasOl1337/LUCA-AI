@@ -1,6 +1,6 @@
 export const SOMPO_GEOFENCE_SITE_VERSION = 1;
 
-const justification = 'Valores sintéticos de demonstração; distâncias não calibradas em campo.';
+const justification = 'Distâncias sintéticas de demonstração; não são distâncias de segurança certificadas.';
 const rect = (id, role, x0, x1, z0, z1, category) => ({
   id, role, ...(category ? { category } : {}), synthetic: true,
   rings: [[{ x: x0, z: z0 }, { x: x1, z: z0 }, { x: x1, z: z1 }, { x: x0, z: z1 }, { x: x0, z: z0 }]],
@@ -49,6 +49,6 @@ export function getSompoGeofenceSite(environmentId, totalTravelMeters) {
   // Perigo de máquina, por último: sem geometria; o limite vem de machine.profile.max_roll_deg em quem avalia (resolveHazards).
   hazards.push({ role: 'machine', metric: 'roll_deg', label: 'Limite de inclinação da máquina', synthetic: true,
     justification: 'Limite declarado no perfil do equipamento (demonstração); faixas em graus de margem até o limite.',
-    bands_m: [{ id: 'acima', label: 'Acima do limite', max_m: 0 }, { id: 'proximo', label: 'Próximo do limite', max_m: 5 }] });
+    bands_m: [{ id: 'acima', label: 'No limite ou acima', max_m: 0 }, { id: 'proximo', label: 'Próximo do limite', max_m: 5 }] });
   return { manifestRules: { hazards, synthetic: true }, polygons, synthetic: true, label: 'Fazenda sintética · talhão de demonstração' };
 }

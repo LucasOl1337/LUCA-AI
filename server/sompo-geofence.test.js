@@ -38,7 +38,11 @@ test('sem heading: faixa e distância continuam, lado e tempo ficam nulos; fora 
   const outside = evaluateGeofence({ x: 200, z: 0, headingDeg: 90, speedKph: 5 }, rules, [field, water]);
   assert.equal(outside.insideAllowed, false);
   assert.equal(describeGeofence(outside), 'Fora da área permitida');
-  assert.match(describeGeofence(evaluateGeofence({ x: 60, z: 0, headingDeg: 180, speedKph: 7.2 }, rules, [field, water])), /^Atenção · Córrego a 20 m à frente · 10 s$/);
+  assert.match(describeGeofence(evaluateGeofence({ x: 60, z: 0, headingDeg: 180, speedKph: 7.2 }, rules, [field, water])), /^Atenção · Córrego a 20 m à frente · ≈ 10 s de aproximação$/);
+  assert.equal(describeGeofence(evaluateGeofence({ x: 60, z: 30, headingDeg: 90, speedKph: 3 }, rules, [field, water])), 'Proximidade crítica · Córrego', 'dentro do perigo não diz "a 0 m"');
+  const outsideNear = evaluateGeofence({ x: 110, z: 30, headingDeg: 90, speedKph: 3 }, rules, [field, water]); // fora do talhão (x > 100) e dentro da água
+  assert.equal(outsideNear.insideAllowed, false);
+  assert.match(describeGeofence(outsideNear), /^Fora da área permitida · Proximidade crítica · Córrego$/, 'sair da cerca não some quando há perigo perto');
   for (const text of [describeGeofence(result), describeGeofence(outside)]) assert.doesNotMatch(text, /seguro|risco|acidente/i);
 });
 

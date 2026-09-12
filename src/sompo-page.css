@@ -2484,6 +2484,7 @@
 .sompo-geofence-map-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; margin: 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.3; color: #c9d3c6; }
 .sompo-geofence-map-legend li { display: flex; align-items: center; gap: 6px; }
 .sompo-geofence-map-legend i { flex: none; width: 11px; height: 11px; border: 1px solid transparent; border-radius: 3px; }
+.sompo-geofence-map-note { margin: 0; font-size: 11px; line-height: 1.35; color: #aab5a8; }
 .sompo-geofence-map-rules { display: grid; gap: 8px; margin: 0; font-size: 12px; line-height: 1.35; color: #c9d3c6; }
 .sompo-geofence-map-rules dt { font-weight: 600; color: #eef3ea; }
 .sompo-geofence-map-rules dd { margin: 0; }

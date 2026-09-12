@@ -73,10 +73,13 @@ export function evaluateGeofence({ x, z, headingDeg = null, speedKph = 0, rollDe
 // Texto curto para HUD e telemetria, sem "seguro"/"risco": só proximidade, direção e tempo.
 export function describeGeofence(result) {
   const near = result?.nearest;
-  if (!near) return result?.insideAllowed === false ? 'Fora da área permitida' : 'Sem perigo mapeado no alcance';
+  const outside = result?.insideAllowed === false ? 'Fora da área permitida' : '';
+  if (!near) return outside || 'Sem perigo mapeado no alcance';
   const side = near.bearingDeg === null ? '' : Math.abs(near.bearingDeg) <= 20 ? ' à frente' : Math.abs(near.bearingDeg) >= 160 ? ' atrás' : near.bearingDeg > 0 ? ' à direita' : ' à esquerda';
-  const time = near.timeToHazardS === null ? '' : ` · ${Math.round(near.timeToHazardS)} s`;
-  return `${near.bandLabel} · ${near.hazardLabel} a ${near.distanceM.toFixed(0)} m${side}${time}`;
+  const time = near.timeToHazardS === null ? '' : ` · ≈ ${Math.round(near.timeToHazardS)} s de aproximação`;
+  // Dentro do polígono a distância é 0 por definição: dizer "a 0 m" parece distância até uma queda.
+  const where = near.distanceM > 0 ? ` a ${near.distanceM.toFixed(0)} m${side}${time}` : '';
+  return `${outside ? `${outside} · ` : ''}${near.bandLabel} · ${near.hazardLabel}${where}`;
 }
 
 
