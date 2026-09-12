@@ -1,3 +1,4 @@
+import zlib from 'node:zlib';
 // Determinístico: sem Math.random, sem Date.now(). Gera public/datasets/piracicaba-artemis/.
 // Fonte da água: fontes/osm-relation-2708872-2026-09-11.json (relação OSM 2708872, ODbL).
 import fs from 'node:fs';
@@ -300,6 +301,64 @@ fs.writeFileSync(path.join(OUT_DIR, '02-declive-tombamento.csv'), csv02);
 
 function sha256(filePath) { return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex'); }
 
+// ---------- 6b. Relevo e imagem aérea SINTÉTICOS ----------
+// O laboratório só constrói a malha 3D do terreno como base da imagem aérea e exige o mesmo bbox nas duas
+// (validateManifest). Sem ortofoto licenciada de Piracicaba, os dois arquivos são gerados aqui, determinísticos,
+// e marcados como simulados: datum vertical "SIMULADO" e atribuição explícita. Não representam levantamento.
+const TERRAIN = { sw: [-170, 40], ne: [510, 540], cellM: 4 };            // cobre propriedade, percursos e margem
+const TERRAIN_COLS = (TERRAIN.ne[0] - TERRAIN.sw[0]) / TERRAIN.cellM;    // 170
+const TERRAIN_ROWS = (TERRAIN.ne[1] - TERRAIN.sw[1]) / TERRAIN.cellM;    // 125
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const smooth = v => { const t = clamp01(v); return t * t * (3 - 2 * t); };
+// Altura fictícia (m): sobe suavemente ao se afastar do rio (sul) e tem uma encosta de 12 m dentro do polígono de declive.
+function syntheticHeight(x, yNorth) {
+  const base = 478 + (yNorth - TERRAIN.sw[1]) * 0.016;
+  const lateral = 1 - smooth((Math.max(HAZARD.sw[0] - x, 0, x - HAZARD.ne[0])) / 20);
+  const hill = 12 * smooth((yNorth - HAZARD.sw[1]) / (HAZARD.ne[1] - HAZARD.sw[1])) * lateral;
+  const ripple = 0.3 * Math.sin(x / 23) * Math.cos(yNorth / 17);
+  return Math.round((base + hill + ripple) * 100) / 100;
+}
+const terrainValues = [];
+for (let r = 0; r < TERRAIN_ROWS; r++) for (let c = 0; c < TERRAIN_COLS; c++) {
+  terrainValues.push(syntheticHeight(TERRAIN.sw[0] + (c + 0.5) * TERRAIN.cellM, TERRAIN.ne[1] - (r + 0.5) * TERRAIN.cellM));
+}
+const terrainBbox = [...toLonLat(TERRAIN.sw[0], TERRAIN.sw[1]), ...toLonLat(TERRAIN.ne[0], TERRAIN.ne[1])];
+const terrainGrid = { version: 1, crs: 'EPSG:4326', unit: 'm', registration: 'pixel-center', vertical_datum: 'SIMULADO', synthetic: true, note: 'Relevo fictício gerado para demonstração; não é levantamento topográfico.', width: TERRAIN_COLS, height: TERRAIN_ROWS, bbox: terrainBbox, values: terrainValues };
+fs.writeFileSync(path.join(OUT_DIR, 'relevo-sintetico.json'), JSON.stringify(terrainGrid) + '\n');
+
+// PNG RGB mínimo (IHDR/IDAT/IEND, filtro 0) sem dependência: 1 pixel por metro, mesmo bbox do relevo.
+function crc32(buffer) {
+  let crc = 0xffffffff;
+  for (const byte of buffer) { let c = (crc ^ byte) & 0xff; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; crc = (crc >>> 8) ^ c; }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+function pngChunk(type, data) {
+  const length = Buffer.alloc(4); length.writeUInt32BE(data.length);
+  const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+  const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(body));
+  return Buffer.concat([length, body, crc]);
+}
+function encodePng(width, height, rgb) {
+  const stride = width * 3 + 1, raw = Buffer.alloc(stride * height);
+  for (let y = 0; y < height; y++) { raw[y * stride] = 0; rgb.copy(raw, y * stride + 1, y * width * 3, (y + 1) * width * 3); }
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(width, 0); ihdr.writeUInt32BE(height, 4); ihdr[8] = 8; ihdr[9] = 2;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), pngChunk('IHDR', ihdr), pngChunk('IDAT', zlib.deflateSync(raw, { level: 9 })), pngChunk('IEND', Buffer.alloc(0))]);
+}
+const IMG_W = TERRAIN.ne[0] - TERRAIN.sw[0], IMG_H = TERRAIN.ne[1] - TERRAIN.sw[1];
+const pixels = Buffer.alloc(IMG_W * IMG_H * 3);
+const inRect = (x, y, rect) => x >= rect.sw[0] && x <= rect.ne[0] && y >= rect.sw[1] && y <= rect.ne[1];
+for (let py = 0; py < IMG_H; py++) for (let px = 0; px < IMG_W; px++) {
+  const x = TERRAIN.sw[0] + px + 0.5, y = TERRAIN.ne[1] - py - 0.5;
+  let rgb = inRect(x, y, ALLOWED) ? [112, 152, 72] : inRect(x, y, PROPERTY) ? [150, 141, 96] : [124, 137, 88];
+  if (inRect(x, y, ALLOWED)) { const row = 10 * Math.sin(y / 1.5 * Math.PI); rgb = [rgb[0] + row, rgb[1] + row, rgb[2] + row * 0.6]; } // fileiras de cana
+  const shade = 1 + 0.06 * (syntheticHeight(x, y + 4) - syntheticHeight(x, y - 4)); // sombreado pela inclinação norte-sul
+  const at = (py * IMG_W + px) * 3;
+  for (let k = 0; k < 3; k++) pixels[at + k] = Math.max(0, Math.min(255, Math.round(rgb[k] * shade)));
+}
+fs.writeFileSync(path.join(OUT_DIR, 'imagem-aerea-sintetica.png'), encodePng(IMG_W, IMG_H, pixels));
+const SYNTHETIC_IMAGE_ATTRIBUTION = 'Imagem aérea SINTÉTICA gerada para demonstração (não é ortofoto nem satélite)';
+const SYNTHETIC_TERRAIN_ATTRIBUTION = 'Relevo SINTÉTICO gerado para demonstração (não é levantamento topográfico)';
+
 // ---------- 7. manifest.json ----------
 const manifest = {
   version: '1.0',
@@ -317,6 +376,8 @@ const manifest = {
   },
   map_warning: 'Água conforme OpenStreetMap (ODbL); limite de propriedade, área permitida e declive são fictícios, desenhados sobre o talhão de cana para fins de demonstração. Não representam cadastro real nem levantamento de campo.',
   machine: { id: 'COLH-DEMO-01', model: 'Colheitadeira (demonstração)' },
+  satellite: { url: '/datasets/piracicaba-artemis/imagem-aerea-sintetica.png', bbox: terrainBbox, attribution: SYNTHETIC_IMAGE_ATTRIBUTION, crs: 'EPSG:4326', resolution_m: 1, synthetic: true },
+  terrain: { url: '/datasets/piracicaba-artemis/relevo-sintetico.json', sha256: sha256(path.join(OUT_DIR, 'relevo-sintetico.json')), bbox: terrainBbox, vertical_datum: 'SIMULADO', attribution: SYNTHETIC_TERRAIN_ATTRIBUTION, resolution_m: TERRAIN.cellM, synthetic: true },
   export_rate_hz: 10,
   rules: {
     water_warning_distance_m: 35,
@@ -380,6 +441,11 @@ O talhão de cana usado como referência é o way OSM 201798960 (\`landuse=farml
 Limite de propriedade, área permitida, o polígono de declive (\`hazard/slope\`, \`declive-01\`) e o percurso das
 duas colheitas são inventados para demonstração; não representam uma fazenda, propriedade ou evento reais.
 Toda feição fictícia traz \`properties.synthetic: true\` e uma nota em português.
+
+O relevo (\`relevo-sintetico.json\`, datum vertical \`SIMULADO\`, grade de 4 m) e a imagem aérea
+(\`imagem-aerea-sintetica.png\`, 1 px/m) também são gerados: uma subida suave ao se afastar do rio e uma
+encosta de 12 m dentro do polígono de declive. Não são levantamento nem ortofoto; existem para que a cena 3D
+mostre o declive e drapeie faixas, percurso e limites sobre um terreno.
 
 ## Como foi gerado
 \`node scripts/generate-piracicaba-dataset.mjs\` — determinístico (sem \`Math.random\`, sem relógio do sistema

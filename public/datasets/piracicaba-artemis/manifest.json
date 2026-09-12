@@ -20,6 +20,33 @@
     "id": "COLH-DEMO-01",
     "model": "Colheitadeira (demonstração)"
   },
+  "satellite": {
+    "url": "/datasets/piracicaba-artemis/imagem-aerea-sintetica.png",
+    "bbox": [
+      -47.80715501100169,
+      -22.67044067388635,
+      -47.800534966994945,
+      -22.665949097465756
+    ],
+    "attribution": "Imagem aérea SINTÉTICA gerada para demonstração (não é ortofoto nem satélite)",
+    "crs": "EPSG:4326",
+    "resolution_m": 1,
+    "synthetic": true
+  },
+  "terrain": {
+    "url": "/datasets/piracicaba-artemis/relevo-sintetico.json",
+    "sha256": "eef4d9d5517a838ac5089da688ce9dcd46ee8eb98f1df5d32e021f14250ffceb",
+    "bbox": [
+      -47.80715501100169,
+      -22.67044067388635,
+      -47.800534966994945,
+      -22.665949097465756
+    ],
+    "vertical_datum": "SIMULADO",
+    "attribution": "Relevo SINTÉTICO gerado para demonstração (não é levantamento topográfico)",
+    "resolution_m": 4,
+    "synthetic": true
+  },
   "export_rate_hz": 10,
   "rules": {
     "water_warning_distance_m": 35,

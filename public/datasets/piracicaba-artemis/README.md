@@ -12,6 +12,11 @@ Limite de propriedade, área permitida, o polígono de declive (`hazard/slope`, 
 duas colheitas são inventados para demonstração; não representam uma fazenda, propriedade ou evento reais.
 Toda feição fictícia traz `properties.synthetic: true` e uma nota em português.
 
+O relevo (`relevo-sintetico.json`, datum vertical `SIMULADO`, grade de 4 m) e a imagem aérea
+(`imagem-aerea-sintetica.png`, 1 px/m) também são gerados: uma subida suave ao se afastar do rio e uma
+encosta de 12 m dentro do polígono de declive. Não são levantamento nem ortofoto; existem para que a cena 3D
+mostre o declive e drapeie faixas, percurso e limites sobre um terreno.
+
 ## Como foi gerado
 `node scripts/generate-piracicaba-dataset.mjs` — determinístico (sem `Math.random`, sem relógio do sistema
 na geometria; ruído de atitude vem de senos com fase fixa), lê a fonte OSM bruta e escreve todo o conteúdo
