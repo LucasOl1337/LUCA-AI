@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { SOMPO_AGRI_SCENARIOS, getSompoAgriFrame } from '../shared/sompo-agri-scenarios.js';
 import { createSompoAgriSimulationSnapshot, getSompoAgriStartX, getSompoAgriTravelMeters } from '../shared/sompo-agri-brief.js';
-import { describeGeofence, evaluateGeofence, suggestSafeLane } from '../shared/sompo-geofence.js';
+import { describeGeofence, evaluateGeofence } from '../shared/sompo-geofence.js';
 import { resolveHazards } from '../shared/lab-geofence.js';
 import { getSompoGeofenceSite, SOMPO_GEOFENCE_SITE_VERSION } from '../shared/sompo-geofence-sites.js';
 
@@ -47,23 +47,6 @@ test('ambientes têm geometrias sintéticas e regras correspondentes sem avisos'
     }
     const labels = [site.label, ...hazards.flatMap(hazard => [hazard.label, ...hazard.bands.map(band => band.label)])];
     for (const label of labels) assert.doesNotMatch(label, /seguro|risco|acidente/i);
-  }
-});
-
-test('colheita tem pista sugerida dentro do talhão e fora das faixas em até 60 m', () => {
-  const scenario = SOMPO_AGRI_SCENARIOS['agri-harvest-dust'];
-  for (const outcome of Object.keys(scenario.outcomes)) {
-    const travel = getSompoAgriTravelMeters(scenario.scenarioId, scenario.totalMs, outcome);
-    const startX = getSompoAgriStartX(scenario.scenarioId, outcome);
-    const site = getSompoGeofenceSite(scenario.environmentId, travel);
-    const lane = suggestSafeLane({ xStart: startX, xEnd: startX + travel, preferredZ: 0, maxOffsetM: 60 }, site.manifestRules, site.polygons);
-    assert.ok(lane);
-    assert.ok(lane.offsetM <= 60);
-    for (let i = 0; i <= 100; i += 1) {
-      const result = evaluateGeofence({ x: startX + travel * i / 100, z: lane.z }, site.manifestRules, site.polygons);
-      assert.equal(result.insideAllowed, true);
-      assert.equal(result.nearest, null);
-    }
   }
 });
 

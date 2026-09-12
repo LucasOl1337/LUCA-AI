@@ -13,7 +13,6 @@ import {
 import { getSompoAgriStartX, getSompoAgriTravelMeters } from '../../../shared/sompo-agri-brief.js';
 import { getSompoGeofenceSite } from '../../../shared/sompo-geofence-sites.js';
 import { bandGrid, resolveHazards } from '../../../shared/lab-geofence.js';
-import { suggestSafeLane } from '../../../shared/sompo-geofence.js';
 import { frameDamping } from './frameDamping.js';
 import { createSompoRenderer, sompoRenderBudget, disposeSompoObject, type SompoStageApi } from './sompoStage';
 import { createSompoEnvironmentAssets } from './createSompoEnvironmentAssets';
@@ -182,24 +181,6 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     mesh.position.set(centerX, 0.05, centerZ);
     mesh.renderOrder = 1;
     geofenceLayer.add(mesh);
-  }
-  const safeLane: { z: number; points: { x: number; z: number }[] } | null = suggestSafeLane({ xStart: startX, xEnd: startX + totalTravel, preferredZ: 0, maxOffsetM: 60 }, site.manifestRules, site.polygons);
-  if (safeLane) {
-    const points: THREE.Vector3[] = [];
-    for (let i = 1; i < safeLane.points.length; i += 1) {
-      const a = safeLane.points[i - 1], b = safeLane.points[i];
-      const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 5));
-      for (let step = 0; step <= steps; step += 1) {
-        const x = THREE.MathUtils.lerp(a.x, b.x, step / steps);
-        const z = THREE.MathUtils.lerp(a.z, b.z, step / steps);
-        points.push(new THREE.Vector3(x, field.groundHeight(x, z) + 0.08, z));
-      }
-    }
-    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineDashedMaterial({ color: '#17614b', dashSize: 2, gapSize: 1.2 }));
-    line.computeLineDistances();
-    line.renderOrder = 2;
-    geofenceLayer.add(line);
-    geofenceLayer.userData.safeLaneZ = safeLane.z;
   }
   for (const polygon of site.polygons) {
     const ring = polygon.rings[0];
