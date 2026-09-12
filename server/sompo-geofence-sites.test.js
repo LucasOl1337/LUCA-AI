@@ -1,118 +1,99 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { SOMPO_AGRI_EQUIPMENT, SOMPO_AGRI_SCENARIOS, getSompoAgriFrame } from '../shared/sompo-agri-scenarios.js';
-import { createSompoAgriSimulationSnapshot, getSompoAgriStartX, getSompoAgriTravelMeters } from '../shared/sompo-agri-brief.js';
-import { describeGeofence, evaluateGeofence } from '../shared/sompo-geofence.js';
+import { createSompoAgriSimulationSnapshot } from '../shared/sompo-agri-brief.js';
+import { describeGeofence, describeMachineLimit, evaluateGeofence } from '../shared/sompo-geofence.js';
 import { resolveHazards } from '../shared/lab-geofence.js';
 import { getSompoGeofenceSite, SOMPO_GEOFENCE_SITE_VERSION } from '../shared/sompo-geofence-sites.js';
 
-const snapshotAt = (id, outcome, elapsedMs) => createSompoAgriSimulationSnapshot(id, outcome, {
+const SCENARIO = 'agri-geofencing';
+const snapshotAt = (outcome, elapsedMs) => createSompoAgriSimulationSnapshot(SCENARIO, outcome, {
   elapsedMs, observedAt: '2026-09-12T12:00:00.000Z',
 });
-const samples = (id, outcome) => Array.from({ length: SOMPO_AGRI_SCENARIOS[id].totalMs / 250 + 1 },
-  (_, i) => snapshotAt(id, outcome, i * 250));
+const samples = (outcome) => Array.from({ length: SOMPO_AGRI_SCENARIOS[SCENARIO].totalMs / 250 + 1 }, (_, i) => snapshotAt(outcome, i * 250));
+const bands = (outcome) => samples(outcome).map(frame => frame.geofence.nearest ? `${frame.geofence.nearest.hazardKey.split(':')[0]}:${frame.geofence.nearest.bandId}` : 'nenhum');
 
-test('colheita aproxima do córrego no meio do percurso e mantém avanço crescente', () => {
-  const frames = samples('agri-harvest-dust', 'clean-pass');
-  assert.equal(frames[0].geofence.nearest, null, 'a corrida começa sem perigo no alcance');
-  assert.ok(frames.some(frame => frame.geofence.nearest?.bandId === 'atencao'));
-  assert.ok(frames.slice(1, -1).some(frame => frame.geofence.nearest?.bandId === 'elevada'));
-  assert.ok(frames.some(frame => frame.geofence.nearest?.bandLabel === 'Atenção'));
-  assert.ok(frames.every(frame => frame.geofence.nearest?.bandId !== 'critica'));
-  for (let i = 1; i < frames.length; i += 1) assert.ok(frames[i].position.x > frames[i - 1].position.x);
-});
-
-test('ambientes têm geometrias sintéticas e regras correspondentes sem avisos', () => {
-  const expected = {
-    'row-crop-field': ['corrego-sintetico', 'lagoa-sintetica', 'ribanceira-sintetica'],
-    'row-crop-field-night': ['corrego-sintetico', 'lagoa-sintetica', 'ribanceira-sintetica'],
-    'muddy-field': ['corrego-sintetico', 'alagado-sintetico'],
-    'sloped-field': ['corrego-sintetico', 'declive-sintetico', 'ribanceira-sintetica'],
-    'farm-barn': [],
-  };
-  for (const [environment, ids] of Object.entries(expected)) {
-    const site = getSompoGeofenceSite(environment, 40);
-    const hazards = resolveHazards(site.manifestRules, site.polygons, SOMPO_AGRI_EQUIPMENT.tractor);
-    assert.deepEqual(hazards.warnings, []);
-    assert.deepEqual(site.polygons.slice(1).map(polygon => polygon.id), ids);
-    assert.equal(hazards.length, ids.length + 1, 'perigos do mapa + limite da máquina');
-    assert.deepEqual(site.polygons[0].rings[0].map(point => point.z), [-70, -70, 70, 70, -70]);
-    assert.equal(site.manifestRules.synthetic, true);
-    for (const polygon of site.polygons) {
-      assert.equal(polygon.synthetic, true);
-      assert.deepEqual(polygon.rings[0][0], polygon.rings[0].at(-1));
-    }
-    for (const rule of site.manifestRules.hazards) {
-      assert.equal(rule.synthetic, true);
-      assert.deepEqual(rule.bands_m.map(band => band.max_m), rule.role === 'water' ? [5, 15, 35] : rule.role === 'machine' ? [0, 5] : rule.category === 'slope' ? [0, 10] : [0, 15]);
-    }
-    const labels = [site.label, ...hazards.flatMap(hazard => [hazard.label, ...hazard.bands.map(band => band.label)])];
-    for (const label of labels) assert.doesNotMatch(label, /seguro|risco|acidente/i);
-  }
-});
-
-test('declive cruza o trecho em que a inclinação aumenta', () => {
-  const frames = samples('agri-tractor-rollover', 'side-rollover');
-  assert.ok(frames.some(frame => frame.geofence.nearest?.hazardKey.startsWith('hazard:slope')));
-  assert.equal(snapshotAt('agri-tractor-rollover', 'side-rollover', 7000).geofence.nearest.bandId, 'dentro');
-});
-
-test('barracão contém todas as manobras sem perigo mapeado', () => {
-  for (const outcome of Object.keys(SOMPO_AGRI_SCENARIOS['agri-barn-maneuver'].outcomes)) {
-    for (const frame of samples('agri-barn-maneuver', outcome)) {
-      assert.equal(frame.geofence.nearest, null);
-      assert.equal(frame.geofence.insideAllowed, true);
-    }
-  }
-});
-
-test('todos os desfechos compartilham posição do palco e preservam as flags do roteiro', () => {
+test('só o ambiente do cenário de geofencing tem talhão; os cenários originais ficam sem radar', () => {
+  assert.equal(SOMPO_GEOFENCE_SITE_VERSION, 2);
   for (const scenario of Object.values(SOMPO_AGRI_SCENARIOS)) {
-    for (const outcome of Object.keys(scenario.outcomes)) {
-      for (const snapshot of samples(scenario.scenarioId, outcome)) {
-        const elapsed = snapshot.deviceTimestamp;
-        const frame = getSompoAgriFrame(scenario.scenarioId, elapsed, outcome);
-        assert.equal(snapshot.position.x, getSompoAgriStartX(scenario.scenarioId, outcome)
-          + getSompoAgriTravelMeters(scenario.scenarioId, elapsed, outcome));
-        assert.equal(snapshot.position.z, frame.lateral);
-        assert.equal(snapshot.position.headingDeg, 90 - frame.yaw);
-        assert.equal(snapshot.risks.proximity, !!snapshot.geofence.nearest);
-        assert.equal(snapshot.risks.collision, frame.collisionRisk);
-        assert.equal(snapshot.risks.inclination, frame.inclinationRisk);
-        assert.deepEqual(snapshot.geofence.warnings, []);
-        assert.doesNotMatch(describeGeofence(snapshot.geofence), /seguro|risco|acidente/i);
-      }
-    }
+    const site = getSompoGeofenceSite(scenario.environmentId, 40);
+    if (scenario.scenarioId === SCENARIO) { assert.ok(site); continue; }
+    assert.equal(site, null);
+    const snapshot = createSompoAgriSimulationSnapshot(scenario.scenarioId, undefined, { elapsedMs: 3000, observedAt: '2026-09-12T12:00:00.000Z' });
+    assert.equal(snapshot.geofence, null);
+    assert.equal(snapshot.risks.proximity, false);
+    assert.ok(Number.isFinite(snapshot.position.x));
   }
+  assert.throws(() => getSompoGeofenceSite('geofence-field', NaN), TypeError);
 });
 
-test('mapa sintético tem anéis fechados, faixas ordenadas e água à direita', () => {
-  const site = getSompoGeofenceSite('row-crop-field', 40);
-  assert.equal(SOMPO_GEOFENCE_SITE_VERSION, 1);
+test('fazenda sintética: anéis fechados, formas curvas, regras ordenadas, sem avisos e sem rótulos proibidos', () => {
+  const site = getSompoGeofenceSite('geofence-field', 47);
   assert.equal(site.synthetic, true);
-  assert.deepEqual(site, getSompoGeofenceSite('row-crop-field-night', 40));
-  assert.throws(() => getSompoGeofenceSite('row-crop-field', NaN), TypeError);
+  assert.deepEqual(site.polygons.map(polygon => polygon.id), ['talhao-sintetico', 'corrego-sintetico', 'lagoa-sintetica', 'declive-sintetico', 'ribanceira-sintetica']);
   for (const polygon of site.polygons) {
     assert.equal(polygon.synthetic, true);
     assert.deepEqual(polygon.rings[0][0], polygon.rings[0].at(-1));
+    assert.ok(polygon.rings[0].length >= 9, `${polygon.id} tem ${polygon.rings[0].length} vértices: sem retângulos`);
   }
-  assert.deepEqual(site.manifestRules.hazards[0].bands_m.map(band => band.max_m), [5, 15, 35]);
-  const beside = evaluateGeofence({ x: 27, z: 0, headingDeg: 90, speedKph: 7 }, site.manifestRules, site.polygons);
-  assert.equal(beside.nearest.distanceM, 13);
-  assert.equal(beside.nearest.bearingDeg, 90);
-  assert.equal(beside.nearest.timeToHazardS, null);
-  const lateral = evaluateGeofence({ x: 27, z: 9, headingDeg: 180, speedKph: 7.2 }, site.manifestRules, site.polygons);
-  assert.equal(lateral.nearest.bandId, 'critica');
-  assert.equal(lateral.nearest.timeToHazardS, 2);
+  const hazards = resolveHazards(site.manifestRules, site.polygons, SOMPO_AGRI_EQUIPMENT.harvester);
+  assert.deepEqual(hazards.warnings, []);
+  assert.equal(hazards.length, 5, 'córrego, lagoa (mesma regra de água), declive, ribanceira e máquina');
+  for (const rule of site.manifestRules.hazards) {
+    assert.equal(rule.synthetic, true);
+    const maxes = rule.bands_m.map(band => band.max_m);
+    assert.deepEqual(maxes, [...maxes].sort((a, b) => a - b));
+  }
+  const labels = [site.label, ...hazards.flatMap(hazard => [hazard.label, ...hazard.bands.map(band => band.label)])];
+  for (const label of labels) assert.doesNotMatch(label, /seguro|risco|acidente/i);
 });
 
-test('trator em curva inclinada: parada controlada chega perto do limite; tombamento cruza; colheita plana não entra em faixa', () => {
-  const stop = samples('agri-tractor-rollover', 'controlled-stop').map(frame => frame.geofence.machine);
-  assert.ok(stop.some(hit => hit?.bandId === 'proximo'), 'roll de 22° contra limite de 25° = próximo');
-  assert.ok(stop.every(hit => hit?.bandId !== 'acima'), 'parada controlada nunca passa do limite');
-  const rollover = samples('agri-tractor-rollover', 'side-rollover').map(frame => frame.geofence.machine);
-  assert.ok(rollover.some(hit => hit?.bandId === 'acima'), 'tombamento passa do limite');
-  assert.equal(rollover.at(-1).limitDeg, SOMPO_AGRI_EQUIPMENT.tractor.profile.max_roll_deg);
-  assert.ok(samples('agri-harvest-dust', 'clean-pass').every(frame => frame.geofence.machine === null), 'colheita a 2° não entra em faixa');
-  for (const hit of [...stop, ...rollover]) if (hit) assert.doesNotMatch(`${hit.bandLabel} ${hit.hazardLabel}`, /seguro|risco|acidente/i);
+test('parada na faixa elevada: sem perigo, depois dentro do declive, depois atenção e elevada da água; para', () => {
+  const run = bands('parada-na-faixa');
+  assert.equal(run[0], 'nenhum', 'começa sem perigo no alcance');
+  assert.ok(run.includes('hazard:dentro'));
+  assert.ok(run.includes('hazard:borda'));
+  assert.ok(run.includes('nenhum'), 'há um trecho sem perigo no alcance');
+  assert.ok(run.includes('water:atencao'));
+  assert.equal(run.at(-1), 'water:elevada', 'termina parada na faixa elevada');
+  assert.ok(!run.includes('water:critica'));
+  const order = ['nenhum', 'hazard:dentro', 'water:atencao', 'water:elevada'].map(key => run.indexOf(key));
+  assert.deepEqual(order, [...order].sort((a, b) => a - b), 'a história acontece nessa ordem');
+  const last = samples('parada-na-faixa').at(-1);
+  assert.equal(getSompoAgriFrame(SCENARIO, 24_000, 'parada-na-faixa').speedKph, 0);
+  assert.equal(last.geofence.machine, null, 'inclinação de 2° não entra em faixa de máquina');
+});
+
+test('segue até a faixa crítica: mesma corrida, deriva para o córrego e termina em crítica', () => {
+  const run = bands('segue-ate-critica');
+  assert.ok(run.includes('water:elevada'));
+  assert.equal(run.at(-1), 'water:critica');
+  const last = samples('segue-ate-critica').at(-1);
+  assert.ok(last.geofence.nearest.distanceM < 5 && last.geofence.nearest.distanceM > 0);
+  assert.match(describeGeofence(last.geofence), /^Proximidade crítica · Córrego sintético a \d+ m à (direita|frente)/);
+});
+
+test('declive além do limite: só este desfecho cruza o limite da colheitadeira (15°) e para dentro do declive', () => {
+  const machine = samples('declive-alem-do-limite').map(frame => frame.geofence.machine);
+  assert.ok(machine.some(hit => hit?.bandId === 'proximo'));
+  assert.ok(machine.some(hit => hit?.bandId === 'acima'));
+  const last = samples('declive-alem-do-limite').at(-1);
+  assert.equal(last.geofence.machine.bandId, 'acima');
+  assert.equal(last.geofence.machine.limitDeg, SOMPO_AGRI_EQUIPMENT.harvester.profile.max_roll_deg);
+  assert.equal(last.geofence.nearest.bandId, 'dentro', 'parou dentro do declive mapeado');
+  assert.match(describeMachineLimit(last.geofence.machine), /^No limite ou acima · inclinação 1[89]° · limite 15°$/);
+  for (const outcome of ['parada-na-faixa', 'segue-ate-critica']) assert.ok(samples(outcome).every(frame => frame.geofence.machine === null), `${outcome} nunca entra em faixa de máquina`);
+});
+
+test('radar: lado e tempo de aproximação na fazenda sintética', () => {
+  const site = getSompoGeofenceSite('geofence-field', 47);
+  const beside = evaluateGeofence({ x: 20, z: 0, headingDeg: 90, speedKph: 7 }, site.manifestRules, site.polygons);
+  assert.equal(beside.nearest.hazardLabel, 'Córrego sintético');
+  assert.ok(beside.nearest.bearingDeg > 20, 'córrego fica à direita de quem vai para leste');
+  assert.equal(beside.nearest.timeToHazardS, null, 'de lado não há tempo de aproximação');
+  const toward = evaluateGeofence({ x: 24, z: 0, headingDeg: 180, speedKph: 7.2 }, site.manifestRules, site.polygons);
+  assert.ok(Math.abs(toward.nearest.bearingDeg) <= 20);
+  assert.ok(toward.nearest.timeToHazardS > 0);
+  assert.match(describeGeofence(toward.geofence ?? toward), /à frente · ≈ \d+ s de aproximação$/);
+  for (const text of [describeGeofence(beside), describeGeofence(toward)]) assert.doesNotMatch(text, /seguro|risco|acidente/i);
 });

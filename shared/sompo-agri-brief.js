@@ -124,8 +124,9 @@ export function createSompoAgriSimulationSnapshot(scenarioId, outcomeId, {
   };
   const scenario = getSompoAgriScenario(scenarioId);
   const site = getSompoGeofenceSite(scenario.environmentId, -2 * startX);
-  const geofence = evaluateGeofence({ ...position, speedKph: frame.speedKph, rollDeg: frame.roll }, site.manifestRules, site.polygons, SOMPO_AGRI_EQUIPMENT[scenario.equipmentId]);
-  return { ...snapshot, position, geofence, risks: { ...snapshot.risks, proximity: !!geofence.nearest } };
+  // Só o cenário de geofencing tem talhão; nos demais o snapshot leva position e geofence = null (campos só adicionados).
+  const geofence = site ? evaluateGeofence({ ...position, speedKph: frame.speedKph, rollDeg: frame.roll }, site.manifestRules, site.polygons, SOMPO_AGRI_EQUIPMENT[scenario.equipmentId]) : null;
+  return { ...snapshot, position, geofence, risks: { ...snapshot.risks, proximity: !!geofence?.nearest } };
 }
 
 /**

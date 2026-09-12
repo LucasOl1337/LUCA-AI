@@ -320,6 +320,52 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
       ]),
     ],
   }),
+
+  'agri-geofencing': scenario({
+    scenarioId: 'agri-geofencing',
+    label: 'Operação com geofencing',
+    description: 'Colheitadeira parte de um trecho sem perigo no alcance, atravessa um declive mapeado e se aproxima do córrego; o radar de faixas e o limite de inclinação da máquina reagem a cada instante. Fazenda e valores sintéticos.',
+    equipmentId: 'harvester',
+    environmentId: 'geofence-field',
+    defaultOutcomeId: 'parada-na-faixa',
+    totalMs: 24_000,
+    sampleIntervalMs: 500,
+    speedKph: 7,
+    distance: 230,
+    temperature: 31,
+    humidity: 38,
+    pitch: 1,
+    roll: 2,
+    roughness: 0.8,
+    collisionRisk: false,
+    inclinationRisk: false,
+    phases: [
+      phase('passada', 'Sem perigo no alcance', 0, 5_000),
+      phase('declive', 'Declive mapeado', 5_000, 15_000),
+      phase('agua', 'Aproximação do córrego', 15_000, 24_000),
+    ],
+    outcomes: [
+      outcome('parada-na-faixa', 'Parada na faixa elevada', 'O operador reduz e para quando o radar entra em proximidade elevada da água.', [
+        [0, { headerSpeed: 1, cropCut: 0.3, dust: 0.35 }],
+        [12_000, { cropCut: 0.7, dust: 0.6 }],
+        [21_000, { speedKph: 7 }],
+        [23_000, { speedKph: 0, headerSpeed: 0.3, brakeLights: 1, dust: 0.2 }],
+        [24_000, { speedKph: 0, headerSpeed: 0, dust: 0 }],
+      ]),
+      outcome('segue-ate-critica', 'Segue até a faixa crítica', 'A máquina deriva para o lado do córrego e chega à faixa crítica sem reduzir.', [
+        [0, { headerSpeed: 1, cropCut: 0.3, dust: 0.35 }],
+        [14_000, { cropCut: 0.7, dust: 0.6, lateral: 0 }],
+        [24_000, { lateral: 10, yaw: -12, dust: 0.7 }],
+      ]),
+      outcome('declive-alem-do-limite', 'Declive além do limite da máquina', 'Dentro do declive mapeado a inclinação passa do limite declarado para a colheitadeira e a máquina para.', [
+        [0, { headerSpeed: 1, cropCut: 0.3, dust: 0.35 }],
+        [2_000, { roll: 2 }],
+        [6_000, { roll: 19, inclinationRisk: true, beacon: 1 }],
+        [7_500, { speedKph: 0, headerSpeed: 0, brakeLights: 1, dust: 0.1 }],
+        [24_000, { speedKph: 0, roll: 18, dust: 0 }],
+      ]),
+    ],
+  }),
 });
 
 const finite = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;

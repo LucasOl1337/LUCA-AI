@@ -7,13 +7,15 @@ export type SompoAgriScenarioId =
   | 'agri-hydraulic-failure'
   | 'agri-field-bogging'
   | 'agri-barn-maneuver'
-  | 'agri-night-operation';
+  | 'agri-night-operation'
+  | 'agri-geofencing';
 export type SompoAgriEnvironmentId =
   | 'row-crop-field'
   | 'sloped-field'
   | 'muddy-field'
   | 'farm-barn'
-  | 'row-crop-field-night';
+  | 'row-crop-field-night'
+  | 'geofence-field';
 
 export interface SompoAgriEquipment {
   readonly id: SompoAgriEquipmentId;

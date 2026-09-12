@@ -11,6 +11,7 @@ import {
 const EXPECTED = [
   'agri-barn-maneuver',
   'agri-field-bogging',
+  'agri-geofencing',
   'agri-harvest-dust',
   'agri-hydraulic-failure',
   'agri-night-operation',

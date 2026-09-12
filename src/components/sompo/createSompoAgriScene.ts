@@ -10,6 +10,7 @@ export const SOMPO_AGRI_ENVIRONMENTS = Object.freeze({
   'muddy-field': Object.freeze({ sky: 0x92a6a5, ground: 0x4a3829, crop: 0x6d8449, slope: 0.035, mud: 1, night: false, barn: false }),
   'farm-barn': Object.freeze({ sky: 0xb7c8c8, ground: 0x735d3f, crop: 0x789347, slope: 0, mud: 0, night: false, barn: true }),
   'row-crop-field-night': Object.freeze({ sky: 0x07111d, ground: 0x29291e, crop: 0x544e28, slope: 0.025, mud: 0, night: true, barn: false }),
+  'geofence-field': Object.freeze({ sky: 0xb8d6dd, ground: 0x6f542d, crop: 0xb99438, slope: 0.04, mud: 0, night: false, barn: false }),
 });
 
 export type SompoAgriEnvironmentId = keyof typeof SOMPO_AGRI_ENVIRONMENTS;

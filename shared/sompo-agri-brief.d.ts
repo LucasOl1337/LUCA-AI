@@ -5,7 +5,7 @@ import type { SompoGeofenceResult, SompoMachineHit } from './sompo-geofence.js';
 
 export type SompoAgriSimulationSnapshot = SompoTelemetrySnapshot & {
   position: { x: number; z: number; headingDeg: number };
-  geofence: SompoGeofenceResult;
+  geofence: SompoGeofenceResult | null;
   risks: SompoTelemetrySnapshot['risks'] & { proximity: boolean };
 };
 export function getSompoAgriStartX(scenarioId: string, outcomeId?: string): number;

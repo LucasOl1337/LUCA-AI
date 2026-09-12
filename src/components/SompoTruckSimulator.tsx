@@ -870,7 +870,7 @@ export default function SompoTruckSimulator({
       </header>
 
       {!isFirebase && <div className="sompo-simulator-toolbar">
-        <div className="sompo-simulator-modes"><button type="button" aria-pressed={!studioOpen && !mapOpen} disabled={episodeActive} onClick={() => { setStudioOpen(false); setMapOpen(false); }}><Truck />Simulador</button>{agriRun && <button type="button" aria-pressed={mapOpen} disabled={episodeActive} data-sompo-map-toggle onClick={() => { setStudioOpen(false); setMapOpen(true); }}><MapIcon />Mapa do talhão</button>}<button type="button" aria-pressed={studioOpen} disabled={episodeActive} onClick={() => { setMapOpen(false); setStudioOpen(true); }}><SlidersHorizontal />Oficina 3D</button></div>
+        <div className="sompo-simulator-modes"><button type="button" aria-pressed={!studioOpen && !mapOpen} disabled={episodeActive} onClick={() => { setStudioOpen(false); setMapOpen(false); }}><Truck />Simulador</button>{agriRun && preview.geofence && <button type="button" aria-pressed={mapOpen} disabled={episodeActive} data-sompo-map-toggle onClick={() => { setStudioOpen(false); setMapOpen(true); }}><MapIcon />Mapa do talhão</button>}<button type="button" aria-pressed={studioOpen} disabled={episodeActive} onClick={() => { setMapOpen(false); setStudioOpen(true); }}><SlidersHorizontal />Oficina 3D</button></div>
         <div className="sompo-simulator-playback">
           <button type="button" disabled={episodeActive} aria-label={playing ? 'Pausar simulação' : 'Reproduzir simulação'} onClick={() => { playback.current.setPlaying(!playing, performance.now(), startedAtRef.current); setPlaying(!playing); }}>{playing ? <Pause /> : <Play />}</button>
           <input aria-label="Instante da simulação" disabled={episodeActive} type="range" min="0" max={scenarioTotalMs || 60000} step="100" value={Math.min(preview.deviceTimestamp || 0, scenarioTotalMs || 60000)} onChange={event => { historyReplay.current = true; playback.current.seek(Number(event.target.value), performance.now(), startedAtRef.current); }} />
@@ -915,7 +915,7 @@ export default function SompoTruckSimulator({
               {agriRun && preview.geofence && (
                 <div data-geofence data-alert={!!preview.geofence.nearest}
                   className={preview.geofence.nearest ? `sompo-geofence-${['critica', 'dentro'].includes(preview.geofence.nearest.bandId) ? 'forte' : ['elevada', 'borda'].includes(preview.geofence.nearest.bandId) ? 'media' : 'fraca'}` : undefined}>
-                  <span>Talhão sintético · demonstração</span>
+                  <span>Fazenda sintética · demonstração</span>
                   <strong>{!preview.geofence.nearest && preview.geofence.insideAllowed
                     ? 'Radar: sem perigo mapeado no alcance'
                     : `Radar: ${describeGeofence(preview.geofence)}`}</strong>
@@ -959,7 +959,7 @@ export default function SompoTruckSimulator({
             onCalibrationReset={() => setAxisCalibration({ ...DEFAULT_SOMPO_AXIS_CALIBRATION })}
             onRecenterHeading={() => sceneApiRef.current?.recenterHeading()}
           />
-        ) : mapOpen && agriRun ? (
+        ) : mapOpen && agriRun && preview.geofence ? (
           <SompoGeofenceMap scenarioId={agriRun.scenarioId} outcomeId={agriRun.outcomeId} elapsedMs={preview.deviceTimestamp ?? 0} position={preview.position ?? null} />
         ) : studioOpen ? <div><SompoStudio config={studioConfig} onChange={setStudioConfig}
           asset={agriRun ? getSompoAgriFrame(agriRun.scenarioId, 0).equipmentId === 'harvester' ? 'harvester' : 'tractor' : studioConfig.truck}

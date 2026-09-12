@@ -1,6 +1,6 @@
-export const SOMPO_GEOFENCE_SITE_VERSION: 1;
+export const SOMPO_GEOFENCE_SITE_VERSION: 2;
 export type { SompoGeofenceHit, SompoGeofenceResult } from './sompo-geofence.js';
-export function getSompoGeofenceSite(environmentId: string, totalTravelMeters: number): {
+export function getSompoGeofenceSite(environmentId: string, totalTravelMeters: number): null | {
   synthetic: true;
   label: string;
   manifestRules: { synthetic: true; hazards: {

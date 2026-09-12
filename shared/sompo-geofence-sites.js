@@ -1,55 +1,67 @@
-export const SOMPO_GEOFENCE_SITE_VERSION = 1;
+export const SOMPO_GEOFENCE_SITE_VERSION = 2;
 
 const justification = 'Distâncias sintéticas de demonstração; não são distâncias de segurança certificadas.';
-const rect = (id, role, x0, x1, z0, z1, category) => ({
+const closed = (points) => [...points, points[0]];
+// Elipse discretizada (lagoa, mancha de declive): sem cantos retos.
+const ellipse = (id, role, cx, cz, rx, rz, category, n = 28) => ({
   id, role, ...(category ? { category } : {}), synthetic: true,
-  rings: [[{ x: x0, z: z0 }, { x: x1, z: z0 }, { x: x1, z: z1 }, { x: x0, z: z1 }, { x: x0, z: z0 }]],
+  rings: [closed(Array.from({ length: n }, (_, i) => {
+    const a = (i / n) * Math.PI * 2;
+    return { x: +(cx + Math.cos(a) * rx).toFixed(2), z: +(cz + Math.sin(a) * rz).toFixed(2) };
+  }))],
+});
+// Faixa em torno de uma linha central (córrego, ribanceira): meia largura em z para curvas suaves em x,
+// em x para curvas suaves em z. ponytail: offset por eixo, não perpendicular; basta para meandros suaves.
+const band = (id, role, line, half, axis, category) => ({
+  id, role, ...(category ? { category } : {}), synthetic: true,
+  rings: [closed([
+    ...line.map(p => axis === 'z' ? { x: p.x, z: p.z - half } : { x: p.x - half, z: p.z }),
+    ...[...line].reverse().map(p => axis === 'z' ? { x: p.x, z: p.z + half } : { x: p.x + half, z: p.z }),
+  ])],
 });
 
-/** Fazenda sintética de demonstração, no mesmo referencial em metros da máquina (x leste, z sul, origem no meio do percurso).
- * Talhão fixo de 180 × 140 m; só cresce se um percurso for mais longo que isso. Tudo aqui é inventado e marcado. */
+const WATER_RULE = { role: 'water', label: 'Córrego sintético', synthetic: true, justification, bands_m: [
+  { id: 'critica', label: 'Proximidade crítica', max_m: 5 },
+  { id: 'elevada', label: 'Proximidade elevada', max_m: 15 },
+  { id: 'atencao', label: 'Atenção', max_m: 35 },
+] };
+const SLOPE_RULE = { role: 'hazard', category: 'slope', label: 'Declive mapeado', synthetic: true, justification, bands_m: [
+  { id: 'dentro', label: 'Dentro do declive', max_m: 0 },
+  { id: 'borda', label: 'Borda do declive', max_m: 6 },
+] };
+const GULLY_RULE = { role: 'hazard', category: 'gully', label: 'Ribanceira', synthetic: true, justification, bands_m: [
+  { id: 'dentro', label: 'Dentro da ribanceira', max_m: 0 },
+  { id: 'borda', label: 'Borda da ribanceira', max_m: 15 },
+] };
+const MACHINE_RULE = { role: 'machine', metric: 'roll_deg', label: 'Limite de inclinação da máquina', synthetic: true,
+  justification: 'Limite declarado no perfil do equipamento (demonstração); faixas em graus de margem até o limite.',
+  bands_m: [{ id: 'acima', label: 'No limite ou acima', max_m: 0 }, { id: 'proximo', label: 'Próximo do limite', max_m: 5 }] };
+
+/** Fazenda sintética do cenário "Operação com geofencing" (ambiente geofence-field), em metros da cena
+ * (x leste, z sul, origem no meio do percurso). Só esse ambiente tem geofencing; os demais devolvem null,
+ * para os cenários originais do simulador continuarem exatamente como estavam. Tudo aqui é inventado e marcado.
+ * Desenhada para a colheitadeira (percurso de até ~47 m em z ≈ 0, centrado em x = 0 por desfecho): começa sem
+ * perigo no alcance, atravessa a mancha de declive no centro e termina perto da curva do córrego. */
 export function getSompoGeofenceSite(environmentId, totalTravelMeters) {
   if (!Number.isFinite(totalTravelMeters)) throw new TypeError('Percurso deve ser finito.');
-  const hx = Math.max(90, Math.abs(totalTravelMeters) / 2 + 30);
-  const polygons = [rect('talhao-sintetico', 'allowed_area', -hx, hx, -70, 70)];
-  const hazards = [];
-  if (environmentId !== 'farm-barn') {
-    // Córrego ao longo da borda sul (z alto) com um braço que sobe até 13 m do percurso, perto do fim dele:
-    // a corrida começa sem perigo no alcance (> 35 m), entra em atenção e termina em proximidade elevada.
-    polygons.push({ id: 'corrego-sintetico', role: 'water', synthetic: true, rings: [[
-      { x: -hx, z: 40 }, { x: 20, z: 40 }, { x: 20, z: 13 }, { x: 34, z: 13 }, { x: 34, z: 40 },
-      { x: hx, z: 40 }, { x: hx, z: 46 }, { x: -hx, z: 46 }, { x: -hx, z: 40 },
-    ]] });
-    hazards.push({ role: 'water', label: 'Água sintética', synthetic: true, justification, bands_m: [
-      { id: 'critica', label: 'Proximidade crítica', max_m: 5 },
-      { id: 'elevada', label: 'Proximidade elevada', max_m: 15 },
-      { id: 'atencao', label: 'Atenção', max_m: 35 },
-    ] });
-  }
-  if (environmentId === 'row-crop-field' || environmentId === 'row-crop-field-night') {
-    polygons.push(rect('lagoa-sintetica', 'water', -80, -50, -60, -36)); // canto noroeste
-  }
-  if (environmentId === 'muddy-field') {
-    polygons.push(rect('alagado-sintetico', 'water', -10, 10, -23, -13));
-  }
-  if (environmentId === 'sloped-field') {
-    // Mancha de declive que o percurso cruza a partir de x = 0: coincide com a subida do roll entre 4 e 10 s.
-    polygons.push(rect('declive-sintetico', 'hazard', 0, 40, -22, 24, 'slope'));
-    hazards.push({ role: 'hazard', category: 'slope', label: 'Declive sintético', synthetic: true, justification, bands_m: [
-      { id: 'dentro', label: 'Dentro do declive', max_m: 0 },
-      { id: 'borda', label: 'Borda do declive', max_m: 10 },
-    ] });
-  }
-  if (['row-crop-field', 'row-crop-field-night', 'sloped-field'].includes(environmentId)) {
-    polygons.push(rect('ribanceira-sintetica', 'hazard', hx - 10, hx, -70, 70, 'gully')); // borda leste inteira
-    hazards.push({ role: 'hazard', category: 'gully', label: 'Ribanceira', synthetic: true, justification, bands_m: [
-      { id: 'dentro', label: 'Dentro da ribanceira', max_m: 0 },
-      { id: 'borda', label: 'Borda da ribanceira', max_m: 15 },
-    ] });
-  }
-  // Perigo de máquina, por último: sem geometria; o limite vem de machine.profile.max_roll_deg em quem avalia (resolveHazards).
-  hazards.push({ role: 'machine', metric: 'roll_deg', label: 'Limite de inclinação da máquina', synthetic: true,
-    justification: 'Limite declarado no perfil do equipamento (demonstração); faixas em graus de margem até o limite.',
-    bands_m: [{ id: 'acima', label: 'No limite ou acima', max_m: 0 }, { id: 'proximo', label: 'Próximo do limite', max_m: 5 }] });
-  return { manifestRules: { hazards, synthetic: true }, polygons, synthetic: true, label: 'Fazenda sintética · talhão de demonstração' };
+  if (environmentId !== 'geofence-field') return null;
+  const polygons = [
+    { id: 'talhao-sintetico', role: 'allowed_area', synthetic: true, rings: [closed([
+      { x: -76, z: -70 }, { x: 76, z: -70 }, { x: 90, z: -56 }, { x: 90, z: 56 },
+      { x: 76, z: 70 }, { x: -76, z: 70 }, { x: -90, z: 56 }, { x: -90, z: -56 },
+    ])] },
+    band('corrego-sintetico', 'water', [
+      { x: -90, z: 50 }, { x: -40, z: 46 }, { x: -10, z: 44 }, { x: 3, z: 42 }, { x: 12, z: 32 },
+      { x: 20, z: 19 }, { x: 24, z: 15 }, { x: 42, z: 28 }, { x: 60, z: 42 }, { x: 90, z: 48 },
+    ], 2.5, 'z'),
+    ellipse('lagoa-sintetica', 'water', -60, -48, 16, 10),
+    ellipse('declive-sintetico', 'hazard', 0, 0, 8, 14, 'slope'),
+    band('ribanceira-sintetica', 'hazard', [
+      { x: 84, z: -70 }, { x: 80, z: -30 }, { x: 86, z: 10 }, { x: 82, z: 50 }, { x: 84, z: 70 },
+    ], 3, 'x', 'gully'),
+  ];
+  return {
+    manifestRules: { hazards: [WATER_RULE, SLOPE_RULE, GULLY_RULE, MACHINE_RULE], synthetic: true },
+    polygons, synthetic: true, label: 'Fazenda sintética · Operação com geofencing',
+  };
 }

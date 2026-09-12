@@ -28,6 +28,7 @@ function buildStaticMap(scenarioId: string, outcomeId: string): StaticMap | null
   const totalTravel = getSompoAgriTravelMeters(scenarioId, scenario.totalMs, outcomeId);
   const startX = getSompoAgriStartX(scenarioId, outcomeId);
   const site = getSompoGeofenceSite(scenario.environmentId, totalTravel);
+  if (!site) return null;
   const polygons = site.polygons as LabPolygon[];
   const rules = site.manifestRules as unknown as LabGeofenceRules;
   const hazards = resolveHazards(rules, polygons, { profile: { max_roll_deg: SOMPO_AGRI_EQUIPMENT[scenario.equipmentId].profile.max_roll_deg } });
