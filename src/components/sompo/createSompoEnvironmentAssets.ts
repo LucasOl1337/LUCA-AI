@@ -6,9 +6,9 @@ const ASSET_ROOT = '/environments/sompo/';
 type Surface = 'asphalt' | 'dirt' | 'wood';
 
 /** Async upgrades keep the scene usable if an HDRI or texture is unavailable. */
-export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
+export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE.WebGLRenderer, options: { background?: boolean; intensity?: number; initialWet?: boolean } = {}) {
   let disposed = false;
-  let wet = false;
+  let wet = options.initialWet ?? false;
   const owned = new Set<THREE.Texture>();
   const hdris: { dry?: THREE.DataTexture; wet?: THREE.DataTexture } = {};
   const hdriJobs: Partial<Record<'dry' | 'wet', Promise<void>>> = {};
@@ -26,10 +26,10 @@ export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE
     if (disposed) return;
     const hdr = (wet ? hdris.wet : hdris.dry) ?? hdris.dry;
     if (!hdr) return;
-    scene.background = hdr;
+    if (options.background !== false) scene.background = hdr;
     scene.environment = hdr;
     scene.backgroundIntensity = wet ? 0.70 : 0.95;
-    scene.environmentIntensity = wet ? 0.70 : 0.90;
+    scene.environmentIntensity = options.intensity ?? (wet ? 0.70 : 0.90);
     scene.backgroundBlurriness = 0;
     scene.backgroundRotation.y = scene.environmentRotation.y = 1.25;
   }
@@ -44,10 +44,10 @@ export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE
       updateLighting();
     }).catch(() => { /* The existing environment remains available. */ });
   }
-  loadHdri('dry');
+  loadHdri(wet ? 'wet' : 'dry');
 
   return {
-    get hasHdri() { return !!hdris.dry; },
+    get hasHdri() { return !!(wet ? hdris.wet : hdris.dry); },
     surface(material: THREE.MeshStandardMaterial, surface: Surface, repeatX: number, repeatY: number) {
       let pending = surfaces.get(surface);
       if (!pending) {
@@ -66,7 +66,8 @@ export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE
           map.needsUpdate = true;
           return map;
         });
-        material.map?.dispose();
+        // Fallback maps can be shared by several materials; retire with this owner.
+        if (material.map) owned.add(material.map);
         material.map = maps[0];
         material.normalMap = maps[1];
         // One packed texture: R = ambient occlusion, G = roughness, B = metalness.

@@ -1,0 +1,11 @@
+{
+  "asset": "pasture-albedo.webp",
+  "kind": "AI-generated albedo, not a render screenshot",
+  "generator": "OpenAI image generation",
+  "createdAt": "2026-09-12",
+  "sourceImage": "exec-a708f281-f0c9-4fc9-93be-9042865ae15f.png",
+  "encoding": "WebP quality 82, original dimensions, no semantic edits",
+  "sha256": "846c43987d91fb1c4c30e31e22ffb442c3f78a6553361e4baaf8f0c908b018ee",
+  "usage": "World-space pasture color; lighting and relief remain computed in Three.js",
+  "prompt": "Seamless top-down diffuse albedo of dense short olive-green Brazilian pasture with fine straw and tiny earth patches, no shadows, horizon or objects; uniform low-contrast detail."
+}

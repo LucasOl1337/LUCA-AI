@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createSompoPastureSurface } from './createSompoPastureSurface';
 import { createSompoAnimal } from './createSompoAnimal';
 import { createSompoVegetation } from './createSompoVegetation';
 import { createSompoRoadDetails, varySompoSurface, wornRoadPaint, wrapSompoX } from './createSompoRoadDetails';
@@ -71,14 +72,15 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const clearSky = sky(false); const rainSky = sky(true);
   scene.background = clearSky;
   scene.fog = new THREE.Fog(0xbebca9, 75, 220);
-  const assets = createSompoEnvironmentAssets(scene, renderer);
+  const assets = createSompoEnvironmentAssets(scene, renderer, { background: false });
   const earthMap = groundTexture('earth');
   const earth = new THREE.MeshStandardMaterial({ map: earthMap, roughness: 1, color: 0xffffff });
   const terrain = createSompoTerrainMesh(earth);
   terrain.position.y = -0.055;
   root.add(terrain);
   assets.surface(earth, 'dirt', 45, 30);
-  varySompoSurface(earth, 0.32);
+  varySompoSurface(earth, 0.24);
+  const pasture = createSompoPastureSurface(earth);
   const details = createSompoRoadDetails(root);
   const roadMap = groundTexture('road');
   const asphalt = new THREE.MeshStandardMaterial({ map: roadMap, roughness: 0.90, metalness: 0.03 });
@@ -133,6 +135,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
     });
   }
   const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.11, 1.2, 0.12), wood, postSlots.length);
+  const postPositions = new Float64Array(postSlots.length).fill(NaN);
   posts.castShadow = true; root.add(posts);
   const wires: THREE.Mesh[] = [];
   const wire = new THREE.MeshStandardMaterial({ color: 0x5f6460, roughness: 0.7, metalness: 0.65 });
@@ -176,14 +179,14 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const rainOrigins = Array.from({ length: 240 }, () => [rainRandom() * 26 - 13, rainRandom() * 20 - 10, rainRandom() * 12]);
   let lastAnimalZ: number | null = null;
   return {
-    update(effectFrame: SompoEffectFrame, frame: SompoRuralFrame | null, elapsed: number, truck: THREE.Vector3, reduceMotion: boolean, slope: number, extras?: { animalAnchorX?: number }) {
+    update(effectFrame: SompoEffectFrame, frame: SompoRuralFrame | null, elapsed: number, truck: THREE.Vector3, reduceMotion: boolean, slope: number, extras?: { animalAnchorX?: number; wind?: number }) {
       const t = elapsed / 1000;
       const truckX = truck.x;
       const effects = new Map(effectFrame.cues.map((cue) => [cue.effect, cue.intensity]));
       // Rampa gira o mundo em torno do próprio caminhão, não da origem da cena.
       root.rotation.z = slope;
       root.position.set(truckX * (1 - Math.cos(slope)), -truckX * Math.sin(slope), 0);
-      vegetation.update((frame?.rain ?? 0) > 0, truckX);
+      vegetation.update((frame?.rain ?? 0) > 0, truckX, truck);
       // Chão recicla por período exato da textura; objetos discretos por wrap.
       terrain.position.x = Math.round(truckX / SOMPO_TERRAIN_PERIOD_X) * SOMPO_TERRAIN_PERIOD_X;
       road.position.x = Math.round(truckX / 20) * 20;
@@ -191,14 +194,18 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       for (const line of edgeLines) line.position.x = Math.round(truckX / 20) * 20;
       dashes.position.x = Math.round(truckX / 5) * 5;
       for (const strand of wires) strand.position.x = truckX;
+      let postsChanged = false;
       for (const [index, slot] of postSlots.entries()) {
-        transform.position.set(wrapSompoX(slot.x, truckX, 243), (slot.height / 2) - 0.04, slot.z);
+        const x = wrapSompoX(slot.x, truckX, 243);
+        if (postPositions[index] === x) continue;
+        postPositions[index] = x; postsChanged = true;
+        transform.position.set(x, (slot.height / 2) - 0.04, slot.z);
         transform.rotation.set(slot.lean, slot.spin, slot.lean * 0.7);
         transform.scale.set(1, slot.height / 1.2, 1);
         transform.updateMatrix();
         posts.setMatrixAt(index, transform.matrix);
       }
-      posts.instanceMatrix.needsUpdate = true;
+      if (postsChanged) { posts.instanceMatrix.needsUpdate = true; posts.computeBoundingSphere(); }
       for (const slot of puddleSlots) slot.mesh.position.x = wrapSompoX(slot.x, truckX, 198);
       shed.position.x = wrapSompoX(-7, truckX, 240);
       rain.position.x = truckX;
@@ -226,7 +233,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       const walking = lastAnimalZ !== null && Math.abs(animalZ - lastAnimalZ) > 0.0004;
       lastAnimalZ = animalZ;
       animal.update(effects.has('animal'), animalZ, elapsed, reduceMotion, extras?.animalAnchorX, walking);
-      details.update(elapsed, wet, reduceMotion, truckX);
+      details.update(elapsed, wet, reduceMotion, truckX, extras?.wind ?? 0.65);
       rainMaterial.opacity = (effects.get('rain') ?? 0) * 0.4;
       const clock = reduceMotion ? 0 : t;
       const rainPositions = rainGeometry.attributes.position as THREE.BufferAttribute;
@@ -238,6 +245,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       rainPositions.needsUpdate = true;
     },
     get hasHdri() { return assets.hasHdri; },
-    dispose() { vegetation.dispose(); animal.dispose(); details.dispose(); assets.dispose(); asphalt.dispose(); unpaved.dispose(); clearSky.dispose(); rainSky.dispose(); },
+    dispose() {
+      pasture.dispose(); vegetation.dispose(); animal.dispose(); details.dispose(); assets.dispose(); asphalt.dispose(); unpaved.dispose(); clearSky.dispose(); rainSky.dispose(); },
   };
 }

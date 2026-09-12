@@ -14,12 +14,13 @@ export const SOMPO_TREE_SPECIES = [
 const TREE_WRAP_SPAN = 212;
 const wrapTreeX = (baseX: number, truckX: number) => baseX + (TREE_WRAP_SPAN * Math.round((truckX - baseX) / TREE_WRAP_SPAN));
 
-/** True geometry beside the road; image impostors only beyond 65 metres. */
+/** True geometry beside the road; image impostors only beyond 32 metres. */
 export function createSompoVegetation(parent: THREE.Group, camera: THREE.Camera, heightAt?: (x: number, z: number) => number) {
   const root = new THREE.Group(); root.name = 'rural-3d-vegetation'; parent.add(root);
   const abort = new AbortController();
   const pending: Promise<void>[] = [];
   const localCamera = new THREE.Vector3();
+  const localFocus = new THREE.Vector3(), sight = new THREE.Vector3(), center = new THREE.Vector3(), projected = new THREE.Vector3();
   const cards: { mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>; lod: THREE.LOD }[] = [];
   const lods: { lod: THREE.LOD; baseX: number; z: number }[] = [];
   const geometries = new Set<THREE.BufferGeometry>();
@@ -64,7 +65,7 @@ export function createSompoVegetation(parent: THREE.Group, camera: THREE.Camera,
       const card = new THREE.Mesh(new THREE.PlaneGeometry(species.height, species.height), material);
       card.position.y = species.height / 2; card.visible = false; far.add(card);
       cards.push({ mesh: card, lod });
-      lod.addLevel(near, 0); lod.addLevel(far, 65, 0.08);
+      lod.addLevel(near, 0); lod.addLevel(far, 32, 0.1);
       root.add(lod);
     }
     const loading = fetch(url, { signal: abort.signal }).then(async (response) => {
@@ -87,6 +88,7 @@ export function createSompoVegetation(parent: THREE.Group, camera: THREE.Camera,
         const mesh = node as THREE.Mesh;
         if (!mesh.isMesh) return;
         mesh.castShadow = mesh.receiveShadow = true;
+        mesh.userData.sompoTree = true;
         for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
           if (material instanceof THREE.MeshStandardMaterial) { material.metalness = 0; material.roughness = 0.95; material.envMapIntensity = 0.65; }
         }
@@ -100,19 +102,26 @@ export function createSompoVegetation(parent: THREE.Group, camera: THREE.Camera,
   retain(root);
   return {
     ready: Promise.all(pending),
-    update(wet: boolean, truckX = 0) {
+    update(wet: boolean, truckX = 0, focus = new THREE.Vector3(truckX, 1.5, 0)) {
       camera.getWorldPosition(localCamera); parent.worldToLocal(localCamera);
+      localFocus.copy(focus); parent.worldToLocal(localFocus); sight.copy(localFocus).sub(localCamera);
       // Trilha infinita: cada árvore recicla à frente e assenta no relevo local.
       for (const { lod, baseX, z } of lods) {
         const x = wrapTreeX(baseX, truckX);
-        lod.position.set(x, heightAt ? heightAt(x, z) - 0.06 : -0.03, z);
+        const setback = z + Math.sign(z) * 9;
+        lod.position.set(x, heightAt ? heightAt(x, setback) - 0.06 : -0.03, setback);
+        // Remove only a foreground tree that crosses the operator's view of the vehicle.
+        center.copy(lod.position); center.y += 4;
+        const t = THREE.MathUtils.clamp(projected.copy(center).sub(localCamera).dot(sight) / Math.max(1, sight.lengthSq()), 0, 1);
+        const distance = center.distanceTo(projected.copy(localCamera).addScaledVector(sight, t));
+        lod.visible = !(t > 0 && t < 1 && distance < 4.5);
       }
       for (const { mesh, lod } of cards) {
         const image = mesh.material.map?.image as HTMLImageElement | undefined;
         mesh.visible = !!image?.naturalWidth;
         if (image?.naturalWidth) mesh.scale.x = image.naturalWidth / image.naturalHeight;
         mesh.rotation.y = Math.atan2(localCamera.x - lod.position.x, localCamera.z - lod.position.z) - lod.rotation.y;
-        mesh.material.color.setScalar(wet ? 0.68 : 1);
+        mesh.material.color.set(wet ? 0x637057 : 0x91a67e);
       }
     },
     dispose() {

@@ -1,0 +1,458 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { loadSompoTruckAsset } from './loadSompoTruckAsset';
+import { createSompoTruckModel, SOMPO_TRUCK_FRONT_X, SOMPO_TRUCK_HALF_SIZE, SOMPO_TRUCK_PIVOT_Y } from './createSompoTruckModel';
+import { createSompoRoadScene } from './createSompoRoadScene';
+import { createSompoPostProcessing } from './createSompoPostProcessing';
+import { createSompoScenarioEffects } from './createSompoScenarioEffects';
+import { getSompoScenarioEffects } from '../../../shared/sompo-scenario-effects.js';
+import { SOMPO_BRAKING_SCRIPT, getSompoRuralFrame, getSompoRuralTravelMeters, getSompoBrakingTravelMeters, getSompoBrakingScriptState, getSompoScenarioScript, type SompoSimulationControls } from '../../../shared/sompo-telemetry-simulator.js';
+import { sensorReadingToPose, SOMPO_EULER_ORDER, type SompoAxisCalibration } from './sensorPose.js';
+import { frameDamping } from './frameDamping.js';
+import type { SompoTelemetrySnapshot } from '@/lib/types';
+import { sompoRenderBudget, createSompoRenderer, disposeSompoObject, createSompoRenderMeter, type SompoStageApi } from './sompoStage';
+import { refineSompoTruck, exportSompoModel } from './refineSompoTruck';
+import { createSompoAtmosphere } from './createSompoAtmosphere';
+import { SOMPO_STUDIO_DEFAULT, type SompoStudioConfig, type SompoRenderStats } from './sompoStudioConfig';
+
+function dampAngle(current: number, target: number, factor: number) {
+  const shortestTurn = Math.atan2(Math.sin(target - current), Math.cos(target - current));
+  return current + (shortestTurn * factor);
+}
+
+function truckGroundHeight(rotation: THREE.Euler, support?: Float32Array) {
+  const matrix = new THREE.Matrix4().makeRotationFromEuler(rotation).elements;
+  if (support) {
+    let minimum = Infinity;
+    for (let i = 0; i < support.length; i += 3) {
+      minimum = Math.min(minimum, matrix[1] * support[i] + matrix[5] * (support[i + 1] - SOMPO_TRUCK_PIVOT_Y) + matrix[9] * support[i + 2]);
+    }
+    return 0.05 - minimum;
+  }
+  const verticalExtent = (
+    Math.abs(matrix[1]) * SOMPO_TRUCK_HALF_SIZE.x
+    + Math.abs(matrix[5]) * SOMPO_TRUCK_HALF_SIZE.y
+    + Math.abs(matrix[9]) * SOMPO_TRUCK_HALF_SIZE.z
+  );
+  return verticalExtent + 0.05;
+}
+/** Mesma régua da cena: distância (cm) → comprimento do feixe/afastamento do obstáculo. */
+function rangeForDistance(distance: number | null | undefined): number {
+  const clamped = Math.min(300, Math.max(5, distance || 5));
+  return 1.2 + (((clamped - 5) * (7.2 - 1.2)) / (300 - 5));
+}
+
+function addBox(
+  parent: THREE.Object3D,
+  size: [number, number, number],
+  position: [number, number, number],
+  material: THREE.Material,
+) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+  mesh.position.set(...position);
+  parent.add(mesh);
+  return mesh;
+}
+
+
+/** Owns the rural WebGL lifecycle. React keeps telemetry, controls and recording. */
+export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRef, axisCalibrationRef, startedAtRef, setModelStatus, setModelAsset, setWebglError, onAfterRender, studioRef, getElapsed, onStats }: {
+  mount: HTMLElement;
+  isFirebase: boolean;
+  controlsRef: { current: SompoSimulationControls };
+  previewRef: { current: SompoTelemetrySnapshot };
+  axisCalibrationRef: { current: SompoAxisCalibration };
+  startedAtRef: { current: number };
+  setModelStatus: (status: 'loading' | 'gltf' | 'fallback' | 'modular') => void;
+  setModelAsset: (asset: string | null) => void;
+  setWebglError: (error: boolean) => void;
+  onAfterRender: (canvas: HTMLCanvasElement) => void;
+  studioRef?: { current: SompoStudioConfig };
+  getElapsed?: (time: number) => number;
+  onStats?: (stats: SompoRenderStats) => void;
+}): SompoStageApi | undefined {
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = createSompoRenderer(mount).renderer;
+      setWebglError(false);
+    } catch {
+      setWebglError(true);
+      return undefined;
+    }
+
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(37, 1, 0.1, 360);
+    camera.position.set(10.8, 5.3, 13.8);
+
+    // Small local fallback while the rural HDRIs load; the real HDRIs replace this IBL.
+    const environmentScene = new RoomEnvironment();
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const environment = pmrem.fromScene(environmentScene, 0.04);
+    scene.environment = environment.texture;
+    scene.environmentIntensity = 0.55;
+    environmentScene.dispose();
+    pmrem.dispose();
+
+    const orbit = new OrbitControls(camera, renderer.domElement);
+    orbit.enableDamping = true;
+    orbit.dampingFactor = 0.07;
+    orbit.enablePan = false;
+    orbit.minDistance = 6;
+    orbit.maxDistance = 24;
+    orbit.maxPolarAngle = Math.PI * 0.49;
+    orbit.target.set(0, 1.5, 0);
+
+    scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x776346, 0.3));
+    const keyLight = new THREE.DirectionalLight(0xffefcd, 2.4);
+    keyLight.position.set(-10, 12, 9);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(sompoRenderBudget().shadowSize, sompoRenderBudget().shadowSize);
+    keyLight.shadow.camera.left = -12; keyLight.shadow.camera.right = 12;
+    keyLight.shadow.camera.top = 12; keyLight.shadow.camera.bottom = -12;
+    keyLight.shadow.camera.near = 0.5; keyLight.shadow.camera.far = 65;
+    keyLight.shadow.normalBias = 0.018;
+    keyLight.shadow.bias = -0.0001;
+    keyLight.shadow.radius = 2;
+    scene.add(keyLight);
+    // A sombra acompanha o caminhão pelo mundo: luz e alvo transladam juntos.
+    scene.add(keyLight.target);
+    const roadScene = createSompoRoadScene(scene, renderer, camera);
+    const atmosphere = createSompoAtmosphere(scene, renderer, keyLight);
+    const meter = createSompoRenderMeter(renderer, onStats);
+    const postProcessing = createSompoPostProcessing(renderer, scene, camera);
+    const frontArrow = new THREE.ArrowHelper(
+      new THREE.Vector3(1, 0, 0),
+      new THREE.Vector3(1.4, 0.06, -2.25),
+      2.2,
+      0x5fd0ff,
+      0.45,
+      0.22,
+    );
+    frontArrow.name = 'frente-caminhao-mais-x';
+    frontArrow.visible = isFirebase;
+    scene.add(frontArrow);
+
+    const truckPoseGroup = new THREE.Group();
+    // O caminhão aponta para +X: guinada → arfagem → rolagem exige YZX para não misturar eixos.
+    truckPoseGroup.rotation.order = isFirebase ? SOMPO_EULER_ORDER : 'XYZ';
+    truckPoseGroup.position.y = SOMPO_TRUCK_PIVOT_Y + 0.05;
+    scene.add(truckPoseGroup);
+
+    const warning = new THREE.MeshStandardMaterial({ color: 0xff4f45, roughness: 0.45, metalness: 0.2 });
+    const truckModel = createSompoTruckModel({
+      sensorLabel: isFirebase ? 'ESP32 FÍSICO' : 'ESP32 VIRTUAL',
+    });
+    const {
+      root: truckGroup,
+      wheels,
+      sensorGroup,
+      ledMaterial,
+      rayGroup,
+      rayMaterial,
+    } = truckModel;
+    truckGroup.position.y = -SOMPO_TRUCK_PIVOT_Y;
+    truckPoseGroup.add(truckGroup);
+    const modular = !isFirebase && (studioRef?.current.truck ?? 'modular') === 'modular' ? refineSompoTruck(truckModel) : null;
+    const scenarioEffects = createSompoScenarioEffects(scene, truckModel, camera);
+    const assetAbort = new AbortController();
+    setModelStatus('loading');
+    setModelAsset(null);
+    truckGroup.visible = !!modular;
+    if (modular) { setModelAsset('SompoModularTruck'); setModelStatus('modular'); }
+    else void loadSompoTruckAsset(truckModel, assetAbort.signal)
+      .then((loaded) => {
+        if (!assetAbort.signal.aborted) {
+          truckGroup.visible = true;
+          setModelAsset(loaded ? truckModel.root.userData.asset : null);
+          setModelStatus(loaded ? 'gltf' : 'fallback');
+        }
+      })
+      .catch(() => {
+        if (!assetAbort.signal.aborted) {
+          for (const child of truckGroup.children) child.visible = true;
+          truckGroup.visible = true;
+          setModelStatus('fallback');
+        }
+      });
+
+    const obstacleGroup = new THREE.Group();
+    scene.add(obstacleGroup);
+    addBox(obstacleGroup, [0.56, 2.45, 2.6], [0, 1.22, 0], warning);
+    const obstacleStripe = new THREE.MeshStandardMaterial({ color: 0xf6d763, roughness: 0.55 });
+    for (const y of [0.45, 1.15, 1.85]) {
+      addBox(obstacleGroup, [0.59, 0.2, 2.68], [0.02, y, 0], obstacleStripe);
+    }
+
+    function resize() {
+      const { width, height } = mount!.getBoundingClientRect();
+      const safeWidth = Math.max(1, width);
+      const safeHeight = Math.max(1, height);
+      renderer.setSize(safeWidth, safeHeight, false);
+      camera.aspect = safeWidth / safeHeight;
+      camera.updateProjectionMatrix();
+      postProcessing.resize(safeWidth, safeHeight);
+    }
+
+    const resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(mount);
+    resize();
+
+    let focusTarget: 'truck' | 'sensor' = 'truck';
+    const focusPoint = new THREE.Vector3();
+    // O rumo integrado nao tem referencia absoluta (o firmware nao manda
+    // magnetometro): curvas reais deixam residuo. Recentrar e do operador.
+    let liveHeading = 0;
+
+    const api: Omit<SompoStageApi, 'dispose'> = {
+      exportModel: () => exportSompoModel(truckGroup),
+      recenterHeading() {
+        liveHeading = 0;
+        truckPoseGroup.rotation.y = 0;
+      },
+      focus(target) {
+        focusTarget = target;
+        if (target === 'sensor') {
+          sensorGroup.getWorldPosition(orbit.target);
+          camera.position.set(orbit.target.x + 3, 4.7, 4.1);
+          orbit.minDistance = 2.5;
+        } else {
+          orbit.target.set(truckPoseGroup.position.x, 1.9, truckPoseGroup.position.z);
+          camera.position.set(truckPoseGroup.position.x + 9.7, 4.3, 11.2);
+          orbit.minDistance = 6;
+        }
+        orbit.update();
+      },
+      adjust(action) {
+        const offset = camera.position.clone().sub(orbit.target);
+        if (action === 'rotate-left' || action === 'rotate-right') {
+          const direction = action === 'rotate-left' ? 1 : -1;
+          offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), direction * THREE.MathUtils.degToRad(12));
+        } else {
+          const factor = action === 'zoom-in' ? 0.84 : 1.18;
+          offset.setLength(THREE.MathUtils.clamp(
+            offset.length() * factor,
+            orbit.minDistance,
+            orbit.maxDistance,
+          ));
+        }
+        camera.position.copy(orbit.target).add(offset);
+        orbit.update();
+      },
+    };
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let frameId = 0;
+    let previousTime = performance.now();
+    let truckBaseHeight = SOMPO_TRUCK_PIVOT_Y + 0.05;
+    const relativeGroundRotation = new THREE.Euler();
+
+    // Deslocamento REAL: a posição X do caminhão no mundo é forma fechada do
+    // relógio do cenário (roteiro, frenagem ou velocidade constante), então
+    // seek/replay são determinísticos e o reinício continua estrada adiante.
+    let lastTruckWorldX = 0;
+    let runStamp = -1;
+    let runOriginX = 0;
+    let animalAnchorX = 9;
+    const REBASE_DISTANCE = 4096;
+
+    function scenarioTravelMeters(settings: SompoSimulationControls, elapsedMs: number) {
+      const scripted = getSompoRuralTravelMeters(settings.scenarioId, elapsedMs, settings.outcomeId);
+      if (scripted !== null) return scripted;
+      if (settings.scenarioId === SOMPO_BRAKING_SCRIPT.scenarioId) {
+        return getSompoBrakingTravelMeters(elapsedMs, settings.speedKph);
+      }
+      return (settings.speedKph / 3.6) * (elapsedMs / 1000);
+    }
+
+    /** O bovino é ancorado no ponto do mundo onde o roteiro fecha a menor distância. */
+    function animalAnchorFor(settings: SompoSimulationControls, originX: number) {
+      const script = getSompoScenarioScript(settings.scenarioId, settings.outcomeId);
+      if (!script) return originX + 9;
+      let closest = script.keyframes[0];
+      for (const keyframe of script.keyframes) if (keyframe.distance < closest.distance) closest = keyframe;
+      return originX + scenarioTravelMeters(settings, closest.atMs)
+        + SOMPO_TRUCK_FRONT_X + rangeForDistance(closest.distance);
+    }
+
+    function render(time: number) {
+      meter.begin();
+      const frameDelta = Math.max(0, (time - previousTime) / 1_000);
+      const delta = Math.min(0.04, frameDelta);
+      previousTime = time;
+      const settings = controlsRef.current;
+      const snapshot = previewRef.current;
+      const physicalCurrent = snapshot.freshness === 'fresh' && snapshot.connection.state === 'live';
+      const attitudeKnown = Number.isFinite(snapshot.readings.pitch) && Number.isFinite(snapshot.readings.roll);
+      const visualScenario = isFirebase ? 'normal' : settings.scenarioId;
+      const scenarioElapsed = getElapsed ? getElapsed(time) : time - startedAtRef.current;
+      const visualElapsed = scenarioElapsed;
+      const effectOutcomeId = settings.outcomeId;
+      const effectFrame = getSompoScenarioEffects(visualScenario, visualElapsed, effectOutcomeId);
+      const ruralFrame = !isFirebase
+        ? getSompoRuralFrame(settings.scenarioId, scenarioElapsed, settings.outcomeId)
+        : null;
+
+      // ── Deslocamento real no mundo ────────────────────────────────────────
+      if (runStamp !== startedAtRef.current) {
+        // Novo cenário, desfecho, reinício ou episódio: o caminhão segue estrada
+        // adiante a partir de onde está, sem teleporte para a origem.
+        runStamp = startedAtRef.current;
+        runOriginX = lastTruckWorldX;
+        animalAnchorX = animalAnchorFor(settings, runOriginX);
+      }
+      let truckWorldX = lastTruckWorldX;
+      if (!isFirebase && !reduceMotion.matches) {
+        truckWorldX = runOriginX + scenarioTravelMeters(settings, scenarioElapsed);
+      }
+      if (truckWorldX > REBASE_DISTANCE) {
+        // Recentra o mundo para preservar a precisão de float32 em corridas longas.
+        runOriginX -= REBASE_DISTANCE;
+        truckWorldX -= REBASE_DISTANCE;
+        lastTruckWorldX -= REBASE_DISTANCE;
+        animalAnchorX -= REBASE_DISTANCE;
+        camera.position.x -= REBASE_DISTANCE;
+        orbit.target.x -= REBASE_DISTANCE;
+        scenarioEffects.rebase(REBASE_DISTANCE);
+      }
+      truckPoseGroup.position.x = truckWorldX;
+      lastTruckWorldX = truckWorldX;
+      const sensorPose = sensorReadingToPose({
+        pitch: snapshot.readings.pitch,
+        roll: snapshot.readings.roll,
+        yawRate: snapshot.readings.rotation?.z,
+        currentHeading: liveHeading,
+        deltaSeconds: reduceMotion.matches || (isFirebase && !physicalCurrent) ? 0 : delta,
+      }, axisCalibrationRef.current);
+      const pitch = isFirebase
+        ? attitudeKnown ? sensorPose.rotationZ : truckPoseGroup.rotation.z
+        : THREE.MathUtils.degToRad(ruralFrame?.pitch ?? snapshot.readings.pitch ?? settings.pitch);
+      const roll = isFirebase
+        ? attitudeKnown ? sensorPose.rotationX : truckPoseGroup.rotation.x
+        : THREE.MathUtils.degToRad(ruralFrame?.roll ?? snapshot.readings.roll ?? settings.roll);
+      const poseDamping = frameDamping(frameDelta, 5);
+      if (reduceMotion.matches) {
+        truckPoseGroup.rotation.z = pitch;
+        truckPoseGroup.rotation.x = roll;
+      } else {
+        truckPoseGroup.rotation.z = dampAngle(truckPoseGroup.rotation.z, pitch, poseDamping);
+        truckPoseGroup.rotation.x = dampAngle(truckPoseGroup.rotation.x, roll, poseDamping);
+      }
+      if (isFirebase && !reduceMotion.matches) {
+        liveHeading = sensorPose.rotationY;
+        truckPoseGroup.rotation.y = liveHeading;
+      }
+      if (!isFirebase) {
+        const targetYaw = ruralFrame?.yaw ?? 0;
+        const targetLateral = ruralFrame?.lateral ?? 0;
+        truckPoseGroup.rotation.y = dampAngle(
+          truckPoseGroup.rotation.y,
+          THREE.MathUtils.degToRad(targetYaw),
+          reduceMotion.matches ? 1 : frameDamping(frameDelta, 7.5),
+        );
+        truckPoseGroup.position.z = targetLateral;
+      }
+      const brakingState = !isFirebase && !ruralFrame && settings.scenarioId === SOMPO_BRAKING_SCRIPT.scenarioId
+        ? getSompoBrakingScriptState(scenarioElapsed, settings.speedKph)
+        : null;
+      const liveActivity = isFirebase
+        ? physicalCurrent ? THREE.MathUtils.clamp((snapshot.readings.rotation?.magnitude || 0) * 0.012, 0, 0.1) : 0
+        : (ruralFrame?.roughness ?? settings.roughness) * 0.008 * (brakingState ? Math.min(1, brakingState.speedKph / 8) : 1);
+      // Rampas roteirizadas ("vence a rampa", "desce controlado") mudam o perfil
+      // do terreno junto com o pitch do roteiro; a cabine (mergulho de frenagem)
+      // não gira o mundo — por isso brake-failure usa o pitch fixo do preset.
+      const slope = !isFirebase && ['steep-climb', 'steep-descent', 'brake-failure'].includes(settings.scenarioId)
+        ? THREE.MathUtils.degToRad(settings.scenarioId === 'brake-failure' ? settings.pitch : (ruralFrame?.pitch ?? settings.pitch))
+        : 0;
+      relativeGroundRotation.copy(truckPoseGroup.rotation);
+      relativeGroundRotation.z -= slope;
+      const targetHeight = slope
+        ? truckGroundHeight(relativeGroundRotation, truckGroup.userData.groundSupport) / Math.cos(slope)
+        : truckGroundHeight(truckPoseGroup.rotation, truckGroup.userData.groundSupport);
+      truckBaseHeight = reduceMotion.matches
+        ? targetHeight
+        : THREE.MathUtils.lerp(truckBaseHeight, targetHeight, frameDamping(frameDelta, 7.5));
+      truckPoseGroup.position.y = truckBaseHeight - (ruralFrame?.sink ?? 0)
+        + (reduceMotion.matches ? 0 : Math.sin(visualElapsed * 0.008) * liveActivity);
+      if (focusTarget === 'sensor') {
+        sensorGroup.getWorldPosition(focusPoint);
+      } else {
+        focusPoint.set(truckPoseGroup.position.x + effectFrame.focusX, truckPoseGroup.position.y, truckPoseGroup.position.z);
+      }
+      // A câmera acompanha o deslocamento: o alvo persegue o caminhão e a câmera
+      // translada junto, preservando o ângulo escolhido pelo operador no orbit.
+      const targetXBefore = orbit.target.x;
+      orbit.target.lerp(focusPoint, reduceMotion.matches ? 1 : frameDamping(frameDelta, 5));
+      camera.position.x += orbit.target.x - targetXBefore;
+      const drivingSpeed = ruralFrame?.speedKph ?? brakingState?.speedKph ?? settings.speedKph;
+      if (!isFirebase && !reduceMotion.matches && !modular) {
+        // Rodas giram coerentes com a velocidade real sobre o solo (ou patinam
+        // quando o roteiro manda wheelSpeedKph diferente do avanço).
+        const wheelSpeed = (ruralFrame?.wheelSpeedKph ?? drivingSpeed) * (ruralFrame?.direction ?? 1);
+        for (const wheel of wheels) wheel.rotation.y -= delta * wheelSpeed / (3.6 * (wheel.userData.radius ?? 0.60));
+      }
+      const studio = studioRef?.current ?? SOMPO_STUDIO_DEFAULT;
+      modular?.update(studio, visualElapsed, scenarioTravelMeters(settings, scenarioElapsed), ruralFrame?.yaw ?? 0, ruralFrame?.roughness ?? settings.roughness, ruralFrame?.rain ?? 0, reduceMotion.matches);
+      roadScene.update(effectFrame, ruralFrame, visualElapsed, truckPoseGroup.position, reduceMotion.matches, slope, { animalAnchorX, wind: studio.wind });
+      keyLight.position.set(truckWorldX - 10, 12, 9);
+      keyLight.target.position.set(truckWorldX, 0, truckPoseGroup.position.z);
+      keyLight.intensity = (ruralFrame?.rain ?? 0) > 0 ? 0.25 : roadScene.hasHdri ? 1.8 : 2.4;
+      // Sem leitura de distância não há alvo do feixe: esconde obstáculo e raio
+      // em vez de desenhá-los numa posição inventada.
+      obstacleGroup.visible = isFirebase
+        ? Number.isFinite(snapshot.readings.distance)
+        : settings.scenarioId === 'obstacle' || settings.scenarioId === 'brake-failure';
+      rayGroup.visible = obstacleGroup.visible;
+      const rangeLength = rangeForDistance(snapshot.readings.distance);
+      rayGroup.scale.x = rangeLength;
+      // Alvo do feixe ultrassônico: anotação de sensor à frente do caminhão.
+      obstacleGroup.position.x = truckWorldX + SOMPO_TRUCK_FRONT_X + rangeLength;
+      obstacleGroup.position.y = Math.tan(slope) * (obstacleGroup.position.x - truckWorldX);
+      const uncertain = isFirebase && (!physicalCurrent || snapshot.status === 'unknown');
+      rayMaterial.color.set(uncertain ? 0xc9ad74 : snapshot.risks.collision ? 0xff5d52 : 0x7dff9a);
+      rayMaterial.opacity = snapshot.risks.collision ? 1 : 0.68;
+      ledMaterial.color.set(uncertain ? 0xc9ad74 : snapshot.status === 'alert' ? 0xff5d52 : 0x7dff9a);
+      ledMaterial.emissive.set(uncertain ? 0x473d20 : snapshot.status === 'alert' ? 0xff2d22 : 0x2dff6b);
+      ledMaterial.emissiveIntensity = reduceMotion.matches ? 2.4 : 2.2 + (Math.sin(visualElapsed * 0.007) * 1.1);
+      if (!isFirebase) scenarioEffects.update(effectFrame, visualElapsed, visualScenario, drivingSpeed, reduceMotion.matches, slope, effectOutcomeId ?? '', truckWorldX);
+      atmosphere.update(studio, camera, truckPoseGroup.position, visualElapsed, (ruralFrame?.rain ?? 0) > 0);
+      orbit.update();
+      postProcessing.render(delta);
+      // Captura síncrona no mesmo rAF do render: o framebuffer WebGL ainda está
+      // válido sem precisar de preserveDrawingBuffer.
+      meter.end();
+      onAfterRender(renderer.domElement);
+      if (!document.hidden) frameId = window.requestAnimationFrame(render);
+    }
+
+    function onVisibilityChange() {
+      window.cancelAnimationFrame(frameId);
+      if (!document.hidden) {
+        previousTime = performance.now();
+        frameId = window.requestAnimationFrame(render);
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    frameId = window.requestAnimationFrame(render);
+
+    return { ...api, dispose() {
+      assetAbort.abort();
+      atmosphere.dispose();
+      roadScene.dispose();
+      scenarioEffects.dispose();
+      window.cancelAnimationFrame(frameId);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      resizeObserver.disconnect();
+      orbit.dispose();
+      disposeSompoObject(scene);
+      postProcessing.dispose();
+      environment.dispose();
+      renderer.dispose();
+      // Each stage owns its canvas/context. Retire driver resources immediately
+      // instead of waiting for GC after repeated rural/agricultural switches.
+      renderer.forceContextLoss();
+      renderer.domElement.remove();
+    } };
+}

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createSompoPastureSurface } from './createSompoPastureSurface';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createSompoAgriScene } from './createSompoAgriScene';
@@ -11,13 +12,14 @@ import {
 } from '../../../shared/sompo-agri-scenarios.js';
 import { getSompoAgriTravelMeters } from '../../../shared/sompo-agri-brief.js';
 import { frameDamping } from './frameDamping.js';
+import { createSompoRenderer, sompoRenderBudget, disposeSompoObject, type SompoStageApi } from './sompoStage';
+import { createSompoEnvironmentAssets } from './createSompoEnvironmentAssets';
+import { createSompoAtmosphere } from './createSompoAtmosphere';
+import { createSompoRenderMeter } from './sompoStage';
+import { exportSompoModel } from './refineSompoTruck';
+import { SOMPO_STUDIO_DEFAULT, type SompoStudioConfig, type SompoRenderStats } from './sompoStudioConfig';
 
-export interface SompoAgriStageApi {
-  focus(target: 'truck' | 'sensor'): void;
-  adjust(action: 'rotate-left' | 'rotate-right' | 'zoom-in' | 'zoom-out'): void;
-  recenterHeading(): void;
-  dispose(): void;
-}
+export type SompoAgriStageApi = SompoStageApi;
 
 function dampAngle(current: number, target: number, factor: number) {
   const shortestTurn = Math.atan2(Math.sin(target - current), Math.cos(target - current));
@@ -54,7 +56,7 @@ function fallbackMachine(equipmentId: 'tractor' | 'harvester') {
  * real em forma fechada — separado do loop do caminhão para não arriscar o
  * fluxo rural. Desmontado e remontado a cada troca de cenário/desfecho.
  */
-export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender }: {
+export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats }: {
   mount: HTMLElement;
   scenarioId: SompoAgriScenarioId;
   outcomeId: string;
@@ -63,25 +65,20 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   onWebglError: () => void;
   // Chamado no mesmo rAF do renderer.render — é o ponto seguro para capturar o canvas.
   onAfterRender?: (canvas: HTMLCanvasElement) => void;
+  studioRef?: { current: SompoStudioConfig };
+  getElapsed?: (time: number) => number;
+  onStats?: (stats: SompoRenderStats) => void;
 }): SompoAgriStageApi | null {
   const scenario = getSompoAgriScenario(scenarioId);
   let renderer: THREE.WebGLRenderer;
   try {
-    renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' });
+    renderer = createSompoRenderer(mount).renderer;
   } catch {
     onWebglError();
     return null;
   }
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(37, 1, 0.1, 360);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-  renderer.setClearColor(0x07100c, 0);
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
-  renderer.domElement.setAttribute('aria-hidden', 'true');
-  mount.appendChild(renderer.domElement);
 
   const environmentScene = new RoomEnvironment();
   const pmrem = new THREE.PMREMGenerator(renderer);
@@ -90,20 +87,44 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   scene.environmentIntensity = scenario.environmentId === 'row-crop-field-night' ? 0.12 : 0.5;
   environmentScene.dispose();
   pmrem.dispose();
-  scene.background = new THREE.Color(scenario.environmentId === 'row-crop-field-night' ? 0x060d16 : 0xb9d2d9);
+  const nightSky = scenario.environmentId === 'row-crop-field-night';
+  const skyCanvas = document.createElement('canvas'); skyCanvas.width = 8; skyCanvas.height = 256;
+  const skyContext = skyCanvas.getContext('2d');
+  if (skyContext) {
+    const gradient = skyContext.createLinearGradient(0, 0, 0, 256);
+    gradient.addColorStop(0, nightSky ? '#081423' : '#6b99b0');
+    gradient.addColorStop(.7, nightSky ? '#162436' : '#b5cdd0');
+    gradient.addColorStop(1, nightSky ? '#25303b' : '#c7cdbc');
+    skyContext.fillStyle = gradient; skyContext.fillRect(0, 0, 8, 256);
+  }
+  const skyMap = new THREE.CanvasTexture(skyCanvas); skyMap.colorSpace = THREE.SRGBColorSpace;
+  scene.background = skyMap;
   scene.fog = new THREE.Fog(scenario.environmentId === 'row-crop-field-night' ? 0x081019 : 0xb9c8c2, 60, 170);
 
   const worldRoot = new THREE.Group();
   scene.add(worldRoot);
-  const field = createSompoAgriScene(worldRoot, scenario.environmentId);
+  const night = scenario.environmentId === 'row-crop-field-night';
+  const budget = sompoRenderBudget();
+  const field = createSompoAgriScene(worldRoot, scenario.environmentId, budget.compact);
+  const atmosphere = createSompoAtmosphere(scene, renderer, field.sun);
+  const meter = createSompoRenderMeter(renderer, onStats);
+  const assets = createSompoEnvironmentAssets(scene, renderer, { background: false, intensity: night ? 0.30 : 0.68, initialWet: scenario.environmentId === 'muddy-field' });
+  assets.surface(field.terrain.material, 'dirt', 45, 30);
+  const pasture = createSompoPastureSurface(field.terrain.material, true);
+  if (scenario.environmentId === 'muddy-field') {
+    // Packed roughness and normals keep wet soil from becoming a flat gray mirror.
+    assets.surface(field.mud.material, 'dirt', 4, 2.6);
+    field.mud.material.envMapIntensity = 0.35;
+  }
+  field.terrain.material.color.set(night ? 0x8b8b81 : scenario.environmentId === 'muddy-field' ? 0x736b60 : 0xd7c6a5);
   // A cena agrícola traz o próprio sol; só o abrimos para cobrir a máquina inteira.
   field.root.traverse((node) => {
     const light = node as THREE.DirectionalLight;
     if (light.isDirectionalLight) {
       light.castShadow = true;
-      light.shadow.mapSize.set(2048, 2048);
-      light.shadow.camera.left = -30; light.shadow.camera.right = 30;
-      light.shadow.camera.top = 30; light.shadow.camera.bottom = -30;
+      light.shadow.mapSize.set(budget.shadowSize, budget.shadowSize);
+      light.shadow.camera.left = -22; light.shadow.camera.right = 22;
+      light.shadow.camera.top = 22; light.shadow.camera.bottom = -22;
       light.shadow.camera.near = 0.5; light.shadow.camera.far = 120;
       light.shadow.normalBias = 0.02;
     }
@@ -123,9 +144,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     for (let atMs = 0; atMs <= scenario.totalMs; atMs += 250) {
       peakTravel = Math.max(peakTravel, getSompoAgriTravelMeters(scenarioId, atMs, outcomeId));
     }
-    const mud = field.root.children.find((child) => (child as THREE.Mesh).isMesh
-      && ((child as THREE.Mesh).geometry as THREE.BufferGeometry).type === 'CircleGeometry');
-    if (mud) mud.position.x = startX + peakTravel;
+    field.placeMud(startX + peakTravel);
   }
 
   const machine = new THREE.Group();
@@ -184,33 +203,41 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const focusPoint = new THREE.Vector3();
+  let focusTarget: 'truck' | 'sensor' = 'truck';
   let frameId = 0;
   let previousTime = performance.now();
 
   function render(time: number) {
+    meter.begin();
     const frameDelta = Math.max(0, (time - previousTime) / 1_000);
     previousTime = time;
-    const elapsed = Math.max(0, time - startedAtRef.current);
+    const elapsed = getElapsed ? getElapsed(time) : Math.max(0, time - startedAtRef.current);
     const frame = getSompoAgriFrame(scenarioId, elapsed, outcomeId);
     const travel = reduceMotion.matches ? 0 : getSompoAgriTravelMeters(scenarioId, elapsed, outcomeId);
     const x = startX + travel;
     const z = frame.lateral;
-    machine.position.set(x, Math.max(0, field.groundHeight(x, z)) + frame.vertical - (frame.sink * 0.5), z);
+    machine.position.set(x, field.groundHeight(x, z) + frame.vertical - (frame.sink * 0.5), z);
     const damp = reduceMotion.matches ? 1 : frameDamping(frameDelta, 7.5);
     machine.rotation.y = dampAngle(machine.rotation.y, THREE.MathUtils.degToRad(frame.yaw), damp);
     machine.rotation.z = dampAngle(machine.rotation.z, THREE.MathUtils.degToRad(frame.pitch), damp);
     machine.rotation.x = dampAngle(machine.rotation.x, THREE.MathUtils.degToRad(frame.roll), damp);
-    field.update(frame);
-    const clock = reduceMotion.matches ? 0 : time / 1000;
-    headlight.intensity = frame.headlights * 55;
-    workLight.intensity = frame.workLights * 40;
+    const studio = studioRef?.current ?? SOMPO_STUDIO_DEFAULT;
+    field.update(frame, machine.position, camera.position, reduceMotion.matches, studio.wind);
+    field.sun.position.set(x - 24, 34, z + 18);
+    field.sun.target.position.set(x, 0, z);
+    field.sun.target.updateMatrixWorld();
+    const clock = reduceMotion.matches ? 0 : elapsed / 1000;
+    headlight.intensity = frame.headlights * 80;
+    workLight.intensity = frame.workLights * 65;
     beacon.intensity = frame.beacon * (reduceMotion.matches ? 6 : 4.5 + Math.max(0, Math.sin(clock * 7)) * 6);
-    focusPoint.set(machine.position.x, machine.position.y + 1.6, machine.position.z);
+    focusPoint.set(machine.position.x + (focusTarget === 'sensor' ? 2.5 : 0), machine.position.y + (focusTarget === 'sensor' ? 2.2 : 1.6), machine.position.z);
     const targetXBefore = orbit.target.x;
     orbit.target.lerp(focusPoint, reduceMotion.matches ? 1 : frameDamping(frameDelta, 5));
     camera.position.x += orbit.target.x - targetXBefore;
     orbit.update();
+    atmosphere.update(studio, camera, machine.position, elapsed, scenario.environmentId === 'muddy-field', night);
     renderer.render(scene, camera);
+    meter.end();
     onAfterRender?.(renderer.domElement);
     if (!document.hidden) frameId = window.requestAnimationFrame(render);
   }
@@ -225,12 +252,14 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   frameId = window.requestAnimationFrame(render);
 
   return {
+    exportModel: () => { if (!model) return Promise.reject(new Error('Aguarde o carregamento da máquina.')); return exportSompoModel(model); },
     focus(target) {
+      focusTarget = target;
       const anchor = target === 'sensor'
         ? focusPoint.set(machine.position.x + 2.5, machine.position.y + 2.2, machine.position.z)
         : focusPoint.set(machine.position.x, machine.position.y + 1.6, machine.position.z);
       orbit.target.copy(anchor);
-      camera.position.set(anchor.x + (target === 'sensor' ? 6 : 10.5), target === 'sensor' ? 4 : 5.2, target === 'sensor' ? 6.5 : 12.5);
+      camera.position.set(anchor.x + (target === 'sensor' ? 6 : 10.5), machine.position.y + (target === 'sensor' ? 4 : 5.2), anchor.z + (target === 'sensor' ? 6.5 : 12.5));
       orbit.update();
     },
     adjust(action) {
@@ -246,6 +275,8 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     recenterHeading() { /* sem rumo integrado no palco agrícola */ },
     dispose() {
       disposed = true;
+      pasture.dispose();
+      atmosphere.dispose();
       abort.abort();
       window.cancelAnimationFrame(frameId);
       document.removeEventListener('visibilitychange', onVisibilityChange);
@@ -253,13 +284,15 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
       orbit.dispose();
       field.dispose();
       if (model) disposeSompoAgriAsset(model);
-      scene.traverse((object) => {
-        const mesh = object as THREE.Mesh & { material?: THREE.Material | THREE.Material[] };
-        mesh.geometry?.dispose();
-        if (mesh.material) (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach((material) => material.dispose());
-      });
+      assets.dispose();
+      skyMap.dispose();
+      if (model) model.removeFromParent();
+      disposeSompoObject(scene);
       environment.dispose();
       renderer.dispose();
+      // Each stage owns its canvas/context. Retire driver resources immediately
+      // instead of waiting for GC after repeated rural/agricultural switches.
+      renderer.forceContextLoss();
       renderer.domElement.remove();
     },
   };

@@ -6,6 +6,7 @@ import {
   Box as BoxIcon,
   Building2,
   Database,
+  Download,
   Filter,
   Loader2,
   MapPin,
@@ -18,6 +19,7 @@ import {
   Wheat,
 } from 'lucide-react';
 import SompoTelemetryPanel from '@/components/SompoTelemetryPanel';
+import SompoRiskPanel from '@/components/SompoRiskPanel';
 import SompoWelcome from '@/components/sompo/SompoWelcome';
 import { useTheme } from '@/hooks/useTheme';
 import { useChatLibrary } from '@/hooks/useChatLibrary';
@@ -25,6 +27,7 @@ import { useAppLocation } from '@/hooks/useAppLocation';
 import { useLuca } from '@/hooks/useLucaState';
 import { getSompoView, GRAVIDADE_VALUES, PRODUTO_PARAM, PRODUTO_VALUE, SOMPO_ABA, SOMPO_TELEMETRY_ABA } from '../../shared/app-location.js';
 import { lucaApi } from '@/lib/api';
+import { downloadFile } from '@/lib/lab-client';
 import { pickFailureCopy } from '@/lib/surface-failure';
 import type {
   LucaAiChatAttachment,
@@ -53,10 +56,10 @@ import {
   type SompoLaunchMode,
   type SompoProductLine,
 } from '@/lib/sompo-cases';
-import { buildSompoEpisodeMission, buildSompoTelemetryMission } from '../../shared/sompo-telemetry.js';
+import { currentSompoTelemetry, buildSompoEpisodeMission, buildSompoTelemetryMission } from '../../shared/sompo-telemetry.js';
+import { assessSompoRisk, sompoRiskBriefing, type SompoRiskContext } from '../../shared/sompo-risk.js';
 import { buildSompoScenarioRunBrief, createSompoSimulationSnapshot } from '../../shared/sompo-telemetry-simulator.js';
 import { buildSompoAgriRunBrief, isSompoAgriScenarioId } from '../../shared/sompo-agri-brief.js';
-import { preloadSompoTruckAsset } from '@/components/sompo/loadSompoTruckAsset';
 import '@/sompo-page.css';
 
 const SompoTruckSimulator = lazy(() => import('@/components/SompoTruckSimulator'));
@@ -135,9 +138,6 @@ function defaultIndividualPresetId(list: LucaIndividualPreset[]): string {
 export default function SompoPage() {
   const { location } = useAppLocation();
 
-  useEffect(() => {
-    void preloadSompoTruckAsset();
-  }, []);
 
   return getSompoView(location) === 'welcome' ? <SompoWelcome /> : <SompoWorkspace />;
 }
@@ -170,7 +170,19 @@ function SompoWorkspace() {
     kind: string;
     outcomeId?: string;
     outcomeLabel?: string;
-  } | null>(null);
+  } | null>(() => {
+    try {
+      const saved = JSON.parse(window.sessionStorage.getItem('luca:sompo:last-episode') || 'null');
+      return saved && typeof saved.publicId === 'string' && /^[a-zA-Z0-9-]+$/.test(saved.publicId) ? saved : null;
+    } catch { return null; }
+  });
+  useEffect(() => {
+    try {
+      if (recordedEpisode) window.sessionStorage.setItem('luca:sompo:last-episode', JSON.stringify(recordedEpisode));
+      else window.sessionStorage.removeItem('luca:sompo:last-episode');
+    } catch { /* A evidência no servidor segue recuperável pelo ID público. */ }
+  }, [recordedEpisode]);
+  const [riskContext, setRiskContext] = useState<SompoRiskContext>({});
   const [teamMode, setTeamMode] = useState<SompoLaunchMode>('team');
   const [teamPresets, setTeamPresets] = useState<LucaTeamPreset[]>(LUCA_TEAM_PRESETS);
   const [individualPresets, setIndividualPresets] = useState<LucaIndividualPreset[]>(LUCA_INDIVIDUAL_PRESETS);
@@ -188,6 +200,10 @@ function SompoWorkspace() {
   const [telemetryError, setTelemetryError] = useState<string | null>(null);
   const [telemetryLaunching, setTelemetryLaunching] = useState(false);
   const [telemetryLaunchError, setTelemetryLaunchError] = useState<string | null>(null);
+  const [exportWindowMinutes, setExportWindowMinutes] = useState(15);
+  const [telemetryExporting, setTelemetryExporting] = useState<'json' | 'csv' | null>(null);
+  const [telemetryExportMessage, setTelemetryExportMessage] = useState<string | null>(null);
+  const [telemetryExportError, setTelemetryExportError] = useState<string | null>(null);
   const telemetryRequestBusyRef = useRef(false);
 
   const loadTelemetry = useCallback(async (kind: 'initial' | 'manual' = 'manual') => {
@@ -292,7 +308,15 @@ function SompoWorkspace() {
     });
   }, [productFilter, query, severityFilter]);
 
-  const firebaseTelemetry = streamedTelemetry || bootstrapTelemetry;
+  // Relógio de 1s só para reavaliar a frescura do snapshot físico: passados 15s
+  // sem update o snapshot vira 'stale' e a cena/painel marcam "último valor".
+  const [telemetryClock, setTelemetryClock] = useState(Date.now);
+  useEffect(() => {
+    if (telemetrySourceMode !== 'firebase') return;
+    const timer = window.setInterval(() => setTelemetryClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [telemetrySourceMode]);
+  const firebaseTelemetry = currentSompoTelemetry(streamedTelemetry || bootstrapTelemetry, telemetryClock);
   const telemetry = telemetrySourceMode === 'simulation' ? simulatedTelemetry : firebaseTelemetry;
   const visibleTelemetryError = telemetrySourceMode === 'firebase' && !streamedTelemetry ? telemetryError : null;
 
@@ -410,6 +434,51 @@ function SompoWorkspace() {
 
   const episodeReady = telemetrySourceMode === 'simulation' && recordedEpisode !== null;
 
+  async function exportTelemetry(format: 'json' | 'csv') {
+    if (telemetryExporting) return;
+    setTelemetryExporting(format);
+    setTelemetryExportMessage(null);
+    setTelemetryExportError(null);
+    const source = telemetrySourceMode === 'simulation' ? 'simulacao' : 'firebase';
+    const tractorId = telemetry?.tractorId || '001';
+    const params = new URLSearchParams({ fonte: source, trator: tractorId, format });
+    if (episodeReady && recordedEpisode) params.set('episodeId', recordedEpisode.publicId);
+    else params.set('janelaMin', String(exportWindowMinutes));
+    try {
+      const response = await fetch(`/api/sompo/telemetry/export?${params}`, {
+        credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(30_000),
+      });
+      const content = await response.text();
+      if (!response.ok) {
+        let message = response.status === 401
+          ? 'Entre novamente para exportar o histórico.'
+          : response.status === 403
+            ? 'Esta conta não tem acesso à exportação da telemetria.'
+            : 'Não foi possível exportar este recorte. Tente novamente.';
+        try {
+          const failure = JSON.parse(content);
+          if (typeof failure?.message === 'string') message = failure.message;
+        } catch { /* A borda pode responder HTML; preserve a mensagem legível. */ }
+        throw new Error(message);
+      }
+      if (!content.trim()) throw new Error('Nenhuma amostra gravada neste recorte. Amplie a janela ou aguarde novas leituras.');
+      const expectedType = format === 'csv' ? 'text/csv' : 'application/json';
+      if (!response.headers.get('content-type')?.includes(expectedType)) throw new Error('O servidor não retornou um dataset válido. Entre novamente ou tente exportar outra vez.');
+      const scope = episodeReady && recordedEpisode ? recordedEpisode.publicId : `${exportWindowMinutes}min`;
+      const filename = `sompo-${source}-${tractorId.replace(/[^a-zA-Z0-9_-]/g, '_')}-${scope}-${new Date().toISOString().replace(/[:.]/g, '-')}.${format}`;
+      downloadFile(content, filename, format === 'csv' ? 'text/csv;charset=utf-8' : 'application/json;charset=utf-8');
+      setTelemetryExportMessage(`${filename} baixado. Abra o Laboratório e selecione o arquivo em Importar.`);
+    } catch (error) {
+      setTelemetryExportError(error instanceof Error && error.name === 'TimeoutError'
+        ? 'A exportação demorou demais. Tente uma janela menor.'
+        : error instanceof TypeError
+          ? 'Sem conexão com o servidor. Reconecte e tente exportar novamente.'
+          : error instanceof Error ? error.message : 'Não foi possível exportar o histórico.');
+    } finally {
+      setTelemetryExporting(null);
+    }
+  }
+
   async function runTelemetryWithSquad() {
     if (!telemetry || !activeSquad || telemetryLaunching || sessionsBusy) return;
     setTelemetryLaunching(true);
@@ -497,7 +566,7 @@ function SompoWorkspace() {
             ? buildSompoAgriRunBrief(telemetry.source.scenarioId, telemetry.source.outcomeId, telemetry.deviceTimestamp ?? 0)
             : buildSompoScenarioRunBrief(telemetry.source.scenarioId, telemetry.source.outcomeId, telemetry.deviceTimestamp ?? 0)
           : null;
-        mission = buildSompoTelemetryMission(telemetry, activeSquad.label, history, scenarioRun);
+        mission = `${buildSompoTelemetryMission(telemetry, activeSquad.label, history, scenarioRun)}\n\n${sompoRiskBriefing(assessSompoRisk(telemetry, riskContext))}`;
       }
       const session = launchSession ?? await createSession();
       if (!session) {
@@ -652,7 +721,7 @@ function SompoWorkspace() {
               </Suspense>
 
               <SompoTelemetryPanel
-                telemetry={telemetry}
+                telemetry={telemetry ?? null}
                 loading={telemetrySourceMode === 'firebase' && telemetryLoading}
                 refreshing={telemetrySourceMode === 'firebase' && telemetryRefreshing}
                 error={visibleTelemetryError}
@@ -750,6 +819,47 @@ function SompoWorkspace() {
                     </div>
                   </aside>
               </SompoTelemetryPanel>
+
+              <SompoRiskPanel
+                key={`${telemetrySourceMode}:${telemetry?.tractorId || 'empty'}`}
+                telemetry={telemetry ?? null}
+                context={riskContext}
+                onContext={setRiskContext}
+              />
+
+              <section className="sompo-telemetry-export" aria-labelledby="sompo-export-title" aria-busy={telemetryExporting !== null}>
+                <div>
+                  <h3 id="sompo-export-title">Levar o histórico ao Laboratório</h3>
+                  <p>
+                    {telemetrySourceMode === 'simulation' ? 'Simulação' : 'Equipamento físico'} · Máquina {telemetry?.tractorId || '001'}.
+                    {' '}{episodeReady
+                      ? `Exportação do episódio ${recordedEpisode?.publicId}, com todas as suas amostras.`
+                      : 'Exportação das leituras gravadas na janela selecionada.'}
+                  </p>
+                  <p>O JSON preserva o registro do dispositivo; o CSV leva os sinais ao replay. Os dois podem ser importados no Laboratório.</p>
+                </div>
+                <div className="sompo-telemetry-export-actions">
+                  {episodeReady ? (
+                    <button type="button" disabled={telemetryExporting !== null} onClick={() => setRecordedEpisode(null)}>Usar janela recente</button>
+                  ) : (
+                    <label>
+                      <span>Janela do histórico</span>
+                      <select value={exportWindowMinutes} disabled={telemetryExporting !== null} onChange={event => setExportWindowMinutes(Number(event.target.value))}>
+                        {[15, 30, 60, 240].map(minutes => <option key={minutes} value={minutes}>Últimos {minutes} minutos</option>)}
+                      </select>
+                    </label>
+                  )}
+                  <button type="button" disabled={telemetryExporting !== null} data-sompo-export-json onClick={() => void exportTelemetry('json')}>
+                    {telemetryExporting === 'json' ? <Loader2 className="animate-spin" /> : <Download />} {telemetryExporting === 'json' ? 'Exportando JSON…' : 'Baixar JSON'}
+                  </button>
+                  <button type="button" disabled={telemetryExporting !== null} data-sompo-export-csv onClick={() => void exportTelemetry('csv')}>
+                    {telemetryExporting === 'csv' ? <Loader2 className="animate-spin" /> : <Download />} {telemetryExporting === 'csv' ? 'Convertendo CSV…' : 'Baixar CSV para o Lab'}
+                  </button>
+                  <button type="button" onClick={() => navigate({ page: 'laboratorio' })}>Abrir Laboratório <ArrowRight /></button>
+                </div>
+                {telemetryExportMessage && <p role="status">{telemetryExportMessage}</p>}
+                {telemetryExportError && <p role="alert" className="sompo-launch-error">{telemetryExportError}</p>}
+              </section>
             </>
           ) : (
             <>

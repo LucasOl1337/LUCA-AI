@@ -42,8 +42,8 @@ export function wornRoadPaint() {
 function grassTuftGeometry(blades: number, seed: number) {
   const parts: THREE.BufferGeometry[] = [];
   for (let i = 0; i < blades; i += 1) {
-    const blade = new THREE.PlaneGeometry(0.075, 1, 1, 3);
-    blade.translate(0, 0.5, 0);
+    const blade = new THREE.PlaneGeometry(0.034, 0.65, 1, 3);
+    blade.translate(0, 0.325, 0);
     const positions = blade.attributes.position as THREE.BufferAttribute;
     const bend = 0.28 + rand(seed + i * 7 + 3) * 0.55;
     const height = 0.65 + rand(seed + i * 7 + 5) * 0.6;
@@ -109,11 +109,18 @@ interface InstanceSlot { x: number; z: number; y?: number; rotation: number; sca
 /** Conjunto instanciado com reciclagem por instância na trilha infinita. */
 function makeTrail(mesh: THREE.InstancedMesh, slots: InstanceSlot[], span: number, onGround: boolean, sink = 0) {
   const transform = new THREE.Object3D();
+  const lastX = new Float64Array(slots.length).fill(NaN);
+  mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), Math.hypot(span / 2 + 12, 80));
   return {
     mesh,
     update(truckX: number) {
+      let changed = false;
+      mesh.boundingSphere!.center.x = truckX;
       for (const [index, slot] of slots.entries()) {
         const x = wrapSompoX(slot.x, truckX, span);
+        if (lastX[index] === x) continue;
+        lastX[index] = x;
+        changed = true;
         const y = slot.y ?? (onGround ? sompoTerrainHeight(x, slot.z) - sink : -sink);
         transform.position.set(x, y, slot.z);
         transform.rotation.set(0, slot.rotation, 0);
@@ -121,7 +128,7 @@ function makeTrail(mesh: THREE.InstancedMesh, slots: InstanceSlot[], span: numbe
         transform.updateMatrix();
         mesh.setMatrixAt(index, transform.matrix);
       }
-      mesh.instanceMatrix.needsUpdate = true;
+      if (changed) mesh.instanceMatrix.needsUpdate = true;
     },
   };
 }
@@ -159,10 +166,12 @@ export function createSompoRoadDetails(parent: THREE.Group) {
   }
 
   const time = { value: 0 };
+  const wind = { value: 0.65 };
   const windify = (material: THREE.MeshStandardMaterial, strength: number) => {
     material.onBeforeCompile = (shader) => {
       shader.uniforms.grassTime = time;
-      shader.vertexShader = 'uniform float grassTime;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\ntransformed.x += sin(grassTime * 1.3 + instanceMatrix[3].x * 0.6) * position.y * position.y * ${strength.toFixed(3)};`);
+      shader.uniforms.grassWind = wind;
+      shader.vertexShader = 'uniform float grassTime; uniform float grassWind;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\ntransformed.x += sin(grassTime * 1.3 + instanceMatrix[3].x * 0.6) * position.y * position.y * grassWind * ${strength.toFixed(3)};`);
     };
     material.customProgramCacheKey = () => `sompo-wind-${strength}`;
   };
@@ -260,7 +269,8 @@ export function createSompoRoadDetails(parent: THREE.Group) {
   const moundTrail = makeTrail(mounds, moundSlots, 240, true, 0.02);
 
   return {
-    update(elapsed: number, wet: boolean, reducedMotion: boolean, truckX: number) {
+    update(elapsed: number, wet: boolean, reducedMotion: boolean, truckX: number, windStrength = 0.65) {
+      wind.value = windStrength;
       time.value = reducedMotion ? 0 : elapsed / 1000;
       grassMaterial.color.set(wet ? 0x85977a : 0xbdc59c);
       clumpMaterial.color.set(wet ? 0x77896e : 0xaab887);

@@ -2380,3 +2380,95 @@
   .sompo-simulator-stage { min-height: 440px; }
   .sompo-simulator-credit { font-size: 8px; }
 }
+
+/* Compact operational reading stays with the machine when the controls scroll. */
+.sompo-simulator-readout {
+  position: absolute; top: 53px; left: 14px; display: flex; gap: 6px;
+  max-width: calc(100% - 28px); pointer-events: none;
+}
+.sompo-simulator-readout > div {
+  padding: 8px 11px; border: 1px solid #ffffff26; border-radius: 9px;
+  background: #12241fd9; color: #edf3ed;
+}
+.sompo-simulator-readout span { display: block; max-width: 240px; font-size: 10px; line-height: 1.4; color: #d0dfd4; }
+.sompo-simulator-readout strong { display: block; margin-top: 2px; font-size: 15px; font-variant-numeric: tabular-nums; }
+.sompo-simulator-readout small { font-size: 10px; font-weight: 400; }
+.sompo-simulator-readout [data-alert='true'] { background: #6c261ee8; border-color: #ffb39787; }
+@media(max-width:700px) {
+  .sompo-simulator-readout { top: 48px; left: 10px; max-width: calc(100% - 20px); }
+  .sompo-simulator-readout > div { padding: 6px 8px; }
+  .sompo-simulator-readout span { font-size: 9px; max-width: 160px; }
+  .sompo-simulator-readout strong { font-size: 13px; }
+}
+
+/* ==== Módulo de risco contextual, exportação e alertas (Laboratório/SOMPO) ==== */
+/* Operational journey: quiet surfaces, readable evidence, explicit status. */
+.sompo-section-heading { margin: 28px 0 14px; max-width: 80ch; }
+.sompo-section-heading > span { color: #9fb8b0; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.sompo-section-heading h2 { margin-top: 7px; font-size: 22px; letter-spacing: -.025em; color: #f2f7f5; }
+.sompo-section-heading p { margin-top: 8px; color: #bacbc5; line-height: 1.6; font-size: 14px; }
+.sompo-risk-assessment { margin: 22px 0; padding: 24px; background: #101d19; border: 1px solid #3b5148; border-radius: 16px; color: #eef5f1; }
+.sompo-risk-assessment .sompo-section-heading { margin-top: 0; }
+.sompo-risk-workspace { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(240px, 1fr); gap: 28px; margin: 22px 0; }
+.sompo-risk-form { display: grid; gap: 16px; }
+.sompo-risk-form label { display: grid; gap: 8px; font-size: 14px; font-weight: 600; }
+.sompo-risk-form :is(input,select) { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #62766e; border-radius: 7px; background: #0c1512; color: #f2f7f5; font: inherit; }
+.sompo-risk-form small, .sompo-risk-limit { font-size: 12px; line-height: 1.6; color: #b8c9c1; }
+.sompo-score { border-left: 1px solid #43594f; padding-left: 28px; }
+.sompo-score > span { font-size: 12px; color: #b8c9c1; }
+.sompo-score-number { font-size: 64px; line-height: 1.25; font-weight: 650; letter-spacing: -.055em; font-variant-numeric: tabular-nums; }
+.sompo-score-number small { font-size: 20px; letter-spacing: 0; margin-left: 8px; color: #a8beb3; }
+.sompo-score > strong { font-size: 15px; }
+.sompo-score p { margin-top: 12px; color: #c0cfc8; line-height: 1.6; font-size: 13px; }
+.sompo-score[data-level="Alto"] > strong { color: #ffb6a4; }
+.sompo-score[data-level="Médio"] > strong { color: #f6d18b; }
+.sompo-score meter { width: 100%; height: 12px; margin-top: 16px; }
+.sompo-risk-details { border-top: 1px solid #40554b; padding: 16px 0; margin-top: 16px; font-size: 14px; }
+.sompo-risk-details summary { cursor: pointer; font-weight: 600; min-height: 28px; }
+.sompo-risk-details p { margin-top: 12px; line-height: 1.6; }
+.sompo-risk-table-wrap { overflow-x: auto; }
+.sompo-risk-details table { width: 100%; border-collapse: collapse; margin-top: 16px; text-align: left; font-size: 13px; }
+.sompo-risk-details :is(th,td) { padding: 12px 10px; border-bottom: 1px solid #32483d; }
+.sompo-risk-details th { font-size: 11px; text-transform: uppercase; color: #bed0c6; }
+.sompo-risk-details td small { display: block; color: #a9bfb3; margin-top: 5px; }
+.sompo-risk-save { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-top: 18px; }
+.sompo-risk-save button, .sompo-assessment-list button, .sompo-risk-details p button { min-height: 44px; padding: 10px 16px; border-radius: 7px; background: #d5eadf; color: #14271d; font-size: 13px; font-weight: 700; }
+.sompo-risk-save button:disabled { opacity: .5; cursor: not-allowed; }
+.sompo-risk-save span { font-size: 13px; color: #c0d0c7; }
+.sompo-assessment-list { list-style: none; padding: 0; }
+.sompo-assessment-list li { display: flex; justify-content: space-between; gap: 16px; align-items: center; border-bottom: 1px solid #3c5147; padding: 16px 0; }
+.sompo-assessment-list small { display: block; margin-top: 6px; color: #b7cbbf; font-size: 12px; }
+.sompo-coverage-note { border-left: 3px solid #c9ad74; padding: 10px 14px; font-size: 13px; line-height: 1.6; background: #20291d; color: #e2decf; }
+.sompo-operational-alert { display: flex; gap: 14px; align-items: flex-start; margin: 16px 0; padding: 18px; border: 1px solid #bd6c58; border-left: 4px solid #ee977d; border-radius: 8px; background: #38231e; color: #ffd8ca; }
+.sompo-operational-alert > svg { flex-shrink: 0; width: 24px; }
+.sompo-operational-alert p { margin-top: 6px; line-height: 1.6; font-size: 13px; }
+.sompo-page :is(button, input, select, summary):focus-visible { outline: 3px solid #f4d589; outline-offset: 4px; }
+.sompo-bench-controls { margin: 18px 0 32px; }
+@media (max-width: 640px) {
+  .sompo-risk-assessment { padding: 18px; }
+  .sompo-risk-workspace { grid-template-columns: 1fr; gap: 24px; }
+  .sompo-score { padding-left: 0; padding-top: 20px; border-left: 0; border-top: 1px solid #43594f; }
+  .sompo-assessment-list li { align-items: flex-start; flex-direction: column; }
+  .sompo-view-switch { width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sompo-page *, .sompo-page *::before, .sompo-page *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+.sompo-risk-grid article[data-unknown="true"] { background: #292b21; border-color: #827958; color: #e6d7ac; }
+.sompo-risk-grid article[data-unknown="true"] :is(svg,strong) { color: #e6d7ac; }
+
+.sompo-episode-selection { font-size: 13px; line-height: 1.6; color: #c0d0c7; overflow-wrap: anywhere; }
+.sompo-episode-selection button { padding: 8px 12px; min-height: 40px; border-radius: 6px; background: #d5eadf; color: #14271d; }
+
+.sompo-telemetry-export { display: grid; gap: 16px; margin: 22px 0; padding: 22px; border: 1px solid #3b5148; border-radius: 14px; background: #101d19; color: #eef5f1; }
+.sompo-telemetry-export h3 { font-size: 18px; }
+.sompo-telemetry-export p { margin-top: 8px; font-size: 13px; line-height: 1.6; color: #c0d0c7; overflow-wrap: anywhere; }
+.sompo-telemetry-export-actions { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.sompo-telemetry-export-actions label { display: grid; gap: 7px; font-size: 12px; }
+.sompo-telemetry-export-actions select { min-height: 44px; padding: 8px 12px; border: 1px solid #62766e; border-radius: 7px; background: #0c1512; color: #f2f7f5; font: inherit; }
+.sompo-telemetry-export-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 16px; border-radius: 7px; background: #d5eadf; color: #14271d; font-size: 13px; font-weight: 700; }
+.sompo-telemetry-export-actions button:last-child { background: transparent; color: #d5eadf; box-shadow: inset 0 0 0 1px #62766e; }
+.sompo-telemetry-export-actions button:disabled, .sompo-telemetry-export-actions select:disabled { opacity: .5; cursor: not-allowed; }
+.sompo-telemetry-export-actions button svg { width: 16px; height: 16px; }
+.sompo-telemetry-export .sompo-launch-error { color: #ffd8ca; }

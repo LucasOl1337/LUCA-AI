@@ -1,10 +1,12 @@
 import { createServer } from 'node:http';
 import { createReadStream, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { extname, resolve } from 'node:path';
+import { extname, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
-const repo = '/home/lol/Projects/LUCA-AI';
-const output = '/tmp/sompo-voxel-preview/agri-csp';
+const repo = resolve(process.env.SOMPO_PREVIEW_ROOT || resolve(dirname(fileURLToPath(import.meta.url)), '../..'));
+const port = Number(process.env.SOMPO_PREVIEW_PORT || 5190);
+const output = resolve(process.env.SOMPO_PREVIEW_OUTPUT || `${repo}/.sompo-agri-preview`);
 mkdirSync(output, { recursive: true });
 await build({
   absWorkingDir: repo,
@@ -25,7 +27,7 @@ const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/htm
 createServer((request, response) => {
   response.setHeader('Content-Security-Policy', csp);
   const pathname = decodeURIComponent(new URL(request.url || '/', 'http://localhost').pathname);
-  const base = pathname.startsWith('/models/') ? `${repo}/public` : output;
+  const base = /^\/(models|environments)\//.test(pathname) ? `${repo}/public` : output;
   const file = resolve(base, `.${pathname === '/' ? '/index.html' : pathname}`);
   if (!file.startsWith(`${base}/`)) { response.writeHead(403).end(); return; }
   try {
@@ -35,5 +37,5 @@ createServer((request, response) => {
   } catch {
     response.writeHead(404).end();
   }
-}).listen(5190, '127.0.0.1', () => console.log('Sompo agri CSP preview: http://127.0.0.1:5190/'));
+}).listen(port, '127.0.0.1', () => console.log(`Sompo agri CSP preview: http://127.0.0.1:${port}/`));
 

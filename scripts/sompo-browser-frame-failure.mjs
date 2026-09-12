@@ -1,0 +1,27 @@
+import { chromium } from 'playwright';
+import assert from 'node:assert/strict';
+const browser = await chromium.launch({ headless: true, channel: 'msedge' });
+const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+await page.goto('http://127.0.0.1:4243/sompo');
+await page.request.post('http://127.0.0.1:4243/api/auth/register', { data: { name: 'Falha de quadros', email: `frames-${Date.now()}@example.test`, password: 'Demo-local-12345' } });
+await page.reload();
+await page.getByRole('button', { name: 'Simulador 3D Dados sintéticos · sem equipamento' }).click();
+let uploads = 0;
+await page.route('**/api/sompo/telemetry/episode/*/frames', route => {
+  uploads += 1;
+  return uploads === 2 ? route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"fixture_frame_upload_failed"}' }) : route.continue();
+});
+const createdResponse = page.waitForResponse(r => r.url().endsWith('/api/sompo/telemetry/episode') && r.request().method() === 'POST');
+await page.getByRole('button', { name: 'Simular colisão', exact: true }).click();
+const created = await (await createdResponse).json();
+await page.locator('[data-sompo-collision-done]').waitFor({ timeout: 60000 });
+assert.match(await page.locator('[data-sompo-collision-frames-warning]').innerText(), /1\/5 enviados/);
+const episode = await (await page.request.get(`http://127.0.0.1:4243/api/sompo/telemetry/episode/${created.episode.publicId}`)).json();
+assert.equal(episode.episode.status, 'complete');
+assert.equal(episode.samples.length, 45);
+assert.equal(episode.frames.length, 1);
+await page.locator('[data-sompo-collision-frames-warning]').scrollIntoViewIfNeeded();
+await page.screenshot({ path: 'docs/audit/ui-frame-failure.png' });
+console.log(JSON.stringify({ passed: ['partial-upload-explicit', '45-samples-preserved', 'one-frame-recoverable'], frames: episode.frames.length }));
+await browser.close();

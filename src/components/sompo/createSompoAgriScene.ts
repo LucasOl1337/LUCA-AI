@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { createSompoCropRows } from './createSompoCropRows';
+import { varySompoSurface } from './createSompoRoadDetails';
+import { disposeSompoObject } from './sompoStage';
 import type { SompoAgriVisualFrame } from '../../../shared/sompo-agri-scenarios.js';
 
 export const SOMPO_AGRI_ENVIRONMENTS = Object.freeze({
@@ -29,42 +32,11 @@ function createTerrain(environment: (typeof SOMPO_AGRI_ENVIRONMENTS)[SompoAgriEn
     roughness: environment.mud ? 0.72 : 0.96,
     metalness: 0,
   });
+  varySompoSurface(material, 0.26);
   const terrain = new THREE.Mesh(geometry, material);
   terrain.name = 'sompo-agri-terrain';
   terrain.receiveShadow = true;
   return terrain;
-}
-
-/** 480 deterministic crop clumps in rows, rendered in two draw calls. */
-function createCropRows(environment: (typeof SOMPO_AGRI_ENVIRONMENTS)[SompoAgriEnvironmentId]) {
-  const root = new THREE.Group();
-  root.name = 'sompo-agri-crop-rows';
-  const stemGeometry = new THREE.CylinderGeometry(0.018, 0.025, 1.15, 4);
-  const crownGeometry = new THREE.ConeGeometry(0.09, 0.38, 5);
-  const stemMaterial = new THREE.MeshStandardMaterial({ color: environment.crop, roughness: 0.95 });
-  const crownMaterial = new THREE.MeshStandardMaterial({ color: environment.night ? 0x65522a : 0xb89437, roughness: 0.93 });
-  const count = 480;
-  const stems = new THREE.InstancedMesh(stemGeometry, stemMaterial, count);
-  const crowns = new THREE.InstancedMesh(crownGeometry, crownMaterial, count);
-  const matrix = new THREE.Matrix4();
-  let cursor = 0;
-  for (let row = -6; row <= 5; row += 1) {
-    const z = row * 3.1;
-    for (let column = 0; column < 40; column += 1) {
-      const x = -58 + (column * 3);
-      const jitter = (((column * 17) + (row * 31)) % 11) * 0.025;
-      const y = terrainHeight(x, z, environment.slope);
-      matrix.makeTranslation(x + jitter, y + 0.575, z);
-      stems.setMatrixAt(cursor, matrix);
-      matrix.makeTranslation(x + jitter, y + 1.18, z);
-      crowns.setMatrixAt(cursor, matrix);
-      cursor += 1;
-    }
-  }
-  stems.castShadow = stems.receiveShadow = true;
-  crowns.castShadow = crowns.receiveShadow = true;
-  root.add(stems, crowns);
-  return root;
 }
 
 function createBarn() {
@@ -97,6 +69,17 @@ function createBarn() {
   return root;
 }
 
+function dustMap() {
+  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const fade = ctx.createRadialGradient(32,32,0,32,32,32);
+    fade.addColorStop(0,'rgba(255,255,255,.6)');fade.addColorStop(.45,'rgba(255,255,255,.24)');fade.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.fillStyle=fade;ctx.fillRect(0,0,64,64);
+  }
+  return new THREE.CanvasTexture(canvas);
+}
+
 function createDust() {
   const count = 160;
   const geometry = new THREE.BufferGeometry();
@@ -109,63 +92,69 @@ function createDust() {
     positions[(index * 3) + 2] = Math.sin(angle) * radius * 0.55;
   }
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  const material = new THREE.PointsMaterial({ color: 0xc6a369, size: 0.18, transparent: true, opacity: 0, depthWrite: false });
+  const material = new THREE.PointsMaterial({ color: 0xc6ad80, size: 0.75, map: dustMap(), transparent: true, opacity: 0, depthWrite: false });
   const dust = new THREE.Points(geometry, material);
   dust.name = 'sompo-agri-dust';
   return dust;
 }
 
-export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAgriEnvironmentId) {
+export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAgriEnvironmentId, compact = false) {
   const definition = SOMPO_AGRI_ENVIRONMENTS[environmentId] || SOMPO_AGRI_ENVIRONMENTS['row-crop-field'];
   const root = new THREE.Group();
   root.name = `sompo-agri-environment-${environmentId}`;
   const terrain = createTerrain(definition);
   root.add(terrain);
-  if (!definition.barn) root.add(createCropRows(definition));
+  const crops = definition.barn ? null : createSompoCropRows((x,z)=>terrainHeight(x,z,definition.slope), compact);
+  if (crops) root.add(crops.root);
   if (definition.barn) root.add(createBarn());
 
   const mud = new THREE.Mesh(
     new THREE.CircleGeometry(8, 40),
-    new THREE.MeshStandardMaterial({ color: 0x30251d, roughness: 0.58, metalness: 0.04 }),
+    new THREE.MeshStandardMaterial({ color: 0x807363, roughness: 0.66, metalness: 0 }),
   );
-  mud.rotation.x = -Math.PI / 2;
-  mud.position.set(2, 0.04, 0);
+  mud.name = 'sompo-agri-mud';
+  mud.geometry.rotateX(-Math.PI / 2);
+  const mudPositions = mud.geometry.attributes.position;
+  for (let i=1;i<mudPositions.count;i++) { const f=1+Math.sin(i*2.3)*.09; mudPositions.setX(i,mudPositions.getX(i)*f);mudPositions.setZ(i,mudPositions.getZ(i)*f*.65); }
+  function placeMud(x: number) {
+    mud.position.x=x;
+    for(let i=0;i<mudPositions.count;i++) mudPositions.setY(i,terrainHeight(x+mudPositions.getX(i),mudPositions.getZ(i),definition.slope)+.025);
+    mudPositions.needsUpdate=true;mud.geometry.computeVertexNormals();
+  }
+  placeMud(2);
   mud.visible = definition.mud > 0;
   mud.receiveShadow = true;
   root.add(mud);
 
   const dust = createDust();
   root.add(dust);
-  const ambient = new THREE.HemisphereLight(definition.sky, 0x30291d, definition.night ? 0.2 : 1.35);
-  const sun = new THREE.DirectionalLight(definition.night ? 0x91b4dd : 0xfff1cf, definition.night ? 0.35 : 2.8);
+  const ambient = new THREE.HemisphereLight(definition.sky, 0x30291d, definition.night ? 0.32 : 0.7);
+  const sun = new THREE.DirectionalLight(definition.night ? 0x91b4dd : 0xfff1cf, definition.night ? 0.6 : 2.1);
   sun.position.set(-24, 34, 18);
   sun.castShadow = true;
   root.add(ambient, sun);
   parent.add(root);
 
   return {
-    root,
+    root, terrain, mud, sun, placeMud,
     groundHeight(x: number, z: number) {
       return terrainHeight(x, z, definition.slope);
     },
-    update(frame: SompoAgriVisualFrame) {
+    update(frame: SompoAgriVisualFrame, machinePosition = new THREE.Vector3(), cameraPosition = new THREE.Vector3(), reducedMotion = false, wind = 0.65) {
+      crops?.update(frame.atMs, cameraPosition, reducedMotion, wind, machinePosition, frame.equipmentId === 'harvester' ? frame.cropCut : 0);
+      dust.position.copy(machinePosition);
+      dust.rotation.y = THREE.MathUtils.degToRad(frame.yaw);
       const material = dust.material as THREE.PointsMaterial;
-      material.opacity = Math.min(0.72, Math.max(0, frame.dust) * 0.64);
+      material.opacity = Math.min(0.32, Math.max(0, frame.dust) * 0.28);
       dust.visible = material.opacity > 0.01;
-      dust.rotation.y = frame.atMs * 0.00008;
+
       dust.scale.setScalar(0.8 + (frame.dust * 0.65));
-      mud.scale.setScalar(0.85 + (frame.sink * 0.6));
+
     },
     dispose() {
       root.removeFromParent();
-      root.traverse((node) => {
-        const mesh = node as THREE.Mesh;
-        mesh.geometry?.dispose();
-        if (mesh.material) {
-          for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) material.dispose();
-        }
-      });
+      crops?.dispose();
+      disposeSompoObject(root);
     },
   };
 }
-

@@ -80,7 +80,7 @@ function cloudPollDelayForSnapshot(snapshot: LucaState | null): number {
 function isLocalRuntimeHost(): boolean {
   if (typeof window === 'undefined') return false;
   const localHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
-  return localHost && window.location.port === '4242';
+  return localHost;
 }
 
 function missionUiPhaseForState(current: LucaState | null, busy: boolean): MissionUiPhase {
@@ -249,6 +249,7 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
         }
         setBackendReady(false);
         setConnectionState('offline');
+        setSompoTelemetry(current => current ? { ...current, freshness: 'stale', connection: { ...current.connection, state: 'reconnecting' } } : null);
         return false;
       }
       if (
@@ -385,12 +386,14 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
       socket.addEventListener('close', () => {
         setBackendReady(false);
         setConnectionState('offline');
+        setSompoTelemetry(current => current ? { ...current, freshness: 'stale', connection: { ...current.connection, state: 'reconnecting' } } : null);
         if (!closed) reconnectTimer = setTimeout(connect, 3000);
       });
 
       socket.addEventListener('error', () => {
         setBackendReady(false);
         setConnectionState('offline');
+        setSompoTelemetry(current => current ? { ...current, freshness: 'stale', connection: { ...current.connection, state: 'reconnecting' } } : null);
       });
 
       socket.addEventListener('message', (message) => {

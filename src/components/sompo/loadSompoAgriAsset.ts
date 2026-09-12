@@ -75,7 +75,14 @@ export async function loadSompoAgriAsset(equipmentId: SompoAgriEquipmentId, sign
     mesh.receiveShadow = true;
     for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
       if (!(material instanceof THREE.MeshStandardMaterial)) continue;
-      material.envMapIntensity = 0.85;
+      material.envMapIntensity = 0.7;
+      // Painted machinery keeps the generated atlas/UVs, with a satin floor to
+      // prevent reconstructed highlights from turning every painted panel into chrome.
+      material.onBeforeCompile = (shader) => {
+        shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>',
+          '#include <roughnessmap_fragment>\nroughnessFactor = max(roughnessFactor, 0.46);');
+      };
+      material.customProgramCacheKey = () => 'sompo-agri-satin-v1';
       for (const value of Object.values(material)) {
         if (value instanceof THREE.Texture) value.anisotropy = 8;
       }
