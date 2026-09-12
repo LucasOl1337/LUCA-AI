@@ -6,7 +6,7 @@ import { getSompoAgriScenario, SOMPO_AGRI_EQUIPMENT } from '../../../shared/somp
 import { getSompoAgriPosition } from '../../../shared/sompo-agri-brief.js';
 import { getSompoGeofenceSite } from '../../../shared/sompo-geofence-sites.js';
 import { bandGrid, resolveHazards, type LabGeofenceRules } from '../../../shared/lab-geofence.js';
-import type { LabPolygon } from '../../../shared/lab-telemetry.js';
+import { polygonContains, type LabPolygon } from '../../../shared/lab-telemetry.js';
 
 const SCALE = 3;          // px por metro no canvas fora da tela (nítido em qualquer largura de painel)
 const STEP_MS = 250;      // amostragem do percurso do cenário
@@ -14,6 +14,9 @@ const CELL_M = 1;         // só para desenhar, mais fina que os 2 m da cena; aq
 const PAD_M = 8;
 // Mesma rampa da cena 3D (createSompoAgriStage): da faixa mais interna para a mais externa, igual para todo perigo.
 const BAND_RAMP = ['#d63a2f', '#e8902c', '#e9c74a'];
+// Nome curto no mapa quando a regra não serve: a lagoa cai na mesma regra de água do córrego ("Córrego sintético").
+const POLYGON_NAMES: Record<string, string> = { 'lagoa-sintetica': 'Lagoa' };
+const LABEL_BG = 'rgba(255, 255, 255, 0.8)';
 
 interface StaticMap {
   canvas: HTMLCanvasElement;
@@ -64,7 +67,6 @@ function buildStaticMap(scenarioId: string, outcomeId: string): StaticMap | null
   // Faixas célula a célula: entre perigos sobrepostos vence a mais interna (menor max_m), como no chão da cena.
   if (grid) {
     const cellPx = CELL_M * SCALE + 0.5;
-    ctx.globalAlpha = 0.6;
     for (let row = 0; row < grid.rows; row += 1) for (let col = 0; col < grid.cols; col += 1) {
       const cell = row * grid.cols + col;
       if (!grid.inside[cell]) continue;
@@ -75,6 +77,9 @@ function buildStaticMap(scenarioId: string, outcomeId: string): StaticMap | null
         bestMax = hazards[h].bands[band].max_m; best = Math.min(band, BAND_RAMP.length - 1);
       }
       if (best < 0) continue;
+      // Faixa "dentro" (max_m 0: declive, ribanceira) em xadrez, mesma paridade da cena: sem isso o declive virava um disco vermelho
+      // sólido no centro. Água não tem max_m 0 (crítica = até 5 m), então continua sólida.
+      ctx.globalAlpha = bestMax === 0 && ((col + row) & 1) ? 0.15 : 0.6;
       ctx.fillStyle = BAND_RAMP[best];
       ctx.fillRect(px(grid.minX + col * CELL_M), py(grid.minZ + row * CELL_M), cellPx, cellPx);
     }
@@ -91,6 +96,20 @@ function buildStaticMap(scenarioId: string, outcomeId: string): StaticMap | null
   ctx.beginPath();
   path.forEach((point, index) => (index ? ctx.lineTo(px(point.x), py(point.z)) : ctx.moveTo(px(point.x), py(point.z))));
   ctx.lineWidth = 2; ctx.strokeStyle = '#6b7a6f'; ctx.stroke();
+  // Nome de cada perigo/água no centroide do anel. Anel fino em curva (córrego) pode ter centroide fora dele:
+  // aí o rótulo ancora no vértice mais próximo, para ficar colado ao desenho.
+  ctx.font = 'bold 17px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const polygon of polygons) {
+    if (polygon.role === 'allowed_area') continue;
+    const ring = polygon.rings[0].slice(0, -1); // anel fechado: o último ponto repete o primeiro
+    const centroid = { x: ring.reduce((sum, p) => sum + p.x, 0) / ring.length, z: ring.reduce((sum, p) => sum + p.z, 0) / ring.length };
+    const anchor = polygonContains(centroid, polygon) ? centroid
+      : ring.reduce((near, p) => Math.hypot(p.x - centroid.x, p.z - centroid.z) < Math.hypot(near.x - centroid.x, near.z - centroid.z) ? p : near);
+    const text = POLYGON_NAMES[polygon.id] ?? hazards.find(hazard => hazard.polygon === polygon)?.label ?? polygon.id;
+    const x = px(anchor.x), y = py(anchor.z), width = ctx.measureText(text).width + 14;
+    ctx.fillStyle = LABEL_BG; ctx.fillRect(x - width / 2, y - 11, width, 22);
+    ctx.fillStyle = '#2b2a24'; ctx.fillText(text, x, y);
+  }
 
   return {
     canvas, minX, minZ, path, label: site.label,
@@ -143,10 +162,16 @@ export default function SompoGeofenceMap({ scenarioId, outcomeId, elapsedMs, pos
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#1f3d2b'; ctx.stroke();
       ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.sin(rad) * r * 2.4, y - Math.cos(rad) * r * 2.4); ctx.lineWidth = 3; ctx.strokeStyle = '#1f3d2b'; ctx.stroke();
     }
-    // Norte e escala.
-    ctx.font = 'bold 14px system-ui, sans-serif'; ctx.fillStyle = '#1f3d2b'; ctx.fillText('N ↑', 8, 20);
-    const bar = 20 * SCALE;
-    ctx.fillRect(8, canvas.height - 14, bar, 3); ctx.font = '12px system-ui, sans-serif'; ctx.fillText('20 m', 8, canvas.height - 18);
+    // Rosa dos ventos (N com seta) e barra de escala de 50 m, sobre fundo claro para ler em cima de qualquer faixa.
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = LABEL_BG; ctx.fillRect(8, 8, 30, 48);
+    ctx.fillStyle = '#1f3d2b'; ctx.font = 'bold 18px system-ui, sans-serif'; ctx.fillText('N', 23, 19);
+    ctx.beginPath(); ctx.moveTo(23, 52); ctx.lineTo(23, 32); ctx.lineWidth = 2; ctx.strokeStyle = '#1f3d2b'; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(23, 27); ctx.lineTo(18, 37); ctx.lineTo(28, 37); ctx.closePath(); ctx.fill();
+    const bar = 50 * SCALE, bx = 8, by = canvas.height - 12;
+    ctx.fillStyle = LABEL_BG; ctx.fillRect(bx - 4, by - 28, bar + 8, 36);
+    ctx.fillStyle = '#1f3d2b'; ctx.fillRect(bx, by - 4, bar, 4); ctx.fillRect(bx, by - 10, 2, 10); ctx.fillRect(bx + bar - 2, by - 10, 2, 10);
+    ctx.font = 'bold 16px system-ui, sans-serif'; ctx.fillText('50 m', bx + bar / 2, by - 18);
   }, [map, elapsedMs, position]);
 
   if (!map) return null;
@@ -163,7 +188,8 @@ export default function SompoGeofenceMap({ scenarioId, outcomeId, elapsedMs, pos
       <ul className="sompo-geofence-map-legend" aria-label="Legenda">
         <li><i style={{ background: '#d9d2b4', borderColor: '#4f7d5c' }} />Área permitida</li>
         <li><i style={{ background: '#79b9c0', borderColor: '#398a96' }} />Água</li>
-        <li><i style={{ background: BAND_RAMP[0] }} />Dentro / crítica</li>
+        <li><i style={{ background: `conic-gradient(${BAND_RAMP[0]} 25%, ${BAND_RAMP[0]}40 0 50%, ${BAND_RAMP[0]} 0 75%, ${BAND_RAMP[0]}40 0) 0 0 / 6px 6px` }} />Dentro do perigo (hachura)</li>
+        <li><i style={{ background: BAND_RAMP[0] }} />Proximidade crítica (água)</li>
         <li><i style={{ background: BAND_RAMP[1] }} />Borda / elevada</li>
         <li><i style={{ background: BAND_RAMP[2] }} />Atenção</li>
         <li><i style={{ background: '#6b7a6f' }} />Percurso do cenário</li>
