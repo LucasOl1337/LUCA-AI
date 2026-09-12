@@ -74,7 +74,7 @@ export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE
         // One packed texture: R = ambient occlusion, G = roughness, B = metalness.
         material.aoMap = material.roughnessMap = maps[2];
         material.aoMapIntensity = 0.8;
-        material.normalScale.setScalar(surface === 'asphalt' ? 0.65 : 0.75);
+        material.normalScale.setScalar(surface === 'asphalt' ? 0.65 : 1.0);
         material.needsUpdate = true;
       }).catch(() => { /* Retain procedural fallback maps until all PBR channels are ready. */ });
     },

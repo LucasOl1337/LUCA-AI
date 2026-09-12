@@ -38,7 +38,7 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
       }`,
   });
   composer.addPass(sanitize);
-  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.26, 0.35, 1.25);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.22, 0.32, 1.25);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
   const grade = new ShaderPass({

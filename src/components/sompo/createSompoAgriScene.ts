@@ -17,8 +17,12 @@ export type SompoAgriEnvironmentId = keyof typeof SOMPO_AGRI_ENVIRONMENTS;
 function terrainHeight(x: number, z: number, slope: number) {
   const base = (z * slope) + (Math.sin(x * 0.075) * 0.18) + (Math.cos(z * 0.11) * 0.1);
   // Anel de morros: o talhão termina num relevo de borda, não num corte reto.
+  // A crista varia por azimute (cristas altas e trechos baixos) pra ler como
+  // serra de verdade no horizonte em vez de um anel uniforme.
   const rim = Math.max(Math.abs(x) / 150, Math.abs(z) / 110);
-  const rise = Math.max(0, rim - 0.55) ** 2 * 30;
+  const crest = Math.sin(x * 0.013 + 2.1) * Math.cos(z * 0.017 - 0.8);
+  const crest2 = Math.sin(x * 0.029 - 0.7) * Math.sin(z * 0.023 + 1.9);
+  const rise = Math.max(0, rim - 0.5) ** 2 * 68 * (0.68 + crest * 0.22 + crest2 * 0.1);
   const roll = Math.sin(x * 0.031 + 1.7) * Math.cos(z * 0.043 + 0.6);
   return base + rise * (0.72 + roll * 0.28);
 }

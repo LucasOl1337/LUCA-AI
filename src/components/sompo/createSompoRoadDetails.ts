@@ -19,7 +19,8 @@ export function varySompoSurface(material: THREE.MeshStandardMaterial, amount = 
         return mix(mix(ruralHash(a),ruralHash(a+vec2(1,0)),f.x),mix(ruralHash(a+vec2(0,1)),ruralHash(a+vec2(1,1)),f.x),f.y); }
     ` + shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       float macro = ruralNoise(ruralWorld.xz * 0.16) * 0.65 + ruralNoise(ruralWorld.xz * 0.041 + 7.0) * 0.35;
-      diffuseColor.rgb *= 1.0 + (macro - 0.5) * ${(amount * 2).toFixed(3)};`);
+      float micro = ruralNoise(ruralWorld.xz * 1.9 + 3.1) * 0.7 + ruralNoise(ruralWorld.xz * 6.3 + 11.7) * 0.3;
+      diffuseColor.rgb *= (1.0 + (macro - 0.5) * ${(amount * 2).toFixed(3)}) * (1.0 + (micro - 0.5) * ${(amount * 0.9).toFixed(3)});`);
   };
   material.customProgramCacheKey = () => `sompo-macro-${amount}`;
 }
@@ -38,22 +39,27 @@ export function wornRoadPaint() {
   return map;
 }
 
-/** Tufo de capim com lâminas 3D curvas de verdade (sem cards com alpha). */
-function grassTuftGeometry(blades: number, seed: number) {
+/** Tufo de capim baixo: lâminas finas e curtas, algumas deitadas tipo palha
+ * seca, base espalhada — lê como gramado e não como agave. `tall` gera a
+ * touceira mais alta do pasto. */
+function grassTuftGeometry(blades: number, seed: number, tall = false) {
   const parts: THREE.BufferGeometry[] = [];
   for (let i = 0; i < blades; i += 1) {
-    const blade = new THREE.PlaneGeometry(0.034, 0.65, 1, 3);
-    blade.translate(0, 0.325, 0);
+    const dry = i % 4 === 3;
+    const height = (dry ? 0.15 + rand(seed + i * 5 + 2) * 0.1 : 0.26 + rand(seed + i * 7 + 5) * 0.16) * (tall ? 1.7 : 1);
+    const blade = new THREE.PlaneGeometry(0.015 + rand(seed + i * 3) * 0.008, height, 1, 2);
+    blade.translate(0, height / 2, 0);
     const positions = blade.attributes.position as THREE.BufferAttribute;
-    const bend = 0.28 + rand(seed + i * 7 + 3) * 0.55;
-    const height = 0.65 + rand(seed + i * 7 + 5) * 0.6;
+    const bend = dry ? 0.6 + rand(seed + i * 7 + 3) * 0.55 : 0.12 + rand(seed + i * 7 + 3) * 0.3;
     for (let v = 0; v < positions.count; v += 1) {
-      const t = positions.getY(v);
-      positions.setX(v, positions.getX(v) * (1 - (t ** 1.4) * 0.85));
-      positions.setZ(v, positions.getZ(v) + (t * t * bend));
-      positions.setY(v, t * height);
+      const t = positions.getY(v) / height;
+      positions.setX(v, positions.getX(v) * (1 - t * 0.78));
+      positions.setZ(v, positions.getZ(v) + t * t * bend * height * (dry ? 3 : 1.8));
     }
     blade.rotateY((i / blades) * Math.PI * 2 + rand(seed + i) * 0.9);
+    const spread = rand(seed + i * 13) * (tall ? 0.16 : 0.075);
+    const angle = rand(seed + i * 11) * Math.PI * 2;
+    blade.translate(Math.cos(angle) * spread, 0, Math.sin(angle) * spread);
     parts.push(blade);
   }
   const geometry = mergeGeometries(parts);
@@ -61,35 +67,39 @@ function grassTuftGeometry(blades: number, seed: number) {
   const positions = geometry.attributes.position as THREE.BufferAttribute;
   const colors = new Float32Array(positions.count * 3);
   for (let v = 0; v < positions.count; v += 1) {
-    const shade = 0.5 + Math.min(1, positions.getY(v) / 0.9) * 0.55;
-    colors[v * 3] = shade; colors[v * 3 + 1] = shade; colors[v * 3 + 2] = shade * 0.92;
+    const shade = 0.42 + Math.min(1, positions.getY(v) / 0.35) * 0.62;
+    colors[v * 3] = shade; colors[v * 3 + 1] = shade; colors[v * 3 + 2] = shade * 0.9;
   }
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
   return geometry;
 }
 
-/** Pé de lavoura: colmo + 7 folhas arqueadas, malha real — denso o bastante pra ler como fileira. */
+/** Pé de lavoura: colmo + 9 folhas largas arqueadas que fecham a copa entre
+ * plantas da fileira — a lavoura lê como massa contínua, não como talos
+ * espaçados. Dois grupos de material: [colmo simples, folhas com textura alfa]. */
 function cropPlantGeometry() {
-  const parts: THREE.BufferGeometry[] = [];
   const stalk = new THREE.CylinderGeometry(0.02, 0.036, 1.1, 5);
   stalk.translate(0, 0.55, 0);
-  parts.push(stalk);
-  for (let leaf = 0; leaf < 7; leaf += 1) {
-    const bladePart = new THREE.PlaneGeometry(0.22, 0.58, 1, 3);
-    bladePart.translate(0, 0.29, 0);
+  const leafParts: THREE.BufferGeometry[] = [];
+  for (let leaf = 0; leaf < 9; leaf += 1) {
+    const wide = leaf % 3 !== 2;
+    const bladePart = new THREE.PlaneGeometry(wide ? 0.34 : 0.2, 0.72, 1, 3);
+    bladePart.translate(0, 0.36, 0);
     const positions = bladePart.attributes.position as THREE.BufferAttribute;
     for (let v = 0; v < positions.count; v += 1) {
-      const t = positions.getY(v) / 0.58;
-      positions.setX(v, positions.getX(v) * (1 - t * 0.62));
-      positions.setZ(v, positions.getZ(v) + (t * t * 0.72));
-      positions.setY(v, positions.getY(v) * (1 - t * 0.3) + 0.2 + leaf * 0.125);
+      const t = positions.getY(v) / 0.72;
+      positions.setX(v, positions.getX(v) * (1 - t * 0.55));
+      positions.setZ(v, positions.getZ(v) + (t * t * 0.8));
+      positions.setY(v, positions.getY(v) * (1 - t * 0.34) + 0.14 + leaf * 0.105);
     }
-    bladePart.rotateY((leaf / 7) * Math.PI * 2 + 0.7 + leaf * 0.31);
-    parts.push(bladePart);
+    bladePart.rotateY((leaf / 9) * Math.PI * 2 + 0.7 + leaf * 0.31);
+    leafParts.push(bladePart);
   }
-  const geometry = mergeGeometries(parts);
-  parts.forEach((part) => part.dispose());
+  const leaves = mergeGeometries(leafParts);
+  leafParts.forEach((part) => part.dispose());
+  const geometry = mergeGeometries([stalk, leaves], true);
+  stalk.dispose(); leaves.dispose();
   geometry.computeVertexNormals();
   return geometry;
 }
@@ -104,7 +114,7 @@ function lumpyGeometry(base: THREE.BufferGeometry, roughness: number, seed: numb
   return base;
 }
 
-interface InstanceSlot { x: number; z: number; y?: number; rotation: number; scale: THREE.Vector3 }
+interface InstanceSlot { x: number; z: number; y?: number; rotation: number; tilt?: number; scale: THREE.Vector3 }
 
 /** Conjunto instanciado com reciclagem por instância na trilha infinita. */
 function makeTrail(mesh: THREE.InstancedMesh, slots: InstanceSlot[], span: number, onGround: boolean, sink = 0) {
@@ -123,7 +133,7 @@ function makeTrail(mesh: THREE.InstancedMesh, slots: InstanceSlot[], span: numbe
         changed = true;
         const y = slot.y ?? (onGround ? sompoTerrainHeight(x, slot.z) - sink : -sink);
         transform.position.set(x, y, slot.z);
-        transform.rotation.set(0, slot.rotation, 0);
+        transform.rotation.set(slot.tilt ?? 0, slot.rotation, (slot.tilt ?? 0) * 0.6);
         transform.scale.copy(slot.scale);
         transform.updateMatrix();
         mesh.setMatrixAt(index, transform.matrix);
@@ -176,36 +186,55 @@ export function createSompoRoadDetails(parent: THREE.Group) {
     material.customProgramCacheKey = () => `sompo-wind-${strength}`;
   };
 
-  // Tufos 3D à beira da pista (faixa plana) e touceiras maiores no pasto.
-  const tuftGeometry = grassTuftGeometry(7, 11);
-  const grassMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide, color: 0xa8bf7e });
+  // Gramado de beira de pista: tufos baixos e densos sobre faixa já coberta
+  // pelo pasto — lê como capim contínuo, não como espinhos em terra pelada.
+  const tuftGeometry = grassTuftGeometry(10, 11);
+  const grassMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide, color: 0xffffff });
   windify(grassMaterial, 0.055);
-  const grass = new THREE.InstancedMesh(tuftGeometry, grassMaterial, 1250);
+  const grass = new THREE.InstancedMesh(tuftGeometry, grassMaterial, 2600);
   grass.name = 'near-road-grass-tufts'; grass.receiveShadow = true; root.add(grass);
   const grassSlots: InstanceSlot[] = [];
-  for (let i = 0; i < 1250; i += 1) {
-    const roadside = i % 2 === 0;
-    const z = roadside ? 3.45 + rand(i + 20) * 3.4 : -7.5 - rand(i + 20) * 2.6;
-    const size = 0.6 + rand(i + 31) * 0.95;
-    // Capim mais alto colado na cerca, como na beira de estrada real.
-    const nearFence = roadside && z > 5.4 ? 1.45 : 1;
-    grassSlots.push({ x: rand(i + 12) * 160 - 80, z, y: -0.03, rotation: rand(i + 42) * Math.PI, scale: new THREE.Vector3(size, size * (0.85 + rand(i + 44) * 0.55) * nearFence, size) });
-    grass.setColorAt(i, new THREE.Color().setHSL(0.19 + rand(i) * 0.07, 0.28 + rand(i + 8) * 0.14, 0.4 + rand(i + 9) * 0.18));
+  for (let i = 0; i < 2600; i += 1) {
+    const band = rand(i + 55);
+    // Maioria na margem norte; sul entre acostamento e cerca; alguns no
+    // acostamento de terra colado no asfalto, onde o capim invade de verdade.
+    const z = band < 0.6 ? 3.35 + rand(i + 20) * 3.6
+      : band < 0.88 ? -7.4 - rand(i + 20) * 2.9
+      : band < 0.95 ? 2.35 + rand(i + 20) * 1.05
+      : -6.4 - rand(i + 20) * 0.95;
+    const onShoulder = band >= 0.88;
+    const size = 0.55 + rand(i + 31) * 0.7;
+    // Capim mais alto colado na cerca; manchas achatadas leem como palha/capim
+    // rasteiro cobrindo o solo entre os tufos.
+    const nearFence = !onShoulder && band < 0.6 && z > 5.4 ? 1.35 : 1;
+    const matted = !onShoulder && rand(i + 91) < 0.14;
+    grassSlots.push({
+      x: rand(i + 12) * 160 - 80, z, y: -0.03, rotation: rand(i + 42) * Math.PI,
+      scale: matted
+        ? new THREE.Vector3(size * 1.9, size * 0.28, size * 1.9)
+        : new THREE.Vector3(size, size * (0.62 + rand(i + 44) * 0.42) * (onShoulder ? 0.55 : nearFence), size),
+    });
+    const pick = rand(i + 77);
+    grass.setColorAt(i, matted || pick < 0.2
+      ? new THREE.Color().setHSL(0.115 + rand(i) * 0.02, 0.3 + rand(i + 8) * 0.14, 0.3 + rand(i + 9) * 0.1)
+      : new THREE.Color().setHSL(0.185 + rand(i) * 0.06, 0.24 + rand(i + 8) * 0.12, 0.28 + rand(i + 9) * 0.13));
   }
   const grassTrail = makeTrail(grass, grassSlots, 160, false, 0.03);
 
   const clumpMaterial = grassMaterial.clone();
   windify(clumpMaterial, 0.075);
-  const clumps = new THREE.InstancedMesh(grassTuftGeometry(9, 57), clumpMaterial, 300);
+  const clumps = new THREE.InstancedMesh(grassTuftGeometry(11, 57, true), clumpMaterial, 300);
   clumps.name = 'pasture-grass-clumps'; clumps.receiveShadow = true; root.add(clumps);
   const clumpSlots: InstanceSlot[] = [];
   for (let i = 0; i < 300; i += 1) {
     const x = rand(i + 301) * 220 - 110;
     const z = 8.5 + rand(i + 302) * 31;
     const density = sompoVegetationDensity(x, z);
-    const size = (0.9 + rand(i + 303) * 1.4) * (0.55 + density * 0.8);
-    clumpSlots.push({ x, z, rotation: rand(i + 304) * Math.PI, scale: new THREE.Vector3(size, size * 1.15, size) });
-    clumps.setColorAt(i, new THREE.Color().setHSL(0.2 + rand(i + 305) * 0.06, 0.3, 0.36 + rand(i + 306) * 0.16));
+    const size = (0.8 + rand(i + 303) * 1.2) * (0.55 + density * 0.8);
+    clumpSlots.push({ x, z, rotation: rand(i + 304) * Math.PI, scale: new THREE.Vector3(size, size * 1.05, size) });
+    clumps.setColorAt(i, rand(i + 350) < 0.22
+      ? new THREE.Color().setHSL(0.115 + rand(i + 305) * 0.02, 0.3 + rand(i + 308) * 0.12, 0.3 + rand(i + 306) * 0.1)
+      : new THREE.Color().setHSL(0.19 + rand(i + 305) * 0.055, 0.22 + rand(i + 308) * 0.1, 0.27 + rand(i + 306) * 0.13));
   }
   const clumpTrail = makeTrail(clumps, clumpSlots, 220, true, 0.05);
 
@@ -231,26 +260,40 @@ export function createSompoRoadDetails(parent: THREE.Group) {
   }
   const bushTrail = makeTrail(bushes, bushSlots, 230, true, 0.04);
 
-  // Lavoura em fileiras subindo a encosta, acompanhando o relevo.
-  const cropMaterial = new THREE.MeshStandardMaterial({ color: 0x588a33, roughness: 0.95, side: THREE.DoubleSide });
-  windify(cropMaterial, 0.04);
-  const cropRows = 24;
-  const cropCols = 170;
-  const crops = new THREE.InstancedMesh(cropPlantGeometry(), cropMaterial, cropRows * cropCols);
+  // Lavoura em fileiras logo atrás da cerca, subindo a encosta. Verde
+  // profundo com variação por fase: altura, prumo e matiz mudam de pé pra pé,
+  // e uma fração amarelada quebra a uniformidade como numa lavoura real.
+  const cropLeafMaterial = new THREE.MeshStandardMaterial({ color: 0xf2f5e2, roughness: 0.85, side: THREE.DoubleSide, emissive: 0x1c2a10, emissiveIntensity: 0.55 });
+  const cropStalkMaterial = new THREE.MeshStandardMaterial({ color: 0x3d5c22, roughness: 0.95 });
+  windify(cropLeafMaterial, 0.04); windify(cropStalkMaterial, 0.04);
+  // Folha real com alfa: gira o UV pra folha da textura correr na vertical do
+  // card (no PNG ela vai na diagonal); tinte da instância claro pra não destruir a nervura.
+  new THREE.TextureLoader().load('/sompo/gen/folha-milho.webp', (map) => {
+    map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8;
+    map.center.set(0.5, 0.5); map.rotation = -0.3; map.repeat.set(0.95, 0.95);
+    cropLeafMaterial.map = map; cropLeafMaterial.alphaTest = 0.42; cropLeafMaterial.needsUpdate = true;
+  });
+  const cropRows = 26;
+  const cropCols = 190;
+  const crops = new THREE.InstancedMesh(cropPlantGeometry(), [cropStalkMaterial, cropLeafMaterial], cropRows * cropCols);
   crops.name = 'row-crop-field'; crops.receiveShadow = true; root.add(crops);
   const cropSlots: InstanceSlot[] = [];
   for (let row = 0; row < cropRows; row += 1) {
     for (let column = 0; column < cropCols; column += 1) {
       const i = row * cropCols + column;
-      const z = -14.6 - row * 1.5 + (rand(i + 401) - 0.5) * 0.3;
-      const size = 1.15 + rand(i + 403) * 0.65;
+      const z = -11.9 - row * 1.42 + (rand(i + 401) - 0.5) * 0.34;
+      const size = 1.15 + rand(i + 403) * 0.85;
       cropSlots.push({
-        x: column * 1.35 - 114.75 + (rand(i + 402) - 0.5) * 0.6,
+        x: column * 1.22 - 115.9 + (rand(i + 402) - 0.5) * 0.62,
         z,
         rotation: rand(i + 404) * Math.PI * 2,
-        scale: new THREE.Vector3(size, size, size),
+        tilt: (rand(i + 407) - 0.5) * 0.14,
+        scale: new THREE.Vector3(size, size * (0.82 + rand(i + 408) * 0.4), size),
       });
-      crops.setColorAt(i, new THREE.Color().setHSL(0.255 + rand(i + 405) * 0.04, 0.48, 0.25 + rand(i + 406) * 0.09));
+      const dry = rand(i + 409) < 0.09;
+      crops.setColorAt(i, dry
+        ? new THREE.Color().setHSL(0.15 + rand(i + 405) * 0.03, 0.4, 0.52 + rand(i + 406) * 0.12)
+        : new THREE.Color().setHSL(0.25 + rand(i + 405) * 0.05, 0.48 + rand(i + 411) * 0.16, 0.52 + rand(i + 406) * 0.2));
     }
   }
   const cropTrail = makeTrail(crops, cropSlots, 240, true, 0.04);
@@ -296,10 +339,11 @@ export function createSompoRoadDetails(parent: THREE.Group) {
     update(elapsed: number, wet: boolean, reducedMotion: boolean, truckX: number, windStrength = 0.65) {
       wind.value = windStrength;
       time.value = reducedMotion ? 0 : elapsed / 1000;
-      grassMaterial.color.set(wet ? 0x7f9470 : 0x9cb872);
-      clumpMaterial.color.set(wet ? 0x71836a : 0x9cb476);
+      grassMaterial.color.set(wet ? 0x9aa383 : 0xffffff);
+      clumpMaterial.color.set(wet ? 0x93a07f : 0xf5f2e2);
       bushMaterial.color.set(wet ? 0x43543a : 0x51683a);
-      cropMaterial.color.set(wet ? 0x476838 : 0x588a33);
+      cropLeafMaterial.color.set(wet ? 0xa8b090 : 0xf2f5e2);
+      cropStalkMaterial.color.set(wet ? 0x2f4719 : 0x3d5c22);
       (patches.material as THREE.MeshBasicMaterial).opacity = wet ? 0.4 : 0.28;
       for (const [index, slot] of patchSlots.entries()) {
         transform.position.set(wrapSompoX(slot.x, truckX, 200), 0.009, slot.z);

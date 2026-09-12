@@ -106,7 +106,7 @@ export function createSompoVegetation(parent: THREE.Group, camera: THREE.Camera,
         for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
           if (material instanceof THREE.MeshStandardMaterial) {
             material.metalness = 0; material.roughness = 0.95; material.envMapIntensity = 0.42;
-            material.color.setHex(0x7c9458); // atlas gerado é claro; multiplica pra verde de verdade
+            material.color.setHex(0x6d8548); // atlas gerado é claro; multiplica pra verde de verdade
           }
         }
       });
@@ -138,7 +138,7 @@ export function createSompoVegetation(parent: THREE.Group, camera: THREE.Camera,
         mesh.visible = !!image?.naturalWidth;
         if (image?.naturalWidth) mesh.scale.x = image.naturalWidth / image.naturalHeight;
         mesh.rotation.y = Math.atan2(localCamera.x - lod.position.x, localCamera.z - lod.position.z) - lod.rotation.y;
-        mesh.material.color.set(wet ? 0x4a5840 : 0x637750);
+        mesh.material.color.set(wet ? 0x414f38 : 0x52653f);
       }
     },
     dispose() {
