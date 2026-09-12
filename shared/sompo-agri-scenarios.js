@@ -355,14 +355,19 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
       outcome('segue-ate-critica', 'Segue até a faixa crítica', 'A máquina vira para o lado do córrego e chega à faixa crítica sem reduzir.', [
         [0, { headerSpeed: 1, cropCut: 0.3, dust: 0.35 }],
         [14_000, { cropCut: 0.7, dust: 0.6, yaw: 0 }],
-        [24_000, { yaw: -70, dust: 0.7 }],
+        [20_000, { yaw: -70, dust: 0.7 }],
+        [23_000, { yaw: -80, speedKph: 7 }],
+        [24_000, { speedKph: 0, brakeLights: 1 }],
       ]),
-      outcome('declive-alem-do-limite', 'Declive além do limite da máquina', 'Dentro do declive mapeado a inclinação passa do limite declarado para a colheitadeira e a máquina para.', [
+      // Mesmo comprimento de percurso dos outros desfechos: o percurso é centrado por desfecho (startX = -travel/2),
+      // então parar cedo deslocaria a origem e a máquina nasceria dentro do declive.
+      outcome('declive-alem-do-limite', 'Declive além do limite da máquina', 'Dentro do declive mapeado a inclinação passa do limite declarado para a colheitadeira; o operador reduz, o conjunto estabiliza e a passada continua.', [
         [0, { headerSpeed: 1, cropCut: 0.3, dust: 0.35 }],
-        [2_000, { roll: 2 }],
-        [6_000, { roll: 19, inclinationRisk: true, beacon: 1 }],
-        [7_500, { speedKph: 0, headerSpeed: 0, brakeLights: 1, dust: 0.1 }],
-        [24_000, { speedKph: 0, roll: 18, dust: 0 }],
+        [5_000, { roll: 2 }],
+        [9_000, { roll: 19, inclinationRisk: true, beacon: 1, speedKph: 4, brakeLights: 1 }],
+        [13_000, { roll: 6, speedKph: 7, inclinationRisk: false, brakeLights: 0 }],
+        [22_000, { roll: 3 }],
+        [24_000, { speedKph: 0, headerSpeed: 0, dust: 0 }],
       ]),
     ],
   }),

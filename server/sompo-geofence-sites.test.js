@@ -73,16 +73,23 @@ test('segue até a faixa crítica: mesma corrida, deriva para o córrego e termi
   assert.match(describeGeofence(last.geofence), /^Proximidade crítica · Córrego sintético a \d+ m à (direita|frente|esquerda)/);
 });
 
-test('declive além do limite: só este desfecho cruza o limite da colheitadeira (15°) e para dentro do declive', () => {
-  const machine = samples('declive-alem-do-limite').map(frame => frame.geofence.machine);
+test('declive além do limite: só este desfecho cruza o limite da colheitadeira (15°), dentro do declive, e segue', () => {
+  const run = samples('declive-alem-do-limite');
+  const machine = run.map(frame => frame.geofence.machine);
   assert.ok(machine.some(hit => hit?.bandId === 'proximo'));
-  assert.ok(machine.some(hit => hit?.bandId === 'acima'));
-  const last = samples('declive-alem-do-limite').at(-1);
-  assert.equal(last.geofence.machine.bandId, 'acima');
-  assert.equal(last.geofence.machine.limitDeg, SOMPO_AGRI_EQUIPMENT.harvester.profile.max_roll_deg);
-  assert.equal(last.geofence.nearest.bandId, 'dentro', 'parou dentro do declive mapeado');
-  assert.match(describeMachineLimit(last.geofence.machine), /^No limite ou acima · inclinação 1[89]° · limite 15°$/);
+  const over = run.filter(frame => frame.geofence.machine?.bandId === 'acima');
+  assert.ok(over.length > 0, 'cruza o limite');
+  for (const frame of over) assert.equal(frame.geofence.nearest.bandId, 'dentro', 'o cruzamento acontece dentro do declive mapeado');
+  assert.equal(over[0].geofence.machine.limitDeg, SOMPO_AGRI_EQUIPMENT.harvester.profile.max_roll_deg);
+  assert.match(describeMachineLimit(over[0].geofence.machine), /^No limite ou acima · inclinação 1[5-9]° · limite 15°$/);
+  const last = run.at(-1);
+  assert.equal(last.geofence.machine, null, 'depois de estabilizar, a inclinação sai das faixas de máquina');
+  assert.equal(last.geofence.nearest.hazardLabel, 'Córrego sintético', 'a passada continua até a água, como nos outros desfechos');
   for (const outcome of ['parada-na-faixa', 'segue-ate-critica']) assert.ok(samples(outcome).every(frame => frame.geofence.machine === null), `${outcome} nunca entra em faixa de máquina`);
+  // Percursos com o mesmo comprimento: a origem por desfecho não desloca a fazenda em relação ao início.
+  const starts = ['parada-na-faixa', 'segue-ate-critica', 'declive-alem-do-limite'].map(outcome => snapshotAt(outcome, 0).position.x);
+  assert.ok(Math.max(...starts) - Math.min(...starts) < 3, `inícios: ${starts.map(x => x.toFixed(1)).join(', ')}`);
+  for (const outcome of ['parada-na-faixa', 'segue-ate-critica', 'declive-alem-do-limite']) assert.equal(snapshotAt(outcome, 0).geofence.nearest, null, `${outcome} começa sem perigo no alcance`);
 });
 
 test('radar: lado e tempo de aproximação na fazenda sintética', () => {
