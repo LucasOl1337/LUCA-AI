@@ -149,6 +149,24 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
     const lamp = new THREE.Mesh(new THREE.BoxGeometry(.05, .09, .16), lampMaterial);
     lamp.position.set(equipmentId === 'tractor' ? -.86 : -2.7, 1.35, side * .73); body.add(lamp);
   }
+  // Fontes visíveis das luzes: sem o emissivo o feixe aparece no chão mas a
+  // lâmpada fica apagada — à noite é isso que lê "farol aceso" com o bloom.
+  const headlampMaterial = new THREE.MeshStandardMaterial({ color: 0x3a3a34, emissive: 0xfff0cd, emissiveIntensity: 0, roughness: .3 });
+  const worklampMaterial = new THREE.MeshStandardMaterial({ color: 0x33383c, emissive: 0xe4efff, emissiveIntensity: 0, roughness: .3 });
+  const beaconDomeMaterial = new THREE.MeshStandardMaterial({ color: 0x53300a, emissive: 0xff9a1f, emissiveIntensity: 0, roughness: .35 });
+  const headY = equipmentId === 'tractor' ? 2.28 : 2.95, headX = equipmentId === 'tractor' ? 1.15 : 2.15, headZ = equipmentId === 'tractor' ? .55 : .72;
+  for (const side of [-1, 1]) {
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(.07, .13, .2), headlampMaterial);
+    lamp.position.set(headX, headY, side * headZ); body.add(lamp);
+  }
+  // Projetores de serviço: na traseira do teto do trator (miram o implemento),
+  // na testa do teto da colheitadeira (miram a plataforma).
+  for (const side of [-1, 1]) {
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(.06, .11, .17), worklampMaterial);
+    lamp.position.set(equipmentId === 'tractor' ? -0.55 : 1.9, equipmentId === 'tractor' ? 2.42 : 3.5, side * (equipmentId === 'tractor' ? .45 : .5)); body.add(lamp);
+  }
+  const beaconDome = new THREE.Mesh(new THREE.CylinderGeometry(.075, .095, .16, 12), beaconDomeMaterial);
+  beaconDome.position.set(equipmentId === 'tractor' ? -0.1 : 0.6, equipmentId === 'tractor' ? 2.52 : 3.74, equipmentId === 'tractor' ? .25 : .2); body.add(beaconDome);
   root.traverse(node => {
     const material = (node as THREE.Mesh).material as THREE.Material | undefined;
     if (material && !Array.isArray(material)) wear(material);
@@ -186,7 +204,11 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
         implement.position.y += -.22 + frame.implementLift * .58;
         implement.rotation.set(frame.implementRoll * Math.PI / 180, frame.implementYaw * Math.PI / 180, -frame.implementLift * .24, 'YZX');
       } else {
-        implement.rotation.z = frame.implementLift * .3 + (1 - frame.headerSpeed) * .065;
+        // Plataforma: levanta no giro de cabeceira e desce para cortar. O giro
+        // no ponto de engate e a subida vertical juntos leem como o cilindro
+        // real trabalhando — sozinho, cada um mal sai do lugar.
+        implement.rotation.z = frame.implementLift * .42 + (1 - frame.headerSpeed) * .05;
+        implement.position.y += frame.implementLift * .55;
         rotor.rotation.z = reduced ? 0 : -headerTurns * Math.PI * 2;
       }
       implement.updateMatrix();
@@ -199,7 +221,12 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
         piston.barrel.position.copy(piston.base).addScaledVector(direction, barrelLength / 2);
         piston.rod.position.copy(piston.base).addScaledVector(direction, (barrelLength + length) / 2);
       }
-      lampMaterial.emissiveIntensity = frame.brakeLights * 3;
+      // Freio vence o marcador noturno; com farol aceso a lanterna fica acesa fraca.
+      lampMaterial.emissiveIntensity = Math.max(frame.brakeLights * 3, frame.headlights > .3 ? .55 : 0);
+      headlampMaterial.emissiveIntensity = frame.headlights * 4.2;
+      worklampMaterial.emissiveIntensity = frame.workLights * 4.2;
+      const beaconPulse = Math.pow(Math.max(0, Math.sin(frame.atMs / 1000 * 7)), 2);
+      beaconDomeMaterial.emissiveIntensity = frame.beacon * (1.1 + beaconPulse * 5);
     },
   };
 }

@@ -160,29 +160,63 @@ function dustMap() {
   return new THREE.CanvasTexture(canvas);
 }
 
-function createDust() {
-  const count = 160;
+/** Pontos com alfa por partícula — base da poeira, da lama e da fumaça. */
+function createParticleCloud(count: number, size: number, color: number, twoTone = false) {
   const geometry = new THREE.BufferGeometry();
-  const positions = new Float32Array(count * 3);
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
   const alpha = new THREE.BufferAttribute(new Float32Array(count), 1);
-  for (let index = 0; index < count; index += 1) {
-    const angle = index * 2.399963;
-    const radius = 0.35 + ((index % 23) / 23) * 4.6;
-    positions[index * 3] = -1 - radius;
-    positions[(index * 3) + 1] = 0.2 + ((index * 19) % 31) / 19;
-    positions[(index * 3) + 2] = Math.sin(angle) * radius * 0.55;
-  }
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute('particleAlpha', alpha);
-  const material = new THREE.PointsMaterial({ color: 0xc6ad80, size: 0.75, map: dustMap(), transparent: true, opacity: 0, depthWrite: false });
+  if (twoTone) {
+    const colors = new Float32Array(count * 3);
+    const dark = new THREE.Color(color).multiplyScalar(.72), light = new THREE.Color(color).multiplyScalar(1.24);
+    for (let i = 0; i < count; i += 1) {
+      const tone = dark.clone().lerp(light, (i % 6) / 5);
+      colors.set([tone.r, tone.g, tone.b], i * 3);
+    }
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  }
+  const material = new THREE.PointsMaterial({ color: twoTone ? 0xffffff : color, size, map: dustMap(), transparent: true, opacity: 0, depthWrite: false, vertexColors: twoTone });
   material.onBeforeCompile = shader => {
     shader.vertexShader = 'attribute float particleAlpha; varying float dustAlpha;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\ndustAlpha=particleAlpha;');
     shader.fragmentShader = 'varying float dustAlpha;\n' + shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.a *= dustAlpha;');
   };
-  const dust = new THREE.Points(geometry, material);
-  dust.frustumCulled = false;
+  const points = new THREE.Points(geometry, material);
+  points.frustumCulled = false;
+  return points;
+}
+
+function createDust() {
+  const dust = createParticleCloud(260, 2.0, 0xcbb287, true);
   dust.name = 'sompo-agri-dust';
   return dust;
+}
+
+/** Torrões de lama ejetados pelas rodas que patinam — balísticos e curtos. */
+function createMudSpray() {
+  const spray = createParticleCloud(130, 0.75, 0x453522);
+  spray.name = 'sompo-agri-mudspray';
+  return spray;
+}
+
+/** Fumaça do escapamento sob carga — escura, sobe rápido e dispersa. */
+function createExhaust() {
+  const exhaust = createParticleCloud(70, 1.0, 0x39332b);
+  exhaust.name = 'sompo-agri-exhaust';
+  return exhaust;
+}
+
+/** Sulcos encharcados deixados pelas rodas no trecho atolado. */
+function createRuts() {
+  const material = new THREE.MeshStandardMaterial({ color: 0x2e241a, roughness: .38, metalness: 0, transparent: true, opacity: 0 });
+  const root = new THREE.Group(); root.name = 'sompo-agri-ruts';
+  for (const side of [-1, 1]) {
+    const rut = new THREE.Mesh(new THREE.PlaneGeometry(15, 0.62, 30, 1), material);
+    rut.geometry.rotateX(-Math.PI / 2);
+    rut.position.z = side * 0.84;
+    rut.receiveShadow = true;
+    root.add(rut);
+  }
+  return { root, material };
 }
 
 export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAgriEnvironmentId, compact = false, equipmentId: 'tractor' | 'harvester' = 'harvester') {
@@ -200,24 +234,56 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
 
   const mud = new THREE.Mesh(
     new THREE.CircleGeometry(8, 40),
-    new THREE.MeshStandardMaterial({ color: 0x807363, roughness: 0.66, metalness: 0 }),
+    new THREE.MeshStandardMaterial({ color: 0x4a3b2c, roughness: 0.5, metalness: 0 }),
   );
   mud.name = 'sompo-agri-mud';
   mud.geometry.rotateX(-Math.PI / 2);
   const mudPositions = mud.geometry.attributes.position;
   for (let i=1;i<mudPositions.count;i++) { const f=1+Math.sin(i*2.3)*.09; mudPositions.setX(i,mudPositions.getX(i)*f);mudPositions.setZ(i,mudPositions.getZ(i)*f*.65); }
+  // Lâmina d'água parada no centro do trecho saturado — o branco baixo é o que
+  // diferencia solo úmido de solo encharcado.
+  const puddle = new THREE.Mesh(
+    new THREE.CircleGeometry(3.4, 32),
+    new THREE.MeshStandardMaterial({ color: 0x1f1913, roughness: 0.18, metalness: 0, envMapIntensity: 0.45, transparent: true, opacity: 0.85 }),
+  );
+  puddle.name = 'sompo-agri-puddle';
+  puddle.geometry.rotateX(-Math.PI / 2);
+  const ruts = createRuts();
+  root.add(ruts.root);
   function placeMud(x: number) {
     mud.position.x=x;
     for(let i=0;i<mudPositions.count;i++) mudPositions.setY(i,terrainHeight(x+mudPositions.getX(i),mudPositions.getZ(i),definition.slope)+.025);
     mudPositions.needsUpdate=true;mud.geometry.computeVertexNormals();
+    puddle.position.set(x - 1.5, 0, 0);
+    const pp = puddle.geometry.attributes.position;
+    for (let i = 0; i < pp.count; i += 1) pp.setY(i, terrainHeight(puddle.position.x + pp.getX(i), pp.getZ(i), definition.slope) + .045);
+    pp.needsUpdate = true; puddle.geometry.computeVertexNormals();
+    // Os sulcos terminam onde o avanço parou e voltam pela trilha de entrada.
+    ruts.root.position.set(x - 7.6, 0, 0);
+    ruts.root.traverse(node => {
+      const mesh = node as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const rp = mesh.geometry.attributes.position;
+      for (let i = 0; i < rp.count; i += 1) rp.setY(i, terrainHeight(ruts.root.position.x + rp.getX(i), mesh.position.z + rp.getZ(i), definition.slope) + .02);
+      rp.needsUpdate = true; mesh.geometry.computeVertexNormals();
+    });
   }
   placeMud(2);
   mud.visible = definition.mud > 0;
+  puddle.visible = definition.mud > 0;
+  ruts.root.visible = definition.mud > 0;
   mud.receiveShadow = true;
-  root.add(mud);
+  root.add(mud, puddle);
 
   const dust = createDust();
-  root.add(dust);
+  const mudSpray = createMudSpray();
+  const exhaust = createExhaust();
+  root.add(dust, mudSpray, exhaust);
+  if (definition.night) {
+    // À noite a poeira só aparece onde a luz bate: vertexColors assado mais escuro.
+    const dc = dust.geometry.attributes.color;
+    for (let i = 0; i < dc.count; i += 1) dc.setXYZ(i, dc.getX(i) * .3, dc.getY(i) * .28, dc.getZ(i) * .24);
+  }
   const ambient = new THREE.HemisphereLight(definition.sky, 0x30291d, definition.night ? 0.32 : 0.7);
   const sun = new THREE.DirectionalLight(definition.night ? 0x91b4dd : 0xfff1cf, definition.night ? 0.6 : 2.1);
   sun.position.set(-24, 34, 18);
@@ -233,11 +299,28 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
     },
     update(frame: SompoAgriVisualFrame, machinePosition = new THREE.Vector3(), cameraPosition = new THREE.Vector3(), reducedMotion = false, wind = 0.65, elapsedMs = frame.atMs) {
       crops?.update(elapsedMs, cameraPosition, reducedMotion, wind, machinePosition, frame.equipmentId === 'harvester' ? frame.cropCut : 0);
-      dust.position.copy(machinePosition);
-      dust.rotation.y = THREE.MathUtils.degToRad(frame.yaw);
+      const yaw = THREE.MathUtils.degToRad(frame.yaw);
+      const seconds = elapsedMs / 1000;
+      const wheelKph = frame.wheelSpeedKph ?? frame.speedKph;
+      // Patinagem real: perímetro da roda corre mais que o chão. É o que ejeta
+      // lama e queima embreagem — e o que faz a fumaça sair preta.
+      const slip = Math.max(0, Math.abs(wheelKph) - Math.abs(frame.speedKph));
+      const eject = Math.min(1, frame.mud * slip / 9);
+      const load = Math.min(1, frame.roughness * .18 + slip * .06 + frame.headerSpeed * .28);
+      for (const cloud of [dust, mudSpray, exhaust]) {
+        cloud.position.copy(machinePosition);
+        cloud.rotation.y = yaw;
+      }
       const material = dust.material as THREE.PointsMaterial;
-      material.opacity = Math.min(0.32, Math.max(0, frame.dust) * 0.28);
+      material.opacity = Math.min(0.6, Math.max(0, frame.dust) * 0.5);
       dust.visible = material.opacity > 0.01;
+      const sprayMaterial = mudSpray.material as THREE.PointsMaterial;
+      sprayMaterial.opacity = eject;
+      mudSpray.visible = eject > 0.02 && !reducedMotion;
+      const exhaustMaterial = exhaust.material as THREE.PointsMaterial;
+      exhaustMaterial.opacity = Math.min(0.6, load * .55);
+      exhaust.visible = load > 0.04 && !reducedMotion;
+      ruts.material.opacity = Math.min(0.85, frame.sink * 1.7 + frame.mud * 0.12);
 
       // Deriva lenta da névoa baixa: cada camada flutua no próprio compasso.
       if (!reducedMotion) for (const layer of groundFog.layers) {
@@ -248,14 +331,64 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
       if (reducedMotion) dust.visible = false;
       if (dust.visible && !reducedMotion) {
         const p = dust.geometry.attributes.position, alpha = dust.geometry.attributes.particleAlpha;
+        // A nuvem nasce na traseira (picador) e na plataforma: a máquina sai da
+        // própria poeira, que fica para trás subindo e alastrando com o vento.
+        const tail = frame.equipmentId === 'harvester' ? 3.7 : 2.1;
+        const groundSpeed = Math.abs(frame.speedKph) / 3.6;
         for (let i = 0; i < p.count; i++) {
-          const life = 1.4 + (i % 7) * .18;
-          const age = ((elapsedMs / 1000) + i * .137) % life;
+          if (i < 30 && frame.equipmentId === 'harvester') {
+            // Pufes do mecanismo de corte: baixos, curtos, engolidos pela nuvem.
+            const life = 1.1 + (i % 4) * .2;
+            const age = (seconds + i * .137) % life;
+            const progress = age / life;
+            p.setXYZ(i, frame.direction * (4.1 - age * (groundSpeed + .8)),
+              .28 + age * .55,
+              Math.sin(i * 2.399963) * (.7 + age * .4) + age * wind * .2);
+            alpha.setX(i, Math.sin(Math.PI * progress) * .35);
+            continue;
+          }
+          const life = 2.4 + (i % 7) * .4;
+          const age = (seconds + i * .137) % life;
           const progress = age / life;
-          p.setXYZ(i, -frame.direction * (.8 + age * (.65 + frame.speedKph / 3.6)),
-            .12 + age * (.18 + (i % 5) * .045),
-            Math.sin(i * 2.399963) * (.5 + age * .5) + age * wind * .25);
-          alpha.setX(i, Math.sin(Math.PI * progress) * (.3 + (i % 3) * .2));
+          p.setXYZ(i,
+            -frame.direction * (tail * (.55 + (i % 5) * .11) + age * (1.6 + groundSpeed * .55)),
+            .22 + age * (1.0 + (i % 6) * .2),
+            Math.sin(i * 2.399963) * (.7 + age * 1.4) + age * wind * .5);
+          alpha.setX(i, Math.pow(Math.sin(Math.PI * progress), .7) * (.45 + (i % 3) * .2));
+        }
+        p.needsUpdate = alpha.needsUpdate = true;
+      }
+
+      if (mudSpray.visible) {
+        const p = mudSpray.geometry.attributes.position, alpha = mudSpray.geometry.attributes.particleAlpha;
+        for (let i = 0; i < p.count; i++) {
+          const life = .5 + (i % 4) * .14;
+          const age = (seconds + i * .083) % life;
+          const progress = age / life;
+          const side = (i % 2) * 2 - 1;
+          const vx = -frame.direction * (2.6 + (i % 5) * 1.1);
+          const vy = 2.4 + (i % 4) * .8;
+          const y = .12 + vy * age - 4.9 * age * age;
+          p.setXYZ(i, -.16 + (i % 3) * .1 + vx * age, Math.max(.015, y), side * (.84 + (i % 7) * .03) + side * (.3 + (i % 3) * .35) * age);
+          alpha.setX(i, y <= .015 ? 0 : (1 - progress) * .95);
+        }
+        p.needsUpdate = alpha.needsUpdate = true;
+      }
+
+      if (exhaust.visible) {
+        const p = exhaust.geometry.attributes.position, alpha = exhaust.geometry.attributes.particleAlpha;
+        const ox = frame.equipmentId === 'harvester' ? -1.2 : 0.02;
+        const oy = frame.equipmentId === 'harvester' ? 3.35 : 3.34;
+        const oz = frame.equipmentId === 'harvester' ? -0.5 : 0.08;
+        for (let i = 0; i < p.count; i++) {
+          const life = .55 + (i % 5) * .22;
+          const age = (seconds + i * .11) % life;
+          const progress = age / life;
+          p.setXYZ(i,
+            ox - frame.direction * age * (Math.abs(frame.speedKph) / 3.6 * .4 + .35) + Math.sin(i * 3.1 + age * 4) * .14,
+            oy + age * (1.05 + (i % 4) * .25),
+            oz + age * wind * .3 + Math.cos(i * 2.7 + age * 3) * .16);
+          alpha.setX(i, Math.sin(Math.PI * progress) * .4);
         }
         p.needsUpdate = alpha.needsUpdate = true;
       }
