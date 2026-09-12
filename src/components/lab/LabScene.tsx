@@ -5,6 +5,8 @@ import { getReplayFrame, toLocalCoordinate, type LabCase, type LabSite, type Lab
 import { createLabTractor } from './createLabTractor';
 import { createSompoTruckModel, SOMPO_TRUCK_PIVOT_Y } from '../sompo/createSompoTruckModel';
 import { parseLabTerrain, createTerrainSampler, type LabTerrain } from '../../../shared/lab-terrain.js';
+import { bandGrid } from '../../../shared/lab-geofence.js';
+import { hazardsOf, bandColor, innermostEpisodeAt, episodeColor, ROUTE_COLOR } from './labBands';
 
 export type LabCameraMode = 'free' | 'top' | 'follow';
 
@@ -93,6 +95,34 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
   const frame = useMemo(() => labCase ? getReplayFrame(labCase, elapsedMs) : null, [labCase, elapsedMs]);
   const geography = labCase || site || null;
   const satellite = useMemo(() => satelliteFor(geography), [geography]);
+
+  // Faixas: a MESMA grade que soma a área atingida pinta a cena (SPEC regra 1). Uma vez por caso.
+  // Só os bytes RGBA moram no memo; a DataTexture nasce e morre com a cena (disposeScene).
+  const bandLayer = useMemo(() => {
+    const hazards = hazardsOf(labCase);
+    if (!labCase || !hazards.length) return null;
+    const grid = labCase.geofence?.grid ?? bandGrid(labCase.polygons, hazards, 2); // Mesma grade que somou a área.
+    if (!grid) return null;
+    const { cols, rows } = grid;
+    const rgba = new Uint8Array(cols * rows * 4);
+    for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
+      const cell = row * cols + col;
+      if (!grid.inside[cell]) continue;
+      let bestHazard = -1, bestBand = -1, bestMax = Infinity;
+      for (let h = 0; h < hazards.length; h++) {
+        const band = grid.bands[h][cell];
+        if (band < 0) continue;
+        const max = hazards[h].bands[band].max_m;
+        if (max < bestMax) { bestMax = max; bestHazard = h; bestBand = band; } // empate fica com o primeiro perigo
+      }
+      if (bestHazard < 0) continue; // dentro da área permitida, fora de faixa: alpha 0
+      const hex = parseInt(bandColor(hazards[bestHazard], bestBand).slice(1), 16);
+      // Linha 0 da DataTexture é v=0 e, com rotation.x=-PI/2, v=0 cai em +Z: grava invertido para a faixa abraçar o polígono.
+      const at = ((rows - 1 - row) * cols + col) * 4;
+      rgba[at] = hex >> 16 & 255; rgba[at + 1] = hex >> 8 & 255; rgba[at + 2] = hex & 255; rgba[at + 3] = 107;
+    }
+    return { grid, rgba };
+  }, [labCase]);
   const terrainReference = geography?.manifest?.terrain;
   const [terrainResult, setTerrainResult] = useState<{ reference: typeof terrainReference; grid?: LabTerrain; error?: string }>();
   const [terrainEnabled, setTerrainEnabled] = useState(true);
@@ -180,7 +210,12 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
     scene.add(sunlight, sunlight.target);
 
     const bounds = new THREE.Box3();
-    for (const polygon of geography?.polygons || []) for (const ring of polygon.rings) for (const point of ring) bounds.expandByPoint(new THREE.Vector3(point.x, 0, point.z));
+    // Com área permitida no mapa, o enquadramento é o talhão: o rio do OSM tem 1,3 km e esconderia as faixas na vista superior.
+    const hasAllowed = geography?.polygons.some(polygon => polygon.role === 'allowed_area');
+    for (const polygon of geography?.polygons || []) {
+      if (hasAllowed && (polygon.role === 'water' || polygon.role === 'hazard')) continue;
+      for (const ring of polygon.rings) for (const point of ring) bounds.expandByPoint(new THREE.Vector3(point.x, 0, point.z));
+    }
     if (satellite && geography) {
       for (const [lon, lat] of [[satellite.bbox[0], satellite.bbox[1]], [satellite.bbox[2], satellite.bbox[3]]]) {
         const point = toLocalCoordinate(lon, lat, geography.origin);
@@ -267,13 +302,43 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
       }, undefined, () => { if (!disposed) setSatelliteState('error'); });
     }
 
+    if (bandLayer) {
+      const { grid, rgba } = bandLayer;
+      const texture = new THREE.DataTexture(rgba, grid.cols, grid.rows, THREE.RGBAFormat);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.magFilter = THREE.LinearFilter;
+      texture.needsUpdate = true;
+      const width = grid.cols * grid.cellM, depth = grid.rows * grid.cellM;
+      const centerX = grid.minX + width / 2, centerZ = grid.minZ + depth / 2;
+      const geometry = new THREE.PlaneGeometry(width, depth, terrain?.width || 1, terrain?.height || 1);
+      if (terrain) {
+        const vertices = geometry.getAttribute('position');
+        for (let row = 0; row <= terrain.height; row++) for (let col = 0; col <= terrain.width; col++) {
+          vertices.setZ(row * (terrain.width + 1) + col, groundHeight({ x: grid.minX + width * col / terrain.width, z: grid.minZ + depth * row / terrain.height }) ?? 0);
+        }
+      }
+      const bandMesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false }));
+      bandMesh.rotation.x = -Math.PI / 2;
+      bandMesh.position.set(centerX, 0.03, centerZ);
+      bandMesh.renderOrder = 1;
+      scene.add(bandMesh);
+    }
+
     const routePositions: number[] = [];
     const routeCounts: number[] = [];
+    const routeColors: number[] = [];
     if (labCase) {
+      const colorCache = new Map<string, THREE.Color>();
       labCase.samples.forEach((sample, index) => {
         const previous = labCase.samples[index - 1];
         if (previous && previous.x !== null && previous.z !== null && sample.x !== null && sample.z !== null && sample.elapsedMs - previous.elapsedMs <= Math.max(1_000, labCase.sampleIntervalMs * 2)) {
-          routePositions.push(...drapeSegment({ x: previous.x, z: previous.z }, { x: sample.x, z: sample.z }, .12));
+          const segment = drapeSegment({ x: previous.x, z: previous.z }, { x: sample.x, z: sample.z }, .12);
+          routePositions.push(...segment);
+          const episode = innermostEpisodeAt(labCase, sample.elapsedMs);
+          const key = episode?.id ?? 'rota';
+          let color = colorCache.get(key);
+          if (!color) colorCache.set(key, color = new THREE.Color(episode ? episodeColor(labCase, episode) : ROUTE_COLOR));
+          for (let vertex = segment.length / 3; vertex > 0; vertex--) routeColors.push(color.r, color.g, color.b);
         }
         routeCounts.push(routePositions.length / 3);
       });
@@ -282,8 +347,9 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
     routeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(routePositions, 3));
     scene.add(new THREE.LineSegments(routeGeometry, new THREE.LineBasicMaterial({ color: 0x638271, transparent: true, opacity: 0.3 })));
     const playedGeometry = routeGeometry.clone();
+    playedGeometry.setAttribute('color', new THREE.Float32BufferAttribute(routeColors, 3));
     playedGeometry.setDrawRange(0, 0);
-    scene.add(new THREE.LineSegments(playedGeometry, new THREE.LineBasicMaterial({ color: 0x215f47, transparent: true, opacity: 0.88 })));
+    scene.add(new THREE.LineSegments(playedGeometry, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.88 })));
 
     const eventMarkers: THREE.Mesh[] = [];
     for (const event of labCase?.events || []) {
@@ -426,8 +492,9 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
         mount.dataset.position = current.position ? `${current.position.x},${current.position.z}` : 'unavailable';
       }
       const outsideFence = current?.activeEvents.some((event) => event.type === 'outside_fence');
-      const nearWater = current?.activeEvents.some((event) => event.type === 'near_water');
-      const hasAlert = outsideFence || nearWater || current?.activeEvents.some((event) => event.type === 'coolant_warning');
+      const bandAlert = current?.activeEvents.filter((event) => event.type === 'hazard_band') || [];
+      const nearWater = current?.activeEvents.some((event) => event.type === 'near_water') || bandAlert.some((event) => String(event.evidence.hazard ?? '').startsWith('water'));
+      const hasAlert = outsideFence || nearWater || bandAlert.length > 0 || current?.activeEvents.some((event) => event.type === 'coolant_warning');
       (locator.material as THREE.MeshBasicMaterial).color.setHex(hasAlert ? 0xc9823e : 0x2c6952);
       headingArrow.setColor(hasAlert ? 0xc9823e : 0x377158);
       for (const zone of zoneOutlines) {
@@ -508,7 +575,7 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
       renderer.forceContextLoss();
       renderer.domElement.remove();
     };
-  }, [labCase, geography, satellite, terrain, sampleTerrain]);
+  }, [labCase, geography, satellite, terrain, sampleTerrain, bandLayer]);
 
   const handleCameraKey = (event: KeyboardEvent<HTMLDivElement>) => {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;

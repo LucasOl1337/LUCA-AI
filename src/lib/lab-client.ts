@@ -1,7 +1,7 @@
 import { formatLabTime, parseLabSite, type LabCase } from '../../shared/lab-telemetry.js';
 
-export async function loadDefaultLabSite() {
-  const responses = await Promise.all(['manifest.json', 'mapa.geojson'].map(file => fetch(`/datasets/frying-pan-farm/${file}`)));
+async function loadSiteFolder(folder: string) {
+  const responses = await Promise.all(['manifest.json', 'mapa.geojson'].map(file => fetch(`/datasets/${folder}/${file}`)));
   // The public repository omits the county's restricted geographic data.
   if (responses.some(response => response.status === 404 || response.headers.get('content-type')?.includes('text/html'))) return null;
   if (responses.some(response => !response.ok)) throw new Error('Não foi possível carregar a fazenda. Recarregue a página ou escolha os arquivos da sua área.');
@@ -9,15 +9,22 @@ export async function loadDefaultLabSite() {
   return parseLabSite(manifest, map);
 }
 
+export async function loadDefaultLabSite() {
+  return await loadSiteFolder('frying-pan-farm') ?? await loadSiteFolder('piracicaba-artemis');
+}
+
 export const exampleMetadata = {
   manifest: '/datasets/laboratorio-virtual-v1/manifest.json',
   map: '/datasets/laboratorio-virtual-v1/mapa.geojson',
   schema: '/datasets/laboratorio-virtual-v1/schema.json',
 };
-export const LAB_EXAMPLES = [
+export interface LabExample { title: string; description: string; fileName: string; url: string; kind: string; metadata?: { manifest: string; map: string; schema?: string } }
+export const LAB_EXAMPLES: LabExample[] = [
   { title: 'Operação normal', description: 'Um percurso de referência, sem alertas.', fileName: '01-operacao-normal.csv', url: '/datasets/laboratorio-virtual-v1/01-operacao-normal.csv', kind: 'normal' },
   { title: 'Cerca e proximidade da água', description: 'Explore os limites e as duas voltas do percurso.', fileName: '02-cerca-e-agua.csv', url: '/datasets/laboratorio-virtual-v1/02-cerca-e-agua.csv', kind: 'water' },
   { title: 'Aquecimento e falha de GPS', description: 'Uma tendência térmica e 3 segundos sem posição.', fileName: '03-aquecimento-e-falha-gps.csv', url: '/datasets/laboratorio-virtual-v1/03-aquecimento-e-falha-gps.csv', kind: 'heat' },
+  { title: 'Piracicaba · colheita normal', description: 'Passadas de colheita junto ao rio Piracicaba; cruza as faixas de água.', fileName: '01-colheita-normal.csv', url: '/datasets/piracicaba-artemis/01-colheita-normal.csv', kind: 'piracicaba-normal', metadata: { manifest: '/datasets/piracicaba-artemis/manifest.json', map: '/datasets/piracicaba-artemis/mapa.geojson' } },
+  { title: 'Piracicaba · declive e tombamento', description: 'Entrada no polígono de declive; inclinação sobe até o tombamento.', fileName: '02-declive-tombamento.csv', url: '/datasets/piracicaba-artemis/02-declive-tombamento.csv', kind: 'piracicaba-slope', metadata: { manifest: '/datasets/piracicaba-artemis/manifest.json', map: '/datasets/piracicaba-artemis/mapa.geojson' } },
 ];
 
 export type Category = 'operational' | 'mechanical' | 'environmental' | 'combined' | 'inconclusive';

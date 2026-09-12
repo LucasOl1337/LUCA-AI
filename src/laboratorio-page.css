@@ -266,7 +266,34 @@
 .lab-scene-first .lab-replay.is-empty { display:none; }
 .lab-scene-first .lab-time-ticks { display:none; }
 .lab-scene-first .lab-replay-top { margin-bottom:12px; }
+.lab-example-icon.piracicaba-normal { background:#e9f1e4; color:#4f7a43; }
+.lab-example-icon.piracicaba-slope { background:#f6ede4; color:#a06a34; }
+/* Legenda das faixas: canto inferior direito, acima do botão de camadas e da rosa dos ventos. */
+.lab-band-legend { position:absolute; right:20px; top:64px; z-index:3; width:max-content; max-width:260px; max-height:min(45%,300px); overflow:auto; padding:9px 11px; background:#f8fcf7e8; border:1px solid #d9e3d5; border-radius:7px; font-size:10px; line-height:1.5; color:#3e644b; scrollbar-width:thin; }
+.lab-band-hazard { margin-bottom:8px; }
+.lab-band-hazard>strong { display:block; font-size:11px; font-weight:600; margin-bottom:4px; }
+.lab-band-hazard>small { display:block; margin-top:4px; color:#68806f; font-size:9px; }
+.lab-band-row { display:flex; align-items:baseline; gap:6px; padding:1px 0; }
+.lab-band-row>i { flex:none; width:10px; height:10px; border-radius:3px; align-self:center; }
+.lab-band-row>span { flex:1; min-width:0; }
+.lab-band-row>em { font-style:normal; color:#68806f; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.lab-band-method { display:block; border-top:1px solid #dde6d9; padding-top:6px; color:#68806f; font-size:9px; }
+.lab-band-episodes { display:flex; flex-direction:column; gap:3px; }
+.lab-band-episodes>p { margin:0; font-size:11px; color:var(--lab-muted); }
+.lab-band-episodes>button { display:flex; width:100%; align-items:flex-start; text-align:left; gap:9px; padding:9px 8px; border:1px solid transparent; border-radius:7px; }
+.lab-band-episodes>button:hover { background:#f4f7f2; }
+.lab-band-episodes>button.selected { background:#edf4ec; border-color:#b6ccb8; }
+.lab-band-episodes>button>i { flex:none; width:10px; height:10px; border-radius:3px; margin-top:3px; }
+.lab-band-episodes>button>span { flex:1; min-width:0; }
+.lab-band-episodes strong { display:block; font-size:11px; font-weight:500; }
+.lab-band-episodes small { display:block; margin-top:3px; font-size:10px; color:#899289; line-height:1.5; font-variant-numeric:tabular-nums; }
+.lab-exposure-strip { position:relative; height:6px; margin:0 0 5px; border-radius:3px; background:#eef2ec; }
+.lab-exposure-strip>button { position:absolute; top:0; height:6px; min-width:3px; border-radius:2px; padding:0; }
+.lab-exposure-strip>button:hover { outline:2px solid #ffffffcc; }
+/* A faixa entra acima do slider; os marcadores compensam os 11 px e continuam na mesma altura. */
+.lab-exposure-strip ~ .lab-timeline-markers>button { top:-23px; }
 @media(max-width:900px) {
+  .lab-band-legend { max-width:190px; top:64px; }
   .lab-scene-first[data-panel-open=true] .lab-workbench { grid-template-columns:minmax(0,1fr); }
   .lab-scene-first .lab-panel:not([hidden]) { position:absolute; right:0; top:0; bottom:0; width:min(350px,100%); z-index:8; box-shadow:-8px 0 24px #203e3520; }
   .lab-scene-first .lab-panel-body { overflow:auto; }
