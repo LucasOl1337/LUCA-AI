@@ -853,6 +853,7 @@ export function getSompoRuralFrame(scenarioId, elapsedMs = 0, outcomeId) {
   frame.phaseLabel = from.phaseLabel;
   frame.accelerationX = (to.speedKph - from.speedKph) / 3.6 * derivative;
   frame.yawRate = (to.yaw - from.yaw) * derivative;
+  frame.lateralRate = (to.lateral - from.lateral) * derivative;
   frame.animalRate = (to.animalZ - from.animalZ) * derivative;
   frame.pitchRate = (to.pitch - from.pitch) * derivative;
   frame.rollRate = (to.roll - from.roll) * derivative;

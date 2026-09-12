@@ -48,6 +48,77 @@ function createTerrain(environment: (typeof SOMPO_AGRI_ENVIRONMENTS)[SompoAgriEn
   return terrain;
 }
 
+/** Silos galvanizados no fundo do talhão — a assinatura do bg-agro. */
+function createSilos(slope: number) {
+  const root = new THREE.Group(); root.name = 'sompo-agri-silos';
+  const metal = new THREE.MeshStandardMaterial({ color: 0xdadcda, metalness: .55, roughness: .5 });
+  const roof = new THREE.MeshStandardMaterial({ color: 0xb4b8b2, metalness: .6, roughness: .46 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x3f4440, metalness: .45, roughness: .6 });
+  if (typeof document !== 'undefined' && typeof document.createElementNS === 'function') new THREE.TextureLoader().load('/sompo/gen/metal-silo.webp', map => {
+    map.colorSpace = THREE.SRGBColorSpace; map.wrapS = map.wrapT = THREE.RepeatWrapping;
+    map.repeat.set(3, 1.6); map.anisotropy = 8;
+    metal.map = map; metal.color.set(0xffffff); metal.needsUpdate = true;
+    const roofMap = map.clone(); roofMap.repeat.set(2, .8);
+    roof.map = roofMap; roof.color.set(0xd8dcda); roof.needsUpdate = true;
+  });
+  const cluster = (bx: number, bz: number, scale: number) => {
+    const group = new THREE.Group();
+    const specs: [number, number, number, number][] = [[0, 0, 2.9, 12.5], [6.4, .8, 2.9, 12.5], [3.2, 5.6, 2.5, 10.2]];
+    for (const [x, z, r, h] of specs) {
+      const silo = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 20), metal);
+      silo.position.set(x, h / 2, z); silo.castShadow = silo.receiveShadow = true; group.add(silo);
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(r * 1.08, r * .78, 20), roof);
+      cone.position.set(x, h + r * .36, z); cone.castShadow = true; group.add(cone);
+      const collar = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.04, r * 1.1, .6, 20), dark);
+      collar.position.set(x, .3, z); group.add(collar);
+    }
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(1.15, 13.5, 1.15), dark);
+    leg.position.set(9.6, 6.75, 2.4); leg.castShadow = true; group.add(leg);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.6, 2.2), roof);
+    head.position.set(9.6, 14.1, 2.4); head.castShadow = true; group.add(head);
+    group.scale.setScalar(scale);
+    group.position.set(bx, terrainHeight(bx, bz, slope) - .15, bz);
+    group.rotation.y = Math.sin(bx * .37) * .4;
+    return group;
+  };
+  root.add(cluster(-46, -64, 1), cluster(58, -58, .82));
+  return root;
+}
+
+/** Camada de névoa baixa sobre o talhão: planos horizontais com fade macio. */
+function createGroundFog() {
+  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(0, 0, 256, 64);
+    ctx.globalCompositeOperation = 'destination-in';
+    const across = ctx.createLinearGradient(0, 0, 256, 0);
+    across.addColorStop(0, 'rgba(255,255,255,0)'); across.addColorStop(.18, 'rgba(255,255,255,1)');
+    across.addColorStop(.82, 'rgba(255,255,255,1)'); across.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = across; ctx.fillRect(0, 0, 256, 64);
+    const along = ctx.createLinearGradient(0, 0, 0, 64);
+    along.addColorStop(0, 'rgba(255,255,255,0)'); along.addColorStop(.5, 'rgba(255,255,255,1)');
+    along.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = along; ctx.fillRect(0, 0, 256, 64);
+  }
+  const map = new THREE.CanvasTexture(canvas);
+  const root = new THREE.Group(); root.name = 'sompo-agri-groundfog';
+  const layers: THREE.Mesh[] = [];
+  const spots: [number, number, number, number][] = [[-30, -10, 120, 46], [34, -4, 110, 40], [-8, 12, 96, 36]];
+  spots.forEach(([x, z, w, d], i) => {
+    const material = new THREE.MeshBasicMaterial({
+      map, transparent: true, depthWrite: false, opacity: .075 - i * .02,
+      color: 0xf3e9d4, fog: false, side: THREE.DoubleSide,
+    });
+    const layer = new THREE.Mesh(new THREE.PlaneGeometry(w, d), material);
+    layer.geometry.rotateX(-Math.PI / 2);
+    layer.position.set(x, 1.1 + i * 1.1, z);
+    layer.userData.drift = { x, speed: .5 + i * .31 };
+    root.add(layer); layers.push(layer);
+  });
+  return { root, layers };
+}
+
 function createBarn() {
   const root = new THREE.Group();
   root.name = 'sompo-agri-barn';
@@ -123,6 +194,9 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
   const crops = definition.barn ? null : createSompoCropRows((x,z)=>terrainHeight(x,z,definition.slope), compact, equipmentId === 'tractor' ? .32 : 1);
   if (crops) root.add(crops.root);
   if (definition.barn) root.add(createBarn());
+  const silos = createSilos(definition.slope); root.add(silos);
+  const groundFog = createGroundFog(); root.add(groundFog.root);
+  groundFog.root.visible = !definition.night;
 
   const mud = new THREE.Mesh(
     new THREE.CircleGeometry(8, 40),
@@ -164,6 +238,12 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
       const material = dust.material as THREE.PointsMaterial;
       material.opacity = Math.min(0.32, Math.max(0, frame.dust) * 0.28);
       dust.visible = material.opacity > 0.01;
+
+      // Deriva lenta da névoa baixa: cada camada flutua no próprio compasso.
+      if (!reducedMotion) for (const layer of groundFog.layers) {
+        const d = layer.userData.drift;
+        layer.position.x = d.x + Math.sin(elapsedMs * 0.000045 * d.speed + d.x) * 5;
+      }
 
       if (reducedMotion) dust.visible = false;
       if (dust.visible && !reducedMotion) {

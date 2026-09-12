@@ -430,6 +430,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       const roll = isFirebase
         ? attitudeKnown ? sensorPose.rotationX : truckPoseGroup.rotation.x
         : THREE.MathUtils.degToRad(ruralFrame?.roll ?? (settings.roll + Math.sin(visualElapsed * .0027 + .6) * settings.roughness * .34 * Math.min(1, (brakingState?.speedKph ?? settings.speedKph) / 8)))
+          + THREE.MathUtils.degToRad(THREE.MathUtils.clamp(-(ruralFrame?.lateralAcceleration ?? 0) * 0.9, -7, 7))
           + rollVibe;
       const poseDamping = frameDamping(frameDelta, 5);
       if (reduceMotion.matches || !isFirebase) {
@@ -446,12 +447,22 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       if (!isFirebase) {
         const targetYaw = ruralFrame?.yaw ?? 0;
         const targetLateral = ruralFrame?.lateral ?? 0;
+        // Heading visual = guinada do roteiro + ângulo do vetor de movimento
+        // (slip angle): a carroceria aponta pra onde o deslocamento real leva,
+        // em vez de transladar de lado como caranguejo. Em ré a traseira lidera.
+        const dir = ruralFrame?.direction ?? 1;
+        const vAbs = Math.max(1, Math.abs(drivingSpeed) / 3.6);
+        // Com o casco apoiando (capotamento, rampa extrema) o slip não se aplica.
+        const gripFactor = 1 - THREE.MathUtils.smoothstep(Math.abs(ruralFrame?.roll ?? settings.roll), 12, 35);
+        const slipYaw = Math.atan2(-(ruralFrame?.lateralRate ?? 0) * dir, vAbs) * gripFactor;
         truckPoseGroup.rotation.y = dampAngle(
           truckPoseGroup.rotation.y,
-          THREE.MathUtils.degToRad(targetYaw),
+          -THREE.MathUtils.degToRad(targetYaw) + slipYaw,
           1,
         );
-        truckPoseGroup.position.z = targetLateral;
+        truckPoseGroup.position.z = reduceMotion.matches
+          ? targetLateral
+          : THREE.MathUtils.lerp(truckPoseGroup.position.z, targetLateral, frameDamping(frameDelta, 10));
       }
       const liveActivity = isFirebase
         ? physicalCurrent ? THREE.MathUtils.clamp((snapshot.readings.rotation?.magnitude || 0) * 0.012, 0, 0.1) : 0

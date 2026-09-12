@@ -3,8 +3,13 @@ import * as THREE from 'three';
 /** Generated albedo is a surface input; geometry, light and shadows remain live. */
 export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, field = false) {
   let disposed = false;
+  // TextureLoader precisa de DOM (createElementNS); nos testes node fica a
+  // textura vazia e o shader segue pelo caminho de fallback (ready = 0).
+  const canLoad = typeof document !== 'undefined' && typeof document.createElementNS === 'function';
+  const load = (url: string, onReady: (map: THREE.Texture) => void) =>
+    canLoad ? new THREE.TextureLoader().load(url, onReady) : new THREE.Texture();
   const ready = { value: 0 };
-  const texture = new THREE.TextureLoader().load('/sompo/gen/pasto-albedo.webp', map => {
+  const texture = load('/sompo/gen/pasto-albedo.webp', map => {
     if (disposed) { map.dispose(); return; }
     ready.value = 1;
   });
@@ -12,19 +17,30 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
   texture.wrapS = texture.wrapT = THREE.MirroredRepeatWrapping;
   texture.anisotropy = 8;
   const soilReady = { value: 0 };
-  const soilTexture = new THREE.TextureLoader().load('/sompo/gen/solo-barro.webp', map => {
+  const soilTexture = load('/sompo/gen/solo-barro.webp', map => {
     if (disposed) { map.dispose(); return; }
     soilReady.value = 1;
   });
   soilTexture.colorSpace = THREE.SRGBColorSpace;
   soilTexture.wrapS = soilTexture.wrapT = THREE.MirroredRepeatWrapping;
   soilTexture.anisotropy = 8;
+  const tilledReady = { value: 0 };
+  const tilledTexture = field ? load('/sompo/gen/solo-talhado.webp', map => {
+    if (disposed) { map.dispose(); return; }
+    tilledReady.value = 1;
+  }) : soilTexture;
+  if (field) {
+    tilledTexture.colorSpace = THREE.SRGBColorSpace;
+    tilledTexture.wrapS = tilledTexture.wrapT = THREE.MirroredRepeatWrapping;
+    tilledTexture.anisotropy = 8;
+  }
   const compile = material.onBeforeCompile;
   material.onBeforeCompile = (shader, renderer) => {
     compile(shader, renderer);
     shader.uniforms.pastureMap = { value: texture }; shader.uniforms.pastureReady = ready;
     shader.uniforms.soilMap = { value: soilTexture }; shader.uniforms.soilReady = soilReady;
-    shader.fragmentShader = 'uniform sampler2D pastureMap; uniform float pastureReady;\nuniform sampler2D soilMap; uniform float soilReady;\n' + shader.fragmentShader;
+    shader.uniforms.tilledMap = { value: tilledTexture }; shader.uniforms.tilledReady = tilledReady;
+    shader.fragmentShader = 'uniform sampler2D pastureMap; uniform float pastureReady;\nuniform sampler2D soilMap; uniform float soilReady;\nuniform sampler2D tilledMap; uniform float tilledReady;\n' + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', `
       float pasture = ${field ? 'smoothstep(11.0,18.0,abs(ruralWorld.z))' : 'smoothstep(4.1,7.2,abs(ruralWorld.z+2.05))'};
       vec3 grassland = mix(vec3(.10,.135,.04), texture2D(pastureMap,ruralWorld.xz*.23).rgb, pastureReady);
@@ -52,8 +68,16 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
         grassland = mix(grassland, parcela, hills * .72);
       }
       diffuseColor.rgb = mix(diffuseColor.rgb, grassland, pasture);
+      // Talhão do agri: sulcos na direção das fileiras (o v da textura segue
+      // o x do mundo) com resteva nas valetas, escurecido sob a copa. A faixa
+      // |z|<~12 fica fora da máscara do pasto, então aplica direto no diffuse.
+      ${field ? `
+      float fieldZone = 1.0 - smoothstep(11.5, 15.5, abs(ruralWorld.z));
+      vec3 tilled = mix(vec3(.24, .17, .1), texture2D(tilledMap, vec2(ruralWorld.z * .36, ruralWorld.x * .16)).rgb * vec3(.9, .8, .7), tilledReady);
+      tilled *= .68 + macro * .5;
+      diffuseColor.rgb = mix(diffuseColor.rgb, tilled, fieldZone);` : ''}
       #include <roughnessmap_fragment>`);
   };
-  material.customProgramCacheKey = () => `sompo-pasture-albedo-v2-${field}`;
-  return { dispose() { disposed = true; texture.dispose(); soilTexture.dispose(); } };
+  material.customProgramCacheKey = () => `sompo-pasture-albedo-v3-${field}`;
+  return { dispose() { disposed = true; texture.dispose(); soilTexture.dispose(); if (field) tilledTexture.dispose(); } };
 }

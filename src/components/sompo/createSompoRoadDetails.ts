@@ -268,7 +268,7 @@ export function createSompoRoadDetails(parent: THREE.Group) {
   windify(cropLeafMaterial, 0.04); windify(cropStalkMaterial, 0.04);
   // Folha real com alfa: gira o UV pra folha da textura correr na vertical do
   // card (no PNG ela vai na diagonal); tinte da instância claro pra não destruir a nervura.
-  new THREE.TextureLoader().load('/sompo/gen/folha-milho.webp', (map) => {
+  if (typeof document !== 'undefined' && typeof document.createElementNS === 'function') new THREE.TextureLoader().load('/sompo/gen/folha-milho.webp', (map) => {
     map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8;
     map.center.set(0.5, 0.5); map.rotation = -0.3; map.repeat.set(0.95, 0.95);
     cropLeafMaterial.map = map; cropLeafMaterial.alphaTest = 0.42; cropLeafMaterial.needsUpdate = true;

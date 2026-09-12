@@ -114,11 +114,45 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
       new Set(meshes.map(mesh => mesh.geometry)).forEach(geometry => geometry.dispose());
     }
   }
+  // Máquina de verdade acumula poeira nas partes baixas e palhada no corpo.
+  // Só material: o GLB fica intacto, sem re-gerar rig nem texturas.
+  const patched = new Set<THREE.Material>();
+  const wear = (material: THREE.Material) => {
+    if (!(material instanceof THREE.MeshStandardMaterial) || patched.has(material)) return;
+    if (material.emissive.getHex() === 0xff2714) return; // luz de freio fica limpa
+    patched.add(material);
+    material.roughness = Math.min(1, material.roughness * 1.25 + .08);
+    material.metalness = Math.min(material.metalness, .45);
+    const compile = material.onBeforeCompile;
+    material.onBeforeCompile = (shader, renderer) => {
+      compile?.call(material, shader, renderer);
+      shader.vertexShader = 'varying vec3 agriW;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+        vec4 agriP = vec4(transformed, 1.0);
+        #ifdef USE_INSTANCING
+          agriP = instanceMatrix * agriP;
+        #endif
+        agriW = (modelMatrix * agriP).xyz;`);
+      shader.fragmentShader = `varying vec3 agriW;
+        float agriHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+        float agriNoise(vec2 p){vec2 i=floor(p),f=fract(p);f*=f*(3.-2.*f);
+          return mix(mix(agriHash(i),agriHash(i+vec2(1,0)),f.x),mix(agriHash(i+vec2(0,1)),agriHash(i+vec2(1,1)),f.x),f.y);}\n` + shader.fragmentShader
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          float agriDust = smoothstep(2.4, .1, agriW.y) * (.35 + .65 * agriNoise(agriW.xz * 2.4));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.48, .4, .26), clamp(agriDust, 0., 1.) * .55);`)
+        .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+          roughnessFactor = mix(roughnessFactor, .95, clamp(agriDust, 0., 1.) * .55);`);
+    };
+    material.customProgramCacheKey = () => 'sompo-agri-wear-v1';
+  };
   const lampMaterial = new THREE.MeshStandardMaterial({ color: 0x721710, emissive: 0xff2714, emissiveIntensity: 0, roughness: .4 });
   for (const side of [-1, 1]) {
     const lamp = new THREE.Mesh(new THREE.BoxGeometry(.05, .09, .16), lampMaterial);
     lamp.position.set(equipmentId === 'tractor' ? -.86 : -2.7, 1.35, side * .73); body.add(lamp);
   }
+  root.traverse(node => {
+    const material = (node as THREE.Mesh).material as THREE.Material | undefined;
+    if (material && !Array.isArray(material)) wear(material);
+  });
   const initialHitch = implement.position.clone();
   const hydraulics = equipmentId === 'tractor' ? [-1, 1].map(side => {
     const barrel = new THREE.Mesh(new THREE.CylinderGeometry(.052, .052, 1, 12), new THREE.MeshStandardMaterial({ color: 0x26372b, roughness: .55, metalness: .4 }));
