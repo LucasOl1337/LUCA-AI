@@ -14,8 +14,10 @@ export default function LabBandLegend({ labCase }: { labCase: LabCase }) {
       <strong>{hazard.label}</strong>
       {hazard.bands.map((band, index) => {
         const area = areas.find(item => item.hazardKey === hazard.key && item.bandId === band.id);
-        return <div key={band.id} className="lab-band-row"><i style={{ background: bandColor(hazard, index) }} /><span>{band.label || band.id} · {band.max_m > 0 ? `até ${band.max_m} m` : 'dentro do polígono'}</span>{area && <em>{area.areaM2.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} m² · {decimal(area.shareOfAllowed * 100)}%</em>}</div>;
+        const reach = hazard.unit === 'deg' ? (band.max_m > 0 ? `até ${band.max_m}° do limite` : 'no limite ou acima') : band.max_m > 0 ? `até ${band.max_m} m` : 'dentro do polígono';
+        return <div key={band.id} className="lab-band-row"><i style={{ background: bandColor(hazard, index) }} /><span>{band.label || band.id} · {reach}</span>{area && <em>{area.areaM2.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} m² · {decimal(area.shareOfAllowed * 100)}%</em>}</div>;
       })}
+      {hazard.metric && <small>Limite declarado no perfil da máquina: {hazard.limit}°. Zonas do terreno acima desse limite aparecem no mapa quando há relevo.</small>}
       {hazard.justification && <small>{hazard.justification}</small>}
     </div>)}
     <small className="lab-band-method">Estimativa por {(areas[0]?.method ?? 'grade 2 m').replace('grade ', 'grade de ')}; o restante da área não foi avaliado como seguro.</small>

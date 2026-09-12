@@ -6,7 +6,7 @@ import { createLabTractor } from './createLabTractor';
 import { createSompoTruckModel, SOMPO_TRUCK_PIVOT_Y } from '../sompo/createSompoTruckModel';
 import { parseLabTerrain, createTerrainSampler, type LabTerrain } from '../../../shared/lab-terrain.js';
 import { bandGrid } from '../../../shared/lab-geofence.js';
-import { hazardsOf, bandColor, innermostEpisodeAt, episodeColor, ROUTE_COLOR } from './labBands';
+import { hazardsOf, bandColor, innermostEpisodeAt, episodeColor, ROUTE_COLOR, slopeZones, SLOPE_ZONE_COLORS, machineRollLimit } from './labBands';
 import { createCropField } from './createCropField';
 import { loadLabHarvester } from './loadLabHarvester';
 
@@ -20,6 +20,7 @@ interface LabSceneProps {
   selectedEventId?: string | null;
   onSelectEvent?: (eventId: string) => void;
   showDetails?: boolean;
+  onTerrain?: (sample: ((x: number, z: number) => number | null) | null) => void;
 }
 
 type Point = { x: number; z: number };
@@ -76,7 +77,7 @@ function disposeScene(scene: THREE.Scene) {
   geometries.forEach((geometry) => geometry.dispose());
 }
 
-export default function LabScene({ labCase, site, elapsedMs, cameraMode, selectedEventId, onSelectEvent, showDetails = false }: LabSceneProps) {
+export default function LabScene({ labCase, site, elapsedMs, cameraMode, selectedEventId, onSelectEvent, showDetails = false, onTerrain }: LabSceneProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const elapsedRef = useRef(elapsedMs);
   const modeRef = useRef(cameraMode);
@@ -87,6 +88,7 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
   const scaleLabelRef = useRef<HTMLSpanElement>(null);
   const cameraActions = useRef<((key: string) => void) | null>(null);
   const detailsRef = useRef(showDetails); detailsRef.current = showDetails;
+  const terrainCallback = useRef(onTerrain); terrainCallback.current = onTerrain;
   const [webglError, setWebglError] = useState(false);
   const [satelliteState, setSatelliteState] = useState<'none' | 'loading' | 'ready' | 'error'>('none');
   elapsedRef.current = elapsedMs;
@@ -98,33 +100,6 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
   const geography = labCase || site || null;
   const satellite = useMemo(() => satelliteFor(geography), [geography]);
 
-  // Faixas: a MESMA grade que soma a área atingida pinta a cena (SPEC regra 1). Uma vez por caso.
-  // Só os bytes RGBA moram no memo; a DataTexture nasce e morre com a cena (disposeScene).
-  const bandLayer = useMemo(() => {
-    const hazards = hazardsOf(labCase);
-    if (!labCase || !hazards.length) return null;
-    const grid = labCase.geofence?.grid ?? bandGrid(labCase.polygons, hazards, 2); // Mesma grade que somou a área.
-    if (!grid) return null;
-    const { cols, rows } = grid;
-    const rgba = new Uint8Array(cols * rows * 4);
-    for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
-      const cell = row * cols + col;
-      if (!grid.inside[cell]) continue;
-      let bestHazard = -1, bestBand = -1, bestMax = Infinity;
-      for (let h = 0; h < hazards.length; h++) {
-        const band = grid.bands[h][cell];
-        if (band < 0) continue;
-        const max = hazards[h].bands[band].max_m;
-        if (max < bestMax) { bestMax = max; bestHazard = h; bestBand = band; } // empate fica com o primeiro perigo
-      }
-      if (bestHazard < 0) continue; // dentro da área permitida, fora de faixa: alpha 0
-      const hex = parseInt(bandColor(hazards[bestHazard], bestBand).slice(1), 16);
-      // Linha 0 da DataTexture é v=0 e, com rotation.x=-PI/2, v=0 cai em +Z: grava invertido para a faixa abraçar o polígono.
-      const at = ((rows - 1 - row) * cols + col) * 4;
-      rgba[at] = hex >> 16 & 255; rgba[at + 1] = hex >> 8 & 255; rgba[at + 2] = hex & 255; rgba[at + 3] = 107;
-    }
-    return { grid, rgba };
-  }, [labCase]);
   const terrainReference = geography?.manifest?.terrain;
   const [terrainResult, setTerrainResult] = useState<{ reference: typeof terrainReference; grid?: LabTerrain; error?: string }>();
   const [terrainEnabled, setTerrainEnabled] = useState(true);
@@ -153,6 +128,43 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
 
   const sampleTerrain = useMemo(() => terrain && geography ? createTerrainSampler(terrain, geography.origin) : null, [terrain, geography]);
   const outsideTerrain = !!(frame?.position && sampleTerrain && sampleTerrain(frame.position.x, frame.position.z) === null);
+
+  // Faixas: a MESMA grade que soma a área atingida pinta a cena (SPEC regra 1).
+  // Só os bytes RGBA moram no memo; a DataTexture nasce e morre com a cena (disposeScene).
+  const bandLayer = useMemo(() => {
+    const hazards = hazardsOf(labCase);
+    const limit = machineRollLimit(labCase);
+    const slope = sampleTerrain && limit !== null ? { sample: sampleTerrain, limit } : null;
+    if (!labCase || (!hazards.length && !slope)) return null;
+    const grid = labCase.geofence?.grid ?? bandGrid(labCase.polygons, hazards, 2); // Mesma grade que somou a área.
+    if (!grid) return null;
+    const zones = slope ? slopeZones(grid, slope.sample, slope.limit) : null;
+    const { cols, rows } = grid;
+    const rgba = new Uint8Array(cols * rows * 4);
+    for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
+      const cell = row * cols + col;
+      if (!grid.inside[cell]) continue;
+      let bestHazard = -1, bestBand = -1, bestMax = Infinity;
+      for (let h = 0; h < hazards.length; h++) {
+        const band = grid.bands[h][cell];
+        if (band < 0) continue;
+        const max = hazards[h].bands[band].max_m;
+        if (max < bestMax) { bestMax = max; bestHazard = h; bestBand = band; } // empate fica com o primeiro perigo
+      }
+      const zone = zones ? zones[cell] : 0;
+      // A inclinação do terreno frente ao limite da máquina prevalece sobre a faixa de água/declive na célula.
+      const color = zone ? SLOPE_ZONE_COLORS[zone] : bestHazard < 0 ? null : bandColor(hazards[bestHazard], bestBand);
+      if (!color) continue; // dentro da área permitida, fora de faixa e fora de zona: alpha 0
+      const hex = parseInt(color.slice(1), 16);
+      // Linha 0 da DataTexture é v=0 e, com rotation.x=-PI/2, v=0 cai em +Z: grava invertido para a faixa abraçar o polígono.
+      const at = ((rows - 1 - row) * cols + col) * 4;
+      rgba[at] = hex >> 16 & 255; rgba[at + 1] = hex >> 8 & 255; rgba[at + 2] = hex & 255; rgba[at + 3] = zone ? 128 : 107;
+    }
+    return { grid, rgba };
+  }, [labCase, sampleTerrain]);
+
+  // O minimapa usa o mesmo relevo da cena; nunca chamado dentro do loop de render.
+  useEffect(() => { terrainCallback.current?.(sampleTerrain); }, [sampleTerrain]);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -589,7 +601,7 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
         // Camera composition follows the sample; the vehicle is never interpolated.
         followTarget.copy(lastKnownPosition).addScaledVector(forward, camera.aspect < 1 ? 0 : 2.5);
         followTarget.y += isTruck ? 1.4 : .6;
-        followOffset.set(-forward.x * 12 + forward.z * 12, 7.5, -forward.z * 12 - forward.x * 12).multiplyScalar(followDistance * Math.max(1, .95 / camera.aspect));
+        followOffset.set(-forward.x * 14, 8, -forward.z * 14).multiplyScalar(followDistance * Math.max(1, .95 / camera.aspect));
         camera.position.copy(lastKnownPosition).add(followOffset);
         controls.target.copy(followTarget);
       }
@@ -654,6 +666,7 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
           {geography?.polygons.some(p => p.role === 'property_boundary') && <span><i style={{ background: '#ffd16a' }} />Limite da propriedade (mapeado)</span>}
           <span><i style={{ background: '#6c9476' }} />{geography?.polygons.some(p => p.role === 'allowed_area') ? 'Área operacional permitida' : 'Área operacional não fornecida'}</span>
           <span><i style={{ background: '#79b9c0' }} />{geography?.polygons.some(p => p.role === 'water') ? 'Água mapeada' : 'Água não cadastrada'}</span>
+          {machineRollLimit(labCase) !== null && sampleTerrain && <span><i style={{ background: SLOPE_ZONE_COLORS[2] }} />Terreno acima do limite da máquina ({machineRollLimit(labCase)}°)</span>}
           {labCase && <span><i style={{ background: '#215f47' }} />{labCase.synthetic ? 'Percurso sintético' : 'Trajetória GNSS'}{!labCase.samples.some(s => s.x !== null) ? ' indisponível' : ''}</span>}
         </div>
         {!!frame?.activeEvents.length && frame.position && (

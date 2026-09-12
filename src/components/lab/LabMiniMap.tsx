@@ -1,14 +1,20 @@
-// Minimapa 2D do trajeto: enquadra a área permitida, pinta as faixas de proximidade da mesma grade da cena
-// e desenha o percurso já percorrido até o instante do replay. Clique no mapa leva a linha do tempo até ali.
+// Minimapa do trajeto em modo rumo-para-cima: a máquina fica fixa no centro-inferior, o mapa gira com o rumo
+// e o que está à frente aparece em cima. As camadas fixas (área, água, perigos, faixas, zonas de inclinação e a
+// rota completa) vivem num canvas offscreen em pixels de mapa; cada quadro só gira, recorta e desenha o percurso.
 import { useEffect, useMemo, useRef } from 'react';
 import { bandGrid } from '../../../shared/lab-geofence.js';
 import { getReplayFrame, type LabCase, type LabPolygon } from '../../../shared/lab-telemetry.js';
-import { hazardsOf, bandColor, innermostEpisodeAt, episodeColor, ROUTE_COLOR } from './labBands';
+import { hazardsOf, bandColor, innermostEpisodeAt, episodeColor, ROUTE_COLOR, slopeZones, SLOPE_ZONE_COLORS, machineRollLimit } from './labBands';
 
-const W = 280, H = 200, PAD = 8, FOOT = 20;
+const W = 240, H = 240, FOOT = 20;
+const PX_PER_M = 1.3;                       // escala fixa: ~119 m à frente e 50 m atrás no enquadramento
+const BEHIND_M = 50;
+const CENTER_X = W / 2, CENTER_Y = H - FOOT - BEHIND_M * PX_PER_M;
 const SCALE_STEPS = [200, 100, 50, 20, 10];
+const MAX_BASE_PX = 6000;                   // ponytail: teto do canvas do mapa; áreas maiores perdem a escala fixa
 
-interface TrackPoint { px: number; py: number; x: number; z: number; ms: number; color: string }
+interface TrackPoint { mx: number; my: number; x: number; z: number; ms: number; color: string; heading: number }
+interface Focus { mx: number; my: number; heading: number }
 
 function boundsOf(polygons: LabPolygon[]) {
   let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
@@ -21,22 +27,25 @@ function boundsOf(polygons: LabPolygon[]) {
   return Number.isFinite(minX) ? { minX, minZ, maxX, maxZ } : null;
 }
 
-function buildView(labCase: LabCase) {
+// Rumo em graus a partir de um deslocamento no plano: 0 = norte = -z, 90 = leste = +x.
+const headingOf = (dx: number, dz: number) => Math.atan2(dx, -dz) * 180 / Math.PI;
+
+function buildView(labCase: LabCase, sampleTerrain: ((x: number, z: number) => number | null) | null | undefined) {
   const hazards = hazardsOf(labCase);
   const allowed = labCase.polygons.filter(polygon => polygon.role === 'allowed_area');
   const box = boundsOf(allowed.length ? allowed : labCase.polygons);
   if (!box) return null;
   const margin = hazards.reduce((most, hazard) => Math.max(most, hazard.reach), 0) || 40;
   const spanX = Math.max(1, box.maxX - box.minX + margin * 2), spanZ = Math.max(1, box.maxZ - box.minZ + margin * 2);
-  const scale = Math.min((W - PAD * 2) / spanX, (H - FOOT - PAD * 2) / spanZ); // proporção preservada
-  const centerX = (box.minX + box.maxX) / 2, centerZ = (box.minZ + box.maxZ) / 2;
-  const toX = (x: number) => W / 2 + (x - centerX) * scale;
-  const toY = (z: number) => (H - FOOT) / 2 + (z - centerZ) * scale; // z cresce para o sul: norte fica em cima
-  const toWorldX = (px: number) => centerX + (px - W / 2) / scale;
-  const toWorldZ = (py: number) => centerZ + (py - (H - FOOT) / 2) / scale;
+  const scale = Math.min(PX_PER_M, MAX_BASE_PX / spanX, MAX_BASE_PX / spanZ);
+  const originX = box.minX - margin, originZ = box.minZ - margin;
+  const mapX = (x: number) => (x - originX) * scale;
+  const mapY = (z: number) => (z - originZ) * scale; // z cresce para o sul; a rotação por quadro coloca o rumo em cima
+  const baseW = spanX * scale, baseH = spanZ * scale;
 
-  // Cor de cada amostra: a faixa mais interna ativa naquele instante (uma cor por episódio, reaproveitada).
+  // Cor e rumo de cada amostra, uma vez por caso (uma cor por episódio, reaproveitada).
   const episodeColors = new Map<string, string>();
+  let previous: { x: number; z: number; heading: number } | null = null;
   const track = labCase.samples.map<TrackPoint | null>(sample => {
     if (sample.x === null || sample.z === null) return null;
     const episode = innermostEpisodeAt(labCase, sample.elapsedMs);
@@ -45,23 +54,26 @@ function buildView(labCase: LabCase) {
       color = episodeColors.get(episode.id) ?? episodeColor(labCase, episode);
       episodeColors.set(episode.id, color);
     }
-    return { px: toX(sample.x), py: toY(sample.z), x: sample.x, z: sample.z, ms: sample.elapsedMs, color };
+    const heading = typeof sample.heading_deg === 'number' ? sample.heading_deg
+      : previous ? headingOf(sample.x - previous.x, sample.z - previous.z) : 0;
+    previous = { x: sample.x, z: sample.z, heading };
+    return { mx: mapX(sample.x), my: mapY(sample.z), x: sample.x, z: sample.z, ms: sample.elapsedMs, color, heading };
   });
 
   const dpr = Math.min(3, window.devicePixelRatio || 1);
   const base = document.createElement('canvas');
-  base.width = Math.round(W * dpr);
-  base.height = Math.round(H * dpr);
+  base.width = Math.round(baseW * dpr);
+  base.height = Math.round(baseH * dpr);
   const ctx = base.getContext('2d');
   if (ctx) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#eef2ea';
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, 0, baseW, baseH);
 
     const trace = (polygon: LabPolygon) => {
       ctx.beginPath();
       for (const ring of polygon.rings) {
-        ring.forEach((point, index) => index ? ctx.lineTo(toX(point.x), toY(point.z)) : ctx.moveTo(toX(point.x), toY(point.z)));
+        ring.forEach((point, index) => index ? ctx.lineTo(mapX(point.x), mapY(point.z)) : ctx.moveTo(mapX(point.x), mapY(point.z)));
         ctx.closePath();
       }
     };
@@ -98,8 +110,8 @@ function buildView(labCase: LabCase) {
 
     // Faixas: a mesma grade que somou a área atingida; cada célula recebe a faixa mais interna entre os perigos.
     const grid = hazards.length ? labCase.geofence?.grid ?? bandGrid(labCase.polygons, hazards, 2) : null;
+    const side = grid ? grid.cellM * scale + 0.5 : 0;
     if (grid) {
-      const side = grid.cellM * scale + 0.5;
       ctx.globalAlpha = 0.55;
       for (let row = 0; row < grid.rows; row++) for (let col = 0; col < grid.cols; col++) {
         const cell = row * grid.cols + col;
@@ -113,7 +125,21 @@ function buildView(labCase: LabCase) {
         }
         if (bestHazard < 0) continue;
         ctx.fillStyle = bandColor(hazards[bestHazard], bestBand);
-        ctx.fillRect(toX(grid.minX + col * grid.cellM), toY(grid.minZ + row * grid.cellM), side, side);
+        ctx.fillRect(mapX(grid.minX + col * grid.cellM), mapY(grid.minZ + row * grid.cellM), side, side);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Zonas de inclinação desta máquina, por cima das faixas (mesma grade).
+    const limitDeg = machineRollLimit(labCase);
+    if (grid && sampleTerrain && limitDeg !== null) {
+      const zones = slopeZones(grid, sampleTerrain, limitDeg);
+      ctx.globalAlpha = 0.55;
+      for (let row = 0; row < grid.rows; row++) for (let col = 0; col < grid.cols; col++) {
+        const zone = zones[row * grid.cols + col];
+        if (!zone) continue;
+        ctx.fillStyle = SLOPE_ZONE_COLORS[zone];
+        ctx.fillRect(mapX(grid.minX + col * grid.cellM), mapY(grid.minZ + row * grid.cellM), side, side);
       }
       ctx.globalAlpha = 1;
     }
@@ -127,43 +153,59 @@ function buildView(labCase: LabCase) {
     let pen = false;
     for (const point of track) {
       if (!point) { pen = false; continue; }
-      if (pen) ctx.lineTo(point.px, point.py); else ctx.moveTo(point.px, point.py);
+      if (pen) ctx.lineTo(point.mx, point.my); else ctx.moveTo(point.mx, point.my);
       pen = true;
     }
     ctx.stroke();
-
-    // Rodapé: barra de escala arredondada e seta de norte.
-    const meters = SCALE_STEPS.find(step => step * scale <= W * 0.32) ?? 10;
-    const bar = meters * scale;
-    ctx.fillStyle = '#f8fcf7e8';
-    ctx.fillRect(0, H - FOOT, W, FOOT);
-    ctx.strokeStyle = '#3e644b';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(10, H - 13);
-    ctx.lineTo(10, H - 7);
-    ctx.lineTo(10 + bar, H - 7);
-    ctx.lineTo(10 + bar, H - 13);
-    ctx.stroke();
-    ctx.fillStyle = '#3e644b';
-    ctx.font = '9px Inter, Segoe UI, sans-serif';
-    ctx.textBaseline = 'alphabetic';
-    ctx.fillText(`${meters} m`, 14 + bar, H - 6);
-    ctx.fillText('↑ N', W - 26, H - 6);
   }
-  return { base, track, toX, toY, toWorldX, toWorldZ, dpr };
+  // Escala fixa: a barra vale para todos os quadros.
+  const meters = SCALE_STEPS.find(step => step * scale <= W * 0.32) ?? 10;
+  return { base, baseW, baseH, track, mapX, mapY, scale, originX, originZ, dpr, meters };
 }
 
-export default function LabMiniMap({ labCase, elapsedMs, onSeek }: { labCase: LabCase; elapsedMs: number; onSeek?: (ms: number) => void }) {
+export default function LabMiniMap({ labCase, elapsedMs, onSeek, sampleTerrain }: {
+  labCase: LabCase;
+  elapsedMs: number;
+  onSeek?: (ms: number) => void;
+  sampleTerrain?: ((x: number, z: number) => number | null) | null;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const view = useMemo(() => buildView(labCase), [labCase]); // camadas estáticas: uma vez por caso
+  const focusRef = useRef<Focus | null>(null);
+  // Camadas fixas: refeitas só quando o caso ou o relevo muda.
+  const view = useMemo(() => buildView(labCase, sampleTerrain), [labCase, sampleTerrain]);
 
   useEffect(() => {
     const canvas = canvasRef.current, ctx = canvas?.getContext('2d');
     if (!canvas || !ctx || !view) return;
+
+    // Âncora: última amostra com posição até o instante; serve de rumo/posição na falta de GNSS.
+    let anchor: TrackPoint | null = null;
+    for (const point of view.track) {
+      if (!point) continue;
+      if (point.ms > elapsedMs) break;
+      anchor = point;
+    }
+    const frame = getReplayFrame(labCase, elapsedMs);
+    const live: Focus | null = frame.position
+      ? {
+        mx: view.mapX(frame.position.x), my: view.mapY(frame.position.z),
+        heading: typeof frame.sample.heading_deg === 'number' ? frame.sample.heading_deg : anchor?.heading ?? 0,
+      }
+      : null;
+    const machine = live ?? (anchor ? { mx: anchor.mx, my: anchor.my, heading: anchor.heading } : null);
+    const focus = machine ?? { mx: view.baseW / 2, my: view.baseH / 2, heading: 0 };
+    focusRef.current = focus;
+    const radians = focus.heading * Math.PI / 180;
+
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
-    ctx.clearRect(0, 0, W, H);
-    ctx.drawImage(view.base, 0, 0, W, H);
+    ctx.fillStyle = '#eef2ea';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    ctx.translate(CENTER_X, CENTER_Y);
+    ctx.rotate(-radians);            // o vetor de frente (sin h, -cos h) passa a apontar para cima
+    ctx.translate(-focus.mx, -focus.my);
+    ctx.drawImage(view.base, 0, 0, view.baseW, view.baseH); // ponytail: blita o mapa inteiro; recortar a vizinhança se pesar
 
     // Trecho percorrido, colorido pela faixa ativa em cada amostra.
     ctx.lineWidth = 2;
@@ -179,44 +221,88 @@ export default function LabMiniMap({ labCase, elapsedMs, onSeek }: { labCase: La
           flush();
           ctx.beginPath();
           ctx.strokeStyle = color = point.color;
-          ctx.moveTo(previous.px, previous.py);
+          ctx.moveTo(previous.mx, previous.my);
           open = true;
         }
-        ctx.lineTo(point.px, point.py);
+        ctx.lineTo(point.mx, point.my);
       }
       previous = point;
     }
     flush();
+    ctx.restore();
 
-    const frame = getReplayFrame(labCase, elapsedMs);
-    if (!frame.position) return; // sem posição no quadro, a máquina não é desenhada
-    const px = view.toX(frame.position.x), py = view.toY(frame.position.z);
-    const heading = frame.sample.heading_deg;
-    if (typeof heading === 'number') {
-      const radians = heading * Math.PI / 180; // 0 = norte = -z, 90 = leste = +x
+    // Marcador fixo no centro-inferior, sempre apontando para cima; esmaecido quando não há posição no quadro.
+    if (machine) {
+      ctx.globalAlpha = live ? 1 : 0.45;
       ctx.strokeStyle = '#17614b';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(px, py);
-      ctx.lineTo(px + Math.sin(radians) * 14, py - Math.cos(radians) * 14);
+      ctx.moveTo(CENTER_X, CENTER_Y);
+      ctx.lineTo(CENTER_X, CENTER_Y - 14);
       ctx.stroke();
+      ctx.fillStyle = '#17614b';
+      ctx.beginPath();
+      ctx.arc(CENTER_X, CENTER_Y, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#f8fcf7';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
     }
-    ctx.fillStyle = '#17614b';
+
+    // Bússola: gira junto, apontando para o norte real (0, -1) do mundo.
+    const northX = -Math.sin(radians), northY = -Math.cos(radians);
+    const cx = W - 24, cy = 24;
+    ctx.fillStyle = '#f8fcf7e8';
     ctx.beginPath();
-    ctx.arc(px, py, 5, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 14, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#f8fcf7';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#d9e3d5';
+    ctx.lineWidth = 1;
     ctx.stroke();
+    ctx.strokeStyle = '#3e644b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - northX * 5, cy - northY * 5);
+    ctx.lineTo(cx + northX * 5, cy + northY * 5);
+    ctx.stroke();
+    ctx.fillStyle = '#3e644b';
+    ctx.font = '8px Inter, Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('N', cx + northX * 10, cy + northY * 10);
+
+    // Rodapé: barra de escala fixa (a escala do mapa não muda com o rumo).
+    const bar = view.meters * view.scale;
+    ctx.fillStyle = '#f8fcf7e8';
+    ctx.fillRect(0, H - FOOT, W, FOOT);
+    ctx.strokeStyle = '#3e644b';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(10, H - 13);
+    ctx.lineTo(10, H - 7);
+    ctx.lineTo(10 + bar, H - 7);
+    ctx.lineTo(10 + bar, H - 13);
+    ctx.stroke();
+    ctx.fillStyle = '#3e644b';
+    ctx.font = '9px Inter, Segoe UI, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(`${view.meters} m`, 14 + bar, H - 6);
   }, [labCase, elapsedMs, view]);
 
   if (!view) return null;
 
   const seekToPoint = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!onSeek) return;
+    const focus = focusRef.current;
+    if (!onSeek || !focus) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const x = view.toWorldX((event.clientX - rect.left) / rect.width * W);
-    const z = view.toWorldZ((event.clientY - rect.top) / rect.height * H);
+    // Inverso da transformação do quadro: desfaz o centro e a rotação para voltar aos pixels de mapa.
+    const u = (event.clientX - rect.left) / rect.width * W - CENTER_X;
+    const v = (event.clientY - rect.top) / rect.height * H - CENTER_Y;
+    const radians = focus.heading * Math.PI / 180;
+    const x = view.originX + (u * Math.cos(radians) - v * Math.sin(radians) + focus.mx) / view.scale;
+    const z = view.originZ + (u * Math.sin(radians) + v * Math.cos(radians) + focus.my) / view.scale;
     let best: TrackPoint | null = null, bestDistance = Infinity;
     for (const point of view.track) {
       if (!point) continue;
@@ -233,7 +319,7 @@ export default function LabMiniMap({ labCase, elapsedMs, onSeek }: { labCase: La
       height={Math.round(H * view.dpr)}
       style={{ width: W, height: H, cursor: onSeek ? 'pointer' : 'default' }}
       role="img"
-      aria-label="Trajeto do maquinário no período de plantio, com as faixas de proximidade em cores"
+      aria-label="Trajeto do maquinário com o rumo para cima: faixas de proximidade e zonas de inclinação em cores"
       onClick={seekToPoint}
     />
   </div>;

@@ -38,6 +38,8 @@ export default function LaboratorioPage() {
   const [sensorView, setSensorView] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [sceneDetails, setSceneDetails] = useState(false);
+  // Amostrador de relevo publicado pela cena; o minimapa pinta as zonas de inclinação com ele. Guardado via updater porque o estado é uma função.
+  const [labTerrain, setLabTerrain] = useState<((x: number, z: number) => number | null) | null>(null);
   const selectedSite = siteChoice === 'farm' ? farmSite : siteChoice === 'custom' ? customSite : null;
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [busy, setBusy] = useState('');
@@ -255,8 +257,14 @@ export default function LaboratorioPage() {
     const event = frame.activeEvents.filter(item => item.type === 'hazard_band').sort((a, b) => Number(a.evidence.threshold_m) - Number(b.evidence.threshold_m))[0];
     if (!event) return null;
     const hazard = hazardsOf(labCase).find(item => item.key === event.evidence.hazard);
-    const distance = hazard ? polygonDistance(frame.position, hazard.polygon) : Number(event.evidence.distance_m);
-    return `Faixa: ${event.evidence.band_label} · ${distance.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} m de ${event.evidence.hazard_label}`;
+    const one = (value: number) => value.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    // Perigo de máquina: a leitura é a inclinação do quadro contra o limite do perfil, não uma distância.
+    if (hazard?.metric) {
+      const value = frame.sample[hazard.metric as keyof typeof frame.sample];
+      return `Inclinação ${typeof value === 'number' ? `${one(Math.abs(value))}°` : 'indisponível'} · limite da máquina ${hazard.limit}° · ${event.evidence.band_label}`;
+    }
+    const distance = hazard?.polygon ? polygonDistance(frame.position, hazard.polygon) : Number(event.evidence.distance_m);
+    return `Faixa: ${event.evidence.band_label} · ${one(distance)} m de ${event.evidence.hazard_label}`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [labCase, frame?.position]);
   const currentWarnings = frame?.gap ? 'GPS indisponível · posição não reconstruída' : bandWarning ? bandWarning : frame?.activeEvents.some(event => event.type === 'coolant_warning') ? 'Temperatura acima do limite didático' : frame?.activeEvents.some(event => event.type === 'near_water') ? 'Máquina próxima da zona de água' : frame?.activeEvents.some(event => event.type === 'outside_fence') ? 'Máquina fora da área permitida' : 'Operação dentro das regras verificáveis';
@@ -267,7 +275,7 @@ export default function LaboratorioPage() {
     <div className="lab-workbench">
       <section className={`lab-viewport ${sensorView ? 'lab-viewport-sensors' : ''}`} aria-label={sensorView ? 'Replay dos sensores ESP32' : 'Mapa e replay do caso'}>
         {labCase?.hasEsp32 && frame && sensorView ? <LabEsp32Replay labCase={labCase} frame={frame} /> : <>
-        <Suspense fallback={<div className="lab-scene-loading"><LoaderCircle className="lab-spin" />Preparando o cenário…</div>}><LabScene labCase={labCase} site={selectedSite} elapsedMs={elapsedMs} cameraMode={cameraMode} selectedEventId={selectedEventId} onSelectEvent={selectEvent} showDetails={sceneDetails} /></Suspense>
+        <Suspense fallback={<div className="lab-scene-loading"><LoaderCircle className="lab-spin" />Preparando o cenário…</div>}><LabScene labCase={labCase} site={selectedSite} elapsedMs={elapsedMs} cameraMode={cameraMode} selectedEventId={selectedEventId} onSelectEvent={selectEvent} showDetails={sceneDetails} onTerrain={sample => setLabTerrain(() => sample)} /></Suspense>
         <div className="lab-scene-title"><span>{labCase ? labCase.synthetic ? 'DADOS SINTÉTICOS' : 'CASO IMPORTADO' : 'ÁREA REAL · EXPLORAÇÃO'}</span><h2>{labCase?.title || selectedSite?.manifest?.site?.name || 'Explore sua área'}</h2>{!labCase && <p>Explore a imagem e os limites. Sem telemetria, a posição do equipamento está indisponível.</p>}</div>
         <div className="lab-camera-control" role="group" aria-label="Câmera">{([{ id: 'follow', label: 'Acompanhar', icon: Tractor }, { id: 'top', label: 'Superior', icon: Map }, { id: 'free', label: 'Livre', icon: Compass }] as const).map(item => <button key={item.id} disabled={item.id === 'follow' && !frame?.position} aria-pressed={cameraMode === item.id} onClick={() => setCameraMode(item.id)}><item.icon size={15} /><span>{item.label}</span></button>)}</div>
         <button className="lab-map-details-button" aria-pressed={sceneDetails} onClick={() => setSceneDetails(value => !value)}>{sceneDetails ? 'Ocultar detalhes' : 'Camadas e fontes'}</button>
@@ -276,7 +284,7 @@ export default function LaboratorioPage() {
         {labCase?.manifest?.demo === 'farm-truck-v1' && <span className="lab-demo-badge">DEMONSTRAÇÃO · PERCURSO SINTÉTICO</span>}
         {labCase && frame?.position && (sceneDetails || frame.activeEvents.length > 0) && <div className={`lab-scene-signal ${frame?.activeEvents.length || frame?.gap ? 'has-warning' : ''}`} data-lab-signal>{frame?.gap ? <WifiOff size={17} /> : frame?.activeEvents.length ? <ScanLine size={17} /> : <ShieldCheck size={17} />}<span>{currentWarnings}</span></div>}
         {labCase && !labCase.hasEsp32 && <div className="lab-sensors" aria-label="Sensores no instante do replay"><div><span>Velocidade <small>GNSS</small></span><strong data-lab-speed>{prettyNumber(frame?.sample.ground_speed_kmh, 1)}<em>{typeof frame?.sample.ground_speed_kmh === 'number' ? 'km/h' : ''}</em></strong></div><div><span>Motor <small>CAN / ECU</small></span><strong>{prettyNumber(frame?.sample.engine_rpm)}<em>{typeof frame?.sample.engine_rpm === 'number' ? 'rpm' : ''}</em></strong></div><div><span>Arrefecimento <small>CAN / ECU</small></span><strong className={Number(frame?.sample.coolant_temp_c) >= 105 ? 'lab-hot' : ''}>{prettyNumber(frame?.sample.coolant_temp_c, 1)}<em>{typeof frame?.sample.coolant_temp_c === 'number' ? '°C' : ''}</em></strong></div></div>}
-        {labCase && !sensorView && labCase.polygons.length > 0 && <LabMiniMap labCase={labCase} elapsedMs={elapsedMs} onSeek={ms => seek(ms)} />}
+        {labCase && !sensorView && labCase.polygons.length > 0 && <LabMiniMap labCase={labCase} elapsedMs={elapsedMs} onSeek={ms => seek(ms)} sampleTerrain={labTerrain} />}
         </>}
       </section>
       <aside className="lab-panel" id="lab-case-panel" hidden={!panelOpen} aria-label={STEPS[step]}>

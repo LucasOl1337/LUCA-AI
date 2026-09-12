@@ -60,15 +60,15 @@ export function createCropField(options: {
       }
     }
   }
-  const height = crop === 'cana' ? 2.2 : 1.6;
+  const height = crop === 'cana' ? 1.7 : 1.4;
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-    -0.125, 0, 0, 0.125, 0, 0, -0.125, height, 0, 0.125, height, 0,
-    0, 0, -0.125, 0, 0, 0.125, 0, height, -0.125, 0, height, 0.125,
+    -0.09, 0, 0, 0.09, 0, 0, -0.09, height, 0, 0.09, height, 0,
+    0, 0, -0.09, 0, 0, 0.09, 0, height, -0.09, 0, height, 0.09,
   ], 3));
   geometry.setIndex([0, 1, 2, 2, 1, 3, 4, 5, 6, 6, 5, 7]);
   geometry.computeVertexNormals();
-  const material = new THREE.MeshStandardMaterial({ color: 0x527d32, roughness: 1, side: THREE.DoubleSide });
+  const material = new THREE.MeshStandardMaterial({ color: 0x5e8f3c, roughness: 1, side: THREE.DoubleSide });
   const mesh = new THREE.InstancedMesh(geometry, material, positions.length);
   mesh.name = `lab-crop-${crop}`;
   mesh.castShadow = false;
