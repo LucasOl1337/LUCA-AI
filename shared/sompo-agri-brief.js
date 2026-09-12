@@ -10,6 +10,9 @@ import {
   getSompoAgriScenario,
 } from './sompo-agri-scenarios.js';
 import { createSompoSimulationSnapshot, sompoEpisodeFrameMoments } from './sompo-telemetry-simulator.js';
+import { evaluateGeofence } from './sompo-geofence.js';
+import { getSompoGeofenceSite } from './sompo-geofence-sites.js';
+export { describeGeofence } from './sompo-geofence.js';
 
 const finite = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
@@ -82,11 +85,12 @@ export function getSompoAgriTravelMeters(scenarioId, elapsedMs = 0, outcomeId) {
   return travel + (((elapsed - scenario.totalMs) / 1000) * ((last.speedKph / 3.6) * last.direction));
 }
 
-/**
- * Snapshot de telemetria do ensaio agrícola: o frame roteirizado entra como
- * scriptFrame (faixas amplas de roll, gravidade rotacionada, taxas do roteiro)
- * e a proveniência aponta o cenário/desfecho agrícolas reais.
- */
+/** Origem em metros compartilhada pelo snapshot e pelo palco. */
+export function getSompoAgriStartX(scenarioId, outcomeId) {
+  return -getSompoAgriTravelMeters(scenarioId, getSompoAgriScenario(scenarioId).totalMs, outcomeId) / 2;
+}
+
+/** Snapshot agrícola com proveniência, posição de cena e radar sintético. */
 export function createSompoAgriSimulationSnapshot(scenarioId, outcomeId, {
   observedAt = new Date().toISOString(),
   elapsedMs = 0,
@@ -97,7 +101,7 @@ export function createSompoAgriSimulationSnapshot(scenarioId, outcomeId, {
     ...frame,
     lateralAcceleration: (frame.speedKph / 3.6) * frame.yawRate * (Math.PI / 180),
   };
-  return createSompoSimulationSnapshot({}, {
+  const snapshot = createSompoSimulationSnapshot({}, {
     observedAt,
     elapsedMs,
     connectedAt,
@@ -111,6 +115,15 @@ export function createSompoAgriSimulationSnapshot(scenarioId, outcomeId, {
       outcomeLabel: frame.outcomeLabel,
     },
   });
+  const startX = getSompoAgriStartX(scenarioId, outcomeId);
+  const position = {
+    x: startX + getSompoAgriTravelMeters(scenarioId, elapsedMs, outcomeId),
+    z: frame.lateral,
+    headingDeg: 90 - frame.yaw,
+  };
+  const site = getSompoGeofenceSite(getSompoAgriScenario(scenarioId).environmentId, -2 * startX);
+  const geofence = evaluateGeofence({ ...position, speedKph: frame.speedKph }, site.manifestRules, site.polygons);
+  return { ...snapshot, position, geofence, risks: { ...snapshot.risks, proximity: !!geofence.nearest } };
 }
 
 /**

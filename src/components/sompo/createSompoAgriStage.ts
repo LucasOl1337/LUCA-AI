@@ -10,7 +10,8 @@ import {
   getSompoAgriScenario,
   type SompoAgriScenarioId,
 } from '../../../shared/sompo-agri-scenarios.js';
-import { getSompoAgriTravelMeters } from '../../../shared/sompo-agri-brief.js';
+import { getSompoAgriStartX, getSompoAgriTravelMeters } from '../../../shared/sompo-agri-brief.js';
+import { getSompoGeofenceSite } from '../../../shared/sompo-geofence-sites.js';
 import { frameDamping } from './frameDamping.js';
 import { createSompoRenderer, sompoRenderBudget, disposeSompoObject, type SompoStageApi } from './sompoStage';
 import { createSompoEnvironmentAssets } from './createSompoEnvironmentAssets';
@@ -132,7 +133,44 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
 
   // Percurso centrado no talhão: o equipamento atravessa o campo de verdade.
   const totalTravel = getSompoAgriTravelMeters(scenarioId, scenario.totalMs, outcomeId);
-  const startX = -totalTravel / 2;
+  const startX = getSompoAgriStartX(scenarioId, outcomeId);
+  const site = getSompoGeofenceSite(scenario.environmentId, totalTravel);
+  const geofenceLayer = new THREE.Group();
+  geofenceLayer.name = 'sompo-geofence-synthetic';
+  worldRoot.add(geofenceLayer);
+  for (const polygon of site.polygons) {
+    const ring = polygon.rings[0];
+    const color = polygon.role === 'water' ? 0x79b9c0 : polygon.role === 'hazard' ? 0xe6ad52 : 0x73c48c;
+    const points: THREE.Vector3[] = [];
+    for (let i = 1; i < ring.length; i += 1) {
+      const a = ring[i - 1], b = ring[i];
+      const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z)));
+      for (let step = 0; step < steps; step += 1) {
+        const x = THREE.MathUtils.lerp(a.x, b.x, step / steps);
+        const z = THREE.MathUtils.lerp(a.z, b.z, step / steps);
+        points.push(new THREE.Vector3(x, field.groundHeight(x, z) + 0.08, z));
+      }
+    }
+    points.push(points[0].clone());
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), polygon.role === 'allowed_area'
+      ? new THREE.LineDashedMaterial({ color, dashSize: 1.5, gapSize: 1 })
+      : new THREE.LineBasicMaterial({ color }));
+    line.computeLineDistances();
+    geofenceLayer.add(line);
+    if (polygon.role === 'water') {
+      const width = ring[1].x - ring[0].x, depth = ring[2].z - ring[1].z;
+      const geometry = new THREE.PlaneGeometry(width, depth, Math.max(1, Math.ceil(width)), Math.ceil(depth));
+      geometry.rotateX(-Math.PI / 2);
+      geometry.translate((ring[0].x + ring[1].x) / 2, 0, (ring[0].z + ring[2].z) / 2);
+      const positions = geometry.attributes.position;
+      for (let i = 0; i < positions.count; i += 1) {
+        positions.setY(i, field.groundHeight(positions.getX(i), positions.getZ(i)) + 0.05);
+      }
+      geofenceLayer.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+        color, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide,
+      })));
+    }
+  }
   if (scenario.environmentId === 'farm-barn') {
     // O barracão gira para a manobra de ré terminar estacionada lá dentro.
     const barn = field.root.getObjectByName('sompo-agri-barn');

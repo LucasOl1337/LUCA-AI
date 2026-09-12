@@ -24,6 +24,7 @@
 | [`docs/operacao.md`](./docs/operacao.md) | SOMENTE ao instalar, executar, testar, diagnosticar estado local ou preparar release. |
 | [`docs/integracoes.md`](./docs/integracoes.md) | SOMENTE ao mudar roteador LLM, Kamui, personas Yume, anexos ou a publicacao pela VM. |
 | [`docs/sompo.md`](./docs/sompo.md) | SOMENTE ao mudar telemetria SOMPO, contrato ESP32/Firebase ou o painel do trator. |
+| [`docs/geofencing.md`](./docs/geofencing.md) | SOMENTE ao mudar faixas de proximidade, perigos do mapa, o radar do simulador agrícola ou os episódios de faixa do laboratório. |
 | [`docs/yume-personas/`](./docs/yume-personas/) | SOMENTE ao criar no Yume a definicao oficial de uma persona (o LUCA nao escreve no Yume). |
 | `server/deliberations/README.md` | SOMENTE ao mudar o contrato de deliberacao para harnesses. |
 | `praisonai-tests/README.md` | SOMENTE ao executar os exemplos Python desse diretorio. |

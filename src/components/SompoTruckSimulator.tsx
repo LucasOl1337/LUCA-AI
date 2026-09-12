@@ -37,6 +37,8 @@ import {
 } from '../../shared/sompo-agri-scenarios.js';
 import {
   createSompoAgriSimulationSnapshot,
+  describeGeofence,
+  type SompoAgriSimulationSnapshot,
   getSompoAgriEpisodePlan,
   getSompoAgriOutcomes,
   isSompoAgriScenarioId,
@@ -317,7 +319,7 @@ export default function SompoTruckSimulator({
   const [controls, setControls] = useState<SompoSimulationControls>(INITIAL_CONTROLS);
   const [agriRun, setAgriRun] = useState<SompoAgriRun | null>(() => !isFirebase && ['tractor', 'harvester'].includes(studioConfig.equipment) ? { scenarioId: studioConfig.equipment === 'harvester' ? 'agri-harvest-dust' : 'agri-field-bogging', outcomeId: studioConfig.equipment === 'harvester' ? 'clean-pass' : getSompoAgriOutcomes('agri-field-bogging')[0].id } : null);
   const [axisCalibration, setAxisCalibration] = useState<SompoAxisCalibration>(loadAxisCalibration);
-  const [preview, setPreview] = useState<SompoTelemetrySnapshot>(() => (
+  const [preview, setPreview] = useState<SompoTelemetrySnapshot & Partial<Pick<SompoAgriSimulationSnapshot, 'geofence'>>>(() => (
     telemetry || createSompoSimulationSnapshot(INITIAL_CONTROLS, { elapsedMs: 0 })
   ));
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -896,6 +898,15 @@ export default function SompoTruckSimulator({
                 <span>{preview.risks.collision ? 'Alerta de colisão' : preview.risks.inclination ? 'Alerta de inclinação' : 'Colisão/inclinação sem alerta'}</span>
                 <strong>{formatReading(preview.readings.distance, ' cm')} <small>à frente</small></strong>
               </div>
+              {agriRun && preview.geofence && (
+                <div data-geofence data-alert={!!preview.geofence.nearest}
+                  className={preview.geofence.nearest ? `sompo-geofence-${['critica', 'dentro'].includes(preview.geofence.nearest.bandId) ? 'forte' : ['elevada', 'borda'].includes(preview.geofence.nearest.bandId) ? 'media' : 'fraca'}` : undefined}>
+                  <span>Talhão sintético · demonstração</span>
+                  <strong>{!preview.geofence.nearest && preview.geofence.insideAllowed
+                    ? 'Radar: sem perigo mapeado no alcance'
+                    : `Radar: ${describeGeofence(preview.geofence)}`}</strong>
+                </div>
+              )}
             </div>
           )}
           <div className="sompo-simulator-camera" role="group" aria-label="Controles da câmera 3D">

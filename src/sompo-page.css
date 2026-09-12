@@ -2383,7 +2383,7 @@
 
 /* Compact operational reading stays with the machine when the controls scroll. */
 .sompo-simulator-readout {
-  position: absolute; top: 53px; left: 14px; display: flex; gap: 6px;
+  position: absolute; top: 53px; left: 14px; display: flex; flex-wrap: wrap; gap: 6px;
   max-width: calc(100% - 28px); pointer-events: none;
 }
 .sompo-simulator-readout > div {
@@ -2394,6 +2394,11 @@
 .sompo-simulator-readout strong { display: block; margin-top: 2px; font-size: 15px; font-variant-numeric: tabular-nums; }
 .sompo-simulator-readout small { font-size: 10px; font-weight: 400; }
 .sompo-simulator-readout [data-alert='true'] { background: #6c261ee8; border-color: #ffb39787; }
+.sompo-simulator-readout .sompo-geofence-forte { background: #6c261ee8; border-color: #ffb397; }
+.sompo-simulator-readout .sompo-geofence-media { background: #65451be8; border-color: #e6ad52; }
+.sompo-simulator-readout .sompo-geofence-fraca { background: #344c38e8; border-color: #b9c77b; }
+.sompo-simulator-readout [data-geofence] { max-width: 280px; }
+.sompo-simulator-readout [data-geofence] strong { font-size: 12px; line-height: 1.4; }
 @media(max-width:700px) {
   .sompo-simulator-readout { top: 48px; left: 10px; max-width: calc(100% - 20px); }
   .sompo-simulator-readout > div { padding: 6px 8px; }
