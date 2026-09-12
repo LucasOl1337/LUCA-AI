@@ -8,6 +8,11 @@ const port = Number(process.env.SOMPO_PREVIEW_PORT || 5197);
 const output = resolve(process.env.SOMPO_PREVIEW_OUTPUT || `${repo}/.sompo-preview`);
 mkdirSync(output, { recursive: true });
 const inspect = process.env.SOMPO_PREVIEW_INSPECT === '1' ? [{ name: 'fixture-scene-probe', setup(build) {
+  build.onLoad({ filter: /\/createSompoRuralStage\.ts$/ }, args => ({ loader: 'ts', contents: readFileSync(args.path, 'utf8')
+    .replace('const settings = controlsRef.current;', `const settings = controlsRef.current;
+      (window as any).__sompoFrame = { started: startedAtRef.current, stamp: runStamp, scenario: settings.scenarioId, outcome: settings.outcomeId, lastX: lastTruckWorldX };`)
+    .replace('animalAnchorX = animalAnchorFor(settings, runOriginX);', `animalAnchorX = animalAnchorFor(settings, runOriginX);
+        (window as any).__sompoAnchor = { anchorX: animalAnchorX, originX: runOriginX, scenario: settings.scenarioId, outcome: settings.outcomeId, lastX: lastTruckWorldX, stamp: runStamp, started: startedAtRef.current };`) }));
   build.onLoad({ filter: /\/sompoStage\.ts$/ }, args => ({ loader: 'ts', contents: readFileSync(args.path, 'utf8').replace('return { renderer, budget };', `
     const draw = renderer.render.bind(renderer);
     renderer.render = (scene, camera) => {
