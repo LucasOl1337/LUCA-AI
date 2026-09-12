@@ -193,7 +193,7 @@ function createDust() {
 
 /** Torrões de lama ejetados pelas rodas que patinam — balísticos e curtos. */
 function createMudSpray() {
-  const spray = createParticleCloud(130, 0.75, 0x453522);
+  const spray = createParticleCloud(130, 0.85, 0x55432c);
   spray.name = 'sompo-agri-mudspray';
   return spray;
 }
@@ -234,7 +234,7 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
 
   const mud = new THREE.Mesh(
     new THREE.CircleGeometry(8, 40),
-    new THREE.MeshStandardMaterial({ color: 0x4a3b2c, roughness: 0.5, metalness: 0 }),
+    new THREE.MeshStandardMaterial({ color: 0x38291c, roughness: 0.55, metalness: 0 }),
   );
   mud.name = 'sompo-agri-mud';
   mud.geometry.rotateX(-Math.PI / 2);

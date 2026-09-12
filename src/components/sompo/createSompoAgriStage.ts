@@ -109,7 +109,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   if (scenario.environmentId === 'muddy-field') {
     // Packed roughness and normals keep wet soil from becoming a flat gray mirror.
     assets.surface(field.mud.material, 'dirt', 4, 2.6);
-    field.mud.material.envMapIntensity = 0.35;
+    field.mud.material.envMapIntensity = 0.18;
   }
   field.terrain.material.color.set(night ? 0x8b8b81 : scenario.environmentId === 'muddy-field' ? 0x736b60 : 0xd7c6a5);
   // A cena agrícola traz o próprio sol; só o abrimos para cobrir a máquina inteira.
