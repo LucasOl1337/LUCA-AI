@@ -41,5 +41,9 @@ export function getSompoGeofenceSite(environmentId, totalTravelMeters) {
       { id: 'borda', label: 'Borda da ribanceira', max_m: 15 },
     ] });
   }
+  // Perigo de máquina, por último: sem geometria; o limite vem de machine.profile.max_roll_deg em quem avalia (resolveHazards).
+  hazards.push({ role: 'machine', metric: 'roll_deg', label: 'Limite de inclinação da máquina', synthetic: true,
+    justification: 'Limite declarado no perfil do equipamento (demonstração); faixas em graus de margem até o limite.',
+    bands_m: [{ id: 'acima', label: 'Acima do limite', max_m: 0 }, { id: 'proximo', label: 'Próximo do limite', max_m: 5 }] });
   return { manifestRules: { hazards, synthetic: true }, polygons, synthetic: true, label: 'Talhão sintético de demonstração' };
 }

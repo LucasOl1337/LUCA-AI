@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { evaluateGeofence, closestPointOnPolygon, forwardVector, describeGeofence } from '../shared/sompo-geofence.js';
+import { evaluateGeofence, closestPointOnPolygon, forwardVector, describeGeofence, describeMachineLimit } from '../shared/sompo-geofence.js';
 
 const rect = (id, role, x0, x1, z0, z1, extra = {}) => ({ id, role, rings: [[{ x: x0, z: z0 }, { x: x1, z: z0 }, { x: x1, z: z1 }, { x: x0, z: z1 }, { x: x0, z: z0 }]], ...extra });
 const field = rect('talhao', 'allowed_area', -100, 100, -50, 50);
@@ -40,4 +40,27 @@ test('sem heading: faixa e distância continuam, lado e tempo ficam nulos; fora 
   assert.equal(describeGeofence(outside), 'Fora da área permitida');
   assert.match(describeGeofence(evaluateGeofence({ x: 60, z: 0, headingDeg: 180, speedKph: 7.2 }, rules, [field, water])), /^Atenção · Córrego a 20 m à frente · 10 s$/);
   for (const text of [describeGeofence(result), describeGeofence(outside)]) assert.doesNotMatch(text, /seguro|risco|acidente/i);
+});
+
+test('limite da máquina: margem em graus até max_roll_deg do perfil, fora de nearest; sem sinal, sem faixa', () => {
+  const withMachine = { hazards: [...rules.hazards, { role: 'machine', metric: 'roll_deg', label: 'Limite de inclinação da máquina',
+    bands_m: [{ id: 'acima', label: 'Acima do limite', max_m: 0 }, { id: 'proximo', label: 'Próximo do limite', max_m: 5 }] }] };
+  const tractor = { profile: { max_roll_deg: 25 } };
+  const flat = evaluateGeofence({ x: 60, z: 0, headingDeg: 90, rollDeg: 10 }, withMachine, [field, water], tractor);
+  assert.equal(flat.machine, null, 'margem de 15° fica fora das faixas');
+  assert.equal(flat.nearest.hazardLabel, 'Córrego', 'radar espacial intacto');
+  const near = evaluateGeofence({ x: 60, z: 0, rollDeg: -22 }, withMachine, [field, water], tractor);
+  assert.equal(near.machine.bandId, 'proximo');
+  assert.equal(near.machine.marginDeg, 3);
+  assert.equal(near.machine.valueDeg, 22);
+  assert.equal(near.all.length, 1, 'faixa de máquina não entra em all');
+  const over = evaluateGeofence({ x: 60, z: 0, rollDeg: 34 }, withMachine, [field, water], tractor);
+  assert.equal(over.machine.bandId, 'acima');
+  assert.equal(over.machine.marginDeg, 0);
+  assert.equal(describeMachineLimit(over.machine), 'Acima do limite · inclinação 34° · limite 25°');
+  assert.equal(evaluateGeofence({ x: 60, z: 0 }, withMachine, [field, water], tractor).machine, null, 'sem rollDeg');
+  const noProfile = evaluateGeofence({ x: 60, z: 0, rollDeg: 34 }, withMachine, [field, water]);
+  assert.equal(noProfile.machine, null);
+  assert.equal(noProfile.warnings.length, 1, 'perfil ausente vira aviso, não faixa');
+  assert.doesNotMatch(describeMachineLimit(near.machine), /seguro|risco|acidente/i);
 });

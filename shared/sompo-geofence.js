@@ -34,15 +34,26 @@ function relativeBearing(forward, dx, dz) {
 
 // Resultado por perigo dentro do alcance da faixa mais externa; nearest = o de menor distância.
 // timeToHazardS: distância / velocidade de aproximação; null quando a máquina não se aproxima (parada, paralela ou afastando).
-export function evaluateGeofence({ x, z, headingDeg = null, speedKph = 0 }, rules, polygons) {
-  const hazards = resolveHazards(rules, polygons);
+// machine = { profile: { max_roll_deg } }: dá o limite aos perigos de role 'machine'; rollDeg/pitchDeg são o sinal medido.
+// A margem em graus não se mistura com metros: fica em result.machine, fora de nearest/all.
+export function evaluateGeofence({ x, z, headingDeg = null, speedKph = 0, rollDeg = null, pitchDeg = null }, rules, polygons, machine = null) {
+  const hazards = resolveHazards(rules, polygons, machine);
+  const signals = { roll_deg: rollDeg, pitch_deg: pitchDeg };
+  let machineHit = null;
   const allowed = polygons.filter(polygon => polygon.role === 'allowed_area');
   const insideAllowed = allowed.length ? allowed.some(polygon => polygonContains({ x, z }, polygon)) : null;
   const forward = headingDeg === null ? null : forwardVector(headingDeg);
   const speedMs = Math.max(0, speedKph) / 3.6;
   const all = [];
   for (const hazard of hazards) {
-    if (!hazard.polygon) continue; // Perigo de máquina (inclinação) não tem geometria; o radar é espacial.
+    if (hazard.metric) {
+      const value = signals[hazard.metric];
+      if (!Number.isFinite(value)) continue; // sem sinal, sem faixa (regra 2 do SPEC)
+      const marginDeg = Math.max(0, hazard.limit - Math.abs(value));
+      const band = classifyBand(marginDeg, hazard.bands);
+      if (band && (!machineHit || marginDeg < machineHit.marginDeg)) machineHit = { hazardKey: hazard.key, hazardLabel: hazard.label, bandId: band.id, bandLabel: band.label ?? band.id, bandMaxDeg: band.max_m, metric: hazard.metric, valueDeg: Math.abs(value), limitDeg: hazard.limit, marginDeg };
+      continue;
+    }
     const nearest = closestPointOnPolygon({ x, z }, hazard.polygon);
     const band = classifyBand(nearest.distance, hazard.bands);
     if (!band) continue;
@@ -56,7 +67,7 @@ export function evaluateGeofence({ x, z, headingDeg = null, speedKph = 0 }, rule
     });
   }
   all.sort((a, b) => a.distanceM - b.distanceM);
-  return { insideAllowed, nearest: all[0] ?? null, all, warnings: hazards.warnings };
+  return { insideAllowed, nearest: all[0] ?? null, all, machine: machineHit, warnings: hazards.warnings };
 }
 
 // Texto curto para HUD e telemetria, sem "seguro"/"risco": só proximidade, direção e tempo.
@@ -68,3 +79,9 @@ export function describeGeofence(result) {
   return `${near.bandLabel} · ${near.hazardLabel} a ${near.distanceM.toFixed(0)} m${side}${time}`;
 }
 
+
+// Texto do limite da máquina para o HUD: faixa, inclinação medida e limite declarado. Sem "seguro"/"risco".
+export function describeMachineLimit(hit) {
+  if (!hit) return '';
+  return `${hit.bandLabel} · inclinação ${hit.valueDeg.toFixed(0)}° · limite ${hit.limitDeg}°`;
+}

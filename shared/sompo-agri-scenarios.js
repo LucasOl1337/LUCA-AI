@@ -54,6 +54,8 @@ export const SOMPO_AGRI_EQUIPMENT = freeze({
     provenanceUrl: '/models/sompo/generated-agri-tractor.provenance.json',
     nominalSizeM: freeze({ length: 5.8, width: 2.7, height: 3.2 }),
     forwardAxis: '+X',
+    // Limite de inclinação declarado para demonstração (não é dado do fabricante): o geofencing mede a margem até ele.
+    profile: freeze({ max_roll_deg: 25, synthetic: true }),
   }),
   harvester: freeze({
     id: 'harvester',
@@ -62,6 +64,7 @@ export const SOMPO_AGRI_EQUIPMENT = freeze({
     provenanceUrl: '/models/sompo/generated-agri-harvester.provenance.json',
     nominalSizeM: freeze({ length: 9.2, width: 7.6, height: 4.0 }),
     forwardAxis: '+X',
+    profile: freeze({ max_roll_deg: 15, synthetic: true }),
   }),
 });
 

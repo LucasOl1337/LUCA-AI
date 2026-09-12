@@ -13,7 +13,7 @@ Geofencing aqui é um framework de delimitação de área e classificação de z
 - **Perigo de máquina** (`role: 'machine'`, `metric: 'roll_deg' | 'pitch_deg'`): sem geometria. A "distância" é a margem em graus entre o sinal do CSV e o limite da máquina, lido de `manifest.machine.profile.max_roll_deg` (ou `limit_deg` fixo na regra). `bands_m` continua sendo a lista de faixas, agora em graus: `max_m: 0` = no limite ou acima, `max_m: 5` = a até 5° do limite. Amostra sem o sinal não abre nem fecha episódio. Esse é o ponto do framework: o declive é o mesmo para todos, o limite é de cada máquina; trocar o perfil troca os episódios e, com relevo, as zonas pintadas no mapa (`slopeZones` em `src/components/lab/labBands.ts`, inclinação do terreno ≥ limite).
 - **Perfil da máquina** em `manifest.machine.profile`: números não negativos (`max_roll_deg`, `max_pitch_deg`, `platform_width_m`, `operating_speed_kmh`, `reaction_time_s`). Demonstração usa 15° para a colheitadeira; o valor real vem do fabricante e do implemento.
 - **Motor** `shared/lab-geofence.js`: `classifyBand`, `resolveHazards`, `computeGeofenceEpisodes` (episódios por perigo com `observedMs`, `gapMs`, distância mínima e qualidade; eventos `hazard_band`), `bandGrid`/`affectedArea` (grade de 2 m dentro de `allowed_area`; a mesma grade pinta a cena, regra 1 do SPEC). `geofence.grid` fica no caso para a interface não recalcular.
-- **Radar** `shared/sompo-geofence.js`: `evaluateGeofence({ x, z, headingDeg, speedKph }, rules, polygons)` → `{ insideAllowed, nearest: { hazardLabel, bandLabel, distanceM, bearingDeg, timeToHazardS }, all }` e `describeGeofence(result)` para HUD. `headingDeg` segue o CSV do laboratório: 0 = norte, 90 = leste.
+- **Radar** `shared/sompo-geofence.js`: `evaluateGeofence({ x, z, headingDeg, speedKph, rollDeg }, rules, polygons, machine)` → `{ insideAllowed, nearest: { hazardLabel, bandLabel, distanceM, bearingDeg, timeToHazardS }, all, machine }` e `describeGeofence(result)` / `describeMachineLimit(result.machine)` para HUD. `headingDeg` segue o CSV do laboratório: 0 = norte, 90 = leste. `machine` é o equipamento do cenário (`SOMPO_AGRI_EQUIPMENT[id].profile.max_roll_deg`, valor de demonstração); a regra `role: 'machine'` está em todo talhão sintético e a margem em graus fica em `result.machine`, separada dos metros de `nearest`.
 
 ## Onde aparece
 
@@ -23,7 +23,7 @@ Geofencing aqui é um framework de delimitação de área e classificação de z
 | Laboratório, minimapa | `src/components/lab/LabMiniMap.tsx` | Canto inferior esquerdo: área, água, faixas forte→fraca, trajeto, máquina; clique leva o replay ao instante |
 | Laboratório, painéis | `LabBandLegend.tsx`, `LabGeofencePanel.tsx` (+ `LabExposureStrip`) | Legenda com área atingida; episódios; régua de exposição na linha do tempo |
 | Laboratório, agentes | `server/lab-cases.js` `evidenceContext` | Episódios e área atingida no payload da IA, com a frase de limitação |
-| Simulador agrícola | `shared/sompo-geofence-sites.js`, `shared/sompo-agri-brief.js`, `src/components/SompoTruckSimulator.tsx`, `createSompoAgriStage.ts` | Talhão sintético por ambiente; `snapshot.position`, `snapshot.geofence`, `risks.proximity`; HUD "Radar: faixa · perigo a N m à direita · T s"; polígonos no palco |
+| Simulador agrícola | `shared/sompo-geofence-sites.js`, `shared/sompo-agri-brief.js`, `src/components/SompoTruckSimulator.tsx`, `createSompoAgriStage.ts` | Talhão sintético por ambiente; `snapshot.position`, `snapshot.geofence`, `risks.proximity`; HUD "Radar: faixa · perigo a N m à direita · T s" e, quando a inclinação entra em faixa, "Próximo do limite · inclinação 22° · limite 25°"; zonas no chão do palco (mesma grade) |
 
 ## Dataset de referência
 
@@ -32,6 +32,6 @@ Geofencing aqui é um framework de delimitação de área e classificação de z
 ## Próximos passos registrados
 
 1. Persistir `posX`/`posZ`/faixa nas amostras do simulador e exportar GNSS sintético em `convertSompoDataset`, para o episódio gravado virar caso com episódios de faixa no laboratório.
-2. `manifest.machine.profile` (largura, velocidade, tempo de reação, limite de inclinação) alimentando faixas operacionais por máquina.
+2. `manifest.machine.profile` (largura, velocidade, tempo de reação) alimentando faixas operacionais por máquina; o limite de inclinação já alimenta o laboratório e o radar do simulador.
 3. GPS no ESP32: campos `latitude`, `longitude`, `gnss_fix` no nó do Firebase; o servidor roda o mesmo `evaluateGeofence` sobre o snapshot físico.
 4. Fontes externas para fazendas reais: OSM (água), SICAR (imóvel), modelo digital de elevação (declividade).

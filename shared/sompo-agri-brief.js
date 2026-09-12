@@ -5,6 +5,7 @@
  * alterar o módulo agrícola. Puro: frames e integrais são função do relógio.
  */
 import {
+  SOMPO_AGRI_EQUIPMENT,
   SOMPO_AGRI_SCENARIOS,
   getSompoAgriFrame,
   getSompoAgriScenario,
@@ -12,7 +13,7 @@ import {
 import { createSompoSimulationSnapshot, sompoEpisodeFrameMoments } from './sompo-telemetry-simulator.js';
 import { evaluateGeofence } from './sompo-geofence.js';
 import { getSompoGeofenceSite } from './sompo-geofence-sites.js';
-export { describeGeofence } from './sompo-geofence.js';
+export { describeGeofence, describeMachineLimit } from './sompo-geofence.js';
 
 const finite = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
@@ -121,8 +122,9 @@ export function createSompoAgriSimulationSnapshot(scenarioId, outcomeId, {
     z: frame.lateral,
     headingDeg: 90 - frame.yaw,
   };
-  const site = getSompoGeofenceSite(getSompoAgriScenario(scenarioId).environmentId, -2 * startX);
-  const geofence = evaluateGeofence({ ...position, speedKph: frame.speedKph }, site.manifestRules, site.polygons);
+  const scenario = getSompoAgriScenario(scenarioId);
+  const site = getSompoGeofenceSite(scenario.environmentId, -2 * startX);
+  const geofence = evaluateGeofence({ ...position, speedKph: frame.speedKph, rollDeg: frame.roll }, site.manifestRules, site.polygons, SOMPO_AGRI_EQUIPMENT[scenario.equipmentId]);
   return { ...snapshot, position, geofence, risks: { ...snapshot.risks, proximity: !!geofence.nearest } };
 }
 

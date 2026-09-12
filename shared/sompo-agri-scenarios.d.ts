@@ -22,6 +22,7 @@ export interface SompoAgriEquipment {
   readonly provenanceUrl: string;
   readonly nominalSizeM: Readonly<{ length: number; width: number; height: number }>;
   readonly forwardAxis: '+X';
+  readonly profile: Readonly<{ max_roll_deg: number; synthetic: true }>;
 }
 
 export interface SompoAgriPhase {

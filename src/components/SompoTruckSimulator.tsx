@@ -38,6 +38,7 @@ import {
 import {
   createSompoAgriSimulationSnapshot,
   describeGeofence,
+  describeMachineLimit,
   type SompoAgriSimulationSnapshot,
   getSompoAgriEpisodePlan,
   getSompoAgriOutcomes,
@@ -905,6 +906,12 @@ export default function SompoTruckSimulator({
                   <strong>{!preview.geofence.nearest && preview.geofence.insideAllowed
                     ? 'Radar: sem perigo mapeado no alcance'
                     : `Radar: ${describeGeofence(preview.geofence)}`}</strong>
+                </div>
+              )}
+              {agriRun && preview.geofence?.machine && (
+                <div data-geofence-machine data-alert className={`sompo-geofence-${preview.geofence.machine.bandId === 'acima' ? 'forte' : 'media'}`}>
+                  <span>Limite da máquina · perfil de demonstração</span>
+                  <strong>{describeMachineLimit(preview.geofence.machine)}</strong>
                 </div>
               )}
             </div>
