@@ -178,6 +178,8 @@ export interface SompoRuralFrame extends SompoSimulationScenario {
   direction: number;
   accelerationX: number;
   yawRate: number;
+  lateralRate: number;
+  animalRate: number;
   pitchRate: number;
   rollRate: number;
   lateralAcceleration: number;
@@ -185,14 +187,14 @@ export interface SompoRuralFrame extends SompoSimulationScenario {
 export const SOMPO_RURAL_SCRIPTS: Readonly<Partial<Record<SompoSimulationScenarioId, Readonly<{
   scenarioId: SompoSimulationScenarioId;
   totalMs: number;
-  keyframes: readonly Readonly<Omit<SompoRuralFrame, 'accelerationX' | 'yawRate' | 'pitchRate' | 'rollRate' | 'lateralAcceleration'>>[];
+  keyframes: readonly Readonly<Omit<SompoRuralFrame, 'accelerationX' | 'yawRate' | 'lateralRate' | 'pitchRate' | 'rollRate' | 'lateralAcceleration' | 'animalRate'>>[];
 }>>>>;
 export function getSompoRuralFrame(scenarioId: string, elapsedMs?: number, outcomeId?: string): SompoRuralFrame | null;
 
 export interface SompoRuralScript {
   scenarioId: SompoSimulationScenarioId;
   totalMs: number;
-  keyframes: readonly Readonly<Omit<SompoRuralFrame, 'accelerationX' | 'yawRate' | 'pitchRate' | 'rollRate' | 'lateralAcceleration'>>[];
+  keyframes: readonly Readonly<Omit<SompoRuralFrame, 'accelerationX' | 'yawRate' | 'lateralRate' | 'pitchRate' | 'rollRate' | 'lateralAcceleration' | 'animalRate'>>[];
 }
 
 export function getSompoScenarioScript(scenarioId: string, outcomeId?: string | null): Readonly<SompoRuralScript> | null;

@@ -370,6 +370,22 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
 
 const finite = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
+const frameCache = new WeakMap();
+
+/** Cascaded, immutable poses are compiled once, shared by sampling and motion. */
+export function getSompoAgriKeyframes(scenarioId, outcomeId) {
+  const selected = getSompoAgriScenario(scenarioId);
+  const selectedOutcome = selected.outcomes[outcomeId] || selected.outcomes[selected.defaultOutcomeId];
+  if (!frameCache.has(selectedOutcome)) {
+    const base = { ...BASE_FRAME };
+    for (const key of ['speedKph', 'distance', 'temperature', 'humidity', 'pitch', 'roll', 'roughness', 'collisionRisk', 'inclinationRisk']) base[key] = selected[key];
+    frameCache.set(selectedOutcome, freeze(selectedOutcome.keyframes.map(keyframe => {
+      Object.assign(base, keyframe);
+      return freeze({ ...base });
+    })));
+  }
+  return frameCache.get(selectedOutcome);
+}
 
 export function getSompoAgriScenario(scenarioId = 'agri-harvest-dust') {
   const selected = Object.hasOwn(SOMPO_AGRI_SCENARIOS, scenarioId)
@@ -382,15 +398,7 @@ export function getSompoAgriFrame(scenarioId, elapsedMs = 0, outcomeId) {
   const selected = getSompoAgriScenario(scenarioId);
   const selectedOutcome = selected.outcomes[outcomeId] || selected.outcomes[selected.defaultOutcomeId];
   const elapsed = clamp(finite(elapsedMs, 0), 0, selected.totalMs);
-  const base = { ...BASE_FRAME };
-  for (const key of ['speedKph', 'distance', 'temperature', 'humidity', 'pitch', 'roll', 'roughness', 'collisionRisk', 'inclinationRisk']) {
-    base[key] = selected[key];
-  }
-  const frames = [];
-  for (const keyframe of selectedOutcome.keyframes) {
-    Object.assign(base, keyframe);
-    frames.push({ ...base });
-  }
+  const frames = getSompoAgriKeyframes(scenarioId, outcomeId);
   const from = frames.findLast((frame) => elapsed >= frame.atMs) || frames[0];
   const to = frames.find((frame) => frame.atMs > elapsed) || from;
   const duration = to.atMs - from.atMs;
@@ -399,10 +407,13 @@ export function getSompoAgriFrame(scenarioId, elapsedMs = 0, outcomeId) {
   const derivative = duration ? 6 * progress * (1 - progress) / (duration / 1_000) : 0;
   const frame = { ...from };
   for (const key of Object.keys(from)) {
-    if (typeof from[key] === 'number' && typeof to[key] === 'number') {
+    if (key !== 'direction' && typeof from[key] === 'number' && typeof to[key] === 'number') {
       frame[key] = from[key] + ((to[key] - from[key]) * blend);
     }
   }
+  // A gearbox is discrete. Wheel speed stays continuous through zero at a shift.
+  frame.wheelSpeedKph = (from.wheelSpeedKph ?? from.speedKph)
+    + ((to.wheelSpeedKph ?? to.speedKph) - (from.wheelSpeedKph ?? from.speedKph)) * blend;
   const activePhase = selected.phases.find((item) => elapsed < item.endMs) || selected.phases.at(-1);
   return {
     ...frame,

@@ -34,6 +34,23 @@ function periodicNoise(x: number, z: number, cell: number, periodColumns: number
     + (corner(1, 1) * ux * uz);
 }
 
+/** Distância periódica em X — o relevo (e o lago) se repetem com o período do terreno. */
+function periodicX(x: number) {
+  return ((x % SOMPO_TERRAIN_PERIOD_X) + SOMPO_TERRAIN_PERIOD_X * 1.5) % SOMPO_TERRAIN_PERIOD_X - SOMPO_TERRAIN_PERIOD_X / 2;
+}
+
+/**
+ * Onde o lago do vale mora: eixo periódico x ≡ −26, z ≈ −100 (lado da lavoura,
+ * no azimute que a câmera padrão enxerga à direita do caminhão). A bacia afunda
+ * abaixo do nível da pista e a lâmina d'água cobre o fundo.
+ */
+export const SOMPO_LAKE = { x: -26, z: -100, bedY: -1.4, waterY: 0.55, radius: 24 };
+
+/** Distância horizontal ao centro do lago (já com o wrap periódico em X). */
+export function sompoLakeDistance(x: number, z: number) {
+  return Math.hypot(periodicX(x - SOMPO_LAKE.x), z - SOMPO_LAKE.z);
+}
+
 /** Faixa da rodovia (pista + acostamentos) permanece plana; o campo ondula suave. */
 export function sompoTerrainHeight(x: number, z: number) {
   const corridor = Math.abs(z + 2.05);
@@ -43,7 +60,23 @@ export function sompoTerrainHeight(x: number, z: number) {
   const middle = (periodicNoise(x + 137, z + 29, 16, SOMPO_TERRAIN_PERIOD_X / 16) * 2) - 1;
   const fine = (periodicNoise(x + 37, z + 91, 5, SOMPO_TERRAIN_PERIOD_X / 5) * 2) - 1;
   const amplitude = 1.4 + (THREE.MathUtils.smoothstep(corridor, 26, 100) * 3.4);
-  return mask * ((broad * amplitude) + (middle * amplitude * 0.35) + (fine * 0.22));
+  let h = mask * ((broad * amplitude) + (middle * amplitude * 0.35) + (fine * 0.22));
+  // Serra ao fundo: crista rolando dos dois lados, abrindo uma forquilha no lago.
+  // MathUtils.smoothstep não inverte bordas como o GLSL — máscaras de raio usam 1-smoothstep.
+  const lakeX = periodicX(x - SOMPO_LAKE.x);
+  const lakeDist = sompoLakeDistance(x, z);
+  const notch = 1 - THREE.MathUtils.smoothstep(lakeDist, 14, 36);
+  const ridge = THREE.MathUtils.smoothstep(corridor, 45, 95)
+    * (4.5 + periodicNoise(x + 501, z + 77, 80, SOMPO_TERRAIN_PERIOD_X / 80) * 9.5
+      + periodicNoise(x + 97, z + 11, 32, SOMPO_TERRAIN_PERIOD_X / 32) * 3.6);
+  h += ridge * (1 - notch * 0.55);
+  // Vale que desce da rodovia até a bacia do lago — linha de visada aberta.
+  const valleyWindow = THREE.MathUtils.smoothstep(corridor, 40, 54) * (1 - THREE.MathUtils.smoothstep(corridor, 82, 96));
+  const valleyFloor = 0.55 + broad * 0.35;
+  h = THREE.MathUtils.lerp(h, valleyFloor, valleyWindow * (1 - THREE.MathUtils.smoothstep(Math.abs(lakeX), 12, 40)) * 0.92);
+  // Bacia do lago: o terreno mergulha abaixo do nível d'água no centro.
+  h = THREE.MathUtils.lerp(h, SOMPO_LAKE.bedY, 1 - THREE.MathUtils.smoothstep(lakeDist, 11, 30));
+  return h;
 }
 
 /** Mancha de vegetação (0..1) usada para tingir o solo e adensar tufos. */

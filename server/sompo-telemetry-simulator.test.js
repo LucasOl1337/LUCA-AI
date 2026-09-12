@@ -105,21 +105,24 @@ test('cenários rurais são completos, distintos e determinísticos no contrato 
 test('frenagem desacelera sem impacto e mantém repouso sem reinício implícito', async () => {
   const { getSompoBrakingScriptState: state, SOMPO_BRAKING_SCRIPT: script } = await import('../shared/sompo-telemetry-simulator.js');
   assert.equal(state(-100).phaseId, 'deslocamento');
-  assert.equal(state(2_999).speedKph, 28);
+  assert.equal(state(2_999).speedKph, 80);
   assert.equal(state(3_000).phaseId, 'frenagem');
-  assert.equal(state(4_000).speedKph, 14);
-  assert.ok(state(4_000).accelerationX < -6);
-  assert.equal(state(5_000).phaseId, 'repouso');
-  assert.equal(state(5_000).speedKph, 0);
+  // 80→0 km/h com desaceleração média ~4,5 m/s²: ~4,94 s e ~55 m de frenagem.
+  const brakeEndMs = 3_000 + (80 / 3.6 / 4.5) * 1_000;
+  const midBrake = Math.round(3_000 + (brakeEndMs - 3_000) / 2);
+  assert.ok(Math.abs(state(midBrake).speedKph - 40) < 2);
+  assert.ok(state(midBrake).accelerationX < -6);
+  assert.ok(state(8_000).phaseId === 'repouso');
+  assert.equal(state(8_000).speedKph, 0);
   assert.deepEqual(state(1e8), state(script.totalMs));
   assert.deepEqual(state(NaN), state(0));
 
   // Deceleration must explain the actual speed loss, not just animate a pulse.
   let integratedVelocity = 0;
-  for (let ms = 3_000; ms < 5_000; ms += 10) integratedVelocity += state(ms + 5).accelerationX * 0.01;
-  assert.ok(Math.abs(integratedVelocity + 28 / 3.6) < 0.001);
+  for (let ms = 3_000; ms < brakeEndMs; ms += 10) integratedVelocity += state(ms + 5).accelerationX * 0.01;
+  assert.ok(Math.abs(integratedVelocity + 80 / 3.6) < 0.05);
 
-  const during = createSompoSimulationSnapshot({ scenarioId: 'hard-braking' }, { elapsedMs: 4_000, observedAt: FIXED_TIME });
+  const during = createSompoSimulationSnapshot({ scenarioId: 'hard-braking' }, { elapsedMs: midBrake, observedAt: FIXED_TIME });
   assert.ok(during.readings.acceleration.x < -5.9);
   assert.ok(during.readings.pitch < -3);
   assert.equal(during.risks.collision, false);
@@ -127,7 +130,7 @@ test('frenagem desacelera sem impacto e mantém repouso sem reinício implícito
   assert.deepEqual(stopped.readings.acceleration, { x: 0, y: 0, z: 9.81, magnitude: 9.81 });
   assert.equal(stopped.readings.rotation.magnitude, 0);
   assert.equal(stopped.readings.pitch, 1);
-  const manual = createSompoSimulationSnapshot({ scenarioId: 'hard-braking', pitch: -25, collisionRisk: true }, { elapsedMs: 4_000, observedAt: FIXED_TIME });
+  const manual = createSompoSimulationSnapshot({ scenarioId: 'hard-braking', pitch: -25, collisionRisk: true }, { elapsedMs: midBrake, observedAt: FIXED_TIME });
   assert.equal(manual.readings.pitch, -25);
   assert.equal(manual.risks.collision, true);
   assert.match(manual.source.scenarioLabel, /ajustado manualmente/);

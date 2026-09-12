@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { rigSompoAgriAsset, SOMPO_AGRI_RIG_LAYOUT } from './rigSompoAgriAsset';
+import { createSompoMotionPath, integrateSompoMotion } from '../../../shared/sompo-motion.js';
 import { createSompoPastureSurface } from './createSompoPastureSurface';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -7,49 +9,41 @@ import { loadSompoAgriAsset, disposeSompoAgriAsset } from './loadSompoAgriAsset'
 import {
   SOMPO_AGRI_EQUIPMENT,
   getSompoAgriFrame,
+  getSompoAgriKeyframes,
   getSompoAgriScenario,
   type SompoAgriScenarioId,
 } from '../../../shared/sompo-agri-scenarios.js';
-import { getSompoAgriStartX, getSompoAgriTravelMeters } from '../../../shared/sompo-agri-brief.js';
 import { getSompoGeofenceSite } from '../../../shared/sompo-geofence-sites.js';
 import { bandGrid, resolveHazards } from '../../../shared/lab-geofence.js';
 import { polygonContains } from '../../../shared/lab-telemetry.js';
-import { frameDamping } from './frameDamping.js';
 import { createSompoRenderer, sompoRenderBudget, disposeSompoObject, type SompoStageApi } from './sompoStage';
 import { createSompoEnvironmentAssets } from './createSompoEnvironmentAssets';
 import { createSompoAtmosphere } from './createSompoAtmosphere';
+import { createSompoPostProcessing } from './createSompoPostProcessing';
 import { createSompoRenderMeter } from './sompoStage';
 import { exportSompoModel } from './refineSompoTruck';
 import { SOMPO_STUDIO_DEFAULT, type SompoStudioConfig, type SompoRenderStats } from './sompoStudioConfig';
 
 export type SompoAgriStageApi = SompoStageApi;
 
-function dampAngle(current: number, target: number, factor: number) {
-  const shortestTurn = Math.atan2(Math.sin(target - current), Math.cos(target - current));
-  return current + (shortestTurn * factor);
-}
 
 /** Silhueta honesta com as dimensões nominais quando o GLB gerado não carrega. */
 function fallbackMachine(equipmentId: 'tractor' | 'harvester') {
-  const size = SOMPO_AGRI_EQUIPMENT[equipmentId].nominalSizeM;
-  const group = new THREE.Group();
-  group.name = `agri-${equipmentId}-fallback`;
-  const paint = new THREE.MeshStandardMaterial({ color: equipmentId === 'tractor' ? 0x1f6b35 : 0xb0392a, roughness: 0.5, metalness: 0.3 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x181c1e, roughness: 0.9 });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(size.length * 0.72, size.height * 0.42, size.width * 0.6), paint);
-  body.position.set(-size.length * 0.08, size.height * 0.42, 0);
-  const cab = new THREE.Mesh(new THREE.BoxGeometry(size.length * 0.3, size.height * 0.38, size.width * 0.5), paint);
-  cab.position.set(size.length * 0.18, size.height * 0.76, 0);
-  group.add(body, cab);
-  for (const x of [size.length * 0.3, -size.length * 0.3]) {
-    for (const side of [-1, 1]) {
-      const radius = x > 0 ? size.height * 0.16 : size.height * 0.24;
-      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 0.5, 20), dark);
-      wheel.rotation.x = Math.PI / 2;
-      wheel.position.set(x, radius, side * size.width * 0.36);
-      group.add(wheel);
-    }
+  const tractor = equipmentId === 'tractor';
+  const group = new THREE.Group(); group.name = `agri-${equipmentId}-fallback`;
+  const paint = new THREE.MeshStandardMaterial({ color: 0x1f6b35, roughness: .55, metalness: .2 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x181c1e, roughness: .9 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x31464d, roughness: .22, metalness: .3 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(tractor ? 2.9 : 4.5, tractor ? .7 : 1.4, tractor ? 1.1 : 2.1), paint);
+  body.position.set(tractor ? .85 : -.25, tractor ? 1.12 : 1.8, 0); group.add(body);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.05, tractor ? 1.25 : 1.7), glass);
+  cab.position.set(tractor ? .35 : 1.45, tractor ? 2.05 : 2.6, 0); group.add(cab);
+  for (const axle of SOMPO_AGRI_RIG_LAYOUT[equipmentId].axles) for (const side of [-1, 1]) {
+    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(axle.radius, axle.radius, tractor ? .42 : .62, 28), dark);
+    wheel.rotation.x = Math.PI / 2; wheel.position.set(axle.x, axle.y, side * axle.z); group.add(wheel);
   }
+  const implement = new THREE.Mesh(new THREE.BoxGeometry(tractor ? 1.9 : 1.6, .18, tractor ? 1.1 : 5.4), paint);
+  implement.position.set(tractor ? -1.9 : 3.5, .55, 0); group.add(implement);
   group.traverse((node) => { const mesh = node as THREE.Mesh; if (mesh.isMesh) mesh.castShadow = mesh.receiveShadow = true; });
   return group;
 }
@@ -108,10 +102,11 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   scene.add(worldRoot);
   const night = scenario.environmentId === 'row-crop-field-night';
   const budget = sompoRenderBudget();
-  const field = createSompoAgriScene(worldRoot, scenario.environmentId, budget.compact);
+  const field = createSompoAgriScene(worldRoot, scenario.environmentId, budget.compact, scenario.equipmentId);
   const atmosphere = createSompoAtmosphere(scene, renderer, field.sun);
+  const post = createSompoPostProcessing(renderer, scene, camera);
   const meter = createSompoRenderMeter(renderer, onStats);
-  const assets = createSompoEnvironmentAssets(scene, renderer, { background: false, intensity: night ? 0.30 : 0.68, initialWet: scenario.environmentId === 'muddy-field' });
+  const assets = createSompoEnvironmentAssets(scene, renderer, { background: false, intensity: night ? 0.30 : 0.68, initialWet: scenario.environmentId === 'muddy-field', onHdri: (kind, tex) => atmosphere.setSkyTexture(kind, tex) });
   assets.surface(field.terrain.material, 'dirt', 45, 30);
   const pasture = createSompoPastureSurface(field.terrain.material, true);
   if (scenario.environmentId === 'muddy-field') {
@@ -134,8 +129,14 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   });
 
   // Percurso centrado no talhão: o equipamento atravessa o campo de verdade.
-  const totalTravel = getSompoAgriTravelMeters(scenarioId, scenario.totalMs, outcomeId);
-  const startX = getSompoAgriStartX(scenarioId, outcomeId);
+  const keyframes = getSompoAgriKeyframes(scenarioId, outcomeId);
+  const path = createSompoMotionPath(at => getSompoAgriFrame(scenarioId, at, outcomeId), scenario.totalMs);
+  const pathPoint = new THREE.Vector3();
+  const totalTravel = path.sample(scenario.totalMs, pathPoint).x;
+  const startX = -totalTravel / 2;
+  if (scenario.equipmentId === 'harvester') field.setHarvestPath(Array.from({ length: 8 }, (_, i) => {
+    const point = path.sample(scenario.totalMs * i / 7, { x: 0, z: 0 }); point.x += startX; return point;
+  }));
   const site = getSompoGeofenceSite(scenario.environmentId, totalTravel);
   const geofenceLayer = new THREE.Group();
   geofenceLayer.name = 'sompo-geofence-synthetic';
@@ -263,13 +264,14 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     // A mancha de lama fica onde o avanço estanca, não num ponto fixo do campo.
     let peakTravel = 0;
     for (let atMs = 0; atMs <= scenario.totalMs; atMs += 250) {
-      peakTravel = Math.max(peakTravel, getSompoAgriTravelMeters(scenarioId, atMs, outcomeId));
+      peakTravel = Math.max(peakTravel, path.sample(atMs, pathPoint).x);
     }
     field.placeMud(startX + peakTravel);
   }
 
   const machine = new THREE.Group();
   machine.name = 'sompo-agri-machine';
+  machine.rotation.order = 'YZX';
   machine.position.set(startX, 0, 0);
   worldRoot.add(machine);
 
@@ -288,16 +290,19 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
 
   let disposed = false;
   let model: THREE.Object3D | null = null;
+  let rig: ReturnType<typeof rigSompoAgriAsset> | null = null;
   const abort = new AbortController();
   onModelStatus('loading', null);
   void loadSompoAgriAsset(scenario.equipmentId, abort.signal).then((loaded) => {
     if (disposed || !loaded) { if (loaded) disposeSompoAgriAsset(loaded); return; }
-    model = loaded;
-    machine.add(loaded);
+    rig = rigSompoAgriAsset(loaded, scenario.equipmentId);
+    model = rig.root;
+    machine.add(model);
     onModelStatus('gltf', SOMPO_AGRI_EQUIPMENT[scenario.equipmentId].label);
   }).catch(() => {
     if (disposed) return;
-    model = fallbackMachine(scenario.equipmentId);
+    rig = rigSompoAgriAsset(fallbackMachine(scenario.equipmentId), scenario.equipmentId);
+    model = rig.root;
     machine.add(model);
     onModelStatus('fallback', null);
   });
@@ -316,7 +321,10 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     const { width, height } = mount.getBoundingClientRect();
     renderer.setSize(Math.max(1, width), Math.max(1, height), false);
     camera.aspect = Math.max(1, width) / Math.max(1, height);
-    camera.updateProjectionMatrix();
+    // Preserve horizontal room for the full vehicle in a portrait canvas.
+      camera.fov = Math.min(72, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(37 / 2)) * Math.max(1, 1.25 / camera.aspect))));
+      camera.updateProjectionMatrix();
+    post.resize(Math.max(1, width), Math.max(1, height));
   }
   const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(mount);
@@ -326,24 +334,23 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   const focusPoint = new THREE.Vector3();
   let focusTarget: 'truck' | 'sensor' = 'truck';
   let frameId = 0;
-  let previousTime = performance.now();
+  const cameraShift = new THREE.Vector3();
 
   function render(time: number) {
     meter.begin();
-    const frameDelta = Math.max(0, (time - previousTime) / 1_000);
-    previousTime = time;
     const elapsed = getElapsed ? getElapsed(time) : Math.max(0, time - startedAtRef.current);
     const frame = getSompoAgriFrame(scenarioId, elapsed, outcomeId);
-    const travel = reduceMotion.matches ? 0 : getSompoAgriTravelMeters(scenarioId, elapsed, outcomeId);
-    const x = startX + travel;
-    const z = frame.lateral;
-    machine.position.set(x, field.groundHeight(x, z) + frame.vertical - (frame.sink * 0.5), z);
-    const damp = reduceMotion.matches ? 1 : frameDamping(frameDelta, 7.5);
-    machine.rotation.y = dampAngle(machine.rotation.y, THREE.MathUtils.degToRad(frame.yaw), damp);
-    machine.rotation.z = dampAngle(machine.rotation.z, THREE.MathUtils.degToRad(frame.pitch), damp);
-    machine.rotation.x = dampAngle(machine.rotation.x, THREE.MathUtils.degToRad(frame.roll), damp);
+    path.sample(reduceMotion.matches ? 0 : elapsed, pathPoint);
+    const x = startX + pathPoint.x;
+    // Only the rollover adds authored lateral slip; normal steering follows its heading.
+    const z = pathPoint.z + (outcomeId === 'side-rollover' ? frame.lateral : 0);
+    machine.rotation.set(THREE.MathUtils.degToRad(frame.roll), THREE.MathUtils.degToRad(frame.yaw), THREE.MathUtils.degToRad(frame.pitch), 'YZX');
+    rig?.update(frame, integrateSompoMotion(keyframes, elapsed) / 3.6,
+      integrateSompoMotion(keyframes, elapsed, 'headerSpeed', false) * .8, reduceMotion.matches);
+    const contactHeight = rig?.supportHeight(machine.rotation, x, z, field.groundHeight) ?? 0;
+    machine.position.set(x, field.groundHeight(x, z) + contactHeight + Math.max(0, frame.vertical) - frame.sink * .5, z);
     const studio = studioRef?.current ?? SOMPO_STUDIO_DEFAULT;
-    field.update(frame, machine.position, camera.position, reduceMotion.matches, studio.wind);
+    field.update(frame, machine.position, camera.position, reduceMotion.matches, studio.wind, elapsed);
     field.sun.position.set(x - 24, 34, z + 18);
     field.sun.target.position.set(x, 0, z);
     field.sun.target.updateMatrixWorld();
@@ -352,12 +359,12 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     workLight.intensity = frame.workLights * 65;
     beacon.intensity = frame.beacon * (reduceMotion.matches ? 6 : 4.5 + Math.max(0, Math.sin(clock * 7)) * 6);
     focusPoint.set(machine.position.x + (focusTarget === 'sensor' ? 2.5 : 0), machine.position.y + (focusTarget === 'sensor' ? 2.2 : 1.6), machine.position.z);
-    const targetXBefore = orbit.target.x;
-    orbit.target.lerp(focusPoint, reduceMotion.matches ? 1 : frameDamping(frameDelta, 5));
-    camera.position.x += orbit.target.x - targetXBefore;
+    cameraShift.copy(focusPoint).sub(orbit.target);
+    camera.position.add(cameraShift);
+    orbit.target.copy(focusPoint);
     orbit.update();
     atmosphere.update(studio, camera, machine.position, elapsed, scenario.environmentId === 'muddy-field', night);
-    renderer.render(scene, camera);
+    post.render(elapsed);
     meter.end();
     onAfterRender?.(renderer.domElement);
     if (!document.hidden) frameId = window.requestAnimationFrame(render);
@@ -365,7 +372,6 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   function onVisibilityChange() {
     window.cancelAnimationFrame(frameId);
     if (!document.hidden) {
-      previousTime = performance.now();
       frameId = window.requestAnimationFrame(render);
     }
   }
@@ -397,6 +403,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     dispose() {
       disposed = true;
       pasture.dispose();
+      post.dispose();
       atmosphere.dispose();
       abort.abort();
       window.cancelAnimationFrame(frameId);

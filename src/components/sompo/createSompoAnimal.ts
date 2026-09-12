@@ -64,27 +64,43 @@ export function createSompoAnimal(parent: THREE.Group) {
   }
   return {
     get ready() { return ensureLoaded(); },
-    update(visible: boolean, z: number, elapsedMs: number, reducedMotion: boolean, anchorX?: number, walking = true) {
+    update(visible: boolean, z: number, elapsedMs: number, reducedMotion: boolean, anchorX?: number, walkingSpeed = 1, impactAgeMs: number | null = null) {
       // A trilha "animal" da cena decide quando o bovino sai de quadro; o corte
       // fixo de 13 s vale só para quem chama sem âncora (compatibilidade).
       const pose = getSompoAnimalPose(z, elapsedMs, anchorX === undefined ? 13000 : null);
       root.visible = visible && pose.visible; if (!root.visible) return;
       void ensureLoaded();
-      const moving = walking && !reducedMotion;
-      const t = moving ? elapsedMs / 1000 : 0;
+      const impact = impactAgeMs === null ? 0 : clamp01(impactAgeMs / 1400);
+      const fall = impact * impact * (3 - 2 * impact);
+      const activity = reducedMotion ? 0 : Math.min(1, Math.abs(walkingSpeed) / .6) * (1 - fall);
+      const moving = activity > 0;
+      // Phase is travelled distance: pausing/replaying never resets a raised hoof.
+      const departure = Math.max(0, Math.min(4.2, z - 2.8)), k = 36 / (4.2 * 4.2);
+      const arc = .5 * (departure * Math.sqrt(1 + (k * departure) ** 2) + Math.asinh(k * departure) / k);
+      const gait = (Math.min(z, 2.8) + 8 + arc) / 1.05 * Math.PI * 2;
+      const t = reducedMotion ? 0 : elapsedMs / 1000;
       // Ancorado no mundo: o caminhão se aproxima do animal, não o contrário.
       const worldX = (anchorX ?? 0) + (pose.x - 7);
-      root.position.set(anchorX === undefined ? pose.x : worldX, moving ? Math.sin(t * 6) * 0.022 : 0, pose.z);
-      root.rotation.y = pose.yaw;
+      root.position.set(anchorX === undefined ? pose.x : worldX, moving ? Math.sin(gait * 2) * .015 * activity : 0, pose.z);
+      root.rotation.set(fall * 1.45, pose.yaw, 0, 'YZX');
+      root.position.x += fall * .4; root.position.z += fall * .35;
+      if (fall > 0 && rest) {
+        // Authored contact response, without gore or an invented physical sensor flag.
+        // Support keeps the animal above the road while it settles onto its side.
+        let bottom = Infinity;
+        const c = Math.cos(root.rotation.x), s = Math.sin(root.rotation.x);
+        for (let i = 0; i < rest.length; i += 3) bottom = Math.min(bottom, c * rest[i + 1] - s * rest[i + 2]);
+        root.position.y = .015 - bottom;
+      }
       fallback.visible = !model && !!fallbackMap.image;
       if (body && rest) {
         const p = body.geometry.attributes.position as THREE.BufferAttribute;
         for (const i of animated) {
           const x = rest[i * 3]; const y = rest[i * 3 + 1]; const side = rest[i * 3 + 2];
           const legWeight = clamp01((0.67 - y) / 0.55);
-          const phase = t * 6 + (x > 0 ? 0 : Math.PI) + (side > 0 ? 0 : Math.PI);
+          const phase = gait + (x > 0 ? 0 : Math.PI * .5) + (side > 0 ? 0 : Math.PI);
           const tailWeight = clamp01((-x - 0.94) / 0.32) * clamp01((1.25 - y) / 0.8);
-          p.setXYZ(i, x + (moving ? Math.sin(phase) * 0.11 * legWeight : 0), y + (moving ? Math.max(0, Math.cos(phase)) * 0.055 * legWeight : 0), side + (moving ? Math.sin(t * 3.5) * 0.09 * tailWeight : 0));
+          p.setXYZ(i, x + (moving ? Math.sin(phase) * 0.14 * legWeight * activity : 0), y + (moving ? Math.max(0, Math.cos(phase)) ** 2 * 0.09 * legWeight * activity : 0), side + (moving ? Math.sin(t * 3.5) * 0.09 * tailWeight : 0));
         }
         p.needsUpdate = true;
       }

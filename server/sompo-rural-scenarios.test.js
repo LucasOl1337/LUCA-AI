@@ -21,7 +21,7 @@ test('dez sinistros rurais mantêm o contrato, fases e amostras determinísticas
       assert.equal(snapshot.risks.inclination, frame.inclinationRisk);
       assert.ok(Math.abs(snapshot.readings.roll - frame.roll) <= controls.roughness * 0.34 + 1.6);
       assert.ok(frame.phaseLabel.length > 0);
-      assert.ok(frame.speedKph >= 0 && frame.speedKph <= 60);
+      assert.ok(frame.speedKph >= 0 && frame.speedKph <= 120);
       for (const key of ['distance', 'temperature', 'humidity', 'pitch', 'roll']) assert.ok(Number.isFinite(snapshot.readings[key]), `${id}: ${key}`);
       for (const key of ['acceleration', 'rotation']) for (const value of Object.values(snapshot.readings[key])) assert.ok(Number.isFinite(value));
     }
@@ -39,8 +39,8 @@ test('casos têm consequências distintas na telemetria e no movimento', () => {
   assert.equal(getSompoRuralFrame('rollover', 12_000).speedKph, 0);
   const rain = getSompoRuralFrame('aquaplaning', 4_000);
   assert.equal(rain.rain, 1); assert.ok(Math.abs(rain.yawRate) > 1);
-  const animal = getSompoRuralFrame('animal-crossing', 5_000);
-  assert.equal(animal.animalZ, 0); assert.equal(animal.speedKph, 0); assert.equal(animal.collisionRisk, true);
+  const animal = getSompoRuralFrame('animal-crossing', 8_000);
+  assert.ok(animal.animalZ > 3.2); assert.equal(animal.speedKph, 0); assert.equal(animal.collisionRisk, true);
   assert.ok(getSompoRuralFrame('brake-failure', 10_000).speedKph > getSompoRuralFrame('brake-failure', 0).speedKph);
   const fire = getSompoRuralFrame('engine-fire', 12_000);
   assert.equal(fire.speedKph, 0); assert.equal(fire.smoke, 1); assert.equal(fire.temperature, 62);

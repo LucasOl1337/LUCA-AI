@@ -194,6 +194,7 @@ export function createSompoTruckModel({ sensorLabel }: SompoTruckModelOptions): 
     metalness: 0.42,
     clearcoat: 0.88,
     clearcoatRoughness: 0.18,
+    envMapIntensity: 1.4,
   });
   const paintedBlueDark = new THREE.MeshPhysicalMaterial({
     color: 0x075a91,
@@ -222,6 +223,7 @@ export function createSompoTruckModel({ sensorLabel }: SompoTruckModelOptions): 
     clearcoat: 1,
     clearcoatRoughness: 0.04,
     side: THREE.DoubleSide,
+    envMapIntensity: 1.5,
   });
   const tireMaterial = new THREE.MeshStandardMaterial({
     color: 0x171c20, roughness: 0.94, bumpMap: createSurfaceTexture('rubber'), bumpScale: 0.028,
@@ -232,6 +234,8 @@ export function createSompoTruckModel({ sensorLabel }: SompoTruckModelOptions): 
   const red = new THREE.MeshStandardMaterial({ color: 0xc82730, emissive: 0xff182a, emissiveIntensity: 0.4, roughness: 0.3 });
   const decal = new THREE.MeshStandardMaterial({ map: createSurfaceTexture('branding'), roughness: 0.5 });
   const boardMaterial = new THREE.MeshStandardMaterial({ color: 0x146cb7, roughness: 0.5, metalness: 0.18 });
+  const refrigHousing = new THREE.MeshStandardMaterial({ color: 0xe4e7e4, roughness: 0.42, metalness: 0.14 });
+  const refrigVent = new THREE.MeshStandardMaterial({ color: 0x22282a, roughness: 0.7, metalness: 0.3 });
 
   const chassis = new THREE.Group();
   registerPart(nodes, chassis, 'chassis-assembly');
@@ -317,9 +321,19 @@ export function createSompoTruckModel({ sensorLabel }: SompoTruckModelOptions): 
     }
     const branding = addPart(cargo, `cargo-decal-${side}`, new THREE.PlaneGeometry(3.0, 0.75), decal, [-1.24, 2.56, side * 1.221]);
     if (side < 0) branding.rotation.y = Math.PI;
+    // Faixa refletiva contínua na base do baú — alternância vermelho/branco.
     for (let i = 0; i < 10; i += 1) {
-      addBox(cargo, `reflector-${side}-${i}`, [0.42, 0.06, 0.012], [-3.95 + i * 0.55, 1.43, side * 1.22], i % 2 ? red : lamp);
+      addBox(cargo, `reflector-${side}-${i}`, [0.56, 0.055, 0.014], [-3.95 + i * 0.55, 1.43, side * 1.22], i % 2 ? red : lamp);
     }
+    // Porta lateral do baú: painel levemente ressaltado + ombreiras, fecho
+    // vertical e trinco — o vinco que a referência mostra na lateral.
+    addBox(cargo, `side-door-panel-${side}`, [1.12, 2.18, 0.035], [-0.42, 2.5, side * 1.195], corrugatedBlue, 0.012);
+    for (const y of [1.72, 2.5, 3.28]) {
+      addBox(cargo, `side-door-hinge-${side}-${y}`, [0.05, 0.16, 0.045], [-1.0, y, side * 1.215], chrome, 0.008);
+    }
+    addRod(cargo, `side-door-lock-${side}`, [0.16, 1.55, side * 1.215], [0.16, 3.52, side * 1.215], 0.016, chrome);
+    addBox(cargo, `side-door-latch-${side}`, [0.26, 0.09, 0.05], [0.02, 2.32, side * 1.215], chrome, 0.01);
+    addBox(cargo, `side-door-seal-${side}`, [1.18, 0.045, 0.02], [-0.42, 3.62, side * 1.2], blackPlastic, 0.008);
     for (const x of [-4.1, -1.4, 1.27]) {
       addBox(cargo, `marker-lamp-${side}-${x}`, [0.14, 0.07, 0.035], [x, 1.60, side * 1.21], amber, 0.015);
     }
@@ -369,6 +383,21 @@ export function createSompoTruckModel({ sensorLabel }: SompoTruckModelOptions): 
   }
   addBox(cab, 'cab-roof-hatch', [0.72, 0.05, 0.88], [2.65, 3.68, 0], paintedBlueDark, 0.035);
   addBox(cab, 'lower-air-intake', [0.035, 0.17, 0.92], [4.483, 0.99, 0], blackPlastic, 0.025);
+
+  // Unidade de refrigeração no topo da face dianteira do baú — silhueta
+  // assinatura do caminhão frigorífico da referência.
+  const refrig = new THREE.Group();
+  registerPart(nodes, refrig, 'refrigeration-unit');
+  refrig.position.set(1.62, 3.45, 0);
+  cargo.add(refrig);
+  addBox(refrig, 'refrig-housing', [0.5, 0.72, 1.9], [0, 0, 0], refrigHousing, 0.05);
+  addBox(refrig, 'refrig-vent', [0.03, 0.62, 1.5], [0.26, -0.02, 0], refrigVent, 0.015);
+  for (let row = 0; row < 7; row += 1) {
+    addBox(refrig, `refrig-slat-${row}`, [0.025, 0.035, 1.44], [0.285, -0.28 + row * 0.09, 0], chrome, 0.004);
+  }
+  const fan = addPart(refrig, 'refrig-fan', new THREE.CylinderGeometry(0.16, 0.16, 0.03, 20), refrigVent, [0.285, 0.18, 0.62]);
+  fan.rotation.z = Math.PI / 2;
+  addPart(refrig, 'refrig-fan-hub', new THREE.CylinderGeometry(0.05, 0.05, 0.045, 12), chrome, [0.3, 0.18, 0.62]).rotation.z = Math.PI / 2;
 
   const wheelsGroup = new THREE.Group();
   registerPart(nodes, wheelsGroup, 'wheel-system');

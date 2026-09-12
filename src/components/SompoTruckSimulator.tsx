@@ -793,7 +793,7 @@ export default function SompoTruckSimulator({
   }
 
   function updateNumber(
-    key: 'distance' | 'temperature' | 'humidity' | 'pitch' | 'roll',
+    key: 'distance' | 'temperature' | 'humidity' | 'pitch' | 'roll' | 'speedKph',
     value: number,
   ) {
     setControls((current) => ({ ...current, [key]: value }));
@@ -1085,6 +1085,19 @@ export default function SompoTruckSimulator({
                 {' · '}{formatReading(brakingPreview.speedKph, ' km/h')}
               </p>
             )}
+            <label>
+              <span>Velocidade <strong>{scenarioScripted ? Math.round(ruralPreview?.speedKph ?? agriPreview?.speedKph ?? controls.speedKph) : controls.speedKph} km/h</strong></span>
+              <input
+                type="range"
+                min="0"
+                max="120"
+                step="5"
+                value={scenarioScripted ? Math.round(ruralPreview?.speedKph ?? agriPreview?.speedKph ?? controls.speedKph) : controls.speedKph}
+                disabled={episodeActive || scenarioScripted}
+                name="sompo-speed"
+                onChange={(event) => updateNumber('speedKph', Number(event.target.value))}
+              />
+            </label>
             <label>
               <span>Distância frontal <strong>{scenarioScripted ? (preview.readings.distance ?? controls.distance) : controls.distance} cm</strong></span>
               <input

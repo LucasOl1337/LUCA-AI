@@ -3,7 +3,7 @@ import { createSompoPastureSurface } from './createSompoPastureSurface';
 import { createSompoAnimal } from './createSompoAnimal';
 import { createSompoVegetation } from './createSompoVegetation';
 import { createSompoRoadDetails, varySompoSurface, wornRoadPaint, wrapSompoX } from './createSompoRoadDetails';
-import { createSompoTerrainMesh, sompoTerrainHeight, SOMPO_TERRAIN_PERIOD_X } from './createSompoTerrain';
+import { createSompoTerrainMesh, sompoTerrainHeight, SOMPO_TERRAIN_PERIOD_X, SOMPO_LAKE } from './createSompoTerrain';
 import type { SompoEffectFrame } from '../../../shared/sompo-scenario-effects.js';
 import { createSompoEnvironmentAssets } from './createSompoEnvironmentAssets';
 import type { SompoRuralFrame } from '../../../shared/sompo-telemetry-simulator.js';
@@ -58,7 +58,7 @@ function mesh(parent: THREE.Object3D, geometry: THREE.BufferGeometry, material: 
  * scroll de textura fingindo deslocamento: marcas, detritos e postes ficam para
  * trás quando o caminhão passa.
  */
-export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
+export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.Camera, hooks?: { onHdri?: (kind: 'dry' | 'wet', texture: THREE.Texture) => void }) {
   const root = new THREE.Group();
   root.name = 'rural-road-environment';
   scene.add(root);
@@ -72,7 +72,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const clearSky = sky(false); const rainSky = sky(true);
   scene.background = clearSky;
   scene.fog = new THREE.Fog(0xbebca9, 75, 220);
-  const assets = createSompoEnvironmentAssets(scene, renderer, { background: false });
+  const assets = createSompoEnvironmentAssets(scene, renderer, { background: false, onHdri: hooks?.onHdri });
   const earthMap = groundTexture('earth');
   const earth = new THREE.MeshStandardMaterial({ map: earthMap, roughness: 1, color: 0xffffff });
   const terrain = createSompoTerrainMesh(earth);
@@ -84,9 +84,21 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const details = createSompoRoadDetails(root);
   const roadMap = groundTexture('road');
   const asphalt = new THREE.MeshStandardMaterial({ map: roadMap, roughness: 0.90, metalness: 0.03 });
+  // Asfalto fotográfico com agregado/trincas: a faixa de brita das bordas corre
+  // no sentido longitudinal (u da textura atravessa a pista, v repete a cada 4m).
+  if (typeof document !== 'undefined') {
+    const detail = new THREE.TextureLoader().load('/sompo/gen/asfalto-detalhe.webp');
+    detail.colorSpace = THREE.SRGBColorSpace;
+    detail.wrapS = detail.wrapT = THREE.RepeatWrapping;
+    detail.center.set(0.5, 0.5);
+    detail.rotation = Math.PI / 2;
+    detail.repeat.set(65, 1);
+    detail.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    asphalt.map = detail;
+  }
   const road = mesh(root, new THREE.PlaneGeometry(260, 8.2), asphalt, [0, 0, -2.05]);
   road.rotation.x = -Math.PI / 2;
-  assets.surface(asphalt, 'asphalt', 65, 2.05);
+  assets.surface(asphalt, 'asphalt', 65, 2.05, { keepMap: true, normalScale: 1.0 });
   varySompoSurface(asphalt, 0.24);
   const unpaved = new THREE.MeshStandardMaterial({ map: earthMap, roughness: 1, color: 0xb09b7e });
   assets.surface(unpaved, 'dirt', 65, 2.05);
@@ -160,6 +172,18 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
     patch.rotation.x = -Math.PI / 2;
     puddleSlots.push({ mesh: patch, x: baseX });
   }
+  // Lago do vale: lâmina d'água na bacia esculpida no relevo — a incidência
+  // rasante devolve o reflexo do céu (Fresnel), como no lago da referência.
+  const lakeWater = new THREE.Mesh(
+    new THREE.CircleGeometry(1, 48),
+    new THREE.MeshStandardMaterial({ color: 0x14425c, roughness: 0.12, metalness: 0, envMapIntensity: 0.9, fog: false }),
+  );
+  lakeWater.name = 'valley-lake-water';
+  lakeWater.geometry.scale(SOMPO_LAKE.radius * 1.15, SOMPO_LAKE.radius * 0.6, 1);
+  lakeWater.rotation.x = -Math.PI / 2;
+  lakeWater.position.set(SOMPO_LAKE.x, SOMPO_LAKE.waterY, SOMPO_LAKE.z);
+  lakeWater.receiveShadow = true;
+  root.add(lakeWater);
   const shed = new THREE.Group(); root.add(shed); shed.position.set(-7, 0, 5.4);
   mesh(shed, new THREE.BoxGeometry(9, 3.8, 4), new THREE.MeshStandardMaterial({ color: 0xb8a586, roughness: 0.9 }), [0, 1.9, 0]);
   const shedRoofMaterial = new THREE.MeshStandardMaterial({ color: 0x745c4b, roughness: 0.8, metalness: 0.25 });
@@ -177,7 +201,6 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   let rainSeed = 83721;
   const rainRandom = () => { rainSeed ^= rainSeed << 13; rainSeed ^= rainSeed >>> 17; rainSeed ^= rainSeed << 5; return (rainSeed >>> 0) / 4294967296; };
   const rainOrigins = Array.from({ length: 240 }, () => [rainRandom() * 26 - 13, rainRandom() * 20 - 10, rainRandom() * 12]);
-  let lastAnimalZ: number | null = null;
   return {
     update(effectFrame: SompoEffectFrame, frame: SompoRuralFrame | null, elapsed: number, truck: THREE.Vector3, reduceMotion: boolean, slope: number, extras?: { animalAnchorX?: number; wind?: number }) {
       const t = elapsed / 1000;
@@ -207,6 +230,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       }
       if (postsChanged) { posts.instanceMatrix.needsUpdate = true; posts.computeBoundingSphere(); }
       for (const slot of puddleSlots) slot.mesh.position.x = wrapSompoX(slot.x, truckX, 198);
+      lakeWater.position.x = wrapSompoX(SOMPO_LAKE.x, truckX, SOMPO_TERRAIN_PERIOD_X);
       shed.position.x = wrapSompoX(-7, truckX, 240);
       rain.position.x = truckX;
       const wet = (frame?.rain ?? 0) > 0;
@@ -217,7 +241,6 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       road.material = mud || gravel ? unpaved : asphalt;
       unpaved.color.set(mud ? 0x77604b : 0xb09b7e);
       unpaved.roughness = mud ? 0.82 : 1;
-      if (!assets.hasHdri) scene.background = wet ? rainSky : clearSky;
       assets.update(wet);
       const fog = scene.fog as THREE.Fog;
       fog.color.set(wet ? 0x919b9c : 0xbebca9); fog.near = wet ? 55 : 100; fog.far = wet ? 220 : 260;
@@ -225,14 +248,14 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       shoulderMaterial.color.set(wet ? 0x96856c : 0xe1c9aa);
       asphalt.color.set(mud ? 0x604331 : gravel ? 0x998467 : wet ? 0x687882 : 0xffffff);
       asphalt.roughness = wet && !mud ? 0.2 : 0.95;
-      asphalt.normalScale.setScalar(wet ? 0.20 : 0.65);
+      asphalt.normalScale.setScalar(wet ? 0.20 : 1.0);
       markings.visible = !mud && !gravel;
       puddles.visible = wet;
       shed.visible = effectFrame.setting === 'yard';
       const animalZ = frame?.animalZ ?? -8;
-      const walking = lastAnimalZ !== null && Math.abs(animalZ - lastAnimalZ) > 0.0004;
-      lastAnimalZ = animalZ;
-      animal.update(effects.has('animal'), animalZ, elapsed, reduceMotion, extras?.animalAnchorX, walking);
+      const walking = frame?.animalRate ?? 0;
+      const animalImpact = effectFrame.cues.find(cue => cue.effect === 'debris');
+      animal.update(effects.has('animal'), animalZ, elapsed, reduceMotion, extras?.animalAnchorX, walking, animalImpact?.ageMs ?? null);
       details.update(elapsed, wet, reduceMotion, truckX, extras?.wind ?? 0.65);
       rainMaterial.opacity = (effects.get('rain') ?? 0) * 0.4;
       const clock = reduceMotion ? 0 : t;

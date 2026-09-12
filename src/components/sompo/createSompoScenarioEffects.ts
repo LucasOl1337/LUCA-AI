@@ -171,7 +171,7 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
     rebase(shift: number) {
       for (const origin of origins.values()) origin.x -= shift;
     },
-    update(frame: SompoEffectFrame, elapsed: number, scenarioId: string, speed: number, reducedMotion: boolean, slope: number, outcomeKey = '', slopePivotX = 0) {
+    update(frame: SompoEffectFrame, elapsed: number, scenarioId: string, speed: number, reducedMotion: boolean, slope: number, outcomeKey = '', slopePivotX = 0, direction = 1, worldXAt?: (atMs: number) => number) {
       refreshModel(); root.visible = attachments.visible = true;
       const runKey = `${scenarioId} ${outcomeKey}`;
       if (runKey !== previousScenario || elapsed < previousTime) origins.clear();
@@ -182,6 +182,14 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
       const cues = new Map(frame.cues.map((cue) => [cue.effect, cue]));
       const intensity = (name: SompoVisualEffect) => cues.get(name)?.intensity ?? 0;
       const clock = reducedMotion ? 0 : elapsed / 1000;
+      const anchorAt = (key: string, atMs: number) => {
+        if (!origins.has(key)) {
+          const anchor = point.clone();
+          if (worldXAt) anchor.x += worldXAt(atMs) - worldXAt(elapsed);
+          origins.set(key, anchor);
+        }
+        return origins.get(key)!;
+      };
       damage(intensity('tire-damage'));
       for (const [name, pool] of pools) {
         const cue = cues.get(name); pool.mesh.visible = !!cue && cue.intensity > 0 && !reducedMotion;
@@ -195,12 +203,11 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
           const emitter = worldOrigin(style, i);
           if (style.motion === 'mud') emitter.y = Math.max(emitter.y, floorAt(emitter.x) + 0.08);
           if (style.burst) {
-            if (!origins.has(name)) origins.set(name, emitter.clone());
-            point.copy(origins.get(name)!);
+            point.copy(anchorAt(name, cue.startMs));
           }
           const side = i % 2 ? 1 : -1;
           if (style.motion === 'spray' || style.motion === 'mud') {
-            velocity.set(-1.7 - rand(i) * 2.6, 2 + rand(i + 2) * 2.2, side * (0.65 + rand(i + 4)));
+            velocity.set(direction * (-1.7 - rand(i) * 2.6), 2 + rand(i + 2) * 2.2, side * (0.65 + rand(i + 4)));
             point.addScaledVector(velocity, particleAge); point.y -= 4.9 * particleAge * particleAge;
           } else if (style.burst) {
             const theta = rand(i + 1) * Math.PI * 2;
@@ -210,7 +217,7 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
           } else {
             // Com deslocamento real, o rastro recua na velocidade verdadeira (m/s)
             // e fica para trás no mundo em vez de acompanhar o caminhão.
-            point.x -= particleAge * (0.45 + Math.abs(speed) / 3.6) + rand(i) * 0.2;
+            point.x -= particleAge * (direction * .45 + speed / 3.6) + rand(i) * 0.2;
             point.y += particleAge * (style.motion === 'smoke' ? 0.8 : 0.3);
             point.z += (rand(i + 6) - 0.5) * particleAge * 0.9;
           }
@@ -246,7 +253,7 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
         const rubber = pieces.effect === 'rubber-shards';
         const key = pieces.effect;
         if (!origins.has(key)) {
-          worldOrigin({ origin: rubber ? 'front-wheel' : 'impact' } as ParticleStyle, 0); origins.set(key, point.clone());
+          worldOrigin({ origin: rubber ? 'front-wheel' : 'impact' } as ParticleStyle, 0); anchorAt(key, pieces.startMs);
         }
         const anchor = origins.get(key)!;
         for (let i = 0; i < 42; i += 1) {
@@ -265,11 +272,12 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
       if (skid) {
         // A marca nasce onde a frenagem começou e se estende até onde o caminhão
         // realmente chegou: deslocamento de mundo, não relógio.
-        const origin = origins.get('skid-marks') ?? model.root.localToWorld(new THREE.Vector3(front.x, 0, 0)).clone(); origins.set('skid-marks', origin);
+        model.root.localToWorld(point.set(front.x, 0, 0));
+        const origin = anchorAt('skid-marks', skid.startMs);
         const frontNowX = model.root.localToWorld(point.set(front.x, 0, 0)).x;
-        const length = clamp(Math.max(frontNowX - origin.x, skid.ageMs / 1000 * 0.4), 0.6, 45);
+        const length = clamp(Math.abs(frontNowX - origin.x), 0.6, 45);
         for (let i = 0; i < 64; i += 1) {
-          const along = Math.floor(i / 2) / 31; const x = origin.x + along * length;
+          const along = Math.floor(i / 2) / 31; const x = origin.x + direction * along * length;
           const curve = scenarioId === 'fast-corner' ? along * along * 1.3 : scenarioId === 'tire-blowout' ? -along * 0.55 : 0;
           transform.position.set(x, floorAt(x) + 0.029, origin.z + (i % 2 ? 1 : -1) * 1.01 + curve);
           transform.rotation.set(-Math.PI / 2, 0, curve * 0.1); transform.scale.set(length / 31 * (0.86 + rand(i) * 0.14), 0.20 + rand(i + 1) * 0.06, 1); transform.updateMatrix(); marks.setMatrixAt(i, transform.matrix);
@@ -285,7 +293,7 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
       if (gravel.visible) {
         for (let i = 0; i < 32; i += 1) {
           const age = (clock + rand(i + 200)) % 1; point.copy(anchors[i % anchors.length]); model.root.localToWorld(point);
-          transform.position.set(point.x - age * 3, Math.max(0.035, 0.08 + age * (mudClumps ? 3.2 : 1.4) - age * age * 4.9), point.z + (i % 2 ? 1 : -1) * age);
+          transform.position.set(point.x - direction * age * 3, Math.max(0.035, 0.08 + age * (mudClumps ? 3.2 : 1.4) - age * age * 4.9), point.z + (i % 2 ? 1 : -1) * age);
           transform.rotation.set(i + age * 3, i, 0); transform.scale.setScalar((mudClumps ? 0.04 : 0.025) + rand(i) * 0.028); transform.updateMatrix(); gravel.setMatrixAt(i, transform.matrix);
         }
         gravel.instanceMatrix.needsUpdate = true;

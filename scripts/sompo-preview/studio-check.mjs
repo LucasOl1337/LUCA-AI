@@ -1,21 +1,23 @@
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 const out = process.env.SOMPO_QA_OUTPUT || '.scratch/sompo-round2/evidence'; mkdirSync(out,{recursive:true});
 const server=spawn(process.execPath,['scripts/sompo-preview/serve.mjs'],{env:{...process.env,SOMPO_PREVIEW_PORT:'5199',SOMPO_PREVIEW_OUTPUT:'/tmp/sompo-round2-preview'},stdio:['ignore','pipe','pipe']});
 await new Promise((resolve,reject)=>{server.stdout.once('data',resolve);server.once('exit',code=>reject(new Error('Fixture exit '+code)));});
+// Route this exact test browser before it can create a window; never steal game focus.
+execFileSync('hyprctl', ['eval', 'if not sompo_studio_qa_rule then sompo_studio_qa_rule=hl.window_rule({name="sompo-studio-qa-only",match={class="^sompo-studio-qa$"},workspace="7 silent",no_initial_focus=true,suppress_event="activate activatefocus"}) end']);
 let browser;
 const errors=[];const checks=[];
 try {
-  browser=await chromium.launch({headless:false,executablePath:process.env.SOMPO_CHROME || '/opt/google/chrome/chrome',args:['--ozone-platform=x11','--use-angle=gl','--enable-gpu','--ignore-gpu-blocklist']});
+  browser=await chromium.launch({headless:false,executablePath:process.env.SOMPO_CHROME || '/opt/google/chrome/chrome',args:['--class=sompo-studio-qa','--disable-backgrounding-occluded-windows','--disable-background-timer-throttling','--disable-renderer-backgrounding','--ozone-platform=x11','--use-angle=gl','--enable-gpu','--ignore-gpu-blocklist']});
   const page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
-  page.on('pageerror',error=>errors.push(String(error)));page.on('console',m=>{if(m.type()==='error'&&!m.text().includes('404'))errors.push(m.text().slice(0,1500));});
-  const cdp=await page.context().newCDPSession(page);await cdp.send('Network.enable');await cdp.send('Network.setCacheDisabled',{cacheDisabled:true});
+  page.on('pageerror',error=>{errors.push(String(error));console.error('PAGE',String(error));});page.on('console',m=>{if(m.type()==='error'&&!m.text().includes('404')){errors.push(m.text().slice(0,1500));console.error('BROWSER',m.text().slice(0,1500));}});
+  const windows=JSON.parse(execFileSync('hyprctl',['clients','-j'],{encoding:'utf8'}));const own=windows.filter(x=>x.class==='sompo-studio-qa');if(!own.length||own.some(x=>x.workspace.id!==7))throw new Error('QA browser must be in workspace 7');console.log('WORKSPACE',own.map(x=>({workspace:x.workspace.id,monitor:x.monitor})));const cdp=await page.context().newCDPSession(page);await cdp.send('Emulation.setFocusEmulationEnabled',{enabled:true});cdp.on('Page.screencastFrame',({sessionId})=>{void cdp.send('Page.screencastFrameAck',{sessionId}).catch(()=>{});});await cdp.send('Page.startScreencast',{format:'jpeg',quality:15,maxWidth:64,maxHeight:64,everyNthFrame:5});await cdp.send('Network.enable');await cdp.send('Network.setCacheDisabled',{cacheDisabled:true});
   const click=name=>page.getByRole('button',{name,exact:true}).click();
-  const advance=async ms=>{await page.evaluate(ms=>window.__sompoPreview.advance(ms),ms);await page.waitForFunction(()=>window.__sompoPreview.time===window.__sompoPreview.until);};
+  const advance=async ms=>{await page.evaluate(ms=>window.__sompoPreview.advance(ms),ms);await page.waitForFunction(()=>window.__sompoPreview.time===window.__sompoPreview.until,null,{timeout:60000,polling:50}).catch(async error=>{console.error('CLOCK',await page.evaluate(()=>({time:window.__sompoPreview.time,until:window.__sompoPreview.until,visibility:document.visibilityState,metrics:window.__sompoPreview.metrics.length})));throw error;});};
   const screenshot=async name=>{await page.locator('[data-sompo-simulator]').screenshot({path:`${out}/${name}.png`});};
-  await page.goto('http://127.0.0.1:5199/?benchmark=1');await page.locator('[data-sompo-model="modular"]').waitFor();await page.waitForTimeout(3500);
+  await page.goto('http://127.0.0.1:5199/?benchmark=1&offscreen=1');await page.locator('[data-sompo-model="modular"]').waitFor();await page.waitForTimeout(3500);
   const renderer=await page.evaluate(()=>window.__sompoPreview.measure().renderer);assert.match(renderer,/NVIDIA/);console.log('GPU',renderer);
   await advance(3000);await screenshot('truck');
   await click('Oficina 3D');await click('Materiais');
@@ -48,7 +50,7 @@ try {
   // Every measured frame advances the logical clock, unlike the former frozen benchmark.
   const measurements=[];
   for(const [name,scenario,width,height] of [['road','normal',1440,1000],['harvest','agri-harvest-dust',1440,1000],['road-mobile','normal',390,844],['harvest-mobile','agri-harvest-dust',390,844]]){
-    await page.setViewportSize({width,height});await page.goto('http://127.0.0.1:5199/?benchmark=1');await page.locator('[data-sompo-model="modular"]').waitFor();await page.locator('select[name="sompo-scenario"]').selectOption(scenario);await page.waitForFunction(()=>document.querySelector('[data-sompo-simulator]').dataset.sompoModel!=='loading');await page.waitForTimeout(3500);await click('Visão geral');await advance(2000);await page.evaluate(()=>{window.__sompoPreview.metrics=[]});await advance(8000);const data=await page.evaluate(()=>window.__sompoPreview.measure());measurements.push({name,logicalStart:2000,logicalEnd:10000,...data});await screenshot(name+'-moving');console.log(name,JSON.stringify({cpu:data.cpuMs,triangles:data.triangles,calls:data.calls}));
+    await page.setViewportSize({width,height});await page.goto('http://127.0.0.1:5199/?benchmark=1&offscreen=1');await page.locator('[data-sompo-model="modular"]').waitFor();await page.locator('select[name="sompo-scenario"]').selectOption(scenario);await page.waitForFunction(()=>document.querySelector('[data-sompo-simulator]').dataset.sompoModel!=='loading');await page.waitForTimeout(3500);await click('Visão geral');await advance(2000);await page.evaluate(()=>{window.__sompoPreview.metrics=[]});await advance(8000);const data=await page.evaluate(()=>window.__sompoPreview.measure());measurements.push({name,logicalStart:2000,logicalEnd:10000,...data});await screenshot(name+'-moving');console.log(name,JSON.stringify({cpu:data.cpuMs,triangles:data.triangles,calls:data.calls}));
   }
   await page.setViewportSize({width:390,height:844});await click('Oficina 3D');await screenshot('studio-mobile');const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);assert.equal(overflow,false);checks.push({check:'mobile no horizontal overflow'});
   assert.deepEqual(errors,[]);writeFileSync(`${out}/checks.json`,JSON.stringify({renderer,checks,errors,measurements},null,2));console.log('PASS',checks.length,'checks');

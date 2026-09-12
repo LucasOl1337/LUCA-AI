@@ -44,7 +44,7 @@ test('todos os 20 cenários têm desfechos declarativos; o padrão preserva o co
         const frame = getSompoRuralFrame(scenarioId, elapsedMs, outcome.id);
         assert.deepEqual(frame, getSompoRuralFrame(scenarioId, elapsedMs, outcome.id));
         assert.ok(frame.phaseLabel.length > 0);
-        assert.ok(frame.speedKph >= 0 && frame.speedKph <= 60);
+        assert.ok(frame.speedKph >= 0 && frame.speedKph <= 120);
         for (const key of ['distance', 'temperature', 'humidity', 'pitch', 'roll']) {
           assert.ok(Number.isFinite(frame[key]), `${scenarioId}/${outcome.id}: ${key}`);
         }
@@ -120,11 +120,16 @@ test('deslocamento em forma fechada bate com a integral numérica do perfil de v
     }
   }
   // Frenagem cossenoidal: 3 s constantes + integral do pulso = metade da rampa.
-  const v = 28 / 3.6;
-  assert.equal(getSompoBrakingTravelMeters(0, 28), 0);
-  assert.ok(Math.abs(getSompoBrakingTravelMeters(3_000, 28) - v * 3) < 1e-9);
-  assert.ok(Math.abs(getSompoBrakingTravelMeters(12_000, 28) - (v * 3 + v)) < 1e-9);
-  assert.equal(getSompoBrakingTravelMeters(12_000, 28), getSompoBrakingTravelMeters(60_000, 28));
+  // A 80 km/h a parada leva ~4,9 s e ~55 m — distância real de emergência.
+  const v = 80 / 3.6;
+  const brakeSeconds = (v / 4.5);
+  assert.equal(getSompoBrakingTravelMeters(0, 80), 0);
+  assert.ok(Math.abs(getSompoBrakingTravelMeters(3_000, 80) - v * 3) < 1e-9);
+  assert.ok(Math.abs(getSompoBrakingTravelMeters(12_000, 80) - (v * 3 + v * brakeSeconds / 2)) < 1e-9);
+  assert.ok(Math.abs(getSompoBrakingTravelMeters(8_000, 80) - (v * 3 + v * brakeSeconds / 2)) < 1e-9);
+  const stopDistance = v * brakeSeconds / 2;
+  assert.ok(stopDistance > 45 && stopDistance < 65, `parada de 80 km/h ≈ 55 m: ${stopDistance}`);
+  assert.equal(getSompoBrakingTravelMeters(12_000, 80), getSompoBrakingTravelMeters(60_000, 80));
 });
 
 test('plano de episódio genérico: todo desfecho roteirizado grava; desfecho manual não', () => {

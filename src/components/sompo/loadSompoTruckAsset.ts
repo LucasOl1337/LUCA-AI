@@ -202,6 +202,32 @@ async function loadGeneratedTruck(model: SompoTruckModel, signal: AbortSignal): 
   body.updateMatrixWorld(true);
   const support: number[] = [];
   const point = new THREE.Vector3();
+  const patched = new Set<THREE.Material>();
+  const wearGenerated = (material: THREE.Material) => {
+    if (!(material instanceof THREE.MeshStandardMaterial) || patched.has(material)) return;
+    if (material.emissive.getHex() !== 0) return; // luzes e lanternas ficam limpas
+    patched.add(material);
+    const compile = material.onBeforeCompile;
+    material.onBeforeCompile = (shader, renderer) => {
+      compile?.call(material, shader, renderer);
+      shader.vertexShader = 'varying vec3 truckW;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+        vec4 truckP = vec4(transformed, 1.0);
+        #ifdef USE_INSTANCING
+          truckP = instanceMatrix * truckP;
+        #endif
+        truckW = (modelMatrix * truckP).xyz;`);
+      shader.fragmentShader = `varying vec3 truckW;
+        float truckHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+        float truckNoise(vec2 p){vec2 i=floor(p),f=fract(p);f*=f*(3.-2.*f);
+          return mix(mix(truckHash(i),truckHash(i+vec2(1,0)),f.x),mix(truckHash(i+vec2(0,1)),truckHash(i+vec2(1,1)),f.x),f.y);}\n` + shader.fragmentShader
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          float truckDust = smoothstep(1.7, .3, truckW.y) * (.35 + .65 * truckNoise(truckW.xz * 2.1));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.44, .37, .25), clamp(truckDust, 0., 1.) * .34);`)
+        .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+          roughnessFactor = mix(roughnessFactor, .93, clamp(truckDust, 0., 1.) * .42);`);
+    };
+    material.customProgramCacheKey = () => 'sompo-gen-truck-wear-v1';
+  };
   body.traverse((object) => {
     const mesh = object as THREE.Mesh;
     if (!mesh.isMesh) return;
@@ -210,6 +236,7 @@ async function loadGeneratedTruck(model: SompoTruckModel, signal: AbortSignal): 
       if (!(material instanceof THREE.MeshStandardMaterial)) continue;
       material.envMapIntensity = 0.85;
       for (const value of Object.values(material)) if (value instanceof THREE.Texture) value.anisotropy = 8;
+      wearGenerated(material);
     }
     // The offline export includes convex-hull vertices: exact support under any pitch/roll,
     // without scanning the 160k-triangle render mesh on every animation frame.

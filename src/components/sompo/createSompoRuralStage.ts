@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { integrateSompoMotion, sompoSteeringAngle } from '../../../shared/sompo-motion.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { loadSompoTruckAsset } from './loadSompoTruckAsset';
@@ -43,6 +44,24 @@ function rangeForDistance(distance: number | null | undefined): number {
   return 1.2 + (((clamped - 5) * (7.2 - 1.2)) / (300 - 5));
 }
 
+/** Altura do solado do pneu no asfalto — quase encostado, sem flutuar. */
+const SOMPO_WHEEL_CONTACT_Y = 0.025;
+/** Curso máximo da suspensão virtual por roda (m), antes de afundar/flutuar. */
+const SOMPO_SUSPENSION_TRAVEL = 0.55;
+
+interface SompoWheelContact {
+  wheel: THREE.Object3D;
+  /** Centro da roda no espaço do modelo (root), X/Z fixos durante a rodagem. */
+  cx: number;
+  cy: number;
+  cz: number;
+  radius: number;
+  /** `position.y` neutra da roda no pai imediato (sem compensação). */
+  baseY: number;
+  /** Escala Y acumulada do pai no espaço do root (GLB pode trazer escala). */
+  parentScaleY: number;
+}
+
 function addBox(
   parent: THREE.Object3D,
   size: [number, number, number],
@@ -84,7 +103,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     const scene = new THREE.Scene();
 
     const camera = new THREE.PerspectiveCamera(37, 1, 0.1, 360);
-    camera.position.set(10.8, 5.3, 13.8);
+    camera.position.set(7.2, 4.9, 15.4);
 
     // Small local fallback while the rural HDRIs load; the real HDRIs replace this IBL.
     const environmentScene = new RoomEnvironment();
@@ -109,17 +128,17 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     keyLight.position.set(-10, 12, 9);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.set(sompoRenderBudget().shadowSize, sompoRenderBudget().shadowSize);
-    keyLight.shadow.camera.left = -12; keyLight.shadow.camera.right = 12;
-    keyLight.shadow.camera.top = 12; keyLight.shadow.camera.bottom = -12;
-    keyLight.shadow.camera.near = 0.5; keyLight.shadow.camera.far = 65;
+    keyLight.shadow.camera.left = -26; keyLight.shadow.camera.right = 26;
+    keyLight.shadow.camera.top = 26; keyLight.shadow.camera.bottom = -26;
+    keyLight.shadow.camera.near = 0.5; keyLight.shadow.camera.far = 110;
     keyLight.shadow.normalBias = 0.018;
     keyLight.shadow.bias = -0.0001;
-    keyLight.shadow.radius = 2;
+    keyLight.shadow.radius = 4;
     scene.add(keyLight);
     // A sombra acompanha o caminhão pelo mundo: luz e alvo transladam juntos.
     scene.add(keyLight.target);
-    const roadScene = createSompoRoadScene(scene, renderer, camera);
     const atmosphere = createSompoAtmosphere(scene, renderer, keyLight);
+    const roadScene = createSompoRoadScene(scene, renderer, camera, { onHdri: (kind, tex) => atmosphere.setSkyTexture(kind, tex) });
     const meter = createSompoRenderMeter(renderer, onStats);
     const postProcessing = createSompoPostProcessing(renderer, scene, camera);
     const frontArrow = new THREE.ArrowHelper(
@@ -136,7 +155,8 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
 
     const truckPoseGroup = new THREE.Group();
     // O caminhão aponta para +X: guinada → arfagem → rolagem exige YZX para não misturar eixos.
-    truckPoseGroup.rotation.order = isFirebase ? SOMPO_EULER_ORDER : 'XYZ';
+    truckPoseGroup.rotation.order = SOMPO_EULER_ORDER;
+    truckPoseGroup.name = 'sompo-rural-machine';
     truckPoseGroup.position.y = SOMPO_TRUCK_PIVOT_Y + 0.05;
     scene.add(truckPoseGroup);
 
@@ -157,6 +177,51 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     const modular = !isFirebase && (studioRef?.current.truck ?? 'modular') === 'modular' ? refineSompoTruck(truckModel) : null;
     const scenarioEffects = createSompoScenarioEffects(scene, truckModel, camera);
     const assetAbort = new AbortController();
+
+    // Contato real das rodas: a carroceria inclina sobre a suspensão, mas os
+    // solados ficam no solo. Apoiar o casco inteiro (convex hull) suspendia o
+    // eixo oposto a qualquer mergulho — era o "flutuando" do bug report.
+    let wheelContacts: SompoWheelContact[] = [];
+    let wheelContactsSource: readonly THREE.Object3D[] = [];
+    let contactMeanX = 0;
+    let contactMeanZ = 0;
+    let contactMeanSole = 0.02;
+    const contactScratch = new THREE.Vector3();
+    const contactColumn = new THREE.Vector3();
+    const contactRootInverse = new THREE.Matrix4();
+    const contactParentMatrix = new THREE.Matrix4();
+    const contactGroundMatrix = new THREE.Matrix4();
+
+    function captureWheelContacts() {
+      wheelContactsSource = wheels.slice();
+      truckGroup.updateMatrixWorld(true);
+      contactRootInverse.copy(truckGroup.matrixWorld).invert();
+      const next: SompoWheelContact[] = [];
+      for (const wheel of wheels) {
+        contactScratch.setFromMatrixPosition(wheel.matrixWorld).applyMatrix4(contactRootInverse);
+        contactParentMatrix.multiplyMatrices(
+          contactRootInverse,
+          wheel.parent?.matrixWorld ?? wheel.matrixWorld,
+        );
+        const scaleY = contactColumn.setFromMatrixColumn(contactParentMatrix, 1).length() || 1;
+        next.push({
+          wheel,
+          cx: contactScratch.x,
+          cy: contactScratch.y,
+          cz: contactScratch.z,
+          radius: typeof wheel.userData.radius === 'number' ? wheel.userData.radius : 0.58,
+          baseY: wheel.position.y,
+          parentScaleY: scaleY,
+        });
+      }
+      wheelContacts = next;
+      const n = Math.max(1, wheelContacts.length);
+      contactMeanX = wheelContacts.reduce((sum, item) => sum + item.cx, 0) / n;
+      contactMeanZ = wheelContacts.reduce((sum, item) => sum + item.cz, 0) / n;
+      contactMeanSole = wheelContacts.reduce((sum, item) => sum + item.cy - item.radius, 0) / n;
+    }
+    captureWheelContacts();
+
     setModelStatus('loading');
     setModelAsset(null);
     truckGroup.visible = !!modular;
@@ -191,6 +256,8 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       const safeHeight = Math.max(1, height);
       renderer.setSize(safeWidth, safeHeight, false);
       camera.aspect = safeWidth / safeHeight;
+      // Preserve horizontal room for the full vehicle in a portrait canvas.
+      camera.fov = Math.min(72, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(37 / 2)) * Math.max(1, 1.25 / camera.aspect))));
       camera.updateProjectionMatrix();
       postProcessing.resize(safeWidth, safeHeight);
     }
@@ -219,7 +286,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
           orbit.minDistance = 2.5;
         } else {
           orbit.target.set(truckPoseGroup.position.x, 1.9, truckPoseGroup.position.z);
-          camera.position.set(truckPoseGroup.position.x + 9.7, 4.3, 11.2);
+          camera.position.set(truckPoseGroup.position.x + 7.0, 4.6, 13.4);
           orbit.minDistance = 6;
         }
         orbit.update();
@@ -255,6 +322,11 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     let runStamp = -1;
     let runOriginX = 0;
     let animalAnchorX = 9;
+    let lastCruiseKph: number | null = null;
+    const cameraShift = new THREE.Vector3();
+    const wheelAxis = new THREE.Vector3(0, 1, 0);
+    const wheelAxle = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+    const wheelSteering = new THREE.Quaternion(), wheelSpin = new THREE.Quaternion();
     const REBASE_DISTANCE = 4096;
 
     function scenarioTravelMeters(settings: SompoSimulationControls, elapsedMs: number) {
@@ -294,7 +366,21 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
         ? getSompoRuralFrame(settings.scenarioId, scenarioElapsed, settings.outcomeId)
         : null;
 
+      const brakingState = !isFirebase && !ruralFrame && settings.scenarioId === SOMPO_BRAKING_SCRIPT.scenarioId
+        ? getSompoBrakingScriptState(scenarioElapsed, settings.speedKph)
+        : null;
+      const motionScript = !isFirebase ? getSompoScenarioScript(settings.scenarioId, settings.outcomeId) : null;
       // ── Deslocamento real no mundo ────────────────────────────────────────
+      if (lastCruiseKph === null) lastCruiseKph = settings.speedKph;
+      else if (settings.speedKph !== lastCruiseKph) {
+        // Slider de cruzeiro em cenário livre: a forma fechada v·t saltaria —
+        // recalibra a origem para a posição ficar contínua.
+        if (!motionScript) {
+          runOriginX += scenarioTravelMeters({ ...settings, speedKph: lastCruiseKph }, scenarioElapsed)
+            - scenarioTravelMeters(settings, scenarioElapsed);
+        }
+        lastCruiseKph = settings.speedKph;
+      }
       if (runStamp !== startedAtRef.current) {
         // Novo cenário, desfecho, reinício ou episódio: o caminhão segue estrada
         // adiante a partir de onde está, sem teleporte para a origem.
@@ -325,14 +411,29 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
         currentHeading: liveHeading,
         deltaSeconds: reduceMotion.matches || (isFirebase && !physicalCurrent) ? 0 : delta,
       }, axisCalibrationRef.current);
+      const drivingSpeed = ruralFrame?.speedKph ?? brakingState?.speedKph ?? settings.speedKph;
+      // Micro-vibração de rodagem: a carroceria fica viva em velocidade de pista
+      // e zera parado; as rodas seguem plantadas pela compensação de contato.
+      const rideVibe = reduceMotion.matches ? 0
+        : Math.min(1, Math.abs(drivingSpeed) / 30)
+          * (0.45 + Math.min(1, (ruralFrame?.roughness ?? settings.roughness)));
+      const pitchVibe = THREE.MathUtils.degToRad(
+        (Math.sin(visualElapsed * .013 + .6) * .1 + Math.sin(visualElapsed * .031 + 2.1) * .05) * rideVibe,
+      );
+      const rollVibe = THREE.MathUtils.degToRad(
+        (Math.sin(visualElapsed * .017 + 1.9) * .08 + Math.sin(visualElapsed * .029 + .4) * .04) * rideVibe,
+      );
       const pitch = isFirebase
         ? attitudeKnown ? sensorPose.rotationZ : truckPoseGroup.rotation.z
-        : THREE.MathUtils.degToRad(ruralFrame?.pitch ?? snapshot.readings.pitch ?? settings.pitch);
+        : THREE.MathUtils.degToRad(ruralFrame?.pitch ?? (settings.pitch + (brakingState?.pitchOffset ?? 0) + Math.sin(visualElapsed * .0021) * settings.roughness * .28 * Math.min(1, (brakingState?.speedKph ?? settings.speedKph) / 8)))
+          + pitchVibe;
       const roll = isFirebase
         ? attitudeKnown ? sensorPose.rotationX : truckPoseGroup.rotation.x
-        : THREE.MathUtils.degToRad(ruralFrame?.roll ?? snapshot.readings.roll ?? settings.roll);
+        : THREE.MathUtils.degToRad(ruralFrame?.roll ?? (settings.roll + Math.sin(visualElapsed * .0027 + .6) * settings.roughness * .34 * Math.min(1, (brakingState?.speedKph ?? settings.speedKph) / 8)))
+          + THREE.MathUtils.degToRad(THREE.MathUtils.clamp(-(ruralFrame?.lateralAcceleration ?? 0) * 0.9, -7, 7))
+          + rollVibe;
       const poseDamping = frameDamping(frameDelta, 5);
-      if (reduceMotion.matches) {
+      if (reduceMotion.matches || !isFirebase) {
         truckPoseGroup.rotation.z = pitch;
         truckPoseGroup.rotation.x = roll;
       } else {
@@ -346,19 +447,26 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       if (!isFirebase) {
         const targetYaw = ruralFrame?.yaw ?? 0;
         const targetLateral = ruralFrame?.lateral ?? 0;
+        // Heading visual = guinada do roteiro + ângulo do vetor de movimento
+        // (slip angle): a carroceria aponta pra onde o deslocamento real leva,
+        // em vez de transladar de lado como caranguejo. Em ré a traseira lidera.
+        const dir = ruralFrame?.direction ?? 1;
+        const vAbs = Math.max(1, Math.abs(drivingSpeed) / 3.6);
+        // Com o casco apoiando (capotamento, rampa extrema) o slip não se aplica.
+        const gripFactor = 1 - THREE.MathUtils.smoothstep(Math.abs(ruralFrame?.roll ?? settings.roll), 12, 35);
+        const slipYaw = Math.atan2(-(ruralFrame?.lateralRate ?? 0) * dir, vAbs) * gripFactor;
         truckPoseGroup.rotation.y = dampAngle(
           truckPoseGroup.rotation.y,
-          THREE.MathUtils.degToRad(targetYaw),
-          reduceMotion.matches ? 1 : frameDamping(frameDelta, 7.5),
+          -THREE.MathUtils.degToRad(targetYaw) + slipYaw,
+          1,
         );
-        truckPoseGroup.position.z = targetLateral;
+        truckPoseGroup.position.z = reduceMotion.matches
+          ? targetLateral
+          : THREE.MathUtils.lerp(truckPoseGroup.position.z, targetLateral, frameDamping(frameDelta, 10));
       }
-      const brakingState = !isFirebase && !ruralFrame && settings.scenarioId === SOMPO_BRAKING_SCRIPT.scenarioId
-        ? getSompoBrakingScriptState(scenarioElapsed, settings.speedKph)
-        : null;
       const liveActivity = isFirebase
         ? physicalCurrent ? THREE.MathUtils.clamp((snapshot.readings.rotation?.magnitude || 0) * 0.012, 0, 0.1) : 0
-        : (ruralFrame?.roughness ?? settings.roughness) * 0.008 * (brakingState ? Math.min(1, brakingState.speedKph / 8) : 1);
+        : (ruralFrame?.roughness ?? settings.roughness) * 0.008 * Math.min(1, (ruralFrame?.speedKph ?? brakingState?.speedKph ?? settings.speedKph) / 8);
       // Rampas roteirizadas ("vence a rampa", "desce controlado") mudam o perfil
       // do terreno junto com o pitch do roteiro; a cabine (mergulho de frenagem)
       // não gira o mundo — por isso brake-failure usa o pitch fixo do preset.
@@ -367,14 +475,29 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
         : 0;
       relativeGroundRotation.copy(truckPoseGroup.rotation);
       relativeGroundRotation.z -= slope;
-      const targetHeight = slope
-        ? truckGroundHeight(relativeGroundRotation, truckGroup.userData.groundSupport) / Math.cos(slope)
+      contactGroundMatrix.makeRotationFromEuler(relativeGroundRotation);
+      const gm = contactGroundMatrix.elements;
+      const hullHeight = slope
+        ? truckGroundHeight(relativeGroundRotation, truckGroup.userData.groundSupport) / Math.max(0.5, Math.cos(slope))
         : truckGroundHeight(truckPoseGroup.rotation, truckGroup.userData.groundSupport);
-      truckBaseHeight = reduceMotion.matches
+      // Em atitudes pequenas o apoio vem das rodas (suspensão virtual); em
+      // inclinações grandes — rampa extrema ou capotamento — o casco apoia.
+      const groundAngle = Math.max(Math.abs(relativeGroundRotation.z), Math.abs(relativeGroundRotation.x));
+      const contactFactor = 1 - THREE.MathUtils.smoothstep(groundAngle, 0.14, 0.34);
+      const cosSlope = Math.max(0.5, Math.cos(slope));
+      let targetHeight = hullHeight;
+      if (wheelContacts.length && contactFactor > 0) {
+        const wheelPoseGround = SOMPO_WHEEL_CONTACT_Y
+          - (gm[1] * contactMeanX + gm[5] * (contactMeanSole - SOMPO_TRUCK_PIVOT_Y) + gm[9] * contactMeanZ);
+        targetHeight = THREE.MathUtils.lerp(hullHeight, wheelPoseGround / cosSlope, contactFactor);
+      }
+      truckBaseHeight = reduceMotion.matches || !isFirebase
         ? targetHeight
         : THREE.MathUtils.lerp(truckBaseHeight, targetHeight, frameDamping(frameDelta, 7.5));
       truckPoseGroup.position.y = truckBaseHeight - (ruralFrame?.sink ?? 0)
-        + (reduceMotion.matches ? 0 : Math.sin(visualElapsed * 0.008) * liveActivity);
+        + (reduceMotion.matches ? 0 : Math.sin(visualElapsed * 0.008) * liveActivity
+          + Math.sin(visualElapsed * 0.021 + 1.3) * liveActivity * 0.5
+          + Math.sin(visualElapsed * 0.037 + 0.7) * liveActivity * 0.3);
       if (focusTarget === 'sensor') {
         sensorGroup.getWorldPosition(focusPoint);
       } else {
@@ -382,29 +505,48 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       }
       // A câmera acompanha o deslocamento: o alvo persegue o caminhão e a câmera
       // translada junto, preservando o ângulo escolhido pelo operador no orbit.
-      const targetXBefore = orbit.target.x;
-      orbit.target.lerp(focusPoint, reduceMotion.matches ? 1 : frameDamping(frameDelta, 5));
-      camera.position.x += orbit.target.x - targetXBefore;
-      const drivingSpeed = ruralFrame?.speedKph ?? brakingState?.speedKph ?? settings.speedKph;
-      if (!isFirebase && !reduceMotion.matches && !modular) {
-        // Rodas giram coerentes com a velocidade real sobre o solo (ou patinam
-        // quando o roteiro manda wheelSpeedKph diferente do avanço).
-        const wheelSpeed = (ruralFrame?.wheelSpeedKph ?? drivingSpeed) * (ruralFrame?.direction ?? 1);
-        for (const wheel of wheels) wheel.rotation.y -= delta * wheelSpeed / (3.6 * (wheel.userData.radius ?? 0.60));
+      cameraShift.copy(focusPoint).sub(orbit.target);
+      if (isFirebase) cameraShift.multiplyScalar(reduceMotion.matches ? 1 : frameDamping(frameDelta, 5));
+      camera.position.add(cameraShift);
+      orbit.target.add(cameraShift);
+      const wheelTravel = isFirebase ? 0 : motionScript
+        ? integrateSompoMotion(motionScript.keyframes, scenarioElapsed) / 3.6
+        : scenarioTravelMeters(settings, scenarioElapsed);
+      const steeringAngle = sompoSteeringAngle(drivingSpeed, ruralFrame?.direction ?? 1, ruralFrame?.yawRate ?? 0, 6.0);
+      if (!isFirebase && !modular) {
+        for (const wheel of wheels) {
+          wheelSteering.setFromAxisAngle(wheelAxis, wheel.position.x > 2 ? steeringAngle : 0);
+          wheelSpin.setFromAxisAngle(wheelAxis, reduceMotion.matches ? 0 : -wheelTravel / (wheel.userData.radius ?? .58));
+          wheel.quaternion.copy(wheelSteering).multiply(wheelAxle).multiply(wheelSpin);
+        }
       }
       const studio = studioRef?.current ?? SOMPO_STUDIO_DEFAULT;
-      modular?.update(studio, visualElapsed, scenarioTravelMeters(settings, scenarioElapsed), ruralFrame?.yaw ?? 0, ruralFrame?.roughness ?? settings.roughness, ruralFrame?.rain ?? 0, reduceMotion.matches);
+      modular?.update(studio, visualElapsed, wheelTravel, steeringAngle, ruralFrame?.roughness ?? settings.roughness, ruralFrame?.rain ?? 0, reduceMotion.matches, drivingSpeed);
+      // Suspensão virtual: cada roda compensa a inclinação da carroceria e fica
+      // plantada no solo; fora do regime de rodagem o hull retoma o apoio.
+      if (wheelContacts.length) {
+        if (wheelContactsSource.length !== wheels.length
+          || wheels.some((wheel, index) => wheel !== wheelContactsSource[index])) captureWheelContacts();
+        const suspensionGain = Math.abs(gm[5]) > 0.6 ? contactFactor : 0;
+        const poseGroundY = truckBaseHeight * cosSlope;
+        for (const contact of wheelContacts) {
+          const residual = SOMPO_WHEEL_CONTACT_Y - poseGroundY
+            - (gm[1] * contact.cx + gm[5] * (contact.cy - contact.radius - SOMPO_TRUCK_PIVOT_Y) + gm[9] * contact.cz);
+          const travel = suspensionGain * THREE.MathUtils.clamp(
+            residual / (gm[5] || 1), -SOMPO_SUSPENSION_TRAVEL, SOMPO_SUSPENSION_TRAVEL,
+          );
+          contact.wheel.position.y = contact.baseY + travel / contact.parentScaleY;
+        }
+      }
       roadScene.update(effectFrame, ruralFrame, visualElapsed, truckPoseGroup.position, reduceMotion.matches, slope, { animalAnchorX, wind: studio.wind });
-      keyLight.position.set(truckWorldX - 10, 12, 9);
-      keyLight.target.position.set(truckWorldX, 0, truckPoseGroup.position.z);
-      keyLight.intensity = (ruralFrame?.rain ?? 0) > 0 ? 0.25 : roadScene.hasHdri ? 1.8 : 2.4;
+      // Posição, cor e intensidade do sol são da atmosfera (alinhada ao HDRI).
       // Sem leitura de distância não há alvo do feixe: esconde obstáculo e raio
       // em vez de desenhá-los numa posição inventada.
       obstacleGroup.visible = isFirebase
         ? Number.isFinite(snapshot.readings.distance)
         : settings.scenarioId === 'obstacle' || settings.scenarioId === 'brake-failure';
       rayGroup.visible = obstacleGroup.visible;
-      const rangeLength = rangeForDistance(snapshot.readings.distance);
+      const rangeLength = rangeForDistance(isFirebase ? snapshot.readings.distance : ruralFrame?.distance ?? settings.distance);
       rayGroup.scale.x = rangeLength;
       // Alvo do feixe ultrassônico: anotação de sensor à frente do caminhão.
       obstacleGroup.position.x = truckWorldX + SOMPO_TRUCK_FRONT_X + rangeLength;
@@ -415,7 +557,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       ledMaterial.color.set(uncertain ? 0xc9ad74 : snapshot.status === 'alert' ? 0xff5d52 : 0x7dff9a);
       ledMaterial.emissive.set(uncertain ? 0x473d20 : snapshot.status === 'alert' ? 0xff2d22 : 0x2dff6b);
       ledMaterial.emissiveIntensity = reduceMotion.matches ? 2.4 : 2.2 + (Math.sin(visualElapsed * 0.007) * 1.1);
-      if (!isFirebase) scenarioEffects.update(effectFrame, visualElapsed, visualScenario, drivingSpeed, reduceMotion.matches, slope, effectOutcomeId ?? '', truckWorldX);
+      if (!isFirebase) scenarioEffects.update(effectFrame, visualElapsed, visualScenario, drivingSpeed * (ruralFrame?.direction ?? 1), reduceMotion.matches, slope, effectOutcomeId ?? '', truckWorldX, ruralFrame?.direction ?? 1, at => runOriginX + scenarioTravelMeters(settings, at));
       atmosphere.update(studio, camera, truckPoseGroup.position, visualElapsed, (ruralFrame?.rain ?? 0) > 0);
       orbit.update();
       postProcessing.render(delta);

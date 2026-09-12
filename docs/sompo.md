@@ -56,4 +56,4 @@ O no ja aceitou escrita REST anonima. Nao faca PUT/PATCH de prova no Firebase re
 
 ## Oficina do simulador
 
-Para renderizar com fixtures, comparar cenários e verificar GPU sem abrir o backend ou o Firebase, veja [sompo-oficina.md](./sompo-oficina.md).
+A oficina fica no próprio simulador: **Telemetria → Simulador 3D → Oficina 3D**. Permite editar o caminhão modular, iluminação e vento, salvar variações e exportar PNG, preset JSON ou GLB. Estrutura, armazenamento, referências aproveitadas e verificação técnica em [sompo-oficina.md](./sompo-oficina.md).

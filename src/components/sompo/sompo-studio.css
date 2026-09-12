@@ -6,3 +6,6 @@
 .sompo-simulator.is-studio .sompo-simulator-workspace{align-items:start}.sompo-simulator.is-studio .sompo-simulator-stage{height:700px;position:sticky;top:12px}.sompo-simulator-playback output{min-width:42px;text-align:right}
 @media(max-width:1000px){.sompo-simulator.is-studio .sompo-simulator-stage{position:relative;top:auto;height:540px;min-height:540px}}
 @media(max-width:700px){.sompo-simulator.is-studio .sompo-simulator-stage{height:430px;min-height:430px}.sompo-simulator-playback{width:100%}.sompo-simulator-playback input{flex:1;min-width:60px}}
+
+.sompo-simulator-toolbar,.sompo-simulator-modes,.sompo-simulator-playback{box-sizing:border-box;min-width:0}.sompo-simulator-modes button{min-width:0}.sompo-simulator-stats{display:flex;gap:10px;flex-wrap:wrap;max-width:calc(100% - 28px)}
+@media(max-width:700px){.sompo-simulator-toolbar{display:grid;grid-template-columns:minmax(0,1fr)}.sompo-simulator-modes{display:grid;grid-template-columns:1fr 1fr}.sompo-simulator-playback{display:grid;grid-template-columns:38px minmax(30px,1fr) 40px 60px;gap:7px}.sompo-simulator-playback input{width:100%;min-width:0}.sompo-simulator-playback select{width:60px;min-width:0}.sompo-simulator-stats{bottom:111px;font-size:9px;gap:8px}}

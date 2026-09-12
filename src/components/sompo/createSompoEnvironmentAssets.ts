@@ -6,7 +6,7 @@ const ASSET_ROOT = '/environments/sompo/';
 type Surface = 'asphalt' | 'dirt' | 'wood';
 
 /** Async upgrades keep the scene usable if an HDRI or texture is unavailable. */
-export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE.WebGLRenderer, options: { background?: boolean; intensity?: number; initialWet?: boolean } = {}) {
+export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE.WebGLRenderer, options: { background?: boolean; intensity?: number; initialWet?: boolean; onHdri?: (kind: 'dry' | 'wet', texture: THREE.Texture) => void } = {}) {
   let disposed = false;
   let wet = options.initialWet ?? false;
   const owned = new Set<THREE.Texture>();
@@ -42,13 +42,14 @@ export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE
       texture.mapping = THREE.EquirectangularReflectionMapping;
       hdris[kind] = texture;
       updateLighting();
+      options.onHdri?.(kind, texture);
     }).catch(() => { /* The existing environment remains available. */ });
   }
   loadHdri(wet ? 'wet' : 'dry');
 
   return {
     get hasHdri() { return !!(wet ? hdris.wet : hdris.dry); },
-    surface(material: THREE.MeshStandardMaterial, surface: Surface, repeatX: number, repeatY: number) {
+    surface(material: THREE.MeshStandardMaterial, surface: Surface, repeatX: number, repeatY: number, options: { keepMap?: boolean; normalScale?: number } = {}) {
       let pending = surfaces.get(surface);
       if (!pending) {
         const size = surface === 'wood' ? '' : '-2k';
@@ -67,13 +68,13 @@ export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE
           return map;
         });
         // Fallback maps can be shared by several materials; retire with this owner.
-        if (material.map) owned.add(material.map);
-        material.map = maps[0];
+        if (material.map && !options.keepMap) owned.add(material.map);
+        if (!options.keepMap) material.map = maps[0];
         material.normalMap = maps[1];
         // One packed texture: R = ambient occlusion, G = roughness, B = metalness.
         material.aoMap = material.roughnessMap = maps[2];
         material.aoMapIntensity = 0.8;
-        material.normalScale.setScalar(surface === 'asphalt' ? 0.65 : 0.75);
+        material.normalScale.setScalar(options.normalScale ?? (surface === 'asphalt' ? 0.65 : 1.0));
         material.needsUpdate = true;
       }).catch(() => { /* Retain procedural fallback maps until all PBR channels are ready. */ });
     },

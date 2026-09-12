@@ -95,6 +95,6 @@ test('gemeo Firebase expoe calibracao persistente, reset e referencia da frente'
   assert.match(simulatorSource, /Trocar arfagem ↔ rolagem/);
   assert.match(simulatorSource, /localStorage\.setItem\(SOMPO_AXIS_CALIBRATION_STORAGE_KEY/);
   assert.match(simulatorSource, /Voltar ao padrão/);
-  assert.match(ruralStageSource, /truckPoseGroup\.rotation\.order = isFirebase \? SOMPO_EULER_ORDER : 'XYZ'/);
+  assert.match(ruralStageSource, /truckPoseGroup\.rotation\.order = SOMPO_EULER_ORDER/);
   assert.match(ruralStageSource, /frente-caminhao-mais-x/);
 });
