@@ -32,7 +32,7 @@ Geofencing aqui é um framework de delimitação de área e classificação de z
 
 ## Próximos passos registrados
 
-1. Persistir `posX`/`posZ`/faixa nas amostras do simulador e exportar GNSS sintético em `convertSompoDataset`, para o episódio gravado virar caso com episódios de faixa no laboratório.
+1. feito: amostra crua do simulador inclui posição/faixa e `convertSompoDataset` exporta posição disponível como GNSS sintético com origem local; falta: preservar esses campos na normalização e em `snapshotToRow`/`mapSampleRow` de `server/sompo-telemetry-history.js`, que hoje os descartam, e associar polígonos/regras do cenário ao caso para calcular episódios de faixa.
 2. `manifest.machine.profile` (largura, velocidade, tempo de reação) alimentando faixas operacionais por máquina; o limite de inclinação já alimenta o laboratório e o radar do simulador.
 3. GPS no ESP32: campos `latitude`, `longitude`, `gnss_fix` no nó do Firebase; o servidor roda o mesmo `evaluateGeofence` sobre o snapshot físico.
 4. Fontes externas para fazendas reais: OSM (água), SICAR (imóvel), modelo digital de elevação (declividade).

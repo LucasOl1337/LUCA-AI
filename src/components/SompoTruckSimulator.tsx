@@ -176,7 +176,17 @@ function captureEpisodeFrameDataUrl(source: HTMLCanvasElement): string | null {
 
 function snapshotToSimulationRaw(snapshot: SompoTelemetrySnapshot): Record<string, unknown> {
   const readings = snapshot.readings;
+  const { position, geofence } = snapshot as Partial<SompoAgriSimulationSnapshot>;
   return {
+    ...(position && geofence ? {
+      posX: position.x,
+      posZ: position.z,
+      headingDeg: position.headingDeg,
+      geofenceBand: geofence.nearest?.bandId ?? null,
+      geofenceHazard: geofence.nearest?.hazardKey ?? null,
+      geofenceDistanceM: geofence.nearest?.distanceM ?? null,
+      machineBand: geofence.machine?.bandId ?? null,
+    } : {}),
     trator: snapshot.tractorId,
     timestamp: snapshot.deviceTimestamp,
     distancia: readings.distance,
