@@ -13,6 +13,7 @@ import {
 import { getSompoAgriStartX, getSompoAgriTravelMeters } from '../../../shared/sompo-agri-brief.js';
 import { getSompoGeofenceSite } from '../../../shared/sompo-geofence-sites.js';
 import { bandGrid, resolveHazards } from '../../../shared/lab-geofence.js';
+import { polygonContains } from '../../../shared/lab-telemetry.js';
 import { frameDamping } from './frameDamping.js';
 import { createSompoRenderer, sompoRenderBudget, disposeSompoObject, type SompoStageApi } from './sompoStage';
 import { createSompoEnvironmentAssets } from './createSompoEnvironmentAssets';
@@ -141,28 +142,36 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   worldRoot.add(geofenceLayer);
   const hazards = resolveHazards(site.manifestRules, site.polygons);
   const grid = bandGrid(site.polygons, hazards, 2);
-  if (grid && hazards.length) {
-    const { cols, rows, cellM, minX, minZ } = grid;
-    const rgba = new Uint8Array(cols * rows * 4);
-    const colors = hazards.map(hazard => {
-      const ramp = hazard.polygon?.role === 'water' ? ['#1b5e8a', '#3f8fbf', '#9ac8e2'] : ['#8b4a1a', '#c9823e', '#e7c39a'];
-      return hazard.bands.map((_, i) => parseInt(ramp[Math.round(i * (ramp.length - 1) / Math.max(1, hazard.bands.length - 1))].slice(1), 16));
-    });
-    for (let row = 0; row < rows; row += 1) for (let col = 0; col < cols; col += 1) {
-      const cell = row * cols + col;
+  // Cor por faixa, da mais interna para a mais externa, igual para todo perigo: a faixa diz "quão perto", não "de quê".
+  // O perigo em si já está desenhado (contorno, lâmina d'água). Regra 1 do SPEC: a grade que soma a área é a que pinta.
+  const BAND_RAMP = [0xd63a2f, 0xe8902c, 0xe9c74a];
+  const paint = grid ? new Int32Array(grid.cols * grid.rows).fill(-1) : null;
+  if (grid && paint) {
+    for (let cell = 0; cell < paint.length; cell += 1) {
       if (!grid.inside[cell]) continue;
-      let bestMax = Infinity, color: number | null = null;
+      let bestMax = Infinity;
       for (let h = 0; h < hazards.length; h += 1) {
         const band = grid.bands[h][cell];
-        if (band >= 0 && hazards[h].bands[band].max_m < bestMax) {
-          bestMax = hazards[h].bands[band].max_m;
-          color = colors[h][band];
-        }
+        if (band < 0 || hazards[h].bands[band].max_m >= bestMax) continue;
+        bestMax = hazards[h].bands[band].max_m;
+        paint[cell] = BAND_RAMP[Math.min(band, BAND_RAMP.length - 1)];
       }
-      if (color === null) continue;
+    }
+  }
+  const paintAt = (x: number, z: number): number => {
+    if (!grid || !paint) return -1;
+    const col = Math.floor((x - grid.minX) / grid.cellM), row = Math.floor((z - grid.minZ) / grid.cellM);
+    return col < 0 || row < 0 || col >= grid.cols || row >= grid.rows ? -1 : paint[row * grid.cols + col];
+  };
+  if (grid && paint) {
+    const { cols, rows, cellM, minX, minZ } = grid;
+    const rgba = new Uint8Array(cols * rows * 4);
+    for (let row = 0; row < rows; row += 1) for (let col = 0; col < cols; col += 1) {
+      const color = paint[row * cols + col];
+      if (color < 0) continue;
       // v=0 cai em +Z após a rotação do plano: inverte as linhas da grade.
       const at = ((rows - 1 - row) * cols + col) * 4;
-      rgba[at] = color >> 16 & 255; rgba[at + 1] = color >> 8 & 255; rgba[at + 2] = color & 255; rgba[at + 3] = 107;
+      rgba[at] = color >> 16 & 255; rgba[at + 1] = color >> 8 & 255; rgba[at + 2] = color & 255; rgba[at + 3] = 150;
     }
     // O map é liberado por disposeSompoObject(scene) junto com os materiais.
     const texture = new THREE.DataTexture(rgba, cols, rows, THREE.RGBAFormat);
@@ -182,6 +191,26 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     mesh.renderOrder = 1;
     geofenceLayer.add(mesh);
   }
+  // O plantio cobre o chão onde a máquina anda; cada pé dentro de uma faixa recebe a cor dela (mesma grade) e
+  // pés em cima da água somem. Só pós-processa as instâncias: o módulo do plantio do Lucas fica intacto.
+  const water = site.polygons.filter(polygon => polygon.role === 'water');
+  const tint = new THREE.Color(), position = new THREE.Vector3(), matrix = new THREE.Matrix4();
+  field.root.getObjectByName('sompo-agri-crop-rows')?.traverse((node) => {
+    const strip = node as THREE.InstancedMesh;
+    if (!strip.isInstancedMesh) return;
+    for (let i = 0; i < strip.count; i += 1) {
+      strip.getMatrixAt(i, matrix);
+      position.setFromMatrixPosition(matrix);
+      if (water.some(polygon => polygonContains(position, polygon))) {
+        strip.setMatrixAt(i, matrix.makeScale(0, 0, 0));
+        continue;
+      }
+      const color = paintAt(position.x, position.z);
+      strip.setColorAt(i, color < 0 ? tint.setScalar(1) : tint.setHex(color).lerp(tint.clone().setScalar(1), 0.15));
+    }
+    strip.instanceMatrix.needsUpdate = true;
+    if (strip.instanceColor) strip.instanceColor.needsUpdate = true;
+  });
   for (const polygon of site.polygons) {
     const ring = polygon.rings[0];
     const color = polygon.role === 'water' ? 0x79b9c0 : polygon.role === 'hazard' ? 0xe6ad52 : 0x73c48c;
