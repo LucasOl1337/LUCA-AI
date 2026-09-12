@@ -33,17 +33,18 @@ export interface GeofenceEpisode {
 export interface GeofenceSummary {
   episodes: GeofenceEpisode[];
   affectedArea: { hazardKey: string; bandId: string; areaM2: number; shareOfAllowed: number; method: `grade ${number} m` }[];
+  grid: LabBandGrid | null;   // a mesma grade que somou a área; a cena pinta a partir dela
   rulesVersion: string;       // hash do bloco rules usado
   warnings: string[];
 }
 export interface LabBandGrid {
   minX: number; minZ: number; cellM: number; cols: number; rows: number;
   inside: Uint8Array;         // 1 = célula dentro de allowed_area
-  bands: Int8Array[];         // por perigo: índice da faixa em hazards[h].bands, -1 = nenhuma
+  bands: Int16Array[];         // por perigo: índice da faixa em hazards[h].bands, -1 = nenhuma
 }
 export function classifyBand<T extends LabBandRule>(distanceM: number, bands: T[]): T | null;
 export function resolveHazards(rules: LabGeofenceRules | null | undefined, polygons: LabPolygon[]): LabHazard[] & { warnings: string[] };
-export function computeGeofenceEpisodes(samples: LabSample[], polygons: LabPolygon[], rules: LabGeofenceRules, caseId: string): { summary: GeofenceSummary; events: LabEvent[] };
+export function computeGeofenceEpisodes(samples: LabSample[], polygons: LabPolygon[], rules: LabGeofenceRules, caseId: string, sampleIntervalMs?: number): { summary: GeofenceSummary; events: LabEvent[] };
 export function bandGrid(polygons: LabPolygon[], hazards: LabHazard[], cellM?: number): LabBandGrid | null;
 export function affectedArea(polygons: LabPolygon[], hazards: LabHazard[], cellM?: number): GeofenceSummary['affectedArea'];
 export type { LabPoint };

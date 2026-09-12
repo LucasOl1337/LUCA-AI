@@ -409,7 +409,7 @@ export function parseLabCase(rawCsv, { fileName = 'caso.csv', manifest = null, m
   warnings.push(...site.warnings);
   const rules = { ...manifest?.rules, water_warning_distance_m: manifest?.rules?.water_warning_distance_m ?? 20, coolant_warning_c: manifest?.rules?.coolant_warning_c ?? 105 };
   const id = `lab:${first.machine_id}:${first.timeMs}:${last.timeMs}:${hashText(rawCsv)}`;
-  const geofence = computeGeofenceEpisodes(samples, polygons, rules, id);
+  const geofence = computeGeofenceEpisodes(samples, polygons, rules, id, sampleIntervalMs);
   // Sem rules.hazards a faixa derivada só alimenta geofence.episodes; a linha do tempo continua com near_water (PR intacta).
   const events = [
     ...detectEvents(samples, polygons, rules, id, Boolean(rules.hazards?.some(hazard => hazard.role === 'water'))),

@@ -137,3 +137,44 @@ test('manifesto rejeita hazards mal formados com mensagens legíveis', () => {
   const hazardMap = { ...map, features: [...map.features, { type: 'Feature', properties: { id: 'd', role: 'hazard' }, geometry: map.features[0].geometry }] };
   assert.throws(() => parseLabCase(source, { manifest, map: hazardMap }), /properties\.category/);
 });
+
+test('perigos com id de polígono repetido ganham chaves distintas, aviso, e episódios independentes', () => {
+  const twin = rect('lago', 'water', -60, -20, -50, 150); // mesmo id do lago, 20 m à esquerda do lado x = 0
+  const hazards = resolveHazards({ hazards: [rules.hazards[0]] }, [allowed, water, twin]);
+  assert.deepEqual(hazards.map(h => h.key), ['water:lago', 'water:lago#2']);
+  assert.ok(hazards.warnings.some(w => /repetido/.test(w)));
+  const { summary, events } = computeGeofenceEpisodes(samplesAt([10, 90]), [allowed, water, twin], { hazards: [rules.hazards[0]] }, 'c');
+  assert.equal(new Set(events.map(e => e.id)).size, events.length);
+  assert.deepEqual(new Set(summary.episodes.map(e => e.hazardKey)), new Set(['water:lago', 'water:lago#2']));
+});
+
+test('lacuna de gravação (sem amostras) conta em gapMs, não em observedMs, quando sampleIntervalMs é informado', () => {
+  const samples = samplesAt([90, 90, 90, 90]).map((s, i) => ({ ...s, elapsedMs: [0, 1000, 6000, 7000][i] }));
+  const { summary } = computeGeofenceEpisodes(samples, [allowed, water], { hazards: [rules.hazards[0]] }, 'c', 1000);
+  assert.equal(summary.episodes.length, 1);
+  assert.equal(summary.episodes[0].observedMs, 2000);
+  assert.equal(summary.episodes[0].gapMs, 5000);
+  assert.equal(summary.episodes[0].quality, 'aberto-no-fim');
+});
+
+test('grade sobrevive a mais de 128 faixas (Int16) e a área da faixa 129 é contada', () => {
+  const polygons = [rect('rio', 'water', 0, 10, 0, 10), rect('permitida', 'allowed_area', 138, 140, 0, 2)];
+  const many = { hazards: [{ role: 'water', bands_m: Array.from({ length: 130 }, (_, i) => ({ id: String(i), max_m: i })) }] };
+  const areas = affectedArea(polygons, resolveHazards(many, polygons));
+  assert.equal(areas.at(-1).areaM2, 4);
+});
+
+test('bandGrid por arestas coincide célula a célula com a distância exata, inclusive com ilha no polígono de água', async () => {
+  const { polygonContains, polygonDistance } = await import('../shared/lab-telemetry.js');
+  const lake = { id: 'lagoa', role: 'water', rings: [rect('', '', 120, 220, -50, 150).rings[0], rect('', '', 150, 190, 40, 60).rings[0]] };
+  const field = rect('campo', 'allowed_area', 60, 200, 0, 100); // x 60–85 fica além dos 35 m: -1
+  const hazards = resolveHazards({ hazards: [rules.hazards[0]] }, [field, lake]);
+  const grid = affectedArea([field, lake], hazards) && (await import('../shared/lab-geofence.js')).bandGrid([field, lake], hazards, 2);
+  const expected = [];
+  for (let row = 0; row < grid.rows; row++) for (let col = 0; col < grid.cols; col++) {
+    const point = { x: grid.minX + (col + 0.5) * grid.cellM, z: grid.minZ + (row + 0.5) * grid.cellM };
+    expected.push(polygonContains(point, field) ? hazards[0].bands.indexOf(classifyBand(polygonDistance(point, lake), hazards[0].bands)) : -1);
+  }
+  assert.deepEqual(Array.from(grid.bands[0]), expected);
+  assert.ok(expected.includes(0) && expected.includes(2) && expected.includes(-1), 'a fixture cobre dentro, faixa externa e ilha');
+});

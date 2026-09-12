@@ -352,22 +352,10 @@ fs.writeFileSync(path.join(OUT_DIR, 'manifest.json'), JSON.stringify(manifest, n
 const { parseLabCase } = await import(pathToFileURL(path.join(ROOT, 'shared', 'lab-telemetry.js')));
 // Todos os eventos do motor atual (inclui hazard_band); server/piracicaba-dataset.test.js compara com o arquivo gerado.
 const ALLOWED_TYPES = null;
-let manifestForParsing = manifest;
-let hazardsDropped = false;
+// Falha do parser com rules.hazards interrompe a geração: nunca gravar eventos esperados sem faixas com um manifesto que as declara.
 function expectedEventsFor(fileName, rawCsv) {
-  try {
-    const labCase = parseLabCase(rawCsv, { fileName, manifest: manifestForParsing, map: mapaGeoJson });
-    return { events: labCase.events, warnings: labCase.warnings };
-  } catch (err) {
-    if (manifestForParsing === manifest) {
-      hazardsDropped = true;
-      const { rules: { hazards, ...restRules }, ...restManifest } = manifest;
-      manifestForParsing = { ...restManifest, rules: restRules };
-      warnings.push(`parseLabCase rejeitou rules.hazards (${err.message}); revalidado com manifesto sem esse bloco.`);
-      return expectedEventsFor(fileName, rawCsv);
-    }
-    throw err;
-  }
+  const labCase = parseLabCase(rawCsv, { fileName, manifest, map: mapaGeoJson });
+  return { events: labCase.events, warnings: labCase.warnings };
 }
 const eventosEsperados = {};
 const parseWarningsByFile = {};
@@ -424,7 +412,7 @@ const summary = {
     approach2ToWater: Number(approach2.toFixed(1)),
     hazardCenterToWater: Number(hazardDistance.toFixed(1)),
   },
-  hazardsDroppedForValidation: hazardsDropped,
+  hazardsDroppedForValidation: false,
   warnings,
   parseWarningsByFile,
 };
