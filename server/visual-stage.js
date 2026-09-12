@@ -419,14 +419,14 @@ export function sompoEpisodeHeadline(data = {}) {
   const flagMs = finiteOrNull(data.flagMs);
   if (impactoMs !== null && flagMs !== null) {
     const deltaMs = flagMs - impactoMs;
-    if (deltaMs > 100) return `O alerta chegou ${ptFixed(deltaMs / 1_000, 1)} s depois da batida`;
-    if (deltaMs < -100) return `O alerta disparou ${ptFixed(-deltaMs / 1_000, 1)} s antes da batida`;
-    return 'O alerta disparou no instante da batida';
+    if (deltaMs > 100) return `O alerta chegou ${ptFixed(deltaMs / 1_000, 1)} s depois do pico`;
+    if (deltaMs < -100) return `O alerta disparou ${ptFixed(-deltaMs / 1_000, 1)} s antes do pico`;
+    return 'O alerta disparou no instante do pico';
   }
   if (impactoMs !== null && data.flagDesdeInicio) {
-    return 'A flag de risco já estava ativa antes da batida';
+    return 'A flag de risco já estava ativa antes do pico';
   }
-  if (impactoMs !== null) return 'A batida aconteceu e o alerta nunca disparou';
+  if (impactoMs !== null) return 'O pico de aceleração passou e o alerta nunca disparou';
   return 'Linha do tempo do episódio';
 }
 
@@ -446,11 +446,13 @@ function polylineSegments(points) {
 }
 
 /**
- * A peça principal do episódio de colisão: série temporal autoral em SVG,
+ * A peça principal do episódio gravado: série temporal autoral em SVG,
  * desenhada pelo runtime com os dados reais — distância (cm) e aceleração (g)
- * ao longo dos segundos, com marcadores nomeados de início, IMPACTO e disparo
- * da flag. A distância entre os dois últimos é o atraso do alerta, visível sem
- * ler número nenhum. Sem barras de média por fase.
+ * ao longo dos segundos, com marcadores nomeados de início, PICO e disparo
+ * da flag. O "pico" é a amostra de maior |aceleração| (heurística; pode ser
+ * frenagem, manobra, varredura de sensor ou batida). A distância entre os
+ * dois últimos marcadores é o atraso do alerta, visível sem ler número
+ * nenhum. Sem barras de média por fase.
  */
 export function renderSompoEpisodeTimelineSvg(data, { headline, subtitle } = {}) {
   const serie = (Array.isArray(data?.serie) ? data.serie : [])
@@ -477,9 +479,9 @@ export function renderSompoEpisodeTimelineSvg(data, { headline, subtitle } = {})
   const niceScale = (max, steps) => ((steps.find((step) => step >= max / 4) ?? steps.at(-1)) * 4);
   const maxDist = Math.max(...serie.map((point) => point.dist ?? 0), 1);
   const distScale = niceScale(maxDist, [5, 10, 20, 25, 40, 50, 100, 200, 250, 500, 1_000]);
-  // O pico do impacto entra na escala: o marcador usa picoAccMs2, que é maior
+  // O pico entra na escala: o marcador usa picoAccMs2, que é maior
   // que qualquer amostra decimada quando a decimação não pegou o topo — sem
-  // isto o ponto do impacto era desenhado fora da área do gráfico.
+  // isto o ponto do pico era desenhado fora da área do gráfico.
   const maxG = Math.max(
     ...serie.map((point) => point.accG ?? 0),
     picoAccMs2 === null ? 0 : picoAccMs2 / GRAVITY_MS2,
@@ -510,14 +512,14 @@ export function renderSompoEpisodeTimelineSvg(data, { headline, subtitle } = {})
     parts.push(`<text x="${plot.x1 + 10}" y="${(y + 5).toFixed(1)}" fill="#ff9f0a" font-size="14" text-anchor="start" font-family="${font}">${ptFixed(gScale * ratio, 1)}</text>`);
   }
 
-  // Faixa do atraso: a distância visual entre IMPACTO e o disparo da flag.
+  // Faixa do atraso: a distância visual entre o PICO e o disparo da flag.
   if (impactoMs !== null && flagMs !== null && flagMs - impactoMs > 100) {
     const xImpact = xFor(impactoMs);
     const xFlag = xFor(flagMs);
     parts.push(`<rect x="${xImpact.toFixed(1)}" y="${plot.yTop}" width="${(xFlag - xImpact).toFixed(1)}" height="${plot.yBottom - plot.yTop}" fill="rgba(255,93,82,0.12)"/>`);
     // Rótulo acima da área do gráfico e preso às bordas: a faixa costuma ser
     // mais estreita que o texto, e centrar dentro dela jogava "atraso de X s"
-    // por cima dos marcadores de IMPACTO e do alerta.
+    // por cima dos marcadores do PICO e do alerta.
     const labelX = Math.min(Math.max((xImpact + xFlag) / 2, plot.x0 + 80), plot.x1 - 80);
     parts.push(`<text x="${labelX.toFixed(1)}" y="${plot.yTop - 12}" fill="#ff5d52" font-size="17" font-weight="700" text-anchor="middle" font-family="${font}">atraso de ${ptFixed((flagMs - impactoMs) / 1_000, 1)} s</text>`);
   }
@@ -532,11 +534,11 @@ export function renderSompoEpisodeTimelineSvg(data, { headline, subtitle } = {})
 
   // Marcadores verticais nomeados.
   parts.push(`<line x1="${plot.x0}" y1="${plot.yTop}" x2="${plot.x0}" y2="${plot.yBottom}" stroke="#8fa3b7" stroke-dasharray="4 5"/>`);
-  parts.push(`<text x="${plot.x0 + 6}" y="${plot.yTop + 22}" fill="#9fb4c8" font-size="15" font-family="${font}">Início da aproximação</text>`);
+  parts.push(`<text x="${plot.x0 + 6}" y="${plot.yTop + 22}" fill="#9fb4c8" font-size="15" font-family="${font}">Início da gravação</text>`);
   if (impactoMs !== null) {
     const x = xFor(impactoMs);
     parts.push(`<line x1="${x.toFixed(1)}" y1="${plot.yTop}" x2="${x.toFixed(1)}" y2="${plot.yBottom}" stroke="#ff5d52" stroke-width="2"/>`);
-    parts.push(`<text x="${x.toFixed(1)}" y="${plot.yTop + 22}" fill="#ff5d52" font-size="16" font-weight="700" text-anchor="middle" font-family="${font}">IMPACTO ${offsetSecondsLabel(impactoMs)}</text>`);
+    parts.push(`<text x="${x.toFixed(1)}" y="${plot.yTop + 22}" fill="#ff5d52" font-size="16" font-weight="700" text-anchor="middle" font-family="${font}">PICO ${offsetSecondsLabel(impactoMs)}</text>`);
     if (picoAccMs2 !== null) {
       parts.push(`<circle cx="${x.toFixed(1)}" cy="${yForG(picoAccMs2 / GRAVITY_MS2).toFixed(1)}" r="6" fill="#ff5d52" stroke="#0b1220" stroke-width="2"/>`);
     }
@@ -551,10 +553,10 @@ export function renderSompoEpisodeTimelineSvg(data, { headline, subtitle } = {})
 
   const heading = clip(headline || sompoEpisodeHeadline(data), 78);
   const sub = clip(
-    subtitle || 'Distância frontal e força do impacto, segundo a segundo; os marcadores mostram a batida e o instante do alerta.',
+    subtitle || 'Distância frontal e aceleração, segundo a segundo; os marcadores mostram o pico de aceleração e o instante do alerta.',
     140,
   );
-  // Única menção a m/s² da peça: g é a unidade primária de impacto.
+  // Única menção a m/s² da peça: g é a unidade primária do evento.
   const accLegend = picoAccMs2 !== null
     ? `Aceleração (g) — pico de ${ptFixed(picoAccMs2 / GRAVITY_MS2, 1)} g (${ptFixed(picoAccMs2, 1)} m/s²)`
     : 'Aceleração (g)';
@@ -568,7 +570,7 @@ export function renderSompoEpisodeTimelineSvg(data, { headline, subtitle } = {})
     </linearGradient>
   </defs>
   <rect width="1280" height="720" fill="url(#bg)"/>
-  <text x="90" y="58" fill="#64d2ff" font-size="15" letter-spacing="3" font-family="${font}">SOMPO · EPISÓDIO DE COLISÃO — LINHA DO TEMPO</text>
+  <text x="90" y="58" fill="#64d2ff" font-size="15" letter-spacing="3" font-family="${font}">SOMPO · EPISÓDIO GRAVADO — LINHA DO TEMPO</text>
   <text x="90" y="108" fill="#f4f8ff" font-size="38" font-weight="700" font-family="${font}">${escapeXml(heading)}</text>
   <text x="90" y="142" fill="#9fb4c8" font-size="18" font-family="${font}">${escapeXml(sub)}</text>
   <rect x="90" y="168" width="16" height="5" rx="2" fill="#64d2ff"/>
@@ -583,7 +585,7 @@ export function renderSompoEpisodeTimelineSvg(data, { headline, subtitle } = {})
 }
 
 /**
- * Pack visual do episódio de colisão: no máximo DUAS peças — a linha do tempo
+ * Pack visual do episódio gravado: no máximo DUAS peças — a linha do tempo
  * (desenhada aqui, com os dados reais) e o cartão de decisão da persona. Os
  * charts do plano são descartados de propósito: barra de média por fase e
  * séries repetidas eram a redundância que o dono reprovou.
@@ -746,7 +748,7 @@ export async function materializeVisualPack({
 } = {}) {
   const plan = parseVisualPlanOutput(personaOutput, { mission });
 
-  // Episódio de colisão SOMPO: a peça principal é determinística (dados reais
+  // Episódio gravado SOMPO: a peça principal é determinística (dados reais
   // embutidos na missão), mesmo que a persona não tenha respondido nada.
   const episodeData = parseSompoEpisodeVisualData(mission);
   if (episodeData) {

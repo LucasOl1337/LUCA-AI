@@ -24,6 +24,7 @@ export const PAGE_PATHS = Object.freeze({
 
 export const PERSONA_FILTRO = Object.freeze(['all', 'principais', 'ativadas']);
 export const SOMPO_ABA = 'casos';
+export const SOMPO_TELEMETRY_ABA = 'telemetria';
 export const LUCA_ABA = 'atividade';
 export const CONFIG_TIPO = Object.freeze(['team', 'individual']);
 
@@ -118,7 +119,7 @@ function parseQuery(search) {
     ? (ORDEM_PARAM[ordemRaw] ? ordemRaw : ORDEM_API[ordemRaw])
     : '';
   const abaRaw = readParam(search, 'aba');
-  const aba = abaRaw === SOMPO_ABA || abaRaw === LUCA_ABA ? abaRaw : '';
+  const aba = [SOMPO_ABA, SOMPO_TELEMETRY_ABA, LUCA_ABA].includes(abaRaw) ? abaRaw : '';
 
   return {
     busca: readParam(search, 'busca'),
@@ -133,7 +134,10 @@ function parseQuery(search) {
     sessao: readParam(search, 'sessao'),
     conta: readParam(search, 'conta'),
     ordem,
-    fonte: readParam(search, 'fonte') === 'simulacao' ? 'simulacao' : '',
+    // '' = simulador (padrão); 'simulacao' = link legado; 'firebase' = gêmeo físico.
+    fonte: ['simulacao', 'firebase'].includes(readParam(search, 'fonte'))
+      ? readParam(search, 'fonte')
+      : '',
     modo: readParam(search, 'modo') === 'individual' ? 'individual' : '',
   };
 }
@@ -209,11 +213,13 @@ export function formatAppUrl(location) {
 
   if (page === 'sompo') {
     if (loc.aba === SOMPO_ABA) params.set('aba', SOMPO_ABA);
+    if (loc.aba === SOMPO_TELEMETRY_ABA) params.set('aba', SOMPO_TELEMETRY_ABA);
     setIfPresent(params, 'busca', loc.busca);
     setIfPresent(params, 'produto', loc.produto);
     setIfPresent(params, 'gravidade', loc.gravidade);
     setIfPresent(params, 'caso', loc.caso);
-    if (!loc.aba && loc.fonte === 'simulacao') params.set('fonte', 'simulacao');
+    if (loc.aba !== SOMPO_ABA && loc.fonte === 'simulacao') params.set('fonte', 'simulacao');
+    if (loc.aba !== SOMPO_ABA && loc.fonte === 'firebase') params.set('fonte', 'firebase');
   }
 
   if (page === 'admin') {
@@ -251,4 +257,12 @@ export function mergeAppLocation(current, patch) {
   }
 
   return { ...now, ...next, kind: next.kind || now.kind || 'app' };
+}
+
+/** A entrada fica em /sompo; links compartilhados continuam abrindo a área escolhida. */
+export function getSompoView(location) {
+  if (location.aba === SOMPO_ABA) return 'cases';
+  if (location.aba === SOMPO_TELEMETRY_ABA || location.fonte) return 'telemetry';
+  if (location.caso || location.produto || location.gravidade || location.busca) return 'cases';
+  return 'welcome';
 }

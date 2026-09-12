@@ -297,6 +297,7 @@ function scenarioRunLines(run) {
 
 const EPISODE_KIND_LABELS = Object.freeze({
   colisao: 'colisão',
+  roteiro: 'roteiro de cenário',
 });
 
 const EPISODE_ASK_LINE = 'Avaliem o evento completo: severidade, causa provável, resposta recomendada e o que verificar no equipamento físico.';
@@ -323,7 +324,7 @@ function episodeImpactLine(summary) {
     return 'Sem pico de aceleração identificado nas amostras';
   }
   const peak = formatPtNumber(impact.accMagnitude);
-  return `Impacto em ${formatOffsetSeconds(impact.offsetMs)} com pico de ${peak === null ? 'não informado' : `${peak} m/s²`}`;
+  return `Pico de aceleração em ${formatOffsetSeconds(impact.offsetMs)} (${peak === null ? 'valor não informado' : `${peak} m/s²`})`;
 }
 
 function episodeDistanceLine(summary) {
@@ -340,7 +341,7 @@ function episodeDistanceLine(summary) {
 function episodeFlagLine(summary) {
   const transitions = Array.isArray(summary?.flagTransitions) ? summary.flagTransitions : [];
   const turnedOn = transitions.some((item) => item.flag === 'riscoColisao' && item.to === true);
-  if (summary?.last?.riscoColisao && turnedOn) return 'risco de colisão ativo desde o impacto';
+  if (summary?.last?.riscoColisao && turnedOn) return 'risco de colisão ativo desde o pico';
   if (summary?.last?.riscoColisao) return 'risco de colisão ativo no episódio inteiro';
   return 'sem flag de colisão ativa no fim do episódio';
 }
@@ -362,7 +363,7 @@ function buildEpisodeHumanSummary(episode, summary, frames = []) {
 function episodePhaseLines(summary) {
   const phases = Array.isArray(summary?.phases) ? summary.phases : [];
   if (phases.length === 0) return ['Fases: não identificadas (sem série de aceleração utilizável).'];
-  const lines = ['Fases detectadas (heurística determinística; impacto = amostra de pico de |aceleração|):'];
+  const lines = ['Fases detectadas (heurística determinística sobre as amostras; "pico" = amostra de maior |aceleração|, não necessariamente uma batida):'];
   for (const phase of phases) {
     lines.push(
       `- ${phase.label}: ${formatOffsetSeconds(phase.startOffsetMs)} → ${formatOffsetSeconds(phase.endOffsetMs)} · ${phase.sampleCount} amostra${phase.sampleCount === 1 ? '' : 's'} · ${formatStat('dist', phase.stats?.distancia)} | ${formatStat('acc', phase.stats?.accMagnitude)} | ${formatStat('pitch', phase.stats?.pitch)} | ${formatStat('roll', phase.stats?.roll)} · riscoColisao=${Boolean(phase.riscoColisao)}`,
@@ -370,7 +371,7 @@ function episodePhaseLines(summary) {
   }
   const impact = summary?.impact;
   if (impact) {
-    lines.push(`Pico de impacto: ${formatOffsetSeconds(impact.offsetMs)} · |aceleração| ${reading(impact.accMagnitude)} m/s²`);
+    lines.push(`Pico de aceleração: ${formatOffsetSeconds(impact.offsetMs)} · |aceleração| ${reading(impact.accMagnitude)} m/s²`);
   }
   return lines;
 }
@@ -433,26 +434,26 @@ function formatSecondsOneDecimal(ms) {
 
 /**
  * O achado que vira manchete: o alerta avisou a tempo? Comparação direta entre
- * o pico de impacto e o instante em que a flag riscoColisao disparou.
+ * o pico de aceleração e o instante em que a flag riscoColisao disparou.
  */
 function episodeAlertFindingLine(summary) {
   const impact = summary?.impact;
   if (!impact || !Number.isFinite(Number(impact.offsetMs))) return null;
   if (summary?.first?.riscoColisao) {
-    return 'Achado do alerta: a flag riscoColisao já estava ativa desde o início da gravação — não há instante de disparo para comparar com o impacto.';
+    return 'Achado do alerta: a flag riscoColisao já estava ativa desde o início da gravação — não há instante de disparo para comparar com o pico.';
   }
   const flagMs = episodeFlagOffsetMs(summary);
   if (flagMs === null) {
-    return `Achado do alerta: a flag riscoColisao NUNCA disparou neste episódio, mesmo com o pico de impacto em ${formatOffsetSeconds(impact.offsetMs)}.`;
+    return `Achado do alerta: a flag riscoColisao NUNCA disparou neste episódio, mesmo com o pico de aceleração em ${formatOffsetSeconds(impact.offsetMs)}.`;
   }
   const deltaMs = flagMs - Number(impact.offsetMs);
   if (deltaMs > 100) {
-    return `Achado do alerta: a flag riscoColisao disparou ${formatSecondsOneDecimal(deltaMs)} s DEPOIS do pico de impacto (impacto em ${formatOffsetSeconds(impact.offsetMs)}, alerta em ${formatOffsetSeconds(flagMs)}) — o equipamento avisou tarde.`;
+    return `Achado do alerta: a flag riscoColisao disparou ${formatSecondsOneDecimal(deltaMs)} s DEPOIS do pico de aceleração (pico em ${formatOffsetSeconds(impact.offsetMs)}, alerta em ${formatOffsetSeconds(flagMs)}) — o equipamento avisou tarde.`;
   }
   if (deltaMs < -100) {
-    return `Achado do alerta: a flag riscoColisao disparou ${formatSecondsOneDecimal(-deltaMs)} s ANTES do pico de impacto (alerta em ${formatOffsetSeconds(flagMs)}, impacto em ${formatOffsetSeconds(impact.offsetMs)}) — o equipamento avisou a tempo.`;
+    return `Achado do alerta: a flag riscoColisao disparou ${formatSecondsOneDecimal(-deltaMs)} s ANTES do pico de aceleração (alerta em ${formatOffsetSeconds(flagMs)}, pico em ${formatOffsetSeconds(impact.offsetMs)}) — o equipamento avisou a tempo.`;
   }
-  return `Achado do alerta: a flag riscoColisao disparou no mesmo instante do pico de impacto (${formatOffsetSeconds(impact.offsetMs)}).`;
+  return `Achado do alerta: a flag riscoColisao disparou no mesmo instante do pico de aceleração (${formatOffsetSeconds(impact.offsetMs)}).`;
 }
 
 /**
@@ -472,7 +473,7 @@ export function buildSompoEpisodeVisualData(summary) {
   const impact = summary?.impact;
   const flagMs = episodeFlagOffsetMs(summary);
   return {
-    tipo: 'sompo-episodio-colisao',
+    tipo: 'sompo-episodio-roteiro',
     duracaoMs: Math.max(0, Math.round(Number(summary?.spanMs) || 0)),
     impactoMs: impact && Number.isFinite(Number(impact.offsetMs)) ? Math.round(Number(impact.offsetMs)) : null,
     picoAccMs2: impact && Number.isFinite(Number(impact.accMagnitude)) ? Number(impact.accMagnitude) : null,
@@ -495,7 +496,9 @@ export function parseSompoEpisodeVisualData(missionText) {
   if (!jsonLine) return null;
   try {
     const parsed = JSON.parse(jsonLine);
-    if (parsed?.tipo !== 'sompo-episodio-colisao') return null;
+    // 'sompo-episodio-colisao' é o tipo legado: missões emitidas antes da
+    // generalização continuam parseáveis.
+    if (parsed?.tipo !== 'sompo-episodio-roteiro' && parsed?.tipo !== 'sompo-episodio-colisao') return null;
     if (!Array.isArray(parsed.serie) || parsed.serie.length < 2) return null;
     return parsed;
   } catch {
@@ -513,11 +516,11 @@ function episodeVisualContractLines(visualData) {
   return [
     '',
     'Contrato da peça visual (etapa de artefatos da bancada):',
-    '- Peça principal ÚNICA: a linha do tempo do episódio — série temporal desenhada pelo runtime com os dados reais do bloco de máquina no fim desta missão (distância frontal em cm e aceleração em g ao longo dos segundos), com marcadores nomeados no início da aproximação, no IMPACTO e no instante em que a flag de risco disparou.',
+    '- Peça principal ÚNICA: a linha do tempo do episódio — série temporal desenhada pelo runtime com os dados reais do bloco de máquina no fim desta missão (distância frontal em cm e aceleração em g ao longo dos segundos), com marcadores nomeados no início do episódio, no PICO e no instante em que a flag de risco disparou.',
     '- PROIBIDO: gráfico de barras com média por fase; repetir a mesma série ou os mesmos números em mais de uma peça; jargão sem tradução — escreva em português comum, nada de "Δv", "piso/saturação do sensor" ou "pulso único de contato".',
-    '- A manchete da peça é o ACHADO acionável (ex.: "O alerta chegou 2,3 s depois da batida"), nunca uma descrição como "Leitura operacional do ensaio".',
+    '- A manchete da peça é o ACHADO acionável (ex.: "O alerta chegou 2,3 s depois do pico"), nunca uma descrição como "Leitura operacional do ensaio".',
     '- Segunda peça (opcional, no máximo UMA): cartão de decisão curto — veredito, severidade para a seguradora e o que fazer agora, em frases, SEM repetir números que já estão na linha do tempo.',
-    '- Unidades humanas: impacto em g (m/s² no máximo uma vez, entre parênteses), distância em cm, tempo em segundos com uma casa decimal.',
+    '- Unidades humanas: aceleração em g (m/s² no máximo uma vez, entre parênteses), distância em cm, tempo em segundos com uma casa decimal.',
     '- Se faltar dado para a severidade física (ex.: velocidade real), diga que está pendente em UMA linha.',
     '',
     `${SOMPO_EPISODE_VISUAL_DATA_MARKER} (bloco de máquina para a etapa visual; não recitar no chat)`,
@@ -552,8 +555,11 @@ export function buildSompoEpisodeMission(episode, samples, summary, teamLabel, f
     'Origem: Simulador 3D local (roteiro determinístico; dados sintéticos; não enviados ao Firebase)',
     ...(episode.scenarioLabel ? [`Cenário: ${episode.scenarioLabel}`] : []),
     ...(options.outcomeLabel ? [`Desfecho selecionado do roteiro: ${options.outcomeLabel}`] : []),
-    ...(options.outcomeId && options.outcomeId !== 'impacto'
+    ...(episode.kind === 'colisao' && options.outcomeId && options.outcomeId !== 'impacto'
       ? ['Atenção: neste desfecho NÃO há impacto físico — o pico de |aceleração| que o resumo automático rotula como "impacto" corresponde à manobra/frenagem de emergência, não a uma batida.']
+      : []),
+    ...(episode.kind === 'roteiro'
+      ? [`Nota de leitura: o "impacto" do resumo é o pico de |aceleração| por heurística — confirmem nos frames e nas amostras se o desfecho "${options.outcomeLabel || 'selecionado'}" teve contato físico (batida, toque, tombamento) ou se o pico corresponde a manobra, frenagem ou varredura do sensor.`]
       : []),
     `Início: ${episode.startedAt || 'não informado'} | Fim: ${episode.endedAt || 'não informado'} | Duração: ${duration === null ? 'não informada' : `${duration}s`}`,
     `Amostras gravadas: ${Number(summary.count) || 0} (episódio completo, ordem cronológica)`,
@@ -582,7 +588,7 @@ export function buildSompoEpisodeMission(episode, samples, summary, teamLabel, f
     '',
     'Objetivo: avaliar o EVENTO em sua totalidade — dinâmica, sequência causal e severidade do episódio inteiro, não leituras isoladas — e recomendar a resposta operacional adequada.',
     '',
-    'Regras: este é um ensaio sintético do roteiro de colisão no simulador. Analisem o evento completo (aproximação, impacto e pós-impacto) como sequência causal; não tratem amostras isoladas nem flags como evidência do equipamento físico, do firmware ou de sinistro real. Separem fatos do cenário, inferências e lacunas; validem qualquer conclusão em telemetria real antes de uma decisão operacional.',
+    'Regras: este é um ensaio sintético de roteiro gravado no simulador — o desfecho selecionado decide o que acontece no evento. Analisem o episódio completo (preparação, evento e pós-evento) como sequência causal; não tratem amostras isoladas nem flags como evidência do equipamento físico, do firmware ou de sinistro real. Separem fatos do cenário, inferências e lacunas; validem qualquer conclusão em telemetria real antes de uma decisão operacional.',
     ...episodeVisualContractLines(visualData),
   ].join('\n');
 

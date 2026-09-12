@@ -4,19 +4,16 @@ import {
   SOMPO_SIMULATION_SCENARIOS,
   SOMPO_RURAL_SCRIPTS,
   SOMPO_SCENARIO_OUTCOMES,
-  SOMPO_COLLISION_OUTCOMES,
-  SOMPO_COLLISION_SCRIPT,
+  SOMPO_BRAKING_SCRIPT,
   buildSompoScenarioRunBrief,
-  createSompoCollisionScriptSnapshot,
   createSompoSimulationSnapshot,
   getSompoBrakingTravelMeters,
-  getSompoCollisionOutcome,
-  getSompoCollisionScriptPhase,
-  getSompoCollisionVisualPose,
+  getSompoEpisodePlan,
   getSompoRuralFrame,
   getSompoRuralTravelMeters,
   getSompoScenarioOutcomes,
   getSompoScenarioScript,
+  sompoEpisodeFrameMoments,
 } from '../shared/sompo-telemetry-simulator.js';
 import { getSompoScenarioEffects } from '../shared/sompo-scenario-effects.js';
 
@@ -130,62 +127,59 @@ test('deslocamento em forma fechada bate com a integral numérica do perfil de v
   assert.equal(getSompoBrakingTravelMeters(12_000, 28), getSompoBrakingTravelMeters(60_000, 28));
 });
 
-test('roteiro de colisão parametrizado: padrão intacto, desvio e frenagem sem impacto', () => {
-  assert.equal(SOMPO_COLLISION_OUTCOMES[0].id, 'impacto');
-  for (let elapsedMs = 0; elapsedMs <= SOMPO_COLLISION_SCRIPT.totalMs; elapsedMs += 250) {
-    assert.deepEqual(
-      createSompoCollisionScriptSnapshot(elapsedMs, { observedAt }),
-      createSompoCollisionScriptSnapshot(elapsedMs, { observedAt, outcomeId: 'impacto' }),
-    );
-    assert.equal(getSompoCollisionScriptPhase(elapsedMs), getSompoCollisionScriptPhase(elapsedMs, 'impacto'));
-  }
-  const plans = SOMPO_COLLISION_OUTCOMES.map((outcome) => getSompoCollisionOutcome(outcome.id));
-  for (const plan of plans) {
-    assert.equal(plan.frameMoments.length, 5);
-    assert.equal(plan.phases[0].startMs, 0);
-    assert.equal(plan.phases[plan.phases.length - 1].endMs, SOMPO_COLLISION_SCRIPT.totalMs);
-    for (const moment of plan.frameMoments) {
-      assert.ok(plan.phases.some((phase) => phase.id === moment.fase));
+test('plano de episódio genérico: todo desfecho roteirizado grava; desfecho manual não', () => {
+  for (const [scenarioId, outcomes] of Object.entries(SOMPO_SCENARIO_OUTCOMES)) {
+    for (const outcome of outcomes) {
+      const plan = getSompoEpisodePlan(scenarioId, outcome.id);
+      const script = getSompoScenarioScript(scenarioId, outcome.id);
+      const isBraking = !script && scenarioId === 'hard-braking';
+      if (!script && !isBraking) {
+        assert.equal(plan, null, `${scenarioId}/${outcome.id}: desfecho manual não gera plano`);
+        continue;
+      }
+      const totalMs = isBraking ? SOMPO_BRAKING_SCRIPT.totalMs : script.totalMs;
+      assert.equal(plan.kind, 'roteiro');
+      assert.equal(plan.catalog, 'rural');
+      assert.equal(plan.scenarioId, scenarioId);
+      assert.equal(plan.outcomeId, outcome.id);
+      assert.equal(plan.outcomeLabel, outcome.label);
+      assert.equal(plan.totalMs, totalMs);
+      assert.ok(plan.sampleIntervalMs > 0);
+      assert.equal(plan.phases[0].startMs, 0, `${scenarioId}/${outcome.id}: fase inicial no t0`);
+      assert.equal(plan.phases.at(-1).endMs, totalMs, `${scenarioId}/${outcome.id}: última fase fecha o roteiro`);
+      assert.ok(plan.frameMoments.length >= 2 && plan.frameMoments.length <= 5);
+      for (const moment of plan.frameMoments) {
+        assert.ok(moment.offsetMs >= 0 && moment.offsetMs < totalMs);
+        assert.ok(plan.phases.some((phase) => phase.id === moment.fase), `${scenarioId}/${outcome.id}: momento "${moment.label}" pertence a uma fase`);
+      }
+      for (let index = 1; index < plan.frameMoments.length; index += 1) {
+        assert.ok(plan.frameMoments[index].offsetMs >= plan.frameMoments[index - 1].offsetMs);
+      }
     }
   }
-  assert.equal(getSompoCollisionOutcome('desconhecido').id, 'impacto');
-  let nearMissPeak = 0;
-  let brakePeak = 0;
-  let nearMissMinDistance = Infinity;
-  let brakeMinDistance = Infinity;
-  for (let elapsedMs = 0; elapsedMs <= SOMPO_COLLISION_SCRIPT.totalMs; elapsedMs += 100) {
-    const nearMiss = createSompoCollisionScriptSnapshot(elapsedMs, { observedAt, outcomeId: 'quase-acidente' });
-    const braked = createSompoCollisionScriptSnapshot(elapsedMs, { observedAt, outcomeId: 'freada-a-tempo' });
-    nearMissPeak = Math.max(nearMissPeak, nearMiss.readings.acceleration.magnitude);
-    brakePeak = Math.max(brakePeak, braked.readings.acceleration.magnitude);
-    nearMissMinDistance = Math.min(nearMissMinDistance, nearMiss.readings.distance);
-    brakeMinDistance = Math.min(brakeMinDistance, braked.readings.distance);
-  }
-  const impactPeak = createSompoCollisionScriptSnapshot(14_750, { observedAt }).readings.acceleration.magnitude;
-  assert.ok(impactPeak > 30, 'impacto mantém pico > 30 m/s²');
-  assert.ok(nearMissPeak < 16 && brakePeak < 16, 'desfechos sem impacto não têm pulso de batida');
-  assert.ok(nearMissMinDistance >= 20 && brakeMinDistance >= 35, 'nunca fecham a distância de contato');
-  const nearMissEnd = createSompoCollisionScriptSnapshot(21_500, { observedAt, outcomeId: 'quase-acidente' });
-  assert.equal(nearMissEnd.risks.collision, false);
-  const brakedEnd = createSompoCollisionScriptSnapshot(21_500, { observedAt, outcomeId: 'freada-a-tempo' });
-  assert.equal(brakedEnd.risks.collision, true, 'parado a 38 cm mantém alerta de proximidade');
-  // Pose visual: avanço monotônico; só o desvio sai da faixa e retorna.
-  for (const outcomeId of ['impacto', 'quase-acidente', 'freada-a-tempo']) {
-    let previous = -1;
-    let minLateral = 0;
-    for (let elapsedMs = 0; elapsedMs <= SOMPO_COLLISION_SCRIPT.totalMs; elapsedMs += 250) {
-      const pose = getSompoCollisionVisualPose(elapsedMs, outcomeId);
-      assert.ok(pose.advance >= previous - 1e-6, `${outcomeId}: avanço nunca regride`);
-      previous = pose.advance;
-      minLateral = Math.min(minLateral, pose.lateral);
-    }
-    if (outcomeId === 'quase-acidente') {
-      assert.ok(minLateral < -2, 'desvio cruza para a outra faixa');
-      assert.ok(Math.abs(getSompoCollisionVisualPose(22_000, outcomeId).lateral) < 0.05, 'retorna à faixa');
-    } else {
-      assert.equal(minLateral, 0);
-    }
-  }
+  assert.equal(getSompoEpisodePlan('normal', 'livre'), null);
+  assert.equal(getSompoEpisodePlan('cenario-inexistente', 'x'), null);
+  // Desfecho desconhecido cai no padrão do cenário (mesmo comportamento do relógio).
+  const fallback = getSompoEpisodePlan('rollover', 'desfecho-inexistente');
+  assert.equal(fallback.outcomeId, SOMPO_SCENARIO_OUTCOMES.rollover[0].id);
+});
+
+test('sompoEpisodeFrameMoments: primeiro e último instante sempre entram; o último é grampeado antes do fim', () => {
+  const points = [
+    { offsetMs: 0, fase: 'a', label: 'Abertura' },
+    { offsetMs: 3_000, fase: 'b', label: 'Meio' },
+    { offsetMs: 9_500, fase: 'c', label: 'Quase fim' },
+  ];
+  const moments = sompoEpisodeFrameMoments(points, 10_000, 'c');
+  assert.equal(moments[0].offsetMs, 0);
+  assert.equal(moments.at(-1).offsetMs, 9_500);
+  assert.equal(moments.at(-1).label, 'Final do episódio');
+  assert.ok(moments.length <= 5);
+  assert.equal(sompoEpisodeFrameMoments([], 5_000, 'fim').length, 1);
+  // Pontos depois do grampeamento final são descartados.
+  const trimmed = sompoEpisodeFrameMoments([{ offsetMs: 4_999, fase: 'x', label: 'Tarde' }], 5_000, 'fim');
+  assert.equal(trimmed.length, 1);
+  assert.equal(trimmed[0].label, 'Final do episódio');
 });
 
 test('coreografia por desfecho: impacto do animal, fogo contido e cena padrão intocada', () => {
@@ -197,8 +191,6 @@ test('coreografia por desfecho: impacto do animal, fogo contido e cena padrão i
   assert.equal(cue('animal-crossing', 6_000, 'impact-dust', 'freada-a-tempo'), undefined);
   assert.equal(cue('engine-fire', 12_000, 'engine-fire', 'fogo-contido'), undefined, 'extintor encerra as chamas');
   assert.ok(cue('engine-fire', 12_000, 'engine-fire', 'fogo-alastra'));
-  assert.ok(cue('colisao-roteirizada', 13_500, 'skid-marks', 'freada-a-tempo'));
-  assert.equal(cue('colisao-roteirizada', 15_000, 'impact-dust', 'freada-a-tempo'), undefined);
   // Determinismo e intensidades válidas nas variantes.
   for (const [scenarioId, outcomes] of Object.entries(SOMPO_SCENARIO_OUTCOMES)) {
     for (const outcome of outcomes) {
@@ -225,6 +217,6 @@ test('resumo do ensaio para a bancada: fases, flags e deslocamento; nulo para ce
   const braking = buildSompoScenarioRunBrief('hard-braking', 'sem-impacto', 12_000);
   assert.equal(braking.scripted, true);
   assert.ok(braking.travelMeters > 0 && braking.phases.length === 3);
-  assert.equal(buildSompoScenarioRunBrief('colisao-roteirizada', 'impacto', 0), null);
+  assert.equal(buildSompoScenarioRunBrief('cenario-inexistente', 'impacto', 0), null);
   assert.equal(buildSompoScenarioRunBrief('__proto__', 'x', 0), null);
 });

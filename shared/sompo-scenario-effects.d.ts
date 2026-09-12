@@ -20,8 +20,8 @@ export interface SompoEffectFrame {
   focusX: number;
   cues: SompoEffectCue[];
 }
-export const SOMPO_SCENARIO_EFFECTS: Readonly<Record<SompoSimulationScenarioId | 'colisao-roteirizada', SompoEffectScene>>;
-export const SOMPO_SCENARIO_OUTCOME_EFFECTS: Readonly<Partial<Record<SompoSimulationScenarioId | 'colisao-roteirizada', Readonly<Record<string, SompoEffectScene>>>>>;
+export const SOMPO_SCENARIO_EFFECTS: Readonly<Record<SompoSimulationScenarioId, SompoEffectScene>>;
+export const SOMPO_SCENARIO_OUTCOME_EFFECTS: Readonly<Partial<Record<SompoSimulationScenarioId, Readonly<Record<string, SompoEffectScene>>>>>;
 export function getSompoScenarioEffects(scenarioId: string, elapsedMs?: number, outcomeId?: string): SompoEffectFrame;
 export function getSompoAnimalPose(animalZ: number, elapsedMs?: number, visibleUntilMs?: number | null): {
   x: number; z: number; yaw: number; visible: boolean; length: number; height: number; width: number;

@@ -1,0 +1,6 @@
+Source: IBGE, API de malhas geográficas v3, simplified Brazil and state boundaries.
+Retrieved 2026-09-12. Projected and simplified for an illustrative interface map.
+https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?formato=application/vnd.geo+json&qualidade=minima
+https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?formato=application/vnd.geo+json&qualidade=minima&intrarregiao=UF
+Documentation: https://servicodados.ibge.gov.br/api/docs/malhas?versao=3
+No live coverage, device locations or operational events are represented.

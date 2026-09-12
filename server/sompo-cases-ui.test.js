@@ -73,12 +73,14 @@ test('modo SOMPO Telemetria assina o Firebase em tempo real e fecha snapshot par
   assert.match(sompoCss, /\.sompo-sensor-grid/);
 });
 
-test('modo SOMPO oferece simulador 3D local sem substituir nem escrever no Firebase', () => {
+test('modo SOMPO abre no simulador 3.2 local e mantém o Firebase como fonte secundária explícita', () => {
   assert.match(sompoPage, /TelemetrySourceMode = 'firebase' \| 'simulation'/);
-  assert.match(sompoPage, /location\.fonte === 'simulacao' \? 'simulation' : 'firebase'/);
+  // '' (padrão) ou 'simulacao' (legado) = simulador; só 'firebase' escolhe o físico.
+  assert.match(sompoPage, /location\.fonte === 'firebase' \? 'firebase' : 'simulation'/);
+  assert.match(sompoPage, /navigate\(\{ fonte: 'firebase' \}/);
   assert.match(sompoPage, /telemetrySourceMode === 'simulation' \? simulatedTelemetry : firebaseTelemetry/);
   assert.match(sompoPage, /lazy\(\(\) => import\('@\/components\/SompoTruckSimulator'\)\)/);
-  assert.match(sompoPage, /Simulador 3D/);
+  assert.match(sompoPage, /Simulador 3\.2/);
   assert.match(sompoPage, /setSimulatedTelemetry/);
   assert.match(sompoSimulator, /from 'three'/);
   assert.match(sompoSimulator, /OrbitControls/);

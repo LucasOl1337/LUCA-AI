@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { SOMPO_COLLISION_FRAME_MOMENTS } from '../shared/sompo-telemetry-simulator.js';
+import { getSompoEpisodePlan } from '../shared/sompo-telemetry-simulator.js';
 import { runAgentWithTools } from './agent-loop.js';
 import {
   createSompoTelemetryEpisodeFrameGetHttpHandler,
@@ -36,8 +36,11 @@ function jpegDataUrl(buffer) {
   return `data:image/jpeg;base64,${buffer.toString('base64')}`;
 }
 
+// Momentos de captura reais de um plano de roteiro (animal-crossing · colisao).
+const EPISODE_FRAME_MOMENTS = getSompoEpisodePlan('animal-crossing', 'colisao').frameMoments;
+
 function frameBody(index, buffer = syntheticJpeg(512, 0x40 + index)) {
-  const moment = SOMPO_COLLISION_FRAME_MOMENTS[index] || { offsetMs: index * 1_000, fase: 'aproximacao', label: `Frame ${index + 1}` };
+  const moment = EPISODE_FRAME_MOMENTS[index] || { offsetMs: index * 1_000, fase: 'abertura', label: `Frame ${index + 1}` };
   return {
     dataUrl: jpegDataUrl(buffer),
     offsetMs: moment.offsetMs,
@@ -93,11 +96,11 @@ test('frames de episódio: upload 1-por-request, GET com metadados e leitura bin
   const getHandler = createSompoTelemetryEpisodeGetHttpHandler(history);
   const frameGetHandler = createSompoTelemetryEpisodeFrameGetHttpHandler(history);
 
-  const episode = history.startEpisode({ kind: 'colisao', tractorId: 'SIM-001' });
-  const buffers = SOMPO_COLLISION_FRAME_MOMENTS.map((_, index) => syntheticJpeg(512, 0x50 + index));
+  const episode = history.startEpisode({ kind: 'roteiro', tractorId: 'SIM-001' });
+  const buffers = EPISODE_FRAME_MOMENTS.map((_, index) => syntheticJpeg(512, 0x50 + index));
 
   // O cliente sobe 1 frame por request (limite de body do Express); o servidor acumula.
-  for (let index = 0; index < SOMPO_COLLISION_FRAME_MOMENTS.length; index += 1) {
+  for (let index = 0; index < EPISODE_FRAME_MOMENTS.length; index += 1) {
     const res = mockRes();
     await framesHandler({
       params: { publicId: episode.publicId },
@@ -115,9 +118,9 @@ test('frames de episódio: upload 1-por-request, GET com metadados e leitura bin
   assert.equal(fetched.body.frames.length, 5);
   const impactFrame = fetched.body.frames[2];
   assert.equal(impactFrame.seq, 3);
-  assert.equal(impactFrame.fase, 'impacto');
-  assert.equal(impactFrame.label, 'Impacto — pico de aceleração');
-  assert.equal(impactFrame.offsetMs, SOMPO_COLLISION_FRAME_MOMENTS[2].offsetMs);
+  assert.equal(impactFrame.fase, 'impacto-com-o-animal');
+  assert.equal(impactFrame.label, 'Impacto com o animal');
+  assert.equal(impactFrame.offsetMs, EPISODE_FRAME_MOMENTS[2].offsetMs);
   assert.equal(impactFrame.mimeType, 'image/jpeg');
   assert.equal(impactFrame.size, buffers[2].length);
   assert.equal(impactFrame.url, `/api/sompo/telemetry/episode/${episode.publicId}/frames/3`);
@@ -149,7 +152,7 @@ test('frames de episódio: teto de 6, teto de 300KB e assinatura de bytes — 40
     cleanup();
   });
   const framesHandler = createSompoTelemetryEpisodeFramesHttpHandler(history);
-  const episode = history.startEpisode({ kind: 'colisao' });
+  const episode = history.startEpisode({ kind: 'roteiro' });
 
   const sixBatch = mockRes();
   await framesHandler({
@@ -168,7 +171,7 @@ test('frames de episódio: teto de 6, teto de 300KB e assinatura de bytes — 40
   assert.equal(seventh.body.error, 'sompo_telemetry_episode_frames_limit');
   assert.match(seventh.body.message, /teto é 6 por episódio/);
 
-  const fresh = history.startEpisode({ kind: 'colisao' });
+  const fresh = history.startEpisode({ kind: 'roteiro' });
   const tooLarge = mockRes();
   await framesHandler({
     params: { publicId: fresh.publicId },
@@ -227,7 +230,7 @@ test('frames de episódio: janela de graça pós-finish e episódio antigo sem f
   const framesHandler = createSompoTelemetryEpisodeFramesHttpHandler(history);
   const getHandler = createSompoTelemetryEpisodeGetHttpHandler(history);
 
-  const episode = history.startEpisode({ kind: 'colisao' });
+  const episode = history.startEpisode({ kind: 'roteiro' });
   clock = BASE_MS + 20_000;
   history.finishEpisode(episode.publicId, { status: 'complete' });
 
@@ -243,7 +246,7 @@ test('frames de episódio: janela de graça pós-finish e episódio antigo sem f
   assert.equal(late.statusCode, 400);
   assert.equal(late.body.error, 'sompo_telemetry_episode_frames_closed');
 
-  const aborted = history.startEpisode({ kind: 'colisao' });
+  const aborted = history.startEpisode({ kind: 'roteiro' });
   history.finishEpisode(aborted.publicId, { status: 'aborted' });
   const ontoAborted = mockRes();
   await framesHandler({ params: { publicId: aborted.publicId }, body: { frames: [frameBody(0)] } }, ontoAborted);
@@ -251,7 +254,7 @@ test('frames de episódio: janela de graça pós-finish e episódio antigo sem f
   assert.equal(ontoAborted.body.error, 'sompo_telemetry_episode_frames_closed');
 
   // Compatibilidade: episódio sem nenhum frame devolve frames: [] no GET.
-  const bare = history.startEpisode({ kind: 'colisao' });
+  const bare = history.startEpisode({ kind: 'roteiro' });
   const bareGet = mockRes();
   await getHandler({ params: { publicId: bare.publicId } }, bareGet);
   assert.equal(bareGet.statusCode, 200);

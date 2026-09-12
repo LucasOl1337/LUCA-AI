@@ -29,7 +29,6 @@ export const SOMPO_SCENARIO_EFFECTS = Object.freeze({
   'bogged-down': scene([track('mud-spray', 1400, 13000), track('mud-ruts', 1400), track('rain', 0, null, 0.2), track('hazard-lights', 7000)], 'mud'),
   'driver-drowsiness': scene([track('running-lights'), track('shoulder-dust', 7500, 10500, 0.6), track('hazard-lights', 10500)]),
   'fast-corner': scene([track('tire-smoke', 1600, 9000, 0.6), track('skid-marks', 1600), track('brake-lights', 5000)]),
-  'colisao-roteirizada': scene([track('running-lights', 0, 14000), track('impact-dust', 14000, 18500, 1, 20), track('debris', 14000, null, 1, 0), track('hazard-lights', 14000), track('brake-lights', 14000)]),
 });
 
 /**
@@ -117,10 +116,6 @@ export const SOMPO_SCENARIO_OUTCOME_EFFECTS = Object.freeze({
   'fast-corner': Object.freeze({
     tombamento: scene([track('tire-smoke', 1600, 7500, 0.8), track('skid-marks', 1600), track('impact-dust', 7000, 11000, 1, 40), track('debris', 7000, null, 1, 0), track('hazard-lights', 7000)]),
     'saida-de-frente': scene([track('tire-smoke', 1600, 6000, 0.7), track('skid-marks', 1600), track('shoulder-dust', 5000, 10000, 0.9), track('gravel', 5500, 10000), track('brake-lights', 5500), track('hazard-lights', 6000)]),
-  }),
-  'colisao-roteirizada': Object.freeze({
-    'quase-acidente': scene([track('running-lights', 0, 13000), track('brake-lights', 12500, 16000), track('tire-smoke', 13000, 15500, 0.5), track('skid-marks', 13000), track('shoulder-dust', 13500, 16000, 0.6), track('hazard-lights', 13000)]),
-    'freada-a-tempo': scene([track('running-lights', 0, 11000), track('sensor-warning', 11000), track('brake-lights', 11000), track('tire-smoke', 11000, 14200, 0.8), track('skid-marks', 11000), track('hazard-lights', 14000)]),
   }),
 });
 

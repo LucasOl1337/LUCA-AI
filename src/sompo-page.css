@@ -787,13 +787,13 @@
   box-shadow: inset 0 0 0 1px rgba(232, 201, 106, 0.28);
 }
 
-.sompo-simulator-collision {
+.sompo-simulator-episode {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.sompo-simulator-collision-run {
+.sompo-simulator-episode-run {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -808,22 +808,22 @@
   box-shadow: inset 0 0 0 1px rgba(255, 138, 130, 0.24);
 }
 
-.sompo-simulator-collision-run:hover:not(:disabled) {
+.sompo-simulator-episode-run:hover:not(:disabled) {
   background: rgba(255, 69, 58, 0.18);
   color: #ffb0aa;
 }
 
-.sompo-simulator-collision-run:disabled {
+.sompo-simulator-episode-run:disabled {
   opacity: 0.55;
   cursor: default;
 }
 
-.sompo-simulator-collision-run svg {
+.sompo-simulator-episode-run svg {
   width: 15px;
   height: 15px;
 }
 
-.sompo-simulator-collision-status {
+.sompo-simulator-episode-status {
   padding: 7px 9px;
   border-radius: 9px;
   background: rgba(255, 255, 255, 0.045);
@@ -833,19 +833,19 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
-.sompo-simulator-collision-status[data-sompo-collision-recording] {
+.sompo-simulator-episode-status[data-sompo-episode-recording] {
   background: rgba(255, 69, 58, 0.09);
   color: #ffa39c;
   box-shadow: inset 0 0 0 1px rgba(255, 138, 130, 0.2);
 }
 
-.sompo-simulator-collision-status.is-done {
+.sompo-simulator-episode-status.is-done {
   background: rgba(48, 209, 88, 0.09);
   color: #8bef9f;
   box-shadow: inset 0 0 0 1px rgba(125, 255, 154, 0.2);
 }
 
-.sompo-simulator-collision-status.is-error {
+.sompo-simulator-episode-status.is-error {
   background: rgba(255, 69, 58, 0.12);
   color: #ff9189;
   box-shadow: inset 0 0 0 1px rgba(255, 138, 130, 0.25);
@@ -2369,9 +2369,8 @@
   width: 100%; padding: 13px 10px; border: 1px solid #536954;
   border-radius: 8px; background: #182b20; color: #f1f5ec; font: inherit; font-size: 13px;
 }
-.sompo-outcome-select select, .sompo-collision-outcome select { padding: 9px 10px; }
+.sompo-outcome-select select { padding: 9px 10px; }
 .sompo-outcome-select small { font-size: 10px; line-height: 1.4; color: #9dac9f; }
-.sompo-collision-outcome { margin-bottom: 8px; }
 .sompo-scenario-phase { display: grid; gap: 8px; padding: 13px; border-left: 3px solid #e6c769; background: #e6c7690d; }
 .sompo-scenario-phase > span { font-size: 12px; color: #e9cc7c; }
 .sompo-scenario-phase strong { font-size: 22px; color: #f3f5ef; }

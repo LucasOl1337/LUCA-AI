@@ -8,6 +8,7 @@ import {
 import {
   buildSompoAgriRunBrief,
   createSompoAgriSimulationSnapshot,
+  getSompoAgriEpisodePlan,
   getSompoAgriOutcomes,
   getSompoAgriTravelMeters,
   isSompoAgriScenarioId,
@@ -80,4 +81,29 @@ test('resumo do ensaio agrícola no contrato da bancada; nulo para id desconheci
   assert.ok(brief.travelMeters < 0, 'ré articulada percorre metros negativos');
   assert.equal(buildSompoAgriRunBrief('normal', 'x', 0), null);
   assert.equal(buildSompoAgriRunBrief('__proto__', 'x', 0), null);
+});
+
+test('plano de episódio agrícola: todo desfecho é roteirizado e capturável', () => {
+  for (const scenario of Object.values(SOMPO_AGRI_SCENARIOS)) {
+    for (const outcome of getSompoAgriOutcomes(scenario.scenarioId)) {
+      const plan = getSompoAgriEpisodePlan(scenario.scenarioId, outcome.id);
+      assert.ok(plan, `${scenario.scenarioId}/${outcome.id}: plano presente`);
+      assert.equal(plan.kind, 'roteiro');
+      assert.equal(plan.catalog, 'agri');
+      assert.equal(plan.scenarioId, scenario.scenarioId);
+      assert.equal(plan.outcomeId, outcome.id);
+      assert.equal(plan.totalMs, scenario.totalMs);
+      assert.equal(plan.phases, scenario.phases);
+      assert.ok(plan.frameMoments.length >= 2 && plan.frameMoments.length <= 5);
+      for (const moment of plan.frameMoments) {
+        assert.ok(moment.offsetMs >= 0 && moment.offsetMs < scenario.totalMs);
+        assert.ok(scenario.phases.some((phase) => phase.id === moment.fase));
+      }
+    }
+  }
+  assert.equal(getSompoAgriEpisodePlan('normal', 'x'), null, 'cenário rural não entra no catálogo agrícola');
+  assert.equal(getSompoAgriEpisodePlan('cenario-inexistente', 'x'), null);
+  // Desfecho desconhecido cai no padrão, como no relógio do palco.
+  const first = Object.values(SOMPO_AGRI_SCENARIOS)[0];
+  assert.equal(getSompoAgriEpisodePlan(first.scenarioId, 'desfecho-inexistente').outcomeId, first.defaultOutcomeId);
 });

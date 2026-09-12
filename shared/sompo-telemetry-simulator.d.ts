@@ -61,35 +61,6 @@ export function createSompoSimulationSnapshot(
   options?: SompoSimulationSnapshotOptions,
 ): SompoTelemetrySnapshot;
 
-export type SompoCollisionScriptPhaseId = 'aproximacao' | 'impacto' | 'pos-impacto';
-
-export interface SompoCollisionScriptPhase {
-  id: SompoCollisionScriptPhaseId;
-  label: string;
-  startMs: number;
-  endMs: number;
-}
-
-export interface SompoCollisionScript {
-  kind: 'colisao';
-  scenarioId: string;
-  label: string;
-  description: string;
-  totalMs: number;
-  sampleIntervalMs: number;
-  phases: readonly SompoCollisionScriptPhase[];
-}
-
-export const SOMPO_COLLISION_SCRIPT: Readonly<SompoCollisionScript>;
-
-export interface SompoCollisionFrameMoment {
-  offsetMs: number;
-  fase: SompoCollisionScriptPhaseId;
-  label: string;
-}
-
-export const SOMPO_COLLISION_FRAME_MOMENTS: readonly Readonly<SompoCollisionFrameMoment>[];
-
 export interface SompoScenarioOutcome {
   id: string;
   label: string;
@@ -100,30 +71,40 @@ export const SOMPO_SCENARIO_OUTCOMES: Readonly<Record<SompoSimulationScenarioId,
 
 export function getSompoScenarioOutcomes(scenarioId?: string): readonly Readonly<SompoScenarioOutcome>[];
 
-export const SOMPO_COLLISION_OUTCOMES: readonly Readonly<SompoScenarioOutcome>[];
-
-export interface SompoCollisionOutcomePlan extends SompoScenarioOutcome {
-  scenarioLabel: string;
-  phases: readonly Readonly<{ id: string; label: string; startMs: number; endMs: number }>[];
-  frameMoments: readonly Readonly<{ offsetMs: number; fase: string; label: string }>[];
-  totalMs: number;
+export interface SompoEpisodePhase {
+  readonly id: string;
+  readonly label: string;
+  readonly startMs: number;
+  readonly endMs: number;
 }
 
-export function getSompoCollisionOutcome(outcomeId?: string | null): SompoCollisionOutcomePlan;
+export interface SompoEpisodeFrameMoment {
+  readonly offsetMs: number;
+  readonly fase: string;
+  readonly label: string;
+}
 
-export function getSompoCollisionScriptPhase(elapsedMs: number, outcomeId?: string): string;
+export interface SompoEpisodePlan {
+  readonly kind: 'roteiro';
+  readonly catalog: 'rural' | 'agri';
+  readonly scenarioId: string;
+  readonly outcomeId: string;
+  readonly outcomeLabel: string;
+  readonly scenarioLabel: string;
+  readonly totalMs: number;
+  readonly sampleIntervalMs: number;
+  readonly phases: readonly SompoEpisodePhase[];
+  readonly frameMoments: readonly SompoEpisodeFrameMoment[];
+}
 
-export function sompoBeamRangeMeters(distanceCm: number | null | undefined): number;
+export function sompoEpisodeFrameMoments(
+  points: readonly { offsetMs: number; fase: string; label: string }[],
+  totalMs: number,
+  finalPhase: string,
+  max?: number,
+): SompoEpisodeFrameMoment[];
 
-export function getSompoCollisionVisualPose(
-  elapsedMs: number,
-  outcomeId?: string,
-): { advance: number; lateral: number; yaw: number };
-
-export function createSompoCollisionScriptSnapshot(
-  elapsedMs: number,
-  options?: { observedAt?: string; connectedAt?: string; outcomeId?: string },
-): SompoTelemetrySnapshot;
+export function getSompoEpisodePlan(scenarioId: string, outcomeId?: string | null): SompoEpisodePlan | null;
 
 export interface SompoScenarioRunBriefPhase {
   atMs: number;

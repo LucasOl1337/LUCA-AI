@@ -26,6 +26,8 @@ export const APP_PAGES: readonly AppPageId[];
 export const PAGE_PATHS: Record<AppPageId, string>;
 export const PERSONA_FILTRO: readonly string[];
 export const SOMPO_ABA: 'casos';
+export const SOMPO_TELEMETRY_ABA: 'telemetria';
+export function getSompoView(location: Partial<AppLocation>): 'welcome' | 'cases' | 'telemetry';
 export const LUCA_ABA: 'atividade';
 export const CONFIG_TIPO: readonly string[];
 export const ORDEM_PARAM: Record<string, string>;

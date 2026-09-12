@@ -54,13 +54,15 @@ function fallbackMachine(equipmentId: 'tractor' | 'harvester') {
  * real em forma fechada — separado do loop do caminhão para não arriscar o
  * fluxo rural. Desmontado e remontado a cada troca de cenário/desfecho.
  */
-export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError }: {
+export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender }: {
   mount: HTMLElement;
   scenarioId: SompoAgriScenarioId;
   outcomeId: string;
   startedAtRef: { current: number };
   onModelStatus: (status: 'loading' | 'gltf' | 'fallback', asset: string | null) => void;
   onWebglError: () => void;
+  // Chamado no mesmo rAF do renderer.render — é o ponto seguro para capturar o canvas.
+  onAfterRender?: (canvas: HTMLCanvasElement) => void;
 }): SompoAgriStageApi | null {
   const scenario = getSompoAgriScenario(scenarioId);
   let renderer: THREE.WebGLRenderer;
@@ -209,6 +211,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     camera.position.x += orbit.target.x - targetXBefore;
     orbit.update();
     renderer.render(scene, camera);
+    onAfterRender?.(renderer.domElement);
     if (!document.hidden) frameId = window.requestAnimationFrame(render);
   }
   function onVisibilityChange() {

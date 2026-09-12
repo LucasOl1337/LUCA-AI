@@ -127,11 +127,43 @@ function mountWheel(mesh: THREE.Mesh, parent: THREE.Group) {
   parent.add(mesh);
 }
 
+let preloadedBufferPromise: Promise<ArrayBuffer> | null = null;
+
+export function preloadSompoTruckAsset(): Promise<ArrayBuffer> | null {
+  if (typeof fetch === 'undefined') return null;
+  if (!preloadedBufferPromise) {
+    preloadedBufferPromise = fetch(SOMPO_TRUCK_ASSET_URL)
+      .then((response) => {
+        if (!response.ok) throw new Error(`Truck asset preload: HTTP ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .catch((err) => {
+        preloadedBufferPromise = null;
+        throw err;
+      });
+  }
+  return preloadedBufferPromise;
+}
+
 async function readTruckAsset(url: string, signal: AbortSignal) {
-  const response = await fetch(url, { signal });
-  if (!response.ok) throw new Error(`Truck asset: HTTP ${response.status}`);
+  let arrayBuffer: ArrayBuffer;
+  if (url === SOMPO_TRUCK_ASSET_URL && preloadedBufferPromise) {
+    try {
+      const preloaded = await preloadedBufferPromise;
+      arrayBuffer = preloaded.slice(0);
+    } catch {
+      const response = await fetch(url, { signal });
+      if (!response.ok) throw new Error(`Truck asset: HTTP ${response.status}`);
+      arrayBuffer = await response.arrayBuffer();
+    }
+  } else {
+    const response = await fetch(url, { signal });
+    if (!response.ok) throw new Error(`Truck asset: HTTP ${response.status}`);
+    arrayBuffer = await response.arrayBuffer();
+  }
+  if (signal.aborted) return null;
   // Tesla geometry is expanded offline: production CSP disallows blob workers/WASM.
-  const gltf = await useSompoExternalTextures(new GLTFLoader()).parseAsync(await response.arrayBuffer(), '/models/sompo/');
+  const gltf = await useSompoExternalTextures(new GLTFLoader()).parseAsync(arrayBuffer, '/models/sompo/');
   if (signal.aborted) {
     disposeAsset(gltf.scene);
     return null;

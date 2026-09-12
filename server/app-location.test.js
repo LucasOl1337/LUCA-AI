@@ -5,6 +5,7 @@ import {
   formatAppUrl,
   mergeAppLocation,
   parseAppLocation,
+  getSompoView,
 } from '../shared/app-location.js';
 
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
@@ -77,6 +78,8 @@ test('toda tela alcançável redonda no parser sem perder o endereço', () => {
     ['/configuracao?novo=1', '/configuracao?novo=1'],
     ['/configuracao?tipo=individual&modelo=risco-agro', '/configuracao?tipo=individual&modelo=risco-agro'],
     ['/sompo', '/sompo'],
+    ['/sompo?aba=telemetria', '/sompo?aba=telemetria'],
+    ['/sompo?aba=telemetria&fonte=simulacao', '/sompo?aba=telemetria&fonte=simulacao'],
     ['/sompo?fonte=simulacao', '/sompo?fonte=simulacao'],
     ['/sompo?aba=casos', '/sompo?aba=casos'],
     ['/sompo?aba=casos&produto=penhor&gravidade=alta&caso=penhor-trator-incendio', '/sompo?aba=casos&produto=penhor&gravidade=alta&caso=penhor-trator-incendio'],
@@ -91,6 +94,16 @@ test('toda tela alcançável redonda no parser sem perder o endereço', () => {
   for (const [href, expected] of screens) {
     assert.equal(formatAppUrl(parseAppLocation(href)), expected, href);
   }
+});
+
+test('entrada SOMPO distingue hero, áreas explícitas e links antigos', () => {
+  assert.equal(getSompoView(parseAppLocation('/sompo')), 'welcome');
+  assert.equal(getSompoView(parseAppLocation('/sompo?aba=telemetria')), 'telemetry');
+  assert.equal(getSompoView(parseAppLocation('/sompo?aba=casos')), 'cases');
+  assert.equal(getSompoView(parseAppLocation('/sompo?fonte=simulacao')), 'telemetry');
+  assert.equal(getSompoView(parseAppLocation('/sompo?caso=penhor-trator-incendio')), 'cases');
+  assert.equal(getSompoView(parseAppLocation('/sompo?produto=penhor')), 'cases');
+  assert.equal(getSompoView(parseAppLocation('/sompo?aba=invalida')), 'welcome');
 });
 
 test('produto aceita id antigo e escreve o apelido curto', () => {

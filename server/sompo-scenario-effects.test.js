@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import * as THREE from 'three';
 import { SOMPO_SCENARIO_EFFECTS, getSompoScenarioEffects, getSompoAnimalPose } from '../shared/sompo-scenario-effects.js';
-import { SOMPO_SIMULATION_SCENARIOS, SOMPO_COLLISION_SCRIPT, getSompoRuralFrame } from '../shared/sompo-telemetry-simulator.js';
+import { SOMPO_SIMULATION_SCENARIOS, getSompoRuralFrame } from '../shared/sompo-telemetry-simulator.js';
 
 const cue = (id, time, effect) => getSompoScenarioEffects(id, time).cues.find((item) => item.effect === effect);
 
@@ -26,8 +26,8 @@ test('Nelore tem escala de animal adulto, sai completamente da pista e encerra f
   assert.deepEqual(getSompoAnimalPose(NaN, Infinity), initial);
 });
 
-test('cada preset e colisão tem coreografia explícita, congelada e determinística', () => {
-  assert.deepEqual(Object.keys(SOMPO_SCENARIO_EFFECTS).sort(), [...Object.keys(SOMPO_SIMULATION_SCENARIOS), SOMPO_COLLISION_SCRIPT.scenarioId].sort());
+test('cada preset de cenário tem coreografia explícita, congelada e determinística', () => {
+  assert.deepEqual(Object.keys(SOMPO_SCENARIO_EFFECTS).sort(), Object.keys(SOMPO_SIMULATION_SCENARIOS).sort());
   for (const [id, definition] of Object.entries(SOMPO_SCENARIO_EFFECTS)) {
     assert.ok(Object.isFrozen(definition) && Object.isFrozen(definition.tracks));
     assert.ok(definition.tracks.length >= 2);
@@ -52,10 +52,11 @@ test('estouro, tombamento e colisão disparam na fase correta e deixam dano/detr
   assert.equal(cue('tire-blowout', 6000, 'blowout-dust'), undefined);
   assert.ok(cue('rollover', 8000, 'impact-dust'));
   assert.ok(cue('rollover', 18000, 'debris'));
-  const impact = SOMPO_COLLISION_SCRIPT.phases.find((phase) => phase.id === 'impacto').startMs;
-  assert.equal(cue('colisao-roteirizada', impact - 1, 'debris'), undefined);
-  assert.ok(cue('colisao-roteirizada', impact, 'debris'));
-  assert.ok(cue('colisao-roteirizada', impact + 750, 'impact-dust'));
+  // O desfecho 'colisao' do animal-crossing assumiu o papel do antigo cenário
+  // dedicado: detritos e poeira só entram na variante com impacto.
+  const animalImpact = getSompoScenarioEffects('animal-crossing', 6_000, 'colisao');
+  assert.ok(animalImpact.cues.some((item) => item.effect === 'impact-dust'));
+  assert.ok(animalImpact.cues.some((item) => item.effect === 'debris'));
 });
 
 test('frenagem deixa marcas; freio falho fuma sem reduzir velocidade; lama encerra spray', () => {

@@ -17,7 +17,7 @@ import {
 /** Dados do diagnóstico do regente: impacto t+14,5s, flag t+16,8s → atraso 2,3 s. */
 function exampleVisualData() {
   return {
-    tipo: 'sompo-episodio-colisao',
+    tipo: 'sompo-episodio-roteiro',
     duracaoMs: 22_310,
     impactoMs: 14_500,
     picoAccMs2: 35.97,
@@ -37,7 +37,7 @@ function exampleVisualData() {
 
 function episodeMission(data = exampleVisualData()) {
   return [
-    'Missão do episódio de colisão.',
+    'Missão do episódio gravado.',
     '',
     `${SOMPO_EPISODE_VISUAL_DATA_MARKER} (bloco de máquina para a etapa visual; não recitar no chat)`,
     JSON.stringify(data),
@@ -45,22 +45,22 @@ function episodeMission(data = exampleVisualData()) {
 }
 
 test('sompoEpisodeHeadline responde a pergunta humana direto do dado', () => {
-  assert.equal(sompoEpisodeHeadline(exampleVisualData()), 'O alerta chegou 2,3 s depois da batida');
+  assert.equal(sompoEpisodeHeadline(exampleVisualData()), 'O alerta chegou 2,3 s depois do pico');
   assert.equal(
     sompoEpisodeHeadline({ ...exampleVisualData(), flagMs: 13_500 }),
-    'O alerta disparou 1 s antes da batida',
+    'O alerta disparou 1 s antes do pico',
   );
   assert.equal(
     sompoEpisodeHeadline({ ...exampleVisualData(), flagMs: 14_520 }),
-    'O alerta disparou no instante da batida',
+    'O alerta disparou no instante do pico',
   );
   assert.equal(
     sompoEpisodeHeadline({ ...exampleVisualData(), flagMs: null }),
-    'A batida aconteceu e o alerta nunca disparou',
+    'O pico de aceleração passou e o alerta nunca disparou',
   );
   assert.equal(
     sompoEpisodeHeadline({ ...exampleVisualData(), flagMs: null, flagDesdeInicio: true }),
-    'A flag de risco já estava ativa antes da batida',
+    'A flag de risco já estava ativa antes do pico',
   );
 });
 
@@ -68,8 +68,8 @@ test('linha do tempo SVG: curvas reais, marcadores nomeados e atraso visível en
   const svg = renderSompoEpisodeTimelineSvg(exampleVisualData()).toString('utf8');
 
   // Manchete = achado; subtítulo em português claro.
-  assert.match(svg, /O alerta chegou 2,3 s depois da batida/);
-  assert.match(svg, /Distância frontal e força do impacto, segundo a segundo/);
+  assert.match(svg, /O alerta chegou 2,3 s depois do pico/);
+  assert.match(svg, /Distância frontal e aceleração, segundo a segundo/);
 
   // Eixo X em segundos e duas curvas (polylines de distância e de aceleração).
   assert.match(svg, />0s</);
@@ -80,8 +80,8 @@ test('linha do tempo SVG: curvas reais, marcadores nomeados e atraso visível en
   assert.ok(accCurves.length >= 1, 'curva de aceleração presente');
 
   // Marcadores nomeados: início, IMPACTO e disparo da flag — mais a faixa do atraso.
-  assert.match(svg, /Início da aproximação/);
-  assert.match(svg, /IMPACTO t\+14,5s/);
+  assert.match(svg, /Início da gravação/);
+  assert.match(svg, /PICO t\+14,5s/);
   assert.match(svg, /Alerta disparou t\+16,8s/);
   assert.match(svg, /atraso de 2,3 s/);
 
@@ -98,8 +98,8 @@ test('linha do tempo SVG: curvas reais, marcadores nomeados e atraso visível en
 
 test('linha do tempo sem disparo de flag não inventa marcador de alerta', () => {
   const svg = renderSompoEpisodeTimelineSvg({ ...exampleVisualData(), flagMs: null }).toString('utf8');
-  assert.match(svg, /A batida aconteceu e o alerta nunca disparou/);
-  assert.match(svg, /IMPACTO t\+14,5s/);
+  assert.match(svg, /O pico de aceleração passou e o alerta nunca disparou/);
+  assert.match(svg, /PICO t\+14,5s/);
   assert.doesNotMatch(svg, /Alerta disparou t\+/);
   assert.doesNotMatch(svg, /atraso de/);
 });
@@ -115,7 +115,7 @@ test('materializeVisualPack em missão de episódio: linha do tempo + cartão, c
       summary: 'Alerta atrasado no ensaio',
       report: {
         title: 'Cartão de decisão',
-        markdown: 'Veredito: o alerta chegou depois da batida. Severidade alta para a seguradora. Ação: antecipar o gatilho do alarme no firmware antes de campo.',
+        markdown: 'Veredito: o alerta chegou depois do pico. Severidade alta para a seguradora. Ação: antecipar o gatilho do alarme no firmware antes de campo.',
       },
       charts: [
         { id: 'c1', title: 'Aceleração por fase (m/s²)', type: 'tower', items: [{ label: 'Aproximação', value: 10.32 }, { label: 'Impacto', value: 35.97 }] },
@@ -138,7 +138,7 @@ test('materializeVisualPack em missão de episódio: linha do tempo + cartão, c
   assert.equal(pack.imageEngine, 'episode-timeline');
   assert.equal(pack.sompoEpisodeTimeline, true);
   assert.equal(pack.images[0].style, 'episode-timeline');
-  assert.equal(pack.images[0].title, 'O alerta chegou 2,3 s depois da batida');
+  assert.equal(pack.images[0].title, 'O alerta chegou 2,3 s depois do pico');
   assert.match(pack.images[0].url, /\/api\/luca-ai\/visual-artifacts\//);
   assert.match(pack.report.markdown, /Veredito/);
 
@@ -146,7 +146,7 @@ test('materializeVisualPack em missão de episódio: linha do tempo + cartão, c
   assert.ok(artifact);
   assert.equal(artifact.mimeType, 'image/svg+xml');
   const svg = artifact.buffer.toString('utf8');
-  assert.match(svg, /IMPACTO t\+14,5s/);
+  assert.match(svg, /PICO t\+14,5s/);
   assert.match(svg, /Alerta disparou t\+16,8s/);
 });
 
@@ -165,7 +165,7 @@ test('materializeVisualPack de episódio entrega a linha do tempo mesmo sem plan
   assert.equal(pack.report, null);
   assert.equal(pack.charts.length, 0);
   assert.equal(pack.status, 'complete');
-  assert.equal(pack.summary, 'O alerta chegou 2,3 s depois da batida');
+  assert.equal(pack.summary, 'O alerta chegou 2,3 s depois do pico');
 });
 
 test('visualPlanNeedsRetry não exige images[] quando a missão é de episódio', () => {
@@ -180,7 +180,7 @@ test('visualPlanNeedsRetry não exige images[] quando a missão é de episódio'
 
 test('escala do eixo mantem o pico dentro do grafico e usa marcas redondas', () => {
   // Decimacao que perde o topo: o pico real (71,8 m/s² ≈ 7,3 g) e maior que
-  // qualquer amostra da serie. Sem entrar na escala, o marcador do impacto era
+  // qualquer amostra da serie. Sem entrar na escala, o marcador do pico era
   // desenhado acima da area do grafico, em cima do titulo.
   const data = {
     ...exampleVisualData(),

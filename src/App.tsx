@@ -24,6 +24,10 @@ export default function App() {
   }, [activePage, navigate, user?.role]);
 
   function goToPage(page: PageId) {
+    if (page === 'sompo') {
+      navigate({ page, aba: '', fonte: '', caso: '', produto: '', gravidade: '', busca: '' }, 'push');
+      return;
+    }
     navigate({ page }, 'push');
   }
 

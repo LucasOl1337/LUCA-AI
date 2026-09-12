@@ -882,307 +882,92 @@ export function getSompoBrakingTravelMeters(elapsedMs = 0, initialSpeedKph = 28)
 }
 
 /**
- * Roteiro determinístico de colisão: aproximação (distância 210→20 cm),
- * impacto (~1,5 s com pico de |aceleração| ~32-36 m/s²) e pós-impacto
- * (parado a 12 cm). Todo o episódio é função pura do relógio do sim.
+ * Plano de gravação de episódio: o que o botão "Gravar episódio" precisa
+ * saber para registrar o roteiro do cenário + desfecho selecionados —
+ * duração, fases (para a linha de status) e até 5 instantes nomeados de
+ * captura de frame (evidência visual anexada à missão da bancada).
+ *
+ * Só existe plano para desfechos com roteiro (keyframes rurais ou o script
+ * de frenagem). Desfecho manual ("livre") não tem instante crítico
+ * conhecido, então não gera episódio.
  */
-export const SOMPO_COLLISION_SCRIPT = Object.freeze({
-  kind: 'colisao',
-  scenarioId: 'colisao-roteirizada',
-  label: 'Colisão frontal roteirizada',
-  description: 'Roteiro determinístico: o caminhão avança, colide com o obstáculo e para; o episódio inteiro vira um caso isolado no histórico.',
-  totalMs: 22_000,
-  sampleIntervalMs: 500,
-  phases: Object.freeze([
-    Object.freeze({ id: 'aproximacao', label: 'Aproximação', startMs: 0, endMs: 14_000 }),
-    Object.freeze({ id: 'impacto', label: 'Impacto', startMs: 14_000, endMs: 15_500 }),
-    Object.freeze({ id: 'pos-impacto', label: 'Pós-impacto', startMs: 15_500, endMs: 22_000 }),
-  ]),
-});
+const SOMPO_EPISODE_FRAME_MAX = 5;
+const SOMPO_EPISODE_FINAL_SLACK_MS = 500;
 
-/**
- * Momentos de captura de frame do canvas 3D, amarrados às fases do roteiro.
- * O pico do pulso de impacto do roteiro acontece em 14 750 ms (meio da fase).
- */
-export const SOMPO_COLLISION_FRAME_MOMENTS = Object.freeze([
-  Object.freeze({ offsetMs: 0, fase: 'aproximacao', label: 'Início da aproximação' }),
-  Object.freeze({ offsetMs: 7_000, fase: 'aproximacao', label: 'Meia aproximação' }),
-  Object.freeze({ offsetMs: 14_750, fase: 'impacto', label: 'Impacto — pico de aceleração' }),
-  Object.freeze({ offsetMs: 16_500, fase: 'pos-impacto', label: 'Pós-impacto imediato' }),
-  Object.freeze({ offsetMs: 21_500, fase: 'pos-impacto', label: 'Final do episódio' }),
-]);
-
-/** Desfechos do roteiro de colisão; o primeiro (impacto) preserva o roteiro canônico. */
-export const SOMPO_COLLISION_OUTCOMES = Object.freeze([
-  Object.freeze({ id: 'impacto', label: 'Impacto frontal', description: 'O caminhão não para a tempo e colide com o obstáculo.' }),
-  Object.freeze({ id: 'quase-acidente', label: 'Desvio no limite', description: 'Desvio de emergência passa rente ao obstáculo, sem contato.' }),
-  Object.freeze({ id: 'freada-a-tempo', label: 'Freada a tempo', description: 'Frenagem máxima imobiliza o caminhão antes do contato.' }),
-]);
-
-const collisionPhase = (id, label, startMs, endMs) => Object.freeze({ id, label, startMs, endMs });
-const collisionMoment = (offsetMs, fase, label) => Object.freeze({ offsetMs, fase, label });
-
-const SOMPO_COLLISION_OUTCOME_PLANS = Object.freeze({
-  impacto: Object.freeze({
-    scenarioLabel: SOMPO_COLLISION_SCRIPT.label,
-    phases: SOMPO_COLLISION_SCRIPT.phases,
-    frameMoments: SOMPO_COLLISION_FRAME_MOMENTS,
-  }),
-  'quase-acidente': Object.freeze({
-    scenarioLabel: 'Colisão evitada por desvio no limite',
-    phases: Object.freeze([
-      collisionPhase('aproximacao', 'Aproximação', 0, 13_000),
-      collisionPhase('desvio', 'Desvio de emergência', 13_000, 15_500),
-      collisionPhase('recuperacao', 'Retorno à faixa', 15_500, 22_000),
-    ]),
-    frameMoments: Object.freeze([
-      collisionMoment(0, 'aproximacao', 'Início da aproximação'),
-      collisionMoment(7_000, 'aproximacao', 'Meia aproximação'),
-      collisionMoment(14_200, 'desvio', 'Desvio no limite — mínima distância'),
-      collisionMoment(16_500, 'recuperacao', 'Retorno à faixa'),
-      collisionMoment(21_500, 'recuperacao', 'Final do episódio'),
-    ]),
-  }),
-  'freada-a-tempo': Object.freeze({
-    scenarioLabel: 'Colisão evitada por frenagem',
-    phases: Object.freeze([
-      collisionPhase('aproximacao', 'Aproximação', 0, 11_000),
-      collisionPhase('frenagem', 'Frenagem máxima', 11_000, 14_000),
-      collisionPhase('parado', 'Parado antes do contato', 14_000, 22_000),
-    ]),
-    frameMoments: Object.freeze([
-      collisionMoment(0, 'aproximacao', 'Início da aproximação'),
-      collisionMoment(7_000, 'aproximacao', 'Meia aproximação'),
-      collisionMoment(12_500, 'frenagem', 'Frenagem máxima — pico de desaceleração'),
-      collisionMoment(15_500, 'parado', 'Parado antes do contato'),
-      collisionMoment(21_500, 'parado', 'Final do episódio'),
-    ]),
-  }),
-});
-
-export function getSompoCollisionOutcome(outcomeId) {
-  const id = typeof outcomeId === 'string' && Object.hasOwn(SOMPO_COLLISION_OUTCOME_PLANS, outcomeId)
-    ? outcomeId : 'impacto';
-  const outcome = SOMPO_COLLISION_OUTCOMES.find((item) => item.id === id);
-  const plan = SOMPO_COLLISION_OUTCOME_PLANS[id];
-  return {
-    id,
-    label: outcome.label,
-    description: outcome.description,
-    scenarioLabel: plan.scenarioLabel,
-    phases: plan.phases,
-    frameMoments: plan.frameMoments,
-    totalMs: SOMPO_COLLISION_SCRIPT.totalMs,
-  };
-}
-
-export function getSompoCollisionScriptPhase(elapsedMs, outcomeId) {
-  const plan = getSompoCollisionOutcome(outcomeId);
-  const elapsed = clamp(finite(elapsedMs, 0), 0, SOMPO_COLLISION_SCRIPT.totalMs);
-  const phase = plan.phases.find((item) => elapsed < item.endMs) || plan.phases.at(-1);
-  return phase.id;
-}
-
-/** Mesma régua da cena 3D: distância (cm) → alcance do feixe em metros. */
-export function sompoBeamRangeMeters(distanceCm) {
-  const clamped = Math.min(300, Math.max(5, finite(distanceCm, 5)));
-  return 1.2 + (((clamped - 5) * (7.2 - 1.2)) / (300 - 5));
+/** Slug curto e estável para a fase derivada de um rótulo livre de keyframe. */
+function sompoPhaseSlug(label, index) {
+  const slug = String(label ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+  return slug || `fase-${index + 1}`;
 }
 
 /**
- * Pose visual do roteiro de colisão: avanço real no mundo (m) a partir do início
- * da gravação, desvio lateral e guinada. Determinística; a cena soma o avanço à
- * posição de partida e mantém o obstáculo fixo no mundo.
+ * Escolhe até `max` instantes de captura dentro do roteiro. O primeiro e o
+ * último sempre entram; o último é grampeado em `totalMs - 500` porque o
+ * episódio fecha exatamente em totalMs e frames posteriores cairiam fora.
  */
-export function getSompoCollisionVisualPose(elapsedMs, outcomeId) {
-  const plan = getSompoCollisionOutcome(outcomeId);
-  const elapsed = clamp(finite(elapsedMs, 0), 0, SOMPO_COLLISION_SCRIPT.totalMs);
-  const base = sompoBeamRangeMeters(210);
-  const snapshot = createSompoCollisionScriptSnapshot(elapsed, { observedAt: '2000-01-01T00:00:00.000Z', outcomeId: plan.id });
-  const approach = Math.max(0, base - sompoBeamRangeMeters(snapshot.readings.distance));
-  if (plan.id === 'quase-acidente') {
-    if (elapsed <= 13_000) return { advance: approach, lateral: 0, yaw: 0 };
-    const tau = clamp((elapsed - 13_000) / 2_500, 0, 1);
-    const after = clamp((elapsed - 15_500) / 6_500, 0, 1);
-    const ease = (value) => value * value * (3 - 2 * value);
-    const start = Math.max(0, base - sompoBeamRangeMeters(55));
-    return {
-      advance: start + (ease(tau) * 4.4) + (ease(after) * 2.2),
-      lateral: -2.5 * ease(tau) * (1 - ease(after)),
-      yaw: -14 * Math.sin(Math.PI * tau) * (1 - after),
-    };
-  }
-  return { advance: approach, lateral: 0, yaw: 0 };
+export function sompoEpisodeFrameMoments(points, totalMs, finalPhase, max = SOMPO_EPISODE_FRAME_MAX) {
+  const finalMs = Math.max(0, (Number(totalMs) || 0) - SOMPO_EPISODE_FINAL_SLACK_MS);
+  const ordered = (Array.isArray(points) ? points : [])
+    .filter((point) => point && Number.isFinite(point.offsetMs) && point.offsetMs < finalMs)
+    .sort((left, right) => left.offsetMs - right.offsetMs);
+  const picked = ordered.length + 1 <= max
+    ? ordered
+    : Array.from({ length: max - 1 }, (_, index) => ordered[Math.round((index * (ordered.length - 1)) / (max - 2))]);
+  return [
+    ...picked.map((point) => ({ offsetMs: point.offsetMs, fase: point.fase, label: point.label })),
+    { offsetMs: finalMs, fase: finalPhase, label: 'Final do episódio' },
+  ];
 }
 
-export function createSompoCollisionScriptSnapshot(elapsedMs, {
-  observedAt = new Date().toISOString(),
-  connectedAt,
-  outcomeId,
-} = {}) {
-  const plan = getSompoCollisionOutcome(outcomeId);
-  const elapsed = clamp(finite(elapsedMs, 0), 0, SOMPO_COLLISION_SCRIPT.totalMs);
-  const phaseId = getSompoCollisionScriptPhase(elapsed, plan.id);
-  const t = elapsed / 1_000;
+/**
+ * Plano de episódio para um desfecho do catálogo convencional (rural).
+ * Retorna null para desfechos manuais — sem roteiro não há episódio.
+ */
+export function getSompoEpisodePlan(scenarioId, outcomeId) {
+  if (!Object.hasOwn(SOMPO_SIMULATION_SCENARIOS, scenarioId)) return null;
+  const scenario = SOMPO_SIMULATION_SCENARIOS[scenarioId];
+  const outcomes = getSompoScenarioOutcomes(scenarioId);
+  const outcome = outcomes.find((item) => item.id === outcomeId) ?? outcomes[0];
+  const script = getSompoScenarioScript(scenarioId, outcome.id);
+  const isBraking = !script && scenarioId === 'hard-braking';
+  if (!script && !isBraking) return null;
+  const totalMs = isBraking ? SOMPO_BRAKING_SCRIPT.totalMs : script.totalMs;
 
-  let distance;
-  let pitch;
-  let roll;
-  let acceleration;
-  let rotation;
-  let collisionRisk;
-  const approachNoise = () => {
-    pitch = 1.5 + (Math.sin(t * 1.7) * 0.4);
-    roll = 0.6 + (Math.sin((t * 1.3) + 0.4) * 0.3);
-    acceleration = vector(
-      0.35 + (Math.sin(t * 2.4) * 0.25),
-      Math.cos(t * 2.1) * 0.2,
-      9.81 + (Math.sin(t * 3.1) * 0.22),
-    );
-    rotation = vector(
-      Math.cos(t * 1.9) * 0.4,
-      Math.sin(t * 1.2) * 0.2,
-      Math.cos(t * 2.2) * 0.5,
-    );
-    collisionRisk = false;
-  };
-  const settleNoise = (sinceMs, spanMs, restDistance) => {
-    const tau = clamp((elapsed - sinceMs) / spanMs, 0, 1);
-    const settle = Math.max(0, 1 - (tau * 2.5));
-    distance = restDistance;
-    pitch = 0.9 + (Math.sin(t * 5.2) * 0.6 * settle);
-    roll = 0.8 + (Math.sin(t * 4.4) * 0.4 * settle);
-    acceleration = vector(
-      Math.sin(t * 6.1) * 1.2 * settle,
-      Math.cos(t * 5.3) * 0.8 * settle,
-      9.81 + (Math.sin(t * 6.8) * 0.5 * settle),
-    );
-    rotation = vector(2 * settle, -1 * settle, 1.5 * settle);
-  };
-  if (plan.id === 'quase-acidente') {
-    if (phaseId === 'aproximacao') {
-      approachNoise();
-      distance = 210 - (155 * (elapsed / 13_000));
-      collisionRisk = distance <= 70;
-    } else if (phaseId === 'desvio') {
-      const tau = clamp((elapsed - 13_000) / 2_500, 0, 1);
-      const pulse = Math.sin(Math.PI * tau);
-      // O feixe frontal deixa de ver o obstáculo conforme o caminhão cruza a faixa.
-      distance = tau < 0.4 ? 55 - (31 * (tau / 0.4)) : 24 + (166 * ((tau - 0.4) / 0.6));
-      pitch = 1.2 - (1.6 * pulse);
-      roll = 0.6 + (6.5 * Math.sin(Math.PI * 2 * tau) * (1 - tau * 0.3));
-      acceleration = vector(
-        -(4.5 * pulse) - 0.3,
-        6 * Math.sin(Math.PI * 2 * tau),
-        9.81 + (1.4 * pulse),
-      );
-      rotation = vector(9 * Math.sin(Math.PI * 2 * tau), -3 * pulse, 20 * Math.sin(Math.PI * 2 * tau));
-      collisionRisk = true;
-    } else {
-      settleNoise(15_500, 6_500, 200);
-      const tau = clamp((elapsed - 15_500) / 6_500, 0, 1);
-      distance = 190 + (70 * tau);
-      collisionRisk = false;
-    }
-  } else if (plan.id === 'freada-a-tempo') {
-    if (phaseId === 'aproximacao') {
-      approachNoise();
-      distance = 210 - (120 * (elapsed / 11_000));
-      collisionRisk = false;
-    } else if (phaseId === 'frenagem') {
-      const tau = clamp((elapsed - 11_000) / 3_000, 0, 1);
-      const pulse = Math.sin(Math.PI * tau);
-      const blend = tau * tau * (3 - 2 * tau);
-      distance = 90 - (52 * blend);
-      pitch = 1.5 - (6.5 * pulse);
-      roll = 0.6 + (1.2 * pulse);
-      acceleration = vector(
-        -(8.5 * pulse) - 0.4,
-        1.2 * pulse,
-        9.81 + (2.2 * pulse),
-      );
-      rotation = vector(4 * pulse, -9 * Math.cos(Math.PI * tau) * pulse, 3 * pulse);
-      collisionRisk = distance <= 60;
-    } else {
-      settleNoise(14_000, 4_000, 38);
-      collisionRisk = true;
-    }
-  } else if (phaseId === 'aproximacao') {
-    const progress = elapsed / 14_000;
-    approachNoise();
-    distance = 210 - (190 * progress);
-  } else if (phaseId === 'impacto') {
-    const tau = clamp((elapsed - 14_000) / 1_500, 0, 1);
-    const pulse = Math.sin(Math.PI * tau);
-    distance = 20 - (8 * tau);
-    pitch = 1.5 - (7.5 * pulse);
-    roll = 0.6 + (3.5 * pulse);
-    acceleration = vector(
-      -(30 * pulse) - 0.4,
-      4 * pulse,
-      9.81 + (9 * pulse),
-    );
-    rotation = vector(28 * pulse, -9 * pulse, 14 * pulse);
-    collisionRisk = true;
-  } else {
-    const tau = clamp((elapsed - 15_500) / 6_500, 0, 1);
-    const settle = Math.max(0, 1 - (tau * 2.5));
-    distance = 12;
-    pitch = 0.9 + (Math.sin(t * 5.2) * 0.6 * settle);
-    roll = 0.8 + (Math.sin(t * 4.4) * 0.4 * settle);
-    acceleration = vector(
-      Math.sin(t * 6.1) * 1.2 * settle,
-      Math.cos(t * 5.3) * 0.8 * settle,
-      9.81 + (Math.sin(t * 6.8) * 0.5 * settle),
-    );
-    rotation = vector(2 * settle, -1 * settle, 1.5 * settle);
-    collisionRisk = true;
-  }
+  const usedPhaseIds = new Set();
+  const phases = (isBraking
+    ? SOMPO_BRAKING_SCRIPT.phases
+    : script.keyframes.map((frame, index) => ({
+      id: sompoPhaseSlug(frame.phaseLabel, index),
+      label: frame.phaseLabel,
+      startMs: frame.atMs,
+      endMs: index + 1 < script.keyframes.length ? script.keyframes[index + 1].atMs : totalMs,
+    }))
+  ).map((phase) => {
+    let id = phase.id;
+    let suffix = 2;
+    while (usedPhaseIds.has(id)) id = `${phase.id}-${suffix++}`;
+    usedPhaseIds.add(id);
+    return id === phase.id ? phase : { ...phase, id };
+  });
+  const points = phases.map((phase) => ({ offsetMs: phase.startMs, fase: phase.id, label: phase.label }));
 
-  const parsedObservedAt = Date.parse(observedAt);
-  const sessionConnectedAt = connectedAt || (
-    Number.isFinite(parsedObservedAt)
-      ? new Date(parsedObservedAt - elapsed).toISOString()
-      : observedAt
-  );
-
-  return {
-    tractorId: 'SIM-001',
-    observedAt,
-    changedAt: observedAt,
-    unchangedForMs: 0,
-    freshness: 'fresh',
-    connection: {
-      state: 'live',
-      connectedAt: sessionConnectedAt,
-      lastEventAt: observedAt,
-      retryAttempt: 0,
-    },
-    deviceTimestamp: Math.round(elapsed),
-    status: collisionRisk ? 'alert' : 'normal',
-    risks: {
-      collision: collisionRisk,
-      inclination: false,
-    },
-    readings: {
-      distance: round(distance),
-      temperature: round(27 + (Math.sin(t * 0.05) * 0.2), 1),
-      humidity: round(48 + (Math.cos(t * 0.04) * 0.4), 1),
-      pitch: round(pitch),
-      roll: round(roll),
-      acceleration,
-      rotation,
-    },
-    source: {
-      kind: 'simulation',
-      provider: 'Simulador 3D local',
-      path: 'simulation://sompo/caminhao/SIM-001/esp32',
-      scenarioId: SOMPO_COLLISION_SCRIPT.scenarioId,
-      scenarioLabel: plan.scenarioLabel,
-      outcomeId: plan.id,
-      outcomeLabel: plan.label,
-    },
-  };
+  return Object.freeze({
+    kind: 'roteiro',
+    catalog: 'rural',
+    scenarioId: scenario.scenarioId,
+    outcomeId: outcome.id,
+    outcomeLabel: outcome.label,
+    scenarioLabel: outcome.id === outcomes[0].id ? scenario.label : `${scenario.label} · ${outcome.label}`,
+    totalMs,
+    sampleIntervalMs: 500,
+    phases: Object.freeze(phases),
+    frameMoments: Object.freeze(sompoEpisodeFrameMoments(points, totalMs, phases.at(-1).id)),
+  });
 }
 
 /**

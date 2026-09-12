@@ -18,11 +18,12 @@ import {
   Wheat,
 } from 'lucide-react';
 import SompoTelemetryPanel from '@/components/SompoTelemetryPanel';
+import SompoWelcome from '@/components/sompo/SompoWelcome';
 import { useTheme } from '@/hooks/useTheme';
 import { useChatLibrary } from '@/hooks/useChatLibrary';
 import { useAppLocation } from '@/hooks/useAppLocation';
 import { useLuca } from '@/hooks/useLucaState';
-import { GRAVIDADE_VALUES, PRODUTO_PARAM, PRODUTO_VALUE, SOMPO_ABA } from '../../shared/app-location.js';
+import { getSompoView, GRAVIDADE_VALUES, PRODUTO_PARAM, PRODUTO_VALUE, SOMPO_ABA, SOMPO_TELEMETRY_ABA } from '../../shared/app-location.js';
 import { lucaApi } from '@/lib/api';
 import { pickFailureCopy } from '@/lib/surface-failure';
 import type {
@@ -55,6 +56,7 @@ import {
 import { buildSompoEpisodeMission, buildSompoTelemetryMission } from '../../shared/sompo-telemetry.js';
 import { buildSompoScenarioRunBrief, createSompoSimulationSnapshot } from '../../shared/sompo-telemetry-simulator.js';
 import { buildSompoAgriRunBrief, isSompoAgriScenarioId } from '../../shared/sompo-agri-brief.js';
+import { preloadSompoTruckAsset } from '@/components/sompo/loadSompoTruckAsset';
 import '@/sompo-page.css';
 
 const SompoTruckSimulator = lazy(() => import('@/components/SompoTruckSimulator'));
@@ -69,11 +71,12 @@ const SOMPO_EPISODE_MAX_ATTACHED_FRAMES = 4;
 
 /**
  * Escolhe quais frames viram anexo quando o episódio tem mais que o orçamento.
- * Prioridade: impacto > abertura > fechamento > pós-impacto > demais; a ordem
- * final de anexo segue a sequência temporal (seq).
+ * Prioridade: o frame mais próximo do pico de aceleração (o "impacto" do
+ * resumo heurístico) > abertura > fechamento > demais, na ordem temporal (seq).
  */
 function selectEpisodeFramesForBench(
   frames: SompoTelemetryEpisodeFrame[],
+  peakOffsetMs?: number | null,
 ): SompoTelemetryEpisodeFrame[] {
   const ordered = [...frames].sort((a, b) => a.seq - b.seq);
   if (ordered.length <= SOMPO_EPISODE_MAX_ATTACHED_FRAMES) return ordered;
@@ -81,10 +84,15 @@ function selectEpisodeFramesForBench(
   const pick = (frame?: SompoTelemetryEpisodeFrame) => {
     if (frame && picked.size < SOMPO_EPISODE_MAX_ATTACHED_FRAMES) picked.add(frame.seq);
   };
-  for (const frame of ordered) if (frame.fase === 'impacto') pick(frame);
+  if (Number.isFinite(peakOffsetMs)) {
+    const nearest = ordered.reduce((best, frame) => (
+      Math.abs((frame.offsetMs ?? 0) - (peakOffsetMs ?? 0))
+        < Math.abs((best?.offsetMs ?? 0) - (peakOffsetMs ?? 0)) ? frame : best
+    ), undefined as SompoTelemetryEpisodeFrame | undefined);
+    pick(nearest);
+  }
   pick(ordered[0]);
   pick(ordered[ordered.length - 1]);
-  for (const frame of ordered) if (frame.fase === 'pos-impacto') pick(frame);
   for (const frame of ordered) pick(frame);
   return ordered.filter((frame) => picked.has(frame.seq));
 }
@@ -125,11 +133,21 @@ function defaultIndividualPresetId(list: LucaIndividualPreset[]): string {
 }
 
 export default function SompoPage() {
+  const { location } = useAppLocation();
+
+  useEffect(() => {
+    void preloadSompoTruckAsset();
+  }, []);
+
+  return getSompoView(location) === 'welcome' ? <SompoWelcome /> : <SompoWorkspace />;
+}
+
+function SompoWorkspace() {
   const theme = useTheme();
   const { createSession, busy: sessionsBusy } = useChatLibrary();
   const { sompoTelemetry: streamedTelemetry } = useLuca();
   const { location, navigate } = useAppLocation();
-  const viewMode: SompoViewMode = location.aba === SOMPO_ABA ? 'cases' : 'telemetry';
+  const viewMode: SompoViewMode = getSompoView(location) === 'cases' ? 'cases' : 'telemetry';
   const query = location.busca;
   const mappedProduct = PRODUTO_VALUE[location.produto];
   const productFilter: ProductFilter = mappedProduct === 'agricola-produtividade'
@@ -142,7 +160,8 @@ export default function SompoPage() {
     ? location.gravidade as SompoCaseSeverity
     : 'all';
   const selectedId = location.caso || null;
-  const telemetrySourceMode: TelemetrySourceMode = location.fonte === 'simulacao' ? 'simulation' : 'firebase';
+  // Simulador 3.2 é a fonte padrão; `?fonte=firebase` escolhe o gêmeo físico.
+  const telemetrySourceMode: TelemetrySourceMode = location.fonte === 'firebase' ? 'firebase' : 'simulation';
   const [simulatedTelemetry, setSimulatedTelemetry] = useState<SompoTelemetrySnapshot>(() => (
     createSompoSimulationSnapshot()
   ));
@@ -317,9 +336,9 @@ export default function SompoPage() {
 
   function setViewMode(mode: SompoViewMode) {
     navigate({
-      aba: mode === 'cases' ? SOMPO_ABA : '',
+      aba: mode === 'cases' ? SOMPO_ABA : SOMPO_TELEMETRY_ABA,
       caso: mode === 'cases' ? location.caso : '',
-      fonte: mode === 'cases' ? '' : location.fonte,
+      fonte: mode === 'cases' ? '' : (location.fonte === 'firebase' ? 'firebase' : ''),
     }, 'replace');
   }
 
@@ -414,7 +433,7 @@ export default function SompoPage() {
           return;
         }
         const episodeFrames = Array.isArray(result.frames) ? result.frames : [];
-        const selectedFrames = selectEpisodeFramesForBench(episodeFrames);
+        const selectedFrames = selectEpisodeFramesForBench(episodeFrames, result.summary?.impact?.offsetMs);
         if (selectedFrames.length > 0) {
           try {
             const uploaded: LucaAiChatAttachment[] = [];
@@ -448,7 +467,7 @@ export default function SompoPage() {
           offsetMs: frame.offsetMs,
           attached: attachedSeqs.has(frame.seq),
         }));
-        caseId = `episodio-colisao-${result.episode.publicId}`;
+        caseId = `episodio-${result.episode.publicId}`;
         mission = buildSompoEpisodeMission(
           result.episode,
           result.samples,
@@ -515,6 +534,11 @@ export default function SompoPage() {
 
       <div className="sompo-page-scroll">
         <div className="sompo-page-inner">
+          <a className="sompo-back-home" href="/sompo" onClick={(event) => {
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            event.preventDefault();
+            navigate({ aba: '', fonte: '', caso: '', produto: '', gravidade: '', busca: '' });
+          }}><ArrowLeft size={14} /> Início SOMPO</a>
           <header className="sompo-header">
             <div>
               <div className="sompo-kicker">
@@ -523,7 +547,7 @@ export default function SompoPage() {
               </div>
               <h1 className="sompo-title">SOMPO</h1>
               <p className="sompo-lead">
-                Acompanhe o ESP32 pelo Firebase ou teste cenários com o caminhão virtual,
+                Teste cenários no simulador 3.2 ou acompanhe o ESP32 pelo Firebase,
                 sempre com a origem do snapshot preservada para a equipe de agentes.
               </p>
             </div>
@@ -550,7 +574,7 @@ export default function SompoPage() {
               onClick={() => setViewMode('telemetry')}
             >
               <Activity />
-              <span><strong>Telemetria</strong><small>Firebase + simulador 3D</small></span>
+              <span><strong>Telemetria</strong><small>Simulador 3.2 + Firebase</small></span>
             </button>
             <button
               type="button"
@@ -567,14 +591,28 @@ export default function SompoPage() {
               <section className="sompo-source-switch" aria-label="Origem dos dados da telemetria">
                 <div className="sompo-source-switch-label">
                   <span>Origem dos dados</span>
-                  <small>O Firebase continua ativo quando o simulador é aberto.</small>
+                  <small>O Simulador 3.2 é a entrada padrão; o Firebase segue como gêmeo do trator físico.</small>
                 </div>
                 <div className="sompo-source-switch-options">
                   <button
                     type="button"
-                    aria-pressed={telemetrySourceMode === 'firebase'}
+                    aria-pressed={telemetrySourceMode === 'simulation'}
                     onClick={() => {
                       navigate({ fonte: '' }, 'replace');
+                      setTelemetryLaunchError(null);
+                    }}
+                  >
+                    <BoxIcon />
+                    <span>
+                      <strong>Simulador 3.2</strong>
+                      <small>Three.js · ensaio local · padrão</small>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={telemetrySourceMode === 'firebase'}
+                    onClick={() => {
+                      navigate({ fonte: 'firebase' }, 'replace');
                       setTelemetryLaunchError(null);
                       setRecordedEpisode(null);
                     }}
@@ -582,21 +620,7 @@ export default function SompoPage() {
                     <Database />
                     <span>
                       <strong>Firebase</strong>
-                      <small>Dispositivo físico · fonte principal</small>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={telemetrySourceMode === 'simulation'}
-                    onClick={() => {
-                      navigate({ fonte: 'simulacao' }, 'replace');
-                      setTelemetryLaunchError(null);
-                    }}
-                  >
-                    <BoxIcon />
-                    <span>
-                      <strong>Simulador 3D</strong>
-                      <small>Three.js · ensaio local</small>
+                      <small>Dispositivo físico · fonte secundária</small>
                     </span>
                   </button>
                 </div>
@@ -639,14 +663,14 @@ export default function SompoPage() {
                       <span>Próxima etapa</span>
                       <h3>
                         {episodeReady
-                          ? 'Analisar o episódio de colisão com a equipe'
+                          ? 'Analisar o episódio gravado com a equipe'
                           : telemetrySourceMode === 'simulation'
                             ? 'Analisar este ensaio com a equipe'
                             : 'Processar este snapshot com a equipe'}
                       </h3>
                       <p>
                         {episodeReady
-                          ? 'O episódio gravado vai inteiro para a bancada: fases, pico de impacto e amostras-chave do evento completo.'
+                          ? 'O episódio gravado vai inteiro para a bancada: fases, pico de aceleração e amostras-chave do evento completo.'
                           : telemetrySourceMode === 'simulation'
                             ? 'O LUCA marca o briefing como simulação, registra os sinais do cenário e inicia uma sessão nova.'
                             : 'O LUCA fecha a leitura real em um briefing, registra alertas e lacunas e inicia uma sessão nova.'}
@@ -715,7 +739,7 @@ export default function SompoPage() {
                           <>
                             <Play />
                             {episodeReady
-                              ? 'Analisar colisão na bancada'
+                              ? 'Analisar episódio na bancada'
                               : telemetrySourceMode === 'simulation'
                                 ? 'Analisar simulação'
                                 : 'Analisar na bancada'}

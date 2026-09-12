@@ -127,7 +127,7 @@ export interface SompoTelemetrySimulationRecordResponse {
   episodeId?: string;
 }
 
-export type SompoTelemetryEpisodeKind = 'colisao';
+export type SompoTelemetryEpisodeKind = 'colisao' | 'roteiro';
 export type SompoTelemetryEpisodeStatus = 'recording' | 'complete' | 'aborted';
 export type SompoTelemetryEpisodePhaseId = 'aproximacao' | 'impacto' | 'pos-impacto';
 
@@ -249,7 +249,7 @@ export const SOMPO_EPISODE_VISUAL_DATA_MARKER: string;
 
 /** Série compacta do episódio para a peça visual: [tMs, distanciaCm|null, accMs2|null]. */
 export interface SompoEpisodeVisualData {
-  tipo: 'sompo-episodio-colisao';
+  tipo: 'sompo-episodio-roteiro' | 'sompo-episodio-colisao';
   duracaoMs: number;
   impactoMs: number | null;
   picoAccMs2: number | null;

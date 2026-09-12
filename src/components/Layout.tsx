@@ -161,12 +161,14 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
             })}
           </nav>
 
-          <div className="min-h-0 flex-1 overflow-hidden px-2 pb-2 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,.06)' }}>
-            <SidebarSessionsRail
-              compact={compact}
-              onOpenLucaAi={() => navigate('luca-ai')}
-            />
-          </div>
+          {activePage === 'luca-ai' && (
+            <div className="min-h-0 flex-1 overflow-hidden px-2 pb-2 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,.06)' }}>
+              <SidebarSessionsRail
+                compact={compact}
+                onOpenLucaAi={() => navigate('luca-ai')}
+              />
+            </div>
+          )}
         </div>
 
         <div className="px-2 pb-2 pt-2">

@@ -1,5 +1,5 @@
 import type { SompoTelemetrySnapshot } from './sompo-telemetry.js';
-import type { SompoScenarioOutcome, SompoScenarioRunBrief } from './sompo-telemetry-simulator.js';
+import type { SompoEpisodePlan, SompoScenarioOutcome, SompoScenarioRunBrief } from './sompo-telemetry-simulator.js';
 import type { SompoAgriScenarioId } from './sompo-agri-scenarios.js';
 
 export function isSompoAgriScenarioId(scenarioId: unknown): scenarioId is SompoAgriScenarioId;
@@ -17,6 +17,11 @@ export function createSompoAgriSimulationSnapshot(
   outcomeId?: string,
   options?: { observedAt?: string; elapsedMs?: number; connectedAt?: string },
 ): SompoTelemetrySnapshot;
+
+export function getSompoAgriEpisodePlan(
+  scenarioId: string,
+  outcomeId?: string | null,
+): (Omit<SompoEpisodePlan, 'catalog' | 'scenarioId'> & { catalog: 'agri'; scenarioId: SompoAgriScenarioId }) | null;
 
 export function buildSompoAgriRunBrief(
   scenarioId: string,

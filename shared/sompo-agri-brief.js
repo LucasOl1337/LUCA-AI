@@ -9,7 +9,7 @@ import {
   getSompoAgriFrame,
   getSompoAgriScenario,
 } from './sompo-agri-scenarios.js';
-import { createSompoSimulationSnapshot } from './sompo-telemetry-simulator.js';
+import { createSompoSimulationSnapshot, sompoEpisodeFrameMoments } from './sompo-telemetry-simulator.js';
 
 const finite = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
@@ -110,6 +110,34 @@ export function createSompoAgriSimulationSnapshot(scenarioId, outcomeId, {
       outcomeId: frame.outcomeId,
       outcomeLabel: frame.outcomeLabel,
     },
+  });
+}
+
+/**
+ * Plano de episódio de um desfecho agrícola — mesmo contrato de
+ * getSompoEpisodePlan: todo desfecho agrícola é roteirizado (keyframes), então
+ * o plano só é nulo quando o cenário não existe.
+ */
+export function getSompoAgriEpisodePlan(scenarioId, outcomeId) {
+  if (!isSompoAgriScenarioId(scenarioId)) return null;
+  const scenario = getSompoAgriScenario(scenarioId);
+  const outcome = resolveOutcome(scenario, outcomeId);
+  const phaseAt = (atMs) => scenario.phases.find((phase) => atMs < phase.endMs) ?? scenario.phases.at(-1);
+  const points = outcome.keyframes.map((keyframe) => {
+    const phase = phaseAt(keyframe.atMs);
+    return { offsetMs: keyframe.atMs, fase: phase.id, label: phase.label };
+  });
+  return Object.freeze({
+    kind: 'roteiro',
+    catalog: 'agri',
+    scenarioId: scenario.scenarioId,
+    outcomeId: outcome.id,
+    outcomeLabel: outcome.label,
+    scenarioLabel: outcome.id === scenario.defaultOutcomeId ? scenario.label : `${scenario.label} · ${outcome.label}`,
+    totalMs: scenario.totalMs,
+    sampleIntervalMs: scenario.sampleIntervalMs,
+    phases: scenario.phases,
+    frameMoments: Object.freeze(sompoEpisodeFrameMoments(points, scenario.totalMs, scenario.phases.at(-1).id)),
   });
 }
 

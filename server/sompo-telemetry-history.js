@@ -9,7 +9,9 @@ export const SOMPO_TELEMETRY_HISTORY_DEFAULT_LIMIT = 2000;
 export const SOMPO_TELEMETRY_HISTORY_DEFAULT_WINDOW_MIN = 15;
 export const SOMPO_TELEMETRY_HISTORY_MAX_WINDOW_MIN = 240;
 export const SOMPO_TELEMETRY_SIMULATION_MAX_BATCH = 50;
-export const SOMPO_TELEMETRY_EPISODE_KINDS = Object.freeze(['colisao']);
+// 'colisao' é o kind legado dos episódios gravados antes da generalização;
+// episódios novos entram como 'roteiro' (qualquer cenário + desfecho roteirizado).
+export const SOMPO_TELEMETRY_EPISODE_KINDS = Object.freeze(['colisao', 'roteiro']);
 export const SOMPO_TELEMETRY_EPISODE_RECORDING_TIMEOUT_MS = 10 * 60_000;
 export const SOMPO_TELEMETRY_EPISODE_KEY_SAMPLES_MAX = 30;
 export const SOMPO_TELEMETRY_EPISODE_FRAMES_MAX = 6;
@@ -23,9 +25,9 @@ const SOURCE_KINDS = new Set(['firebase', 'simulation']);
 const EPISODE_KIND_SET = new Set(SOMPO_TELEMETRY_EPISODE_KINDS);
 const EPISODE_FINAL_STATUSES = new Set(['complete', 'aborted']);
 const EPISODE_PHASE_LABELS = Object.freeze({
-  aproximacao: 'Aproximação',
-  impacto: 'Impacto',
-  'pos-impacto': 'Pós-impacto',
+  aproximacao: 'Antes do pico',
+  impacto: 'Pico',
+  'pos-impacto': 'Depois do pico',
 });
 const FONTE_TO_KIND = Object.freeze({
   firebase: 'firebase',
