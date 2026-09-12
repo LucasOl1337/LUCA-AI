@@ -146,9 +146,13 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   // O perigo em si já está desenhado (contorno, lâmina d'água). Regra 1 do SPEC: a grade que soma a área é a que pinta.
   const BAND_RAMP = [0xd63a2f, 0xe8902c, 0xe9c74a];
   const paint = grid ? new Int32Array(grid.cols * grid.rows).fill(-1) : null;
+  const water = site.polygons.filter(polygon => polygon.role === 'water');
   if (grid && paint) {
+    const center = { x: 0, z: 0 };
     for (let cell = 0; cell < paint.length; cell += 1) {
       if (!grid.inside[cell]) continue;
+      center.x = grid.minX + (cell % grid.cols + 0.5) * grid.cellM; center.z = grid.minZ + (Math.floor(cell / grid.cols) + 0.5) * grid.cellM;
+      if (water.some(polygon => polygonContains(center, polygon))) continue; // dentro da água é lâmina d'água, não faixa
       let bestMax = Infinity;
       for (let h = 0; h < hazards.length; h += 1) {
         const band = grid.bands[h][cell];
@@ -193,7 +197,6 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   }
   // O plantio cobre o chão onde a máquina anda; cada pé dentro de uma faixa recebe a cor dela (mesma grade) e
   // pés em cima da água somem. Só pós-processa as instâncias: o módulo do plantio do Lucas fica intacto.
-  const water = site.polygons.filter(polygon => polygon.role === 'water');
   const tint = new THREE.Color(), position = new THREE.Vector3(), matrix = new THREE.Matrix4();
   field.root.getObjectByName('sompo-agri-crop-rows')?.traverse((node) => {
     const strip = node as THREE.InstancedMesh;
@@ -231,16 +234,16 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     line.computeLineDistances();
     geofenceLayer.add(line);
     if (polygon.role === 'water') {
-      const width = ring[1].x - ring[0].x, depth = ring[2].z - ring[1].z;
-      const geometry = new THREE.PlaneGeometry(width, depth, Math.max(1, Math.ceil(width)), Math.ceil(depth));
+      // Forma livre (o córrego é um L). Vértice y = -z vira z do mundo após rotateX(-90°).
+      const geometry = new THREE.ShapeGeometry(new THREE.Shape(ring.map(point => new THREE.Vector2(point.x, -point.z))));
       geometry.rotateX(-Math.PI / 2);
-      geometry.translate((ring[0].x + ring[1].x) / 2, 0, (ring[0].z + ring[2].z) / 2);
       const positions = geometry.attributes.position;
+      // ponytail: só os vértices do contorno seguem o relevo; +0.3 m cobre o ruído do terreno entre eles.
       for (let i = 0; i < positions.count; i += 1) {
-        positions.setY(i, field.groundHeight(positions.getX(i), positions.getZ(i)) + 0.05);
+        positions.setY(i, field.groundHeight(positions.getX(i), positions.getZ(i)) + 0.3);
       }
       geofenceLayer.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
-        color, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide,
+        color, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide,
       })));
     }
   }

@@ -23,7 +23,8 @@ Geofencing aqui é um framework de delimitação de área e classificação de z
 | Laboratório, minimapa | `src/components/lab/LabMiniMap.tsx` | Canto inferior esquerdo: área, água, faixas forte→fraca, trajeto, máquina; clique leva o replay ao instante |
 | Laboratório, painéis | `LabBandLegend.tsx`, `LabGeofencePanel.tsx` (+ `LabExposureStrip`) | Legenda com área atingida; episódios; régua de exposição na linha do tempo |
 | Laboratório, agentes | `server/lab-cases.js` `evidenceContext` | Episódios e área atingida no payload da IA, com a frase de limitação |
-| Simulador agrícola | `shared/sompo-geofence-sites.js`, `shared/sompo-agri-brief.js`, `src/components/SompoTruckSimulator.tsx`, `createSompoAgriStage.ts` | Talhão sintético por ambiente; `snapshot.position`, `snapshot.geofence`, `risks.proximity`; HUD "Radar: faixa · perigo a N m à direita · T s" e, quando a inclinação entra em faixa, "Próximo do limite · inclinação 22° · limite 25°"; zonas no chão do palco (mesma grade) |
+| Simulador agrícola, mapa do talhão | `src/components/sompo/SompoGeofenceMap.tsx` (modo "Mapa do talhão" na barra do simulador) | Fazenda sintética vista de cima, norte para cima: área permitida, córrego em L, lagoa, ribanceira, declive, faixas pela mesma grade, percurso, máquina no instante, lista de regras com justificativa |
+| Simulador agrícola | `shared/sompo-geofence-sites.js`, `shared/sompo-agri-brief.js`, `src/components/SompoTruckSimulator.tsx`, `createSompoAgriStage.ts` | Fazenda sintética fixa de 180 × 140 m por ambiente; `snapshot.position`, `snapshot.geofence`, `risks.proximity`; HUD "Radar: faixa · perigo a N m à direita · T s" e, quando a inclinação entra em faixa, "Próximo do limite · inclinação 22° · limite 25°"; zonas no chão do palco e no plantio (mesma grade; vermelho dentro/crítica, laranja borda/elevada, amarelo atenção) |
 
 ## Dataset de referência
 

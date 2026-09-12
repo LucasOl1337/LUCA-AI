@@ -96,11 +96,11 @@ test('mapa sintético tem anéis fechados, faixas ordenadas e água à direita',
     assert.deepEqual(polygon.rings[0][0], polygon.rings[0].at(-1));
   }
   assert.deepEqual(site.manifestRules.hazards[0].bands_m.map(band => band.max_m), [5, 15, 35]);
-  const beside = evaluateGeofence({ x: 0, z: 0, headingDeg: 90, speedKph: 7 }, site.manifestRules, site.polygons);
+  const beside = evaluateGeofence({ x: 10, z: 0, headingDeg: 90, speedKph: 7 }, site.manifestRules, site.polygons);
   assert.equal(beside.nearest.distanceM, 13);
   assert.equal(beside.nearest.bearingDeg, 90);
   assert.equal(beside.nearest.timeToHazardS, null);
-  const lateral = evaluateGeofence({ x: 0, z: 9, headingDeg: 180, speedKph: 7.2 }, site.manifestRules, site.polygons);
+  const lateral = evaluateGeofence({ x: 10, z: 9, headingDeg: 180, speedKph: 7.2 }, site.manifestRules, site.polygons);
   assert.equal(lateral.nearest.bandId, 'critica');
   assert.equal(lateral.nearest.timeToHazardS, 2);
 });
