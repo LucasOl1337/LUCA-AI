@@ -176,7 +176,7 @@
 .lab-area .lab-field { margin-top:12px; }
 .lab-scene-scale { position:absolute; left:24px; bottom:145px; display:flex; flex-direction:column; gap:4px; padding:5px 8px; background:#f9fcf9ed; border-radius:4px; font-size:10px; }
 .lab-scene-scale>span:first-child { height:6px; border:solid #203e35; border-width:0 1px 2px; }
-.lab-scene-terrain { position:absolute; left:24px; right:24px; bottom:190px; display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; font-size:10px; }
+.lab-scene-terrain { position:absolute; left:320px; right:24px; bottom:190px; display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; font-size:10px; }
 .lab-scene-terrain button { pointer-events:auto; padding:7px 10px; border:1px solid #9cad9e; border-radius:5px; background:#f9fcf9ed; color:#203e35; cursor:pointer; }
 .lab-scene-terrain span { max-width:480px; padding:5px 8px; border-radius:4px; background:#f9fcf9ed; color:#203e35; }
 .lab-scene[data-site] .lab-scene-legend,.lab-scene[data-site] .lab-scene-hint,.lab-scene[data-site] .lab-scene-attribution,.lab-scene[data-site] .lab-scene-topline { background:#f9fcf9ed; padding:5px 8px; border-radius:4px; }
@@ -310,3 +310,9 @@
   .lab-scene-first .lab-replay-right>span { display:none; }
   .lab-scene-first .lab-scene-signal { top:112px; max-width:calc(100% - 40px); font-size:10px; }
 }
+
+/* Minimapa do trajeto: canto inferior esquerdo, acima da barra de sensores (bottom:24px), da legenda (118px) e da escala (145px) da cena. */
+.lab-minimap { position:absolute; left:24px; bottom:190px; z-index:3; line-height:0; padding:0; overflow:hidden; background:#f8fcf7f0; border:1px solid #d9e3d5; border-radius:8px; box-shadow:0 4px 14px #1d342614; }
+.lab-minimap canvas { display:block; border-radius:7px; }
+@media(max-width:1000px) { .lab-minimap { left:15px; } }
+@media(max-width:650px) { .lab-minimap { display:none; } }

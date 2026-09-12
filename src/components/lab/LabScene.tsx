@@ -7,6 +7,8 @@ import { createSompoTruckModel, SOMPO_TRUCK_PIVOT_Y } from '../sompo/createSompo
 import { parseLabTerrain, createTerrainSampler, type LabTerrain } from '../../../shared/lab-terrain.js';
 import { bandGrid } from '../../../shared/lab-geofence.js';
 import { hazardsOf, bandColor, innermostEpisodeAt, episodeColor, ROUTE_COLOR } from './labBands';
+import { createCropField } from './createCropField';
+import { loadLabHarvester } from './loadLabHarvester';
 
 export type LabCameraMode = 'free' | 'top' | 'follow';
 
@@ -367,13 +369,64 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
     }
 
     const isTruck = labCase?.manifest?.machine?.model === 'Caminhão SOMPO';
+    const wantsHarvester = !isTruck && /colheitadeira|harvester/i.test(String(labCase?.manifest?.machine?.model ?? ''));
     const tractor = isTruck ? createSompoTruckModel({ sensorLabel: 'DEMONSTRAÇÃO' }) : createLabTractor();
-    const pivot = isTruck ? SOMPO_TRUCK_PIVOT_Y : 1.1;
+    let pivot = isTruck ? SOMPO_TRUCK_PIVOT_Y : 1.1;
     if ('rayGroup' in tractor) tractor.rayGroup.visible = false;
     const vehicle = new THREE.Group();
     tractor.root.position.y = -pivot;
     vehicle.add(tractor.root);
     scene.add(vehicle);
+    // Colheitadeira: o GLB gerado para o simulador (e8c1535). O trator fica até o GLB carregar e volta se ele falhar.
+    const assetController = new AbortController();
+    let harvester: Awaited<ReturnType<typeof loadLabHarvester>> = null;
+    if (wantsHarvester) void loadLabHarvester(assetController.signal).then((loaded) => {
+      if (!loaded || disposed) { loaded?.dispose(); return; }
+      harvester = loaded; pivot = loaded.pivotY;
+      vehicle.remove(tractor.root); loaded.root.position.y = -pivot; vehicle.add(loaded.root);
+    });
+    // Plantio dentro da área permitida. Onde a colheitadeira já passou, as plantas ficam achatadas: o percurso conta a colheita.
+    const crop = geography ? createCropField({ polygons: geography.polygons, groundHeight, crop: 'cana' }) : null;
+    if (crop) scene.add(crop.mesh);
+    const HARVEST_REACH = 3, BUCKET = 4;
+    const plantBuckets = new Map<string, number[]>();
+    const plantXZ = crop ? new Float32Array(crop.count * 2) : null;
+    const originalMatrices = crop ? crop.mesh.instanceMatrix.array.slice() : null;
+    if (crop && plantXZ) {
+      const matrix = new THREE.Matrix4();
+      for (let i = 0; i < crop.count; i++) {
+        crop.mesh.getMatrixAt(i, matrix);
+        const x = matrix.elements[12], z = matrix.elements[14];
+        plantXZ[i * 2] = x; plantXZ[i * 2 + 1] = z;
+        const key = `${Math.floor(x / BUCKET)}:${Math.floor(z / BUCKET)}`;
+        const bucket = plantBuckets.get(key); if (bucket) bucket.push(i); else plantBuckets.set(key, [i]);
+      }
+    }
+    const harvested = new Uint8Array(crop?.count ?? 0);
+    let harvestedUpTo = -1;
+    const harvestUpTo = (sampleIndex: number) => {
+      if (!crop || !plantXZ || !originalMatrices || !wantsHarvester || !labCase) return;
+      if (sampleIndex < harvestedUpTo) { // Voltou no tempo: replanta tudo e recolhe de novo até o instante.
+        crop.mesh.instanceMatrix.array.set(originalMatrices); harvested.fill(0); harvestedUpTo = -1;
+      }
+      const matrix = new THREE.Matrix4();
+      for (let i = harvestedUpTo + 1; i <= sampleIndex; i++) {
+        const sample = labCase.samples[i];
+        if (!sample || sample.x === null || sample.z === null) continue;
+        const cx = Math.floor(sample.x / BUCKET), cz = Math.floor(sample.z / BUCKET);
+        for (let bx = cx - 1; bx <= cx + 1; bx++) for (let bz = cz - 1; bz <= cz + 1; bz++) {
+          for (const j of plantBuckets.get(`${bx}:${bz}`) ?? []) {
+            if (harvested[j] || Math.hypot(plantXZ[j * 2] - sample.x, plantXZ[j * 2 + 1] - sample.z) > HARVEST_REACH) continue;
+            harvested[j] = 1;
+            crop.mesh.getMatrixAt(j, matrix);
+            matrix.elements[4] *= 0.06; matrix.elements[5] *= 0.06; matrix.elements[6] *= 0.06; // achata o eixo Y da instância
+            crop.mesh.setMatrixAt(j, matrix);
+          }
+        }
+      }
+      harvestedUpTo = sampleIndex;
+      crop.mesh.instanceMatrix.needsUpdate = true;
+    };
     const locator = new THREE.Mesh(new THREE.RingGeometry(3.1, 3.3, 48), new THREE.MeshBasicMaterial({ color: 0x2c6952, transparent: true, opacity: 0.5, side: THREE.DoubleSide }));
     locator.rotation.x = -Math.PI / 2;
     scene.add(locator);
@@ -484,6 +537,7 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
       headingArrow.setDirection(forward);
       if (current && previousSampleIndex !== current.sampleIndex) {
         playedGeometry.setDrawRange(0, routeCounts[current.sampleIndex] || 0);
+        harvestUpTo(current.sampleIndex);
         previousSampleIndex = current.sampleIndex;
       }
       if (current) {
@@ -570,6 +624,9 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
       controls.dispose();
       cameraActions.current = null;
       sunlight.shadow.dispose();
+      assetController.abort();
+      harvester?.dispose();
+      crop?.dispose();
       disposeScene(scene);
       renderer.dispose();
       renderer.forceContextLoss();
@@ -586,7 +643,7 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
   return (
     <div className="lab-scene" data-lab-scene data-camera={cameraMode} data-terrain={terrain ? 'ready' : terrainError ? 'error' : terrainReference && terrainEnabled ? 'loading' : 'flat'} data-satellite={satelliteState} data-site={geography?.manifest?.site?.id} style={{ position: 'relative', height: '100%', minHeight: 360 }}>
       <div ref={mountRef} className="lab-scene-canvas" data-lab-canvas tabIndex={0} role="img"
-        aria-label={`Mapa da área. ${cameraMode === 'follow' && frame?.position ? 'Câmera acompanha a posição registrada.' : 'Arraste e use a roda do mouse ou as setas para navegar.'} ${terrain ? 'Relevo LiDAR, escala vertical 1:1' : 'Superfície plana'}, uma unidade equivale a um metro. ${!frame?.position ? 'Posição do equipamento indisponível.' : ''}`}
+        aria-label={`Mapa da área. ${cameraMode === 'follow' && frame?.position ? 'Câmera acompanha a posição registrada.' : 'Arraste e use a roda do mouse ou as setas para navegar.'} ${terrain ? `Relevo ${terrain.vertical_datum === 'SIMULADO' ? 'simulado' : 'LiDAR'}, escala vertical 1:1` : 'Superfície plana'}, uma unidade equivale a um metro. ${!frame?.position ? 'Posição do equipamento indisponível.' : ''}`}
         onKeyDown={handleCameraKey} style={{ position: 'absolute', inset: 0 }} />
       <div className="lab-scene-overlay" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <div className="lab-scene-topline">
@@ -611,7 +668,7 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
         <div className="lab-scene-scale" aria-label="Escala do mapa"><span ref={scaleRef} /><span ref={scaleLabelRef} /></div>
         {!showDetails && (terrainError || outsideTerrain) && <p className="lab-terrain-alert" role="status">{terrainError ? 'Relevo indisponível · mapa plano' : 'Posição fora da cobertura do relevo'}</p>}
         {terrainReference && <div className="lab-scene-terrain">
-          <button type="button" aria-pressed={terrainEnabled} onClick={() => setTerrainEnabled(value => !value)}>Relevo LiDAR {terrainEnabled ? 'ativado' : 'desativado'}</button>
+          <button type="button" aria-pressed={terrainEnabled} onClick={() => setTerrainEnabled(value => !value)}>Relevo {terrainReference?.vertical_datum === 'SIMULADO' ? 'simulado' : 'LiDAR'} {terrainEnabled ? 'ativado' : 'desativado'}</button>
           <span role="status">{terrainError ? `${terrainError} Superfície plana mantida.` : terrain ? `Grade ~${terrainReference.resolution_m} m · vertical 1:1 · ${terrain.minimum.toFixed(1)}–${terrain.maximum.toFixed(1)} m (${terrain.vertical_datum})` : terrainEnabled ? 'Carregando e verificando relevo…' : 'Mapa plano'}{outsideTerrain ? ' · Posição fora do recorte de relevo; marcador oculto.' : ''}</span>
         </div>}
         <p className="lab-scene-hint">{cameraMode === 'free' ? 'Arraste para orbitar · role para aproximar · ' : cameraMode === 'top' ? 'Arraste para mover · role para aproximar · ' : ''}{terrain ? 'Altura do solo; não medida pelo ESP32' : 'Superfície plana'}</p>

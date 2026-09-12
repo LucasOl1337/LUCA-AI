@@ -6,6 +6,7 @@ import { convertSompoDataset } from '../../shared/sompo-lab-export.js';
 import { createFarmDemo } from '../../shared/lab-farm-demo.js';
 import LabEsp32Replay from '@/components/lab/LabEsp32Replay';
 import LabBandLegend from '@/components/lab/LabBandLegend';
+import LabMiniMap from '@/components/lab/LabMiniMap';
 import { LabGeofencePanel, LabExposureStrip } from '@/components/lab/LabGeofencePanel';
 import { hazardsOf } from '@/components/lab/labBands';
 import { LAB_EXAMPLES, exampleMetadata, loadDefaultLabSite, categories, labRequest, downloadFile, exportLabReport, type CaseSummary, type SavedCase, type LabAnalysis, type ConclusionDraft, type Category, type Hypothesis, type LabExample } from '@/lib/lab-client';
@@ -275,6 +276,7 @@ export default function LaboratorioPage() {
         {labCase?.manifest?.demo === 'farm-truck-v1' && <span className="lab-demo-badge">DEMONSTRAÇÃO · PERCURSO SINTÉTICO</span>}
         {labCase && frame?.position && (sceneDetails || frame.activeEvents.length > 0) && <div className={`lab-scene-signal ${frame?.activeEvents.length || frame?.gap ? 'has-warning' : ''}`} data-lab-signal>{frame?.gap ? <WifiOff size={17} /> : frame?.activeEvents.length ? <ScanLine size={17} /> : <ShieldCheck size={17} />}<span>{currentWarnings}</span></div>}
         {labCase && !labCase.hasEsp32 && <div className="lab-sensors" aria-label="Sensores no instante do replay"><div><span>Velocidade <small>GNSS</small></span><strong data-lab-speed>{prettyNumber(frame?.sample.ground_speed_kmh, 1)}<em>{typeof frame?.sample.ground_speed_kmh === 'number' ? 'km/h' : ''}</em></strong></div><div><span>Motor <small>CAN / ECU</small></span><strong>{prettyNumber(frame?.sample.engine_rpm)}<em>{typeof frame?.sample.engine_rpm === 'number' ? 'rpm' : ''}</em></strong></div><div><span>Arrefecimento <small>CAN / ECU</small></span><strong className={Number(frame?.sample.coolant_temp_c) >= 105 ? 'lab-hot' : ''}>{prettyNumber(frame?.sample.coolant_temp_c, 1)}<em>{typeof frame?.sample.coolant_temp_c === 'number' ? '°C' : ''}</em></strong></div></div>}
+        {labCase && !sensorView && labCase.polygons.length > 0 && <LabMiniMap labCase={labCase} elapsedMs={elapsedMs} onSeek={ms => seek(ms)} />}
         </>}
       </section>
       <aside className="lab-panel" id="lab-case-panel" hidden={!panelOpen} aria-label={STEPS[step]}>
