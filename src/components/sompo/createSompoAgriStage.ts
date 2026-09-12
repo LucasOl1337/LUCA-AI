@@ -140,12 +140,14 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   const geofenceLayer = new THREE.Group();
   geofenceLayer.name = 'sompo-geofence-synthetic';
   worldRoot.add(geofenceLayer);
-  const hazards = resolveHazards(site.manifestRules, site.polygons);
+  const hazards = resolveHazards(site.manifestRules, site.polygons, { profile: { max_roll_deg: SOMPO_AGRI_EQUIPMENT[scenario.equipmentId].profile.max_roll_deg } });
   const grid = bandGrid(site.polygons, hazards, 2);
   // Cor por faixa, da mais interna para a mais externa, igual para todo perigo: a faixa diz "quão perto", não "de quê".
   // O perigo em si já está desenhado (contorno, lâmina d'água). Regra 1 do SPEC: a grade que soma a área é a que pinta.
   const BAND_RAMP = [0xd63a2f, 0xe8902c, 0xe9c74a];
   const paint = grid ? new Int32Array(grid.cols * grid.rows).fill(-1) : null;
+  // Faixa "dentro" (max_m 0) vira hachura em xadrez, não bloco sólido: dentro do declive o plantio inteiro ficava vermelho.
+  const hatch = grid ? new Uint8Array(grid.cols * grid.rows) : null;
   const water = site.polygons.filter(polygon => polygon.role === 'water');
   if (grid && paint) {
     const center = { x: 0, z: 0 };
@@ -159,13 +161,14 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
         if (band < 0 || hazards[h].bands[band].max_m >= bestMax) continue;
         bestMax = hazards[h].bands[band].max_m;
         paint[cell] = BAND_RAMP[Math.min(band, BAND_RAMP.length - 1)];
+        hatch![cell] = bestMax === 0 && ((cell % grid.cols + Math.floor(cell / grid.cols)) & 1) ? 1 : 0;
       }
     }
   }
-  const paintAt = (x: number, z: number): number => {
-    if (!grid || !paint) return -1;
+  const cellAt = (x: number, z: number): number => {
+    if (!grid) return -1;
     const col = Math.floor((x - grid.minX) / grid.cellM), row = Math.floor((z - grid.minZ) / grid.cellM);
-    return col < 0 || row < 0 || col >= grid.cols || row >= grid.rows ? -1 : paint[row * grid.cols + col];
+    return col < 0 || row < 0 || col >= grid.cols || row >= grid.rows ? -1 : row * grid.cols + col;
   };
   if (grid && paint) {
     const { cols, rows, cellM, minX, minZ } = grid;
@@ -175,7 +178,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
       if (color < 0) continue;
       // v=0 cai em +Z após a rotação do plano: inverte as linhas da grade.
       const at = ((rows - 1 - row) * cols + col) * 4;
-      rgba[at] = color >> 16 & 255; rgba[at + 1] = color >> 8 & 255; rgba[at + 2] = color & 255; rgba[at + 3] = 150;
+      rgba[at] = color >> 16 & 255; rgba[at + 1] = color >> 8 & 255; rgba[at + 2] = color & 255; rgba[at + 3] = hatch![row * cols + col] ? 60 : 150;
     }
     // O map é liberado por disposeSompoObject(scene) junto com os materiais.
     const texture = new THREE.DataTexture(rgba, cols, rows, THREE.RGBAFormat);
@@ -208,8 +211,10 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
         strip.setMatrixAt(i, matrix.makeScale(0, 0, 0));
         continue;
       }
-      const color = paintAt(position.x, position.z);
-      strip.setColorAt(i, color < 0 ? tint.setScalar(1) : tint.setHex(color).lerp(tint.clone().setScalar(1), 0.15));
+      const cell = cellAt(position.x, position.z);
+      const color = cell < 0 ? -1 : paint![cell];
+      // Na hachura, metade dos pés fica na cor natural: a zona se lê como marcação, não como erro de textura.
+      strip.setColorAt(i, color < 0 || hatch![cell] ? tint.setScalar(1) : tint.setHex(color).lerp(tint.clone().setScalar(1), 0.15));
     }
     strip.instanceMatrix.needsUpdate = true;
     if (strip.instanceColor) strip.instanceColor.needsUpdate = true;

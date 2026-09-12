@@ -9,7 +9,7 @@ export interface SompoGeofenceHit {
   bandMaxM: number;
   distanceM: number;
   bearingDeg: number | null;      // 0 = à frente, +90 = à direita, -90 = à esquerda, ±180 = atrás; null sem rumo ou dentro do perigo
-  timeToHazardS: number | null;   // null quando a máquina não se aproxima
+  timeToHazardS: number | null;   // só com o perigo à frente (±20°) e aproximando; senão null
   closestPoint: LabPoint;
 }
 export interface SompoMachineHit {

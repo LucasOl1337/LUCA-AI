@@ -10,7 +10,7 @@ import type { LabPolygon } from '../../../shared/lab-telemetry.js';
 
 const SCALE = 3;          // px por metro no canvas fora da tela (nítido em qualquer largura de painel)
 const STEP_MS = 250;      // amostragem do percurso do cenário
-const CELL_M = 2;         // mesma célula da grade da cena 3D
+const CELL_M = 1;         // só para desenhar, mais fina que os 2 m da cena; aqui ninguém soma área (regra 1 do SPEC não se aplica)
 const PAD_M = 8;
 // Mesma rampa da cena 3D (createSompoAgriStage): da faixa mais interna para a mais externa, igual para todo perigo.
 const BAND_RAMP = ['#d63a2f', '#e8902c', '#e9c74a'];

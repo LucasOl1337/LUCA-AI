@@ -14,9 +14,10 @@ export function getSompoGeofenceSite(environmentId, totalTravelMeters) {
   const polygons = [rect('talhao-sintetico', 'allowed_area', -hx, hx, -70, 70)];
   const hazards = [];
   if (environmentId !== 'farm-barn') {
-    // Córrego ao longo da borda sul (z alto) com um braço que sobe até 13 m do percurso, logo depois do meio do talhão.
+    // Córrego ao longo da borda sul (z alto) com um braço que sobe até 13 m do percurso, perto do fim dele:
+    // a corrida começa sem perigo no alcance (> 35 m), entra em atenção e termina em proximidade elevada.
     polygons.push({ id: 'corrego-sintetico', role: 'water', synthetic: true, rings: [[
-      { x: -hx, z: 40 }, { x: 4, z: 40 }, { x: 4, z: 13 }, { x: 18, z: 13 }, { x: 18, z: 40 },
+      { x: -hx, z: 40 }, { x: 20, z: 40 }, { x: 20, z: 13 }, { x: 34, z: 13 }, { x: 34, z: 40 },
       { x: hx, z: 40 }, { x: hx, z: 46 }, { x: -hx, z: 46 }, { x: -hx, z: 40 },
     ]] });
     hazards.push({ role: 'water', label: 'Água sintética', synthetic: true, justification, bands_m: [

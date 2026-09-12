@@ -33,7 +33,8 @@ function relativeBearing(forward, dx, dz) {
 }
 
 // Resultado por perigo dentro do alcance da faixa mais externa; nearest = o de menor distância.
-// timeToHazardS: distância / velocidade de aproximação; null quando a máquina não se aproxima (parada, paralela ou afastando).
+// timeToHazardS: distância / velocidade de aproximação, só com o perigo à frente (|rumo relativo| ≤ 20°); null parada, de lado, afastando.
+// De lado a máquina passa ao largo do ponto mais próximo: um tempo ali sugere um evento que não acontece.
 // machine = { profile: { max_roll_deg } }: dá o limite aos perigos de role 'machine'; rollDeg/pitchDeg são o sinal medido.
 // A margem em graus não se mistura com metros: fica em result.machine, fora de nearest/all.
 export function evaluateGeofence({ x, z, headingDeg = null, speedKph = 0, rollDeg = null, pitchDeg = null }, rules, polygons, machine = null) {
@@ -63,7 +64,7 @@ export function evaluateGeofence({ x, z, headingDeg = null, speedKph = 0, rollDe
     all.push({
       hazardKey: hazard.key, hazardLabel: hazard.label, bandId: band.id, bandLabel: band.label ?? band.id, bandMaxM: band.max_m,
       distanceM: nearest.distance, bearingDeg, closestPoint: { x: nearest.x, z: nearest.z },
-      timeToHazardS: nearest.distance > 0 && closingMs > 0.05 ? nearest.distance / closingMs : null,
+      timeToHazardS: nearest.distance > 0 && closingMs > 0.05 && Math.abs(bearingDeg) <= 20 ? nearest.distance / closingMs : null,
     });
   }
   all.sort((a, b) => a.distanceM - b.distanceM);
