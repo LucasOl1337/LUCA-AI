@@ -364,7 +364,8 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
       outcome('declive-alem-do-limite', 'Declive além do limite da máquina', 'Dentro do declive mapeado a inclinação passa do limite declarado para a colheitadeira; o operador reduz, o conjunto estabiliza e a passada continua.', [
         [0, { headerSpeed: 1, cropCut: 0.3, dust: 0.35 }],
         [5_000, { roll: 2 }],
-        [9_000, { roll: 19, inclinationRisk: true, beacon: 1, speedKph: 4, brakeLights: 1 }],
+        [7_500, { roll: 13, inclinationRisk: true, beacon: 1 }], // a bandeira do dispositivo acende junto com o cruzamento dos 15°
+        [9_000, { roll: 19, speedKph: 4, brakeLights: 1 }],
         [13_000, { roll: 6, speedKph: 7, inclinationRisk: false, brakeLights: 0 }],
         [22_000, { roll: 3 }],
         [24_000, { speedKph: 0, headerSpeed: 0, dust: 0 }],

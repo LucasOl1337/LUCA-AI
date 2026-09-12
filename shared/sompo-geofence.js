@@ -79,7 +79,7 @@ export function describeGeofence(result) {
   const side = near.bearingDeg === null ? '' : Math.abs(near.bearingDeg) <= 20 ? ' à frente' : Math.abs(near.bearingDeg) >= 160 ? ' atrás' : near.bearingDeg > 0 ? ' à direita' : ' à esquerda';
   const time = near.timeToHazardS === null ? '' : ` · ≈ ${Math.round(near.timeToHazardS)} s de aproximação`;
   // Dentro do polígono a distância é 0 por definição: dizer "a 0 m" parece distância até uma queda.
-  const where = near.distanceM > 0 ? ` a ${near.distanceM.toFixed(0)} m${side}${time}` : '';
+  const where = near.distanceM >= 0.5 ? ` a ${near.distanceM.toFixed(0)} m${side}${time}` : ''; // < 0,5 m arredondaria para "a 0 m"
   return `${outside ? `${outside} · ` : ''}${near.bandLabel} · ${near.hazardLabel}${where}`;
 }
 
