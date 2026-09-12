@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 
 // Poly Haven CC0 assets, downloaded locally. Exact sources/credits: public/environments/sompo/LICENSE.txt.
 const ASSET_ROOT = '/environments/sompo/';
-type Surface = 'asphalt' | 'dirt' | 'grass' | 'wood';
+type Surface = 'asphalt' | 'dirt' | 'wood';
 
 /** Async upgrades keep the scene usable if an HDRI or texture is unavailable. */
 export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
@@ -11,6 +11,7 @@ export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE
   let wet = false;
   const owned = new Set<THREE.Texture>();
   const hdris: { dry?: THREE.DataTexture; wet?: THREE.DataTexture } = {};
+  const hdriJobs: Partial<Record<'dry' | 'wet', Promise<void>>> = {};
   const surfaces = new Map<Surface, Promise<THREE.Texture[]>>();
   const anisotropy = Math.min(16, renderer.capabilities.getMaxAnisotropy());
   const loader = new THREE.TextureLoader();
@@ -32,8 +33,10 @@ export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE
     scene.backgroundBlurriness = 0;
     scene.backgroundRotation.y = scene.environmentRotation.y = 1.25;
   }
-  for (const [kind, filename] of [['dry', 'kloppenheim_06_2k.hdr'], ['wet', 'farmland_overcast_2k.hdr']] as const) {
-    void new RGBELoader().loadAsync(ASSET_ROOT + filename).then((texture) => {
+  function loadHdri(kind: 'dry' | 'wet') {
+    if (hdriJobs[kind]) return;
+    const filename = kind === 'dry' ? 'kloppenheim_06_2k.hdr' : 'farmland_overcast_2k.hdr';
+    hdriJobs[kind] = new HDRLoader().loadAsync(ASSET_ROOT + filename).then((texture) => {
       retain(texture);
       if (disposed) return;
       texture.mapping = THREE.EquirectangularReflectionMapping;
@@ -41,13 +44,15 @@ export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE
       updateLighting();
     }).catch(() => { /* The existing environment remains available. */ });
   }
+  loadHdri('dry');
 
   return {
     get hasHdri() { return !!hdris.dry; },
     surface(material: THREE.MeshStandardMaterial, surface: Surface, repeatX: number, repeatY: number) {
       let pending = surfaces.get(surface);
       if (!pending) {
-        pending = Promise.all(['color', 'normal', 'arm'].map((channel) => loader.loadAsync(`${ASSET_ROOT}${surface}-${channel}.jpg`).then(retain)));
+        const size = surface === 'wood' ? '' : '-2k';
+        pending = Promise.all(['color', 'normal', 'arm'].map((channel) => loader.loadAsync(`${ASSET_ROOT}${surface}-${channel}${size}.jpg`).then(retain)));
         surfaces.set(surface, pending);
       }
       void pending.then((textures) => {
@@ -66,22 +71,16 @@ export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE
         material.normalMap = maps[1];
         // One packed texture: R = ambient occlusion, G = roughness, B = metalness.
         material.aoMap = material.roughnessMap = maps[2];
-        material.aoMapIntensity = surface === 'grass' ? 0.65 : 0.8;
+        material.aoMapIntensity = 0.8;
         material.normalScale.setScalar(surface === 'asphalt' ? 0.65 : 0.75);
         material.needsUpdate = true;
       }).catch(() => { /* Retain procedural fallback maps until all PBR channels are ready. */ });
     },
-    grassMap() {
-      const map = retain(loader.load(`${ASSET_ROOT}grass-tuft.png`));
-      map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = anisotropy; return map;
+    update(isWet: boolean) {
+      wet = isWet;
+      if (wet) loadHdri('wet');
+      updateLighting();
     },
-    treeMap(index: number) {
-      const map = retain(loader.load(`${ASSET_ROOT}tree-${index}.png`));
-      map.colorSpace = THREE.SRGBColorSpace;
-      map.anisotropy = anisotropy;
-      return map;
-    },
-    update(isWet: boolean) { wet = isWet; updateLighting(); },
     dispose() {
       disposed = true;
       if (scene.background === hdris.dry || scene.background === hdris.wet) scene.background = initialBackground;

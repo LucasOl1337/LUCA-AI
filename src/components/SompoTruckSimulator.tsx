@@ -49,6 +49,7 @@ import {
   isSompoAgriScenarioId,
 } from '../../shared/sompo-agri-brief.js';
 import { mountSompoAgriStage } from './sompo/createSompoAgriStage';
+import { frameDamping } from './sompo/frameDamping.js';
 import {
   SOMPO_RURAL_SCRIPTS,
   getSompoRuralFrame,
@@ -486,7 +487,13 @@ export default function SompoTruckSimulator({
         await lucaApi.postSompoTelemetrySimulation(batch);
         if (!cancelled) setHistoryOffline(false);
       } catch {
-        if (!cancelled) setHistoryOffline(true);
+        // A falha é transitória: preserve as amostras mais recentes para a
+        // próxima tentativa, em vez de removê-las silenciosamente da janela.
+        if (!cancelled) {
+          pendingSamplesRef.current = [...batch, ...pendingSamplesRef.current]
+            .slice(-SIMULATION_HISTORY_MAX_BATCH);
+          setHistoryOffline(true);
+        }
       } finally {
         flushBusyRef.current = false;
       }
@@ -509,7 +516,7 @@ export default function SompoTruckSimulator({
     const run: CollisionRunHandle = handle;
 
     let settled = false;
-    let flushBusy = false;
+    let activeFlush: Promise<void> | null = null;
 
     function stopTimers() {
       window.clearInterval(tickTimer);
@@ -551,6 +558,9 @@ export default function SompoTruckSimulator({
       stopTimers();
       setCollisionRun({ status: 'finishing', publicId: run.publicId });
       try {
+        // O timer pode ter removido um lote da fila enquanto o request ainda
+        // está em voo. Espere esse lote antes de fechar o episódio no servidor.
+        if (activeFlush) await activeFlush;
         while (run.queue.length > 0) {
           await lucaApi.postSompoTelemetrySimulation(
             run.queue.splice(0, SIMULATION_HISTORY_MAX_BATCH),
@@ -602,16 +612,22 @@ export default function SompoTruckSimulator({
       }
     }, COLLISION_TICK_MS);
 
-    const flushTimer = window.setInterval(() => {
-      if (flushBusy) return;
+    function flushQueue(): Promise<void> | null {
+      if (activeFlush) return activeFlush;
       const batch = run.queue.splice(0, SIMULATION_HISTORY_MAX_BATCH);
-      if (batch.length === 0) return;
-      flushBusy = true;
-      lucaApi.postSompoTelemetrySimulation(batch, run.publicId)
-        .catch(() => abortRun('Falha de rede ao gravar o episódio — gravação abortada. O simulador continua ativo.'))
+      if (batch.length === 0) return null;
+      activeFlush = lucaApi.postSompoTelemetrySimulation(batch, run.publicId)
+        .then(() => undefined)
         .finally(() => {
-          flushBusy = false;
+          activeFlush = null;
         });
+      return activeFlush;
+    }
+
+    const flushTimer = window.setInterval(() => {
+      void flushQueue()?.catch(() => abortRun(
+        'Falha de rede ao gravar o episódio — gravação abortada. O simulador continua ativo.',
+      ));
     }, SIMULATION_HISTORY_FLUSH_MS);
 
     return () => {
@@ -710,7 +726,7 @@ export default function SompoTruckSimulator({
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.domElement.setAttribute('aria-hidden', 'true');
     mount.appendChild(renderer.domElement);
 
@@ -893,7 +909,8 @@ export default function SompoTruckSimulator({
     }
 
     function render(time: number) {
-      const delta = Math.min(0.04, Math.max(0, (time - previousTime) / 1_000));
+      const frameDelta = Math.max(0, (time - previousTime) / 1_000);
+      const delta = Math.min(0.04, frameDelta);
       previousTime = time;
       const settings = controlsRef.current;
       const snapshot = previewRef.current;
@@ -928,8 +945,8 @@ export default function SompoTruckSimulator({
         if (collisionVisual.startX === null) collisionVisual.startX = lastTruckWorldX;
         collisionPose = getSompoCollisionVisualPose(visualElapsed, collisionVisual.outcomeId);
         truckWorldX = collisionVisual.startX + (reduceMotion.matches ? 0 : collisionPose.advance);
-        collisionSpeedKph = delta > 0
-          ? Math.max(0, ((collisionPose.advance - collisionVisual.lastAdvance) / delta) * 3.6)
+        collisionSpeedKph = frameDelta > 0
+          ? Math.max(0, ((collisionPose.advance - collisionVisual.lastAdvance) / frameDelta) * 3.6)
           : 0;
         collisionVisual.lastAdvance = collisionPose.advance;
       } else if (!isFirebase && !reduceMotion.matches) {
@@ -961,12 +978,13 @@ export default function SompoTruckSimulator({
       const roll = isFirebase
         ? sensorPose.rotationX
         : THREE.MathUtils.degToRad(snapshot.readings.roll ?? settings.roll);
+      const poseDamping = frameDamping(frameDelta, 5);
       if (reduceMotion.matches) {
         truckPoseGroup.rotation.z = pitch;
         truckPoseGroup.rotation.x = roll;
       } else {
-        truckPoseGroup.rotation.z = dampAngle(truckPoseGroup.rotation.z, pitch, 0.08);
-        truckPoseGroup.rotation.x = dampAngle(truckPoseGroup.rotation.x, roll, 0.08);
+        truckPoseGroup.rotation.z = dampAngle(truckPoseGroup.rotation.z, pitch, poseDamping);
+        truckPoseGroup.rotation.x = dampAngle(truckPoseGroup.rotation.x, roll, poseDamping);
       }
       if (isFirebase && !reduceMotion.matches) {
         liveHeading = sensorPose.rotationY;
@@ -975,7 +993,11 @@ export default function SompoTruckSimulator({
       if (!isFirebase) {
         const targetYaw = collisionPose ? collisionPose.yaw : (ruralFrame?.yaw ?? 0);
         const targetLateral = collisionPose ? collisionPose.lateral : (ruralFrame?.lateral ?? 0);
-        truckPoseGroup.rotation.y = dampAngle(truckPoseGroup.rotation.y, THREE.MathUtils.degToRad(targetYaw), reduceMotion.matches ? 1 : 0.12);
+        truckPoseGroup.rotation.y = dampAngle(
+          truckPoseGroup.rotation.y,
+          THREE.MathUtils.degToRad(targetYaw),
+          reduceMotion.matches ? 1 : frameDamping(frameDelta, 7.5),
+        );
         truckPoseGroup.position.z = targetLateral;
       }
       const brakingState = !isFirebase && !collisionVisualRef.current && !ruralFrame && settings.scenarioId === SOMPO_BRAKING_SCRIPT.scenarioId
@@ -997,7 +1019,7 @@ export default function SompoTruckSimulator({
         : truckGroundHeight(truckPoseGroup.rotation, truckGroup.userData.groundSupport);
       truckBaseHeight = reduceMotion.matches
         ? targetHeight
-        : THREE.MathUtils.lerp(truckBaseHeight, targetHeight, 0.12);
+        : THREE.MathUtils.lerp(truckBaseHeight, targetHeight, frameDamping(frameDelta, 7.5));
       truckPoseGroup.position.y = truckBaseHeight - (ruralFrame?.sink ?? 0)
         + (reduceMotion.matches ? 0 : Math.sin(time * 0.008) * liveActivity);
       if (focusTarget === 'sensor') {
@@ -1008,7 +1030,7 @@ export default function SompoTruckSimulator({
       // A câmera acompanha o deslocamento: o alvo persegue o caminhão e a câmera
       // translada junto, preservando o ângulo escolhido pelo operador no orbit.
       const targetXBefore = orbit.target.x;
-      orbit.target.lerp(focusPoint, reduceMotion.matches ? 1 : 0.08);
+      orbit.target.lerp(focusPoint, reduceMotion.matches ? 1 : frameDamping(frameDelta, 5));
       camera.position.x += orbit.target.x - targetXBefore;
       const drivingSpeed = collisionVisual ? collisionSpeedKph
         : (ruralFrame?.speedKph ?? brakingState?.speedKph ?? settings.speedKph);
@@ -1018,7 +1040,7 @@ export default function SompoTruckSimulator({
         const wheelSpeed = (ruralFrame?.wheelSpeedKph ?? drivingSpeed) * (ruralFrame?.direction ?? 1);
         for (const wheel of wheels) wheel.rotation.y -= delta * wheelSpeed / (3.6 * (wheel.userData.radius ?? 0.60));
       }
-      roadScene.update(effectFrame, ruralFrame, isFirebase ? 0 : drivingSpeed, visualElapsed, truckPoseGroup.position, reduceMotion.matches, delta, slope, { animalAnchorX });
+      roadScene.update(effectFrame, ruralFrame, visualElapsed, truckPoseGroup.position, reduceMotion.matches, slope, { animalAnchorX });
       keyLight.position.set(truckWorldX - 10, 12, 9);
       keyLight.target.position.set(truckWorldX, 0, truckPoseGroup.position.z);
       keyLight.intensity = (ruralFrame?.rain ?? 0) > 0 ? 0.25 : roadScene.hasHdri ? 1.8 : 2.4;
@@ -1271,7 +1293,7 @@ export default function SompoTruckSimulator({
 
           <label className="sompo-scenario-select">
             <span>Escolha entre {SCENARIO_IDS.length + AGRI_SCENARIO_IDS.length} cenários</span>
-            <select value={agriRun ? agriRun.scenarioId : controls.scenarioId} disabled={collisionActive} onChange={(event) => selectScenario(event.target.value as SompoSimulationScenarioId | SompoAgriScenarioId)}>
+            <select name="sompo-scenario" value={agriRun ? agriRun.scenarioId : controls.scenarioId} disabled={collisionActive} onChange={(event) => selectScenario(event.target.value as SompoSimulationScenarioId | SompoAgriScenarioId)}>
               <optgroup label="Sinistros e emergências · roteiros">
                 {SCENARIO_IDS.filter((id) => !!SOMPO_RURAL_SCRIPTS[id]).map((id) => <option key={id} value={id}>{SOMPO_SIMULATION_SCENARIOS[id].label}</option>)}
               </optgroup>
@@ -1288,6 +1310,7 @@ export default function SompoTruckSimulator({
               <span>Desfecho do cenário</span>
               <select
                 value={activeOutcomeId}
+                name="sompo-scenario-outcome"
                 disabled={collisionActive}
                 data-sompo-outcome
                 onChange={(event) => selectScenario(agriRun ? agriRun.scenarioId : controls.scenarioId, event.target.value)}
@@ -1314,6 +1337,7 @@ export default function SompoTruckSimulator({
               <span>Desfecho do roteiro de colisão</span>
               <select
                 value={collisionOutcomeId}
+                name="sompo-collision-outcome"
                 disabled={collisionActive}
                 data-sompo-collision-outcome
                 onChange={(event) => setCollisionOutcomeId(event.target.value)}
@@ -1386,6 +1410,7 @@ export default function SompoTruckSimulator({
                 step="1"
                 value={scenarioScripted ? (preview.readings.distance ?? controls.distance) : controls.distance}
                 disabled={collisionActive || scenarioScripted}
+                name="sompo-distance"
                 onChange={(event) => updateNumber('distance', Number(event.target.value))}
               />
             </label>
@@ -1398,6 +1423,7 @@ export default function SompoTruckSimulator({
                 step="0.5"
                 value={scenarioScripted ? (preview.readings.pitch ?? controls.pitch) : controls.pitch}
                 disabled={collisionActive || scenarioScripted}
+                name="sompo-pitch"
                 onChange={(event) => updateNumber('pitch', Number(event.target.value))}
               />
             </label>
@@ -1410,6 +1436,7 @@ export default function SompoTruckSimulator({
                 step="0.5"
                 value={scenarioScripted ? (preview.readings.roll ?? controls.roll) : controls.roll}
                 disabled={collisionActive || scenarioScripted}
+                name="sompo-roll"
                 onChange={(event) => updateNumber('roll', Number(event.target.value))}
               />
             </label>
@@ -1422,6 +1449,7 @@ export default function SompoTruckSimulator({
                 step="1"
                 value={scenarioScripted ? (preview.readings.temperature ?? controls.temperature) : controls.temperature}
                 disabled={collisionActive || scenarioScripted}
+                name="sompo-temperature"
                 onChange={(event) => updateNumber('temperature', Number(event.target.value))}
               />
             </label>
@@ -1434,6 +1462,7 @@ export default function SompoTruckSimulator({
                 step="1"
                 value={scenarioScripted ? (preview.readings.humidity ?? controls.humidity) : controls.humidity}
                 disabled={collisionActive || scenarioScripted}
+                name="sompo-humidity"
                 onChange={(event) => updateNumber('humidity', Number(event.target.value))}
               />
             </label>

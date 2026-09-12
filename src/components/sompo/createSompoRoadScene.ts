@@ -176,7 +176,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const rainOrigins = Array.from({ length: 240 }, () => [rainRandom() * 26 - 13, rainRandom() * 20 - 10, rainRandom() * 12]);
   let lastAnimalZ: number | null = null;
   return {
-    update(effectFrame: SompoEffectFrame, frame: SompoRuralFrame | null, speed: number, elapsed: number, truck: THREE.Vector3, reduceMotion: boolean, delta: number, slope: number, extras?: { animalAnchorX?: number }) {
+    update(effectFrame: SompoEffectFrame, frame: SompoRuralFrame | null, elapsed: number, truck: THREE.Vector3, reduceMotion: boolean, slope: number, extras?: { animalAnchorX?: number }) {
       const t = elapsed / 1000;
       const truckX = truck.x;
       const effects = new Map(effectFrame.cues.map((cue) => [cue.effect, cue.intensity]));

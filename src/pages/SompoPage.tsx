@@ -17,7 +17,6 @@ import {
   Users,
   Wheat,
 } from 'lucide-react';
-import type { PageId } from '@/components/Layout';
 import SompoTelemetryPanel from '@/components/SompoTelemetryPanel';
 import { useTheme } from '@/hooks/useTheme';
 import { useChatLibrary } from '@/hooks/useChatLibrary';
@@ -59,10 +58,6 @@ import { buildSompoAgriRunBrief, isSompoAgriScenarioId } from '../../shared/somp
 import '@/sompo-page.css';
 
 const SompoTruckSimulator = lazy(() => import('@/components/SompoTruckSimulator'));
-
-interface SompoPageProps {
-  onNavigate: (page: PageId) => void;
-}
 
 type ProductFilter = 'all' | SompoProductLine;
 type SeverityFilter = 'all' | SompoCaseSeverity;
@@ -129,7 +124,7 @@ function defaultIndividualPresetId(list: LucaIndividualPreset[]): string {
     || '';
 }
 
-export default function SompoPage({ onNavigate }: SompoPageProps) {
+export default function SompoPage() {
   const theme = useTheme();
   const { createSession, busy: sessionsBusy } = useChatLibrary();
   const { sompoTelemetry: streamedTelemetry } = useLuca();

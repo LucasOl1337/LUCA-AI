@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { SompoEffectCue, SompoEffectFrame, SompoVisualEffect } from '../../../shared/sompo-scenario-effects.js';
+import type { SompoEffectFrame, SompoVisualEffect } from '../../../shared/sompo-scenario-effects.js';
 import type { SompoTruckModel } from './createSompoTruckModel';
 
 const rand = (i: number) => { const n = Math.sin(i * 127.1 + 311.7) * 43758.5453; return n - Math.floor(n); };

@@ -10,6 +10,7 @@ import {
   type SompoAgriScenarioId,
 } from '../../../shared/sompo-agri-scenarios.js';
 import { getSompoAgriTravelMeters } from '../../../shared/sompo-agri-brief.js';
+import { frameDamping } from './frameDamping.js';
 
 export interface SompoAgriStageApi {
   focus(target: 'truck' | 'sensor'): void;
@@ -76,7 +77,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.domElement.setAttribute('aria-hidden', 'true');
   mount.appendChild(renderer.domElement);
 
@@ -185,7 +186,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   let previousTime = performance.now();
 
   function render(time: number) {
-    const delta = Math.min(0.04, Math.max(0, (time - previousTime) / 1_000));
+    const frameDelta = Math.max(0, (time - previousTime) / 1_000);
     previousTime = time;
     const elapsed = Math.max(0, time - startedAtRef.current);
     const frame = getSompoAgriFrame(scenarioId, elapsed, outcomeId);
@@ -193,7 +194,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     const x = startX + travel;
     const z = frame.lateral;
     machine.position.set(x, Math.max(0, field.groundHeight(x, z)) + frame.vertical - (frame.sink * 0.5), z);
-    const damp = reduceMotion.matches ? 1 : 0.12;
+    const damp = reduceMotion.matches ? 1 : frameDamping(frameDelta, 7.5);
     machine.rotation.y = dampAngle(machine.rotation.y, THREE.MathUtils.degToRad(frame.yaw), damp);
     machine.rotation.z = dampAngle(machine.rotation.z, THREE.MathUtils.degToRad(frame.pitch), damp);
     machine.rotation.x = dampAngle(machine.rotation.x, THREE.MathUtils.degToRad(frame.roll), damp);
@@ -204,11 +205,10 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     beacon.intensity = frame.beacon * (reduceMotion.matches ? 6 : 4.5 + Math.max(0, Math.sin(clock * 7)) * 6);
     focusPoint.set(machine.position.x, machine.position.y + 1.6, machine.position.z);
     const targetXBefore = orbit.target.x;
-    orbit.target.lerp(focusPoint, reduceMotion.matches ? 1 : 0.08);
+    orbit.target.lerp(focusPoint, reduceMotion.matches ? 1 : frameDamping(frameDelta, 5));
     camera.position.x += orbit.target.x - targetXBefore;
     orbit.update();
     renderer.render(scene, camera);
-    void delta;
     if (!document.hidden) frameId = window.requestAnimationFrame(render);
   }
   function onVisibilityChange() {

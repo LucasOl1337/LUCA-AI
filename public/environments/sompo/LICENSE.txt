@@ -24,9 +24,14 @@ for instanced roadside vegetation.
 
 Detail upgrade, 2026-09-11:
 Asphalt 02, Dirt Aerial 02 and Leafy Grass: 4096px PBR channels.
+The `asphalt-*-2k.jpg` and `dirt-*-2k.jpg` runtime variants are local,
+downsampled derivatives of those same CC0 originals; the 4K files remain the
+archival source in this repository.
 Rough Wood (2K) — https://polyhaven.com/a/rough_wood
 Jacaranda Tree — https://polyhaven.com/a/jacaranda_tree
 Shrub 02 — https://polyhaven.com/a/shrub_02
 Bermuda Grass 01 — https://polyhaven.com/a/grass_bermuda_01
 tree-3.png, tree-4.png and grass-tuft.png: transparent views rendered locally
 from these CC0 models, using their original opacity maps.
+The `generated-*-billboard.webp` files are local, reduced WebP derivatives of
+the corresponding generated `*-source.png` files for distant LOD rendering.

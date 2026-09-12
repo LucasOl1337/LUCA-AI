@@ -47,7 +47,7 @@ export function createSompoVegetation(parent: THREE.Group, camera: THREE.Camera,
   }
   for (const [speciesIndex, species] of SOMPO_TREE_SPECIES.entries()) {
     const url = `/models/sompo/${species.asset}.glb`;
-    const map = new THREE.TextureLoader().load(`/models/sompo/${species.asset}-source.png`, (loaded) => {
+    const map = new THREE.TextureLoader().load(`/models/sompo/${species.asset}-billboard.webp`, (loaded) => {
       if (abort.signal.aborted) loaded.dispose();
     });
     map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8;
