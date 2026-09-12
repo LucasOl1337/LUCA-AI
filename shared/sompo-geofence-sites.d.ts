@@ -20,7 +20,7 @@ export function getSompoGeofenceSite(environmentId: string, totalTravelMeters: n
   synthetic: true;
   label: string;
   manifestRules: { synthetic: true; hazards: {
-    role: string; category?: string; label: string; synthetic: true; justification: string;
+    role: 'water' | 'hazard'; category?: string; label: string; synthetic: true; justification: string;
     bands_m: { id: string; label: string; max_m: number }[];
   }[] };
   polygons: {

@@ -1,7 +1,7 @@
 // Radar de geofencing: avalia UMA posição contra os perigos do talhão, como o aviso de radar de um GPS de carro.
 // Puro, em metros de cena ({x, z}, x para leste/frente, z para sul), sem lat/lon, sem Three.js. Roda no browser e no Node.
 // Reaproveita o motor do laboratório: as faixas e os polígonos são o mesmo contrato (manifest.rules.hazards + papéis do GeoJSON).
-import { resolveHazards, classifyBand } from './lab-geofence.js';
+import { resolveHazards, classifyBand, bandGrid } from './lab-geofence.js';
 import { polygonContains } from './lab-telemetry.js';
 
 // Ponto mais próximo do polígono (borda ou interior). Necessário para direção e tempo até o perigo, que polygonDistance não dá.
@@ -66,4 +66,29 @@ export function describeGeofence(result) {
   const side = near.bearingDeg === null ? '' : Math.abs(near.bearingDeg) <= 20 ? ' à frente' : Math.abs(near.bearingDeg) >= 160 ? ' atrás' : near.bearingDeg > 0 ? ' à direita' : ' à esquerda';
   const time = near.timeToHazardS === null ? '' : ` · ${Math.round(near.timeToHazardS)} s`;
   return `${near.bandLabel} · ${near.hazardLabel} a ${near.distanceM.toFixed(0)} m${side}${time}`;
+}
+
+// Rota sugerida: uma passada paralela ao eixo x (como o percurso dos cenários agrícolas) que fica dentro da área
+// permitida e fora de TODAS as faixas, o mais perto possível da lateral preferida. Varre z em passos de cellM até
+// maxOffsetM para cada lado. null quando não há pista limpa. Puro, determinístico; usa a mesma grade das faixas.
+// ponytail: só pistas retas em x; roteamento em grade (A*) se os percursos deixarem de ser passadas paralelas.
+export function suggestSafeLane({ xStart, xEnd, preferredZ = 0, maxOffsetM = 60, cellM = 2 }, rules, polygons) {
+  const hazards = resolveHazards(rules, polygons);
+  const grid = bandGrid(polygons, hazards, cellM);
+  if (!grid) return null;
+  const clean = (x, z) => {
+    const col = Math.floor((x - grid.minX) / grid.cellM), row = Math.floor((z - grid.minZ) / grid.cellM);
+    if (col < 0 || row < 0 || col >= grid.cols || row >= grid.rows) return false;
+    const cell = row * grid.cols + col;
+    return grid.inside[cell] === 1 && grid.bands.every(bands => bands[cell] < 0);
+  };
+  const lo = Math.min(xStart, xEnd), hi = Math.max(xStart, xEnd);
+  for (let offset = 0; offset <= maxOffsetM; offset += cellM) {
+    for (const z of offset ? [preferredZ - offset, preferredZ + offset] : [preferredZ]) {
+      let ok = true;
+      for (let x = lo; x <= hi && ok; x += cellM) ok = clean(x, z);
+      if (ok) return { z, offsetM: Math.abs(z - preferredZ), points: [{ x: xStart, z }, { x: xEnd, z }] };
+    }
+  }
+  return null;
 }

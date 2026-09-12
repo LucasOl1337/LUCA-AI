@@ -41,3 +41,15 @@ test('sem heading: faixa e distância continuam, lado e tempo ficam nulos; fora 
   assert.match(describeGeofence(evaluateGeofence({ x: 60, z: 0, headingDeg: 180, speedKph: 7.2 }, rules, [field, water])), /^Atenção · Córrego a 20 m à frente · 10 s$/);
   for (const text of [describeGeofence(result), describeGeofence(outside)]) assert.doesNotMatch(text, /seguro|risco|acidente/i);
 });
+
+test('suggestSafeLane: pista mais próxima da lateral preferida que fica fora de todas as faixas e dentro da área', async () => {
+  const { suggestSafeLane } = await import('../shared/sompo-geofence.js');
+  // Água a z 20..40 com faixa até 35 m: z = 0 está a 20 m (faixa "atenção"); a pista limpa mais próxima fica em z ≤ -15.
+  const lane = suggestSafeLane({ xStart: -90, xEnd: 90, preferredZ: 0 }, rules, [field, water]);
+  assert.ok(lane && lane.z <= -15 && lane.z >= -49, `pista em ${lane?.z}`);
+  assert.equal(lane.points.length, 2);
+  const none = suggestSafeLane({ xStart: -90, xEnd: 90, preferredZ: 0, maxOffsetM: 4 }, rules, [field, water]);
+  assert.equal(none, null, 'sem pista limpa dentro do deslocamento máximo');
+  const free = suggestSafeLane({ xStart: -90, xEnd: 90, preferredZ: -40 }, rules, [field, water]);
+  assert.equal(free.offsetM, 0, 'lateral preferida já limpa é mantida');
+});

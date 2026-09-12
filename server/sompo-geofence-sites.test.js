@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { SOMPO_AGRI_SCENARIOS, getSompoAgriFrame } from '../shared/sompo-agri-scenarios.js';
 import { createSompoAgriSimulationSnapshot, getSompoAgriStartX, getSompoAgriTravelMeters } from '../shared/sompo-agri-brief.js';
-import { describeGeofence, evaluateGeofence } from '../shared/sompo-geofence.js';
+import { describeGeofence, evaluateGeofence, suggestSafeLane } from '../shared/sompo-geofence.js';
+import { resolveHazards } from '../shared/lab-geofence.js';
 import { getSompoGeofenceSite, SOMPO_GEOFENCE_SITE_VERSION } from '../shared/sompo-geofence-sites.js';
 
 const snapshotAt = (id, outcome, elapsedMs) => createSompoAgriSimulationSnapshot(id, outcome, {
@@ -15,8 +16,55 @@ test('colheita aproxima do córrego no meio do percurso e mantém avanço cresce
   const frames = samples('agri-harvest-dust', 'clean-pass');
   assert.ok(!frames[0].geofence.nearest || frames[0].geofence.nearest.bandId === 'atencao');
   assert.ok(frames.slice(1, -1).some(frame => frame.geofence.nearest?.bandId === 'elevada'));
+  assert.ok(frames.some(frame => frame.geofence.nearest?.bandLabel === 'Atenção'));
   assert.ok(frames.every(frame => frame.geofence.nearest?.bandId !== 'critica'));
   for (let i = 1; i < frames.length; i += 1) assert.ok(frames[i].position.x > frames[i - 1].position.x);
+});
+
+test('ambientes têm geometrias sintéticas e regras correspondentes sem avisos', () => {
+  const expected = {
+    'row-crop-field': ['corrego-sintetico', 'lagoa-sintetica', 'ribanceira-sintetica'],
+    'row-crop-field-night': ['corrego-sintetico', 'lagoa-sintetica', 'ribanceira-sintetica'],
+    'muddy-field': ['corrego-sintetico', 'alagado-sintetico'],
+    'sloped-field': ['corrego-sintetico', 'declive-sintetico', 'ribanceira-sintetica'],
+    'farm-barn': [],
+  };
+  for (const [environment, ids] of Object.entries(expected)) {
+    const site = getSompoGeofenceSite(environment, 40);
+    const hazards = resolveHazards(site.manifestRules, site.polygons);
+    assert.deepEqual(hazards.warnings, []);
+    assert.deepEqual(site.polygons.slice(1).map(polygon => polygon.id), ids);
+    assert.equal(hazards.length, ids.length);
+    assert.deepEqual(site.polygons[0].rings[0].map(point => point.z), [-70, -70, 70, 70, -70]);
+    assert.equal(site.manifestRules.synthetic, true);
+    for (const polygon of site.polygons) {
+      assert.equal(polygon.synthetic, true);
+      assert.deepEqual(polygon.rings[0][0], polygon.rings[0].at(-1));
+    }
+    for (const rule of site.manifestRules.hazards) {
+      assert.equal(rule.synthetic, true);
+      assert.deepEqual(rule.bands_m.map(band => band.max_m), rule.role === 'water' ? [5, 15, 35] : rule.category === 'slope' ? [0, 10] : [0, 15]);
+    }
+    const labels = [site.label, ...hazards.flatMap(hazard => [hazard.label, ...hazard.bands.map(band => band.label)])];
+    for (const label of labels) assert.doesNotMatch(label, /seguro|risco|acidente/i);
+  }
+});
+
+test('colheita tem pista sugerida dentro do talhão e fora das faixas em até 60 m', () => {
+  const scenario = SOMPO_AGRI_SCENARIOS['agri-harvest-dust'];
+  for (const outcome of Object.keys(scenario.outcomes)) {
+    const travel = getSompoAgriTravelMeters(scenario.scenarioId, scenario.totalMs, outcome);
+    const startX = getSompoAgriStartX(scenario.scenarioId, outcome);
+    const site = getSompoGeofenceSite(scenario.environmentId, travel);
+    const lane = suggestSafeLane({ xStart: startX, xEnd: startX + travel, preferredZ: 0, maxOffsetM: 60 }, site.manifestRules, site.polygons);
+    assert.ok(lane);
+    assert.ok(lane.offsetM <= 60);
+    for (let i = 0; i <= 100; i += 1) {
+      const result = evaluateGeofence({ x: startX + travel * i / 100, z: lane.z }, site.manifestRules, site.polygons);
+      assert.equal(result.insideAllowed, true);
+      assert.equal(result.nearest, null);
+    }
+  }
 });
 
 test('declive cruza o trecho em que a inclinação aumenta', () => {
