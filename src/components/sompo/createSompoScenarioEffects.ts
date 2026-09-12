@@ -278,7 +278,7 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
         const length = clamp(Math.abs(frontNowX - origin.x), 0.6, 45);
         for (let i = 0; i < 64; i += 1) {
           const along = Math.floor(i / 2) / 31; const x = origin.x + direction * along * length;
-          const curve = scenarioId === 'fast-corner' ? along * along * 1.3 : scenarioId === 'tire-blowout' ? -along * 0.55 : 0;
+          const curve = scenarioId === 'fast-corner' ? along * along * 1.3 : scenarioId === 'tire-blowout' ? along * 0.55 : 0;
           transform.position.set(x, floorAt(x) + 0.029, origin.z + (i % 2 ? 1 : -1) * 1.01 + curve);
           transform.rotation.set(-Math.PI / 2, 0, curve * 0.1); transform.scale.set(length / 31 * (0.86 + rand(i) * 0.14), 0.20 + rand(i + 1) * 0.06, 1); transform.updateMatrix(); marks.setMatrixAt(i, transform.matrix);
         }
