@@ -78,6 +78,18 @@ export function convertSompoDataset(input) {
     seen.set(timestamp.ms, signature);
     const row = Object.fromEntries(columns.map(name => [name, null]));
     Object.assign(row, { timestamp: timestamp.normalized, machine_id: tractorId, synthetic: sourceKind === 'simulation' });
+    const x = number(sample.posX, 'posX', index);
+    const z = number(sample.posZ, 'posZ', index);
+    if (x !== null && z !== null) {
+      if (sourceKind !== 'simulation') fail('Posição local sintética exige origem simulation.');
+      // Opção (a): o CSV só aceita GNSS; x/z são derivados pelo parser, não importados.
+      // Inversa da projeção local em [0, 0], com x leste e z sul, sem mudar o motor.
+      row.latitude_deg = -z / 6378137 * (180 / Math.PI);
+      row.longitude_deg = x / 6378137 * (180 / Math.PI);
+      row.gnss_fix = '3d';
+      const heading = number(sample.headingDeg, 'headingDeg', index);
+      row.heading_deg = heading === null ? null : ((heading % 360) + 360) % 360;
+    }
     for (const [field, column] of Object.entries(SIGNALS)) row[column] = number(sample[field], field, index);
     for (const [field, column] of Object.entries(FLAGS)) {
       const value = sample[field];
@@ -101,13 +113,15 @@ export function convertSompoDataset(input) {
   const timestampBasis = sourceKind === 'firebase' ? 'server_received' : 'simulator_observed';
   if (input.timestampBasis != null && input.timestampBasis !== timestampBasis) fail('A base temporal declarada é incompatível com a origem do histórico SOMPO.');
   rows.sort((a, b) => a.ms - b.ms);
+  const hasPosition = rows.some(({ row }) => row.gnss_fix === '3d');
   const fileName = `sompo-${tractorId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80)}-${sourceKind}-${rows[0].row.timestamp.replace(/[:.]/g, '-')}.csv`;
   const warnings = [
     'Histórico normalizado pelo servidor SOMPO; não é o payload bruto do firmware.',
     timestampBasis === 'server_received' ? 'Tempo de recebimento no servidor; não confirma o instante de medição no ESP32.' : 'Tempo observado pelo simulador; não representa aquisição física.',
     'Distância em cm, temperatura ambiente em °C e umidade em % seguem a convenção SOMPO; confirme a calibração do dispositivo.',
     'IMU preservada na unidade de origem, sem converter eixos para orientação geográfica ou inferir trajetória.',
-    'GNSS e ECU não registrados; sinais ausentes permanecem vazios. Velocidade, quando presente, é a do chassi no roteiro, não fix de satélite.',
+    hasPosition ? 'Posição GNSS sintética derivada de metros locais; ECU não registrada; sinais ausentes permanecem vazios.' : 'GNSS e ECU não registrados; sinais ausentes permanecem vazios.',
+    'Velocidade, quando presente, é a do chassi no roteiro, não fix de satélite.',
     'Flags são avisos registrados pelo dispositivo/simulador; não comprovam colisão ou causa de incidente.',
   ];
   if (timeoutCount) warnings.push(`${timeoutCount} leitura(s) de distância 999 tratadas como ausência de eco; o valor original permanece no JSON.`);
@@ -120,13 +134,16 @@ export function convertSompoDataset(input) {
     original_sample_count: input.samples.length, removed_exact_duplicates: input.samples.length - rows.length,
     source_episode_id: typeof input.episode?.publicId === 'string' ? input.episode.publicId : null,
     conversion_warnings: warnings,
+    ...(hasPosition ? { local_origin: [0, 0] } : {}),
   };
   const mappedFields = Object.fromEntries([...Object.entries(SIGNALS), ...Object.entries(FLAGS)].map(([field, column]) => [column, field]));
   const schema = {
     version: 1, delimiter: ',', decimal: '.', encoding: 'UTF-8', missing_value: 'empty CSV cell',
     fields: columns.map(name => ({
       name, unit: LAB_UNITS[name], origin: `Histórico SOMPO normalizado (${sourceKind})`,
-      meaning: mappedFields[name] ? `Campo ${mappedFields[name]} preservado; ${name.endsWith('_raw') ? 'unidade e eixos de origem não calibrados' : name === 'ambient_temp_c' ? 'temperatura do ar, não arrefecimento do motor' : 'null permanece ausente'}.`
+      meaning: hasPosition && ['latitude_deg', 'longitude_deg', 'gnss_fix', 'heading_deg'].includes(name)
+        ? ({ latitude_deg: 'Latitude sintética derivada de posZ, positivo para sul.', longitude_deg: 'Longitude sintética derivada de posX, positivo para leste.', gnss_fix: '3d somente com posX e posZ; ausente sem posição.', heading_deg: 'headingDeg do simulador: 0 = norte, 90 = leste.' }[name])
+        : mappedFields[name] ? `Campo ${mappedFields[name]} preservado; ${name.endsWith('_raw') ? 'unidade e eixos de origem não calibrados' : name === 'ambient_temp_c' ? 'temperatura do ar, não arrefecimento do motor' : 'null permanece ausente'}.`
         : ({ timestamp: `observedAt em UTC (${timestampBasis})`, machine_id: 'Identificador tractorId', synthetic: 'true somente para origem simulation', obstacle_distance_cm: 'Distância frontal em cm pela convenção SOMPO; 999 é ausência de eco', ultrasonic_echo_valid: 'false para sentinela 999; null quando qualidade do eco não foi registrada' }[name] || 'Sinal não registrado neste histórico; célula vazia, sem valor inventado.'),
     })),
   };

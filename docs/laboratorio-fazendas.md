@@ -103,12 +103,20 @@ Para KML, faça a conversão geográfica antes do upload, por exemplo no QGIS: c
 
 As regras do caso têm prioridade sobre `rules` da área ao associar. Na ausência delas, permanece o padrão didático já existente (água ≤20 m, arrefecimento ≥105 °C). Água só é avaliada com posição GNSS e polígonos `water`; cerca só com GNSS e `allowed_area`. Distância ultrassônica frontal do ESP32 não é distância à água.
 
+## Faixas por perigo
+
+Além do limiar único de água, o manifesto pode declarar faixas de proximidade por perigo em `rules.hazards`. Cada entrada tem `role` (`water` ou `hazard`), `category` quando `role` é `hazard` (por exemplo `slope`), `label`, `bands_m` em ordem crescente de `max_m` (a borda pertence à faixa; `max_m: 0` significa dentro do polígono) e `justification`, que aparece na legenda. Com faixas de água, `water_warning_distance_m` deve ser igual ao `max_m` da faixa mais externa e o evento `near_water` dá lugar aos eventos `hazard_band`. Sem `rules.hazards`, nada muda.
+
+No GeoJSON, o papel `hazard` exige `properties.category` e aceita `properties.id`. O motor (`shared/lab-geofence.js`) produz, por caso, `geofence.episodes` (perigo, faixa, início, fim ou aberto no fim, duração observada só com posição em ambas as amostras, lacuna de GNSS, distância mínima e qualidade) e `geofence.affectedArea` (área por faixa dentro de `allowed_area`, estimada por grade de 2 m, sem dupla contagem; o restante da área não foi avaliado como seguro). Amostra sem posição não abre nem fecha episódio. A versão das regras fica gravada no caso.
+
+Os valores das faixas são parâmetros declarados pelo operador, não distâncias de segurança calibradas. Exemplo completo em `public/datasets/piracicaba-artemis/` (rio real do OSM, limites e percursos fictícios identificados), gerado por `scripts/generate-piracicaba-dataset.mjs` e travado por `server/piracicaba-dataset.test.js`.
+
 ## Verificação local
 
 ```powershell
 npm run typecheck
 npm run build
-node --test server/lab-farm-demo.test.js server/lab-telemetry.test.js server/lab-terrain.test.js server/lab-site.test.js server/lab-cases.test.js server/sompo-lab-export.test.js
+node --test server/lab-farm-demo.test.js server/lab-telemetry.test.js server/lab-terrain.test.js server/lab-site.test.js server/lab-cases.test.js server/sompo-lab-export.test.js server/lab-geofence.test.js server/piracicaba-dataset.test.js
 $env:LUCA_DEMO_PORT = '4245'
 node scripts/sompo-demo.mjs
 # Em outro terminal:

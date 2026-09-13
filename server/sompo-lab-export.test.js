@@ -186,3 +186,57 @@ test('valores físicos fora do contrato retornam erro de conversão 400 legível
   assert.match(res.body.message, /fora do intervalo/);
   assert.equal((await exportRequest(history, { janelaMin: 60, format: 'json' })).statusCode, 200);
 });
+
+function positionDataset(sourceKind = 'simulation') {
+  return { samples: [0, 1].map(index => ({
+    sourceKind, tractorId: '001', observedAt: new Date(1788955200000 + index * 1000).toISOString(),
+    temperatura: 28, distancia: index ? 75 : 999, riscoColisao: false,
+  })) };
+}
+
+test('export sem posição não ganha coordenadas, origem local nem aviso novo', () => {
+  for (const sourceKind of ['firebase', 'simulation']) {
+    const converted = convertSompoDataset(positionDataset(sourceKind));
+    assert.equal(Object.hasOwn(converted.manifest, 'local_origin'), false);
+    assert.ok(converted.manifest.conversion_warnings.includes('GNSS e ECU não registrados; sinais ausentes permanecem vazios.'));
+    for (const sample of parsed(converted).samples) for (const field of ['gnss_fix', 'latitude_deg', 'longitude_deg', 'heading_deg']) assert.equal(sample[field], null);
+  }
+});
+
+test('posição sintética faz roundtrip em metros locais e lacuna não inventa fix ou rumo', () => {
+  const dataset = positionDataset();
+  Object.assign(dataset.samples[0], { posX: 0, posZ: -20, headingDeg: 0 });
+  dataset.samples.push({ ...dataset.samples[0], observedAt: new Date(1788955202000).toISOString(), posX: 45, posZ: 30, headingDeg: 450 });
+  const converted = convertSompoDataset(dataset);
+  const lab = parsed(converted);
+  assert.equal(converted.manifest.synthetic, true);
+  assert.deepEqual(converted.manifest.local_origin, [0, 0]);
+  for (const index of [0, 2]) {
+    const sample = lab.samples[index];
+    assert.equal(sample.synthetic, true);
+    assert.equal(sample.gnss_fix, '3d');
+    assert.ok(Number.isFinite(sample.latitude_deg) && Number.isFinite(sample.longitude_deg));
+    assert.ok(Math.abs(sample.x - dataset.samples[index].posX) < 1e-8);
+    assert.ok(Math.abs(sample.z - dataset.samples[index].posZ) < 1e-8);
+  }
+  assert.equal(lab.samples[0].heading_deg, 0);
+  assert.equal(lab.samples[2].heading_deg, 90);
+  for (const field of ['gnss_fix', 'latitude_deg', 'longitude_deg', 'x', 'z', 'heading_deg']) assert.equal(lab.samples[1][field], null);
+  // Identificadores legados são preservados; a restrição textual vale para a prosa.
+  assert.doesNotMatch(JSON.stringify(converted).replaceAll('riscoColisao', '').replaceAll('riscoInclinacao', ''), /seguro|risco|acidente/i);
+});
+
+test('posição parcial fica ausente e coordenadas inválidas ou origem física são rejeitadas', () => {
+  const dataset = positionDataset();
+  dataset.samples[0].posX = 0;
+  assert.equal(parsed(convertSompoDataset(dataset)).samples[0].gnss_fix, null);
+  for (const posX of [NaN, Infinity, '2']) {
+    dataset.samples[0].posX = posX;
+    assert.throws(() => convertSompoDataset(dataset), /posX/);
+  }
+  Object.assign(dataset.samples[0], { posX: 0, posZ: 1e10 });
+  assert.throws(() => convertSompoDataset(dataset), /fora do intervalo/);
+  const physical = positionDataset('firebase');
+  Object.assign(physical.samples[0], { posX: 0, posZ: 0 });
+  assert.throws(() => convertSompoDataset(physical), /origem simulation/);
+});

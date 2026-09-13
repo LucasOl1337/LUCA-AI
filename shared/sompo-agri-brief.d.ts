@@ -1,6 +1,20 @@
 import type { SompoTelemetrySnapshot } from './sompo-telemetry.js';
 import type { SompoEpisodePlan, SompoScenarioOutcome, SompoScenarioRunBrief } from './sompo-telemetry-simulator.js';
 import type { SompoAgriScenarioId } from './sompo-agri-scenarios.js';
+import type { SompoGeofenceResult, SompoMachineHit } from './sompo-geofence.js';
+import type { GeofenceEpisode } from './lab-geofence.js';
+
+export type SompoAgriSimulationSnapshot = SompoTelemetrySnapshot & {
+  position: { x: number; z: number; headingDeg: number };
+  geofence: SompoGeofenceResult | null;
+  risks: SompoTelemetrySnapshot['risks'] & { proximity: boolean };
+};
+export const SOMPO_GEOFENCE_TREND_STEP_MS: number;
+export function getSompoAgriStartX(scenarioId: string, outcomeId?: string): number;
+export function getSompoAgriPosition(scenarioId: string, elapsedMs?: number, outcomeId?: string): { x: number; z: number; headingDeg: number };
+export function getSompoAgriGeofenceEpisodes(scenarioId: string, outcomeId?: string, stepMs?: number): readonly GeofenceEpisode[];
+export function describeGeofence(result: SompoGeofenceResult | null | undefined): string;
+export function describeMachineLimit(hit: SompoMachineHit | null | undefined): string;
 
 export function isSompoAgriScenarioId(scenarioId: unknown): scenarioId is SompoAgriScenarioId;
 
@@ -16,7 +30,7 @@ export function createSompoAgriSimulationSnapshot(
   scenarioId: string,
   outcomeId?: string,
   options?: { observedAt?: string; elapsedMs?: number; connectedAt?: string },
-): SompoTelemetrySnapshot;
+): SompoAgriSimulationSnapshot;
 
 export function getSompoAgriEpisodePlan(
   scenarioId: string,

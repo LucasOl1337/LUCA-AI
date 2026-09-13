@@ -59,7 +59,8 @@ test('snapshot agrícola: proveniência correta, roll amplo e gravidade rotacion
   assert.ok(Math.abs(rolled.readings.roll) > 70, 'roll do tombamento não é grampeado em ±25°');
   assert.ok(rolled.readings.acceleration.z < 3, 'gravidade sai do eixo Z quando o trator deita');
   assert.ok(Math.abs(rolled.readings.acceleration.y) > 8.5, 'gravidade aparece no eixo lateral');
-  assert.deepEqual(rolled.risks, { collision: true, inclination: true });
+  assert.deepEqual({ collision: rolled.risks.collision, inclination: rolled.risks.inclination }, { collision: true, inclination: true });
+  assert.equal(typeof rolled.risks.proximity, 'boolean', 'radar de geofencing acrescenta proximity ao snapshot');
   // Desfecho padrão mantém o rótulo simples do cenário.
   const clean = createSompoAgriSimulationSnapshot('agri-harvest-dust', undefined, { elapsedMs: 5_000, observedAt });
   assert.equal(clean.source.scenarioLabel, getSompoAgriScenario('agri-harvest-dust').label);

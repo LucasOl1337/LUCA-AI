@@ -7,13 +7,17 @@ export type SompoAgriScenarioId =
   | 'agri-hydraulic-failure'
   | 'agri-field-bogging'
   | 'agri-barn-maneuver'
-  | 'agri-night-operation';
+  | 'agri-night-operation'
+  | 'agri-geofencing'
+  | 'agri-geofencing-operacao';
 export type SompoAgriEnvironmentId =
   | 'row-crop-field'
   | 'sloped-field'
   | 'muddy-field'
   | 'farm-barn'
-  | 'row-crop-field-night';
+  | 'row-crop-field-night'
+  | 'geofence-field'
+  | 'geofence-operacao';
 
 export interface SompoAgriEquipment {
   readonly id: SompoAgriEquipmentId;
@@ -22,6 +26,7 @@ export interface SompoAgriEquipment {
   readonly provenanceUrl: string;
   readonly nominalSizeM: Readonly<{ length: number; width: number; height: number }>;
   readonly forwardAxis: '+X';
+  readonly profile: Readonly<{ max_roll_deg: number; synthetic: true }>;
 }
 
 export interface SompoAgriPhase {
@@ -36,6 +41,7 @@ export interface SompoAgriKeyframe extends Partial<SompoAgriVisualFrame> {
 }
 
 export interface SompoAgriOutcome {
+  readonly phases?: readonly Readonly<SompoAgriPhase>[];
   readonly id: string;
   readonly label: string;
   readonly description: string;
@@ -53,6 +59,8 @@ export interface SompoAgriScenario extends Omit<SompoSimulationControls, 'scenar
   readonly totalMs: number;
   readonly sampleIntervalMs: number;
   readonly distanceSensorPosition: 'front' | 'rear';
+  /** Origem em x declarada (metros de cena). Sem ela o percurso é centrado em x. */
+  readonly startX?: number;
   readonly phases: readonly Readonly<SompoAgriPhase>[];
   readonly outcomes: Readonly<Record<string, Readonly<SompoAgriOutcome>>>;
 }
