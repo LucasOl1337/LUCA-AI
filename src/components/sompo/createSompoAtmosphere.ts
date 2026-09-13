@@ -12,7 +12,7 @@ const HDRI_SUN_U = 0.613;
 
 /**
  * Céu real: o domo amostra o HDRI equiretangolar (foto de verdade) e pinta por
- * cima as silhuetas de serra e a névoa do horizonte — a borda entre o relevo e o
+ * cima as silhuetas de serra e a névoa do horizonte. A borda entre o relevo e o
  * céu fica limpa em qualquer azimute. Sem HDRI carregado, cai no gradiente
  * procedural. O sol da cena (DirectionalLight) e o sol da foto ficam no mesmo
  * azimute via `skyYaw`, então sombras e reflexos concordam com o céu visível.
@@ -67,20 +67,30 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
           sky*=mix(vec3(1.),vec3(1.42,1.05,.60),lowBand*(.5+.5*sunProx)*warmth); // banho âmbar
           sky*=mix(vec3(1.),vec3(.82,.92,1.18),(1.-lowBand)*(.42+.3*(1.-sunProx))); // topo azulado longe do sol
           c=sky;
-          // Nuvens em camadas no céu fotográfico: cirros estirados no alto,
-          // altostrato no meio e uma faixa de estratos baixa — ambas pegam
-          // fogo do lado do sol. As faixas sobem o suficiente pra aparecer
-          // no topo do quadro das duas câmeras (rural e agri).
+          // Nuvens em camadas no céu fotográfico, modeladas como corpo +
+          // borda: o centro da nuvem sombreia o céu e a beirada pega fogo do
+          // lado do sol: é o que faz a camada ler de verdade em vez de só
+          // clarear. Cirros estirados no alto, altostrato no meio, estratos
+          // baixos na linha do horizonte.
           vec2 cirP=vec2(az*2.4+clock*.0025,d.y*9.5);
           float cir=fbm(cirP)*smoothstep(.04,.16,d.y)*(1.-smoothstep(.5,.78,d.y));
           vec3 cirCol=mix(vec3(.66,.72,.82),sunlight*1.12,sunProx*.7+.15);
-          c=mix(c,cirCol,smoothstep(.55,.8,cir)*.3);
+          float cirBody=smoothstep(.55,.72,cir);
+          float cirEdge=smoothstep(.5,.62,cir)-smoothstep(.62,.8,cir);
+          c=mix(c,c*vec3(.87,.86,.9),cirBody*.42);
+          c+=cirCol*cirEdge*.3;
           float altN=fbm(vec2(az*1.55+3.7,d.y*13.-clock*.0012));
-          float alto=smoothstep(.6,.85,altN)*smoothstep(.16,.26,d.y)*(1.-smoothstep(.42,.6,d.y));
-          c=mix(c,mix(cirCol,vec3(.9,.87,.82),.45),alto*.22);
+          float altMask=smoothstep(.16,.26,d.y)*(1.-smoothstep(.42,.6,d.y));
+          float altBody=smoothstep(.52,.72,altN)*altMask;
+          float altEdge=(smoothstep(.48,.62,altN)-smoothstep(.62,.8,altN))*altMask;
+          c=mix(c,c*vec3(.82,.81,.86),altBody*.5);
+          c+=mix(cirCol,vec3(.9,.87,.82),.45)*altEdge*.38;
           float strN=fbm(vec2(az*1.15-clock*.0018,d.y*22.));
-          float strat=smoothstep(.58,.85,strN)*smoothstep(.005,.05,d.y)*(1.-smoothstep(.09,.2,d.y));
-          c=mix(c,mix(haze,cirCol,.6),strat*.3);
+          float strMask=smoothstep(.005,.05,d.y)*(1.-smoothstep(.09,.2,d.y));
+          float strBody=smoothstep(.55,.8,strN)*strMask;
+          float strEdge=(smoothstep(.5,.66,strN)-smoothstep(.66,.85,strN))*strMask;
+          c=mix(c,c*vec3(.8,.79,.82),strBody*.55);
+          c+=mix(haze,cirCol,.6)*strEdge*.4;
           c+=sunlight*(pow(sunAmt,80.)*.18+pow(sunAmt,14.)*.07)*warmth;   // halo dourado
         } else {
           float h=max(d.y,0.);c=mix(horizon,top,pow(h,.32));

@@ -34,7 +34,7 @@ function periodicNoise(x: number, z: number, cell: number, periodColumns: number
     + (corner(1, 1) * ux * uz);
 }
 
-/** Distância periódica em X — o relevo (e o lago) se repetem com o período do terreno. */
+/** Distância periódica em X. O relevo (e o lago) se repetem com o período do terreno. */
 function periodicX(x: number) {
   return ((x % SOMPO_TERRAIN_PERIOD_X) + SOMPO_TERRAIN_PERIOD_X * 1.5) % SOMPO_TERRAIN_PERIOD_X - SOMPO_TERRAIN_PERIOD_X / 2;
 }
@@ -62,7 +62,7 @@ export function sompoTerrainHeight(x: number, z: number) {
   const amplitude = 1.4 + (THREE.MathUtils.smoothstep(corridor, 26, 100) * 3.4);
   let h = mask * ((broad * amplitude) + (middle * amplitude * 0.35) + (fine * 0.22));
   // Serra ao fundo: crista rolando dos dois lados, abrindo uma forquilha no lago.
-  // MathUtils.smoothstep não inverte bordas como o GLSL — máscaras de raio usam 1-smoothstep.
+  // MathUtils.smoothstep não inverte bordas como o GLSL: máscaras de raio usam 1-smoothstep.
   const lakeX = periodicX(x - SOMPO_LAKE.x);
   const lakeDist = sompoLakeDistance(x, z);
   const notch = 1 - THREE.MathUtils.smoothstep(lakeDist, 14, 36);
@@ -70,7 +70,7 @@ export function sompoTerrainHeight(x: number, z: number) {
     * (4.5 + periodicNoise(x + 501, z + 77, 80, SOMPO_TERRAIN_PERIOD_X / 80) * 9.5
       + periodicNoise(x + 97, z + 11, 32, SOMPO_TERRAIN_PERIOD_X / 32) * 3.6);
   h += ridge * (1 - notch * 0.55);
-  // Vale que desce da rodovia até a bacia do lago — linha de visada aberta.
+  // Vale que desce da rodovia até a bacia do lago: linha de visada aberta.
   const valleyWindow = THREE.MathUtils.smoothstep(corridor, 40, 54) * (1 - THREE.MathUtils.smoothstep(corridor, 82, 96));
   const valleyFloor = 0.55 + broad * 0.35;
   h = THREE.MathUtils.lerp(h, valleyFloor, valleyWindow * (1 - THREE.MathUtils.smoothstep(Math.abs(lakeX), 12, 40)) * 0.92);
@@ -88,8 +88,8 @@ export function createSompoTerrainMesh(material: THREE.MeshStandardMaterial) {
   const geometry = new THREE.PlaneGeometry(
     SOMPO_TERRAIN_LENGTH_X,
     SOMPO_TERRAIN_WIDTH_Z,
-    Math.round(SOMPO_TERRAIN_LENGTH_X / 2),
-    Math.round(SOMPO_TERRAIN_WIDTH_Z / 2),
+    Math.round(SOMPO_TERRAIN_LENGTH_X / 4),
+    Math.round(SOMPO_TERRAIN_WIDTH_Z / 4),
   );
   geometry.rotateX(-Math.PI / 2);
   const positions = geometry.attributes.position as THREE.BufferAttribute;
