@@ -246,6 +246,31 @@ export function createSompoRoadDetails(parent: THREE.Group) {
   }
   const grassTrail = makeTrail(grass, grassSlots, 160, false, 0.03);
 
+  // Quebra de repetição no 1º plano: tufos altos e secos (capim barba-de-bode)
+  // entremeados na faixa — silhueta e palheta diferentes do gramado rasteiro.
+  const tallWeedMaterial = grassMaterial.clone();
+  windify(tallWeedMaterial, 0.08);
+  grassRamp(tallWeedMaterial);
+  const tallWeeds = new THREE.InstancedMesh(grassTuftGeometry(7, 137, true), tallWeedMaterial, 210);
+  tallWeeds.name = 'roadside-tall-weeds'; tallWeeds.receiveShadow = true; root.add(tallWeeds);
+  const weedSlots: InstanceSlot[] = [];
+  for (let i = 0; i < 210; i += 1) {
+    const band = rand(i + 855);
+    const z = band < 0.55 ? 3.6 + rand(i + 820) * 3.4
+      : band < 0.85 ? -7.3 - rand(i + 820) * 2.7
+      : 2.4 + rand(i + 820) * 0.9;
+    const size = 0.5 + rand(i + 831) * 0.65;
+    weedSlots.push({
+      x: rand(i + 812) * 160 - 80, z, y: -0.03, rotation: rand(i + 842) * Math.PI,
+      scale: new THREE.Vector3(size * (0.8 + rand(i + 844) * 0.5), size * (0.75 + rand(i + 846) * 0.6), size * (0.8 + rand(i + 844) * 0.5)),
+    });
+    // Maioria seco/dourado; fração verde-oliva — é a textura da beira real.
+    tallWeeds.setColorAt(i, rand(i + 877) < 0.7
+      ? new THREE.Color().setHSL(0.105 + rand(i + 878) * 0.03, 0.34 + rand(i + 879) * 0.16, 0.3 + rand(i + 880) * 0.12)
+      : new THREE.Color().setHSL(0.175 + rand(i + 878) * 0.04, 0.28 + rand(i + 879) * 0.12, 0.26 + rand(i + 880) * 0.1));
+  }
+  const weedTrail = makeTrail(tallWeeds, weedSlots, 160, false, 0.03);
+
   const clumpMaterial = grassMaterial.clone();
   windify(clumpMaterial, 0.075);
   grassRamp(clumpMaterial);
@@ -352,24 +377,6 @@ export function createSompoRoadDetails(parent: THREE.Group) {
   }
   const rockTrail = makeTrail(rocks, rockSlots, 240, true, 0.06);
 
-  const mounds = new THREE.InstancedMesh(
-    lumpyGeometry(new THREE.ConeGeometry(0.75, 1.6, 8, 4), 0.3, 91),
-    new THREE.MeshStandardMaterial({ color: 0x9c5a33, roughness: 1 }),
-    10,
-  );
-  mounds.name = 'cerrado-termite-mounds'; mounds.castShadow = mounds.receiveShadow = true; root.add(mounds);
-  const moundSlots: InstanceSlot[] = [];
-  for (let i = 0; i < 10; i += 1) {
-    const size = 0.5 + rand(i + 601) * 0.8;
-    moundSlots.push({
-      x: rand(i + 602) * 240 - 120,
-      z: 10 + rand(i + 603) * 24,
-      rotation: rand(i + 604) * Math.PI,
-      scale: new THREE.Vector3(size, size + 0.35 + rand(i + 605) * 0.5, size),
-    });
-  }
-  const moundTrail = makeTrail(mounds, moundSlots, 240, true, 0.02);
-
   return {
     update(elapsed: number, wet: boolean, reducedMotion: boolean, truckX: number, windStrength = 0.65) {
       wind.value = windStrength;
@@ -390,12 +397,12 @@ export function createSompoRoadDetails(parent: THREE.Group) {
       patches.instanceMatrix.needsUpdate = true;
       for (const rut of ruts) rut.position.x = Math.round(truckX / 20) * 20;
       grassTrail.update(truckX);
+      weedTrail.update(truckX);
       clumpTrail.update(truckX);
       bushTrail.update(truckX);
       cropNearTrail.update(truckX);
       cropFarTrail.update(truckX);
       rockTrail.update(truckX);
-      moundTrail.update(truckX);
     },
     dispose() { patchMap.dispose(); rutMap.dispose(); },
   };
