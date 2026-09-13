@@ -90,6 +90,12 @@ export interface SompoTelemetryHistorySample {
   rotZ: number | null;
   riscoColisao: boolean;
   riscoInclinacao: boolean;
+  /** Posição de cena do simulador (metros locais, sintética) e faixa do radar no instante; null sem posição. */
+  posX?: number | null;
+  posZ?: number | null;
+  headingDeg?: number | null;
+  geofenceHazard?: string | null;
+  geofenceBand?: string | null;
 }
 
 export interface SompoTelemetryFlagTransition {
@@ -150,6 +156,9 @@ export interface SompoTelemetryEpisode {
   endedMs: number | null;
   status: SompoTelemetryEpisodeStatus;
   durationMs: number | null;
+  /** Roteiro gravado (id do cenário e do desfecho); null nos episódios antigos. */
+  scenarioId?: string | null;
+  outcomeId?: string | null;
 }
 
 export interface SompoTelemetryEpisodePhase {

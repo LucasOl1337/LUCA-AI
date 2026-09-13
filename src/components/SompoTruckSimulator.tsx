@@ -643,6 +643,8 @@ export default function SompoTruckSimulator({
         kind: plan.kind,
         trator: 'SIM-001',
         scenarioLabel: plan.scenarioLabel,
+        scenarioId: plan.scenarioId,
+        outcomeId: plan.outcomeId,
       });
       if (!result?.ok || !result.episode?.publicId) throw new Error('sompo_episode_start_failed');
       publicId = result.episode.publicId;

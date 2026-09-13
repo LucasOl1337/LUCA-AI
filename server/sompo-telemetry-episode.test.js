@@ -242,6 +242,19 @@ test('migração idempotente: DB pré-existente sem episode_id ganha a coluna e 
     );
     CREATE INDEX sompo_telemetry_samples_source_observed
       ON sompo_telemetry_samples (source_kind, observed_ms);
+    CREATE TABLE sompo_telemetry_episodes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      public_id TEXT UNIQUE NOT NULL,
+      kind TEXT NOT NULL,
+      tractor_id TEXT NULL,
+      source_kind TEXT NULL,
+      scenario_label TEXT NULL,
+      started_at TEXT NOT NULL,
+      started_ms INTEGER NOT NULL,
+      ended_at TEXT NULL,
+      ended_ms INTEGER NULL,
+      status TEXT NOT NULL DEFAULT 'recording'
+    );
   `);
   legacy.prepare(`
     INSERT INTO sompo_telemetry_samples (
@@ -257,13 +270,26 @@ test('migração idempotente: DB pré-existente sem episode_id ganha a coluna e 
   const columns = inspect.prepare('PRAGMA table_info(sompo_telemetry_samples)').all();
   inspect.close();
   assert.ok(columns.some((column) => column.name === 'episode_id'), 'coluna episode_id migrada');
+  for (const name of ['pos_x', 'pos_z', 'heading_deg', 'geofence_hazard', 'geofence_band']) {
+    assert.ok(columns.some((column) => column.name === name), `coluna ${name} migrada`);
+  }
+  const episodeInspect = new DatabaseSync(dbPath);
+  const episodeColumns = episodeInspect.prepare('PRAGMA table_info(sompo_telemetry_episodes)').all();
+  episodeInspect.close();
+  for (const name of ['scenario_id', 'outcome_id']) {
+    assert.ok(episodeColumns.some((column) => column.name === name), `coluna ${name} migrada`);
+  }
 
   const preserved = history.query({ sourceKind: 'firebase', tractorId: '001', windowMs: 5 * 60_000 });
   assert.equal(preserved.length, 1);
   assert.equal(preserved[0].distancia, 70.66);
   assert.equal(preserved[0].episodeId, null);
+  assert.equal(preserved[0].posX, null);
+  assert.equal(preserved[0].geofenceBand, null);
 
   const episode = history.startEpisode({ kind: 'colisao' });
+  assert.equal(episode.scenarioId, null);
+  assert.equal(episode.outcomeId, null);
   assert.equal(history.recordMany([
     simSnapshotAt(scriptedRaw(0, {}), new Date(BASE_MS + 61_000).toISOString()),
   ], { episodeId: episode.publicId }), 1);
@@ -277,6 +303,39 @@ test('migração idempotente: DB pré-existente sem episode_id ganha a coluna e 
   recheck.close();
   assert.equal(again.filter((column) => column.name === 'episode_id').length, 1);
   reopened.close();
+});
+
+test('episódio guarda scenarioId e outcomeId do roteiro, devolve os dois na leitura e rejeita id malformado', async (t) => {
+  const { dbPath, cleanup } = tempDb();
+  const history = createSompoTelemetryHistory({ dbPath, now: () => BASE_MS });
+  t.after(() => {
+    history.close();
+    cleanup();
+  });
+  const start = createSompoTelemetryEpisodeStartHttpHandler(history);
+  const get = createSompoTelemetryEpisodeGetHttpHandler(history);
+
+  const started = mockRes();
+  await start({ body: { kind: 'roteiro', trator: 'SIM-001', scenarioLabel: 'Operação com geofencing', scenarioId: 'agri-geofencing', outcomeId: 'segue-ate-critica' } }, started);
+  assert.equal(started.statusCode, 200);
+  assert.equal(started.body.episode.scenarioId, 'agri-geofencing');
+  assert.equal(started.body.episode.outcomeId, 'segue-ate-critica');
+
+  const read = mockRes();
+  await get({ params: { publicId: started.body.episode.publicId } }, read);
+  assert.equal(read.body.episode.scenarioId, 'agri-geofencing');
+  assert.equal(read.body.episode.outcomeId, 'segue-ate-critica');
+
+  const legacyStart = mockRes();
+  await start({ body: { kind: 'colisao' } }, legacyStart);
+  assert.equal(legacyStart.body.episode.scenarioId, null);
+
+  for (const scenarioId of ['agri geofencing', 'a/b', 'x'.repeat(81), 7]) {
+    const rejected = mockRes();
+    await start({ body: { kind: 'roteiro', scenarioId } }, rejected);
+    assert.equal(rejected.statusCode, 400, String(scenarioId));
+    assert.equal(rejected.body.error, 'sompo_telemetry_episode_scenario_invalid');
+  }
 });
 
 test('episódio recording esquecido há mais de 10 min vira aborted na leitura', (t) => {
