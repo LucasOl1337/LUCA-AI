@@ -108,23 +108,30 @@ function loadedPersona(slug, {
   builtin = false,
   warning = '',
   source = 'yume',
+  admin = {},
 } = {}) {
+  // Precedência: escolha explícita da rodada > catálogo do admin > override da conta > Yume.
+  const adminModel = String(admin?.model || '').trim();
+  const effectiveOverride = isAllowed9RouterModel(modelOverride) ? modelOverride : adminModel;
   const model = resolvePersonaRuntimeModel({
     localModel,
     yumeModel,
-    overrideModel: modelOverride,
+    overrideModel: effectiveOverride,
     fallback: ROUTER_MODEL,
   });
+  const adminPrompt = String(admin?.systemPrompt || '').trim();
   return {
-    name: name || slug,
+    name: String(admin?.name || name || slug).trim(),
     model,
     yumeModel,
     localModel: isAllowed9RouterModel(localModel) ? localModel : '',
+    adminModel: isAllowed9RouterModel(adminModel) ? adminModel : '',
     modelOverridden: Boolean(
-      (isAllowed9RouterModel(modelOverride) && modelOverride !== yumeModel)
+      (isAllowed9RouterModel(effectiveOverride) && effectiveOverride !== yumeModel)
       || (isAllowed9RouterModel(localModel) && yumeModel && localModel !== yumeModel),
     ),
-    systemPrompt,
+    systemPrompt: adminPrompt || systemPrompt,
+    ...(adminPrompt ? { promptOverridden: true } : {}),
     version,
     cached,
     source,
@@ -139,6 +146,7 @@ export function createPersonaSource({
   builtin,
   cache,
   workspaces = null,
+  overrides = null,
   now = () => new Date(),
 } = {}) {
   if (typeof yume?.list !== 'function'
@@ -155,6 +163,12 @@ export function createPersonaSource({
 
   function builtinPersonas() {
     return builtin.list().filter((persona) => String(persona?.slug || '').trim());
+  }
+
+  // Catálogo global do admin (opcional): override de nome, prompt, modelo e visibilidade.
+  function adminOverride(slug) {
+    if (typeof overrides?.get !== 'function') return {};
+    return overrides.get(slug) || {};
   }
 
   function findBuiltin(slug) {
@@ -328,6 +342,7 @@ export function createPersonaSource({
       builtin: true,
       warning,
       source: 'luca-builtin',
+      admin: adminOverride(slug),
     });
   }
 
@@ -354,6 +369,7 @@ export function createPersonaSource({
           version: currentVersion,
           cached: true,
           source: 'cache',
+          admin: adminOverride(clean),
         });
       }
     } catch {
@@ -384,6 +400,7 @@ export function createPersonaSource({
         version: currentVersion,
         cached: false,
         source: 'yume',
+        admin: adminOverride(clean),
       });
     } catch (error) {
       const warning = errorMessage(error);
@@ -402,6 +419,7 @@ export function createPersonaSource({
           stale: true,
           warning,
           source: 'cache',
+          admin: adminOverride(clean),
         });
       }
       throw error;
@@ -441,7 +459,7 @@ export function createPersonaSource({
   async function listAvailable() {
     const snapshot = await syncRoster();
     return {
-      personas: normalizeYumePersonasForLuca(snapshot.personas, snapshot.roster),
+      personas: normalizeYumePersonasForLuca(snapshot.personas, snapshot.roster, overrides),
       rosterSource: snapshot.rosterSource,
       warning: snapshot.warning || undefined,
     };

@@ -423,5 +423,5 @@ export function createAuthService({ rootDir = process.cwd(), dataPath = '', admi
     });
   }
 
-  return { registerRoutes, registerAdminRoutes, requireUser, sessionFromRequest, store };
+  return { registerRoutes, registerAdminRoutes, requireUser, requireAdmin, sessionFromRequest, store };
 }

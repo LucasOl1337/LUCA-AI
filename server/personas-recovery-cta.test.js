@@ -32,10 +32,9 @@ test('personas empty state has actionable CTA', () => {
   assert.ok(start >= 0, 'empty shell present');
   const slice = source.slice(start, start + 3000);
   assert.ok(slice.includes('data-personas-clear-filters'), 'clear filters CTA');
-  assert.ok(slice.includes('data-personas-open-yume'), 'open Yume CTA');
   assert.ok(slice.includes('data-personas-empty-reload'), 'secondary reload');
   assert.ok(slice.includes('Limpar busca e filtro'), 'clear label');
-  assert.ok(slice.includes('Abrir Yume'), 'yume label');
+  assert.equal(slice.includes('Abrir Yume'), false, 'no Yume redirect');
   assert.equal(slice.includes('data-personas-error'), false, 'error marker not inside empty');
   assert.equal(slice.includes('data-personas-retry'), false, 'retry marker not inside empty');
 });

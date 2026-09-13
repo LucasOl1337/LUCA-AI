@@ -18,6 +18,8 @@ Imagem: `POST {ROUTER_BASE_URL}/images/generations` (`size` + `b64_json`). Defau
 
 `server/persona-source.js` e o unico merge: Yume por slug vence; builtin LUCA cobre slug canonica ausente; em outage, cache + builtin. `is_official` invalido falha alto. Roster sincroniza na subida e no intervalo `LUCA_PERSONA_ROSTER_SYNC_MS` (minimo 15s).
 
+Catalogo global do admin: `server/persona-catalog-config.js` guarda em `LUCA_DATA_DIR/persona-catalog.json` (arquivo unico, sem separacao por conta) os overrides de `visible`, `name`, `description`, `purpose`, `model`, `avatarUrl` e `systemPrompt`. Rotas `GET/PUT/DELETE /api/admin/personas[/:slug]` (so admin). `listAvailable()` devolve `visible`, `customized`, `override` e `base`; a bancada (`LucaAiPage`) filtra `visible === false` e `resolve()` aplica nome, prompt e modelo do admin (escolha explicita da rodada ainda vence). O painel do Yume nao e mais linkado da UI; edicao acontece em Admin > Personas.
+
 ## Anexos e deliberacao
 
 Texto de anexo entra no prompt (`server/agent-loop.js`); Claude no 9Router ignora `input_file` em silencio. PDF e recusado (`attachment_pdf_not_supported`). Corte em 120000 caracteres com aviso no prompt. Anexos nao entram no snapshot publico `/s/:token`.

@@ -1,4 +1,5 @@
 import type {
+  AdminPersonasResponse,
   LucaAiChatAttachment,
   LucaAiChatLibraryResponse,
   LucaAiChatSession,
@@ -12,6 +13,7 @@ import type {
   LucaAiWorkflowAssignment,
   LucaState,
   PersonaAgentEntry,
+  PersonaCatalogOverride,
   RouterModelsResponse,
   RuntimeEvent,
   SompoTelemetryEpisodeFinishResponse,
@@ -206,6 +208,19 @@ export const lucaApi = {
   resumeSchedule: (scheduleId: string) => apiPost('/api/schedule/resume', { scheduleId }),
   listPersonas: (base?: string, timeoutMs = ACTION_REQUEST_TIMEOUT_MS) =>
     apiGet<{ ok: boolean; personas: YumePersonaSummary[] }>('/api/personas/available', timeoutMs, base),
+  adminListPersonas: (base?: string, timeoutMs = ACTION_REQUEST_TIMEOUT_MS) =>
+    apiGet<AdminPersonasResponse>('/api/admin/personas', timeoutMs, base),
+  adminUpdatePersona: (slug: string, patch: PersonaCatalogOverride, base?: string) =>
+    apiPut<AdminPersonasResponse & { slug: string; override: PersonaCatalogOverride; persona: YumePersonaSummary | null }>(
+      `/api/admin/personas/${encodeURIComponent(slug)}`,
+      { ...patch },
+      base,
+    ),
+  adminResetPersona: (slug: string, base?: string) =>
+    apiDelete<AdminPersonasResponse & { slug: string; removed: boolean; persona: YumePersonaSummary | null }>(
+      `/api/admin/personas/${encodeURIComponent(slug)}`,
+      base,
+    ),
   importYumePersona: (slug: string, base?: string) =>
     apiPost<{ ok: boolean; agent: PersonaAgentEntry | null }>('/api/agent/persona/add', { slug }, base),
   removeYumePersona: (slug: string, base?: string) =>

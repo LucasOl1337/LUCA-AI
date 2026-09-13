@@ -39,40 +39,53 @@ export function buildKamuiYumeAvatarUrl(value) {
   return `${KAMUI_BASE}/kamui/yume${avatarPath}`;
 }
 
-export function normalizeYumePersonaForLuca(persona = {}, importedAgents = new Map()) {
+export function normalizeYumePersonaForLuca(persona = {}, importedAgents = new Map(), override = {}) {
   const slug = String(persona.slug || '').trim();
-  const avatarUrl = buildYumeAvatarProxyUrl(persona.avatar_url);
+  const baseAvatarUrl = buildYumeAvatarProxyUrl(persona.avatar_url);
   const importedAgent = importedAgents.get(slug);
   const isOfficial = persona.is_official === true;
   const yumeModel = String(persona.model || '').trim();
   const localModel = String(importedAgent?.model || '').trim();
-  const defaultedYumeModel = slug === VISUAL_PERSONA_SLUG && !isAllowed9RouterModel(localModel)
+  const adminModel = String(override?.model || '').trim();
+  const defaultedYumeModel = slug === VISUAL_PERSONA_SLUG && !isAllowed9RouterModel(localModel) && !isAllowed9RouterModel(adminModel)
     ? VISUAL_PERSONA_MODEL
     : yumeModel;
   const model = resolvePersonaRuntimeModel({
     localModel,
     yumeModel: defaultedYumeModel,
+    overrideModel: adminModel,
     fallback: ROUTER_MODEL,
   });
   const modelOverridden = Boolean(
-    importedAgent
-    && isAllowed9RouterModel(localModel)
-    && yumeModel
-    && localModel !== yumeModel,
+    (isAllowed9RouterModel(adminModel) && yumeModel && adminModel !== yumeModel)
+    || (importedAgent
+      && isAllowed9RouterModel(localModel)
+      && yumeModel
+      && localModel !== yumeModel),
   );
+
+  const base = {
+    name: String(persona.name || slug || 'Persona Yume').trim(),
+    description: String(persona.description || '').trim(),
+    purpose: String(persona.purpose || '').trim(),
+    avatarUrl: baseAvatarUrl,
+  };
+  const adminOverride = override && typeof override === 'object' ? override : {};
+  const customized = Object.keys(adminOverride).length > 0;
 
   return {
     slug,
-    name: String(persona.name || slug || 'Persona Yume').trim(),
+    name: String(adminOverride.name || base.name).trim(),
     // Motor efetivo que o LUCA usa no 9Router (sempre preenchido quando possível).
     model,
     yumeModel,
     localModel: isAllowed9RouterModel(localModel) ? localModel : '',
+    adminModel: isAllowed9RouterModel(adminModel) ? adminModel : '',
     modelOverridden,
-    description: String(persona.description || '').trim(),
-    purpose: String(persona.purpose || '').trim(),
+    description: String(adminOverride.description || base.description).trim(),
+    purpose: String(adminOverride.purpose || base.purpose).trim(),
     avatar_url: String(persona.avatar_url || '').trim(),
-    avatarUrl,
+    avatarUrl: adminOverride.avatarUrl || baseAvatarUrl,
     is_official: isOfficial,
     version: persona.version ?? null,
     updated_at: persona.updated_at ?? null,
@@ -80,16 +93,31 @@ export function normalizeYumePersonaForLuca(persona = {}, importedAgents = new M
     // imported = disponível no runtime local (oficial do Yume OU secundária cacheada).
     // A categoria editorial continua em is_official (fonte Yume, GET only).
     imported: Boolean(slug && (isOfficial || importedAgent)),
+    // Catálogo global do admin: visível para todo mundo salvo override explícito.
+    visible: adminOverride.visible !== false,
+    customized,
+    hasPromptOverride: Boolean(adminOverride.systemPrompt),
+    override: { ...adminOverride },
+    base,
   };
 }
 
-export function normalizeYumePersonasForLuca(personas = [], personaAgents = []) {
+export function normalizeYumePersonasForLuca(personas = [], personaAgents = [], overrides = null) {
   const importedAgents = new Map(
     (Array.isArray(personaAgents) ? personaAgents : [])
       .map((agent) => [String(agent?.slug || '').trim(), agent])
       .filter(([slug]) => Boolean(slug)),
   );
+  const overrideFor = (slug) => {
+    if (!overrides) return {};
+    if (typeof overrides.get === 'function') return overrides.get(slug) || {};
+    return overrides[slug] || {};
+  };
   return (Array.isArray(personas) ? personas : [])
-    .map((persona) => normalizeYumePersonaForLuca(persona, importedAgents))
+    .map((persona) => normalizeYumePersonaForLuca(
+      persona,
+      importedAgents,
+      overrideFor(String(persona?.slug || '').trim()),
+    ))
     .filter((persona) => persona.slug);
 }

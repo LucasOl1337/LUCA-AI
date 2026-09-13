@@ -246,12 +246,16 @@ function withBaseUrl(value: string | undefined, base: string | undefined): strin
   return `${base.replace(/\/+$/, '')}${raw}`;
 }
 
+// A bancada só mostra o que o admin deixou visível no catálogo global
+// (Admin > Personas). Persona oculta some daqui para todas as contas.
 function normalizePersonaAssetUrls(personas: YumePersonaSummary[], base: string | undefined): YumePersonaSummary[] {
-  return personas.map((persona) => ({
-    ...persona,
-    avatarUrl: withBaseUrl(persona.avatarUrl, base),
-    avatar_url: withBaseUrl(persona.avatar_url, base),
-  }));
+  return personas
+    .filter((persona) => persona.visible !== false)
+    .map((persona) => ({
+      ...persona,
+      avatarUrl: withBaseUrl(persona.avatarUrl, base),
+      avatar_url: withBaseUrl(persona.avatar_url, base),
+    }));
 }
 
 function nowId(prefix: string): string {
@@ -724,8 +728,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     } catch (err) {
       setError(pickFailureCopy(err, {
         offline: 'Sem internet. A bancada não montou a equipe. Reconecte e tente de novo.',
-        forbidden: 'Esta conta não pode ver as personas da bancada. Peça acesso a quem opera o Yume.',
-        server: 'As personas do Yume não chegaram. Tente de novo ou abra o catálogo.',
+        forbidden: 'Esta conta não pode ver as personas da bancada. Peça acesso ao admin do LUCA.',
+        server: 'As personas não chegaram. Tente de novo ou abra o catálogo.',
       }));
       setErrorRetry('personas');
     } finally {

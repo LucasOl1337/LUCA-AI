@@ -8,16 +8,38 @@ const serverIndex = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
 const configPage = readFileSync(new URL('../src/pages/ConfiguracaoPage.tsx', import.meta.url), 'utf8');
 const layout = readFileSync(new URL('../src/components/Layout.tsx', import.meta.url), 'utf8');
 
-test('tela de personas exibe só o trio principal e personas ativadas na conta', () => {
-  assert.match(personasPage, /Personas principais/);
-  assert.match(personasPage, /Ativadas na sua conta/);
-  assert.match(personasPage, /gpt\|grok\|claude/);
-  assert.match(personasPage, /state\?\.personaAgents/);
-  assert.match(personasPage, /Fonte editorial: oficiais do Yume/);
-  assert.match(personasPage, /builtins LUCA/);
-  assert.match(personasPage, /Gerenciar categoria no Yume/);
+test('tela de personas e o catalogo global do admin, sem ativacao por conta nem link do Yume', () => {
+  assert.match(personasPage, /Visíveis para todos/);
+  assert.match(personasPage, /Ocultas/);
+  assert.match(personasPage, /adminListPersonas/);
+  assert.match(personasPage, /adminUpdatePersona/);
+  assert.match(personasPage, /adminResetPersona/);
+  assert.match(personasPage, /data-persona-editor/);
+  assert.match(personasPage, /data-persona-field="systemPrompt"/);
+  assert.match(personasPage, /Salvar para todos/);
+  assert.doesNotMatch(personasPage, /state\?\.personaAgents/);
+  assert.doesNotMatch(personasPage, /57\.156\.59\.165|YUME_DASHBOARD_URL|Abrir Yume|Gerenciar categoria no Yume/);
+  assert.doesNotMatch(personasPage, /Ativadas na sua conta|Personas principais/);
   assert.doesNotMatch(personasPage, /Adicionar ao LUCA|Remover do LUCA/);
   assert.doesNotMatch(personasPage, /Disponíveis no Yume|secondaryExpanded|Roster principal/);
+});
+
+test('bancada respeita o catalogo global: persona oculta nao aparece para ninguem', () => {
+  assert.match(lucaAiPage, /persona\.visible !== false/);
+  assert.doesNotMatch(lucaAiPage, /YUME_DASHBOARD_URL/);
+});
+
+test('Express expoe o catalogo global de personas so para admin e nao emite snapshot vazio sem conta', () => {
+  assert.match(serverIndex, /app\.get\('\/api\/admin\/personas', authService\.requireAdmin/);
+  assert.match(serverIndex, /app\.put\('\/api\/admin\/personas\/:slug', authService\.requireAdmin/);
+  assert.match(serverIndex, /app\.delete\('\/api\/admin\/personas\/:slug', authService\.requireAdmin/);
+  assert.match(serverIndex, /overrides: \{ get: \(slug\) => personaCatalogConfig\.get\(slug\) \}/);
+  // Regressao do flicker: emitState sem workspace no contexto precisa
+  // resolver o snapshot por cliente, nunca mandar o estado vazio de processo.
+  const emitStateSource = serverIndex.slice(serverIndex.indexOf('function emitState()'), serverIndex.indexOf('function emitSompoTelemetry'));
+  assert.match(emitStateSource, /clientsByUser/);
+  assert.match(emitStateSource, /runWithWorkspaceUser\(userId/);
+  assert.doesNotMatch(emitStateSource, /if \(ownerUserId && client\.userId && client\.userId !== ownerUserId\) continue;/);
 });
 
 test('picker mostra oficiais e secundárias selecionáveis via cache local', () => {

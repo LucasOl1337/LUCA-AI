@@ -24,7 +24,8 @@ export const PAGE_PATHS = Object.freeze({
   admin: '/admin',
 });
 
-export const PERSONA_FILTRO = Object.freeze(['all', 'principais', 'ativadas']);
+// 'principais' e 'ativadas' ficam só por compatibilidade com links antigos.
+export const PERSONA_FILTRO = Object.freeze(['all', 'visiveis', 'ocultas', 'editadas', 'principais', 'ativadas']);
 export const SOMPO_ABA = 'casos';
 export const SOMPO_TELEMETRY_ABA = 'telemetria';
 export const LUCA_ABA = 'atividade';

@@ -7,7 +7,7 @@ export interface AppLocation {
   authMode: 'login' | 'register';
   leituraToken: string;
   busca: string;
-  filtro: 'all' | 'principais' | 'ativadas';
+  filtro: 'all' | 'visiveis' | 'ocultas' | 'editadas' | 'principais' | 'ativadas';
   aba: string;
   tipo: 'team' | 'individual';
   modelo: string;

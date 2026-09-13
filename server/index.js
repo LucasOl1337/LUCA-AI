@@ -156,6 +156,7 @@ import {
 } from './persona-cards.js';
 import { listBuiltinPersonas } from './builtin-personas.js';
 import { createPersonaSource } from './persona-source.js';
+import { createPersonaCatalogConfig } from './persona-catalog-config.js';
 import {
   buildConversationContextFromTranscript,
   buildIndividualJudgePrompt,
@@ -219,6 +220,9 @@ import { registerLabCaseRoutes } from './lab-cases.js';
 const app = express();
 const personaRunJobs = createPersonaRunJobStore();
 const deliberationJobs = createPersonaRunJobStore();
+// Catálogo global: o admin define o que fica visível e como cada persona se
+// apresenta, e isso vale para todas as contas (sem separação por usuário).
+const personaCatalogConfig = createPersonaCatalogConfig();
 const personaSource = createPersonaSource({
   yume: {
     list: listYumePersonas,
@@ -230,6 +234,7 @@ const personaSource = createPersonaSource({
     list: getPersonaAgents,
     replace: replacePersonaAgents,
   },
+  overrides: { get: (slug) => personaCatalogConfig.get(slug) },
   workspaces: {
     list: listWorkspaceUserIds,
     run: runWithWorkspaceUser,
@@ -575,16 +580,30 @@ function emitEvent(event) {
 }
 
 function emitState() {
-  const state = publicStateSnapshot();
-  const payload = JSON.stringify({
-    kind: 'state',
-    state,
-  });
   const ownerUserId = getWorkspaceUserId();
+  if (ownerUserId) {
+    const payload = JSON.stringify({ kind: 'state', state: publicStateSnapshot() });
+    for (const client of wss.clients) {
+      if (client.readyState !== 1) continue;
+      if (client.userId && client.userId !== ownerUserId) continue;
+      client.send(payload);
+    }
+    return;
+  }
+  // Sem conta no contexto (stdout do heartbeat, timers de processo): cada
+  // cliente recebe o snapshot do próprio workspace. Antes disso, o snapshot
+  // vazio de processo ia para todo mundo e apagava personaAgents na tela.
+  const clientsByUser = new Map();
   for (const client of wss.clients) {
-    if (client.readyState !== 1) continue;
-    if (ownerUserId && client.userId && client.userId !== ownerUserId) continue;
-    client.send(payload);
+    if (client.readyState !== 1 || !client.userId) continue;
+    if (!clientsByUser.has(client.userId)) clientsByUser.set(client.userId, []);
+    clientsByUser.get(client.userId).push(client);
+  }
+  for (const [userId, clients] of clientsByUser) {
+    runWithWorkspaceUser(userId, () => {
+      const payload = JSON.stringify({ kind: 'state', state: publicStateSnapshot() });
+      for (const client of clients) client.send(payload);
+    });
   }
 }
 
@@ -3126,6 +3145,47 @@ app.get('/api/personas/avatar', async (req, res) => {
 app.get('/api/personas/available', async (_req, res) => {
   try {
     res.json({ ok: true, ...await personaSource.listAvailable() });
+  } catch (error) {
+    res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
+  }
+});
+
+// Catálogo global de personas (admin). Nunca escreve no Yume: é override local
+// de visibilidade, nome, descrição, modelo, avatar e system prompt.
+app.get('/api/admin/personas', authService.requireAdmin, async (_req, res) => {
+  try {
+    const available = await personaSource.listAvailable();
+    res.json({ ok: true, ...available, catalog: personaCatalogConfig.snapshot() });
+  } catch (error) {
+    res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
+  }
+});
+
+app.put('/api/admin/personas/:slug', authService.requireAdmin, async (req, res) => {
+  const slug = String(req.params.slug || '').trim();
+  if (!slug) {
+    res.status(400).json({ ok: false, error: 'slug_required' });
+    return;
+  }
+  try {
+    const override = personaCatalogConfig.set(slug, req.body || {});
+    const available = await personaSource.listAvailable();
+    const persona = available.personas.find((item) => item.slug === slug) || null;
+    emitEvent({ type: 'persona.catalog', slug, override, source: 'admin', time: new Date().toISOString() });
+    res.json({ ok: true, slug, override, persona, ...available });
+  } catch (error) {
+    res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
+  }
+});
+
+app.delete('/api/admin/personas/:slug', authService.requireAdmin, async (req, res) => {
+  const slug = String(req.params.slug || '').trim();
+  try {
+    const removed = personaCatalogConfig.reset(slug);
+    const available = await personaSource.listAvailable();
+    const persona = available.personas.find((item) => item.slug === slug) || null;
+    emitEvent({ type: 'persona.catalog', slug, override: {}, removed, source: 'admin', time: new Date().toISOString() });
+    res.json({ ok: true, slug, removed, override: {}, persona, ...available });
   } catch (error) {
     res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
   }

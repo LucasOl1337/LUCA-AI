@@ -78,6 +78,39 @@ export interface YumePersonaSummary {
   updated_at?: string | null;
   imported: boolean;
   source?: 'yume' | 'luca-builtin' | 'cache' | string;
+  /** Modelo fixado pelo admin no catálogo global (vale para todas as contas). */
+  adminModel?: string;
+  /** Catálogo global do admin: false = oculta para todo mundo. */
+  visible?: boolean;
+  customized?: boolean;
+  hasPromptOverride?: boolean;
+  override?: PersonaCatalogOverride;
+  /** Valores originais (Yume/builtin) antes do override do admin. */
+  base?: { name: string; description: string; purpose: string; avatarUrl?: string };
+}
+
+export interface PersonaCatalogOverride {
+  visible?: boolean;
+  name?: string;
+  description?: string;
+  purpose?: string;
+  systemPrompt?: string;
+  model?: string;
+  avatarUrl?: string;
+}
+
+export interface PersonaCatalogSnapshot {
+  version: number;
+  updatedAt: string | null;
+  personas: Record<string, PersonaCatalogOverride>;
+}
+
+export interface AdminPersonasResponse {
+  ok: boolean;
+  personas: YumePersonaSummary[];
+  rosterSource?: string;
+  warning?: string;
+  catalog: PersonaCatalogSnapshot;
 }
 
 export interface RouterModelProfile {
