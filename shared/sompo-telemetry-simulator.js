@@ -637,9 +637,9 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [2_500, 'Carga escora a cada balanço', { roll: 24, speedKph: 2, roughness: 1.4 }],
       [4_500, 'Passa do ponto de equilíbrio', { roll: 33, speedKph: 0, roughness: 0.6 }],
       [6_000, 'Queda acelera', { roll: 52, lateral: 0.5, roughness: 0 }],
-      [7_200, 'Carroceria toca o solo', { roll: 78, lateral: 1.1, collisionRisk: true }],
-      [9_000, 'Imobilizado de lado', { roll: 84, lateral: 1.3 }],
-      [14_000, 'Imobilizado — carga ao solo', {}],
+      [7_200, 'Carroceria toca o solo', { roll: 78, lateral: 1.1, collisionRisk: true, roughness: 3.4 }],
+      [9_000, 'Imobilizado de lado', { roll: 84, lateral: 1.3, roughness: 0.8 }],
+      [14_000, 'Imobilizado — carga ao solo', { roughness: 0 }],
     ]),
   }),
   'hot-weather': Object.freeze({
