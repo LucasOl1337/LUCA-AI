@@ -170,6 +170,8 @@ function mapSampleRow(row) {
     rotZ: finiteNumber(row.rotZ),
     riscoColisao: row.collisionKnown ? Boolean(row.riscoColisao) : null,
     riscoInclinacao: row.inclinationKnown ? Boolean(row.riscoInclinacao) : null,
+    velocidade: finiteNumber(row.velocidade),
+    velocidadeRoda: finiteNumber(row.velocidadeRoda),
   };
 }
 
@@ -201,6 +203,8 @@ function snapshotToRow(snapshot, observedMs) {
     rotZ: finiteNumber(rotation.z),
     riscoColisao: snapshot.risks?.collision ? 1 : 0,
     riscoInclinacao: snapshot.risks?.inclination ? 1 : 0,
+    velocidade: finiteNumber(readings.speedKph),
+    velocidadeRoda: finiteNumber(readings.wheelSpeedKph),
   };
 }
 
@@ -368,7 +372,30 @@ function episodePhaseSlice(id, samples, startIndex, endIndex) {
  */
 export function summarizeSompoEpisodeSamples(samples) {
   const base = summarizeSamples(samples);
-  if (samples.length === 0) return { ...base, impact: null, phases: [] };
+
+  // Divergência roda x solo: o smoking gun da aquaplanagem — roda mede
+  // rotação, solo mede deslocamento; separados indicam pneu sem contato.
+  let wheelDivergence = null;
+  if (samples.length > 0) {
+    for (let index = 0; index < samples.length; index += 1) {
+      const sample = samples[index];
+      const ground = finiteNumber(sample.velocidade);
+      const wheel = finiteNumber(sample.velocidadeRoda);
+      if (ground === null || wheel === null || ground < 20) continue;
+      const diff = Math.abs(ground - wheel);
+      if (diff >= 15 && (wheelDivergence === null || diff > wheelDivergence.diffKph)) {
+        wheelDivergence = {
+          index,
+          at: sample.observedAt,
+          offsetMs: sample.observedMs - samples[0].observedMs,
+          wheelKph: roundAvg(wheel),
+          groundKph: roundAvg(ground),
+          diffKph: roundAvg(diff),
+        };
+      }
+    }
+  }
+  if (samples.length === 0) return { ...base, impact: null, phases: [], wheelDivergence };
 
   const accSeries = samples.map((sample) => magnitude(sample.accX, sample.accY, sample.accZ));
   let peakIndex = -1;
@@ -376,7 +403,7 @@ export function summarizeSompoEpisodeSamples(samples) {
     if (accSeries[index] === null) continue;
     if (peakIndex === -1 || accSeries[index] > accSeries[peakIndex]) peakIndex = index;
   }
-  if (peakIndex === -1) return { ...base, impact: null, phases: [] };
+  if (peakIndex === -1) return { ...base, impact: null, phases: [], wheelDivergence };
 
   const median = medianOf(accSeries.filter((value) => value !== null));
   const threshold = median + ((accSeries[peakIndex] - median) / 2);
@@ -401,6 +428,7 @@ export function summarizeSompoEpisodeSamples(samples) {
   }
 
   const required = new Set([0, samples.length - 1, peakIndex]);
+  if (wheelDivergence) required.add(wheelDivergence.index);
   for (const transition of collectFlagTransitions(samples)) required.add(transition.index);
   for (const phase of phases) {
     required.add(phase.startIndex);
@@ -425,6 +453,7 @@ export function summarizeSompoEpisodeSamples(samples) {
       accMagnitude: roundAvg(accSeries[peakIndex]),
     },
     phases,
+    wheelDivergence,
   };
 }
 
@@ -540,6 +569,9 @@ export function createSompoTelemetryHistory({
     for (const column of ['collision_known', 'inclination_known']) {
       if (!sampleColumns.some((item) => item.name === column)) db.exec(`ALTER TABLE sompo_telemetry_samples ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`);
     }
+    for (const column of ['velocidade', 'velocidade_roda']) {
+      if (!sampleColumns.some((item) => item.name === column)) db.exec(`ALTER TABLE sompo_telemetry_samples ADD COLUMN ${column} REAL NULL`);
+    }
     db.exec(`
       CREATE TABLE IF NOT EXISTS sompo_risk_assessments (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, tractor_id TEXT NOT NULL, source_kind TEXT NOT NULL, created_at TEXT NOT NULL, evidence_json TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS sompo_telemetry_samples_episode
@@ -581,8 +613,9 @@ export function createSompoTelemetryHistory({
       observed_at, observed_ms,
       distancia, temperatura, umidade, pitch, roll,
       acc_x, acc_y, acc_z, rot_x, rot_y, rot_z,
-      risco_colisao, risco_inclinacao, episode_id, collision_known, inclination_known
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      risco_colisao, risco_inclinacao, episode_id, collision_known, inclination_known,
+      velocidade, velocidade_roda
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const insertEpisodeStatement = db.prepare(`
@@ -671,7 +704,9 @@ export function createSompoTelemetryHistory({
       rot_z AS rotZ,
       risco_colisao AS riscoColisao,
       risco_inclinacao AS riscoInclinacao,
-      collision_known AS collisionKnown, inclination_known AS inclinationKnown
+      collision_known AS collisionKnown, inclination_known AS inclinationKnown,
+      velocidade,
+      velocidade_roda AS velocidadeRoda
     FROM sompo_telemetry_samples
   `;
   const episodeSamplesStatement = db.prepare(`${sampleSelect} WHERE episode_id = ?
@@ -756,6 +791,8 @@ export function createSompoTelemetryHistory({
       episodeRowId,
       typeof snapshot.risks?.collision === 'boolean' ? 1 : 0,
       typeof snapshot.risks?.inclination === 'boolean' ? 1 : 0,
+      row.velocidade,
+      row.velocidadeRoda,
     );
     pending.set(originKey(row.sourceKind, row.tractorId, episodeRowId), changedMs);
     return true;

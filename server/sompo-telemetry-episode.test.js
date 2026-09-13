@@ -88,7 +88,7 @@ function scriptedSnapshots() {
   ));
 }
 
-function flatSample(index, { acc = 9.8, collision = false } = {}) {
+function flatSample(index, { acc = 9.8, collision = false, velocidade = null, velocidadeRoda = null } = {}) {
   const observedMs = BASE_MS + (index * 500);
   return {
     id: index + 1,
@@ -112,6 +112,8 @@ function flatSample(index, { acc = 9.8, collision = false } = {}) {
     rotZ: 0,
     riscoColisao: collision,
     riscoInclinacao: false,
+    velocidade,
+    velocidadeRoda,
   };
 }
 
@@ -321,6 +323,51 @@ test('decimação adaptativa: série longa respeita o teto 30 e densifica ao red
   }
   assert.deepEqual(summarizeSompoEpisodeSamples([]).phases, []);
   assert.equal(summarizeSompoEpisodeSamples([]).impact, null);
+});
+
+test('divergência roda x solo: canais persistem no episódio e o resumo aponta o instante-chave', (t) => {
+  const { dbPath, cleanup } = tempDb();
+  let clock = BASE_MS;
+  const history = createSompoTelemetryHistory({ dbPath, now: () => clock });
+  t.after(() => {
+    history.close();
+    cleanup();
+  });
+
+  // Rodas a 30 km/h com o solo a 80 km/h nas amostras 10..14 (flutuação tipo aquaplanagem).
+  const snapshots = Array.from({ length: 24 }, (_, index) => simSnapshotAt({
+    ...scriptedRaw(index, {}),
+    velocidade: 80,
+    velocidadeRoda: index >= 10 && index <= 14 ? 30 : 80,
+  }, new Date(BASE_MS + (index * 1_000)).toISOString()));
+  const episode = history.startEpisode({ kind: 'roteiro' });
+  assert.equal(history.recordMany(snapshots, { episodeId: episode.publicId }), 24);
+  history.finishEpisode(episode.publicId, { status: 'complete' });
+
+  const detail = history.getEpisode(episode.publicId);
+  assert.equal(detail.samples.length, 24);
+  assert.equal(detail.samples[0].velocidade, 80);
+  assert.equal(detail.samples[10].velocidadeRoda, 30);
+
+  const divergence = detail.summary.wheelDivergence;
+  assert.ok(divergence, 'divergência detectada no resumo');
+  assert.equal(divergence.wheelKph, 30);
+  assert.equal(divergence.groundKph, 80);
+  assert.equal(divergence.diffKph, 50);
+  assert.ok(
+    detail.summary.keySamples.some((sample) => sample.id === detail.samples[divergence.index].id),
+    'instante da divergência preservado nas amostras-chave',
+  );
+
+  // Sem canal de roda (firmware real) ou roda acoplada: sem achado.
+  const semCanal = summarizeSompoEpisodeSamples(
+    Array.from({ length: 6 }, (_, index) => flatSample(index, { velocidade: 80 })),
+  );
+  assert.equal(semCanal.wheelDivergence, null);
+  const acoplado = summarizeSompoEpisodeSamples(
+    Array.from({ length: 6 }, (_, index) => flatSample(index, { velocidade: 80, velocidadeRoda: 78 })),
+  );
+  assert.equal(acoplado.wheelDivergence, null);
 });
 
 test('endpoints de episódio: lifecycle 200 e erros 400/404 claros', async (t) => {

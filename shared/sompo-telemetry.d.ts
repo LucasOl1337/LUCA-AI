@@ -44,6 +44,8 @@ export interface SompoTelemetrySnapshot {
     roll: number | null;
     acceleration: SompoTelemetryVector;
     rotation: SompoTelemetryVector;
+    speedKph?: number | null;
+    wheelSpeedKph?: number | null;
   };
   source: {
     kind: SompoTelemetrySourceKind;
@@ -89,6 +91,8 @@ export interface SompoTelemetryHistorySample {
   rotZ: number | null;
   riscoColisao: boolean;
   riscoInclinacao: boolean;
+  velocidade?: number | null;
+  velocidadeRoda?: number | null;
 }
 
 export interface SompoTelemetryFlagTransition {
@@ -179,9 +183,19 @@ export interface SompoTelemetryEpisodeImpact {
   accMagnitude: number | null;
 }
 
+export interface SompoTelemetryEpisodeWheelDivergence {
+  index: number;
+  at: string;
+  offsetMs: number;
+  wheelKph: number;
+  groundKph: number;
+  diffKph: number;
+}
+
 export interface SompoTelemetryEpisodeSummary extends SompoTelemetryHistorySummary {
   impact: SompoTelemetryEpisodeImpact | null;
   phases: SompoTelemetryEpisodePhase[];
+  wheelDivergence?: SompoTelemetryEpisodeWheelDivergence | null;
 }
 
 export interface SompoTelemetryEpisodeFrame {

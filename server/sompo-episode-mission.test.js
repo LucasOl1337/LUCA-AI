@@ -9,7 +9,7 @@ import { summarizeSompoEpisodeSamples } from './sompo-telemetry-history.js';
 
 const BASE_MS = Date.parse('2026-08-26T15:00:00.000Z');
 
-function sample(index, { acc = 9.8, distancia, collision = false } = {}) {
+function sample(index, { acc = 9.8, distancia, collision = false, velocidade = null, velocidadeRoda = null } = {}) {
   const observedMs = BASE_MS + (index * 500);
   return {
     id: index + 1,
@@ -33,6 +33,8 @@ function sample(index, { acc = 9.8, distancia, collision = false } = {}) {
     rotZ: 0,
     riscoColisao: collision,
     riscoInclinacao: false,
+    velocidade,
+    velocidadeRoda,
   };
 }
 
@@ -200,6 +202,46 @@ test('missão de episódio: achado do alerta calculado e bloco de máquina parse
 
   // Missão sem bloco não é episódio para a etapa visual.
   assert.equal(parseSompoEpisodeVisualData('missão comum sem bloco'), null);
+});
+
+test('missão de episódio: divergência roda x solo vira achado de tração no dossiê', () => {
+  // Aquaplanagem sintética: rodas a 30 km/h com o solo a 80 km/h entre t+5s e t+7s.
+  const samples = Array.from({ length: 40 }, (_, index) => sample(index, {
+    velocidade: 80,
+    velocidadeRoda: index >= 10 && index <= 14 ? 30 : 80,
+    acc: index === 25 ? 32 : 9.8,
+  }));
+  const episode = {
+    id: 9,
+    publicId: 'ep-aquaplaning-teste',
+    kind: 'roteiro',
+    tractorId: 'SIM-001',
+    sourceKind: 'simulation',
+    scenarioLabel: 'Aquaplanagem · Recupera o controle',
+    startedAt: new Date(BASE_MS).toISOString(),
+    startedMs: BASE_MS,
+    endedAt: new Date(BASE_MS + 20_000).toISOString(),
+    endedMs: BASE_MS + 20_000,
+    status: 'complete',
+    durationMs: 20_000,
+  };
+  const summary = summarizeSompoEpisodeSamples(samples);
+  assert.equal(summary.wheelDivergence.wheelKph, 30);
+  assert.equal(summary.wheelDivergence.groundKph, 80);
+
+  const mission = buildSompoEpisodeMission(episode, samples, summary, 'Risco Agro');
+  assert.match(mission, /Achado de tração: rodas a 30 km\/h com o solo a 80 km\/h \(t\+5s, diferença de 50 km\/h\) — a divergência roda×solo indica pneus sem contato efetivo \(aquaplanagem ou patinação\)/);
+
+  // Sem divergência: a linha não aparece (não há prova de desacoplamento).
+  const coupled = Array.from({ length: 40 }, (_, index) => sample(index, {
+    velocidade: 80,
+    velocidadeRoda: 79,
+    acc: index === 25 ? 32 : 9.8,
+  }));
+  const coupledMission = buildSompoEpisodeMission(
+    episode, coupled, summarizeSompoEpisodeSamples(coupled), 'Risco Agro',
+  );
+  assert.doesNotMatch(coupledMission, /Achado de tração/);
 });
 
 test('missão de episódio sem frames diz explicitamente que não há evidência visual', () => {

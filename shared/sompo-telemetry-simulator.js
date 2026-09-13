@@ -1127,6 +1127,10 @@ export function createSompoSimulationSnapshot(controls = {}, {
       roll,
       acceleration,
       rotation,
+      speedKph: round(clamp(braking?.speedKph ?? speedKph, 0, 120), 1),
+      wheelSpeedKph: rural?.wheelSpeedKph == null
+        ? null
+        : round(clamp(finite(rural.wheelSpeedKph, speedKph), 0, 120), 1),
     },
     source: {
       kind: 'simulation',
