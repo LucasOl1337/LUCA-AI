@@ -136,7 +136,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   const path = createSompoMotionPath(at => getSompoAgriFrame(scenarioId, at, outcomeId), scenario.totalMs);
   const pathPoint = new THREE.Vector3();
   const totalTravel = path.sample(scenario.totalMs, pathPoint).x;
-  const startX = -totalTravel / 2;
+  const startX = scenario.startX ?? -totalTravel / 2;
   if (operation) field.setHarvestPath(Array.from({ length: scenario.totalMs / 250 + 1 }, (_, i) => {
     const atMs = i * 250, frame = getSompoAgriFrame(scenarioId, atMs, outcomeId);
     const point = path.sample(atMs, { x: 0, z: 0 });

@@ -57,6 +57,8 @@ export interface SompoAgriScenario extends Omit<SompoSimulationControls, 'scenar
   readonly defaultOutcomeId: string;
   readonly totalMs: number;
   readonly sampleIntervalMs: number;
+  /** Origem em x declarada (metros de cena). Sem ela o percurso é centrado em x. */
+  readonly startX?: number;
   readonly phases: readonly Readonly<SompoAgriPhase>[];
   readonly outcomes: Readonly<Record<string, Readonly<SompoAgriOutcome>>>;
 }

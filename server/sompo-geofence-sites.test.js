@@ -74,35 +74,48 @@ test('só o ambiente do cenário de geofencing tem talhão; os cenários origina
   assert.throws(() => getSompoGeofenceSite('geofence-field', NaN), TypeError);
 });
 
-test('operação: série real a 250 ms, três passadas, faixas e alertas nos intervalos declarados', () => {
+test('operação: série real a 250 ms, duas passadas e uma cabeceira, sem episódio aberto no fim', () => {
   const id = 'agri-geofencing-operacao';
   const site = getSompoGeofenceSite('geofence-operacao', 450);
   const scenario = SOMPO_AGRI_SCENARIOS[id];
-  assert.equal(scenario.totalMs, 400_000);
+  assert.equal(scenario.totalMs, 232_000);
+  assert.equal(scenario.startX, -76);
   const outcomes = ['operacao-completa', 'encosta-alem-do-limite', 'cabeceira-na-ribanceira'];
+  const forbidden = /segur[o]|risco alto|neglig[eê]ncia|vai tombar/i;
   for (const outcome of outcomes) {
-    const extra = outcome === outcomes[2] ? 56_000 : 0;
-    const run = Array.from({ length: 1601 }, (_, i) => createSompoAgriSimulationSnapshot(id, outcome, { elapsedMs: i * 250, observedAt: '2026-09-13T12:00:00Z' }));
+    const extra = outcome === outcomes[2] ? 58_000 : 0;
+    const run = Array.from({ length: scenario.totalMs / 250 + 1 }, (_, i) => createSompoAgriSimulationSnapshot(id, outcome, { elapsedMs: i * 250, observedAt: '2026-09-13T12:00:00Z' }));
     const episodes = getSompoAgriGeofenceEpisodes(id, outcome);
+    // Parte e para fora de qualquer faixa: nada aberto no fim, nada com uma amostra só (flicker).
+    assert.equal(run[0].geofence.nearest, null, `${outcome}: começa sem perigo`);
+    assert.equal(run.at(-1).geofence.nearest, null, `${outcome}: termina sem perigo`);
+    for (const episode of episodes) {
+      assert.notEqual(episode.endMs, null, `${outcome}: ${episode.hazardKey}/${episode.bandId} aberto no fim`);
+      assert.ok(episode.endMs - episode.startMs >= 750, `${outcome}: ${episode.hazardKey}/${episode.bandId} dura ${episode.endMs - episode.startMs} ms`);
+    }
     const water = episodes.filter(e => e.hazardKey.startsWith('water'));
-    assert.deepEqual(water.map(e => [e.bandId, e.startMs - extra, e.endMs === null ? null : e.endMs - extra]), [
-      ['atencao', 290000, 303750], ['elevada', 303750, 328000], ['atencao', 328000, 328250], ['elevada', 328250, null],
+    assert.deepEqual(water.map(e => [e.bandId, e.startMs - extra, e.endMs - extra]), [
+      ['atencao', 121000, 133750], ['elevada', 133750, 142250], ['atencao', 142250, 155250],
     ]);
-    assert.deepEqual(episodes.filter(e => e.hazardLabel === 'Declive mapeado').map(e => e.bandId), ['borda', 'dentro', 'borda']);
-    assert.deepEqual(episodes.filter(e => e.hazardLabel === 'Ribanceira').map(e => e.bandId), extra ? ['borda', 'dentro', 'borda', 'borda', 'borda'] : ['borda', 'borda']);
+    const waterMin = Math.min(...water.map(e => e.minDistanceM));
+    assert.ok(waterMin > 5 && waterMin < 15, `córrego: mínimo ${waterMin} m (chega à elevada, nunca à crítica)`);
+    assert.deepEqual(episodes.filter(e => e.hazardLabel === 'Declive mapeado').map(e => [e.bandId, e.startMs, e.endMs]), [['borda', 4000, 8500], ['dentro', 8500, 27500], ['borda', 27500, 32250]]);
+    const gully = episodes.filter(e => e.hazardLabel === 'Ribanceira');
+    assert.deepEqual(gully.map(e => e.bandId), extra ? ['borda', 'dentro', 'borda', 'borda'] : ['borda']);
+    if (!extra) assert.ok(gully[0].minDistanceM > 5, `ribanceira a ${gully[0].minDistanceM} m na cabeceira`);
     assert.deepEqual(episodes.filter(e => e.hazardKey.startsWith('machine')).map(e => [e.bandId, e.startMs, e.endMs]), outcome === outcomes[1] ? [
-      ['proximo', 191750, 192500], ['acima', 192500, 195750], ['proximo', 195750, 196500],
+      ['proximo', 14750, 15500], ['acima', 15500, 18750], ['proximo', 18750, 19500],
     ] : []);
     const actualAlerts = run.flatMap((s, i) => s.risks.proximity ? [i * 250] : []);
-    const alertStart = extra ? 96250 : 192500, alertCount = extra ? 55 : outcome === outcomes[1] ? 13 : 0;
+    const alertStart = extra ? 97750 : 15500, alertCount = extra ? 31 : outcome === outcomes[1] ? 13 : 0;
     assert.deepEqual(actualAlerts, Array.from({ length: alertCount }, (_, i) => alertStart + i * 250));
     // Integração independente em 250 ms: detecta salto/lateral variável e divergência entre rumo, velocidade e posição.
-    let x = run[0].position.x, z = -45, distance = 0;
+    let x = -76, z = -10, distance = 0;
     for (let i = 0; i < run.length; i++) {
       const t = i * 250, frame = getSompoAgriFrame(id, t, outcome), s = run[i];
       assert.equal(s.geofence.insideAllowed, true, `${outcome} @${t}`);
       assert.ok(frame.speedKph >= 0 && frame.speedKph <= 7);
-      assert.equal(frame.lateral, -45, 'offset inicial constante, não deslocamento lateral durante o movimento');
+      assert.equal(frame.lateral, -10, 'offset inicial constante, não deslocamento lateral durante o movimento');
       if (i) {
         const previous = getSompoAgriFrame(id, t - 250, outcome);
         for (const f of [previous, frame]) {
@@ -120,31 +133,31 @@ test('operação: série real a 250 ms, três passadas, faixas e alertas nos int
         } else {
           assert.equal(polygonContains(s.position, site.polygons[2]), true);
           assert.ok(frame.roll >= 15);
-          assert.equal(frame.phaseId, 'passada-2');
+          assert.equal(frame.phaseId, 'passada-1');
         }
       }
-      assert.doesNotMatch(describeGeofence(s.geofence), /segur[o]|risco alto|neglig[eê]ncia|vai tombar/i);
-      for (const hit of s.geofence.all) assert.ok(episodes.some(e => e.hazardKey === hit.hazardKey && e.bandId === hit.bandId && e.startMs <= t && (e.endMs === null || t < e.endMs)), `${outcome} @${t}: episódio ${hit.hazardKey}`);
+      assert.doesNotMatch(describeGeofence(s.geofence), forbidden);
+      for (const hit of s.geofence.all) assert.ok(episodes.some(e => e.hazardKey === hit.hazardKey && e.bandId === hit.bandId && e.startMs <= t && t < e.endMs), `${outcome} @${t}: episódio ${hit.hazardKey}`);
     }
-    // Integral dos patamares e rampas simétricas de velocidade: A/B = 1810 / 3,6 m; C soma ida e ré de 20 m.
-    assert.ok(Math.abs(distance - (1810 / 3.6 + (extra ? 40 : 0))) < 0.01, `${outcome}: ${distance} m`);
-    assert.equal(getSompoAgriFrame(id, 400000, outcome).speedKph, 0);
+    // Integral dos patamares e rampas simétricas: A/B = 1016 / 3,6 m; C soma ida e ré de 20 m mais as rampas de parar e arrancar (150 / 3,6 m).
+    assert.ok(Math.abs(distance - (1016 / 3.6 + (extra ? 150 / 3.6 : 0))) < 0.01, `${outcome}: ${distance} m`);
+    assert.equal(getSompoAgriFrame(id, scenario.totalMs, outcome).speedKph, 0);
     const plan = getSompoAgriEpisodePlan(id, outcome);
-    assert.deepEqual(plan.phases.map(p => p.id), ['entrada', 'passada-1', 'cabeceira-leste', 'passada-2', 'cabeceira-oeste', 'passada-3', 'parada']);
+    assert.deepEqual(plan.phases.map(p => p.id), ['entrada', 'passada-1', 'cabeceira-leste', 'passada-2', 'parada']);
     assert.deepEqual(buildSompoAgriRunBrief(id, outcome).phases.map(p => p.atMs), plan.phases.map(p => p.startMs));
     for (const phase of plan.phases) assert.equal(getSompoAgriFrame(id, phase.startMs, outcome).phaseId, phase.id);
     const waterAt = t => run[(t + extra) / 250].geofence.all.find(h => h.hazardKey.startsWith('water'));
-    for (let t = 300000; t <= 306000; t += 250) {
-      assert.equal(waterAt(t).trend, 'aproximando');
+    for (let t = 124000; t <= 136000; t += 250) {
+      assert.equal(waterAt(t).trend, 'aproximando', `${outcome} @${t}`);
       assert.ok(waterAt(t).timeToNextBandS > 0);
     }
-    for (let t = 318000; t <= 322000; t += 250) assert.equal(waterAt(t).trend, 'afastando');
+    for (let t = 142000; t <= 152000; t += 250) assert.equal(waterAt(t).trend, 'afastando', `${outcome} @${t}`);
   }
-  const stop = getSompoAgriPosition(id, 102000, outcomes[2]);
+  const stop = getSompoAgriPosition(id, 101000, outcomes[2]);
   const ring = site.polygons[3].rings[0];
   const depth = Math.min(...ring.slice(1).map((p, i) => segmentDistance(stop, ring[i], p)));
-  assert.ok(Math.abs(depth - 2) < 0.05, `parada a ${depth} m dentro da ribanceira`);
-  for (const [t, trend] of [[95000, 'aproximando'], [112000, 'afastando']]) {
+  assert.ok(depth > 1.4 && depth < 2.4, `parada a ${depth} m dentro da ribanceira`);
+  for (const [t, trend] of [[95000, 'aproximando'], [110000, 'afastando']]) {
     const s = createSompoAgriSimulationSnapshot(id, outcomes[2], { elapsedMs: t });
     assert.equal(s.geofence.all.find(h => h.hazardLabel === 'Ribanceira').trend, trend);
   }

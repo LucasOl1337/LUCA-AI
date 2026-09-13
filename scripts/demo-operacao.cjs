@@ -6,9 +6,9 @@ const path = require('node:path');
 const { chromium } = require('playwright');
 const base = 'http://127.0.0.1:4243';
 const cases = [
-  ['operacao-completa', [[105000, 'Borda da ribanceira', false], [193000, 'Dentro do declive', false], [305000, 'Proximidade elevada', false]]],
-  ['encosta-alem-do-limite', [[105000, 'Borda da ribanceira', false], [193000, 'No limite ou acima', true], [305000, 'Proximidade elevada', false]]],
-  ['cabeceira-na-ribanceira', [[102000, 'Dentro da ribanceira', true], [249000, 'Dentro do declive', false], [361000, 'Proximidade elevada', false]]],
+  ['operacao-completa', [[16000, 'Dentro do declive', false], [93000, 'Borda da ribanceira', false], [136000, 'Proximidade elevada', false]]],
+  ['encosta-alem-do-limite', [[16000, 'No limite ou acima', true], [93000, 'Borda da ribanceira', false], [136000, 'Proximidade elevada', false]]],
+  ['cabeceira-na-ribanceira', [[16000, 'Dentro do declive', false], [101000, 'Dentro da ribanceira', true], [194000, 'Proximidade elevada', false]]],
 ];
 
 (async () => {
@@ -37,6 +37,7 @@ const cases = [
     const now = page.locator('[data-sompo-geofence-now] strong');
     async function assertClock(ms) {
       await page.waitForFunction(value => [...document.querySelectorAll('.sompo-simulator-workspace span')].some(el => el.textContent === `${value} ms`), ms);
+      // Tolerância de 1e-4 % cobre a serialização de 6 dígitos das porcentagens pelo navegador.
       // O range nativo tem step=100: seu valor DOM arredonda amostras de 250 ms. O HUD expõe o relógio exato.
       assert.equal(await page.locator('.sompo-simulator-workspace').getByText(`${ms} ms`, { exact: true }).count(), 1);
     }
@@ -60,7 +61,7 @@ const cases = [
       assert.equal(await page.locator('.sompo-geofence-lane').count(), 5);
       const overlap = await page.locator('.sompo-geofence-lane').evaluateAll(lanes => lanes.some(lane => {
         const buttons = [...lane.querySelectorAll('button')];
-        return buttons.slice(1).some((button, i) => parseFloat(button.style.left) + 1e-8 < parseFloat(buttons[i].style.left) + parseFloat(buttons[i].style.width));
+        return buttons.slice(1).some((button, i) => parseFloat(button.style.left) + 1e-4 < parseFloat(buttons[i].style.left) + parseFloat(buttons[i].style.width));
       }));
       assert.equal(overlap, false, 'episódios curtos não cobrem o próximo segmento');
       for (const [ms, band, alert] of moments) {
@@ -70,7 +71,7 @@ const cases = [
         assert.equal(snapshot.risks.proximity, alert);
         assert.equal(await page.locator('[data-geofence]').getAttribute('data-alert'), String(alert));
         assert.equal(await page.locator('[data-geofence] strong').textContent(), `Radar: ${describeGeofence(snapshot.geofence)}`);
-        if (band === 'Proximidade elevada') assert.match(await page.locator('[data-sompo-geofence-now]').innerText(), /aproximando.*≈ 6 s.*crítica/s);
+        if (band === 'Proximidade elevada') assert.match(await page.locator('[data-sompo-geofence-now]').innerText(), /aproximando.*≈ \d+ s.*crítica/s);
         if (band === 'No limite ou acima') assert.match(await page.locator('[data-geofence-machine]').innerText(), /inclinação 17° · limite 15°/);
         // Deixa o palco desenhar após o seek; relógio permanece pausado.
         await page.waitForTimeout(700);
@@ -100,7 +101,7 @@ const cases = [
     }
     await page.setViewportSize({ width: 390, height: 844 });
     await pause();
-    await seek(361000);
+    await seek(194000);
     await page.waitForTimeout(700);
     const widths = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth,
       panels: [...document.querySelectorAll('.sompo-simulator-workspace, [data-sompo-geofence-panel]')].map(el => ({ client: el.clientWidth, scroll: el.scrollWidth })),

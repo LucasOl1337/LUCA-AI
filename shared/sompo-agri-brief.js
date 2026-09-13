@@ -91,7 +91,8 @@ export function getSompoAgriTravelMeters(scenarioId, elapsedMs = 0, outcomeId) {
 
 /** Origem em metros compartilhada pelo snapshot e pelo palco. */
 export function getSompoAgriStartX(scenarioId, outcomeId) {
-  return -getSompoAgriTravelMeters(scenarioId, getSompoAgriScenario(scenarioId).totalMs, outcomeId) / 2;
+  const scenario = getSompoAgriScenario(scenarioId);
+  return scenario.startX ?? -getSompoAgriTravelMeters(scenarioId, scenario.totalMs, outcomeId) / 2;
 }
 
 // Mesma posição que o palco 3D (createSompoAgriStage): rumo integrado por createSompoMotionPath, e o
@@ -116,7 +117,7 @@ export function getSompoAgriPosition(scenarioId, elapsedMs = 0, outcomeId) {
   const total = path.sample(scenario.totalMs, { x: 0, z: 0 });
   const point = path.sample(elapsedMs, { x: 0, z: 0 });
   const frame = getSompoAgriFrame(scenario.scenarioId, elapsedMs, outcome.id);
-  return { x: -total.x / 2 + point.x, z: point.z + (useLateral ? frame.lateral : 0), headingDeg: 90 - frame.yaw };
+  return { x: (scenario.startX ?? -total.x / 2) + point.x, z: point.z + (useLateral ? frame.lateral : 0), headingDeg: 90 - frame.yaw };
 }
 
 // Episódios de faixa da corrida inteira de um desfecho, pelo mesmo motor do laboratório (computeGeofenceEpisodes).
