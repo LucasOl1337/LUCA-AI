@@ -82,6 +82,7 @@ export interface SompoAgriVisualFrame extends Omit<SompoSimulationControls, 'sce
   implementRoll: number;
   implementYaw: number;
   hydraulicPressure: number;
+  shudder: number;
   headlights: number;
   workLights: number;
   brakeLights: number;

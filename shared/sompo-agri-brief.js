@@ -8,6 +8,7 @@ import {
   SOMPO_AGRI_EQUIPMENT,
   SOMPO_AGRI_SCENARIOS,
   getSompoAgriFrame,
+  getSompoAgriKeyframes,
   getSompoAgriScenario,
 } from './sompo-agri-scenarios.js';
 import { createSompoSimulationSnapshot, sompoEpisodeFrameMoments } from './sompo-telemetry-simulator.js';
@@ -93,24 +94,28 @@ export function getSompoAgriStartX(scenarioId, outcomeId) {
 }
 
 // Mesma posição que o palco 3D (createSompoAgriStage): rumo integrado por createSompoMotionPath, e o
-// deslocamento lateral explícito só no tombamento do trator, como lá. Tabela de 60 Hz construída uma vez por desfecho.
+// deslocamento lateral explícito só quando algum quadro do desfecho o pede, como lá. Tabela de 60 Hz construída uma vez por desfecho.
 const motionPaths = new Map();
 function motionPath(scenarioId, outcomeId) {
   const scenario = getSompoAgriScenario(scenarioId);
   const outcome = resolveOutcome(scenario, outcomeId);
   const key = `${scenario.scenarioId}:${outcome.id}`;
-  if (!motionPaths.has(key)) motionPaths.set(key, createSompoMotionPath(at => getSompoAgriFrame(scenario.scenarioId, at, outcome.id), scenario.totalMs));
+  if (!motionPaths.has(key)) {
+    const path = createSompoMotionPath(at => getSompoAgriFrame(scenario.scenarioId, at, outcome.id), scenario.totalMs);
+    const useLateral = getSompoAgriKeyframes(scenario.scenarioId, outcome.id).some(keyframe => Math.abs(keyframe.lateral) > 1e-3);
+    motionPaths.set(key, { path, useLateral });
+  }
   return motionPaths.get(key);
 }
 /** Posição da máquina em metros de cena no instante: x leste, z sul, rumo 0 = norte / 90 = leste. Igual à cena 3D. */
 export function getSompoAgriPosition(scenarioId, elapsedMs = 0, outcomeId) {
   const scenario = getSompoAgriScenario(scenarioId);
   const outcome = resolveOutcome(scenario, outcomeId);
-  const path = motionPath(scenario.scenarioId, outcome.id);
+  const { path, useLateral } = motionPath(scenario.scenarioId, outcome.id);
   const total = path.sample(scenario.totalMs, { x: 0, z: 0 });
   const point = path.sample(elapsedMs, { x: 0, z: 0 });
   const frame = getSompoAgriFrame(scenario.scenarioId, elapsedMs, outcome.id);
-  return { x: -total.x / 2 + point.x, z: point.z + (outcome.id === 'side-rollover' ? frame.lateral : 0), headingDeg: 90 - frame.yaw };
+  return { x: -total.x / 2 + point.x, z: point.z + (useLateral ? frame.lateral : 0), headingDeg: 90 - frame.yaw };
 }
 
 /** Snapshot agrícola com proveniência, posição de cena e radar sintético. */

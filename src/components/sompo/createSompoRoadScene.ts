@@ -135,7 +135,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   assets.surface(wood, 'wood', 0.18, 1.2);
   wood.color.set(0xb9b2a0);
   // Cerca com mourões irregulares: altura, prumo e giro variam por instância.
-  const postSlots: { x: number; z: number; height: number; lean: number; spin: number }[] = [];
+  const postSlots: { x: number; z: number; height: number; lean: number; spin: number; fallen?: number }[] = [];
   const postRand = (i: number) => { const n = Math.sin(i * 127.1 + 311.7) * 43758.5453; return n - Math.floor(n); };
   for (let i = 0; i < 108; i += 1) {
     postSlots.push({
@@ -148,12 +148,14 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   }
   const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.11, 1.2, 0.12), wood, postSlots.length);
   const postPositions = new Float64Array(postSlots.length).fill(NaN);
+  const postFallen = new Float64Array(postSlots.length).fill(-1);
   posts.castShadow = true; root.add(posts);
   const wires: THREE.Mesh[] = [];
   const wire = new THREE.MeshStandardMaterial({ color: 0x5f6460, roughness: 0.7, metalness: 0.65 });
   for (const z of [6, -10]) for (const y of [0.45, 0.9]) {
     const strand = mesh(root, new THREE.CylinderGeometry(0.004, 0.004, 245, 4), wire, [0, y, z]);
     strand.rotation.z = Math.PI / 2;
+    strand.userData.rowZ = z; strand.userData.wireY = y;
     wires.push(strand);
   }
   const vegetation = createSompoVegetation(root, camera, sompoTerrainHeight);
@@ -216,15 +218,33 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       for (const shoulder of shoulders) shoulder.position.x = Math.round(truckX / 20) * 20;
       for (const line of edgeLines) line.position.x = Math.round(truckX / 20) * 20;
       dashes.position.x = Math.round(truckX / 5) * 5;
-      for (const strand of wires) strand.position.x = truckX;
+      for (const strand of wires) {
+        strand.position.x = truckX;
+        // Cerca derrubada: quando o caminhão cruza a linha da cerca, os arames
+        // daquela fileira caem pro chão junto com os mourões da janela dele.
+        const rowCrossed = strand.userData.rowZ > 0 ? truck.z > 4.3 : truck.z < -8.6;
+        strand.position.y = rowCrossed ? 0.12 : strand.userData.wireY;
+      }
       let postsChanged = false;
       for (const [index, slot] of postSlots.entries()) {
         const x = wrapSompoX(slot.x, truckX, 243);
-        if (postPositions[index] === x) continue;
-        postPositions[index] = x; postsChanged = true;
-        transform.position.set(x, (slot.height / 2) - 0.04, slot.z);
-        transform.rotation.set(slot.lean, slot.spin, slot.lean * 0.7);
-        transform.scale.set(1, slot.height / 1.2, 1);
+        const crossing = slot.z > 0 ? truck.z > 4.3 : truck.z < -8.6;
+        if (crossing && Math.abs(x - truckX) < 5.6) slot.fallen = 1;
+        const fallen = slot.fallen ?? 0;
+        if (postPositions[index] === x && postFallen[index] === fallen) continue;
+        postPositions[index] = x; postFallen[index] = fallen; postsChanged = true;
+        if (fallen) {
+          // Mourão derrubado: deita no sentido do deslocamento e é empurrado
+          // um pouco pra fora da linha da cerca.
+          const dir = frame?.direction ?? 1;
+          transform.position.set(x, 0.08, slot.z + Math.sign(slot.z) * 0.35);
+          transform.rotation.set(0, slot.spin, dir * -1.42 + slot.lean * 0.2);
+          transform.scale.set(1, slot.height / 1.2, 1);
+        } else {
+          transform.position.set(x, (slot.height / 2) - 0.04, slot.z);
+          transform.rotation.set(slot.lean, slot.spin, slot.lean * 0.7);
+          transform.scale.set(1, slot.height / 1.2, 1);
+        }
         transform.updateMatrix();
         posts.setMatrixAt(index, transform.matrix);
       }

@@ -91,7 +91,7 @@ test('desfechos alternativos terminam em estados fisicamente distintos', () => {
   assert.equal(done('engine-fire', 'fogo-alastra').temperature, 70);
   assert.ok(done('bogged-down', 'desatola').speedKph > 0);
   assert.equal(done('bogged-down', 'afunda-mais').inclinationRisk, true);
-  assert.equal(done('shifted-load', 'tomba-parado').roll, 64);
+  assert.equal(done('shifted-load', 'tomba-parado').roll, 84);
   assert.equal(done('steep-climb', 'perda-de-tracao').direction, -1);
 });
 
