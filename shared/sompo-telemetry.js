@@ -447,11 +447,29 @@ function formatSecondsOneDecimal(ms) {
   return String(Math.round(Number(ms) / 100) / 10).replace('.', ',');
 }
 
+const SOMPO_COLLISION_CONTACT_OUTCOMES = new Set([
+  'impacto',
+  'colisao',
+  'toque-no-portao',
+  'toque-na-doca',
+]);
+
+/** Se o roteiro ou a própria distância traz evidência de contato frontal. */
+function episodeCollisionAlertExpected(episode, summary, options = {}) {
+  if (summary?.first?.riscoColisao) return true;
+  const transitions = Array.isArray(summary?.flagTransitions) ? summary.flagTransitions : [];
+  if (transitions.some((item) => item.flag === 'riscoColisao' && item.to === true)) return true;
+  if (SOMPO_COLLISION_CONTACT_OUTCOMES.has(String(options.outcomeId || ''))) return true;
+  if (episode?.kind === 'colisao' && (!options.outcomeId || options.outcomeId === 'impacto')) return true;
+  const minimumDistance = finiteNumber(summary?.stats?.distancia?.min);
+  return minimumDistance !== null && minimumDistance <= 50;
+}
+
 /**
  * O achado que vira manchete: o alerta avisou a tempo? Comparação direta entre
  * o pico de aceleração e o instante em que a flag riscoColisao disparou.
  */
-function episodeAlertFindingLine(summary) {
+function episodeAlertFindingLine(summary, collisionAlertExpected = true) {
   const impact = summary?.impact;
   if (!impact || !Number.isFinite(Number(impact.offsetMs))) return null;
   if (summary?.first?.riscoColisao) {
@@ -460,7 +478,9 @@ function episodeAlertFindingLine(summary) {
   const flagMs = episodeFlagOffsetMs(summary);
   if (flagMs === null && summary?.unknownCollisionCount > 0) return 'Achado do alerta: flags de colisão ausentes em parte do episódio; não é possível confirmar se houve disparo.';
   if (flagMs === null) {
-    return `Achado do alerta: a flag riscoColisao NUNCA disparou neste episódio, mesmo com o pico de aceleração em ${formatOffsetSeconds(impact.offsetMs)}.`;
+    return collisionAlertExpected
+      ? `Achado do alerta: a flag riscoColisao NUNCA disparou neste episódio, mesmo com evidência de colisão em ${formatOffsetSeconds(impact.offsetMs)}.`
+      : `Achado do alerta: a flag riscoColisao não disparou, como esperado num episódio sem evidência de colisão; o maior pico de aceleração ocorreu em ${formatOffsetSeconds(impact.offsetMs)}.`;
   }
   const deltaMs = flagMs - Number(impact.offsetMs);
   if (deltaMs > 100) {
@@ -491,7 +511,7 @@ function episodeTractionFindingLine(summary) {
  * Série compacta para a peça visual: usa as amostras-chave já decimadas
  * (≤30, densas ao redor do pico). Cada ponto é [tMs, distanciaCm, accMs2].
  */
-export function buildSompoEpisodeVisualData(summary) {
+export function buildSompoEpisodeVisualData(summary, options = {}) {
   const keySamples = Array.isArray(summary?.keySamples) ? summary.keySamples : [];
   if (keySamples.length < 2) return null;
   const originMs = Number(keySamples[0].observedMs);
@@ -511,6 +531,7 @@ export function buildSompoEpisodeVisualData(summary) {
     flagMs: flagMs === null ? null : Math.round(flagMs),
     flagsIncompletas: (summary?.unknownCollisionCount || 0) > 0,
     flagDesdeInicio: Boolean(summary?.first?.riscoColisao),
+    alertaColisaoEsperado: options.collisionAlertExpected ?? episodeCollisionAlertExpected(null, summary),
     serie,
   };
 }
@@ -576,9 +597,10 @@ export function buildSompoEpisodeMission(episode, samples, summary, teamLabel, f
   const stats = summary.stats || {};
   const transitions = Array.isArray(summary.flagTransitions) ? summary.flagTransitions : [];
   const keySamples = Array.isArray(summary.keySamples) ? summary.keySamples : [];
-  const alertFinding = episodeAlertFindingLine(summary);
+  const collisionAlertExpected = episodeCollisionAlertExpected(episode, summary, options);
+  const alertFinding = episodeAlertFindingLine(summary, collisionAlertExpected);
   const tractionFinding = episodeTractionFindingLine(summary);
-  const visualData = buildSompoEpisodeVisualData(summary);
+  const visualData = buildSompoEpisodeVisualData(summary, { collisionAlertExpected });
 
   const briefing = [
     `[SIMULAÇÃO] Episódio SOMPO: ${kindLabel}, caminhão ${episode.tractorId || 'SIM-001'}`,

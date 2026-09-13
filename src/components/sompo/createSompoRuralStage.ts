@@ -348,6 +348,32 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
         + SOMPO_TRUCK_FRONT_X + rangeForDistance(closest.distance);
     }
 
+    /**
+     * A doca/portão precisa ocupar o mesmo ponto físico do roteiro. O galpão
+     * cênico sozinho era reciclado ao redor da câmera e nunca chegava ao
+     * para-choque, embora a telemetria marcasse 8–12 cm.
+     */
+    function yardContactFor(settings: SompoSimulationControls, originX: number) {
+      const contact = settings.scenarioId === 'yard-maneuver' && settings.outcomeId === 'encosta-na-doca'
+        ? { atMs: 10_800, bumperX: SOMPO_TRUCK_FRONT_X, gap: 0.12, kind: 'dock' as const }
+        : settings.scenarioId === 'yard-maneuver' && settings.outcomeId === 'toque-no-portao'
+          ? { atMs: 5_400, bumperX: SOMPO_TRUCK_FRONT_X, gap: 0, kind: 'gate' as const }
+          : settings.scenarioId === 'tight-reverse' && settings.outcomeId === 'toque-na-doca'
+            ? { atMs: 5_200, bumperX: -SOMPO_TRUCK_HALF_SIZE.x, gap: 0, kind: 'dock' as const }
+            : null;
+      if (!contact) return null;
+      const frame = getSompoRuralFrame(settings.scenarioId, contact.atMs, settings.outcomeId);
+      const yaw = -THREE.MathUtils.degToRad(frame?.yaw ?? 0);
+      const signedGap = Math.sign(contact.bumperX) * contact.gap;
+      const offset = contact.bumperX + signedGap;
+      return {
+        x: originX + scenarioTravelMeters(settings, contact.atMs) + Math.cos(yaw) * offset,
+        z: (frame?.lateral ?? 0) - Math.sin(yaw) * offset,
+        yaw,
+        kind: contact.kind,
+      };
+    }
+
     function render(time: number) {
       meter.begin();
       const frameDelta = Math.max(0, (time - previousTime) / 1_000);
@@ -538,7 +564,14 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
           contact.wheel.position.y = contact.baseY + travel / contact.parentScaleY;
         }
       }
-      roadScene.update(effectFrame, ruralFrame, visualElapsed, truckPoseGroup.position, reduceMotion.matches, slope, { animalAnchorX, wind: studio.wind });
+      // Também reage à troca de desfecho feita pela URL/controle, mesmo quando
+      // ela ocorre depois do primeiro frame do componente.
+      const yardContactAnchor = isFirebase ? null : yardContactFor(settings, runOriginX);
+      roadScene.update(effectFrame, ruralFrame, visualElapsed, truckPoseGroup.position, reduceMotion.matches, slope, {
+        animalAnchorX,
+        yardContactAnchor,
+        wind: studio.wind,
+      });
       // Posição, cor e intensidade do sol são da atmosfera (alinhada ao HDRI).
       // Sem leitura de distância não há alvo do feixe: esconde obstáculo e raio
       // em vez de desenhá-los numa posição inventada.

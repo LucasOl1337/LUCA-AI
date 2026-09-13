@@ -274,11 +274,13 @@ export interface SompoEpisodeVisualData {
   picoAccMs2: number | null;
   flagMs: number | null;
   flagDesdeInicio: boolean;
+  alertaColisaoEsperado: boolean;
   serie: [number, number | null, number | null][];
 }
 
 export function buildSompoEpisodeVisualData(
   summary: SompoTelemetryEpisodeSummary,
+  options?: { collisionAlertExpected?: boolean },
 ): SompoEpisodeVisualData | null;
 
 export function parseSompoEpisodeVisualData(

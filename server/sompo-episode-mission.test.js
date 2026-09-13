@@ -204,6 +204,56 @@ test('missão de episódio: achado do alerta calculado e bloco de máquina parse
   assert.equal(parseSompoEpisodeVisualData('missão comum sem bloco'), null);
 });
 
+test('missão preventiva não chama pico de aceleração de colisão sem alerta', () => {
+  const samples = Array.from({ length: 20 }, (_, index) => sample(index, {
+    distancia: 250,
+    acc: index === 10 ? 18 : 9.8,
+    collision: false,
+  }));
+  const episode = {
+    id: 10,
+    publicId: 'ep-pausa-preventiva',
+    kind: 'roteiro',
+    tractorId: 'SIM-001',
+    sourceKind: 'simulation',
+    scenarioLabel: 'Calor intenso · Pausa preventiva',
+    startedAt: new Date(BASE_MS).toISOString(),
+    startedMs: BASE_MS,
+    endedAt: new Date(BASE_MS + 10_000).toISOString(),
+    endedMs: BASE_MS + 10_000,
+    status: 'complete',
+    durationMs: 10_000,
+  };
+  const mission = buildSompoEpisodeMission(
+    episode,
+    samples,
+    summarizeSompoEpisodeSamples(samples),
+    'Risco Agro',
+    [],
+    { outcomeId: 'pausa-preventiva', outcomeLabel: 'Pausa preventiva' },
+  );
+
+  assert.match(mission, /riscoColisao não disparou, como esperado num episódio sem evidência de colisão/);
+  assert.doesNotMatch(mission, /NUNCA disparou/);
+  assert.equal(parseSompoEpisodeVisualData(mission)?.alertaColisaoEsperado, false);
+});
+
+test('missão mantém alerta perdido quando o roteiro termina em colisão', () => {
+  const { episode, samples } = scriptedEpisodeFixture();
+  const withoutFlag = samples.map((item) => ({ ...item, riscoColisao: false }));
+  const mission = buildSompoEpisodeMission(
+    episode,
+    withoutFlag,
+    summarizeSompoEpisodeSamples(withoutFlag),
+    'Risco Agro',
+    [],
+    { outcomeId: 'colisao', outcomeLabel: 'Colisão com o animal' },
+  );
+
+  assert.match(mission, /riscoColisao NUNCA disparou neste episódio, mesmo com evidência de colisão/);
+  assert.equal(parseSompoEpisodeVisualData(mission)?.alertaColisaoEsperado, true);
+});
+
 test('missão de episódio: divergência roda x solo vira achado de tração no dossiê', () => {
   // Aquaplanagem sintética: rodas a 30 km/h com o solo a 80 km/h entre t+5s e t+7s.
   const samples = Array.from({ length: 40 }, (_, index) => sample(index, {

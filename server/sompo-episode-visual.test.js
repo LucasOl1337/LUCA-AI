@@ -59,6 +59,10 @@ test('sompoEpisodeHeadline responde a pergunta humana direto do dado', () => {
     'O pico de aceleração passou e o alerta nunca disparou',
   );
   assert.equal(
+    sompoEpisodeHeadline({ ...exampleVisualData(), flagMs: null, alertaColisaoEsperado: false }),
+    'Pico de aceleração sem evidência de colisão',
+  );
+  assert.equal(
     sompoEpisodeHeadline({ ...exampleVisualData(), flagMs: null, flagDesdeInicio: true }),
     'A flag de risco já estava ativa antes do pico',
   );

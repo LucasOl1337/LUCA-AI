@@ -216,6 +216,31 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   }
   mesh(shed, new THREE.BoxGeometry(9, 0.85, 0.12), new THREE.MeshStandardMaterial({ color: 0xa8957a, roughness: 0.9 }), [0, 4.12, 0]);
   mesh(shed, new THREE.BoxGeometry(3.5, 3.1, 0.035), new THREE.MeshStandardMaterial({ color: 0x343d37, roughness: 0.9 }), [0, 1.55, -2.03]);
+  // Face física da doca/portão, ancorada pelo roteiro no ponto de contato.
+  // O galpão acima continua ambientando o terreiro sem fingir essa colisão.
+  const yardContact = new THREE.Group();
+  yardContact.name = 'sompo-yard-contact-surface';
+  root.add(yardContact);
+  const dockWall = new THREE.Group(); yardContact.add(dockWall);
+  const dockConcrete = new THREE.MeshStandardMaterial({ color: 0x9b8f7d, roughness: 0.96 });
+  const dockDark = new THREE.MeshStandardMaterial({ color: 0x263036, roughness: 0.85, metalness: 0.2 });
+  mesh(dockWall, new THREE.BoxGeometry(0.34, 4.4, 7.2), dockConcrete, [0.17, 2.2, 0]);
+  mesh(dockWall, new THREE.BoxGeometry(0.08, 3.15, 3.8), dockDark, [-0.045, 1.58, 0]);
+  for (const side of [-1, 1]) {
+    mesh(dockWall, new THREE.BoxGeometry(0.34, 0.55, 0.38), dockDark, [-0.12, 0.38, side * 2.25]);
+  }
+  const yardGate = new THREE.Group(); yardContact.add(yardGate);
+  const gateMetal = new THREE.MeshStandardMaterial({ color: 0x4f5c57, roughness: 0.68, metalness: 0.55 });
+  for (const side of [-1, 1]) {
+    mesh(yardGate, new THREE.BoxGeometry(0.34, 3.7, 0.34), dockConcrete, [0.17, 1.85, side * 3.25]);
+  }
+  for (let index = -3; index <= 3; index += 1) {
+    mesh(yardGate, new THREE.BoxGeometry(0.12, 3.1, 0.09), gateMetal, [-0.06, 1.58, index * 0.9]);
+  }
+  for (const y of [0.15, 1.55, 3.05]) {
+    mesh(yardGate, new THREE.BoxGeometry(0.12, 0.1, 6.4), gateMetal, [-0.06, y, 0]);
+  }
+  yardContact.visible = false;
   const animal = createSompoAnimal(root);
 
   const rainGeometry = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(240 * 6), 3));
@@ -225,7 +250,11 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const rainRandom = () => { rainSeed ^= rainSeed << 13; rainSeed ^= rainSeed >>> 17; rainSeed ^= rainSeed << 5; return (rainSeed >>> 0) / 4294967296; };
   const rainOrigins = Array.from({ length: 240 }, () => [rainRandom() * 26 - 13, rainRandom() * 20 - 10, rainRandom() * 12]);
   return {
-    update(effectFrame: SompoEffectFrame, frame: SompoRuralFrame | null, elapsed: number, truck: THREE.Vector3, reduceMotion: boolean, slope: number, extras?: { animalAnchorX?: number; wind?: number }) {
+    update(effectFrame: SompoEffectFrame, frame: SompoRuralFrame | null, elapsed: number, truck: THREE.Vector3, reduceMotion: boolean, slope: number, extras?: {
+      animalAnchorX?: number;
+      yardContactAnchor?: { x: number; z: number; yaw: number; kind: 'dock' | 'gate' } | null;
+      wind?: number;
+    }) {
       const t = elapsed / 1000;
       const truckX = truck.x;
       const effects = new Map(effectFrame.cues.map((cue) => [cue.effect, cue.intensity]));
@@ -292,7 +321,14 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       asphalt.normalScale.setScalar(wet ? 0.20 : 1.0);
       markings.visible = !mud && !gravel;
       puddles.visible = wet;
-      shed.visible = effectFrame.setting === 'yard';
+      shed.visible = effectFrame.setting === 'yard' && !extras?.yardContactAnchor;
+      yardContact.visible = effectFrame.setting === 'yard' && Boolean(extras?.yardContactAnchor);
+      if (extras?.yardContactAnchor) {
+        yardContact.position.set(extras.yardContactAnchor.x, 0, extras.yardContactAnchor.z);
+        yardContact.rotation.y = extras.yardContactAnchor.yaw;
+        dockWall.visible = extras.yardContactAnchor.kind === 'dock';
+        yardGate.visible = extras.yardContactAnchor.kind === 'gate';
+      }
       const animalZ = frame?.animalZ ?? -8;
       const walking = frame?.animalRate ?? 0;
       const animalImpact = effectFrame.cues.find(cue => cue.effect === 'debris');
