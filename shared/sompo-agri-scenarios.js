@@ -289,7 +289,9 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
     inclinationRisk: false,
     phases: [
       phase('align', 'Alinhamento externo', 0, 4_000),
-      phase('reverse', 'Ré articulada', 4_000, 11_000),
+      // Cobre a ré e a correção de tração do 'parked' — a fase é compartilhada
+      // com 'post-contact', que não tem avanço de realinhamento.
+      phase('reverse', 'Manobra de ré', 4_000, 11_000),
       phase('outcome', 'Posicionamento final', 11_000, 15_000),
     ],
     outcomes: [
