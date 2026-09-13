@@ -759,7 +759,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [2_900, 'Nariz morde a esquerda', { animalZ: -1.1, yaw: -5, lateral: -0.15, roll: -2, speedKph: 75 }],
       [3_600, 'Desvio para a outra faixa', { animalZ: -0.2, lateral: -1.9, yaw: -5.5, roll: -4, distance: 92, speedKph: 66 }],
       [4_400, 'Passagem rente ao animal', { animalZ: 0.8, lateral: -3.0, yaw: -2, roll: -2.5, distance: 70, speedKph: 56, pitch: -1 }],
-      [5_400, 'Na faixa oposta', { animalZ: 2.0, lateral: -3.1, yaw: 5, roll: 3, distance: 130, speedKph: 55 }],
+      [5_400, 'Na faixa oposta', { animalZ: 2.0, lateral: -3.1, yaw: 5, roll: 3, distance: 130, speedKph: 55, collisionRisk: false }],
       [6_600, 'Retorno à faixa', { animalZ: 3.6, lateral: -1.7, yaw: 4.5, roll: 2, distance: 200, speedKph: 62 }],
       [7_800, 'Alinhando na faixa', { animalZ: 5.0, lateral: -0.4, yaw: 1.5, roll: 0.5, distance: 250, collisionRisk: false, speedKph: 70 }],
       [9_000, 'Segue viagem', { animalZ: 6.2, lateral: 0, yaw: 0, distance: 280, speedKph: 75 }],
