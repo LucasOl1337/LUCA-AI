@@ -4,7 +4,7 @@ export function getSompoGeofenceSite(environmentId: string, totalTravelMeters: n
   synthetic: true;
   label: string;
   manifestRules: { synthetic: true; hazards: {
-    role: 'water' | 'hazard' | 'machine'; category?: string; metric?: 'roll_deg' | 'pitch_deg'; label: string; synthetic: true; justification: string;
+    role: 'water' | 'hazard' | 'machine'; category?: string; metric?: 'roll_deg' | 'pitch_deg'; label: string; synthetic: true; justification: string; alertable?: boolean;
     bands_m: { id: string; label: string; max_m: number }[];
   }[] };
   polygons: {

@@ -157,8 +157,8 @@ function validateManifest(manifest) {
         if (hazard.limit_deg != null && (!finite(hazard.limit_deg) || hazard.limit_deg <= 0)) fail(`${where}: limit_deg deve ser um número positivo em graus.`);
       }
       if (hazard.role === 'hazard' && (typeof hazard.category !== 'string' || !hazard.category.trim())) fail(`${where}: informe category (por exemplo slope) para role hazard.`);
-      const kind = [hazard.role, hazard.category].filter(Boolean).join('/');
-      if (seen.has(kind)) fail(`${where}: perigo ${kind} repetido; use uma entrada por papel e categoria.`);
+      const kind = [hazard.role, hazard.category, hazard.role === 'machine' ? hazard.metric ?? 'roll_deg' : null].filter(Boolean).join('/');
+      if (seen.has(kind)) fail(`${where}: perigo ${kind} repetido; use uma entrada por papel, categoria e métrica.`);
       seen.add(kind);
       const bands = hazard.bands_m;
       if (!Array.isArray(bands) || !bands.length) fail(`${where}: bands_m deve ser uma lista com pelo menos uma faixa.`);

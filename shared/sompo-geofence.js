@@ -75,8 +75,8 @@ export function evaluateGeofence({ x, z, headingDeg = null, speedKph = 0, rollDe
       distanceM: nearest.distance, bearingDeg, closestPoint: { x: nearest.x, z: nearest.z },
       timeToHazardS: nearest.distance > 0 && closingMs > 0.05 && Math.abs(bearingDeg) <= 20 ? nearest.distance / closingMs : null,
       closingSpeedMs, trend, nextBandLabel: nextBand?.label ?? nextBand?.id ?? null,
-      timeToNextBandS: nextBand && closingSpeedMs > 0 && nearest.distance > 0 ? Math.max(0, nearest.distance - nextBand.max_m) / closingSpeedMs : null,
-      timeToHazardEdgeS: closingSpeedMs > 0 && nearest.distance > 0 ? nearest.distance / closingSpeedMs : null,
+      timeToNextBandS: nextBand && trend === 'aproximando' ? Math.max(0, nearest.distance - nextBand.max_m) / closingSpeedMs : null,
+      timeToHazardEdgeS: trend === 'aproximando' ? nearest.distance / closingSpeedMs : null,
     });
   }
   all.sort((a, b) => a.distanceM - b.distanceM);

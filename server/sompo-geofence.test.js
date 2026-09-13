@@ -10,7 +10,7 @@ const rules = { hazards: [{ role: 'water', label: 'Córrego', bands_m: [{ id: 'c
 test('closestPointOnPolygon: borda mais próxima, interior = o próprio ponto', () => {
   assert.deepEqual(closestPointOnPolygon({ x: 60, z: 0 }, water), { x: 60, z: 20, distance: 20 });
   assert.deepEqual(closestPointOnPolygon({ x: 60, z: 30 }, water), { x: 60, z: 30, distance: 0 });
-  assert.equal(Math.round(closestPointOnPolygon({ x: 0, z: 0 }, water).distance), Math.round(Math.hypot(40, 20)));
+  assert.ok(Math.abs(closestPointOnPolygon({ x: 0, z: 0 }, water).distance - Math.hypot(40, 20)) < 1e-9);
 });
 
 test('forwardVector segue heading_deg do laboratório: 90 = +x, 0 = -z (norte)', () => {
@@ -94,6 +94,8 @@ test('tendência geométrica: aproximação, afastamento, estabilidade e parada'
 
   const stable = radarAt(0, 250, { previous: { x: 60, z: -0.01, elapsedMs: 0 } }).nearest;
   assert.equal(stable.trend, 'estavel');
+  assert.equal(stable.timeToNextBandS, null);
+  assert.equal(stable.timeToHazardEdgeS, null);
   const stopped = radarAt(0, 250, { previous: { x: 60, z: 0, elapsedMs: 0 }, speedKph: 0 }).nearest;
   assert.equal(stopped.closingSpeedMs, 0);
   assert.equal(stopped.trend, 'estavel');
