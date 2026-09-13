@@ -304,9 +304,10 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       sprayMaterial.opacity = sprayAmt * 0.36;
       if (spray.visible) {
         const drift = 1 + (frame?.speedKph ?? 0) / 60;
+        const sprayT = reduceMotion ? 0 : t;
         for (let i = 0; i < SPRAY_COUNT; i += 1) {
           const origin = sprayOrigins[i];
-          const age = (t * 1.6 + origin.seed) % 1;
+          const age = (sprayT * 1.6 + origin.seed) % 1;
           sprayPositions[i * 3] = truckX + origin.axle - age * 2.6 * drift;
           sprayPositions[i * 3 + 1] = 0.18 + age * 0.85 - age * age * 0.55;
           sprayPositions[i * 3 + 2] = truck.z + origin.side * (0.72 + origin.jitter * 0.35 + age * 0.5);
