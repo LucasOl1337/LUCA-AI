@@ -35,6 +35,7 @@ export default function SompoStoryCards() {
                   onClick={() => navigate({
                     page: 'sompo',
                     aba: 'telemetria',
+                    fonte: '',
                     cenario: story.lead.scenarioId,
                     desfecho: story.lead.outcomeId,
                   }, 'push')}

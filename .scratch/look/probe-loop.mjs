@@ -1,0 +1,14 @@
+import { chromium } from 'playwright';
+const port = process.env.SHOT_PORT || '5197';
+const browser = await chromium.launch({ headless: true, executablePath: '/opt/google/chrome/chrome', args: ['--use-angle=gl', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'] });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+page.on('pageerror', e => console.error('PAGE', String(e).slice(0, 600)));
+await page.goto(`http://127.0.0.1:${port}/?benchmark=1&offscreen=1`);
+await page.waitForFunction(() => document.querySelector('[data-sompo-simulator]')?.dataset.sompoModel && document.querySelector('[data-sompo-simulator]').dataset.sompoModel !== 'loading', null, { timeout: 90000 });
+await page.locator('select[name="sompo-scenario"]').selectOption('agri-harvest-dust');
+await page.waitForTimeout(4000);
+const a = await page.evaluate(() => window.__sompoPreview.metrics.length);
+await page.waitForTimeout(1000);
+const b = await page.evaluate(() => window.__sompoPreview.metrics.length);
+console.log('metrics', a, '->', b, b > a ? 'LOOP VIVO' : 'LOOP MORTO');
+await browser.close();

@@ -1,0 +1,138 @@
+{
+  "renderer": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4070 Ti SUPER/PCIe/SSE2, OpenGL 4.5.0)",
+  "scheduler": "fixture timer; no presentation FPS claim",
+  "checks": [
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "normal",
+      "hz": 30,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "normal",
+      "hz": 60,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "normal",
+      "hz": 120,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "bogged-down",
+      "hz": 30,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "bogged-down",
+      "hz": 60,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "bogged-down",
+      "hz": 120,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "agri-field-bogging",
+      "hz": 30,
+      "maxError": 1.1102230246251565e-16
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "agri-field-bogging",
+      "hz": 60,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "agri-field-bogging",
+      "hz": 120,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "agri-hydraulic-failure",
+      "hz": 30,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "agri-hydraulic-failure",
+      "hz": 60,
+      "maxError": 2.220446049250313e-16
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "agri-hydraulic-failure",
+      "hz": 120,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "agri-harvest-dust",
+      "hz": 30,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "agri-harvest-dust",
+      "hz": 60,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "agri-harvest-dust",
+      "hz": 120,
+      "maxError": 0
+    },
+    {
+      "check": "resource reuse across stage alternations",
+      "resources": [
+        {
+          "textures": 33,
+          "buffers": 454
+        },
+        {
+          "textures": 32,
+          "buffers": 455
+        },
+        {
+          "textures": 32,
+          "buffers": 455
+        },
+        {
+          "textures": 32,
+          "buffers": 454
+        }
+      ]
+    },
+    {
+      "check": "mobile rendering",
+      "id": "normal"
+    },
+    {
+      "check": "mobile rendering",
+      "id": "agri-harvest-dust"
+    },
+    {
+      "check": "mobile rendering",
+      "id": "agri-hydraulic-failure"
+    },
+    {
+      "check": "articulated fallback after failed GLB",
+      "id": "agri-hydraulic-failure"
+    },
+    {
+      "check": "articulated fallback after failed GLB",
+      "id": "agri-harvest-dust"
+    }
+  ],
+  "errors": []
+}

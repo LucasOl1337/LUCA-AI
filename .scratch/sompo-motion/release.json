@@ -1,0 +1,12 @@
+{
+  "release": "478d1ec978d5-motion-738f094d",
+  "baseCommit": "478d1ec978d54cb34244fbe4d208230463aace6b",
+  "committed": false,
+  "createdAt": "2026-09-12T16:01:41.200Z",
+  "staging": "/tmp/luca-deploy-478d1ec978d5-motion-738f094d",
+  "simulatorAsset": "/assets/SompoTruckSimulator-Djqb9MZh.js",
+  "simulatorAssetBytes": 200241,
+  "simulatorAssetSha256": "738f094dd995dbfcb0166d166db88e0ff732d51289fd2bd6b1a7454786d73a32",
+  "previousRelease": "/opt/sennin/luca-ai/releases/478d1ec978d5-studio-final-99b3f3fa",
+  "notes": "Equipment axes, agricultural rig, signed wheel travel, deterministic playback, terrain support, continuous effects and animal contact response. Preserves concurrent shared work and physical calibration."
+}

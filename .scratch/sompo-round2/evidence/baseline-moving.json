@@ -1,0 +1,1093 @@
+[
+  {
+    "name": "road",
+    "logicalStart": 2000,
+    "logicalEnd": 10000,
+    "scheduler": "fixture timer 16ms; no presentation FPS claim",
+    "logicalRange": [
+      6033.3333333333585,
+      11000
+    ],
+    "viewport": [
+      1440,
+      1000
+    ],
+    "dpr": 1,
+    "canvas": [
+      897,
+      590
+    ],
+    "renderer": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4070 Ti SUPER/PCIe/SSE2, OpenGL 4.5.0)",
+    "count": 300,
+    "intervalMs": {
+      "median": 18.700000002980232,
+      "p95": 330.79999999701977
+    },
+    "cpuMs": {
+      "median": 2.2999999970197678,
+      "p95": 338.09999999403954
+    },
+    "calls": {
+      "median": 147,
+      "p95": 150
+    },
+    "triangles": {
+      "median": 888997,
+      "p95": 925001
+    },
+    "resources": {
+      "textures": 60,
+      "buffers": 274
+    },
+    "heap": 50702067,
+    "transferBytes": 42280710,
+    "loadedBytes": 42270510,
+    "network": [
+      {
+        "name": "http://127.0.0.1:5196/preview.css",
+        "bytes": 37859,
+        "transferBytes": 38159
+      },
+      {
+        "name": "http://127.0.0.1:5196/instrument.js",
+        "bytes": 4558,
+        "transferBytes": 4858
+      },
+      {
+        "name": "http://127.0.0.1:5196/preview.js",
+        "bytes": 1107989,
+        "transferBytes": 1108289
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/kloppenheim_06_2k.hdr",
+        "bytes": 5830386,
+        "transferBytes": 5830686
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda.glb",
+        "bytes": 2907820,
+        "transferBytes": 2908120
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus.glb",
+        "bytes": 2335388,
+        "transferBytes": 2335688
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado.glb",
+        "bytes": 3171684,
+        "transferBytes": 3171984
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-rural-truck.glb",
+        "bytes": 6673960,
+        "transferBytes": 6674260
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/dirt-color-2k.jpg",
+        "bytes": 838347,
+        "transferBytes": 838647
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/dirt-normal-2k.jpg",
+        "bytes": 1142550,
+        "transferBytes": 1142850
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/dirt-arm-2k.jpg",
+        "bytes": 1106137,
+        "transferBytes": 1106437
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/asphalt-color-2k.jpg",
+        "bytes": 1559633,
+        "transferBytes": 1559933
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/asphalt-normal-2k.jpg",
+        "bytes": 2075157,
+        "transferBytes": 2075457
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/asphalt-arm-2k.jpg",
+        "bytes": 1845255,
+        "transferBytes": 1845555
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/wood-color.jpg",
+        "bytes": 1230499,
+        "transferBytes": 1230799
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/wood-normal.jpg",
+        "bytes": 1890303,
+        "transferBytes": 1890603
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/wood-arm.jpg",
+        "bytes": 783758,
+        "transferBytes": 784058
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda-billboard.webp",
+        "bytes": 181174,
+        "transferBytes": 181474
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus-billboard.webp",
+        "bytes": 116522,
+        "transferBytes": 116822
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado-billboard.webp",
+        "bytes": 164592,
+        "transferBytes": 164892
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-nelore-billboard.webp",
+        "bytes": 40566,
+        "transferBytes": 40866
+      },
+      {
+        "name": "http://127.0.0.1:5196/favicon.ico",
+        "bytes": 0,
+        "transferBytes": 300
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda.textures.json",
+        "bytes": 111,
+        "transferBytes": 411
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus.textures.json",
+        "bytes": 113,
+        "transferBytes": 413
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado.textures.json",
+        "bytes": 107,
+        "transferBytes": 407
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-rural-truck.textures.json",
+        "bytes": 115,
+        "transferBytes": 415
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda-basecolor.jpg",
+        "bytes": 444289,
+        "transferBytes": 444589
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda-metallicroughness.png",
+        "bytes": 1467221,
+        "transferBytes": 1467521
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus-basecolor.jpg",
+        "bytes": 455096,
+        "transferBytes": 455396
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus-metallicroughness.png",
+        "bytes": 1313998,
+        "transferBytes": 1314298
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado-basecolor.jpg",
+        "bytes": 553272,
+        "transferBytes": 553572
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado-metallicroughness.png",
+        "bytes": 1624219,
+        "transferBytes": 1624519
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-rural-truck-basecolor.jpg",
+        "bytes": 304002,
+        "transferBytes": 304302
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-rural-truck-metallicroughness.png",
+        "bytes": 1063830,
+        "transferBytes": 1064130
+      }
+    ],
+    "time": 11000,
+    "snapshot": {
+      "tractorId": "SIM-001",
+      "observedAt": "2026-09-12T14:40:11.278Z",
+      "changedAt": "2026-09-12T14:40:11.278Z",
+      "unchangedForMs": 0,
+      "freshness": "fresh",
+      "connection": {
+        "state": "live",
+        "connectedAt": "2026-09-12T14:39:29.043Z",
+        "lastEventAt": "2026-09-12T14:40:11.278Z",
+        "retryAttempt": 0
+      },
+      "deviceTimestamp": 10000,
+      "status": "normal",
+      "risks": {
+        "collision": false,
+        "inclination": false
+      },
+      "readings": {
+        "distance": 210.23,
+        "temperature": 27.1,
+        "humidity": 48.2,
+        "pitch": 1.58,
+        "roll": 1.07,
+        "acceleration": {
+          "x": 0.15,
+          "y": -0.06,
+          "z": 9.69,
+          "magnitude": 9.7
+        },
+        "rotation": {
+          "x": -0.13,
+          "y": 0.1,
+          "z": -0.22,
+          "magnitude": 0.28
+        }
+      },
+      "source": {
+        "kind": "simulation",
+        "provider": "Simulador 3D local",
+        "path": "simulation://sompo/caminhao/SIM-001/esp32",
+        "scenarioId": "normal",
+        "scenarioLabel": "Operação normal",
+        "outcomeId": "livre",
+        "outcomeLabel": "Condução livre"
+      }
+    }
+  },
+  {
+    "name": "harvest",
+    "logicalStart": 2000,
+    "logicalEnd": 10000,
+    "scheduler": "fixture timer 16ms; no presentation FPS claim",
+    "logicalRange": [
+      6050.0000000000255,
+      11000
+    ],
+    "viewport": [
+      1440,
+      1000
+    ],
+    "dpr": 1,
+    "canvas": [
+      897,
+      692
+    ],
+    "renderer": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4070 Ti SUPER/PCIe/SSE2, OpenGL 4.5.0)",
+    "count": 300,
+    "intervalMs": {
+      "median": 16.5,
+      "p95": 19.099999994039536
+    },
+    "cpuMs": {
+      "median": 0.4000000059604645,
+      "p95": 1.2999999970197678
+    },
+    "calls": {
+      "median": 10,
+      "p95": 11
+    },
+    "triangles": {
+      "median": 112882,
+      "p95": 122098
+    },
+    "resources": {
+      "textures": 18,
+      "buffers": 59
+    },
+    "heap": 29743879,
+    "transferBytes": 52080145,
+    "loadedBytes": 52068745,
+    "network": [
+      {
+        "name": "http://127.0.0.1:5196/preview.css",
+        "bytes": 37859,
+        "transferBytes": 38159
+      },
+      {
+        "name": "http://127.0.0.1:5196/instrument.js",
+        "bytes": 4558,
+        "transferBytes": 4858
+      },
+      {
+        "name": "http://127.0.0.1:5196/preview.js",
+        "bytes": 1107989,
+        "transferBytes": 1108289
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/kloppenheim_06_2k.hdr",
+        "bytes": 5830386,
+        "transferBytes": 5830686
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda.glb",
+        "bytes": 2907820,
+        "transferBytes": 2908120
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus.glb",
+        "bytes": 2335388,
+        "transferBytes": 2335688
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado.glb",
+        "bytes": 3171684,
+        "transferBytes": 3171984
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-rural-truck.glb",
+        "bytes": 6673960,
+        "transferBytes": 6674260
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/dirt-color-2k.jpg",
+        "bytes": 838347,
+        "transferBytes": 838647
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/dirt-normal-2k.jpg",
+        "bytes": 1142550,
+        "transferBytes": 1142850
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/dirt-arm-2k.jpg",
+        "bytes": 1106137,
+        "transferBytes": 1106437
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/asphalt-color-2k.jpg",
+        "bytes": 1559633,
+        "transferBytes": 1559933
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/asphalt-normal-2k.jpg",
+        "bytes": 2075157,
+        "transferBytes": 2075457
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/asphalt-arm-2k.jpg",
+        "bytes": 1845255,
+        "transferBytes": 1845555
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/wood-color.jpg",
+        "bytes": 1230499,
+        "transferBytes": 1230799
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/wood-normal.jpg",
+        "bytes": 1890303,
+        "transferBytes": 1890603
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/wood-arm.jpg",
+        "bytes": 783758,
+        "transferBytes": 784058
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda-billboard.webp",
+        "bytes": 181174,
+        "transferBytes": 181474
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus-billboard.webp",
+        "bytes": 116522,
+        "transferBytes": 116822
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado-billboard.webp",
+        "bytes": 164592,
+        "transferBytes": 164892
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-nelore-billboard.webp",
+        "bytes": 40566,
+        "transferBytes": 40866
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda.textures.json",
+        "bytes": 111,
+        "transferBytes": 411
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus.textures.json",
+        "bytes": 113,
+        "transferBytes": 413
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado.textures.json",
+        "bytes": 107,
+        "transferBytes": 407
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-rural-truck.textures.json",
+        "bytes": 115,
+        "transferBytes": 415
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda-basecolor.jpg",
+        "bytes": 444289,
+        "transferBytes": 444589
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda-metallicroughness.png",
+        "bytes": 1467221,
+        "transferBytes": 1467521
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus-basecolor.jpg",
+        "bytes": 455096,
+        "transferBytes": 455396
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus-metallicroughness.png",
+        "bytes": 1313998,
+        "transferBytes": 1314298
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado-basecolor.jpg",
+        "bytes": 553272,
+        "transferBytes": 553572
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado-metallicroughness.png",
+        "bytes": 1624219,
+        "transferBytes": 1624519
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-rural-truck-basecolor.jpg",
+        "bytes": 304002,
+        "transferBytes": 304302
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-rural-truck-metallicroughness.png",
+        "bytes": 1063830,
+        "transferBytes": 1064130
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/kloppenheim_06_2k.hdr",
+        "bytes": 5830386,
+        "transferBytes": 5830686
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-agri-harvester.glb",
+        "bytes": 2465396,
+        "transferBytes": 2465696
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-agri-harvester.textures.json",
+        "bytes": 121,
+        "transferBytes": 421
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-agri-harvester-basecolor.jpg",
+        "bytes": 355716,
+        "transferBytes": 356016
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-agri-harvester-metallicroughness.png",
+        "bytes": 1146616,
+        "transferBytes": 1146916
+      }
+    ],
+    "time": 11000,
+    "snapshot": {
+      "tractorId": "SIM-001",
+      "observedAt": "2026-09-12T14:40:59.805Z",
+      "changedAt": "2026-09-12T14:40:59.805Z",
+      "unchangedForMs": 0,
+      "freshness": "fresh",
+      "connection": {
+        "state": "live",
+        "connectedAt": "2026-09-12T14:40:37.544Z",
+        "lastEventAt": "2026-09-12T14:40:59.805Z",
+        "retryAttempt": 0
+      },
+      "deviceTimestamp": 10000,
+      "status": "normal",
+      "risks": {
+        "collision": false,
+        "inclination": false
+      },
+      "readings": {
+        "distance": 220.53,
+        "temperature": 34.1,
+        "humidity": 31.2,
+        "pitch": 1.19,
+        "roll": 2.17,
+        "acceleration": {
+          "x": -0.22,
+          "y": 0.3,
+          "z": 9.54,
+          "magnitude": 9.54
+        },
+        "rotation": {
+          "x": -0.31,
+          "y": 0.22,
+          "z": 1.74,
+          "magnitude": 1.78
+        }
+      },
+      "source": {
+        "kind": "simulation",
+        "provider": "Simulador 3D local",
+        "path": "simulation://sompo/caminhao/SIM-001/esp32",
+        "scenarioId": "agri-harvest-dust",
+        "scenarioLabel": "Colheita com poeira",
+        "outcomeId": "clean-pass",
+        "outcomeLabel": "Passada concluída"
+      }
+    }
+  },
+  {
+    "name": "road-mobile",
+    "logicalStart": 2000,
+    "logicalEnd": 10000,
+    "scheduler": "fixture timer 16ms; no presentation FPS claim",
+    "logicalRange": [
+      6066.666666666692,
+      11000
+    ],
+    "viewport": [
+      390,
+      844
+    ],
+    "dpr": 1,
+    "canvas": [
+      359,
+      440
+    ],
+    "renderer": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4070 Ti SUPER/PCIe/SSE2, OpenGL 4.5.0)",
+    "count": 300,
+    "intervalMs": {
+      "median": 18,
+      "p95": 23
+    },
+    "cpuMs": {
+      "median": 1.6000000089406967,
+      "p95": 6.4000000059604645
+    },
+    "calls": {
+      "median": 73,
+      "p95": 74
+    },
+    "triangles": {
+      "median": 553366,
+      "p95": 571366
+    },
+    "resources": {
+      "textures": 41,
+      "buffers": 260
+    },
+    "heap": 46336373,
+    "transferBytes": 42280410,
+    "loadedBytes": 42270510,
+    "network": [
+      {
+        "name": "http://127.0.0.1:5196/preview.css",
+        "bytes": 37859,
+        "transferBytes": 38159
+      },
+      {
+        "name": "http://127.0.0.1:5196/instrument.js",
+        "bytes": 4558,
+        "transferBytes": 4858
+      },
+      {
+        "name": "http://127.0.0.1:5196/preview.js",
+        "bytes": 1107989,
+        "transferBytes": 1108289
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/kloppenheim_06_2k.hdr",
+        "bytes": 5830386,
+        "transferBytes": 5830686
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda.glb",
+        "bytes": 2907820,
+        "transferBytes": 2908120
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus.glb",
+        "bytes": 2335388,
+        "transferBytes": 2335688
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado.glb",
+        "bytes": 3171684,
+        "transferBytes": 3171984
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-rural-truck.glb",
+        "bytes": 6673960,
+        "transferBytes": 6674260
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/dirt-color-2k.jpg",
+        "bytes": 838347,
+        "transferBytes": 838647
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/dirt-normal-2k.jpg",
+        "bytes": 1142550,
+        "transferBytes": 1142850
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/dirt-arm-2k.jpg",
+        "bytes": 1106137,
+        "transferBytes": 1106437
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/asphalt-color-2k.jpg",
+        "bytes": 1559633,
+        "transferBytes": 1559933
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/asphalt-normal-2k.jpg",
+        "bytes": 2075157,
+        "transferBytes": 2075457
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/asphalt-arm-2k.jpg",
+        "bytes": 1845255,
+        "transferBytes": 1845555
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/wood-color.jpg",
+        "bytes": 1230499,
+        "transferBytes": 1230799
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/wood-normal.jpg",
+        "bytes": 1890303,
+        "transferBytes": 1890603
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/wood-arm.jpg",
+        "bytes": 783758,
+        "transferBytes": 784058
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda-billboard.webp",
+        "bytes": 181174,
+        "transferBytes": 181474
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus-billboard.webp",
+        "bytes": 116522,
+        "transferBytes": 116822
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado-billboard.webp",
+        "bytes": 164592,
+        "transferBytes": 164892
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-nelore-billboard.webp",
+        "bytes": 40566,
+        "transferBytes": 40866
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda.textures.json",
+        "bytes": 111,
+        "transferBytes": 411
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus.textures.json",
+        "bytes": 113,
+        "transferBytes": 413
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado.textures.json",
+        "bytes": 107,
+        "transferBytes": 407
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-rural-truck.textures.json",
+        "bytes": 115,
+        "transferBytes": 415
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda-basecolor.jpg",
+        "bytes": 444289,
+        "transferBytes": 444589
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda-metallicroughness.png",
+        "bytes": 1467221,
+        "transferBytes": 1467521
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus-basecolor.jpg",
+        "bytes": 455096,
+        "transferBytes": 455396
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus-metallicroughness.png",
+        "bytes": 1313998,
+        "transferBytes": 1314298
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado-basecolor.jpg",
+        "bytes": 553272,
+        "transferBytes": 553572
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado-metallicroughness.png",
+        "bytes": 1624219,
+        "transferBytes": 1624519
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-rural-truck-basecolor.jpg",
+        "bytes": 304002,
+        "transferBytes": 304302
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-rural-truck-metallicroughness.png",
+        "bytes": 1063830,
+        "transferBytes": 1064130
+      }
+    ],
+    "time": 11000,
+    "snapshot": {
+      "tractorId": "SIM-001",
+      "observedAt": "2026-09-12T14:41:53.063Z",
+      "changedAt": "2026-09-12T14:41:53.063Z",
+      "unchangedForMs": 0,
+      "freshness": "fresh",
+      "connection": {
+        "state": "live",
+        "connectedAt": "2026-09-12T14:41:25.055Z",
+        "lastEventAt": "2026-09-12T14:41:53.063Z",
+        "retryAttempt": 0
+      },
+      "deviceTimestamp": 10000,
+      "status": "normal",
+      "risks": {
+        "collision": false,
+        "inclination": false
+      },
+      "readings": {
+        "distance": 210.23,
+        "temperature": 27.1,
+        "humidity": 48.2,
+        "pitch": 1.58,
+        "roll": 1.07,
+        "acceleration": {
+          "x": 0.15,
+          "y": -0.06,
+          "z": 9.69,
+          "magnitude": 9.7
+        },
+        "rotation": {
+          "x": -0.13,
+          "y": 0.1,
+          "z": -0.22,
+          "magnitude": 0.28
+        }
+      },
+      "source": {
+        "kind": "simulation",
+        "provider": "Simulador 3D local",
+        "path": "simulation://sompo/caminhao/SIM-001/esp32",
+        "scenarioId": "normal",
+        "scenarioLabel": "Operação normal",
+        "outcomeId": "livre",
+        "outcomeLabel": "Condução livre"
+      }
+    }
+  },
+  {
+    "name": "harvest-mobile",
+    "logicalStart": 2000,
+    "logicalEnd": 10000,
+    "scheduler": "fixture timer 16ms; no presentation FPS claim",
+    "logicalRange": [
+      6066.666666666692,
+      11000
+    ],
+    "viewport": [
+      390,
+      844
+    ],
+    "dpr": 1,
+    "canvas": [
+      359,
+      440
+    ],
+    "renderer": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4070 Ti SUPER/PCIe/SSE2, OpenGL 4.5.0)",
+    "count": 300,
+    "intervalMs": {
+      "median": 16.600000008940697,
+      "p95": 19.5
+    },
+    "cpuMs": {
+      "median": 0.4000000059604645,
+      "p95": 1.7999999970197678
+    },
+    "calls": {
+      "median": 9,
+      "p95": 9
+    },
+    "triangles": {
+      "median": 88306,
+      "p95": 88306
+    },
+    "resources": {
+      "textures": 18,
+      "buffers": 58
+    },
+    "heap": 29987456,
+    "transferBytes": 52080145,
+    "loadedBytes": 52068745,
+    "network": [
+      {
+        "name": "http://127.0.0.1:5196/preview.css",
+        "bytes": 37859,
+        "transferBytes": 38159
+      },
+      {
+        "name": "http://127.0.0.1:5196/instrument.js",
+        "bytes": 4558,
+        "transferBytes": 4858
+      },
+      {
+        "name": "http://127.0.0.1:5196/preview.js",
+        "bytes": 1107989,
+        "transferBytes": 1108289
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/kloppenheim_06_2k.hdr",
+        "bytes": 5830386,
+        "transferBytes": 5830686
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda.glb",
+        "bytes": 2907820,
+        "transferBytes": 2908120
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus.glb",
+        "bytes": 2335388,
+        "transferBytes": 2335688
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado.glb",
+        "bytes": 3171684,
+        "transferBytes": 3171984
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-rural-truck.glb",
+        "bytes": 6673960,
+        "transferBytes": 6674260
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/dirt-color-2k.jpg",
+        "bytes": 838347,
+        "transferBytes": 838647
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/dirt-normal-2k.jpg",
+        "bytes": 1142550,
+        "transferBytes": 1142850
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/dirt-arm-2k.jpg",
+        "bytes": 1106137,
+        "transferBytes": 1106437
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/asphalt-color-2k.jpg",
+        "bytes": 1559633,
+        "transferBytes": 1559933
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/asphalt-normal-2k.jpg",
+        "bytes": 2075157,
+        "transferBytes": 2075457
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/asphalt-arm-2k.jpg",
+        "bytes": 1845255,
+        "transferBytes": 1845555
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/wood-color.jpg",
+        "bytes": 1230499,
+        "transferBytes": 1230799
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/wood-arm.jpg",
+        "bytes": 783758,
+        "transferBytes": 784058
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/wood-normal.jpg",
+        "bytes": 1890303,
+        "transferBytes": 1890603
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda-billboard.webp",
+        "bytes": 181174,
+        "transferBytes": 181474
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus-billboard.webp",
+        "bytes": 116522,
+        "transferBytes": 116822
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado-billboard.webp",
+        "bytes": 164592,
+        "transferBytes": 164892
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-nelore-billboard.webp",
+        "bytes": 40566,
+        "transferBytes": 40866
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda.textures.json",
+        "bytes": 111,
+        "transferBytes": 411
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus.textures.json",
+        "bytes": 113,
+        "transferBytes": 413
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado.textures.json",
+        "bytes": 107,
+        "transferBytes": 407
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-rural-truck.textures.json",
+        "bytes": 115,
+        "transferBytes": 415
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda-basecolor.jpg",
+        "bytes": 444289,
+        "transferBytes": 444589
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-jacaranda-metallicroughness.png",
+        "bytes": 1467221,
+        "transferBytes": 1467521
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus-basecolor.jpg",
+        "bytes": 455096,
+        "transferBytes": 455396
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-eucalyptus-metallicroughness.png",
+        "bytes": 1313998,
+        "transferBytes": 1314298
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado-basecolor.jpg",
+        "bytes": 553272,
+        "transferBytes": 553572
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-cerrado-metallicroughness.png",
+        "bytes": 1624219,
+        "transferBytes": 1624519
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-rural-truck-basecolor.jpg",
+        "bytes": 304002,
+        "transferBytes": 304302
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-rural-truck-metallicroughness.png",
+        "bytes": 1063830,
+        "transferBytes": 1064130
+      },
+      {
+        "name": "http://127.0.0.1:5196/environments/sompo/kloppenheim_06_2k.hdr",
+        "bytes": 5830386,
+        "transferBytes": 5830686
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-agri-harvester.glb",
+        "bytes": 2465396,
+        "transferBytes": 2465696
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-agri-harvester.textures.json",
+        "bytes": 121,
+        "transferBytes": 421
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-agri-harvester-basecolor.jpg",
+        "bytes": 355716,
+        "transferBytes": 356016
+      },
+      {
+        "name": "http://127.0.0.1:5196/models/sompo/generated-agri-harvester-metallicroughness.png",
+        "bytes": 1146616,
+        "transferBytes": 1146916
+      }
+    ],
+    "time": 11000,
+    "snapshot": {
+      "tractorId": "SIM-001",
+      "observedAt": "2026-09-12T14:42:39.432Z",
+      "changedAt": "2026-09-12T14:42:39.432Z",
+      "unchangedForMs": 0,
+      "freshness": "fresh",
+      "connection": {
+        "state": "live",
+        "connectedAt": "2026-09-12T14:42:19.415Z",
+        "lastEventAt": "2026-09-12T14:42:39.432Z",
+        "retryAttempt": 0
+      },
+      "deviceTimestamp": 9983,
+      "status": "normal",
+      "risks": {
+        "collision": false,
+        "inclination": false
+      },
+      "readings": {
+        "distance": 220.52,
+        "temperature": 34.1,
+        "humidity": 31.2,
+        "pitch": 1.19,
+        "roll": 2.18,
+        "acceleration": {
+          "x": -0.2,
+          "y": 0.28,
+          "z": 9.55,
+          "magnitude": 9.55
+        },
+        "rotation": {
+          "x": -0.29,
+          "y": 0.22,
+          "z": 1.73,
+          "magnitude": 1.77
+        }
+      },
+      "source": {
+        "kind": "simulation",
+        "provider": "Simulador 3D local",
+        "path": "simulation://sompo/caminhao/SIM-001/esp32",
+        "scenarioId": "agri-harvest-dust",
+        "scenarioLabel": "Colheita com poeira",
+        "outcomeId": "clean-pass",
+        "outcomeLabel": "Passada concluída"
+      }
+    }
+  }
+]

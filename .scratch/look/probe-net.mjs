@@ -1,0 +1,11 @@
+import { chromium } from 'playwright';
+const port = process.env.SHOT_PORT || '5197';
+const browser = await chromium.launch({ headless: true, executablePath: '/opt/google/chrome/chrome', args: ['--use-angle=gl', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'] });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+page.on('pageerror', e => console.error('PAGE', String(e)));
+await page.goto(`http://127.0.0.1:${port}/?benchmark=1&offscreen=1`);
+await page.waitForFunction(() => document.querySelector('[data-sompo-simulator]')?.dataset.sompoModel && document.querySelector('[data-sompo-simulator]').dataset.sompoModel !== 'loading', null, { timeout: 90000 });
+await page.waitForTimeout(5000);
+const net = await page.evaluate(() => performance.getEntriesByType('resource').map(r => r.name).filter(n => /hdr|sompo|glb|jpg|webp/i.test(n)));
+console.log(net.join('\n'));
+await browser.close();

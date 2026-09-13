@@ -1,0 +1,34 @@
+{
+  "renderer": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4070 Ti SUPER/PCIe/SSE2, OpenGL 4.5.0)",
+  "scheduler": "fixture timer; no presentation FPS claim",
+  "checks": [
+    {
+      "check": "actual WebGL motion capture",
+      "id": "agri-field-bogging",
+      "outcome": "assisted-recovery",
+      "start": 6500,
+      "duration": 3000,
+      "frames": 92,
+      "fps": 30
+    },
+    {
+      "check": "actual WebGL motion capture",
+      "id": "agri-harvest-dust",
+      "outcome": "clean-pass",
+      "start": 3000,
+      "duration": 3000,
+      "frames": 94,
+      "fps": 30
+    },
+    {
+      "check": "actual WebGL motion capture",
+      "id": "animal-crossing",
+      "outcome": "colisao",
+      "start": 4000,
+      "duration": 3000,
+      "frames": 92,
+      "fps": 30
+    }
+  ],
+  "errors": []
+}

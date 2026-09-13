@@ -1,0 +1,12 @@
+{
+  "release": "478d1ec978d5-studio-final-99b3f3fa",
+  "baseCommit": "478d1ec978d54cb34244fbe4d208230463aace6b",
+  "committed": false,
+  "createdAt": "2026-09-12T14:46:40.560Z",
+  "staging": "/tmp/luca-deploy-478d1ec978d5-studio-final-99b3f3fa",
+  "simulatorAsset": "/assets/SompoTruckSimulator-DHoAbz-C.js",
+  "simulatorAssetBytes": 182403,
+  "simulatorAssetSha256": "99b3f3fa158bdb6a7b7e285a23696b7615eb5caf0d6d59924378a7e6904c5fcd",
+  "previousRelease": "/opt/sennin/luca-ai/releases/478d1ec978d5",
+  "notes": "Keeps the current production release; adds the final mobile controls and camera framing, plus documentation and technical QA changes."
+}

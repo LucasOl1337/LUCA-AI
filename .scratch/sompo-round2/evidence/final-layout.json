@@ -1,0 +1,31 @@
+{
+  "workspace": 7,
+  "bounds": [
+    {
+      "label": "Simulador",
+      "left": 20,
+      "right": 184
+    },
+    {
+      "label": "Oficina 3D",
+      "left": 191,
+      "right": 355
+    },
+    {
+      "label": "Pausar simulação",
+      "left": 20,
+      "right": 58
+    },
+    {
+      "label": "Instante da simulação",
+      "left": 67,
+      "right": 243
+    },
+    {
+      "label": "Velocidade de reprodução",
+      "left": 295,
+      "right": 355
+    }
+  ],
+  "errors": []
+}

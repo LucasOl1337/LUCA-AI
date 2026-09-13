@@ -1,0 +1,54 @@
+{
+  "verifiedAt": "2026-09-12T16:07:13.388Z",
+  "release": "478d1ec978d5-motion-738f094d",
+  "health": {
+    "ok": true,
+    "service": "luca-ai",
+    "version": "0.5.0",
+    "supervisorMode": "standby",
+    "agents": 6,
+    "personaAgents": 0,
+    "activeMission": false,
+    "scheduledMissions": 0,
+    "kamuiBase": "http://127.0.0.1:1338",
+    "workspaces": 18
+  },
+  "remote": [
+    "/opt/sennin/luca-ai/releases/478d1ec978d5-motion-738f094d",
+    "active",
+    "active"
+  ],
+  "entry": "/assets/index-BL29wSO4.js",
+  "assets": [
+    {
+      "path": "/assets/SompoTruckSimulator-Djqb9MZh.js",
+      "bytes": 200241,
+      "sha256": "738f094dd995dbfcb0166d166db88e0ff732d51289fd2bd6b1a7454786d73a32"
+    },
+    {
+      "path": "/assets/index-BL29wSO4.js",
+      "bytes": 842039,
+      "sha256": "8d93aa9089fa32e87d707ec7d93d61d40adabbf5d4305ff6c1b500ba67c4d265"
+    },
+    {
+      "path": "/assets/SompoTruckSimulator-BBVcWTf6.css",
+      "bytes": 8058,
+      "sha256": "96cdb55fccf44263190b8539834c981170527f9caa60f52d1a32ee7ba6cae52d"
+    },
+    {
+      "path": "/assets/createSompoTruckModel-LZCuTz3z.js",
+      "bytes": 649635,
+      "sha256": "7340008b596ac85201535d3c9ee21c753335ee06ed3ddb272157f83088a0bcfc"
+    },
+    {
+      "path": "/models/sompo/generated-agri-tractor.glb",
+      "bytes": 2264596,
+      "sha256": "a875614c2775a9afd5e55e7579d9fac119bfa4387ab2eef66bf952221b159573"
+    },
+    {
+      "path": "/models/sompo/generated-agri-harvester.glb",
+      "bytes": 2465396,
+      "sha256": "985151d167a10df3011d4dd693782de2663d78e470a1f53331fa72c05035b461"
+    }
+  ]
+}

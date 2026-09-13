@@ -1,0 +1,32 @@
+{
+  "release": "478d1ec978d5-studio-final-99b3f3fa",
+  "health": {
+    "ok": true,
+    "version": "0.5.0"
+  },
+  "checks": [
+    {
+      "url": "https://luca-ai.com.br/assets/SompoTruckSimulator-DHoAbz-C.js",
+      "bytes": 182403,
+      "sha256": "99b3f3fa158bdb6a7b7e285a23696b7615eb5caf0d6d59924378a7e6904c5fcd",
+      "matchesLocal": true
+    },
+    {
+      "url": "https://luca-ai.com.br/sompo/studio/pasture-albedo.webp",
+      "bytes": 684456,
+      "sha256": "846c43987d91fb1c4c30e31e22ffb442c3f78a6553361e4baaf8f0c908b018ee",
+      "matchesLocal": true
+    },
+    {
+      "url": "https://luca-ai.com.br/sompo/?aba=telemetria",
+      "mainAsset": "/assets/index-B20jdovF.js",
+      "matchesRelease": true
+    },
+    {
+      "url": "https://luca-ai.com.br/assets/SompoTruckSimulator-BBVcWTf6.css",
+      "bytes": 8058,
+      "matchesLocal": true,
+      "sha256": "96cdb55fccf44263190b8539834c981170527f9caa60f52d1a32ee7ba6cae52d"
+    }
+  ]
+}

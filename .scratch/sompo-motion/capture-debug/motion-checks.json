@@ -1,0 +1,16 @@
+{
+  "renderer": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4070 Ti SUPER/PCIe/SSE2, OpenGL 4.5.0)",
+  "scheduler": "fixture timer; no presentation FPS claim",
+  "checks": [
+    {
+      "check": "actual WebGL motion capture",
+      "id": "agri-hydraulic-failure",
+      "outcome": "isolated",
+      "start": 2000,
+      "duration": 2000,
+      "frames": 62,
+      "fps": 30
+    }
+  ],
+  "errors": []
+}

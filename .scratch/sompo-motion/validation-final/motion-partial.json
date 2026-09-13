@@ -1,0 +1,95 @@
+{
+  "checks": [
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "normal",
+      "hz": 30,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "normal",
+      "hz": 60,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "normal",
+      "hz": 120,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "bogged-down",
+      "hz": 30,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "bogged-down",
+      "hz": 60,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "bogged-down",
+      "hz": 120,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "agri-field-bogging",
+      "hz": 30,
+      "maxError": 1.1102230246251565e-16
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "agri-field-bogging",
+      "hz": 60,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "agri-field-bogging",
+      "hz": 120,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "agri-hydraulic-failure",
+      "hz": 30,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "agri-hydraulic-failure",
+      "hz": 60,
+      "maxError": 2.220446049250313e-16
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "agri-hydraulic-failure",
+      "hz": 120,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "agri-harvest-dust",
+      "hz": 30,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "agri-harvest-dust",
+      "hz": 60,
+      "maxError": 0
+    },
+    {
+      "check": "actual scene pose matches seek and pause",
+      "id": "agri-harvest-dust",
+      "hz": 120,
+      "maxError": 0
+    }
+  ],
+  "errors": []
+}

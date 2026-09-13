@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "name": "Frota QA",
+  "truck": "modular",
+  "equipment": "modular",
+  "lighting": "golden",
+  "paint": "#9c3524",
+  "cargo": "#d8d7c9",
+  "roughness": 0.3,
+  "exposure": 1,
+  "wind": 0.65,
+  "wireframe": false,
+  "exploded": 0.7
+}

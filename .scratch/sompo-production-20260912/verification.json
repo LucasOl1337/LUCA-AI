@@ -1,0 +1,46 @@
+{
+  "/api/health": {
+    "status": 200,
+    "bytes": 201,
+    "sha256": "d6602c32567ddce3b512f0658d4347754b0e64ee718b78bb1e0437b3b2592eea",
+    "health": {
+      "ok": true,
+      "service": "luca-ai",
+      "version": "0.5.0",
+      "supervisorMode": "standby",
+      "agents": 6,
+      "personaAgents": 0,
+      "activeMission": false,
+      "scheduledMissions": 0,
+      "kamuiBase": "http://127.0.0.1:1338",
+      "workspaces": 18
+    }
+  },
+  "/sompo/?aba=telemetria": {
+    "status": 200,
+    "bytes": 2299,
+    "sha256": "1bf4fe66ad29162bd422db48e725b238ea80612b21cdd8a59a73279f7387601b"
+  },
+  "/assets/SompoTruckSimulator-nH0XqY30.js": {
+    "status": 200,
+    "bytes": 165443,
+    "sha256": "b4cebd93ba2334074695dbdf2831ee05b06f1fc92a40002a6fe236a23942d29e"
+  },
+  "/assets/index-CxfaMUGm.js": {
+    "status": 200,
+    "bytes": 1443879,
+    "sha256": "bf5e047b53727a3d4b15c8b171bc94181072b24bb94190ae16d1aeae1c63fd57"
+  },
+  "/assets/index-CpJz3HwP.css": {
+    "status": 200,
+    "bytes": 150309,
+    "sha256": "514540a8f54826a984ec9e436465c9088cc09eb69c5e89708a2a3ba705c6cb00"
+  },
+  "/api/state": {
+    "status": 401,
+    "bytes": 46,
+    "sha256": "12408277d2940c16896276b3803e2f24165d71369579342736777419c3181660"
+  },
+  "checkedAt": "2026-09-12T13:40:36.097125+00:00",
+  "release": "f20901429d10-sompo3d-b4cebd93"
+}

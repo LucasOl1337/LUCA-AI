@@ -1,0 +1,9 @@
+ M docs/sompo-oficina.md
+ M docs/sompo.md
+ M scripts/sompo-preview/instrument.js
+ M scripts/sompo-preview/serve.mjs
+ M scripts/sompo-preview/studio-check.mjs
+ M src/components/sompo/sompo-studio.css
+?? .maestri/
+?? .scratch/sompo-production-20260912/
+?? .scratch/sompo-round2/

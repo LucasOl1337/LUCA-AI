@@ -1,0 +1,10 @@
+import {spawn} from 'node:child_process';
+const server=spawn(process.execPath,['scripts/sompo-preview/serve.mjs'],{env:{...process.env,SOMPO_PREVIEW_PORT:'5199',SOMPO_PREVIEW_OUTPUT:'/tmp/sompo-round2-preview'}});await new Promise(resolve=>server.stdout.once('data',resolve));process.on('exit',()=>server.kill());
+import {chromium} from 'playwright';
+const browser=await chromium.launch({headless:false, executablePath:'/opt/google/chrome/chrome',args:['--ozone-platform=x11','--use-angle=gl','--enable-gpu','--ignore-gpu-blocklist','--remote-debugging-port=9348']});
+const page=await browser.newPage({viewport:{width:1440,height:1000}});
+page.on('pageerror',e=>console.log('ERROR',String(e)));page.on('console',m=>{if(m.type()==='error')console.log('CONSOLE',m.text().slice(0,1000))});
+await page.goto('http://127.0.0.1:5199/?benchmark=1');await page.waitForTimeout(4000);console.log(await page.evaluate(()=>window.__sompoPreview.measure().renderer));
+await page.screenshot({path:'/tmp/sompo-r2-green.png'});
+await page.getByRole('button',{name:'Oficina 3D',exact:true}).click();await page.getByRole('button',{name:'Colheitadeira Lavoura e corte visual'}).click();await page.waitForTimeout(6000);await page.evaluate(()=>window.__sompoPreview.advance(9000));await page.waitForFunction(()=>window.__sompoPreview.time===window.__sompoPreview.until);await page.waitForTimeout(1000);await page.screenshot({path:'/tmp/sompo-r2-agri.png'});
+console.log(JSON.stringify(await page.evaluate(()=>window.__sompoPreview.measure())));await browser.close();

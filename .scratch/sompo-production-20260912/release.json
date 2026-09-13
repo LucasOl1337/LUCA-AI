@@ -1,0 +1,15 @@
+{
+  "release": "f20901429d10-sompo3d-b4cebd93",
+  "baseCommit": "f20901429d1083aa47334a22570131a0e4f29ac3",
+  "committed": false,
+  "createdAt": "2026-09-12T13:36:57.528832+00:00",
+  "staging": "/tmp/luca-deploy-f20901429d10-sompo3d-b4cebd93",
+  "simulatorAsset": "/assets/SompoTruckSimulator-nH0XqY30.js",
+  "simulatorAssetBytes": 165443,
+  "simulatorAssetSha256": "b4cebd93ba2334074695dbdf2831ee05b06f1fc92a40002a6fe236a23942d29e",
+  "previousRelease": "/opt/sennin/luca-ai/releases/f20901429d10-sompo-hero-v2-20260912",
+  "entryAssets": [
+    "/assets/index-CxfaMUGm.js",
+    "/assets/index-CpJz3HwP.css"
+  ]
+}
