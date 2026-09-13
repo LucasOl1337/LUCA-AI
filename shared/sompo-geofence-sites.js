@@ -20,6 +20,32 @@ const band = (id, role, line, half, axis, category) => ({
   ])],
 });
 
+// Relevo sintético da fazenda (metros), marcado como simulado: morro sob a mancha de declive (o "declive mapeado"
+// é o morro, não um desenho), lagoa e córrego em depressão, ribanceira como degrau na borda leste.
+// ponytail: formas analíticas; um heightfield real (MDE) entra pelo mesmo contrato quando houver fazenda de verdade.
+const STREAM_LINE = [
+  { x: -90, z: 50 }, { x: -40, z: 46 }, { x: -10, z: 44 }, { x: 3, z: 42 }, { x: 12, z: 32 },
+  { x: 20, z: 19 }, { x: 24, z: 15 }, { x: 42, z: 28 }, { x: 60, z: 42 }, { x: 90, z: 48 },
+];
+const RAVINE_LINE = [{ x: 84, z: -70 }, { x: 80, z: -30 }, { x: 86, z: 10 }, { x: 82, z: 50 }, { x: 84, z: 70 }];
+function distanceToLine(x, z, line) {
+  let best = Infinity;
+  for (let i = 1; i < line.length; i++) {
+    const a = line[i - 1], b = line[i], dx = b.x - a.x, dz = b.z - a.z, len = dx * dx + dz * dz;
+    const t = len ? Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / len)) : 0;
+    best = Math.min(best, Math.hypot(x - (a.x + t * dx), z - (a.z + t * dz)));
+  }
+  return best;
+}
+export function geofenceFieldRelief(x, z) {
+  const hill = 3.4 * Math.exp(-(((x / 8) ** 2) + ((z / 14) ** 2)) * 1.1);            // crista ≈ 3,4 m, encosta até ~22°
+  const pond = -1.2 * Math.exp(-((((x + 60) / 16) ** 2) + (((z + 48) / 10) ** 2)) * 1.4);
+  const stream = -0.9 * Math.max(0, 1 - distanceToLine(x, z, STREAM_LINE) / 4.5);
+  const ravineSide = x - (RAVINE_LINE[Math.min(RAVINE_LINE.length - 1, Math.max(0, Math.round((z + 70) / 35)))].x - 3);
+  const ravine = ravineSide > 0 ? -Math.min(6, ravineSide * 0.9) : 0;                  // degrau para leste da crista da ribanceira
+  return hill + pond + stream + ravine;
+}
+
 const WATER_RULE = { role: 'water', label: 'Córrego sintético', synthetic: true, justification, bands_m: [
   { id: 'critica', label: 'Proximidade crítica', max_m: 5 },
   { id: 'elevada', label: 'Proximidade elevada', max_m: 15 },

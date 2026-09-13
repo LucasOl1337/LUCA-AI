@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createSompoCropRows } from './createSompoCropRows';
+import { geofenceFieldRelief } from '../../../shared/sompo-geofence-sites.js';
 import { varySompoSurface } from './createSompoRoadDetails';
 import { disposeSompoObject } from './sompoStage';
 import type { SompoAgriVisualFrame } from '../../../shared/sompo-agri-scenarios.js';
@@ -10,13 +11,13 @@ export const SOMPO_AGRI_ENVIRONMENTS = Object.freeze({
   'muddy-field': Object.freeze({ sky: 0x92a6a5, ground: 0x4a3829, crop: 0x6d8449, slope: 0.035, mud: 1, night: false, barn: false }),
   'farm-barn': Object.freeze({ sky: 0xb7c8c8, ground: 0x735d3f, crop: 0x789347, slope: 0, mud: 0, night: false, barn: true }),
   'row-crop-field-night': Object.freeze({ sky: 0x07111d, ground: 0x29291e, crop: 0x544e28, slope: 0.025, mud: 0, night: true, barn: false }),
-  'geofence-field': Object.freeze({ sky: 0xb8d6dd, ground: 0x6f542d, crop: 0xb99438, slope: 0.04, mud: 0, night: false, barn: false }),
+  'geofence-field': Object.freeze({ sky: 0xb8d6dd, ground: 0x6f542d, crop: 0xb99438, slope: 0.02, mud: 0, night: false, barn: false, relief: geofenceFieldRelief as (x: number, z: number) => number }),
 });
 
 export type SompoAgriEnvironmentId = keyof typeof SOMPO_AGRI_ENVIRONMENTS;
 
-function terrainHeight(x: number, z: number, slope: number) {
-  const base = (z * slope) + (Math.sin(x * 0.075) * 0.18) + (Math.cos(z * 0.11) * 0.1);
+function terrainHeight(x: number, z: number, slope: number, relief?: (x: number, z: number) => number) {
+  const base = (z * slope) + (relief ? relief(x, z) : 0) + (Math.sin(x * 0.075) * 0.18) + (Math.cos(z * 0.11) * 0.1);
   // Anel de morros: o talhão termina num relevo de borda, não num corte reto.
   // A crista varia por azimute (cristas altas e trechos baixos) pra ler como
   // serra de verdade no horizonte em vez de um anel uniforme.
@@ -33,7 +34,7 @@ function createTerrain(environment: (typeof SOMPO_AGRI_ENVIRONMENTS)[SompoAgriEn
   geometry.rotateX(-Math.PI / 2);
   const positions = geometry.attributes.position;
   for (let index = 0; index < positions.count; index += 1) {
-    positions.setY(index, terrainHeight(positions.getX(index), positions.getZ(index), environment.slope));
+    positions.setY(index, terrainHeight(positions.getX(index), positions.getZ(index), environment.slope, (environment as { relief?: (x: number, z: number) => number }).relief));
   }
   positions.needsUpdate = true;
   geometry.computeVertexNormals();
@@ -192,7 +193,7 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
   root.name = `sompo-agri-environment-${environmentId}`;
   const terrain = createTerrain(definition);
   root.add(terrain);
-  const crops = definition.barn ? null : createSompoCropRows((x,z)=>terrainHeight(x,z,definition.slope), compact, equipmentId === 'tractor' ? .32 : 1);
+  const crops = definition.barn ? null : createSompoCropRows((x,z)=>terrainHeight(x,z,definition.slope,(definition as { relief?: (x: number, z: number) => number }).relief), compact, equipmentId === 'tractor' ? .32 : 1);
   if (crops) root.add(crops.root);
   if (definition.barn) root.add(createBarn());
   const silos = createSilos(definition.slope); root.add(silos);
@@ -209,7 +210,7 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
   for (let i=1;i<mudPositions.count;i++) { const f=1+Math.sin(i*2.3)*.09; mudPositions.setX(i,mudPositions.getX(i)*f);mudPositions.setZ(i,mudPositions.getZ(i)*f*.65); }
   function placeMud(x: number) {
     mud.position.x=x;
-    for(let i=0;i<mudPositions.count;i++) mudPositions.setY(i,terrainHeight(x+mudPositions.getX(i),mudPositions.getZ(i),definition.slope)+.025);
+    for(let i=0;i<mudPositions.count;i++) mudPositions.setY(i,terrainHeight(x+mudPositions.getX(i),mudPositions.getZ(i),definition.slope,(definition as { relief?: (x: number, z: number) => number }).relief)+.025);
     mudPositions.needsUpdate=true;mud.geometry.computeVertexNormals();
   }
   placeMud(2);
@@ -230,7 +231,7 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
     root, terrain, mud, sun, placeMud,
     setHarvestPath(points: readonly { x: number; z: number }[]) { crops?.setHarvestPath(points); },
     groundHeight(x: number, z: number) {
-      return terrainHeight(x, z, definition.slope);
+      return terrainHeight(x, z, definition.slope, (definition as { relief?: (x: number, z: number) => number }).relief);
     },
     update(frame: SompoAgriVisualFrame, machinePosition = new THREE.Vector3(), cameraPosition = new THREE.Vector3(), reducedMotion = false, wind = 0.65, elapsedMs = frame.atMs) {
       crops?.update(elapsedMs, cameraPosition, reducedMotion, wind, machinePosition, frame.equipmentId === 'harvester' ? frame.cropCut : 0);

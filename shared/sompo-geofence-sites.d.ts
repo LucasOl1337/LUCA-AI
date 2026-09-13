@@ -12,3 +12,4 @@ export function getSompoGeofenceSite(environmentId: string, totalTravelMeters: n
     rings: { x: number; z: number }[][];
   }[];
 };
+export function geofenceFieldRelief(x: number, z: number): number;

@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { getSompoAgriScenario, SOMPO_AGRI_EQUIPMENT } from '../../../shared/sompo-agri-scenarios.js';
 import { getSompoAgriPosition } from '../../../shared/sompo-agri-brief.js';
-import { getSompoGeofenceSite } from '../../../shared/sompo-geofence-sites.js';
+import { getSompoGeofenceSite, geofenceFieldRelief } from '../../../shared/sompo-geofence-sites.js';
 import { bandGrid, resolveHazards, type LabGeofenceRules } from '../../../shared/lab-geofence.js';
 import { polygonContains, type LabPolygon } from '../../../shared/lab-telemetry.js';
 
@@ -63,6 +63,18 @@ function buildStaticMap(scenarioId: string, outcomeId: string): StaticMap | null
   ctx.lineJoin = 'round';
   for (const polygon of polygons) if (polygon.role === 'allowed_area') for (const ring of polygon.rings) {
     trace(ring); ctx.fillStyle = '#d9d2b4'; ctx.fill();
+  }
+  // Relevo: sombreado simples (luz de noroeste) a partir da mesma função de altura da cena, por baixo das faixas.
+  if (scenario.environmentId === 'geofence-field') {
+    const step = 2;
+    for (let z = minZ; z < maxZ; z += step) for (let x = minX; x < maxX; x += step) {
+      const dx = geofenceFieldRelief(x + 1, z) - geofenceFieldRelief(x - 1, z);
+      const dz = geofenceFieldRelief(x, z + 1) - geofenceFieldRelief(x, z - 1);
+      const shade = (dx + dz) * 0.35; // encostas voltadas para noroeste clareiam, para sudeste escurecem
+      if (Math.abs(shade) < 0.02) continue;
+      ctx.fillStyle = shade > 0 ? `rgba(40,30,10,${Math.min(0.45, shade)})` : `rgba(255,255,255,${Math.min(0.5, -shade)})`;
+      ctx.fillRect(px(x), py(z), step * SCALE + 0.5, step * SCALE + 0.5);
+    }
   }
   // Faixas célula a célula: entre perigos sobrepostos vence a mais interna (menor max_m), como no chão da cena.
   if (grid) {
