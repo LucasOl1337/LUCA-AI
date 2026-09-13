@@ -321,12 +321,15 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
     ],
     outcomes: [
       outcome('parked', 'Manobra concluída', 'Conjunto corrige o ângulo e para centralizado dentro do barracão.', [
-        [0, { direction: -1, yaw: 12, implementYaw: -18, beacon: 1 }],
-        [2_600, { yaw: -4, implementYaw: 8 }],
-        [4_200, { yaw: -15, implementYaw: 24, pitch: 0.5 }],
+        // O sensor de ré enxerga o vão: ombreira a ~1,9 m no arranque, ~1,5 m na
+        // travessia e o pilar interno a ~1,1 m — nunca aciona a flag de colisão.
+        [0, { direction: -1, yaw: 12, implementYaw: -18, distance: 190, beacon: 1 }],
+        [2_600, { yaw: -4, implementYaw: 8, distance: 150 }],
+        [4_200, { yaw: -15, implementYaw: 24, pitch: 0.5, distance: 120 }],
+        [4_400, { distance: 110 }],
         // Freia a ré em linha torta: traseira senta, conjunto para um instante.
-        [5_800, { speedKph: 0, yaw: -16, implementYaw: 20, brakeLights: 1, pitch: 0.9 }],
-        // Troca de marcha parado; traciona para frente alinhando antes da ré final.
+        [5_800, { speedKph: 0, yaw: -16, implementYaw: 20, brakeLights: 1, pitch: 0.9, distance: 400 }],
+        // Troca de marcha parado; traciona pra frente alinhando antes da ré final.
         [6_200, { direction: 1, speedKph: 0, pitch: 0.3 }],
         [7_000, { speedKph: 1.5, yaw: -8, implementYaw: 14, brakeLights: 0, pitch: 0.5 }],
         [7_600, { speedKph: 0, yaw: -4, implementYaw: 8, brakeLights: 1, pitch: -0.9 }],
