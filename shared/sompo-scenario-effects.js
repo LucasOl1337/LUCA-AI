@@ -24,7 +24,7 @@ export const SOMPO_SCENARIO_EFFECTS = Object.freeze({
   'animal-crossing': scene([track('animal', 0, 13000), track('brake-lights', 2600), track('tire-smoke', 2700, 7900, 0.45), track('skid-marks', 2700), track('hazard-lights', 8300)], 'asphalt', 'road', 2.8),
   aquaplaning: scene([track('wheel-spray'), track('rain'), track('running-lights'), track('hazard-lights', 2600, 12500), track('brake-lights', 7400, 11500)], 'wet'),
   'brake-failure': scene([track('brake-smoke', 3800, null, 1, 3000), track('brake-glow', 3800, null, 1, 4000), track('brake-lights'), track('hazard-lights', 8000)]),
-  'engine-fire': scene([track('engine-smoke', 1400, null, 1, 4500), track('engine-fire', 8000, null, 1, 2800), track('hazard-lights', 4800)]),
+  'engine-fire': scene([track('engine-smoke', 1400, null, 1, 4500), track('engine-steam', 1500, 8000, 0.6, 1200), track('exhaust', 4600, 9400, 0.85, 700), track('brake-lights', 5600, 9600), track('engine-fire', 8000, null, 1, 2800), track('hazard-lights', 4800)]),
   'tight-reverse': scene([track('reverse-lights', 900, 11500), track('maneuver-guides'), track('brake-lights', 5600, 6400), track('brake-lights', 11500)], 'asphalt', 'yard'),
   'bogged-down': scene([track('mud-spray', 2000, 12500), track('mud-ruts', 2000), track('rain', 0, null, 0.2), track('hazard-lights', 5200)], 'mud'),
   'driver-drowsiness': scene([track('running-lights'), track('shoulder-dust', 8600, 12000, 0.5), track('hazard-lights', 13500)]),
@@ -98,8 +98,8 @@ export const SOMPO_SCENARIO_OUTCOME_EFFECTS = Object.freeze({
     colisao: scene([track('brake-smoke', 3800, null, 1, 3000), track('brake-glow', 3800, null, 1, 4000), track('brake-lights'), track('hazard-lights', 8000), track('impact-dust', 13100, 17000, 1, 30), track('debris', 13100, null, 1, 0)]),
   }),
   'engine-fire': Object.freeze({
-    'fogo-contido': scene([track('engine-smoke', 1400, 10800, 1, 4000), track('engine-fire', 7000, 9300, 1, 2200), track('hazard-lights', 4600), track('engine-steam', 8800, null, 0.35, 2000)]),
-    'fogo-alastra': scene([track('engine-smoke', 1400, null, 1, 3800), track('engine-fire', 7200, null, 1, 2200), track('hazard-lights', 4400)]),
+    'fogo-contido': scene([track('engine-smoke', 1400, 10800, 1, 4000), track('exhaust', 4400, 7400, 0.8, 700), track('brake-lights', 5000, 7600), track('engine-fire', 7400, 9300, 1, 1800), track('hazard-lights', 4600), track('engine-steam', 8800, null, 0.35, 2000)]),
+    'fogo-alastra': scene([track('engine-smoke', 1400, null, 1, 3800), track('engine-steam', 1400, 8200, 0.6, 1200), track('exhaust', 4600, 9000, 0.85, 700), track('brake-lights', 5600, 9400), track('engine-fire', 8600, null, 1, 2200), track('hazard-lights', 4400)]),
   }),
   'tight-reverse': Object.freeze({
     'toque-na-doca': scene([track('reverse-lights', 800, 5200), track('maneuver-guides'), track('impact-dust', 5200, 7000, 0.35, 60), track('brake-lights', 5200), track('hazard-lights', 5200)], 'asphalt', 'yard'),
