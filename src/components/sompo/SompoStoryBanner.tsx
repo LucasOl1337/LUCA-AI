@@ -16,7 +16,7 @@ interface SompoStoryBannerProps {
  * Faixa narrativa da user story ativa: mostra o problema, o desfecho que está
  * rodando e a timeline de fases do roteiro com o ponteiro seguindo a
  * telemetria (deviceTimestamp = elapsedMs do ensaio). A leitura de km/h vem
- * do mesmo frame que anima a cena — prova de que é simulador, não vídeo.
+ * do mesmo frame que anima a cena: prova de que é simulador, não vídeo.
  */
 export default function SompoStoryBanner({ story, telemetry, onSelect }: SompoStoryBannerProps) {
   const scenarioId = telemetry?.source?.scenarioId ?? story.lead.scenarioId;
@@ -53,7 +53,7 @@ export default function SompoStoryBanner({ story, telemetry, onSelect }: SompoSt
         <div className="sompo-story-live" aria-label="Leitura ao vivo">
           <span className="sompo-story-live-dot" aria-hidden="true" />
           <div>
-            <strong>{speedKph != null ? `${Math.round(speedKph)} km/h${direction < 0 ? ' · ré' : ''}` : '—'}</strong>
+            <strong>{speedKph != null ? `${Math.round(speedKph)} km/h${direction < 0 ? ' · ré' : ''}` : '-'}</strong>
             <span>{frame?.phaseLabel || currentPhase?.label || 'Roteiro livre'}</span>
           </div>
         </div>

@@ -21,6 +21,7 @@ import {
 import SompoTelemetryPanel from '@/components/SompoTelemetryPanel';
 import SompoStoryBanner from '@/components/sompo/SompoStoryBanner';
 import { findSompoStoryForScenario } from '@/lib/sompo-stories';
+import { sompoActiveStoryKeys } from '@/lib/sompo-scenario-selection';
 import SompoRiskPanel from '@/components/SompoRiskPanel';
 import SompoWelcome from '@/components/sompo/SompoWelcome';
 import { useTheme } from '@/hooks/useTheme';
@@ -119,7 +120,7 @@ const SEVERITY_FILTERS: { id: SeverityFilter; label: string }[] = [
   { id: 'baixa', label: 'Baixa' },
 ];
 
-/** Três fatos-chave no header — o resto do contexto fica de fora pra reduzir poluição. */
+/** Três fatos-chave no header. O resto do contexto fica de fora pra reduzir poluição. */
 const CONTEXT_HIGHLIGHTS = SOMPO_INDUSTRY_CONTEXT.filter((fact) =>
   ['triade-climatica', 'seca', 'zarc'].includes(fact.id),
 );
@@ -221,7 +222,7 @@ function SompoWorkspace() {
       setTelemetryError(null);
     } catch (err) {
       setTelemetryError(pickFailureCopy(err, {
-        offline: 'Sem internet. O último snapshot do trator, se houver, continua na tela — reconecte para atualizar.',
+        offline: 'Sem internet. O último snapshot do trator, se houver, continua na tela. Reconecte para atualizar.',
         forbidden: 'Esta conta não pode ver a telemetria do trator. Peça acesso a quem opera o SOMPO.',
         server: 'A telemetria do trator não chegou. Tente de novo; o último snapshot permanece se já tinha sido lido.',
       }));
@@ -253,7 +254,7 @@ function SompoWorkspace() {
       ));
     } catch (err) {
       setTemplatesError(pickFailureCopy(err, {
-        offline: 'Sem internet. A lista abaixo é o preset embutido — reconecte para buscar as equipes gravadas.',
+        offline: 'Sem internet. A lista abaixo é o preset embutido. Reconecte para buscar as equipes gravadas.',
         forbidden: 'Esta conta não pode ver as equipes gravadas. Os presets embutidos continuam disponíveis.',
         server: 'As equipes gravadas não chegaram. Os presets embutidos estão na lista; tente recarregar.',
       }));
@@ -321,11 +322,17 @@ function SompoWorkspace() {
   }, [telemetrySourceMode]);
   const firebaseTelemetry = currentSompoTelemetry(streamedTelemetry || bootstrapTelemetry, telemetryClock);
   const telemetry = telemetrySourceMode === 'simulation' ? simulatedTelemetry : firebaseTelemetry;
-  // A user story fica ativa quando o cenário em tela casa com um roteiro dela —
-  // seja por link (?cenario=) ou pela seleção manual dentro do simulador.
+  // A faixa segue o que está no canvas. O deep-link só entra se o simulador
+  // ainda não publicou cenário: senão a regulação segura o dropdown embaixo.
+  const storyKeys = sompoActiveStoryKeys({
+    liveScenarioId: telemetry?.source?.scenarioId,
+    liveOutcomeId: telemetry?.source?.outcomeId,
+    urlScenarioId: location.cenario,
+    urlOutcomeId: location.desfecho,
+  });
   const activeStory = findSompoStoryForScenario(
-    location.cenario || telemetry?.source?.scenarioId || '',
-    location.desfecho || telemetry?.source?.outcomeId || undefined,
+    storyKeys.scenarioId,
+    storyKeys.outcomeId || undefined,
   );
   const visibleTelemetryError = telemetrySourceMode === 'firebase' && !streamedTelemetry ? telemetryError : null;
 
@@ -432,9 +439,9 @@ function SompoWorkspace() {
       navigate({ page: 'luca-ai', sessao: session.id }, 'push');
     } catch (err) {
       setLaunchError(pickFailureCopy(err, {
-        offline: 'Sem internet. O caso continua selecionado — reconecte e rode de novo.',
+        offline: 'Sem internet. O caso continua selecionado. Reconecte e rode de novo.',
         forbidden: 'Esta conta não pode abrir a bancada com este caso. Peça acesso a um administrador.',
-        server: 'A avaliação não começou. O caso continua selecionado — tente rodar de novo.',
+        server: 'A avaliação não começou. O caso continua selecionado. Tente rodar de novo.',
       }));
     } finally {
       setLaunching(false);
@@ -533,7 +540,7 @@ function SompoWorkspace() {
             launchAttachments = uploaded;
           } catch {
             // Falhar alto: sem anexo pela metade a bancada não recebe evidência inconsistente.
-            setTelemetryLaunchError('Falha ao anexar os frames do episódio à bancada. Nada foi enviado — tente de novo.');
+            setTelemetryLaunchError('Falha ao anexar os frames do episódio à bancada. Nada foi enviado. Tente de novo.');
             return;
           }
         }
@@ -594,9 +601,9 @@ function SompoWorkspace() {
       navigate({ page: 'luca-ai', sessao: session.id }, 'push');
     } catch (err) {
       setTelemetryLaunchError(pickFailureCopy(err, {
-        offline: 'Sem internet. O snapshot continua na tela — reconecte e envie de novo.',
+        offline: 'Sem internet. O snapshot continua na tela. Reconecte e envie de novo.',
         forbidden: 'Esta conta não pode enviar a telemetria para a bancada. Peça acesso a um administrador.',
-        server: 'A telemetria não foi enviada à bancada. O snapshot continua aqui — tente de novo.',
+        server: 'A telemetria não foi enviada à bancada. O snapshot continua aqui. Tente de novo.',
       }));
     } finally {
       setTelemetryLaunching(false);
@@ -725,6 +732,7 @@ function SompoWorkspace() {
                     onEpisodeRecorded={setRecordedEpisode}
                     requestedScenario={location.cenario}
                     requestedOutcome={location.desfecho}
+                    onScenarioSelect={(cenario, desfecho) => navigate({ cenario, desfecho }, 'replace')}
                   />
                 ) : firebaseTelemetry ? (
                   <SompoTruckSimulator

@@ -15,7 +15,7 @@ export default function SompoStoryCards() {
       <header className="sompo-stories-head">
         <p className="sompo-stories-eyebrow">O que o LUCA resolve</p>
         <h2 id="sompo-stories-title">Três problemas da seguradora, resolvidos ao vivo.</h2>
-        <p>Cada história abre o simulador no roteiro real — com a telemetria correndo junto, não um vídeo.</p>
+        <p>Cada história abre o simulador no roteiro real, com a telemetria correndo junto, não um vídeo.</p>
       </header>
       <div className="sompo-stories-grid">
         {SOMPO_USER_STORIES.map((story) => (

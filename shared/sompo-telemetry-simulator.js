@@ -312,7 +312,7 @@ export const SOMPO_RURAL_SCRIPTS = Object.freeze({
     [5_400, 'Contra-esterço', { yaw: -5, lateral: 1.6, roll: 3, speedKph: 58, roughness: 3.4 }],
     [7_200, 'Busca o acostamento', { yaw: 3, lateral: 2.2, speedKph: 30, roll: 4, collisionRisk: false }],
     [9_500, 'Parada no acostamento', { speedKph: 0, yaw: 1, lateral: 2.5, roll: 3.5, roughness: 0 }],
-    [14_000, 'Imobilizado — pneu destruído', {}],
+    [14_000, 'Imobilizado: pneu destruído', {}],
   ]),
   'animal-crossing': ruralScript('animal-crossing', [
     [0, 'Animal no acostamento', { animalZ: -6 }],
@@ -344,7 +344,7 @@ export const SOMPO_RURAL_SCRIPTS = Object.freeze({
     [7_400, 'Redução forçada de marcha', { speedKph: 86, roughness: 2.6, pitch: -15.5 }],
     [9_800, 'Freio-motor segura o embalo', { speedKph: 92, roughness: 1.2, pitch: -14 }],
     [13_000, 'Embalo vence a redução', { speedKph: 101, distance: 70, temperature: 40 }],
-    [16_000, 'Risco persiste — intervenção necessária', { speedKph: 105, distance: 32 }],
+    [16_000, 'Risco persiste: intervenção necessária', { speedKph: 105, distance: 32 }],
   ]),
   'engine-fire': ruralScript('engine-fire', [
     [0, 'Operação', {}],
@@ -352,15 +352,15 @@ export const SOMPO_RURAL_SCRIPTS = Object.freeze({
     [5_200, 'Perda de potência', { speedKph: 56, smoke: 0.55, temperature: 48 }],
     [7_000, 'Busca o acostamento', { speedKph: 24, lateral: 1.7, yaw: 5, smoke: 0.75, temperature: 54 }],
     [9_200, 'Parada no acostamento', { speedKph: 0, lateral: 2.5, yaw: 1, smoke: 0.9, temperature: 58, roughness: 0 }],
-    [12_000, 'Imobilizado — foco ativo', { smoke: 1, temperature: 62, humidity: 20 }],
+    [12_000, 'Imobilizado: foco ativo', { smoke: 1, temperature: 62, humidity: 20 }],
   ]),
   'tight-reverse': ruralScript('tight-reverse', [
     [0, 'Parado no acesso', { speedKph: 0 }],
     [900, 'Engata a ré', { direction: -1 }],
-    [2_400, 'Ré — traseira entra no acesso', { speedKph: 2.5, yaw: -10, lateral: 0.4, distance: 165 }],
+    [2_400, 'Ré: traseira entra no acesso', { speedKph: 2.5, yaw: -10, lateral: 0.4, distance: 165 }],
     [4_500, 'Correção de esterco', { yaw: -18, lateral: 0.95, distance: 200 }],
-    [5_600, 'Segura — confere a lateral', { speedKph: 0 }],
-    [7_200, 'Ré — endireita o conjunto', { speedKph: 2, yaw: -8, lateral: 1.05, distance: 220 }],
+    [5_600, 'Segura: confere a lateral', { speedKph: 0 }],
+    [7_200, 'Ré: endireita o conjunto', { speedKph: 2, yaw: -8, lateral: 1.05, distance: 220 }],
     [8_600, 'Pausa final', { speedKph: 0, yaw: 0, distance: 235 }],
     [9_600, 'Encosta os últimos metros', { speedKph: 1.2, yaw: 0 }],
     [11_500, 'Manobra concluída', { speedKph: 0, roughness: 0, distance: 250 }],
@@ -370,15 +370,15 @@ export const SOMPO_RURAL_SCRIPTS = Object.freeze({
     [0, 'Entrada no trecho de lama', { rain: 0.2 }],
     [2_200, 'Rodas começam a patinar', { speedKph: 5, wheelSpeedKph: 13, sink: 0.1, pitch: -2, roughness: 1.8 }],
     [3_600, 'Perda de tração', { speedKph: 1.2, wheelSpeedKph: 17, sink: 0.22, pitch: -4, roll: 7, roughness: 2.6 }],
-    [5_200, 'Primeira tentativa — sem avanço', { speedKph: 0, wheelSpeedKph: 15, sink: 0.3 }],
+    [5_200, 'Primeira tentativa, sem avanço', { speedKph: 0, wheelSpeedKph: 15, sink: 0.3 }],
     [5_800, 'Balanço: engata a ré', { direction: -1, wheelSpeedKph: 4 }],
     [6_600, 'Balanço: ré', { speedKph: 1.2, wheelSpeedKph: 6, pitch: -1, roll: 5 }],
     [7_400, 'Segura no freio', { speedKph: 0, wheelSpeedKph: 0 }],
     [8_000, 'Balanço: à frente', { direction: 1, wheelSpeedKph: 9 }],
-    [8_800, 'Surto para frente — patina', { speedKph: 1.4, wheelSpeedKph: 16, pitch: -5, roll: 8, sink: 0.42 }],
+    [8_800, 'Surto para frente: patina', { speedKph: 1.4, wheelSpeedKph: 16, pitch: -5, roll: 8, sink: 0.42 }],
     [9_800, 'Enterra sem sair', { speedKph: 0, wheelSpeedKph: 10, sink: 0.5, roll: 9 }],
     [10_400, 'Último esforço: engata a ré', { direction: -1, wheelSpeedKph: 0 }],
-    [11_000, 'Ré final — enterra mais', { speedKph: 0.8, wheelSpeedKph: 5, pitch: -3, roll: 8, sink: 0.53 }],
+    [11_000, 'Ré final: enterra mais', { speedKph: 0.8, wheelSpeedKph: 5, pitch: -3, roll: 8, sink: 0.53 }],
     [12_000, 'Imobilizado', { speedKph: 0, wheelSpeedKph: 3, sink: 0.55, roll: 10, pitch: -5 }],
     [13_000, 'Tentativa encerrada', { wheelSpeedKph: 0, roughness: 0, rain: 0.15 }],
   ]),
@@ -398,7 +398,7 @@ export const SOMPO_RURAL_SCRIPTS = Object.freeze({
     [1_800, 'Esterço para a curva', { yaw: -10, roll: 5, speedKph: 92 }],
     [3_200, 'Limite de aderência lateral', { yaw: -19, roll: 11, lateral: 0.5, speedKph: 78, inclinationRisk: true, roughness: 1.1 }],
     [4_800, 'Freio em curva segura a linha', { yaw: -24, roll: 13, lateral: 0.9, speedKph: 58, roughness: 1.4 }],
-    [7_000, 'Apex — retoma a trajetória', { yaw: -14, roll: 6, lateral: 0.6, speedKph: 52, inclinationRisk: false, roughness: 0.9 }],
+    [7_000, 'Apex: retoma a trajetória', { yaw: -14, roll: 6, lateral: 0.6, speedKph: 52, inclinationRisk: false, roughness: 0.9 }],
     [9_500, 'Saída de curva', { yaw: 0, roll: 1, lateral: 0, speedKph: 48, roughness: 0.6 }],
     [14_000, 'Segue em marcha reduzida', {}],
   ]),
@@ -536,7 +536,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [4_000, 'Vibração incomum percebida', { roughness: 1.6 }],
       [8_000, 'Redução por precaução', { speedKph: 25 }],
       [10_000, 'Parada para inspeção', { speedKph: 0, roughness: 0 }],
-      [16_000, 'Checagem concluída — sem avaria', {}],
+      [16_000, 'Checagem concluída, sem avaria', {}],
     ]),
   }),
   obstacle: Object.freeze({
@@ -592,7 +592,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [3_300, 'Impacto no fundo do buraco', { pitch: 5, roll: 5, roughness: 5, speedKph: 30 }],
       [4_500, 'Vibração anormal persiste', { roughness: 3.4, speedKph: 16, pitch: 2, roll: 2 }],
       [7_500, 'Parada para inspecionar a carga', { speedKph: 0, roughness: 0, pitch: 3, roll: 3 }],
-      [14_000, 'Amarração reforçada — apto a seguir', { pitch: 4, roll: 5 }],
+      [14_000, 'Amarração reforçada: apto a seguir', { pitch: 4, roll: 5 }],
     ]),
   }),
   'hard-braking': Object.freeze({
@@ -614,7 +614,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
   'steep-climb': Object.freeze({
     'vence-a-rampa': ruralScript('steep-climb', [
       [0, 'Aproximação da rampa', { pitch: 3, speedKph: 28, inclinationRisk: false }],
-      [2_000, 'Pé embaixo — entra na rampa', { pitch: 15, speedKph: 14, inclinationRisk: true, roughness: 1.4 }],
+      [2_000, 'Pé embaixo: entra na rampa', { pitch: 15, speedKph: 14, inclinationRisk: true, roughness: 1.4 }],
       [4_200, 'Subida de 21°', { pitch: 21, speedKph: 7 }],
       [7_000, 'Motor no limite', { speedKph: 4.5, roughness: 1.8 }],
       [9_800, 'Crista da subida', { pitch: 9, speedKph: 6, roughness: 1 }],
@@ -626,7 +626,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [2_000, 'Entra na rampa de cascalho', { pitch: 16, speedKph: 13, inclinationRisk: true }],
       [4_000, 'Subida de 21°', { pitch: 21, speedKph: 7 }],
       [5_000, 'Rodas patinam no cascalho', { speedKph: 3, wheelSpeedKph: 12, roughness: 2.4 }],
-      [6_200, 'Tração se esgota — estanca', { speedKph: 0, wheelSpeedKph: 5 }],
+      [6_200, 'Tração se esgota: estanca', { speedKph: 0, wheelSpeedKph: 5 }],
       [7_000, 'Segura no freio', { wheelSpeedKph: 0 }],
       [7_800, 'Engata a ré', { direction: -1 }],
       [9_600, 'Recuo controlado em ré', { speedKph: 2.8, wheelSpeedKph: 2.8, pitch: 15 }],
@@ -639,7 +639,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [0, 'Rodovia na serra', { pitch: -4, speedKph: 88 }],
       [2_200, 'Entra no declive', { pitch: -16, speedKph: 93 }],
       [5_200, 'Freio motor segura a descida', { pitch: -22, speedKph: 98 }],
-      [8_600, 'Meio da serra — velocidade estica', { speedKph: 100, roughness: 1.5 }],
+      [8_600, 'Meio da serra: velocidade estica', { speedKph: 100, roughness: 1.5 }],
       [11_500, 'Base da serra', { pitch: -8, speedKph: 95 }],
       [13_500, 'Plano alcançado', { pitch: -1, speedKph: 88, inclinationRisk: false }],
       [16_000, 'Segue no plano', { pitch: 0, speedKph: 85 }],
@@ -647,9 +647,9 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
     'freio-aquece': ruralScript('steep-descent', [
       [0, 'Rodovia na serra', { pitch: -4, speedKph: 86 }],
       [2_400, 'Entra no declive', { pitch: -17, speedKph: 92 }],
-      [5_000, 'Freio no limite — velocidade cresce', { pitch: -22, speedKph: 100, temperature: 27 }],
+      [5_000, 'Freio no limite: velocidade cresce', { pitch: -22, speedKph: 100, temperature: 27 }],
       [7_600, 'Fade do freio de serviço', { speedKph: 106, temperature: 32, roughness: 1.6 }],
-      [10_800, 'Reduz marcha — freio motor pega', { speedKph: 90, temperature: 34, roughness: 2, pitch: -18 }],
+      [10_800, 'Reduz marcha: freio motor pega', { speedKph: 90, temperature: 34, roughness: 2, pitch: -18 }],
       [14_400, 'Freio de serviço volta aos poucos', { speedKph: 56, lateral: 0.7, yaw: -2, pitch: -12 }],
       [17_200, 'Busca o acostamento', { speedKph: 24, lateral: 1.6, yaw: -4, pitch: -6, temperature: 33 }],
       [19_000, 'Parada técnica para resfriar', { speedKph: 0, lateral: 2, yaw: 0, pitch: -2, roughness: 0, inclinationRisk: false }],
@@ -661,7 +661,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [0, 'Manobra no terreiro', { distance: 130, collisionRisk: false, speedKph: 3 }],
       [2_600, 'Diagonal de aproximação', { yaw: -5, lateral: 0.5, distance: 95, speedKph: 2.5 }],
       [4_600, 'Endireita junto à doca', { yaw: 2.5, lateral: 0.9, distance: 70, collisionRisk: true, speedKph: 2 }],
-      [6_800, 'Pausa — confere o espelho', { speedKph: 0, distance: 55 }],
+      [6_800, 'Pausa: confere o espelho', { speedKph: 0, distance: 55 }],
       [8_200, 'Ajuste fino', { speedKph: 1, yaw: 0, distance: 30 }],
       [10_800, 'Encostado na doca', { speedKph: 0, distance: 12, roughness: 0 }],
       [14_000, 'Posicionado para a carga', {}],
@@ -670,7 +670,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [0, 'Manobra no terreiro', { distance: 130, collisionRisk: false, speedKph: 3 }],
       [3_200, 'Espaço mais estreito que o previsto', { yaw: -4, lateral: 0.5, distance: 60, collisionRisk: true, speedKph: 3.5 }],
       [5_400, 'Toque no portão', { distance: 8, speedKph: 0, pitch: -1.8, yaw: -5.5, roll: 1.5, roughness: 2.4 }],
-      [6_600, 'Parado — confere o dano', { pitch: 0, yaw: -5, roughness: 0.5, distance: 10 }],
+      [6_600, 'Parado: confere o dano', { pitch: 0, yaw: -5, roughness: 0.5, distance: 10 }],
       [7_400, 'Engata a ré', { direction: -1 }],
       [9_200, 'Recuo para avaliar', { speedKph: 1.5, distance: 60, yaw: -2, lateral: 0.4, roll: 0 }],
       [11_200, 'Parado para avaliar o dano', { speedKph: 0, roughness: 0 }],
@@ -681,7 +681,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
     reacomoda: ruralScript('shifted-load', [
       [0, 'Carga deslocada a 19°', {}],
       [2_500, 'Parada imediata', { speedKph: 0, roughness: 0.2 }],
-      [5_500, 'Cintas aliviam — carga cede mais', { roll: 23, roughness: 1.2 }],
+      [5_500, 'Cintas aliviam: carga cede mais', { roll: 23, roughness: 1.2 }],
       [8_500, 'Reamarração puxa a carga', { roll: 14, roughness: 0.8 }],
       [11_500, 'Carga reacomodada', { roll: 4, inclinationRisk: false, roughness: 0.3 }],
       [15_000, 'Retoma em marcha lenta', { speedKph: 5 }],
@@ -693,7 +693,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [6_000, 'Queda acelera', { roll: 52, lateral: 0.5, roughness: 0 }],
       [7_200, 'Carroceria toca o solo', { roll: 78, lateral: 1.1, collisionRisk: true }],
       [9_000, 'Imobilizado de lado', { roll: 84, lateral: 1.3 }],
-      [14_000, 'Imobilizado — carga ao solo', {}],
+      [14_000, 'Imobilizado: carga ao solo', {}],
     ]),
   }),
   'hot-weather': Object.freeze({
@@ -711,7 +711,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [6_000, 'Temperatura dispara no painel', { temperature: 52, speedKph: 45, roughness: 1.5 }],
       [8_000, 'Vapor no radiador', { temperature: 57, smoke: 0.3, speedKph: 18, roughness: 0.9 }],
       [10_000, 'Parada de emergência', { speedKph: 0, temperature: 59, smoke: 0.45, roughness: 0 }],
-      [15_000, 'Motor desligado — aguardando resfriar', { temperature: 53, smoke: 0.15 }],
+      [15_000, 'Motor desligado: aguardando resfriar', { temperature: 53, smoke: 0.15 }],
     ]),
   }),
   rollover: Object.freeze({
@@ -774,7 +774,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [5_400, 'Frenagem máxima', { animalZ: -0.3, distance: 46, speedKph: 44, pitch: -5 }],
       [6_500, 'Impacto com o animal', { animalZ: 0.05, distance: 8, speedKph: 26, pitch: -2, roughness: 3.2 }],
       [8_500, 'Parado após o impacto', { animalZ: 0.2, speedKph: 0, pitch: 0, roughness: 0.4, distance: 10 }],
-      [14_000, 'Imobilizado — animal ferido na pista', { animalZ: 0.35, roughness: 0 }],
+      [14_000, 'Imobilizado: animal ferido na pista', { animalZ: 0.35, roughness: 0 }],
     ]),
   }),
   aquaplaning: Object.freeze({
@@ -827,7 +827,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [5_000, 'Perda de potência', { speedKph: 56, smoke: 0.5, temperature: 46 }],
       [7_200, 'Parada imediata no acostamento', { speedKph: 0, lateral: 2.3, yaw: 2, smoke: 0.6, temperature: 50, roughness: 0 }],
       [9_000, 'Extintor aplicado', { smoke: 0.18, temperature: 38 }],
-      [13_000, 'Foco contido — aguardando resgate', { smoke: 0.05, temperature: 33 }],
+      [13_000, 'Foco contido: aguardando resgate', { smoke: 0.05, temperature: 33 }],
     ]),
     'fogo-alastra': ruralScript('engine-fire', [
       [0, 'Operação', {}],
@@ -836,7 +836,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [6_800, 'Busca o acostamento', { speedKph: 26, lateral: 1.4, yaw: 4, smoke: 0.8, temperature: 55 }],
       [9_200, 'Parada de emergência no acostamento', { speedKph: 0, lateral: 2.4, yaw: 2, smoke: 0.9, temperature: 58, roughness: 0 }],
       [9_800, 'Chamas se alastram', { smoke: 1, temperature: 68, humidity: 16 }],
-      [14_000, 'Abandono do veículo — fogo ativo', { temperature: 70 }],
+      [14_000, 'Abandono do veículo: fogo ativo', { temperature: 70 }],
     ]),
   }),
   'tight-reverse': Object.freeze({
@@ -846,7 +846,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [2_200, 'Ré rápida demais', { speedKph: 3.5, yaw: -12, lateral: 0.6, distance: 175 }],
       [3_800, 'Sem corrigir o ângulo', { yaw: -16, lateral: 1, distance: 220, collisionRisk: true }],
       [5_200, 'Toque na doca', { speedKph: 0, pitch: 1.5, yaw: -14, roll: -2, roughness: 2.2, distance: 240 }],
-      [6_400, 'Parado — impacto leve', { pitch: 0, roll: 0, roughness: 0.4 }],
+      [6_400, 'Parado: impacto leve', { pitch: 0, roll: 0, roughness: 0.4 }],
       [13_000, 'Manobra suspensa', { roughness: 0 }],
     ]),
     'reinicia-manobra': ruralScript('tight-reverse', [
@@ -874,7 +874,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [7_200, 'Converte o balanço', { speedKph: 0, wheelSpeedKph: 0 }],
       [7_800, 'Engata à frente', { direction: 1 }],
       [8_600, 'Surto para frente', { speedKph: 2.2, wheelSpeedKph: 14, pitch: -5, roll: 7, sink: 0.3 }],
-      [9_800, 'Tração recuperada — sai do berço', { speedKph: 5.5, wheelSpeedKph: 9, sink: 0.1, pitch: -1, roll: 2 }],
+      [9_800, 'Tração recuperada: sai do berço', { speedKph: 5.5, wheelSpeedKph: 9, sink: 0.1, pitch: -1, roll: 2 }],
       [11_500, 'Segue em marcha lenta', { speedKph: 7, wheelSpeedKph: 7, sink: 0, roll: 3, roughness: 0.9 }],
       [14_000, 'Fora do trecho de lama', { roughness: 0.5, rain: 0.1 }],
     ]),
@@ -887,7 +887,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [9_200, 'Ré enterra a traseira', { speedKph: 0.9, wheelSpeedKph: 7, sink: 0.56, roll: 12, pitch: -3 }],
       [10_400, 'Afundamento lateral', { direction: 1, speedKph: 0, wheelSpeedKph: 8, sink: 0.62, roll: 13, inclinationRisk: true, pitch: -6 }],
       [11_500, 'Enterrado até o eixo', { wheelSpeedKph: 3, sink: 0.64, roll: 14 }],
-      [14_000, 'Operação abortada — resgate necessário', { wheelSpeedKph: 0, roughness: 0, rain: 0.15 }],
+      [14_000, 'Operação abortada: resgate necessário', { wheelSpeedKph: 0, roughness: 0, rain: 0.15 }],
     ]),
   }),
   'driver-drowsiness': Object.freeze({
@@ -895,7 +895,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [0, 'Rodagem contínua', {}],
       [2_000, 'Nariz deriva para o acostamento', { yaw: 3 }],
       [3_600, 'Primeiro desvio de faixa', { yaw: 2, lateral: 1.2, roll: 1.5 }],
-      [5_000, 'Sem correção — rumo ao acostamento', { yaw: 3.5, lateral: 2.0, collisionRisk: true }],
+      [5_000, 'Sem correção: rumo ao acostamento', { yaw: 3.5, lateral: 2.0, collisionRisk: true }],
       [7_500, 'Sai da pista dormindo', { yaw: 2, lateral: 3.6, roughness: 3.2, speedKph: 60, pitch: -2 }],
       [9_500, 'Desperta no terreno', { yaw: -3.5, speedKph: 30, roll: 4, roughness: 3.8 }],
       [11_500, 'Parada no campo', { speedKph: 0, yaw: 0, roughness: 0, pitch: 0, roll: 2 }],
@@ -925,7 +925,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
     'saida-de-frente': ruralScript('fast-corner', [
       [0, 'Entrada em curva', {}],
       [1_800, 'Esterço para a curva', { yaw: -10, roll: 5, speedKph: 92 }],
-      [3_000, 'Frente escapa — subesterço', { yaw: -13, lateral: 0.9, roll: 9, speedKph: 80, inclinationRisk: true, roughness: 1.2 }],
+      [3_000, 'Frente escapa: subesterço', { yaw: -13, lateral: 0.9, roll: 9, speedKph: 80, inclinationRisk: true, roughness: 1.2 }],
       [5_000, 'Sai pela tangente da curva', { yaw: -6, lateral: 2.6, roll: 7, speedKph: 58, roughness: 2.6, collisionRisk: true }],
       [7_500, 'Freia no cascalho do acostamento', { speedKph: 22, lateral: 3.6, roll: 4, yaw: -2, roughness: 3.0 }],
       [10_000, 'Parada fora da curva', { speedKph: 0, yaw: 0, roll: 2, roughness: 0, inclinationRisk: false, collisionRisk: false }],
@@ -1002,7 +1002,7 @@ export function getSompoRuralTravelMeters(scenarioId, elapsedMs = 0, outcomeId) 
   return travel + (((elapsed - script.totalMs) / 1000) * ((last.speedKph / 3.6) * last.direction));
 }
 
-/** Deslocamento (m) da frenagem brusca padrão — mesma forma fechada do perfil cossenoidal. */
+/** Deslocamento (m) da frenagem brusca padrão: mesma forma fechada do perfil cossenoidal. */
 export function getSompoBrakingTravelMeters(elapsedMs = 0, initialSpeedKph = 80) {
   const speed = clamp(finite(initialSpeedKph, 80), 0, 120) / 3.6;
   const elapsed = Math.max(0, finite(elapsedMs, 0)) / 1000;
@@ -1017,7 +1017,7 @@ export function getSompoBrakingTravelMeters(elapsedMs = 0, initialSpeedKph = 80)
 
 /**
  * Plano de gravação de episódio: o que o botão "Gravar episódio" precisa
- * saber para registrar o roteiro do cenário + desfecho selecionados —
+ * saber para registrar o roteiro do cenário + desfecho selecionados -
  * duração, fases (para a linha de status) e até 5 instantes nomeados de
  * captura de frame (evidência visual anexada à missão da bancada).
  *
@@ -1040,7 +1040,7 @@ function sompoPhaseSlug(label, index) {
 }
 
 /**
- * Fases que representam o clímax do roteiro — impacto, colisão, tombamento,
+ * Fases que representam o clímax do roteiro: impacto, colisão, tombamento,
  * estouro, queda ou rolagem. São a evidência que mais importa no episódio:
  * se a grade uniforme passar entre elas, o instante crítico é injetado no
  * lugar do vizinho mais próximo que não seja a abertura nem outro clímax.
@@ -1098,7 +1098,7 @@ export function sompoEpisodeSampleOffsets(lastMs, elapsedMs, intervalMs, totalMs
 
 /**
  * Plano de episódio para um desfecho do catálogo convencional (rural).
- * Retorna null para desfechos manuais — sem roteiro não há episódio.
+ * Retorna null para desfechos manuais, sem roteiro não há episódio.
  */
 export function getSompoEpisodePlan(scenarioId, outcomeId) {
   if (!Object.hasOwn(SOMPO_SIMULATION_SCENARIOS, scenarioId)) return null;

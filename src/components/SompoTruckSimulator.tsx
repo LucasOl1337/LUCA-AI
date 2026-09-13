@@ -25,6 +25,7 @@ import { downloadSompoFile, loadSompoStudioConfig, type SompoStudioConfig, type 
 import { mountSompoRuralStage } from './sompo/createSompoRuralStage';
 import type { SompoTelemetrySnapshot } from '@/lib/types';
 import { lucaApi } from '@/lib/api';
+import { sompoRequestedScenarioAction } from '@/lib/sompo-scenario-selection';
 import {
   DEFAULT_SOMPO_AXIS_CALIBRATION,
   type SompoAxisCalibration,
@@ -64,9 +65,11 @@ interface SompoTruckSimulatorProps {
   telemetry?: SompoTelemetrySnapshot | null;
   onTelemetry?: (snapshot: SompoTelemetrySnapshot) => void;
   onEpisodeRecorded?: (episode: { publicId: string; kind: string; outcomeId?: string; outcomeLabel?: string } | null) => void;
-  /** Cenário/desfecho pedidos pela URL (?cenario=&desfecho=) — abrem direto no roteiro. */
+  /** Cenário/desfecho pedidos pela URL (?cenario=&desfecho=): abrem direto no roteiro. */
   requestedScenario?: string;
   requestedOutcome?: string;
+  /** Devolve a seleção do dropdown para a URL, para a faixa de regulação acompanhar. */
+  onScenarioSelect?: (scenarioId: string, outcomeId: string) => void;
 }
 
 type EpisodeRunState =
@@ -151,7 +154,7 @@ const EPISODE_FRAME_JPEG_QUALITY = 0.7;
 const EPISODE_FRAME_LATE_TOLERANCE_MS = 1_000;
 
 /**
- * Captura síncrona após o render — o buffer WebGL ainda está preenchido no
+ * Captura síncrona após o render. O buffer WebGL ainda está preenchido no
  * mesmo rAF, então não precisamos de preserveDrawingBuffer.
  * Reduz para ~640px num canvas 2D antes de serializar em JPEG.
  */
@@ -198,7 +201,7 @@ function snapshotToSimulationRaw(snapshot: SompoTelemetrySnapshot): Record<strin
 }
 
 function formatReading(value: number | null | undefined, suffix: string) {
-  if (!Number.isFinite(value)) return '—';
+  if (!Number.isFinite(value)) return '-';
   return `${Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}${suffix}`;
 }
 
@@ -268,7 +271,7 @@ function LiveReadings({
         <summary>Calibração de eixos</summary>
         <p>
           Incline o caminhão físico e ajuste até a tela seguir a mesma direção. O rumo é integrado
-          do giroscópio e não tem norte: depois de várias curvas ele acumula erro — recentre com o
+          do giroscópio e não tem norte: depois de várias curvas ele acumula erro: recentre com o
           caminhão apontado para a seta ciano.
         </p>
         <div>
@@ -308,6 +311,7 @@ export default function SompoTruckSimulator({
   onEpisodeRecorded,
   requestedScenario = '',
   requestedOutcome = '',
+  onScenarioSelect,
 }: SompoTruckSimulatorProps) {
   const isFirebase = source === 'firebase';
   const [studioOpen, setStudioOpen] = useState(false);
@@ -366,7 +370,7 @@ export default function SompoTruckSimulator({
   );
 
   // Plano de gravação do cenário + desfecho atuais: null quando o desfecho
-  // é manual ("livre") — sem roteiro não há instantes conhecidos de captura.
+  // é manual ("livre"), sem roteiro não há instantes conhecidos de captura.
   const episodePlan = useMemo<SompoEpisodePlan | null>(
     () => (agriRun
       ? getSompoAgriEpisodePlan(agriRun.scenarioId, agriRun.outcomeId)
@@ -518,7 +522,7 @@ export default function SompoTruckSimulator({
         }
       } catch {
         setEpisodeFramesWarning(
-          `Falha ao enviar os frames do simulador — o episódio foi gravado, mas a análise seguirá sem evidência visual. Enviados: ${uploaded}/${frames.length}.`,
+          `Falha ao enviar os frames do simulador. O episódio foi gravado, mas a análise seguirá sem evidência visual. Enviados: ${uploaded}/${frames.length}.`,
         );
       }
     }
@@ -555,7 +559,7 @@ export default function SompoTruckSimulator({
         episodeCaptureRef.current = null;
         setEpisodeRun({
           status: 'error',
-          message: 'Falha de rede ao fechar o episódio — gravação abortada. O simulador continua ativo.',
+          message: 'Falha de rede ao fechar o episódio. Gravação abortada. O simulador continua ativo.',
         });
         void lucaApi.postSompoTelemetryEpisodeFinish(run.publicId, 'aborted').catch(() => undefined);
       }
@@ -567,7 +571,7 @@ export default function SompoTruckSimulator({
         void finishRun();
         return;
       }
-      // A telemetria gravada é o mesmo snapshot que o cenário emite em tela —
+      // A telemetria gravada é o mesmo snapshot que o cenário emite em tela -
       // o episódio é literalmente "o que está na cena agora", do início ao desfecho.
       const snapshot = run.plan.catalog === 'agri'
         ? createSompoAgriSimulationSnapshot(run.plan.scenarioId, run.plan.outcomeId, {
@@ -614,7 +618,7 @@ export default function SompoTruckSimulator({
 
     const flushTimer = window.setInterval(() => {
       void flushQueue()?.catch(() => abortRun(
-        'Falha de rede ao gravar o episódio — gravação abortada. O simulador continua ativo.',
+        'Falha de rede ao gravar o episódio. Gravação abortada. O simulador continua ativo.',
       ));
     }, SIMULATION_HISTORY_FLUSH_MS);
 
@@ -644,7 +648,7 @@ export default function SompoTruckSimulator({
       return;
     }
     // O relógio do cenário zera no início da gravação: o episódio registra o
-    // roteiro inteiro e a cena rejoga junto — os dois palcos leem o mesmo ref.
+    // roteiro inteiro e a cena rejoga junto. Os dois palcos leem o mesmo ref.
     const startedAt = performance.now();
     startedAtRef.current = startedAt;
     connectedAtRef.current = new Date().toISOString();
@@ -755,6 +759,14 @@ export default function SompoTruckSimulator({
     return () => { sceneApiRef.current = null; stage.dispose(); };
   }, [agriRun, isFirebase, studioConfig.truck]);
 
+  const onScenarioSelectRef = useRef(onScenarioSelect);
+  onScenarioSelectRef.current = onScenarioSelect;
+  const currentSelectionRef = useRef({ scenarioId: '', outcomeId: '' });
+  currentSelectionRef.current = agriRun
+    ? { scenarioId: agriRun.scenarioId, outcomeId: agriRun.outcomeId }
+    : { scenarioId: controls.scenarioId, outcomeId: controls.outcomeId || '' };
+  const lastHonoredRequestRef = useRef('');
+
   function selectScenario(scenarioId: SompoSimulationScenarioId | SompoAgriScenarioId, outcomeId?: string) {
     if (episodeActive) return;
     historyReplay.current = false;
@@ -764,34 +776,47 @@ export default function SompoTruckSimulator({
     // não oferecer análise de um episódio que não corresponde à cena atual.
     setEpisodeRun({ status: 'idle' });
     onEpisodeRecordedRef.current?.(null);
+    let resolvedOutcome = outcomeId || '';
     if (isSompoAgriScenarioId(scenarioId)) {
       const outcomes = getSompoAgriOutcomes(scenarioId);
       const outcome = outcomes.find((item) => item.id === outcomeId) || outcomes[0];
+      resolvedOutcome = outcome.id;
       setAgriRun({ scenarioId, outcomeId: outcome.id });
       setStudioConfig(current => ({ ...current, equipment: getSompoAgriFrame(scenarioId, 0).equipmentId === 'harvester' ? 'harvester' : 'tractor' }));
-      return;
+    } else {
+      const next = controlsForScenario(scenarioId, outcomeId);
+      resolvedOutcome = next.outcomeId || '';
+      setAgriRun(null);
+      setStudioConfig(current => ({ ...current, equipment: current.truck }));
+      setControls(next);
     }
-    setAgriRun(null);
-    setStudioConfig(current => ({ ...current, equipment: current.truck }));
-    setControls(controlsForScenario(scenarioId, outcomeId));
+    onScenarioSelectRef.current?.(scenarioId, resolvedOutcome);
   }
   const selectScenarioRef = useRef(selectScenario);
   selectScenarioRef.current = selectScenario;
 
-  // Links de história/caso (?cenario=&desfecho=) abrem o roteiro direto.
+  // Deep-link (?cenario=&desfecho=) só reaplica quando a URL muda. O dropdown
+  // do laboratório não compete com a faixa de regulação.
   useEffect(() => {
-    if (isFirebase || episodeActive || !requestedScenario) return;
-    const valid = isSompoAgriScenarioId(requestedScenario)
+    if (isFirebase || episodeActive) return;
+    const valid = !requestedScenario
+      || isSompoAgriScenarioId(requestedScenario)
       || requestedScenario in SOMPO_SIMULATION_SCENARIOS;
     if (!valid) return;
-    const currentId = agriRun ? agriRun.scenarioId : controls.scenarioId;
-    const currentOutcome = agriRun ? agriRun.outcomeId : controls.outcomeId;
-    if (currentId === requestedScenario && (!requestedOutcome || currentOutcome === requestedOutcome)) return;
-    selectScenarioRef.current(
-      requestedScenario as SompoSimulationScenarioId | SompoAgriScenarioId,
-      requestedOutcome || undefined,
-    );
-  }, [requestedScenario, requestedOutcome, isFirebase, episodeActive, agriRun, controls.scenarioId, controls.outcomeId]);
+    const action = sompoRequestedScenarioAction({
+      requested: { scenarioId: requestedScenario, outcomeId: requestedOutcome },
+      current: currentSelectionRef.current,
+      lastHonoredKey: lastHonoredRequestRef.current,
+    });
+    if (action.type === 'idle') return;
+    lastHonoredRequestRef.current = action.key;
+    if (action.type === 'apply') {
+      selectScenarioRef.current(
+        action.scenarioId as SompoSimulationScenarioId | SompoAgriScenarioId,
+        action.outcomeId,
+      );
+    }
+  }, [requestedScenario, requestedOutcome, isFirebase, episodeActive]);
 
   function selectStudioAsset(asset: SompoStudioAsset) {
     setStudioConfig(current => ({ ...current, equipment: asset }));
@@ -911,7 +936,7 @@ export default function SompoTruckSimulator({
           </div>
           <div className="sompo-simulator-stage-badges" aria-hidden="true">
             <span><span className="sompo-simulator-led" /> {isFirebase ? `ESP32 físico · trator ${preview.tractorId}` : 'ESP32 virtual transmitindo'}</span>
-            <span>{isFirebase ? `tick ${preview.deviceTimestamp ?? '—'}` : `${Math.round(preview.deviceTimestamp || 0)} ms`}</span>
+            <span>{isFirebase ? `tick ${preview.deviceTimestamp ?? '-'}` : `${Math.round(preview.deviceTimestamp || 0)} ms`}</span>
           </div>
           {!isFirebase && (
             <div className="sompo-simulator-readout" aria-label="Resumo do cenário">
@@ -1029,7 +1054,7 @@ export default function SompoTruckSimulator({
             </button>
             {!episodePlan && !episodeActive && (
               <p className="sompo-simulator-episode-status" data-sompo-episode-manual>
-                Este desfecho é manual e não gera episódio — escolha um desfecho roteirizado para gravar.
+                Este desfecho é manual e não gera episódio. Escolha um desfecho roteirizado para gravar.
               </p>
             )}
             {episodeRun.status === 'starting' && (
