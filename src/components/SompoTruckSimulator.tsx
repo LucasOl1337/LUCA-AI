@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import SompoStudio, { type SompoStudioAsset } from './sompo/SompoStudio';
 import SompoGeofenceMap from './sompo/SompoGeofenceMap';
+import SompoGeofencePanel from './sompo/SompoGeofencePanel';
 import { createSompoPlayback } from './sompo/sompoPlayback';
 import { downloadSompoFile, loadSompoStudioConfig, type SompoStudioConfig, type SompoRenderStats } from './sompo/sompoStudioConfig';
 import { mountSompoRuralStage } from './sompo/createSompoRuralStage';
@@ -836,6 +837,125 @@ export default function SompoTruckSimulator({
     ? preview.freshness === 'stale' ? 'Conectado · leitura parada' : 'Firebase ao vivo'
     : preview.connection.state === 'reconnecting' ? 'Reconectando ao Firebase' : 'Conectando ao Firebase';
 
+  // Coluna direita vira painel de geofencing só no cenário com talhão (radar presente); os demais cenários ficam como eram.
+  const geofencePanel = !isFirebase && agriRun && preview.geofence ? (
+    <SompoGeofencePanel scenarioId={agriRun.scenarioId} outcomeId={agriRun.outcomeId} elapsedMs={preview.deviceTimestamp ?? 0} geofence={preview.geofence} rollDeg={preview.readings.roll ?? null} />
+  ) : null;
+  const manualControls = (
+    <>
+          <div className="sompo-simulator-ranges">
+            {brakingPreview && (
+              <p role="status">
+                {brakingPreview.phaseLabel}
+                {' · '}{formatReading(brakingPreview.speedKph, ' km/h')}
+              </p>
+            )}
+            <label>
+              <span>Velocidade <strong>{scenarioScripted ? Math.round(ruralPreview?.speedKph ?? agriPreview?.speedKph ?? controls.speedKph) : controls.speedKph} km/h</strong></span>
+              <input
+                type="range"
+                min="0"
+                max="120"
+                step="5"
+                value={scenarioScripted ? Math.round(ruralPreview?.speedKph ?? agriPreview?.speedKph ?? controls.speedKph) : controls.speedKph}
+                disabled={episodeActive || scenarioScripted}
+                name="sompo-speed"
+                onChange={(event) => updateNumber('speedKph', Number(event.target.value))}
+              />
+            </label>
+            <label>
+              <span>Distância frontal <strong>{scenarioScripted ? (preview.readings.distance ?? controls.distance) : controls.distance} cm</strong></span>
+              <input
+                type="range"
+                min="5"
+                max="300"
+                step="1"
+                value={scenarioScripted ? (preview.readings.distance ?? controls.distance) : controls.distance}
+                disabled={episodeActive || scenarioScripted}
+                name="sompo-distance"
+                onChange={(event) => updateNumber('distance', Number(event.target.value))}
+              />
+            </label>
+            <label>
+              <span>Pitch <strong>{scenarioScripted ? (preview.readings.pitch ?? controls.pitch) : controls.pitch}°</strong></span>
+              <input
+                type="range"
+                min="-25"
+                max="25"
+                step="0.5"
+                value={scenarioScripted ? (preview.readings.pitch ?? controls.pitch) : controls.pitch}
+                disabled={episodeActive || scenarioScripted}
+                name="sompo-pitch"
+                onChange={(event) => updateNumber('pitch', Number(event.target.value))}
+              />
+            </label>
+            <label>
+              <span>Roll <strong>{scenarioScripted ? (preview.readings.roll ?? controls.roll) : controls.roll}°</strong></span>
+              <input
+                type="range"
+                min="-25"
+                max={scenarioScripted ? 90 : 25}
+                step="0.5"
+                value={scenarioScripted ? (preview.readings.roll ?? controls.roll) : controls.roll}
+                disabled={episodeActive || scenarioScripted}
+                name="sompo-roll"
+                onChange={(event) => updateNumber('roll', Number(event.target.value))}
+              />
+            </label>
+            <label>
+              <span>Temperatura <strong>{scenarioScripted ? (preview.readings.temperature ?? controls.temperature) : controls.temperature} °C</strong></span>
+              <input
+                type="range"
+                min="-10"
+                max="70"
+                step="1"
+                value={scenarioScripted ? (preview.readings.temperature ?? controls.temperature) : controls.temperature}
+                disabled={episodeActive || scenarioScripted}
+                name="sompo-temperature"
+                onChange={(event) => updateNumber('temperature', Number(event.target.value))}
+              />
+            </label>
+            <label>
+              <span>Umidade <strong>{scenarioScripted ? (preview.readings.humidity ?? controls.humidity) : controls.humidity}%</strong></span>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={scenarioScripted ? (preview.readings.humidity ?? controls.humidity) : controls.humidity}
+                disabled={episodeActive || scenarioScripted}
+                name="sompo-humidity"
+                onChange={(event) => updateNumber('humidity', Number(event.target.value))}
+              />
+            </label>
+          </div>
+
+          <div className="sompo-simulator-flags" role="group" aria-label="Flags sintéticas do cenário">
+            <button
+              type="button"
+              aria-pressed={(scenarioScripted ? preview.risks.collision : controls.collisionRisk) ?? false}
+              disabled={episodeActive || scenarioScripted}
+              onClick={() => setControls((current) => ({ ...current, collisionRisk: !current.collisionRisk }))}
+            >
+              {(scenarioScripted ? preview.risks.collision : controls.collisionRisk) ? <ShieldAlert /> : <ShieldCheck />}
+              Colisão {(scenarioScripted ? preview.risks.collision : controls.collisionRisk) ? 'ativa' : 'livre'}
+            </button>
+            <button
+              type="button"
+              aria-pressed={(scenarioScripted ? preview.risks.inclination : controls.inclinationRisk) ?? false}
+              disabled={episodeActive || scenarioScripted}
+              onClick={() => setControls((current) => ({ ...current, inclinationRisk: !current.inclinationRisk }))}
+            >
+              {(scenarioScripted ? preview.risks.inclination : controls.inclinationRisk) ? <ShieldAlert /> : <ShieldCheck />}
+              Inclinação {(scenarioScripted ? preview.risks.inclination : controls.inclinationRisk) ? 'ativa' : 'livre'}
+            </button>
+          </div>
+          <p className="sompo-simulator-disclaimer">
+            As flags são comandos do cenário. Não representam limiares confirmados do firmware.
+          </p>
+    </>
+  );
+
   return (
     <section
       className={`sompo-simulator${isFirebase ? ' sompo-simulator-live' : ''}${studioOpen ? ' is-studio' : ''}`}
@@ -1026,6 +1146,8 @@ export default function SompoTruckSimulator({
             </div>
           )}
 
+          {geofencePanel}
+
           <div className="sompo-simulator-episode" data-sompo-episode-panel>
             <button
               type="button"
@@ -1078,116 +1200,12 @@ export default function SompoTruckSimulator({
             )}
           </div>
 
-          <div className="sompo-simulator-ranges">
-            {brakingPreview && (
-              <p role="status">
-                {brakingPreview.phaseLabel}
-                {' · '}{formatReading(brakingPreview.speedKph, ' km/h')}
-              </p>
-            )}
-            <label>
-              <span>Velocidade <strong>{scenarioScripted ? Math.round(ruralPreview?.speedKph ?? agriPreview?.speedKph ?? controls.speedKph) : controls.speedKph} km/h</strong></span>
-              <input
-                type="range"
-                min="0"
-                max="120"
-                step="5"
-                value={scenarioScripted ? Math.round(ruralPreview?.speedKph ?? agriPreview?.speedKph ?? controls.speedKph) : controls.speedKph}
-                disabled={episodeActive || scenarioScripted}
-                name="sompo-speed"
-                onChange={(event) => updateNumber('speedKph', Number(event.target.value))}
-              />
-            </label>
-            <label>
-              <span>Distância frontal <strong>{scenarioScripted ? (preview.readings.distance ?? controls.distance) : controls.distance} cm</strong></span>
-              <input
-                type="range"
-                min="5"
-                max="300"
-                step="1"
-                value={scenarioScripted ? (preview.readings.distance ?? controls.distance) : controls.distance}
-                disabled={episodeActive || scenarioScripted}
-                name="sompo-distance"
-                onChange={(event) => updateNumber('distance', Number(event.target.value))}
-              />
-            </label>
-            <label>
-              <span>Pitch <strong>{scenarioScripted ? (preview.readings.pitch ?? controls.pitch) : controls.pitch}°</strong></span>
-              <input
-                type="range"
-                min="-25"
-                max="25"
-                step="0.5"
-                value={scenarioScripted ? (preview.readings.pitch ?? controls.pitch) : controls.pitch}
-                disabled={episodeActive || scenarioScripted}
-                name="sompo-pitch"
-                onChange={(event) => updateNumber('pitch', Number(event.target.value))}
-              />
-            </label>
-            <label>
-              <span>Roll <strong>{scenarioScripted ? (preview.readings.roll ?? controls.roll) : controls.roll}°</strong></span>
-              <input
-                type="range"
-                min="-25"
-                max={scenarioScripted ? 90 : 25}
-                step="0.5"
-                value={scenarioScripted ? (preview.readings.roll ?? controls.roll) : controls.roll}
-                disabled={episodeActive || scenarioScripted}
-                name="sompo-roll"
-                onChange={(event) => updateNumber('roll', Number(event.target.value))}
-              />
-            </label>
-            <label>
-              <span>Temperatura <strong>{scenarioScripted ? (preview.readings.temperature ?? controls.temperature) : controls.temperature} °C</strong></span>
-              <input
-                type="range"
-                min="-10"
-                max="70"
-                step="1"
-                value={scenarioScripted ? (preview.readings.temperature ?? controls.temperature) : controls.temperature}
-                disabled={episodeActive || scenarioScripted}
-                name="sompo-temperature"
-                onChange={(event) => updateNumber('temperature', Number(event.target.value))}
-              />
-            </label>
-            <label>
-              <span>Umidade <strong>{scenarioScripted ? (preview.readings.humidity ?? controls.humidity) : controls.humidity}%</strong></span>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={scenarioScripted ? (preview.readings.humidity ?? controls.humidity) : controls.humidity}
-                disabled={episodeActive || scenarioScripted}
-                name="sompo-humidity"
-                onChange={(event) => updateNumber('humidity', Number(event.target.value))}
-              />
-            </label>
-          </div>
-
-          <div className="sompo-simulator-flags" role="group" aria-label="Flags sintéticas do cenário">
-            <button
-              type="button"
-              aria-pressed={(scenarioScripted ? preview.risks.collision : controls.collisionRisk) ?? false}
-              disabled={episodeActive || scenarioScripted}
-              onClick={() => setControls((current) => ({ ...current, collisionRisk: !current.collisionRisk }))}
-            >
-              {(scenarioScripted ? preview.risks.collision : controls.collisionRisk) ? <ShieldAlert /> : <ShieldCheck />}
-              Colisão {(scenarioScripted ? preview.risks.collision : controls.collisionRisk) ? 'ativa' : 'livre'}
-            </button>
-            <button
-              type="button"
-              aria-pressed={(scenarioScripted ? preview.risks.inclination : controls.inclinationRisk) ?? false}
-              disabled={episodeActive || scenarioScripted}
-              onClick={() => setControls((current) => ({ ...current, inclinationRisk: !current.inclinationRisk }))}
-            >
-              {(scenarioScripted ? preview.risks.inclination : controls.inclinationRisk) ? <ShieldAlert /> : <ShieldCheck />}
-              Inclinação {(scenarioScripted ? preview.risks.inclination : controls.inclinationRisk) ? 'ativa' : 'livre'}
-            </button>
-          </div>
-          <p className="sompo-simulator-disclaimer">
-            As flags são comandos do cenário. Não representam limiares confirmados do firmware.
-          </p>
+          {geofencePanel ? (
+            <details className="sompo-geofence-more" data-sompo-geofence-more>
+              <summary>Leituras do roteiro e flags do cenário</summary>
+              {manualControls}
+            </details>
+          ) : manualControls}
         </aside>
         )}
       </div>

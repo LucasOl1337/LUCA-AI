@@ -15,6 +15,7 @@ import { createSompoSimulationSnapshot, sompoEpisodeFrameMoments } from './sompo
 import { createSompoMotionPath } from './sompo-motion.js';
 import { evaluateGeofence } from './sompo-geofence.js';
 import { getSompoGeofenceSite } from './sompo-geofence-sites.js';
+import { computeGeofenceEpisodes } from './lab-geofence.js';
 export { describeGeofence, describeMachineLimit } from './sompo-geofence.js';
 
 const finite = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
@@ -116,6 +117,32 @@ export function getSompoAgriPosition(scenarioId, elapsedMs = 0, outcomeId) {
   const point = path.sample(elapsedMs, { x: 0, z: 0 });
   const frame = getSompoAgriFrame(scenario.scenarioId, elapsedMs, outcome.id);
   return { x: -total.x / 2 + point.x, z: point.z + (useLateral ? frame.lateral : 0), headingDeg: 90 - frame.yaw };
+}
+
+// Episódios de faixa da corrida inteira de um desfecho, pelo mesmo motor do laboratório (computeGeofenceEpisodes).
+// O roteiro é conhecido de ponta a ponta, então o painel mostra a corrida toda desde o primeiro quadro. As amostras
+// levam a posição de cena marcada como fix sintético ('3d'), só para o motor aceitá-las; nada disso é persistido.
+const runEpisodes = new Map();
+/** Episódios de faixa (mapa e limite da máquina) do desfecho, ordenados por início; vazio nos cenários sem talhão. */
+export function getSompoAgriGeofenceEpisodes(scenarioId, outcomeId, stepMs = 250) {
+  const scenario = getSompoAgriScenario(scenarioId);
+  const outcome = resolveOutcome(scenario, outcomeId);
+  const key = `${scenario.scenarioId}:${outcome.id}:${stepMs}`;
+  if (!runEpisodes.has(key)) {
+    const site = getSompoGeofenceSite(scenario.environmentId, Math.abs(2 * getSompoAgriPosition(scenario.scenarioId, 0, outcome.id).x));
+    let episodes = [];
+    if (site) {
+      const samples = [];
+      for (let t = 0; t <= scenario.totalMs; t += stepMs) {
+        const { x, z } = getSompoAgriPosition(scenario.scenarioId, t, outcome.id);
+        samples.push({ elapsedMs: t, timestamp: t, x, z, gnss_fix: '3d', roll_deg: getSompoAgriFrame(scenario.scenarioId, t, outcome.id).roll });
+      }
+      episodes = computeGeofenceEpisodes(samples, site.polygons, site.manifestRules, key, stepMs, SOMPO_AGRI_EQUIPMENT[scenario.equipmentId]).summary.episodes
+        .sort((a, b) => a.startMs - b.startMs);
+    }
+    runEpisodes.set(key, Object.freeze(episodes));
+  }
+  return runEpisodes.get(key);
 }
 
 /** Snapshot agrícola com proveniência, posição de cena e radar sintético. */

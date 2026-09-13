@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { SOMPO_AGRI_EQUIPMENT, SOMPO_AGRI_SCENARIOS, getSompoAgriFrame } from '../shared/sompo-agri-scenarios.js';
-import { createSompoAgriSimulationSnapshot } from '../shared/sompo-agri-brief.js';
+import { createSompoAgriSimulationSnapshot, getSompoAgriGeofenceEpisodes } from '../shared/sompo-agri-brief.js';
 import { describeGeofence, describeMachineLimit, evaluateGeofence } from '../shared/sompo-geofence.js';
 import { resolveHazards } from '../shared/lab-geofence.js';
 import { getSompoGeofenceSite, SOMPO_GEOFENCE_SITE_VERSION } from '../shared/sompo-geofence-sites.js';
@@ -118,4 +118,34 @@ test('bandeira de proximidade: acende na faixa crítica e no limite da máquina,
   assert.ok(over.length > 0 && over.every(frame => frame.risks.proximity === true && frame.status === 'alert'));
   const inside = samples('parada-na-faixa').filter(frame => frame.geofence.nearest?.bandId === 'dentro');
   assert.ok(inside.length > 0 && inside.every(frame => frame.risks.proximity === true), 'dentro do declive mapeado também acende');
+});
+
+test('episódios da corrida inteira: mesmo motor do laboratório, coerentes com o radar instante a instante', () => {
+  const total = SOMPO_AGRI_SCENARIOS[SCENARIO].totalMs;
+  for (const outcome of ['parada-na-faixa', 'segue-ate-critica', 'declive-alem-do-limite']) {
+    const episodes = getSompoAgriGeofenceEpisodes(SCENARIO, outcome);
+    assert.ok(episodes.length >= 4, `${outcome} tem episódios de mapa`);
+    assert.ok(Object.isFrozen(episodes) && episodes === getSompoAgriGeofenceEpisodes(SCENARIO, outcome), 'lista congelada e cacheada');
+    for (let i = 1; i < episodes.length; i += 1) assert.ok(episodes[i].startMs >= episodes[i - 1].startMs, 'ordenados por início');
+    for (const episode of episodes) {
+      assert.ok(episode.startMs >= 0 && (episode.endMs === null || episode.endMs <= total));
+      assert.equal(episode.gapMs, 0, 'roteiro não tem lacuna de posição');
+      assert.equal(episode.quality, episode.endMs === null ? 'aberto-no-fim' : 'observado');
+    }
+    // Em cada instante amostrado, a faixa do perigo mais próximo no radar tem um episódio aberto com a mesma faixa.
+    for (const frame of samples(outcome)) {
+      const near = frame.geofence.nearest;
+      const at = frame.deviceTimestamp ?? frame.elapsedMs;
+      if (!near) continue;
+      assert.ok(episodes.some(e => e.hazardKey === near.hazardKey && e.bandId === near.bandId && e.startMs <= at && (e.endMs === null || at < e.endMs)), `${outcome} @${at}: ${near.hazardKey}/${near.bandId}`);
+    }
+  }
+  const machine = getSompoAgriGeofenceEpisodes(SCENARIO, 'declive-alem-do-limite').filter(e => e.hazardKey.startsWith('machine:'));
+  assert.deepEqual(machine.map(e => e.bandId), ['proximo', 'acima', 'proximo'], 'sobe até o limite e volta');
+  assert.equal(machine[1].minDistanceM, 0, 'no limite ou acima: margem mínima zero');
+  for (const outcome of ['parada-na-faixa', 'segue-ate-critica']) assert.equal(getSompoAgriGeofenceEpisodes(SCENARIO, outcome).filter(e => e.hazardKey.startsWith('machine:')).length, 0);
+  const water = getSompoAgriGeofenceEpisodes(SCENARIO, 'segue-ate-critica').filter(e => e.hazardLabel === 'Córrego sintético');
+  assert.equal(water.at(-1).bandId, 'critica');
+  assert.equal(water.at(-1).quality, 'aberto-no-fim', 'a máquina para dentro da faixa crítica');
+  assert.deepEqual([...getSompoAgriGeofenceEpisodes('agri-harvest-dust')], [], 'cenário sem talhão não tem episódios');
 });

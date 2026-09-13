@@ -2,6 +2,7 @@ import type { SompoTelemetrySnapshot } from './sompo-telemetry.js';
 import type { SompoEpisodePlan, SompoScenarioOutcome, SompoScenarioRunBrief } from './sompo-telemetry-simulator.js';
 import type { SompoAgriScenarioId } from './sompo-agri-scenarios.js';
 import type { SompoGeofenceResult, SompoMachineHit } from './sompo-geofence.js';
+import type { GeofenceEpisode } from './lab-geofence.js';
 
 export type SompoAgriSimulationSnapshot = SompoTelemetrySnapshot & {
   position: { x: number; z: number; headingDeg: number };
@@ -10,6 +11,7 @@ export type SompoAgriSimulationSnapshot = SompoTelemetrySnapshot & {
 };
 export function getSompoAgriStartX(scenarioId: string, outcomeId?: string): number;
 export function getSompoAgriPosition(scenarioId: string, elapsedMs?: number, outcomeId?: string): { x: number; z: number; headingDeg: number };
+export function getSompoAgriGeofenceEpisodes(scenarioId: string, outcomeId?: string, stepMs?: number): readonly GeofenceEpisode[];
 export function describeGeofence(result: SompoGeofenceResult | null | undefined): string;
 export function describeMachineLimit(hit: SompoMachineHit | null | undefined): string;
 
