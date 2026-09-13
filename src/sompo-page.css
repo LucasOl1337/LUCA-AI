@@ -2558,3 +2558,5 @@
 /* Com o painel de geofencing a coluna cresce; rola por dentro para o palco 3D não esticar junto. */
 .sompo-simulator-controls.has-geofence-panel { max-height: 940px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.18) transparent; }
 @media (max-width: 900px) { .sompo-simulator-controls.has-geofence-panel { max-height: none; overflow: visible; } }
+.sompo-geofence-now b[data-trend] { font-weight: 600; padding: 0 5px; border-radius: 4px; background: rgba(255, 255, 255, 0.1); }
+.sompo-geofence-now b[data-trend='aproximando'] { background: rgba(255, 255, 255, 0.16); }

@@ -9,6 +9,7 @@ export type SompoAgriSimulationSnapshot = SompoTelemetrySnapshot & {
   geofence: SompoGeofenceResult | null;
   risks: SompoTelemetrySnapshot['risks'] & { proximity: boolean };
 };
+export const SOMPO_GEOFENCE_TREND_STEP_MS: number;
 export function getSompoAgriStartX(scenarioId: string, outcomeId?: string): number;
 export function getSompoAgriPosition(scenarioId: string, elapsedMs?: number, outcomeId?: string): { x: number; z: number; headingDeg: number };
 export function getSompoAgriGeofenceEpisodes(scenarioId: string, outcomeId?: string, stepMs?: number): readonly GeofenceEpisode[];

@@ -9,13 +9,15 @@ import { getSompoAgriScenario, SOMPO_AGRI_EQUIPMENT } from '../../../shared/somp
 import { getSompoAgriGeofenceEpisodes, getSompoAgriPosition } from '../../../shared/sompo-agri-brief.js';
 import { getSompoGeofenceSite } from '../../../shared/sompo-geofence-sites.js';
 import type { SompoGeofenceResult } from '../../../shared/sompo-geofence.js';
-import type { GeofenceEpisode, LabHazardRule } from '../../../shared/lab-geofence.js';
+import { resolveHazards, type GeofenceEpisode, type LabGeofenceRules } from '../../../shared/lab-geofence.js';
+import type { LabPolygon } from '../../../shared/lab-telemetry.js';
 import SompoGeofenceMap from './SompoGeofenceMap';
 
 // Mesma leitura de cor do HUD (SompoTruckSimulator): faixa mais interna forte, intermediária média, externa fraca.
-export function bandTone(bandId: string | null | undefined): 'forte' | 'media' | 'fraca' | 'livre' {
+// Perigo não alertável (declive: contexto territorial) nunca passa de médio; o forte ali vem do limite da máquina.
+export function bandTone(bandId: string | null | undefined, alertable = true): 'forte' | 'media' | 'fraca' | 'livre' {
   if (!bandId) return 'livre';
-  if (['critica', 'dentro', 'acima'].includes(bandId)) return 'forte';
+  if (['critica', 'dentro', 'acima'].includes(bandId)) return alertable ? 'forte' : 'media';
   if (['elevada', 'borda', 'proximo'].includes(bandId)) return 'media';
   return 'fraca';
 }
@@ -59,7 +61,7 @@ function Lane({ episodes, totalMs, elapsedMs, label, onSeek, locked }: { episode
             <button
               key={episode.id}
               type="button"
-              className={`sompo-geofence-tone-${bandTone(episode.bandId)}`}
+              className={`sompo-geofence-tone-${bandTone(episode.bandId, episode.alertable)}`}
               style={{ left: `${episode.startMs / totalMs * 100}%`, width: `${Math.max(0.4, (end - episode.startMs) / totalMs * 100)}%` }}
               title={`${episode.hazardLabel} · ${episode.bandLabel} · ${seconds(episode.startMs)}`}
               aria-label={`Ir para ${episode.hazardLabel}, ${episode.bandLabel}, ${seconds(episode.startMs)}`}
@@ -78,12 +80,13 @@ export default function SompoGeofencePanel({ scenarioId, outcomeId, elapsedMs, g
   const scenario = getSompoAgriScenario(scenarioId);
   const totalMs = scenario.totalMs;
   const limitDeg = SOMPO_AGRI_EQUIPMENT[scenario.equipmentId].profile.max_roll_deg;
-  // Largura da faixa "próximo do limite" vem da regra do talhão (graus de margem), não de um número solto aqui.
-  const nearDeg = useMemo(() => {
+  // Faixas de cada perigo pelo mesmo resolveHazards do motor: a largura de "próximo do limite" (graus de margem) e o
+  // nome da próxima faixa mais interna na tendência vêm da regra do talhão, não de números soltos aqui.
+  const hazards = useMemo(() => {
     const site = getSompoGeofenceSite(scenario.environmentId, Math.abs(2 * getSompoAgriPosition(scenarioId, 0, outcomeId).x));
-    const rule = (site?.manifestRules.hazards as LabHazardRule[] | undefined)?.find(hazard => hazard.role === 'machine');
-    return rule ? Math.max(...rule.bands_m.map(band => band.max_m)) : 0;
-  }, [scenario.environmentId, scenarioId, outcomeId]);
+    return site ? resolveHazards(site.manifestRules as unknown as LabGeofenceRules, site.polygons as LabPolygon[], { profile: { max_roll_deg: limitDeg } }) : [];
+  }, [scenario.environmentId, scenarioId, outcomeId, limitDeg]);
+  const nearDeg = hazards.find(hazard => hazard.metric)?.reach ?? 0;
   const episodes = useMemo(() => getSompoAgriGeofenceEpisodes(scenarioId, outcomeId), [scenarioId, outcomeId]);
   // Pistas na ordem em que cada perigo aparece na corrida; o limite da máquina sempre por último.
   const lanes = useMemo(() => {
@@ -96,12 +99,21 @@ export default function SompoGeofencePanel({ scenarioId, outcomeId, elapsedMs, g
   }, [episodes]);
 
   const near = geofence.nearest;
-  const tone = bandTone(near?.bandId);
   const roll = Math.abs(rollDeg ?? 0);
   const marginDeg = Math.max(0, limitDeg - roll);
   const machineTone = bandTone(geofence.machine?.bandId);
+  // O limite da máquina vira o estado principal quando não há perigo geométrico por perto ou quando pesa mais que ele
+  // (dentro do declive, nivelada: médio; passando do limite: forte, e é o limite que manda).
+  const RANK = { livre: 0, fraca: 1, media: 2, forte: 3 } as const;
+  const nearTone = bandTone(near?.bandId, near?.alertable);
+  const machineLeads = !!geofence.machine && (!near || RANK[machineTone] > RANK[nearTone]);
+  const tone = machineLeads ? machineTone : nearTone;
   const distance = near && near.distanceM >= 0.5 ? `${near.distanceM.toFixed(0)} m ${sideLabel(near.bearingDeg)}`.trim() : null;
-  const approach = near?.timeToHazardS != null ? `≈ ${Math.round(near.timeToHazardS)} s no rumo atual` : null;
+  // Tendência por distância (independe do rumo): selo textual, nunca muda o tom. Tempo "se nada mudar".
+  const trend = near?.trend === 'aproximando'
+    ? near.timeToNextBandS != null && near.nextBandLabel ? `≈ ${Math.round(near.timeToNextBandS)} s até ${near.nextBandLabel.toLowerCase()} se nada mudar`
+      : near.timeToHazardEdgeS != null ? `≈ ${Math.round(near.timeToHazardEdgeS)} s até a borda se nada mudar` : null
+    : null;
   const seekAt = (ms: number) => Math.min(ms, totalMs);
 
   return (
@@ -110,10 +122,12 @@ export default function SompoGeofencePanel({ scenarioId, outcomeId, elapsedMs, g
         <i className="sompo-geofence-stripe" aria-hidden="true" />
         <div>
           <span>Agora · {seconds(Math.min(elapsedMs, totalMs))}</span>
-          <strong aria-live="polite">{near ? near.bandLabel : geofence.insideAllowed === false ? 'Fora da área permitida' : 'Sem perigo no alcance'}</strong>
-          <p>{near
-            ? <>{near.hazardLabel}{distance && <> <em>·</em> {distance}</>}{approach && <> <em>·</em> {approach}</>}</>
-            : 'Nenhum perigo mapeado dentro das faixas declaradas.'}</p>
+          <strong aria-live="polite">{machineLeads ? geofence.machine!.bandLabel : near ? near.bandLabel : geofence.insideAllowed === false ? 'Fora da área permitida' : 'Sem perigo no alcance'}</strong>
+          <p>{machineLeads
+            ? <>Limite de inclinação da máquina <em>·</em> {degrees(geofence.machine!.valueDeg)} de {geofence.machine!.limitDeg}°{near && <> <em>·</em> {near.bandLabel.toLowerCase()}, {near.hazardLabel}</>}</>
+            : near
+              ? <>{near.hazardLabel}{distance && <> <em>·</em> {distance}</>}{near.trend && near.trend !== 'estavel' && <> <em>·</em> <b data-trend={near.trend}>{near.trend}</b></>}{trend && <> <em>·</em> {trend}</>}</>
+              : 'Nenhum perigo mapeado dentro das faixas declaradas.'}</p>
           <div className={`sompo-geofence-meter sompo-geofence-tone-${machineTone}`} data-sompo-geofence-meter>
             <div>
               <span>Inclinação <b>{degrees(roll)}</b></span>
@@ -149,7 +163,7 @@ export default function SompoGeofencePanel({ scenarioId, outcomeId, elapsedMs, g
             const end = episode.endMs ?? totalMs;
             const state = episode.startMs <= elapsedMs && (episode.endMs === null || elapsedMs < episode.endMs) ? 'open' : episode.startMs > elapsedMs ? 'next' : 'done';
             return (
-              <tr key={episode.id} data-state={state} className={`sompo-geofence-tone-${bandTone(episode.bandId)}`}>
+              <tr key={episode.id} data-state={state} className={`sompo-geofence-tone-${bandTone(episode.bandId, episode.alertable)}`}>
                 <td><button type="button" disabled={locked} onClick={() => onSeek(seekAt(episode.startMs))}><i aria-hidden="true" /><b>{episode.bandLabel}</b><small>{episode.hazardLabel}</small></button></td>
                 <td>{seconds(episode.startMs)}</td>
                 <td>{state === 'next' ? '—' : seconds(end - episode.startMs)}{episode.endMs === null && state !== 'next' ? <small>até o fim</small> : null}</td>

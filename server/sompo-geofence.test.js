@@ -68,3 +68,65 @@ test('limite da máquina: margem em graus até max_roll_deg do perfil, fora de n
   assert.equal(noProfile.warnings.length, 1, 'perfil ausente vira aviso, não faixa');
   assert.doesNotMatch(describeMachineLimit(near.machine), /seguro|risco|acidente/i);
 });
+
+const radarAt = (z, elapsedMs, extra = {}) => evaluateGeofence({ x: 60, z, headingDeg: 90, elapsedMs, ...extra }, rules, [field, water]);
+
+test('tendência sem previous fica nula e preserva o tempo pelo rumo', () => {
+  const hit = radarAt(0, 250, { speedKph: 7.2, headingDeg: 180 }).nearest;
+  assert.equal(hit.closingSpeedMs, null);
+  assert.equal(hit.trend, null);
+  assert.equal(hit.timeToNextBandS, null);
+  assert.equal(hit.timeToHazardEdgeS, null);
+  assert.equal(hit.timeToHazardS, 10);
+});
+
+test('tendência geométrica: aproximação, afastamento, estabilidade e parada', () => {
+  const approaching = radarAt(0, 250, { previous: { x: 60, z: -0.5, elapsedMs: 0 } }).nearest;
+  assert.equal(approaching.closingSpeedMs, 2);
+  assert.equal(approaching.trend, 'aproximando');
+  assert.equal(approaching.timeToHazardEdgeS, 10);
+  assert.equal(approaching.timeToNextBandS, 2.5);
+
+  const receding = radarAt(0, 250, { previous: { x: 60, z: 0.5, elapsedMs: 0 } }).nearest;
+  assert.equal(receding.trend, 'afastando');
+  assert.equal(receding.timeToNextBandS, null);
+  assert.equal(receding.timeToHazardEdgeS, null);
+
+  const stable = radarAt(0, 250, { previous: { x: 60, z: -0.01, elapsedMs: 0 } }).nearest;
+  assert.equal(stable.trend, 'estavel');
+  const stopped = radarAt(0, 250, { previous: { x: 60, z: 0, elapsedMs: 0 }, speedKph: 0 }).nearest;
+  assert.equal(stopped.closingSpeedMs, 0);
+  assert.equal(stopped.trend, 'estavel');
+  assert.equal(stopped.timeToHazardEdgeS, null);
+});
+
+test('tendência usa a geometria em ré, de lado e dentro do polígono', () => {
+  const reverse = evaluateGeofence({ x: 60, z: 0, headingDeg: 0, elapsedMs: 250, previous: { x: 60, z: -0.5, elapsedMs: 0 } }, rules, [field, water]).nearest;
+  assert.equal(reverse.trend, 'aproximando');
+  assert.equal(reverse.timeToHazardS, null);
+  assert.equal(reverse.timeToHazardEdgeS, 10);
+
+  const sideways = radarAt(0, 250, { previous: { x: 60, z: -0.5, elapsedMs: 0 } }).nearest;
+  assert.equal(sideways.timeToHazardS, null);
+  assert.equal(sideways.timeToHazardEdgeS, 10);
+
+  const inside = evaluateGeofence({ x: 60, z: 30, elapsedMs: 250, previous: { x: 60, z: 29, elapsedMs: 0 } }, rules, [field, water]).nearest;
+  assert.equal(inside.distanceM, 0);
+  assert.equal(inside.timeToHazardEdgeS, null);
+});
+
+test('faixa mais interna, dt inválido e texto de tendência', () => {
+  const inner = evaluateGeofence({ x: 60, z: 16, elapsedMs: 250, previous: { x: 60, z: 15.5, elapsedMs: 0 } }, rules, [field, water]).nearest;
+  assert.equal(inner.bandId, 'critica');
+  assert.equal(inner.timeToNextBandS, null);
+  assert.match(describeGeofence(radarAt(0, 250, { previous: { x: 60, z: -0.5, elapsedMs: 0 } })), /aproximando · ≈ 3 s até a faixa proximidade elevada/);
+  assert.match(describeGeofence(radarAt(0, 250, { previous: { x: 60, z: 0.5, elapsedMs: 0 } })), /afastando/);
+  assert.doesNotMatch(describeGeofence(radarAt(0, 250, { previous: { x: 60, z: -0.01, elapsedMs: 0 } })), /aproximando|afastando/);
+
+  const invalid = radarAt(0, 1000, { previous: { x: 60, z: -0.5, elapsedMs: 0 } }).nearest;
+  assert.equal(invalid.closingSpeedMs, null);
+  assert.equal(invalid.trend, null);
+  assert.equal(invalid.timeToNextBandS, null);
+  assert.equal(invalid.timeToHazardEdgeS, null);
+  for (const text of [describeGeofence(inner), describeGeofence(invalid)]) assert.doesNotMatch(text, /seguro|risco|tombar|acidente|negligência/i);
+});

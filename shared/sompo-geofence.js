@@ -37,7 +37,7 @@ function relativeBearing(forward, dx, dz) {
 // De lado a máquina passa ao largo do ponto mais próximo: um tempo ali sugere um evento que não acontece.
 // machine = { profile: { max_roll_deg } }: dá o limite aos perigos de role 'machine'; rollDeg/pitchDeg são o sinal medido.
 // A margem em graus não se mistura com metros: fica em result.machine, fora de nearest/all.
-export function evaluateGeofence({ x, z, headingDeg = null, speedKph = 0, rollDeg = null, pitchDeg = null }, rules, polygons, machine = null) {
+export function evaluateGeofence({ x, z, headingDeg = null, speedKph = 0, rollDeg = null, pitchDeg = null, previous = null, elapsedMs = null }, rules, polygons, machine = null) {
   const hazards = resolveHazards(rules, polygons, machine);
   const signals = { roll_deg: rollDeg, pitch_deg: pitchDeg };
   let machineHit = null;
@@ -45,6 +45,8 @@ export function evaluateGeofence({ x, z, headingDeg = null, speedKph = 0, rollDe
   const insideAllowed = allowed.length ? allowed.some(polygon => polygonContains({ x, z }, polygon)) : null;
   const forward = headingDeg === null ? null : forwardVector(headingDeg);
   const speedMs = Math.max(0, speedKph) / 3.6;
+  const dt = Number.isFinite(elapsedMs) && Number.isFinite(previous?.elapsedMs) ? elapsedMs - previous.elapsedMs : null;
+  const validPrevious = dt !== null && dt >= 125 && dt <= 500 && Number.isFinite(previous.x) && Number.isFinite(previous.z);
   const all = [];
   for (const hazard of hazards) {
     if (hazard.metric) {
@@ -61,10 +63,19 @@ export function evaluateGeofence({ x, z, headingDeg = null, speedKph = 0, rollDe
     const dx = nearest.x - x, dz = nearest.z - z;
     const bearingDeg = forward && nearest.distance > 0 ? relativeBearing(forward, dx, dz) : null;
     const closingMs = bearingDeg === null ? 0 : speedMs * Math.cos(bearingDeg * Math.PI / 180);
+    const previousDistance = validPrevious ? closestPointOnPolygon(previous, hazard.polygon).distance : null;
+    const closingSpeedMs = previousDistance === null ? null : (previousDistance - nearest.distance) / (dt / 1000);
+    const trend = closingSpeedMs === null ? null : closingSpeedMs >= 0.10 ? 'aproximando' : closingSpeedMs <= -0.10 ? 'afastando' : 'estavel';
+    const bandIndex = hazard.bands.indexOf(band);
+    const nextBand = bandIndex > 0 ? hazard.bands[bandIndex - 1] : null;
     all.push({
       hazardKey: hazard.key, hazardLabel: hazard.label, bandId: band.id, bandLabel: band.label ?? band.id, bandMaxM: band.max_m,
+      innermost: band === hazard.bands[0], alertable: hazard.alertable,
       distanceM: nearest.distance, bearingDeg, closestPoint: { x: nearest.x, z: nearest.z },
       timeToHazardS: nearest.distance > 0 && closingMs > 0.05 && Math.abs(bearingDeg) <= 20 ? nearest.distance / closingMs : null,
+      closingSpeedMs, trend, nextBandLabel: nextBand?.label ?? nextBand?.id ?? null,
+      timeToNextBandS: nextBand && closingSpeedMs > 0 && nearest.distance > 0 ? Math.max(0, nearest.distance - nextBand.max_m) / closingSpeedMs : null,
+      timeToHazardEdgeS: closingSpeedMs > 0 && nearest.distance > 0 ? nearest.distance / closingSpeedMs : null,
     });
   }
   all.sort((a, b) => a.distanceM - b.distanceM);
@@ -77,7 +88,12 @@ export function describeGeofence(result) {
   const outside = result?.insideAllowed === false ? 'Fora da área permitida' : '';
   if (!near) return outside || 'Sem perigo mapeado no alcance';
   const side = near.bearingDeg === null ? '' : Math.abs(near.bearingDeg) <= 20 ? ' à frente' : Math.abs(near.bearingDeg) >= 160 ? ' atrás' : near.bearingDeg > 0 ? ' à direita' : ' à esquerda';
-  const time = near.timeToHazardS === null ? '' : ` · ≈ ${Math.round(near.timeToHazardS)} s de aproximação`;
+  const trendTime = near.trend === 'aproximando'
+    ? near.timeToNextBandS !== null
+      ? ` · aproximando · ≈ ${Math.round(near.timeToNextBandS)} s até a faixa ${(near.nextBandLabel ?? '').toLowerCase()}`
+      : near.timeToHazardEdgeS !== null ? ` · aproximando · ≈ ${Math.round(near.timeToHazardEdgeS)} s até a borda` : ' · aproximando'
+    : near.trend === 'afastando' ? ' · afastando' : '';
+  const time = trendTime || (near.timeToHazardS === null ? '' : ` · ≈ ${Math.round(near.timeToHazardS)} s de aproximação`);
   // Dentro do polígono a distância é 0 por definição: dizer "a 0 m" parece distância até uma queda.
   const where = near.distanceM >= 0.5 ? ` a ${near.distanceM.toFixed(0)} m${side}${time}` : ''; // < 0,5 m arredondaria para "a 0 m"
   return `${outside ? `${outside} · ` : ''}${near.bandLabel} · ${near.hazardLabel}${where}`;

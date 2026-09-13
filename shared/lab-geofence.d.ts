@@ -9,6 +9,7 @@ export interface LabHazardRule {
   label?: string;
   bands_m: LabBandRule[];
   justification?: string;
+  alertable?: boolean;                 // false = contexto territorial: não acende alerta sozinho (padrão true)
 }
 export interface LabGeofenceRules { water_warning_distance_m?: number; hazards?: LabHazardRule[]; [key: string]: unknown }
 export interface LabHazard {
@@ -22,12 +23,14 @@ export interface LabHazard {
   metric: string | null;
   limit: number | null;
   unit: 'm' | 'deg';
+  alertable: boolean;
 }
 export interface GeofenceEpisode {
   id: string;                 // `${caseId}:geo:${hazardKey}:${bandId}:${startMs}`
   hazardKey: string;          // role + category + polygon id
   hazardLabel: string;
   bandId: string; bandLabel: string; bandMaxM: number;
+  alertable: boolean;         // regra do perigo (false = contexto territorial)
   startMs: number; endMs: number | null;      // null = aberto no fim da observação
   observedMs: number;         // soma dos intervalos com posição válida
   gapMs: number;              // intervalos sem GNSS dentro do episódio

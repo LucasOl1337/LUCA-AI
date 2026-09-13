@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import SompoStudio, { type SompoStudioAsset } from './sompo/SompoStudio';
 import SompoGeofenceMap from './sompo/SompoGeofenceMap';
-import SompoGeofencePanel from './sompo/SompoGeofencePanel';
+import SompoGeofencePanel, { bandTone } from './sompo/SompoGeofencePanel';
 import { createSompoPlayback } from './sompo/sompoPlayback';
 import { downloadSompoFile, loadSompoStudioConfig, type SompoStudioConfig, type SompoRenderStats } from './sompo/sompoStudioConfig';
 import { mountSompoRuralStage } from './sompo/createSompoRuralStage';
@@ -1043,8 +1043,8 @@ export default function SompoTruckSimulator({
                 <strong>{formatReading(preview.readings.distance, ' cm')} <small>à frente</small></strong>
               </div>
               {agriRun && preview.geofence && (
-                <div data-geofence data-alert={!!preview.geofence.nearest}
-                  className={preview.geofence.nearest ? `sompo-geofence-${['critica', 'dentro'].includes(preview.geofence.nearest.bandId) ? 'forte' : ['elevada', 'borda'].includes(preview.geofence.nearest.bandId) ? 'media' : 'fraca'}` : undefined}>
+                <div data-geofence data-alert={!!preview.risks.proximity}
+                  className={preview.geofence.nearest ? `sompo-geofence-${bandTone(preview.geofence.nearest.bandId, preview.geofence.nearest.alertable)}` : undefined}>
                   <span>Fazenda sintética · demonstração</span>
                   <strong>{!preview.geofence.nearest && preview.geofence.insideAllowed
                     ? 'Radar: sem perigo mapeado no alcance'

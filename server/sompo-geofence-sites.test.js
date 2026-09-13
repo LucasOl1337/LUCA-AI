@@ -116,8 +116,21 @@ test('bandeira de proximidade: acende na faixa crítica e no limite da máquina,
   assert.equal(stopped.status, 'normal');
   const over = samples('declive-alem-do-limite').filter(frame => frame.geofence.machine?.bandId === 'acima');
   assert.ok(over.length > 0 && over.every(frame => frame.risks.proximity === true && frame.status === 'alert'));
+  // Declive é contexto (alertable: false): dentro dele, nivelada, a máquina não acende alerta; só o limite dela acende.
   const inside = samples('parada-na-faixa').filter(frame => frame.geofence.nearest?.bandId === 'dentro');
-  assert.ok(inside.length > 0 && inside.every(frame => frame.risks.proximity === true), 'dentro do declive mapeado também acende');
+  assert.ok(inside.length > 0 && inside.every(frame => frame.risks.proximity === false && frame.geofence.nearest.alertable === false), 'dentro do declive nivelada não acende');
+  const insideOver = samples('declive-alem-do-limite').filter(frame => frame.geofence.nearest?.bandId === 'dentro');
+  assert.ok(insideOver.some(frame => frame.risks.proximity) && insideOver.some(frame => !frame.risks.proximity), 'no mesmo declive, acende só enquanto a máquina passa do limite');
+  assert.ok(critical.geofence.nearest.alertable && critical.geofence.nearest.innermost, 'água é alertável e crítica é a faixa mais interna');
+  // A bandeira olha todos os perigos, não só o mais próximo.
+  const site = getSompoGeofenceSite('geofence-field', 47);
+  const stacked = evaluateGeofence({ x: 0, z: 0, headingDeg: 0, speedKph: 5, rollDeg: 0 }, site.manifestRules, [
+    ...site.polygons.filter(polygon => polygon.role === 'allowed_area'),
+    { id: 'declive-teste', role: 'hazard', category: 'slope', rings: [[{ x: -10, z: -10 }, { x: 10, z: -10 }, { x: 10, z: 10 }, { x: -10, z: 10 }, { x: -10, z: -10 }]] },
+    { id: 'agua-teste', role: 'water', rings: [[{ x: 3, z: -1 }, { x: 4, z: -1 }, { x: 4, z: 1 }, { x: 3, z: 1 }, { x: 3, z: -1 }]] },
+  ], SOMPO_AGRI_EQUIPMENT.harvester);
+  assert.equal(stacked.nearest.hazardKey.split(':')[0], 'hazard', 'o declive (0 m) é o mais próximo');
+  assert.ok(stacked.all.some(hit => hit.alertable && hit.innermost && hit.hazardKey.startsWith('water')), 'a água a 3 m em faixa crítica está em all');
 });
 
 test('episódios da corrida inteira: mesmo motor do laboratório, coerentes com o radar instante a instante', () => {
@@ -149,4 +162,36 @@ test('episódios da corrida inteira: mesmo motor do laboratório, coerentes com 
   assert.equal(water.at(-1).quality, 'aberto-no-fim', 'a máquina para dentro da faixa crítica');
   assert.deepEqual([...getSompoAgriGeofenceEpisodes('agri-harvest-dust')], [], 'cenário sem talhão não tem episódios');
   assert.throws(() => getSompoAgriGeofenceEpisodes(SCENARIO, 'parada-na-faixa', 0), RangeError);
+});
+
+test('tendência de aproximação: independe do rumo, cobre a aproximação inteira e nunca usa termos proibidos', () => {
+  for (const outcome of ['parada-na-faixa', 'segue-ate-critica', 'declive-alem-do-limite']) {
+    const run = samples(outcome);
+    assert.equal(run[0].geofence.nearest, null);
+    for (const frame of run) for (const hit of frame.geofence.all) {
+      if (frame.deviceTimestamp === 0) { assert.equal(hit.trend, null, 'primeira amostra sem anterior'); continue; }
+      assert.ok(['aproximando', 'afastando', 'estavel'].includes(hit.trend), `${outcome} @${frame.deviceTimestamp} ${hit.hazardKey}: ${hit.trend}`);
+      if (hit.timeToHazardEdgeS !== null) assert.ok(hit.closingSpeedMs > 0 && hit.distanceM > 0 && Math.abs(hit.timeToHazardEdgeS - hit.distanceM / hit.closingSpeedMs) < 1e-9);
+      if (hit.timeToNextBandS !== null) assert.ok(!hit.innermost && hit.closingSpeedMs > 0);
+      assert.doesNotMatch(describeGeofence(frame.geofence), /seguro|risco|tombar|acidente|neglig/i);
+    }
+  }
+  // "Segue até a crítica": o córrego fica a 30–60° do rumo depois de 19 s (o cone de ±20° perde o tempo de aproximação),
+  // mas a distância continua caindo até a faixa crítica: a tendência tem de dizer "aproximando" o tempo todo.
+  const chase = samples('segue-ate-critica').filter(frame => frame.deviceTimestamp >= 17_500 && frame.deviceTimestamp <= 23_500);
+  assert.ok(chase.length >= 20);
+  for (const frame of chase) {
+    const water = frame.geofence.all.find(hit => hit.hazardKey.startsWith('water'));
+    assert.equal(water?.trend, 'aproximando', `@${frame.deviceTimestamp}`);
+    assert.ok(water.timeToHazardEdgeS > 0 && water.timeToHazardEdgeS < 30, `@${frame.deviceTimestamp}: ${water.timeToHazardEdgeS}`);
+  }
+  assert.ok(chase.some(frame => frame.geofence.nearest.timeToHazardS === null && frame.geofence.nearest.trend === 'aproximando'), 'fora do cone de ±20° a tendência continua');
+  assert.match(describeGeofence(chase[0].geofence), /aproximando · ≈ \d+ s até a (faixa|borda)/);
+  // Parada na faixa elevada: aproximando até parar; parada, estável.
+  const stop = samples('parada-na-faixa');
+  assert.equal(stop.at(-1).geofence.nearest.trend, 'estavel');
+  assert.ok(stop.filter(frame => frame.deviceTimestamp >= 19_000 && frame.deviceTimestamp <= 21_500).every(frame => frame.geofence.nearest.trend === 'aproximando'));
+  // Declive (alertable: false): tendência é contexto, não muda status nem bandeira.
+  const slope = samples('declive-alem-do-limite').filter(frame => frame.geofence.nearest?.hazardKey.includes('slope') && frame.geofence.nearest.trend === 'aproximando' && !frame.geofence.machine);
+  assert.ok(slope.length > 0 && slope.every(frame => frame.risks.proximity === false && frame.status === 'normal'));
 });

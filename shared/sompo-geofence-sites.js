@@ -51,7 +51,10 @@ const WATER_RULE = { role: 'water', label: 'Córrego sintético', synthetic: tru
   { id: 'elevada', label: 'Proximidade elevada', max_m: 15 },
   { id: 'atencao', label: 'Atenção', max_m: 35 },
 ] };
-const SLOPE_RULE = { role: 'hazard', category: 'slope', label: 'Declive mapeado', synthetic: true, justification, bands_m: [
+// Declive é contexto, não alerta: terreno irregular é a condição normal da lavoura. O alerta vem do limite de inclinação
+// da própria máquina (MACHINE_RULE); a mesma encosta alerta uma colheitadeira de 15° e não um trator de 25°.
+const SLOPE_RULE = { role: 'hazard', category: 'slope', label: 'Declive mapeado', synthetic: true, alertable: false,
+  justification: `${justification} O declive por si não acende alerta: o alerta vem do limite de inclinação da máquina.`, bands_m: [
   { id: 'dentro', label: 'Dentro do declive', max_m: 0 },
   { id: 'borda', label: 'Borda do declive', max_m: 6 },
 ] };

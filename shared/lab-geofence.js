@@ -45,7 +45,7 @@ export function resolveHazards(rules, polygons, machine = null) {
       const key = `machine:${metric}`;
       if (keys.has(key)) continue;
       keys.add(key);
-      hazards.push({ key, label: rule.label || `Limite da máquina (${metric})`, justification: rule.justification ?? null, bands: rule.bands_m, reach: rule.bands_m.at(-1).max_m, polygon: null, box: null, metric, limit, unit: 'deg' });
+      hazards.push({ key, label: rule.label || `Limite da máquina (${metric})`, justification: rule.justification ?? null, bands: rule.bands_m, reach: rule.bands_m.at(-1).max_m, polygon: null, box: null, metric, limit, unit: 'deg', alertable: rule.alertable !== false });
       continue;
     }
     const matches = polygons.filter(polygon => polygon.role === rule.role && (rule.role !== 'hazard' || polygon.category === rule.category));
@@ -62,6 +62,9 @@ export function resolveHazards(rules, polygons, machine = null) {
         key,
         label: rule.label || polygon.id, justification: rule.justification ?? null,
         bands: rule.bands_m, reach: rule.bands_m.at(-1).max_m, polygon, box: boundingBox(polygon), metric: null, limit: null, unit: 'm',
+        // alertable false = exposição territorial (contexto): entra no mapa, nos episódios e no painel, mas não acende alerta
+        // sozinho. Padrão true. O declive é o caso: a mesma encosta só vira alerta pelo limite de inclinação da máquina.
+        alertable: rule.alertable !== false,
       });
     }
   }
@@ -119,7 +122,7 @@ export function computeGeofenceEpisodes(samples, polygons, rules, caseId, sample
       if (band && !open) {
         open = {
           id: `${caseId}:geo:${hazard.key}:${band.id}:${sample.elapsedMs}`, hazardKey: hazard.key, hazardLabel: hazard.label,
-          bandId: band.id, bandLabel: band.label, bandMaxM: band.max_m, startMs: sample.elapsedMs, endMs: null,
+          bandId: band.id, bandLabel: band.label, bandMaxM: band.max_m, alertable: hazard.alertable, startMs: sample.elapsedMs, endMs: null,
           observedMs: 0, gapMs: 0, minDistanceM: distance, minDistanceAtMs: sample.elapsedMs, sampleCount: 0, quality: 'aberto-no-fim',
         };
         openBand = band;

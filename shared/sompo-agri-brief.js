@@ -146,6 +146,9 @@ export function getSompoAgriGeofenceEpisodes(scenarioId, outcomeId, stepMs = 250
   return runEpisodes.get(key);
 }
 
+/** Intervalo entre a amostra atual e a anterior usado pela tendência de aproximação do radar (ms). */
+export const SOMPO_GEOFENCE_TREND_STEP_MS = 250;
+
 /** Snapshot agrícola com proveniência, posição de cena e radar sintético. */
 export function createSompoAgriSimulationSnapshot(scenarioId, outcomeId, {
   observedAt = new Date().toISOString(),
@@ -175,10 +178,13 @@ export function createSompoAgriSimulationSnapshot(scenarioId, outcomeId, {
   const position = getSompoAgriPosition(scenarioId, elapsedMs, outcomeId);
   const site = getSompoGeofenceSite(scenario.environmentId, Math.abs(2 * getSompoAgriPosition(scenarioId, 0, outcomeId).x));
   // Só o cenário de geofencing tem talhão; nos demais o snapshot leva position e geofence = null (campos só adicionados).
-  const geofence = site ? evaluateGeofence({ ...position, speedKph: frame.speedKph, rollDeg: frame.roll }, site.manifestRules, site.polygons, SOMPO_AGRI_EQUIPMENT[scenario.equipmentId]) : null;
-  // Bandeira de proximidade: só a faixa mais interna (crítica na água, dentro no declive/ribanceira) ou o limite da
-  // máquina atingido. Atenção/elevada ficam no radar, não viram alerta do ensaio. Eleva status como as flags do firmware.
-  const proximity = !!geofence && (['critica', 'dentro'].includes(geofence.nearest?.bandId ?? '') || geofence.machine?.bandId === 'acima');
+  // Tendência de aproximação: o radar compara com a amostra de 250 ms atrás, recalculada do roteiro (sem estado no radar).
+  const previous = elapsedMs >= SOMPO_GEOFENCE_TREND_STEP_MS ? { ...getSompoAgriPosition(scenarioId, elapsedMs - SOMPO_GEOFENCE_TREND_STEP_MS, outcomeId), elapsedMs: elapsedMs - SOMPO_GEOFENCE_TREND_STEP_MS } : undefined;
+  const geofence = site ? evaluateGeofence({ ...position, elapsedMs, previous, speedKph: frame.speedKph, rollDeg: frame.roll }, site.manifestRules, site.polygons, SOMPO_AGRI_EQUIPMENT[scenario.equipmentId]) : null;
+  // Bandeira de proximidade: faixa mais interna de qualquer perigo alertável (crítica na água, dentro na ribanceira) ou o
+  // limite da máquina atingido. O declive (alertable: false) não acende sozinho. Atenção/elevada ficam no radar, não viram
+  // alerta do ensaio. Olha `all`, não só `nearest`: dentro do declive, uma água a 4 m continua acendendo.
+  const proximity = !!geofence && (geofence.all.some(hit => hit.alertable && hit.innermost) || geofence.machine?.bandId === 'acima');
   return { ...snapshot, position, geofence, status: proximity ? 'alert' : snapshot.status, risks: { ...snapshot.risks, proximity } };
 }
 
