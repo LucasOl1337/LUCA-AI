@@ -42,8 +42,8 @@ export const SOMPO_SCENARIO_OUTCOME_EFFECTS = Object.freeze({
     'parada-tecnica': scene([track('road-dust', 0, null, 0.2), track('running-lights'), track('brake-lights', 4500, 10200), track('hazard-lights', 10000)]),
   }),
   obstacle: Object.freeze({
-    'parada-segura': scene([track('sensor-warning', 3000), track('brake-lights', 3000, 7500), track('hazard-lights', 6000), track('road-dust', 0, 6000, 0.15)]),
-    'toque-leve': scene([track('sensor-warning', 3000), track('brake-lights', 3000, 6500), track('impact-dust', 5200, 7200, 0.4, 50), track('hazard-lights', 5200)]),
+    'parada-segura': scene([track('sensor-warning', 2500), track('brake-lights', 2500, 7300), track('hazard-lights', 6800), track('road-dust', 0, 6800, 0.15)]),
+    'toque-leve': scene([track('sensor-warning', 2500), track('brake-lights', 2500, 6700), track('impact-dust', 4900, 7000, 0.4, 50), track('hazard-lights', 6200)]),
   }),
   inclination: Object.freeze({
     estabiliza: scene([track('shoulder-dust', 0, 8200, 0.35), track('cargo-strain', 0, 8200), track('hazard-lights', 0, 8200), track('running-lights', 8200)]),
@@ -87,7 +87,7 @@ export const SOMPO_SCENARIO_OUTCOME_EFFECTS = Object.freeze({
   }),
   'animal-crossing': Object.freeze({
     desvio: scene([track('animal', 0, 13000), track('brake-lights', 2500, 6200), track('tire-smoke', 2600, 6000, 0.5), track('skid-marks', 2600)], 'asphalt', 'road', 2.8),
-    colisao: scene([track('animal', 0, null), track('brake-lights', 3200), track('tire-smoke', 3200, 6500, 0.6), track('skid-marks', 3200), track('impact-dust', 6500, 9900, 1, 30), track('debris', 6500, null, 1, 0), track('hazard-lights', 6500)], 'asphalt', 'road', 2.8),
+    colisao: scene([track('animal', 0, null), track('brake-lights', 3200, 7200), track('tire-smoke', 3200, 6500, 0.6), track('skid-marks', 3200), track('impact-dust', 6500, 8500, 1, 30), track('debris', 6500, null, 1, 0), track('hazard-lights', 6500)], 'asphalt', 'road', 2.8),
   }),
   aquaplaning: Object.freeze({
     'saida-de-pista': scene([track('wheel-spray', 0, 9500), track('rain'), track('hazard-lights', 2600), track('mud-spray', 7200, 11500, 0.6)], 'wet'),
