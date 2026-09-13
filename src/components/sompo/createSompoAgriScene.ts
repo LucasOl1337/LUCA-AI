@@ -288,8 +288,10 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
   const barn = definition.barn ? createBarn() : null;
   if (barn) root.add(barn.root, barn.barnPost);
   const silos = createSilos(definition.slope); root.add(silos);
-  const groundFog = createGroundFog(); root.add(groundFog.root);
-  groundFog.root.visible = !definition.night;
+  // Névoa baixa é do talhão aberto — dentro do galpão as faixas horizontais
+  // atravessavam as paredes (bug reportado pela frente agri-máquina).
+  const groundFog = definition.barn ? null : createGroundFog();
+  if (groundFog) { root.add(groundFog.root); groundFog.root.visible = !definition.night; }
 
   const mud = new THREE.Mesh(
     new THREE.CircleGeometry(8, 40),
@@ -383,7 +385,7 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
       ruts.material.opacity = Math.min(0.85, frame.sink * 1.7 + frame.mud * 0.12);
 
       // Deriva lenta da névoa baixa: cada camada flutua no próprio compasso.
-      if (!reducedMotion) for (const layer of groundFog.layers) {
+      if (!reducedMotion && groundFog) for (const layer of groundFog.layers) {
         const d = layer.userData.drift;
         layer.position.x = d.x + Math.sin(elapsedMs * 0.000045 * d.speed + d.x) * 5;
       }
