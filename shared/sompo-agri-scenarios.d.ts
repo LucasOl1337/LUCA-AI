@@ -40,6 +40,7 @@ export interface SompoAgriOutcome {
   readonly label: string;
   readonly description: string;
   readonly keyframes: readonly Readonly<SompoAgriKeyframe>[];
+  readonly phases?: readonly Readonly<SompoAgriPhase>[];
 }
 
 export interface SompoAgriScenario extends Omit<SompoSimulationControls, 'scenarioId'> {
@@ -96,6 +97,7 @@ export const SOMPO_AGRI_EQUIPMENT: Readonly<Record<SompoAgriEquipmentId, Readonl
 export const SOMPO_AGRI_SCENARIOS: Readonly<Record<SompoAgriScenarioId, Readonly<SompoAgriScenario>>>;
 
 export function getSompoAgriScenario(scenarioId?: string): Readonly<SompoAgriScenario>;
+export function getSompoAgriOutcomePhases(scenario: Readonly<SompoAgriScenario>, outcome?: Readonly<SompoAgriOutcome>): readonly Readonly<SompoAgriPhase>[];
 export function getSompoAgriFrame(scenarioId: string, elapsedMs?: number, outcomeId?: string): SompoAgriVisualFrame;
 export function toSompoSimulationControls(frame: SompoAgriVisualFrame): Omit<SompoSimulationControls, 'scenarioId'> & { scenarioId: SompoAgriScenarioId };
 export function getSompoAgriKeyframes(scenarioId: string, outcomeId?: string): readonly Readonly<SompoAgriVisualFrame>[];

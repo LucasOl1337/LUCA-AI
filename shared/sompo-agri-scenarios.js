@@ -9,11 +9,12 @@
 
 const freeze = (value) => Object.freeze(value);
 const phase = (id, label, startMs, endMs) => freeze({ id, label, startMs, endMs });
-const outcome = (id, label, description, keyframes) => freeze({
+const outcome = (id, label, description, keyframes, phases) => freeze({
   id,
   label,
   description,
   keyframes: freeze(keyframes.map(([atMs, values]) => freeze({ atMs, ...values }))),
+  ...(phases ? { phases: freeze(phases) } : {}),
 });
 
 const BASE_FRAME = freeze({
@@ -111,6 +112,11 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
         [10_000, { speedKph: 0, headerSpeed: 0, cropCut: 0.64, dust: 0.2, beacon: 1, brakeLights: 1 }],
         [12_000, { brakeLights: 0, implementLift: 0.4 }],
         [18_000, { dust: 0, roughness: 0.1 }],
+      ], [
+        phase('approach', 'Alinhamento nas fileiras', 0, 3_000),
+        phase('harvest', 'Plataforma em colheita', 3_000, 6_500),
+        phase('blockage', 'Embuchamento da plataforma', 6_500, 10_000),
+        phase('stalled', 'Parada no talhão', 10_000, 18_000),
       ]),
     ],
   }),
@@ -269,6 +275,11 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
         [11_000, { wheelSpeedKph: 9, sink: 0.68, roll: 11, roughness: 2.8, beacon: 1 }],
         [14_000, { wheelSpeedKph: 0, roughness: 0, mud: 0.2 }],
         [16_000, { sink: 0.7, pitch: 6.5 }],
+      ], [
+        phase('entry', 'Entrada no solo saturado', 0, 4_000),
+        phase('traction-loss', 'Perda de tração', 4_000, 7_000),
+        phase('digging', 'Patinagem e afundamento', 7_000, 14_000),
+        phase('immobilized', 'Imobilizado no talhão', 14_000, 16_000),
       ]),
     ],
   }),
@@ -368,6 +379,11 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
         [11_000, { speedKph: 0, workLights: 0, headerSpeed: 0, brakeLights: 1, dust: 0.1 }],
         [13_000, { brakeLights: 0, implementLift: 0.4 }],
         [18_000, { headlights: 0.45, dust: 0 }],
+      ], [
+        phase('startup', 'Acendimento e inspeção', 0, 3_000),
+        phase('night-work', 'Colheita noturna', 3_000, 9_000),
+        phase('light-failure', 'Falha dos projetores', 9_000, 11_000),
+        phase('awaiting-light', 'Aguardando iluminação', 11_000, 18_000),
       ]),
     ],
   }),
@@ -399,6 +415,11 @@ export function getSompoAgriScenario(scenarioId = 'agri-harvest-dust') {
   return selected;
 }
 
+/** Fases do desfecho: roteiro próprio quando ele diverge do plano feliz do cenário. */
+export function getSompoAgriOutcomePhases(scenario, outcome) {
+  return (outcome && outcome.phases) || scenario.phases;
+}
+
 export function getSompoAgriFrame(scenarioId, elapsedMs = 0, outcomeId) {
   const selected = getSompoAgriScenario(scenarioId);
   const selectedOutcome = selected.outcomes[outcomeId] || selected.outcomes[selected.defaultOutcomeId];
@@ -419,7 +440,8 @@ export function getSompoAgriFrame(scenarioId, elapsedMs = 0, outcomeId) {
   // A gearbox is discrete. Wheel speed stays continuous through zero at a shift.
   frame.wheelSpeedKph = (from.wheelSpeedKph ?? from.speedKph)
     + ((to.wheelSpeedKph ?? to.speedKph) - (from.wheelSpeedKph ?? from.speedKph)) * blend;
-  const activePhase = selected.phases.find((item) => elapsed < item.endMs) || selected.phases.at(-1);
+  const activePhases = getSompoAgriOutcomePhases(selected, selectedOutcome);
+  const activePhase = activePhases.find((item) => elapsed < item.endMs) || activePhases.at(-1);
   return {
     ...frame,
     atMs: elapsed,

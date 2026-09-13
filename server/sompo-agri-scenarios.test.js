@@ -40,6 +40,15 @@ test('fases e desfechos são explícitos, contínuos e congelados', () => {
       assert.equal(selectedOutcome.keyframes[0].atMs, 0, `${scenarioId}/${selectedOutcome.id}: começa em zero`);
       assert.equal(selectedOutcome.keyframes.at(-1).atMs, scenario.totalMs, `${scenarioId}/${selectedOutcome.id}: estado final explícito`);
       assert.ok(selectedOutcome.keyframes.every((frame, index) => !index || frame.atMs > selectedOutcome.keyframes[index - 1].atMs));
+      if (selectedOutcome.phases) {
+        assert.ok(Object.isFrozen(selectedOutcome.phases), `${scenarioId}/${selectedOutcome.id}: fases do desfecho congeladas`);
+        assert.equal(selectedOutcome.phases[0].startMs, 0);
+        assert.equal(selectedOutcome.phases.at(-1).endMs, scenario.totalMs);
+        selectedOutcome.phases.forEach((item, index) => {
+          assert.equal(item.startMs, index ? selectedOutcome.phases[index - 1].endMs : 0, `${scenarioId}/${selectedOutcome.id}: fases contíguas`);
+          assert.ok(item.endMs > item.startMs, `${scenarioId}/${selectedOutcome.id}: fase não vazia`);
+        });
+      }
     }
   }
 });
@@ -68,6 +77,17 @@ test('amostragem é determinística, segura em limites e compatível com control
       }
     }
   }
+});
+
+test('desfechos abortivos rotulam a fase pelo estado real da máquina', () => {
+  assert.equal(getSompoAgriFrame('agri-harvest-dust', 14_000, 'header-blockage').phaseLabel, 'Parada no talhão');
+  assert.equal(getSompoAgriFrame('agri-harvest-dust', 8_000, 'header-blockage').phaseLabel, 'Embuchamento da plataforma');
+  assert.equal(getSompoAgriFrame('agri-harvest-dust', 14_000, 'clean-pass').phaseLabel, 'Saída para o carreador');
+  assert.equal(getSompoAgriFrame('agri-field-bogging', 15_000, 'deep-stall').phaseLabel, 'Imobilizado no talhão');
+  assert.equal(getSompoAgriFrame('agri-field-bogging', 9_000, 'deep-stall').phaseLabel, 'Patinagem e afundamento');
+  assert.equal(getSompoAgriFrame('agri-field-bogging', 15_000, 'assisted-recovery').phaseLabel, 'Desfecho');
+  assert.equal(getSompoAgriFrame('agri-night-operation', 12_000, 'work-light-failure').phaseLabel, 'Aguardando iluminação');
+  assert.equal(getSompoAgriFrame('agri-night-operation', 15_000, 'lit-pass').phaseLabel, 'Desfecho');
 });
 
 test('ids desconhecidos têm fallback fechado e não escolhem desfecho ao acaso', () => {
