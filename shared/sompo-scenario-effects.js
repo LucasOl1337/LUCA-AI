@@ -71,11 +71,11 @@ export const SOMPO_SCENARIO_OUTCOME_EFFECTS = Object.freeze({
   }),
   'shifted-load': Object.freeze({
     reacomoda: scene([track('cargo-strain', 800), track('cargo-shift', 1200, 11500, 1, 1200), track('hazard-lights'), track('brake-lights', 1500, 3200)]),
-    'tomba-parado': scene([track('cargo-strain', 800), track('cargo-shift', 1200, null, 1, 3000), track('hazard-lights', 2500), track('impact-dust', 6900, 11000, 0.8, 60), track('debris', 6900, null, 1, 0)]),
+    'tomba-parado': scene([track('cargo-strain', 800), track('cargo-shift', 1200, null, 1, 3000), track('hazard-lights', 2500), track('impact-dust', 7100, 11000, 0.8, 60), track('debris', 7100, null, 1, 0)]),
   }),
   'hot-weather': Object.freeze({
     'pausa-preventiva': scene([track('heat-haze'), track('exhaust', 0, null, 0.15), track('brake-lights', 7200, 13000), track('hazard-lights', 12500)]),
-    superaquecimento: scene([track('heat-haze'), track('engine-steam', 5500, null, 1, 2500), track('hazard-lights', 7500), track('brake-lights', 7500, 10000)]),
+    superaquecimento: scene([track('heat-haze'), track('engine-steam', 6200, null, 1, 2500), track('hazard-lights', 7500), track('brake-lights', 7500, 10000)]),
   }),
   rollover: Object.freeze({
     recuperacao: scene([track('shoulder-dust', 2400, 9000, 0.8), track('hazard-lights', 4500, 12000), track('running-lights')]),
@@ -90,7 +90,7 @@ export const SOMPO_SCENARIO_OUTCOME_EFFECTS = Object.freeze({
     colisao: scene([track('animal', 0, null), track('brake-lights', 3200), track('tire-smoke', 3200, 5800, 0.6), track('skid-marks', 3200), track('impact-dust', 5600, 9000, 1, 30), track('debris', 5600, null, 1, 0), track('hazard-lights', 5600)], 'asphalt', 'road', 2.8),
   }),
   aquaplaning: Object.freeze({
-    'saida-de-pista': scene([track('wheel-spray', 0, 9500), track('rain'), track('hazard-lights', 2600), track('mud-spray', 7000, 11500, 0.6)], 'wet'),
+    'saida-de-pista': scene([track('wheel-spray', 0, 9500), track('rain'), track('hazard-lights', 2600), track('mud-spray', 7200, 11500, 0.6)], 'wet'),
     'parada-preventiva': scene([track('wheel-spray', 0, 11500), track('rain'), track('running-lights'), track('brake-lights', 5000, 11500), track('hazard-lights', 10500)], 'wet'),
   }),
   'brake-failure': Object.freeze({
