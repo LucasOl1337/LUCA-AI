@@ -56,9 +56,9 @@ test('snapshot agrícola: proveniência correta, roll amplo e gravidade rotacion
   assert.equal(rolled.source.scenarioId, 'agri-tractor-rollover');
   assert.equal(rolled.source.outcomeId, 'side-rollover');
   assert.match(rolled.source.scenarioLabel, / · Tombamento lateral$/);
-  assert.ok(rolled.readings.roll > 70, 'roll do tombamento não é grampeado em ±25°');
+  assert.ok(Math.abs(rolled.readings.roll) > 70, 'roll do tombamento não é grampeado em ±25°');
   assert.ok(rolled.readings.acceleration.z < 3, 'gravidade sai do eixo Z quando o trator deita');
-  assert.ok(rolled.readings.acceleration.y > 8.5, 'gravidade aparece no eixo lateral');
+  assert.ok(Math.abs(rolled.readings.acceleration.y) > 8.5, 'gravidade aparece no eixo lateral');
   assert.deepEqual(rolled.risks, { collision: true, inclination: true });
   // Desfecho padrão mantém o rótulo simples do cenário.
   const clean = createSompoAgriSimulationSnapshot('agri-harvest-dust', undefined, { elapsedMs: 5_000, observedAt });

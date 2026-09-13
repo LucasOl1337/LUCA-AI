@@ -127,6 +127,8 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
 
   // Percurso centrado no talhão: o equipamento atravessa o campo de verdade.
   const keyframes = getSompoAgriKeyframes(scenarioId, outcomeId);
+  // Lateral é deslize roteirizado: só entra no path quando algum keyframe o pede.
+  const useLateral = keyframes.some((keyframe) => Math.abs(keyframe.lateral) > 1e-3);
   const path = createSompoMotionPath(at => getSompoAgriFrame(scenarioId, at, outcomeId), scenario.totalMs);
   const pathPoint = new THREE.Vector3();
   const totalTravel = path.sample(scenario.totalMs, pathPoint).x;
@@ -136,8 +138,17 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   }));
   if (scenario.environmentId === 'farm-barn') {
     // O barracão gira para a manobra de ré terminar estacionada lá dentro.
+    // A porta fica ~1 m atrás da ponta do implemento em t=0 — o conjunto
+    // começa fora e a ré termina com o implemento dentro do vão.
     const barn = field.root.getObjectByName('sompo-agri-barn');
-    if (barn) { barn.rotation.y = Math.PI; barn.position.set(startX + totalTravel + 0.5, 0, 0); }
+    if (barn) { barn.rotation.y = Math.PI; barn.position.set(startX - 10, 0, 0); }
+    // Pilar interno aonde a ponta do implemento varre em t≈7000. Em
+    // 'post-contact' fica na linha da varredura (o implemento engancha); em
+    // 'parked' mais aberto, para a ré final passar rente sem tocar.
+    const postAt = path.sample(7_000, pathPoint);
+    const postX = startX + postAt.x - 2.55;
+    const postZ = postAt.z + (outcomeId === 'post-contact' ? 1.45 : 1.85);
+    field.barnPost?.position.set(postX, field.groundHeight(postX, postZ) - 0.08, postZ);
   }
   if (scenario.environmentId === 'muddy-field') {
     // A mancha de lama fica onde o avanço estanca, não num ponto fixo do campo.
@@ -230,8 +241,9 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     const frame = getSompoAgriFrame(scenarioId, elapsed, outcomeId);
     path.sample(reduceMotion.matches ? 0 : elapsed, pathPoint);
     const x = startX + pathPoint.x;
-    // Only the rollover adds authored lateral slip; normal steering follows its heading.
-    const z = pathPoint.z + (outcomeId === 'side-rollover' ? frame.lateral : 0);
+    // Authored lateral slip only applies where the script calls for it (capotamento,
+    // tranco de contato); normal steering follows the integrated heading.
+    const z = pathPoint.z + (useLateral ? frame.lateral : 0);
     machine.rotation.set(THREE.MathUtils.degToRad(frame.roll), THREE.MathUtils.degToRad(frame.yaw), THREE.MathUtils.degToRad(frame.pitch), 'YZX');
     // Chacoalho físico: slip de roda e roughness do roteiro viram tremor de
     // alta frequência + balanço lento das tentativas de desatolamento.
@@ -244,10 +256,16 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
       machine.rotation.z += effort * .008 * Math.sin(shakeT * 43 + 1.7);
       machine.rotation.z += Math.min(1, slip / 15) * .02 * Math.sin(shakeT * 4.6);
     }
+    // Trepidação mecânica: jitter de alta frequência limitado pelo envelope do roteiro.
+    const tremor = reduceMotion.matches ? 0 : (frame.shudder ?? 0);
+    if (tremor) {
+      machine.rotation.x += tremor * 0.012 * Math.sin(elapsed * 0.047);
+      machine.rotation.z += tremor * 0.009 * Math.sin(elapsed * 0.059 + 1.9);
+    }
     rig?.update(frame, integrateSompoMotion(keyframes, elapsed) / 3.6,
       integrateSompoMotion(keyframes, elapsed, 'headerSpeed', false) * .8, reduceMotion.matches);
     const contactHeight = rig?.supportHeight(machine.rotation, x, z, field.groundHeight) ?? 0;
-    machine.position.set(x, field.groundHeight(x, z) + contactHeight + Math.max(0, frame.vertical) - frame.sink * .5, z);
+    machine.position.set(x, field.groundHeight(x, z) + contactHeight + THREE.MathUtils.clamp(frame.vertical, -0.6, 1) - frame.sink * .5, z);
     if (effort > 0.02) machine.position.y += effort * .014 * (0.5 + 0.5 * Math.sin(shakeT * 51));
     const studio = studioRef?.current ?? SOMPO_STUDIO_DEFAULT;
     field.update(frame, machine.position, camera.position, reduceMotion.matches, studio.wind, elapsed);

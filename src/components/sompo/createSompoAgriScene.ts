@@ -119,6 +119,10 @@ function createGroundFog() {
   return { root, layers };
 }
 
+/** Galpão de máquinas com o lado da câmera aberto: pilares e telhado sem
+ * parede, para a manobra continuar visível quando o trator entra de ré.
+ * Eixo local: -x é a fachada da porta (virada para +x mundo após o giro do
+ * palco), +z é a parede do fundo (longe da câmera). */
 function createBarn() {
   const root = new THREE.Group();
   root.name = 'sompo-agri-barn';
@@ -126,27 +130,81 @@ function createBarn() {
   const steel = new THREE.MeshStandardMaterial({ color: 0x4d5556, metalness: 0.62, roughness: 0.52 });
   const siding = new THREE.MeshStandardMaterial({ color: 0x8c3d2d, metalness: 0.28, roughness: 0.72 });
   const roof = new THREE.MeshStandardMaterial({ color: 0x8d9895, metalness: 0.72, roughness: 0.42 });
-  for (const x of [-8, 8]) for (const z of [-6, 6]) {
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.3, 5.2, 0.3), steel);
-    post.position.set(x, 2.6, z);
+  const timber = new THREE.MeshStandardMaterial({ color: 0x6b5138, metalness: 0.05, roughness: 0.85 });
+  const straw = new THREE.MeshStandardMaterial({ color: 0xa98f4e, roughness: 0.95 });
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0x5c4a33, roughness: 1 });
+  const D = 6, W = 5.5, H = 5.1;
+  // Lado -z (câmera): vão livre com pilares a cada 3 m e longarina no topo.
+  for (const x of [-6, -3, 0, 3, 6]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.26, H, 0.26), steel);
+    post.position.set(x, H / 2, -W);
     post.castShadow = true;
     root.add(post);
   }
-  for (const z of [-6.15, 6.15]) {
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(16.5, 4.8, 0.18), siding);
-    wall.position.set(0, 2.4, z);
-    wall.castShadow = wall.receiveShadow = true;
-    root.add(wall);
-  }
-  const back = new THREE.Mesh(new THREE.BoxGeometry(0.18, 4.8, 12.5), siding);
-  back.position.set(8.15, 2.4, 0);
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(12.4, 0.22, 0.22), steel);
+  rail.position.set(0, H - 0.25, -W);
+  root.add(rail);
+  // Lado +z: parede inteiriça, fundo da cena para a silhueta da máquina.
+  const farWall = new THREE.Mesh(new THREE.BoxGeometry(12.4, H, 0.18), siding);
+  farWall.position.set(0, H / 2, W);
+  farWall.castShadow = farWall.receiveShadow = true;
+  root.add(farWall);
+  // Fundo +x: parede inteiriça.
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.18, H, 11.2), siding);
+  back.position.set(D, H / 2, 0);
+  back.castShadow = back.receiveShadow = true;
   root.add(back);
-  const roofMesh = new THREE.Mesh(new THREE.BoxGeometry(17.4, 0.18, 13.4), roof);
-  roofMesh.position.set(0, 5.45, 0);
-  roofMesh.rotation.z = -0.06;
+  // Fachada -x: vão de 5 m entre as ombreiras; folga lateral mínima na entrada.
+  const entryA = new THREE.Mesh(new THREE.BoxGeometry(0.18, H, 4.0), siding);
+  entryA.position.set(-D, H / 2, -3.5);
+  entryA.castShadow = entryA.receiveShadow = true;
+  root.add(entryA);
+  const entryB = new THREE.Mesh(new THREE.BoxGeometry(0.18, H, 2.0), siding);
+  entryB.position.set(-D, H / 2, 4.5);
+  entryB.castShadow = entryB.receiveShadow = true;
+  root.add(entryB);
+  for (const z of [-1.5, 3.5]) {
+    const jamb = new THREE.Mesh(new THREE.BoxGeometry(0.3, H, 0.3), timber);
+    jamb.position.set(-D, H / 2, z);
+    jamb.castShadow = true;
+    root.add(jamb);
+  }
+  const roofMesh = new THREE.Mesh(new THREE.BoxGeometry(12.9, 0.18, 11.9), roof);
+  roofMesh.position.set(0, H + 0.02, 0);
+  roofMesh.rotation.z = -0.05;
   roofMesh.castShadow = true;
   root.add(roofMesh);
-  return root;
+  // Piso socado do galpão: mais escuro que o talhão ao redor.
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(12.2, 11.2), floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = 0.04;
+  floor.receiveShadow = true;
+  root.add(floor);
+  // Fardos junto à parede do fundo e tambores no canto: leitura de galpão apertado.
+  for (const [bx, bz, by] of [[-1.5, 4.35, 0.55], [-0.2, 4.45, 0.55], [-0.85, 4.4, 1.55], [4.3, 4.4, 0.55]]) {
+    const bale = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.05, 1.15), straw);
+    bale.position.set(bx, by, bz);
+    bale.rotation.y = bx * 0.4;
+    bale.castShadow = bale.receiveShadow = true;
+    root.add(bale);
+  }
+  for (const [bx, bz] of [[4.9, -3.9], [5.35, -3.35]]) {
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.92, 14), steel);
+    drum.position.set(bx, 0.46, bz);
+    drum.castShadow = true;
+    root.add(drum);
+  }
+  // Pilar de balanço interno: o palco posiciona no ponto onde a ponta do
+  // implemento varre; no desfecho de contato é nele que a máquina engancha.
+  const barnPost = new THREE.Group();
+  barnPost.name = 'sompo-agri-barn-post';
+  const postMesh = new THREE.Mesh(new THREE.BoxGeometry(0.32, 5.0, 0.32), timber);
+  postMesh.position.y = 2.5;
+  postMesh.castShadow = true;
+  const postShoe = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.18, 0.56), steel);
+  postShoe.position.y = 0.09;
+  barnPost.add(postMesh, postShoe);
+  return { root, barnPost };
 }
 
 function dustMap() {
@@ -227,7 +285,8 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
   root.add(terrain);
   const crops = definition.barn ? null : createSompoCropRows((x,z)=>terrainHeight(x,z,definition.slope), compact, equipmentId === 'tractor' ? .32 : 1);
   if (crops) root.add(crops.root);
-  if (definition.barn) root.add(createBarn());
+  const barn = definition.barn ? createBarn() : null;
+  if (barn) root.add(barn.root, barn.barnPost);
   const silos = createSilos(definition.slope); root.add(silos);
   const groundFog = createGroundFog(); root.add(groundFog.root);
   groundFog.root.visible = !definition.night;
@@ -293,6 +352,7 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
 
   return {
     root, terrain, mud, sun, placeMud,
+    barnPost: barn?.barnPost,
     setHarvestPath(points: readonly { x: number; z: number }[]) { crops?.setHarvestPath(points); },
     groundHeight(x: number, z: number) {
       return terrainHeight(x, z, definition.slope);
