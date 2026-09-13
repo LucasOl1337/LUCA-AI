@@ -74,7 +74,7 @@ export const SOMPO_SCENARIO_OUTCOME_EFFECTS = Object.freeze({
     'tomba-parado': scene([track('cargo-strain', 800), track('cargo-shift', 1200, null, 1, 3000), track('hazard-lights', 2500), track('impact-dust', 6900, 11000, 0.8, 60), track('debris', 6900, null, 1, 0)]),
   }),
   'hot-weather': Object.freeze({
-    'pausa-preventiva': scene([track('heat-haze'), track('exhaust', 0, null, 0.15), track('brake-lights', 6000, 9500), track('hazard-lights', 9000)]),
+    'pausa-preventiva': scene([track('heat-haze'), track('exhaust', 0, null, 0.15), track('brake-lights', 7200, 13000), track('hazard-lights', 12500)]),
     superaquecimento: scene([track('heat-haze'), track('engine-steam', 5500, null, 1, 2500), track('hazard-lights', 7500), track('brake-lights', 7500, 10000)]),
   }),
   rollover: Object.freeze({
