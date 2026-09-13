@@ -1,6 +1,6 @@
 // Contrato visual das faixas de proximidade: uma rampa por tipo de perigo, do mais interno (forte) ao mais externo (claro).
 // Usado pela cena (textura e rastro), pela legenda e pelo painel. Nenhuma regra de distância vive aqui (SPEC regra 1).
-import { resolveHazards, type GeofenceEpisode, type LabHazard } from '../../../shared/lab-geofence.js';
+import { resolveHazards, type GeofenceEpisode, type LabHazard } from '../../../shared/geofencing/index.js';
 import type { LabCase } from '../../../shared/lab-telemetry.js';
 
 const RAMPS: Record<'water' | 'hazard', string[]> = {

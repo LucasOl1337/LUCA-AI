@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, '..');
+const ROOT = path.resolve(HERE, '..', '..');
 const OSM_SOURCE = path.join(path.dirname(ROOT), 'fontes', 'osm-relation-2708872-2026-09-11.json');
 const OUT_DIR = path.join(ROOT, 'public', 'datasets', 'piracicaba-artemis');
 fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -419,7 +419,7 @@ const manifest = {
       },
     ],
   },
-  provenance: 'Água: OpenStreetMap, relação 2708872, consultada em 2026-09-11 via api.openstreetmap.org, licença ODbL, atribuição obrigatória. Limite de propriedade, área permitida, declive e percurso: fictícios, gerados por scripts/generate-piracicaba-dataset.mjs para demonstração, sem correspondência com uma fazenda real.',
+  provenance: 'Água: OpenStreetMap, relação 2708872, consultada em 2026-09-11 via api.openstreetmap.org, licença ODbL, atribuição obrigatória. Limite de propriedade, área permitida, declive e percurso: fictícios, gerados por scripts/geofencing/generate-piracicaba-dataset.mjs para demonstração, sem correspondência com uma fazenda real.',
   files: [
     { file: '01-colheita-normal.csv', samples: rows01.length, sha256: sha256(path.join(OUT_DIR, '01-colheita-normal.csv')) },
     { file: '02-declive-tombamento.csv', samples: rows02.length, sha256: sha256(path.join(OUT_DIR, '02-declive-tombamento.csv')) },
@@ -429,7 +429,7 @@ fs.writeFileSync(path.join(OUT_DIR, 'manifest.json'), JSON.stringify(manifest, n
 
 // ---------- 8. eventos-esperados.json: roda parseLabCase de verdade ----------
 const { parseLabCase } = await import(pathToFileURL(path.join(ROOT, 'shared', 'lab-telemetry.js')));
-// Todos os eventos do motor atual (inclui hazard_band); server/piracicaba-dataset.test.js compara com o arquivo gerado.
+// Todos os eventos do motor atual (inclui hazard_band); server/geofencing/piracicaba-dataset.test.js compara com o arquivo gerado.
 const ALLOWED_TYPES = null;
 // Falha do parser com rules.hazards interrompe a geração: nunca gravar eventos esperados sem faixas com um manifesto que as declara.
 function expectedEventsFor(fileName, rawCsv) {

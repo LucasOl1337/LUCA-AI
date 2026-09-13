@@ -117,7 +117,7 @@
       }
     ]
   },
-  "provenance": "Água: OpenStreetMap, relação 2708872, consultada em 2026-09-11 via api.openstreetmap.org, licença ODbL, atribuição obrigatória. Limite de propriedade, área permitida, declive e percurso: fictícios, gerados por scripts/generate-piracicaba-dataset.mjs para demonstração, sem correspondência com uma fazenda real.",
+  "provenance": "Água: OpenStreetMap, relação 2708872, consultada em 2026-09-11 via api.openstreetmap.org, licença ODbL, atribuição obrigatória. Limite de propriedade, área permitida, declive e percurso: fictícios, gerados por scripts/geofencing/generate-piracicaba-dataset.mjs para demonstração, sem correspondência com uma fazenda real.",
   "files": [
     {
       "file": "01-colheita-normal.csv",

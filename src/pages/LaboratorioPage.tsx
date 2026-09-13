@@ -5,10 +5,11 @@ import { parseLabCase, parseLabSite, associateLabSite, getReplayFrame, formatLab
 import { convertSompoDataset } from '../../shared/sompo-lab-export.js';
 import { createFarmDemo } from '../../shared/lab-farm-demo.js';
 import LabEsp32Replay from '@/components/lab/LabEsp32Replay';
-import LabBandLegend from '@/components/lab/LabBandLegend';
-import LabMiniMap from '@/components/lab/LabMiniMap';
-import { LabGeofencePanel, LabExposureStrip } from '@/components/lab/LabGeofencePanel';
-import { hazardsOf } from '@/components/lab/labBands';
+// geofencing (módulo src/geofencing/lab): legenda, minimapa e painel de faixas do laboratório.
+import LabBandLegend from '@/geofencing/lab/LabBandLegend';
+import LabMiniMap from '@/geofencing/lab/LabMiniMap';
+import { LabGeofencePanel, LabExposureStrip } from '@/geofencing/lab/LabGeofencePanel';
+import { hazardsOf } from '@/geofencing/lab/labBands';
 import { LAB_EXAMPLES, exampleMetadata, loadDefaultLabSite, categories, labRequest, downloadFile, exportLabReport, type CaseSummary, type SavedCase, type LabAnalysis, type ConclusionDraft, type Category, type Hypothesis, type LabExample } from '@/lib/lab-client';
 import '@/laboratorio-page.css';
 

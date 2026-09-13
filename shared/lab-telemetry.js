@@ -1,5 +1,7 @@
 // File-backed laboratory telemetry. No Firebase, wall clock, or expected-event fixture.
-import { computeGeofenceEpisodes } from './lab-geofence.js';
+// geofencing (módulo shared/geofencing): regras rules.hazards, episódios de faixa e validação do manifesto.
+import { computeGeofenceEpisodes } from './geofencing/engine.js';
+import { validateGeofenceManifest } from './geofencing/manifest.js';
 const EARTH_RADIUS_M = 6378137;
 const RAD = Math.PI / 180;
 const FIELDS = [
@@ -132,11 +134,6 @@ function validateManifest(manifest) {
     if (image.resolution_m != null && (!finite(image.resolution_m) || image.resolution_m <= 0)) fail('Imagem aérea: resolução deve ser positiva, em metros por pixel.');
   }
   if (manifest.machine != null && (!object(manifest.machine) || typeof manifest.machine.id !== 'string' || !manifest.machine.id.trim())) fail('Identificação de máquina inválida no manifesto.');
-  if (manifest.machine?.profile != null) {
-    const profile = manifest.machine.profile;
-    if (!object(profile)) fail('Perfil de máquina inválido: machine.profile deve ser um objeto.');
-    for (const [key, value] of Object.entries(profile)) if (value != null && (!finite(value) || value < 0)) fail(`Perfil de máquina: ${key} deve ser um número maior ou igual a zero.`);
-  }
   for (const field of ['duration_s', 'export_rate_hz']) {
     if (manifest[field] != null && (!finite(manifest[field]) || manifest[field] <= 0)) fail(`Metadado ${field} deve ser um número positivo.`);
   }
@@ -145,33 +142,7 @@ function validateManifest(manifest) {
   const coolant = manifest.rules?.coolant_warning_c;
   if (water != null && (!finite(water) || water < 0)) fail('A distância de aviso da água deve ser um número em metros, maior ou igual a zero.');
   if (coolant != null && (!finite(coolant) || coolant < -273.15)) fail('O limite de arrefecimento deve ser um número válido em °C.');
-  const hazards = manifest.rules?.hazards;
-  if (hazards != null) {
-    if (!Array.isArray(hazards) || !hazards.length) fail('Regras: hazards deve ser uma lista com pelo menos um perigo.');
-    const seen = new Set();
-    for (const [index, hazard] of hazards.entries()) {
-      const where = `Regras: perigo ${index + 1}`;
-      if (!object(hazard) || !['water', 'hazard', 'machine'].includes(hazard.role)) fail(`${where}: role deve ser water, hazard ou machine.`);
-      if (hazard.role === 'machine') {
-        if (hazard.metric != null && hazard.metric !== 'roll_deg' && hazard.metric !== 'pitch_deg') fail(`${where}: metric de máquina deve ser roll_deg ou pitch_deg.`);
-        if (hazard.limit_deg != null && (!finite(hazard.limit_deg) || hazard.limit_deg <= 0)) fail(`${where}: limit_deg deve ser um número positivo em graus.`);
-      }
-      if (hazard.role === 'hazard' && (typeof hazard.category !== 'string' || !hazard.category.trim())) fail(`${where}: informe category (por exemplo slope) para role hazard.`);
-      const kind = [hazard.role, hazard.category, hazard.role === 'machine' ? hazard.metric ?? 'roll_deg' : null].filter(Boolean).join('/');
-      if (seen.has(kind)) fail(`${where}: perigo ${kind} repetido; use uma entrada por papel, categoria e métrica.`);
-      seen.add(kind);
-      const bands = hazard.bands_m;
-      if (!Array.isArray(bands) || !bands.length) fail(`${where}: bands_m deve ser uma lista com pelo menos uma faixa.`);
-      const ids = new Set();
-      for (const [j, band] of bands.entries()) {
-        if (!object(band) || typeof band.id !== 'string' || !band.id.trim() || !finite(band.max_m) || band.max_m < 0) fail(`${where}, faixa ${j + 1}: informe id e max_m em metros, maior ou igual a zero.`);
-        if (j && band.max_m <= bands[j - 1].max_m) fail(`${where}: bands_m deve estar em ordem crescente de max_m (faixa "${band.id}" com ${band.max_m} m depois de ${bands[j - 1].max_m} m).`);
-        if (ids.has(band.id)) fail(`${where}: id de faixa "${band.id}" repetido.`);
-        ids.add(band.id);
-      }
-      if (hazard.role === 'water' && water != null && bands.at(-1).max_m !== water) fail(`${where}: com faixas de água, water_warning_distance_m (${water} m) deve ser igual ao max_m da faixa mais externa (${bands.at(-1).max_m} m).`);
-    }
-  }
+  validateGeofenceManifest(manifest, { fail, finite, object, water }); // geofencing (módulo shared/geofencing)
   if (manifest.files != null && (!Array.isArray(manifest.files) || manifest.files.some(file => !object(file) || typeof file.file !== 'string' || !Number.isInteger(file.samples) || file.samples < 1))) fail('Lista de arquivos inválida no manifesto.');
 }
 

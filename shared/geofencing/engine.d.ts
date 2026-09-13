@@ -1,4 +1,7 @@
-import type { LabEvent, LabPolygon, LabPoint, LabSample } from './lab-telemetry.js';
+import type { LabEvent, LabPolygon, LabPoint, LabSample } from '../lab-telemetry.js';
+
+/** Máquina lida pelo motor: só o perfil importa (max_roll_deg, max_pitch_deg...). */
+export interface GeofenceMachineLike { readonly profile?: { readonly max_roll_deg?: number; readonly max_pitch_deg?: number; readonly [key: string]: unknown } }
 
 export interface LabBandRule { id: string; label?: string; max_m: number }
 export interface LabHazardRule {
@@ -51,8 +54,8 @@ export interface LabBandGrid {
   bands: Int16Array[];         // por perigo: índice da faixa em hazards[h].bands, -1 = nenhuma
 }
 export function classifyBand<T extends LabBandRule>(distanceM: number, bands: T[]): T | null;
-export function resolveHazards(rules: LabGeofenceRules | null | undefined, polygons: LabPolygon[], machine?: { profile?: Record<string, number | undefined> } | null): LabHazard[] & { warnings: string[] };
-export function computeGeofenceEpisodes(samples: LabSample[], polygons: LabPolygon[], rules: LabGeofenceRules, caseId: string, sampleIntervalMs?: number, machine?: { profile?: Record<string, number | undefined> } | null): { summary: GeofenceSummary; events: LabEvent[] };
+export function resolveHazards(rules: LabGeofenceRules | null | undefined, polygons: LabPolygon[], machine?: GeofenceMachineLike | null): LabHazard[] & { warnings: string[] };
+export function computeGeofenceEpisodes(samples: LabSample[], polygons: LabPolygon[], rules: LabGeofenceRules, caseId: string, sampleIntervalMs?: number, machine?: GeofenceMachineLike | null): { summary: GeofenceSummary; events: LabEvent[] };
 export function bandGrid(polygons: LabPolygon[], hazards: LabHazard[], cellM?: number): LabBandGrid | null;
 export function affectedArea(polygons: LabPolygon[], hazards: LabHazard[], cellM?: number): GeofenceSummary['affectedArea'];
 export type { LabPoint };

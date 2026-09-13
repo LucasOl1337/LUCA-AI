@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createSompoCropRows } from './createSompoCropRows';
-import { geofenceFieldRelief, geofenceOperacaoRelief } from '../../../shared/sompo-geofence-sites.js';
+import { geofenceFieldRelief, geofenceOperacaoRelief } from '../../../shared/geofencing/index.js'; // geofencing: relevo dos talhões sintéticos
 import { grassTuftGeometry, varySompoSurface } from './createSompoRoadDetails';
 import { disposeSompoObject } from './sompoStage';
 import type { SompoAgriVisualFrame } from '../../../shared/sompo-agri-scenarios.js';

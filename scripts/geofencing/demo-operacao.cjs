@@ -1,5 +1,5 @@
 // Produto local já aberto por npm run demo:sompo. Não inicia servidores.
-// Uso: node scripts/demo-operacao.cjs — capturas e relatório em tmp-shots/operacao-*/ (pasta ignorada pelo git).
+// Uso: node scripts/geofencing/demo-operacao.cjs — capturas e relatório em tmp-shots/operacao-*/ (pasta ignorada pelo git).
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -12,8 +12,8 @@ const cases = [
 ];
 
 (async () => {
-  const { createSompoAgriSimulationSnapshot, describeGeofence, getSompoAgriGeofenceEpisodes } = await import('../shared/sompo-agri-brief.js');
-  const artifacts = path.resolve(__dirname, '../tmp-shots');
+  const { createSompoAgriGeofenceSnapshot: createSompoAgriSimulationSnapshot, describeGeofence, getSompoAgriGeofenceEpisodes } = await import('../../shared/geofencing/index.js');
+  const artifacts = path.resolve(__dirname, '../../tmp-shots');
   fs.mkdirSync(artifacts, { recursive: true });
   const output = fs.mkdtempSync(path.join(artifacts, 'operacao-'));
   const report = { errors: [], captures: [], checks: [], complete: false };

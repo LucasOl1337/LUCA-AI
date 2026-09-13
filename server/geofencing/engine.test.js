@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { classifyBand, resolveHazards, computeGeofenceEpisodes, affectedArea } from '../shared/lab-geofence.js';
-import { parseLabCase, getReplayFrame } from '../shared/lab-telemetry.js';
+import { classifyBand, resolveHazards, computeGeofenceEpisodes, affectedArea } from '../../shared/geofencing/index.js';
+import { parseLabCase, getReplayFrame } from '../../shared/lab-telemetry.js';
 
-const dataset = new URL('../datasets/laboratorio-virtual-v1/', import.meta.url);
+const dataset = new URL('../../datasets/laboratorio-virtual-v1/', import.meta.url);
 const read = file => readFileSync(new URL(file, dataset), 'utf8');
 const manifest = JSON.parse(read('manifest.json'));
 const map = JSON.parse(read('mapa.geojson'));
@@ -165,11 +165,11 @@ test('grade sobrevive a mais de 128 faixas (Int16) e a área da faixa 129 é con
 });
 
 test('bandGrid por arestas coincide célula a célula com a distância exata, inclusive com ilha no polígono de água', async () => {
-  const { polygonContains, polygonDistance } = await import('../shared/lab-telemetry.js');
+  const { polygonContains, polygonDistance } = await import('../../shared/lab-telemetry.js');
   const lake = { id: 'lagoa', role: 'water', rings: [rect('', '', 120, 220, -50, 150).rings[0], rect('', '', 150, 190, 40, 60).rings[0]] };
   const field = rect('campo', 'allowed_area', 60, 200, 0, 100); // x 60–85 fica além dos 35 m: -1
   const hazards = resolveHazards({ hazards: [rules.hazards[0]] }, [field, lake]);
-  const grid = affectedArea([field, lake], hazards) && (await import('../shared/lab-geofence.js')).bandGrid([field, lake], hazards, 2);
+  const grid = affectedArea([field, lake], hazards) && (await import('../../shared/geofencing/index.js')).bandGrid([field, lake], hazards, 2);
   const expected = [];
   for (let row = 0; row < grid.rows; row++) for (let col = 0; col < grid.cols; col++) {
     const point = { x: grid.minX + (col + 0.5) * grid.cellM, z: grid.minZ + (row + 0.5) * grid.cellM };

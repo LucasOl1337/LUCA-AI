@@ -40,7 +40,7 @@ export interface LabSample {
   x: number | null;
   z: number | null;
 }
-import type { GeofenceSummary, LabHazardRule } from './lab-geofence.js';
+import type { GeofenceSummary, LabHazardRule } from './geofencing/engine.js'; // geofencing (módulo shared/geofencing)
 export type LabEventType = 'outside_fence' | 'near_water' | 'coolant_warning' | 'gnss_unavailable' | 'device_collision_warning' | 'device_inclination_warning' | 'hazard_band';
 export interface LabEvent {
   id: string;

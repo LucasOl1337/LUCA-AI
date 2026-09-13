@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { evaluateGeofence, closestPointOnPolygon, forwardVector, describeGeofence, describeMachineLimit } from '../shared/sompo-geofence.js';
+import { evaluateGeofence, closestPointOnPolygon, forwardVector, describeGeofence, describeMachineLimit } from '../../shared/geofencing/index.js';
 
 const rect = (id, role, x0, x1, z0, z1, extra = {}) => ({ id, role, rings: [[{ x: x0, z: z0 }, { x: x1, z: z0 }, { x: x1, z: z1 }, { x: x0, z: z1 }, { x: x0, z: z0 }]], ...extra });
 const field = rect('talhao', 'allowed_area', -100, 100, -50, 50);

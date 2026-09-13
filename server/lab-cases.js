@@ -116,7 +116,7 @@ function evidenceContext(parsed) {
         coolant_warning_c: parsed.manifest?.rules?.coolant_warning_c,
         hazards: parsed.manifest?.rules?.hazards ?? null,
       },
-      // Episódios por faixa (shared/lab-geofence.js). Distâncias horizontais a polígonos do mapa; não medem contato nem causa.
+      // Episódios por faixa (shared/geofencing/engine.js). Distâncias horizontais a polígonos do mapa; não medem contato nem causa.
       geofence: parsed.geofence ? {
         notice: 'Faixas são parâmetros declarados no manifesto, não distâncias de segurança calibradas. Área atingida é estimativa por grade; o restante da área não foi avaliado como seguro.',
         rulesVersion: parsed.geofence.rulesVersion,

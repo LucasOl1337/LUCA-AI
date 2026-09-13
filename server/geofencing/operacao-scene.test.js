@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Vector3 } from 'three';
-import { createSompoCropRows } from '../src/components/sompo/createSompoCropRows.ts';
+import { createSompoCropRows } from '../../src/components/sompo/createSompoCropRows.ts';
 
 test('plantio da operação: corte cronológico nas duas direções e cobertura das três passadas', () => {
   const crop = createSompoCropRows(() => 0, true, 1, true);

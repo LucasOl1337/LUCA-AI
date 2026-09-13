@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseLabCase } from '../shared/lab-telemetry.js';
+import { parseLabCase } from '../../shared/lab-telemetry.js';
 
 const dir = path.resolve('public/datasets/piracicaba-artemis');
 const read = (name) => fs.readFileSync(path.join(dir, name), 'utf8');

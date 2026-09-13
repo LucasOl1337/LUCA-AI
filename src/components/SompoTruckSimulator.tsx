@@ -21,8 +21,12 @@ import {
   Truck,
 } from 'lucide-react';
 import SompoStudio, { type SompoStudioAsset } from './sompo/SompoStudio';
-import SompoGeofenceMap from './sompo/SompoGeofenceMap';
-import SompoGeofencePanel, { bandTone } from './sompo/SompoGeofencePanel';
+// geofencing (módulo src/geofencing): painel, mapa, HUD e campos da amostra só existem nos cenários com talhão.
+import SompoGeofenceMap from '../geofencing/SompoGeofenceMap';
+import SompoGeofencePanel from '../geofencing/SompoGeofencePanel';
+import SompoGeofenceReadout from '../geofencing/SompoGeofenceReadout';
+import { sompoGeofenceRawFields } from '../geofencing/sompoGeofenceRaw';
+import { withSompoAgriGeofence, type SompoAgriMaybeGeofenceSnapshot } from '../../shared/geofencing/index.js';
 import { createSompoPlayback } from './sompo/sompoPlayback';
 import { downloadSompoFile, loadSompoStudioConfig, type SompoStudioConfig, type SompoRenderStats } from './sompo/sompoStudioConfig';
 import { mountSompoRuralStage } from './sompo/createSompoRuralStage';
@@ -41,9 +45,6 @@ import {
 } from '../../shared/sompo-agri-scenarios.js';
 import {
   createSompoAgriSimulationSnapshot,
-  describeGeofence,
-  describeMachineLimit,
-  type SompoAgriSimulationSnapshot,
   getSompoAgriEpisodePlan,
   getSompoAgriOutcomes,
   isSompoAgriScenarioId,
@@ -183,19 +184,15 @@ function captureEpisodeFrameDataUrl(source: HTMLCanvasElement): string | null {
   }
 }
 
+// geofencing (módulo shared/geofencing): cenário com talhão ganha posição, radar e bandeira de proximidade;
+// os demais cenários saem de createSompoAgriSimulationSnapshot exatamente como antes.
+const agriSnapshot: typeof createSompoAgriSimulationSnapshot = (scenarioId, outcomeId, options) =>
+  withSompoAgriGeofence(createSompoAgriSimulationSnapshot(scenarioId, outcomeId, options), scenarioId, outcomeId, options?.elapsedMs ?? 0);
+
 function snapshotToSimulationRaw(snapshot: SompoTelemetrySnapshot): Record<string, unknown> {
   const readings = snapshot.readings;
-  const { position, geofence } = snapshot as Partial<SompoAgriSimulationSnapshot>;
   return {
-    ...(position && geofence ? {
-      posX: position.x,
-      posZ: position.z,
-      headingDeg: position.headingDeg,
-      geofenceBand: geofence.nearest?.bandId ?? null,
-      geofenceHazard: geofence.nearest?.hazardKey ?? null,
-      geofenceDistanceM: geofence.nearest?.distanceM ?? null,
-      machineBand: geofence.machine?.bandId ?? null,
-    } : {}),
+    ...sompoGeofenceRawFields(snapshot), // geofencing: vazio fora dos cenários com talhão
     trator: snapshot.tractorId,
     timestamp: snapshot.deviceTimestamp,
     distancia: readings.distance,
@@ -347,7 +344,7 @@ export default function SompoTruckSimulator({
   const [controls, setControls] = useState<SompoSimulationControls>(INITIAL_CONTROLS);
   const [agriRun, setAgriRun] = useState<SompoAgriRun | null>(() => !isFirebase && ['tractor', 'harvester'].includes(studioConfig.equipment) ? { scenarioId: studioConfig.equipment === 'harvester' ? 'agri-harvest-dust' : 'agri-field-bogging', outcomeId: studioConfig.equipment === 'harvester' ? 'clean-pass' : getSompoAgriOutcomes('agri-field-bogging')[0].id } : null);
   const [axisCalibration, setAxisCalibration] = useState<SompoAxisCalibration>(loadAxisCalibration);
-  const [preview, setPreview] = useState<SompoTelemetrySnapshot & Partial<Pick<SompoAgriSimulationSnapshot, 'geofence' | 'position'>>>(() => (
+  const [preview, setPreview] = useState<SompoAgriMaybeGeofenceSnapshot>(() => (
     telemetry || createSompoSimulationSnapshot(INITIAL_CONTROLS, { elapsedMs: 0 })
   ));
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -439,7 +436,7 @@ export default function SompoTruckSimulator({
 
     function emitSnapshot() {
       const snapshot = agriRun
-        ? createSompoAgriSimulationSnapshot(agriRun.scenarioId, agriRun.outcomeId, {
+        ? agriSnapshot(agriRun.scenarioId, agriRun.outcomeId, {
           elapsedMs: getElapsed(performance.now()),
           connectedAt: connectedAtRef.current,
         })
@@ -594,7 +591,7 @@ export default function SompoTruckSimulator({
       // A telemetria gravada é o mesmo snapshot que o cenário emite em tela -
       // o episódio é literalmente "o que está na cena agora", do início ao desfecho.
       const snapshot = run.plan.catalog === 'agri'
-        ? createSompoAgriSimulationSnapshot(run.plan.scenarioId, run.plan.outcomeId, {
+        ? agriSnapshot(run.plan.scenarioId, run.plan.outcomeId, {
           elapsedMs: elapsed,
           connectedAt: connectedAtRef.current,
         })
@@ -610,7 +607,7 @@ export default function SompoTruckSimulator({
       // os pontos cruzados são recuperados com o offset original, não o do tick.
       for (const offset of sompoEpisodeSampleOffsets(run.lastSampleMs, elapsed, run.plan.sampleIntervalMs, run.plan.totalMs)) {
         const sample = run.plan.catalog === 'agri'
-          ? createSompoAgriSimulationSnapshot(run.plan.scenarioId, run.plan.outcomeId, {
+          ? agriSnapshot(run.plan.scenarioId, run.plan.outcomeId, {
             elapsedMs: offset,
             observedAt: new Date(run.observedStartMs + offset).toISOString(),
             connectedAt: connectedAtRef.current,
@@ -690,7 +687,7 @@ export default function SompoTruckSimulator({
       },
     };
     const firstSnapshot = plan.catalog === 'agri'
-      ? createSompoAgriSimulationSnapshot(plan.scenarioId, plan.outcomeId, {
+      ? agriSnapshot(plan.scenarioId, plan.outcomeId, {
         elapsedMs: 0,
         observedAt: new Date(episodeRunRef.current.observedStartMs).toISOString(),
         connectedAt: connectedAtRef.current,
@@ -1101,21 +1098,7 @@ export default function SompoTruckSimulator({
                 <span>{preview.risks.collision ? 'Alerta de colisão' : preview.risks.inclination ? 'Alerta de inclinação' : 'Colisão/inclinação sem alerta'}</span>
                 <strong>{formatReading(preview.readings.distance, ' cm')} <small>{distanceSensorCopy.relative}</small></strong>
               </div>
-              {agriRun && preview.geofence && (
-                <div data-geofence data-alert={!!preview.risks.proximity}
-                  className={(preview.geofence.alert ?? preview.geofence.nearest) ? `sompo-geofence-${bandTone((preview.geofence.alert ?? preview.geofence.nearest)!.bandId, (preview.geofence.alert ?? preview.geofence.nearest)!.alertable)}` : undefined}>
-                  <span>Fazenda sintética · demonstração</span>
-                  <strong>{!preview.geofence.nearest && preview.geofence.insideAllowed
-                    ? 'Radar: sem perigo mapeado no alcance'
-                    : `Radar: ${describeGeofence(preview.geofence)}`}</strong>
-                </div>
-              )}
-              {agriRun && preview.geofence?.machine && (
-                <div data-geofence-machine data-alert className={`sompo-geofence-${preview.geofence.machine.bandId === 'acima' ? 'forte' : 'media'}`}>
-                  <span>Limite da máquina · perfil de demonstração</span>
-                  <strong>{describeMachineLimit(preview.geofence.machine)}</strong>
-                </div>
-              )}
+              {agriRun && <SompoGeofenceReadout geofence={preview.geofence} proximity={!!(preview.risks as { proximity?: boolean }).proximity} />}
             </div>
           )}
           <div className="sompo-simulator-camera" role="group" aria-label="Controles da câmera 3D">

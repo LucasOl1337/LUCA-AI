@@ -18,7 +18,7 @@ encosta de 12 m dentro do polígono de declive. Não são levantamento nem ortof
 mostre o declive e drapeie faixas, percurso e limites sobre um terreno.
 
 ## Como foi gerado
-`node scripts/generate-piracicaba-dataset.mjs` — determinístico (sem `Math.random`, sem relógio do sistema
+`node scripts/geofencing/generate-piracicaba-dataset.mjs` — determinístico (sem `Math.random`, sem relógio do sistema
 na geometria; ruído de atitude vem de senos com fase fixa), lê a fonte OSM bruta e escreve todo o conteúdo
 desta pasta. Duas execuções produzem os mesmos bytes.
 

@@ -5,19 +5,12 @@
  * alterar o módulo agrícola. Puro: frames e integrais são função do relógio.
  */
 import {
-  SOMPO_AGRI_EQUIPMENT,
   SOMPO_AGRI_SCENARIOS,
   getSompoAgriFrame,
   getSompoAgriOutcomePhases,
-  getSompoAgriKeyframes,
   getSompoAgriScenario,
 } from './sompo-agri-scenarios.js';
 import { createSompoSimulationSnapshot, sompoEpisodeFrameMoments } from './sompo-telemetry-simulator.js';
-import { createSompoMotionPath } from './sompo-motion.js';
-import { evaluateGeofence } from './sompo-geofence.js';
-import { getSompoGeofenceSite } from './sompo-geofence-sites.js';
-import { computeGeofenceEpisodes } from './lab-geofence.js';
-export { describeGeofence, describeMachineLimit } from './sompo-geofence.js';
 
 const finite = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
@@ -90,68 +83,11 @@ export function getSompoAgriTravelMeters(scenarioId, elapsedMs = 0, outcomeId) {
   return travel + (((elapsed - scenario.totalMs) / 1000) * ((last.speedKph / 3.6) * last.direction));
 }
 
-/** Origem em metros compartilhada pelo snapshot e pelo palco. */
-export function getSompoAgriStartX(scenarioId, outcomeId) {
-  const scenario = getSompoAgriScenario(scenarioId);
-  return scenario.startX ?? -getSompoAgriTravelMeters(scenarioId, scenario.totalMs, outcomeId) / 2;
-}
-
-// Mesma posição que o palco 3D (createSompoAgriStage): rumo integrado por createSompoMotionPath, e o
-// deslocamento lateral explícito só quando algum quadro do desfecho o pede, como lá. Tabela de 60 Hz construída uma vez por desfecho.
-const motionPaths = new Map();
-function motionPath(scenarioId, outcomeId) {
-  const scenario = getSompoAgriScenario(scenarioId);
-  const outcome = resolveOutcome(scenario, outcomeId);
-  const key = `${scenario.scenarioId}:${outcome.id}`;
-  if (!motionPaths.has(key)) {
-    const path = createSompoMotionPath(at => getSompoAgriFrame(scenario.scenarioId, at, outcome.id), scenario.totalMs);
-    const useLateral = getSompoAgriKeyframes(scenario.scenarioId, outcome.id).some(keyframe => Math.abs(keyframe.lateral) > 1e-3);
-    motionPaths.set(key, { path, useLateral });
-  }
-  return motionPaths.get(key);
-}
-/** Posição da máquina em metros de cena no instante: x leste, z sul, rumo 0 = norte / 90 = leste. Igual à cena 3D. */
-export function getSompoAgriPosition(scenarioId, elapsedMs = 0, outcomeId) {
-  const scenario = getSompoAgriScenario(scenarioId);
-  const outcome = resolveOutcome(scenario, outcomeId);
-  const { path, useLateral } = motionPath(scenario.scenarioId, outcome.id);
-  const total = path.sample(scenario.totalMs, { x: 0, z: 0 });
-  const point = path.sample(elapsedMs, { x: 0, z: 0 });
-  const frame = getSompoAgriFrame(scenario.scenarioId, elapsedMs, outcome.id);
-  return { x: (scenario.startX ?? -total.x / 2) + point.x, z: point.z + (useLateral ? frame.lateral : 0), headingDeg: 90 - frame.yaw };
-}
-
-// Episódios de faixa da corrida inteira de um desfecho, pelo mesmo motor do laboratório (computeGeofenceEpisodes).
-// O roteiro é conhecido de ponta a ponta, então o painel mostra a corrida toda desde o primeiro quadro. As amostras
-// levam a posição de cena marcada como fix sintético ('3d'), só para o motor aceitá-las; nada disso é persistido.
-const runEpisodes = new Map();
-/** Episódios de faixa (mapa e limite da máquina) do desfecho, ordenados por início; vazio nos cenários sem talhão. */
-export function getSompoAgriGeofenceEpisodes(scenarioId, outcomeId, stepMs = 250) {
-  if (!Number.isFinite(stepMs) || stepMs <= 0) throw new RangeError(`stepMs deve ser positivo: ${stepMs}`);
-  const scenario = getSompoAgriScenario(scenarioId);
-  const outcome = resolveOutcome(scenario, outcomeId);
-  const key = `${scenario.scenarioId}:${outcome.id}:${stepMs}`;
-  if (!runEpisodes.has(key)) {
-    const site = getSompoGeofenceSite(scenario.environmentId, Math.abs(2 * getSompoAgriPosition(scenario.scenarioId, 0, outcome.id).x));
-    let episodes = [];
-    if (site) {
-      const samples = [];
-      for (let t = 0; t <= scenario.totalMs; t += stepMs) {
-        const { x, z } = getSompoAgriPosition(scenario.scenarioId, t, outcome.id);
-        samples.push({ elapsedMs: t, timestamp: t, x, z, gnss_fix: '3d', roll_deg: getSompoAgriFrame(scenario.scenarioId, t, outcome.id).roll });
-      }
-      episodes = computeGeofenceEpisodes(samples, site.polygons, site.manifestRules, key, stepMs, SOMPO_AGRI_EQUIPMENT[scenario.equipmentId]).summary.episodes
-        .sort((a, b) => a.startMs - b.startMs);
-    }
-    runEpisodes.set(key, Object.freeze(episodes.map(Object.freeze))); // campos escalares: congelar cada episódio basta
-  }
-  return runEpisodes.get(key);
-}
-
-/** Intervalo entre a amostra atual e a anterior usado pela tendência de aproximação do radar (ms). */
-export const SOMPO_GEOFENCE_TREND_STEP_MS = 250;
-
-/** Snapshot agrícola com proveniência, posição de cena e radar sintético. */
+/**
+ * Snapshot de telemetria do ensaio agrícola: o frame roteirizado entra como
+ * scriptFrame (faixas amplas de roll, gravidade rotacionada, taxas do roteiro)
+ * e a proveniência aponta o cenário/desfecho agrícolas reais.
+ */
 export function createSompoAgriSimulationSnapshot(scenarioId, outcomeId, {
   observedAt = new Date().toISOString(),
   elapsedMs = 0,
@@ -162,7 +98,7 @@ export function createSompoAgriSimulationSnapshot(scenarioId, outcomeId, {
     ...frame,
     lateralAcceleration: (frame.speedKph / 3.6) * frame.yawRate * (Math.PI / 180),
   };
-  const snapshot = createSompoSimulationSnapshot({}, {
+  return createSompoSimulationSnapshot({}, {
     observedAt,
     elapsedMs,
     connectedAt,
@@ -177,18 +113,6 @@ export function createSompoAgriSimulationSnapshot(scenarioId, outcomeId, {
       distanceSensorPosition: frame.distanceSensorPosition,
     },
   });
-  const scenario = getSompoAgriScenario(scenarioId);
-  const position = getSompoAgriPosition(scenarioId, elapsedMs, outcomeId);
-  const site = getSompoGeofenceSite(scenario.environmentId, Math.abs(2 * getSompoAgriPosition(scenarioId, 0, outcomeId).x));
-  // Só o cenário de geofencing tem talhão; nos demais o snapshot leva position e geofence = null (campos só adicionados).
-  // Tendência de aproximação: o radar compara com a amostra de 250 ms atrás, recalculada do roteiro (sem estado no radar).
-  const previous = elapsedMs >= SOMPO_GEOFENCE_TREND_STEP_MS ? { ...getSompoAgriPosition(scenarioId, elapsedMs - SOMPO_GEOFENCE_TREND_STEP_MS, outcomeId), elapsedMs: elapsedMs - SOMPO_GEOFENCE_TREND_STEP_MS } : undefined;
-  const geofence = site ? evaluateGeofence({ ...position, elapsedMs, previous, speedKph: frame.speedKph, rollDeg: frame.roll }, site.manifestRules, site.polygons, SOMPO_AGRI_EQUIPMENT[scenario.equipmentId]) : null;
-  // Bandeira de proximidade: faixa mais interna de qualquer perigo alertável (crítica na água, dentro na ribanceira) ou o
-  // limite da máquina atingido. O declive (alertable: false) não acende sozinho. Atenção/elevada ficam no radar, não viram
-  // alerta do ensaio. Olha `all`, não só `nearest`: dentro do declive, uma água a 4 m continua acendendo.
-  const proximity = !!geofence && (geofence.all.some(hit => hit.alertable && hit.innermost) || geofence.machine?.bandId === 'acima');
-  return { ...snapshot, position, geofence, status: proximity ? 'alert' : snapshot.status, risks: { ...snapshot.risks, proximity } };
 }
 
 /**

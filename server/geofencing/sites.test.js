@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { SOMPO_AGRI_EQUIPMENT, SOMPO_AGRI_SCENARIOS, getSompoAgriFrame } from '../shared/sompo-agri-scenarios.js';
-import { createSompoAgriSimulationSnapshot, getSompoAgriGeofenceEpisodes, getSompoAgriPosition, getSompoAgriEpisodePlan, buildSompoAgriRunBrief } from '../shared/sompo-agri-brief.js';
-import { describeGeofence, describeMachineLimit, evaluateGeofence } from '../shared/sompo-geofence.js';
-import { resolveHazards } from '../shared/lab-geofence.js';
-import { getSompoGeofenceSite, geofenceOperacaoRelief, SOMPO_GEOFENCE_SITE_VERSION } from '../shared/sompo-geofence-sites.js';
-import { polygonContains, segmentDistance } from '../shared/lab-telemetry.js';
+import { SOMPO_AGRI_SCENARIOS, getSompoAgriFrame } from '../../shared/sompo-agri-scenarios.js';
+import { getSompoAgriEpisodePlan, buildSompoAgriRunBrief } from '../../shared/sompo-agri-brief.js';
+import {
+  createSompoAgriGeofenceSnapshot as createSompoAgriSimulationSnapshot, getSompoAgriGeofenceEpisodes, getSompoAgriPosition, getGeofenceMachine,
+  describeGeofence, describeMachineLimit, evaluateGeofence, resolveHazards,
+  getSompoGeofenceSite, geofenceOperacaoRelief, SOMPO_GEOFENCE_SITE_VERSION,
+} from '../../shared/geofencing/index.js';
+import { polygonContains, segmentDistance } from '../../shared/lab-telemetry.js';
 
 const SCENARIO = 'agri-geofencing';
 const snapshotAt = (outcome, elapsedMs) => createSompoAgriSimulationSnapshot(SCENARIO, outcome, {
@@ -40,7 +42,7 @@ test('talhão 2: geometria, faixas e relevo sintéticos de demonstração', () =
   assert.deepEqual(bounds(barn), [[53, 67], [-59, -51]]);
   assert.equal(polygonContains({ x: 30, z: 43 }, stream), true);
   assert.equal(polygonContains({ x: 30, z: 40 }, stream), false);
-  const hazards = resolveHazards(site.manifestRules, site.polygons, SOMPO_AGRI_EQUIPMENT.harvester);
+  const hazards = resolveHazards(site.manifestRules, site.polygons, getGeofenceMachine('harvester'));
   assert.deepEqual(hazards.warnings, []);
   assert.equal(hazards.length, 5);
   assert.deepEqual(site.manifestRules.hazards.map(r => r.bands_m.map(b => b.max_m)), [[5, 15, 35], [0, 6], [0, 15], [0, 10], [0, 5]]);
@@ -67,9 +69,11 @@ test('só o ambiente do cenário de geofencing tem talhão; os cenários origina
     if ([SCENARIO, 'agri-geofencing-operacao'].includes(scenario.scenarioId)) { assert.ok(site); continue; }
     assert.equal(site, null);
     const snapshot = createSompoAgriSimulationSnapshot(scenario.scenarioId, undefined, { elapsedMs: 3000, observedAt: '2026-09-12T12:00:00.000Z' });
-    assert.equal(snapshot.geofence, null);
-    assert.equal(snapshot.risks.proximity, false);
-    assert.ok(Number.isFinite(snapshot.position.x));
+    // Módulo isolado: cenário sem talhão sai do geofencing exatamente como entrou (sem position, geofence ou proximity).
+    assert.equal('geofence' in snapshot, false);
+    assert.equal('position' in snapshot, false);
+    assert.equal('proximity' in snapshot.risks, false);
+    assert.ok(Number.isFinite(getSompoAgriPosition(scenario.scenarioId, 3000).x), 'a posição de cena continua disponível pela função do módulo');
   }
   assert.throws(() => getSompoGeofenceSite('geofence-field', NaN), TypeError);
 });
@@ -172,7 +176,7 @@ test('fazenda sintética: anéis fechados, formas curvas, regras ordenadas, sem 
     assert.deepEqual(polygon.rings[0][0], polygon.rings[0].at(-1));
     assert.ok(polygon.rings[0].length >= 9, `${polygon.id} tem ${polygon.rings[0].length} vértices: sem retângulos`);
   }
-  const hazards = resolveHazards(site.manifestRules, site.polygons, SOMPO_AGRI_EQUIPMENT.harvester);
+  const hazards = resolveHazards(site.manifestRules, site.polygons, getGeofenceMachine('harvester'));
   assert.deepEqual(hazards.warnings, []);
   assert.equal(hazards.length, 5, 'córrego, lagoa (mesma regra de água), declive, ribanceira e máquina');
   for (const rule of site.manifestRules.hazards) {
@@ -216,7 +220,7 @@ test('declive além do limite: só este desfecho cruza o limite da colheitadeira
   const over = run.filter(frame => frame.geofence.machine?.bandId === 'acima');
   assert.ok(over.length > 0, 'cruza o limite');
   for (const frame of over) assert.equal(frame.geofence.nearest.bandId, 'dentro', 'o cruzamento acontece dentro do declive mapeado');
-  assert.equal(over[0].geofence.machine.limitDeg, SOMPO_AGRI_EQUIPMENT.harvester.profile.max_roll_deg);
+  assert.equal(over[0].geofence.machine.limitDeg, getGeofenceMachine('harvester').profile.max_roll_deg);
   assert.match(describeMachineLimit(over[0].geofence.machine), /^No limite ou acima · inclinação 1[5-9]° · limite 15°$/);
   const last = run.at(-1);
   assert.equal(last.geofence.machine, null, 'depois de estabilizar, a inclinação sai das faixas de máquina');
@@ -264,7 +268,7 @@ test('bandeira de proximidade: acende na faixa crítica e no limite da máquina,
     ...site.polygons.filter(polygon => polygon.role === 'allowed_area'),
     { id: 'declive-teste', role: 'hazard', category: 'slope', rings: [[{ x: -10, z: -10 }, { x: 10, z: -10 }, { x: 10, z: 10 }, { x: -10, z: 10 }, { x: -10, z: -10 }]] },
     { id: 'agua-teste', role: 'water', rings: [[{ x: 3, z: -1 }, { x: 4, z: -1 }, { x: 4, z: 1 }, { x: 3, z: 1 }, { x: 3, z: -1 }]] },
-  ], SOMPO_AGRI_EQUIPMENT.harvester);
+  ], getGeofenceMachine('harvester'));
   assert.equal(stacked.nearest.hazardKey.split(':')[0], 'hazard', 'o declive (0 m) é o mais próximo');
   assert.ok(stacked.all.some(hit => hit.alertable && hit.innermost && hit.hazardKey.startsWith('water')), 'a água a 3 m em faixa crítica está em all');
   assert.ok(stacked.alert?.hazardKey.startsWith('water'), 'alert aponta a água, não o declive mais próximo');

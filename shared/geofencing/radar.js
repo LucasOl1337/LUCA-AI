@@ -1,8 +1,8 @@
 // Radar de geofencing: avalia UMA posição contra os perigos do talhão, como o aviso de radar de um GPS de carro.
 // Puro, em metros de cena ({x, z}, x para leste/frente, z para sul), sem lat/lon, sem Three.js. Roda no browser e no Node.
 // Reaproveita o motor do laboratório: as faixas e os polígonos são o mesmo contrato (manifest.rules.hazards + papéis do GeoJSON).
-import { resolveHazards, classifyBand } from './lab-geofence.js';
-import { polygonContains } from './lab-telemetry.js';
+import { resolveHazards, classifyBand } from './engine.js';
+import { polygonContains } from '../lab-telemetry.js';
 
 // Ponto mais próximo do polígono (borda ou interior). Necessário para direção e tempo até o perigo, que polygonDistance não dá.
 export function closestPointOnPolygon(point, polygon) {

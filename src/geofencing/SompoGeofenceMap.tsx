@@ -2,11 +2,13 @@
 // Puro desenho: polígonos, faixas e percurso vêm de shared/*; a mesma grade de 2 m que pinta o chão da cena 3D pinta aqui.
 // Por cima, só a máquina no instante atual e o trecho já percorrido.
 import { useEffect, useMemo, useRef } from 'react';
-import { getSompoAgriScenario, SOMPO_AGRI_EQUIPMENT } from '../../../shared/sompo-agri-scenarios.js';
-import { getSompoAgriPosition } from '../../../shared/sompo-agri-brief.js';
-import { getSompoGeofenceSite, geofenceFieldRelief, geofenceOperacaoRelief } from '../../../shared/sompo-geofence-sites.js';
-import { bandGrid, resolveHazards, type LabGeofenceRules } from '../../../shared/lab-geofence.js';
-import { polygonContains, type LabPolygon } from '../../../shared/lab-telemetry.js';
+import { getSompoAgriScenario } from '../../shared/sompo-agri-scenarios.js';
+import {
+  getSompoAgriPosition, getSompoAgriGeofenceSite, getGeofenceMachine, geofenceFieldRelief, geofenceOperacaoRelief,
+  bandGrid, resolveHazards, type LabGeofenceRules,
+} from '../../shared/geofencing/index.js';
+import { polygonContains, type LabPolygon } from '../../shared/lab-telemetry.js';
+import './geofencing.css';
 
 const SCALE = 3;          // px por metro no canvas fora da tela (nítido em qualquer largura de painel)
 const STEP_MS = 250;      // amostragem do percurso do cenário
@@ -28,11 +30,11 @@ interface StaticMap {
 
 function buildStaticMap(scenarioId: string, outcomeId: string): StaticMap | null {
   const scenario = getSompoAgriScenario(scenarioId);
-  const site = getSompoGeofenceSite(scenario.environmentId, Math.abs(2 * getSompoAgriPosition(scenarioId, 0, outcomeId).x));
+  const site = getSompoAgriGeofenceSite(scenarioId, outcomeId);
   if (!site) return null;
   const polygons = site.polygons as LabPolygon[];
   const rules = site.manifestRules as unknown as LabGeofenceRules;
-  const hazards = resolveHazards(rules, polygons, { profile: { max_roll_deg: SOMPO_AGRI_EQUIPMENT[scenario.equipmentId].profile.max_roll_deg } });
+  const hazards = resolveHazards(rules, polygons, getGeofenceMachine(scenario.equipmentId));
   const grid = bandGrid(polygons, hazards, CELL_M);
 
   const path: StaticMap['path'] = [];

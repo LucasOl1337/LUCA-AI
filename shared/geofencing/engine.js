@@ -1,6 +1,6 @@
 // Faixas de proximidade por perigo: episódios, eventos hazard_band e área atingida.
 // Roda no browser e no Node (parseLabCase é chamado nos dois), por isso sem node:crypto.
-import { polygonDistance, segmentDistance, hasPosition, hashText } from './lab-telemetry.js';
+import { polygonDistance, segmentDistance, hasPosition, hashText } from '../lab-telemetry.js';
 
 // bands ordenadas por max_m crescente; a borda pertence à faixa; distância 0 = dentro do polígono.
 export function classifyBand(distanceM, bands) {

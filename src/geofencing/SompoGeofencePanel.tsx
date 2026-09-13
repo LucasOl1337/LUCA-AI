@@ -1,17 +1,18 @@
 // Painel de geofencing na coluna direita do simulador, só no cenário com talhão: leitura do instante (faixa, perigo,
 // distância, lado), margem até o limite de inclinação da máquina, régua de exposição da corrida, episódios de faixa e
-// o mapa do talhão em miniatura. Todo número vem do radar (shared/sompo-geofence), do motor de episódios do laboratório
+// o mapa do talhão em miniatura. Todo número vem do radar (shared/geofencing/radar), do motor de episódios do laboratório
 // (getSompoAgriGeofenceEpisodes) e do perfil do equipamento; aqui só se desenha. Sem "seguro"/"risco": faixas descrevem
 // proximidade e margem.
 import { useMemo } from 'react';
 import { Maximize2 } from 'lucide-react';
-import { getSompoAgriScenario, SOMPO_AGRI_EQUIPMENT } from '../../../shared/sompo-agri-scenarios.js';
-import { getSompoAgriGeofenceEpisodes, getSompoAgriPosition } from '../../../shared/sompo-agri-brief.js';
-import { getSompoGeofenceSite } from '../../../shared/sompo-geofence-sites.js';
-import type { SompoGeofenceResult } from '../../../shared/sompo-geofence.js';
-import { resolveHazards, type GeofenceEpisode, type LabGeofenceRules } from '../../../shared/lab-geofence.js';
-import type { LabPolygon } from '../../../shared/lab-telemetry.js';
+import { getSompoAgriScenario } from '../../shared/sompo-agri-scenarios.js';
+import {
+  getSompoAgriGeofenceEpisodes, getSompoAgriGeofenceSite, getGeofenceMachine, resolveHazards,
+  type SompoGeofenceResult, type GeofenceEpisode, type LabGeofenceRules,
+} from '../../shared/geofencing/index.js';
+import type { LabPolygon } from '../../shared/lab-telemetry.js';
 import SompoGeofenceMap from './SompoGeofenceMap';
+import './geofencing.css';
 
 // Mesma leitura de cor do HUD (SompoTruckSimulator): faixa mais interna forte, intermediária média, externa fraca.
 // Perigo não alertável (declive: contexto territorial) nunca passa de médio; o forte ali vem do limite da máquina.
@@ -79,13 +80,13 @@ function Lane({ episodes, totalMs, elapsedMs, label, onSeek, locked }: { episode
 export default function SompoGeofencePanel({ scenarioId, outcomeId, elapsedMs, geofence, rollDeg, position, onSeek, onOpenMap, locked = false }: Props) {
   const scenario = getSompoAgriScenario(scenarioId);
   const totalMs = scenario.totalMs;
-  const limitDeg = SOMPO_AGRI_EQUIPMENT[scenario.equipmentId].profile.max_roll_deg;
+  const limitDeg = getGeofenceMachine(scenario.equipmentId)?.profile.max_roll_deg ?? 0;
   // Faixas de cada perigo pelo mesmo resolveHazards do motor: a largura de "próximo do limite" (graus de margem) e o
   // nome da próxima faixa mais interna na tendência vêm da regra do talhão, não de números soltos aqui.
   const hazards = useMemo(() => {
-    const site = getSompoGeofenceSite(scenario.environmentId, Math.abs(2 * getSompoAgriPosition(scenarioId, 0, outcomeId).x));
-    return site ? resolveHazards(site.manifestRules as unknown as LabGeofenceRules, site.polygons as LabPolygon[], { profile: { max_roll_deg: limitDeg } }) : [];
-  }, [scenario.environmentId, scenarioId, outcomeId, limitDeg]);
+    const site = getSompoAgriGeofenceSite(scenarioId, outcomeId);
+    return site ? resolveHazards(site.manifestRules as unknown as LabGeofenceRules, site.polygons as LabPolygon[], getGeofenceMachine(scenario.equipmentId)) : [];
+  }, [scenario.equipmentId, scenarioId, outcomeId]);
   const nearDeg = hazards.find(hazard => hazard.metric)?.reach ?? 0;
   const episodes = useMemo(() => getSompoAgriGeofenceEpisodes(scenarioId, outcomeId), [scenarioId, outcomeId]);
   // Pistas na ordem em que cada perigo aparece na corrida; o limite da máquina sempre por último.

@@ -302,9 +302,9 @@ test('missão de episódio sem frames diz explicitamente que não há evidência
   assert.doesNotMatch(mission, /frames? do simulador anexado/);
 });
 
-test('missão de episódio com geofencing: dossiê lista talhão, regras, episódios de faixa e coerência; sem talhão diz não aplicável', async () => {
-  const [{ createSompoTelemetryHistory }, { createSompoAgriSimulationSnapshot }] = await Promise.all([
-    import('./sompo-telemetry-history.js'), import('../shared/sompo-agri-brief.js'),
+test('missão de episódio com geofencing: dossiê lista talhão, regras, episódios de faixa e coerência; sem talhão o dossiê não menciona geofencing', async () => {
+  const [{ createSompoTelemetryHistory }, { createSompoAgriGeofenceSnapshot: createSompoAgriSimulationSnapshot }] = await Promise.all([
+    import('./sompo-telemetry-history.js'), import('../shared/geofencing/index.js'),
   ]);
   const base = 1_800_000_000_000;
   const history = createSompoTelemetryHistory({ dbPath: ':memory:', now: () => base });
@@ -336,8 +336,8 @@ test('missão de episódio com geofencing: dossiê lista talhão, regras, episó
 
     const plain = scriptedEpisodeFixture();
     const plainMission = buildSompoEpisodeMission(plain.episode, plain.samples, plain.summary, 'Risco Agro');
-    assert.match(plainMission, /Geofencing: não aplicável \(cenário sem talhão mapeado ou episódio sem posição gravada\)\./);
-    assert.doesNotMatch(plainMission.slice(0, plainMission.indexOf(SOMPO_MISSION_DOSSIER_DELIMITER)), /Geofencing:/);
+    // Módulo isolado: cenário sem talhão não ganha linha nem bloco de geofencing, nem no resumo nem no dossiê.
+    assert.doesNotMatch(plainMission, /[Gg]eofencing/);
   } finally {
     history.close();
   }

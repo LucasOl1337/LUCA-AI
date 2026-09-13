@@ -523,8 +523,8 @@ function agriRaw(snapshot) {
   };
 }
 
-test('episódio do cenário com geofencing: resumo traz talhão, regras e episódios de faixa iguais aos do motor; sem talhão fica null', async (t) => {
-  const { createSompoAgriSimulationSnapshot, getSompoAgriGeofenceEpisodes } = await import('../shared/sompo-agri-brief.js');
+test('episódio do cenário com geofencing: resumo traz talhão, regras e episódios de faixa iguais aos do motor; sem talhão não há campo geofence', async (t) => {
+  const { createSompoAgriGeofenceSnapshot: createSompoAgriSimulationSnapshot, getSompoAgriGeofenceEpisodes } = await import('../shared/geofencing/index.js');
   const { dbPath, cleanup } = tempDb();
   let clock = BASE_MS;
   const history = createSompoTelemetryHistory({ dbPath, now: () => clock });
@@ -573,15 +573,15 @@ test('episódio do cenário com geofencing: resumo traz talhão, regras e episó
   }
   assert.doesNotMatch(JSON.stringify(geofence), /segur[o]|risco alto|neglig[eê]ncia|vai tombar/i);
 
-  // Episódio de cenário sem talhão e episódio legado sem cenário: null, nada inventado.
+  // Episódio de cenário sem talhão e episódio legado sem cenário: sem campo geofence no resumo, nada inventado.
   const plain = history.startEpisode({ kind: 'roteiro', tractorId: 'SIM-001', scenarioId: 'agri-harvest-dust', outcomeId: null });
   history.recordMany([simSnapshotAt(scriptedRaw(0), new Date(BASE_MS + 30_000).toISOString())], { episodeId: plain.publicId });
-  assert.equal(history.getEpisode(plain.publicId).summary.geofence, null);
+  assert.equal('geofence' in history.getEpisode(plain.publicId).summary, false);
   const legacy = history.startEpisode({ kind: 'colisao' });
   history.recordMany([simSnapshotAt(scriptedRaw(0), new Date(BASE_MS + 31_000).toISOString())], { episodeId: legacy.publicId });
-  assert.equal(history.getEpisode(legacy.publicId).summary.geofence, null);
+  assert.equal('geofence' in history.getEpisode(legacy.publicId).summary, false);
   const unknownOutcome = history.startEpisode({ kind: 'roteiro', scenarioId: 'agri-geofencing', outcomeId: 'nao-existe' });
   history.recordMany([{ ...snapshots[0], observedAt: new Date(BASE_MS + 32_000).toISOString(), changedAt: new Date(BASE_MS + 32_000).toISOString(), source: { ...snapshots[0].source, kind: 'simulation' } }], { episodeId: unknownOutcome.publicId });
-  assert.equal(history.getEpisode(unknownOutcome.publicId).summary.geofence, null, 'desfecho desconhecido não cai no padrão em silêncio');
-  assert.equal(summarizeSompoEpisodeSamples(samples).geofence, null, 'sem o episódio o resumo não adivinha talhão');
+  assert.equal('geofence' in history.getEpisode(unknownOutcome.publicId).summary, false, 'desfecho desconhecido não cai no padrão em silêncio');
+  assert.equal('geofence' in summarizeSompoEpisodeSamples(samples), false, 'sem o episódio o resumo não adivinha talhão');
 });

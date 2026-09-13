@@ -2,9 +2,10 @@
 // e o que está à frente aparece em cima. As camadas fixas (área, água, perigos, faixas, zonas de inclinação e a
 // rota completa) vivem num canvas offscreen em pixels de mapa; cada quadro só gira, recorta e desenha o percurso.
 import { useEffect, useMemo, useRef } from 'react';
-import { bandGrid } from '../../../shared/lab-geofence.js';
+import { bandGrid } from '../../../shared/geofencing/index.js';
 import { getReplayFrame, type LabCase, type LabPolygon } from '../../../shared/lab-telemetry.js';
 import { hazardsOf, bandColor, innermostEpisodeAt, episodeColor, ROUTE_COLOR, slopeZones, SLOPE_ZONE_COLORS, machineRollLimit } from './labBands';
+import '../geofencing.css';
 
 const W = 240, H = 240, FOOT = 20;
 const PX_PER_M = 1.3;                       // escala fixa: ~119 m à frente e 50 m atrás no enquadramento

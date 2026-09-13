@@ -1,8 +1,9 @@
 // Episódios de faixa: tabela no painel do caso e faixa de exposição sobre a linha do tempo.
 import { useMemo } from 'react';
-import type { GeofenceEpisode } from '../../../shared/lab-geofence.js';
+import type { GeofenceEpisode } from '../../../shared/geofencing/index.js';
 import { formatLabTime, type LabCase } from '../../../shared/lab-telemetry.js';
 import { episodeColor } from './labBands';
+import '../geofencing.css';
 
 const QUALITY: Record<GeofenceEpisode['quality'], string> = { 'observado': 'Observado', 'com-lacuna': 'Com lacuna', 'aberto-no-fim': 'Aberto no fim' };
 // A cor vem de resolveHazards; memoizada porque estes componentes redesenham a cada quadro do replay.

@@ -2,6 +2,7 @@
 import { useMemo } from 'react';
 import type { LabCase } from '../../../shared/lab-telemetry.js';
 import { bandColor, hazardsOf } from './labBands';
+import '../geofencing.css';
 
 const decimal = (value: number, digits = 1) => value.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 

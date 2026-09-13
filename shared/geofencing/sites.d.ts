@@ -1,5 +1,5 @@
 export const SOMPO_GEOFENCE_SITE_VERSION: 3;
-export type { SompoGeofenceHit, SompoGeofenceResult } from './sompo-geofence.js';
+export type { SompoGeofenceHit, SompoGeofenceResult } from './radar.js';
 export function getSompoGeofenceSite(environmentId: string, totalTravelMeters: number): null | {
   synthetic: true;
   label: string;

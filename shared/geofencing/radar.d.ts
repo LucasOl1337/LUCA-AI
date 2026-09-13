@@ -1,5 +1,5 @@
-import type { LabGeofenceRules } from './lab-geofence.js';
-import type { LabPolygon, LabPoint } from './lab-telemetry.js';
+import type { LabGeofenceRules } from './engine.js';
+import type { LabPolygon, LabPoint } from '../lab-telemetry.js';
 
 export interface SompoGeofenceHit {
   hazardKey: string;

@@ -5,8 +5,9 @@ import { getReplayFrame, toLocalCoordinate, type LabCase, type LabSite, type Lab
 import { createLabTractor } from './createLabTractor';
 import { createSompoTruckModel, SOMPO_TRUCK_PIVOT_Y } from '../sompo/createSompoTruckModel';
 import { parseLabTerrain, createTerrainSampler, type LabTerrain } from '../../../shared/lab-terrain.js';
-import { bandGrid } from '../../../shared/lab-geofence.js';
-import { hazardsOf, bandColor, innermostEpisodeAt, episodeColor, ROUTE_COLOR, slopeZones, SLOPE_ZONE_COLORS, machineRollLimit } from './labBands';
+// geofencing (módulo src/geofencing/lab): faixas na cena do laboratório.
+import { bandGrid } from '../../../shared/geofencing/index.js';
+import { hazardsOf, bandColor, innermostEpisodeAt, episodeColor, ROUTE_COLOR, slopeZones, SLOPE_ZONE_COLORS, machineRollLimit } from '../../geofencing/lab/labBands';
 import { createCropField } from './createCropField';
 import { loadLabHarvester } from './loadLabHarvester';
 
