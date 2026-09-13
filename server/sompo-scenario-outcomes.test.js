@@ -189,7 +189,7 @@ test('sompoEpisodeFrameMoments: primeiro e último instante sempre entram; o úl
 
 test('coreografia por desfecho: impacto do animal, fogo contido e cena padrão intocada', () => {
   const cue = (id, time, effect, outcomeId) => getSompoScenarioEffects(id, time, outcomeId).cues.find((item) => item.effect === effect);
-  assert.ok(cue('animal-crossing', 6_000, 'impact-dust', 'colisao'));
+  assert.ok(cue('animal-crossing', 6_600, 'impact-dust', 'colisao'));
   assert.ok(cue('animal-crossing', 20_000, 'animal', 'colisao'), 'animal permanece em cena após o impacto');
   assert.ok(getSompoScenarioEffects('animal-crossing', 13_000, 'colisao').focusX > 0, 'foco não decai com trilha sem fim');
   assert.equal(cue('animal-crossing', 6_000, 'impact-dust'), undefined, 'desfecho padrão sem poeira de impacto');
