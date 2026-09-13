@@ -33,6 +33,7 @@ export interface SompoMachineHit {
 export interface SompoGeofenceResult {
   insideAllowed: boolean | null;
   nearest: SompoGeofenceHit | null;
+  alert: SompoGeofenceHit | null;   // perigo alertável na faixa mais interna (acende a bandeira); pode não ser o mais próximo
   all: SompoGeofenceHit[];
   machine: SompoMachineHit | null;
   warnings: string[];

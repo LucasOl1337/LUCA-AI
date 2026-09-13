@@ -131,6 +131,8 @@ test('bandeira de proximidade: acende na faixa crítica e no limite da máquina,
   ], SOMPO_AGRI_EQUIPMENT.harvester);
   assert.equal(stacked.nearest.hazardKey.split(':')[0], 'hazard', 'o declive (0 m) é o mais próximo');
   assert.ok(stacked.all.some(hit => hit.alertable && hit.innermost && hit.hazardKey.startsWith('water')), 'a água a 3 m em faixa crítica está em all');
+  assert.ok(stacked.alert?.hazardKey.startsWith('water'), 'alert aponta a água, não o declive mais próximo');
+  assert.match(describeGeofence(stacked), /^Proximidade crítica · /, 'o texto descreve o perigo que acende a bandeira');
 });
 
 test('episódios da corrida inteira: mesmo motor do laboratório, coerentes com o radar instante a instante', () => {
@@ -170,6 +172,7 @@ test('tendência de aproximação: independe do rumo, cobre a aproximação inte
     assert.equal(run[0].geofence.nearest, null);
     for (const frame of run) for (const hit of frame.geofence.all) {
       if (frame.deviceTimestamp === 0) { assert.equal(hit.trend, null, 'primeira amostra sem anterior'); continue; }
+      if (hit.distanceM === 0) { assert.equal(hit.trend, null, 'dentro do polígono não há tendência'); continue; }
       assert.ok(['aproximando', 'afastando', 'estavel'].includes(hit.trend), `${outcome} @${frame.deviceTimestamp} ${hit.hazardKey}: ${hit.trend}`);
       if (hit.timeToHazardEdgeS !== null) assert.ok(hit.closingSpeedMs > 0 && hit.distanceM > 0 && Math.abs(hit.timeToHazardEdgeS - hit.distanceM / hit.closingSpeedMs) < 1e-9);
       if (hit.timeToNextBandS !== null) assert.ok(!hit.innermost && hit.closingSpeedMs > 0);
@@ -191,7 +194,9 @@ test('tendência de aproximação: independe do rumo, cobre a aproximação inte
   const stop = samples('parada-na-faixa');
   assert.equal(stop.at(-1).geofence.nearest.trend, 'estavel');
   assert.ok(stop.filter(frame => frame.deviceTimestamp >= 19_000 && frame.deviceTimestamp <= 21_500).every(frame => frame.geofence.nearest.trend === 'aproximando'));
-  // Declive (alertable: false): tendência é contexto, não muda status nem bandeira.
-  const slope = samples('declive-alem-do-limite').filter(frame => frame.geofence.nearest?.hazardKey.includes('slope') && frame.geofence.nearest.trend === 'aproximando' && !frame.geofence.machine);
-  assert.ok(slope.length > 0 && slope.every(frame => frame.risks.proximity === false && frame.status === 'normal'));
+  // Dentro do polígono não há tendência; nas transições de faixa o texto não diz "≈ 0 s".
+  for (const outcome of ['parada-na-faixa', 'segue-ate-critica', 'declive-alem-do-limite']) for (const frame of samples(outcome)) {
+    for (const hit of frame.geofence.all) if (hit.distanceM === 0) assert.equal(hit.trend, null);
+    assert.doesNotMatch(describeGeofence(frame.geofence), /≈ 0 s/);
+  }
 });

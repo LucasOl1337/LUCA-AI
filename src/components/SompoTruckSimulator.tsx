@@ -1044,7 +1044,7 @@ export default function SompoTruckSimulator({
               </div>
               {agriRun && preview.geofence && (
                 <div data-geofence data-alert={!!preview.risks.proximity}
-                  className={preview.geofence.nearest ? `sompo-geofence-${bandTone(preview.geofence.nearest.bandId, preview.geofence.nearest.alertable)}` : undefined}>
+                  className={(preview.geofence.alert ?? preview.geofence.nearest) ? `sompo-geofence-${bandTone((preview.geofence.alert ?? preview.geofence.nearest)!.bandId, (preview.geofence.alert ?? preview.geofence.nearest)!.alertable)}` : undefined}>
                   <span>Fazenda sintética · demonstração</span>
                   <strong>{!preview.geofence.nearest && preview.geofence.insideAllowed
                     ? 'Radar: sem perigo mapeado no alcance'

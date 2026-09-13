@@ -98,7 +98,8 @@ export default function SompoGeofencePanel({ scenarioId, outcomeId, elapsedMs, g
     return [...byHazard.entries()].sort(([, a], [, b]) => Number(isMachine(a[0])) - Number(isMachine(b[0])));
   }, [episodes]);
 
-  const near = geofence.nearest;
+  // O perigo que acende a bandeira tem prioridade sobre o mais próximo (dentro do declive, contexto, com água crítica ao lado).
+  const near = geofence.alert ?? geofence.nearest;
   const roll = Math.abs(rollDeg ?? 0);
   const marginDeg = Math.max(0, limitDeg - roll);
   const machineTone = bandTone(geofence.machine?.bandId);
@@ -111,8 +112,8 @@ export default function SompoGeofencePanel({ scenarioId, outcomeId, elapsedMs, g
   const distance = near && near.distanceM >= 0.5 ? `${near.distanceM.toFixed(0)} m ${sideLabel(near.bearingDeg)}`.trim() : null;
   // Tendência por distância (independe do rumo): selo textual, nunca muda o tom. Tempo "se nada mudar".
   const trend = near?.trend === 'aproximando'
-    ? near.timeToNextBandS != null && near.nextBandLabel ? `≈ ${Math.round(near.timeToNextBandS)} s até ${near.nextBandLabel.toLowerCase()} se nada mudar`
-      : near.timeToHazardEdgeS != null ? `≈ ${Math.round(near.timeToHazardEdgeS)} s até a borda se nada mudar` : null
+    ? near.timeToNextBandS != null && near.timeToNextBandS >= 0.5 && near.nextBandLabel ? `≈ ${Math.round(near.timeToNextBandS)} s até ${near.nextBandLabel.toLowerCase()} se nada mudar`
+      : near.timeToHazardEdgeS != null && near.timeToHazardEdgeS >= 0.5 ? `≈ ${Math.round(near.timeToHazardEdgeS)} s até a borda se nada mudar` : null
     : null;
   const seekAt = (ms: number) => Math.min(ms, totalMs);
 

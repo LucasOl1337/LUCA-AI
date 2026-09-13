@@ -65,7 +65,8 @@ export function evaluateGeofence({ x, z, headingDeg = null, speedKph = 0, rollDe
     const closingMs = bearingDeg === null ? 0 : speedMs * Math.cos(bearingDeg * Math.PI / 180);
     const previousDistance = validPrevious ? closestPointOnPolygon(previous, hazard.polygon).distance : null;
     const closingSpeedMs = previousDistance === null ? null : (previousDistance - nearest.distance) / (dt / 1000);
-    const trend = closingSpeedMs === null ? null : closingSpeedMs >= 0.10 ? 'aproximando' : closingSpeedMs <= -0.10 ? 'afastando' : 'estavel';
+    // Dentro do polígono (distância 0) não há para onde aproximar: tendência só fora dele.
+    const trend = closingSpeedMs === null || nearest.distance === 0 ? null : closingSpeedMs >= 0.10 ? 'aproximando' : closingSpeedMs <= -0.10 ? 'afastando' : 'estavel';
     const bandIndex = hazard.bands.indexOf(band);
     const nextBand = bandIndex > 0 ? hazard.bands[bandIndex - 1] : null;
     all.push({
@@ -79,19 +80,23 @@ export function evaluateGeofence({ x, z, headingDeg = null, speedKph = 0, rollDe
     });
   }
   all.sort((a, b) => a.distanceM - b.distanceM);
-  return { insideAllowed, nearest: all[0] ?? null, all, machine: machineHit, warnings: hazards.warnings };
+  // alert: o perigo alertável na faixa mais interna, se houver. Pode não ser o mais próximo (dentro do declive, contexto,
+  // com água crítica a 3 m): é ele que acende a bandeira e que o texto descreve.
+  const alert = all.find(hit => hit.alertable && hit.innermost) ?? null;
+  return { insideAllowed, nearest: all[0] ?? null, alert, all, machine: machineHit, warnings: hazards.warnings };
 }
 
 // Texto curto para HUD e telemetria, sem "seguro"/"risco": só proximidade, direção e tempo.
 export function describeGeofence(result) {
-  const near = result?.nearest;
+  const near = result?.alert ?? result?.nearest;
   const outside = result?.insideAllowed === false ? 'Fora da área permitida' : '';
   if (!near) return outside || 'Sem perigo mapeado no alcance';
   const side = near.bearingDeg === null ? '' : Math.abs(near.bearingDeg) <= 20 ? ' à frente' : Math.abs(near.bearingDeg) >= 160 ? ' atrás' : near.bearingDeg > 0 ? ' à direita' : ' à esquerda';
+  // Menos de meio segundo arredondaria para "≈ 0 s": nas transições de faixa fica só "aproximando".
   const trendTime = near.trend === 'aproximando'
-    ? near.timeToNextBandS !== null
+    ? near.timeToNextBandS !== null && near.timeToNextBandS >= 0.5
       ? ` · aproximando · ≈ ${Math.round(near.timeToNextBandS)} s até a faixa ${(near.nextBandLabel ?? '').toLowerCase()}`
-      : near.timeToHazardEdgeS !== null ? ` · aproximando · ≈ ${Math.round(near.timeToHazardEdgeS)} s até a borda` : ' · aproximando'
+      : near.timeToHazardEdgeS !== null && near.timeToHazardEdgeS >= 0.5 ? ` · aproximando · ≈ ${Math.round(near.timeToHazardEdgeS)} s até a borda` : ' · aproximando'
     : near.trend === 'afastando' ? ' · afastando' : '';
   const time = trendTime || (near.timeToHazardS === null ? '' : ` · ≈ ${Math.round(near.timeToHazardS)} s de aproximação`);
   // Dentro do polígono a distância é 0 por definição: dizer "a 0 m" parece distância até uma queda.
