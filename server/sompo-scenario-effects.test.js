@@ -54,7 +54,7 @@ test('estouro, tombamento e colisão disparam na fase correta e deixam dano/detr
   assert.ok(cue('rollover', 18000, 'debris'));
   // O desfecho 'colisao' do animal-crossing assumiu o papel do antigo cenário
   // dedicado: detritos e poeira só entram na variante com impacto.
-  const animalImpact = getSompoScenarioEffects('animal-crossing', 6_000, 'colisao');
+  const animalImpact = getSompoScenarioEffects('animal-crossing', 6_600, 'colisao');
   assert.ok(animalImpact.cues.some((item) => item.effect === 'impact-dust'));
   assert.ok(animalImpact.cues.some((item) => item.effect === 'debris'));
 });
