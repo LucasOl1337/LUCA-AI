@@ -1037,6 +1037,20 @@ function sompoPhaseSlug(label, index) {
 }
 
 /**
+ * Fases que representam o clímax do roteiro — impacto, colisão, tombamento,
+ * estouro, queda ou rolagem. São a evidência que mais importa no episódio:
+ * se a grade uniforme passar entre elas, o instante crítico é injetado no
+ * lugar do vizinho mais próximo que não seja a abertura nem outro clímax.
+ */
+const SOMPO_EPISODE_CRITICAL_PHASE = /impacto|colis|tomba|capot|estouro|queda|rolag/;
+const SOMPO_EPISODE_CRITICAL_EXCLUDE = /iminente|sem-impacto|sem-tombar|apos-o-impacto|apos-impacto/;
+
+function sompoEpisodeCriticalPhase(fase) {
+  const slug = String(fase ?? '');
+  return SOMPO_EPISODE_CRITICAL_PHASE.test(slug) && !SOMPO_EPISODE_CRITICAL_EXCLUDE.test(slug);
+}
+
+/**
  * Escolhe até `max` instantes de captura dentro do roteiro. O primeiro e o
  * último sempre entram; o último é grampeado em `totalMs - 500` porque o
  * episódio fecha exatamente em totalMs e frames posteriores cairiam fora.
@@ -1047,8 +1061,21 @@ export function sompoEpisodeFrameMoments(points, totalMs, finalPhase, max = SOMP
     .filter((point) => point && Number.isFinite(point.offsetMs) && point.offsetMs < finalMs)
     .sort((left, right) => left.offsetMs - right.offsetMs);
   const picked = ordered.length + 1 <= max
-    ? ordered
+    ? [...ordered]
     : Array.from({ length: max - 1 }, (_, index) => ordered[Math.round((index * (ordered.length - 1)) / (max - 2))]);
+  const isPicked = new Set(picked);
+  for (const point of ordered) {
+    if (!sompoEpisodeCriticalPhase(point.fase) || isPicked.has(point)) continue;
+    const candidates = picked.filter(
+      (candidate) => candidate !== ordered[0] && !sompoEpisodeCriticalPhase(candidate.fase),
+    );
+    if (!candidates.length) continue;
+    const swap = candidates.reduce((closest, candidate) =>
+      Math.abs(candidate.offsetMs - point.offsetMs) < Math.abs(closest.offsetMs - point.offsetMs) ? candidate : closest);
+    picked[picked.indexOf(swap)] = point;
+    isPicked.add(point);
+  }
+  picked.sort((left, right) => left.offsetMs - right.offsetMs);
   return [
     ...picked.map((point) => ({ offsetMs: point.offsetMs, fase: point.fase, label: point.label })),
     { offsetMs: finalMs, fase: finalPhase, label: 'Final do episódio' },
