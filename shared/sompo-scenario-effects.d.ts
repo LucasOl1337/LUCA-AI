@@ -1,5 +1,5 @@
 import type { SompoSimulationScenarioId } from './sompo-telemetry-simulator.js';
-export type SompoVisualEffect = 'road-dust' | 'running-lights' | 'hazard-lights' | 'brake-lights' | 'sensor-warning' | 'shoulder-dust' | 'cargo-strain' | 'gravel' | 'tire-smoke' | 'skid-marks' | 'exhaust' | 'brake-glow' | 'brake-smoke' | 'reverse-lights' | 'maneuver-guides' | 'cargo-shift' | 'heat-haze' | 'engine-steam' | 'impact-dust' | 'debris' | 'tire-damage' | 'rubber-shards' | 'blowout-dust' | 'animal' | 'wheel-spray' | 'rain' | 'engine-smoke' | 'engine-fire' | 'mud-spray' | 'mud-ruts';
+export type SompoVisualEffect = 'road-dust' | 'running-lights' | 'hazard-lights' | 'brake-lights' | 'sensor-warning' | 'shoulder-dust' | 'cargo-strain' | 'gravel' | 'tire-smoke' | 'skid-marks' | 'exhaust' | 'brake-glow' | 'brake-smoke' | 'reverse-lights' | 'maneuver-guides' | 'cargo-shift' | 'heat-haze' | 'engine-steam' | 'impact-dust' | 'impact-dust-rear' | 'debris' | 'tire-damage' | 'rubber-shards' | 'blowout-dust' | 'animal' | 'wheel-spray' | 'rain' | 'engine-smoke' | 'engine-fire' | 'mud-spray' | 'mud-ruts';
 export interface SompoEffectTrack {
   readonly effect: SompoVisualEffect;
   readonly startMs: number;

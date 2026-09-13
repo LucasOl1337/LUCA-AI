@@ -4,7 +4,7 @@ import type { SompoTruckModel } from './createSompoTruckModel';
 
 const rand = (i: number) => { const n = Math.sin(i * 127.1 + 311.7) * 43758.5453; return n - Math.floor(n); };
 const clamp = THREE.MathUtils.clamp;
-type ParticleStyle = { color: number; count: number; size: number; life: number; origin: 'wheels' | 'front-wheel' | 'engine' | 'exhaust' | 'impact'; motion: 'smoke' | 'dust' | 'spray' | 'mud'; burst?: boolean; opacity?: number };
+type ParticleStyle = { color: number; count: number; size: number; life: number; origin: 'wheels' | 'front-wheel' | 'engine' | 'exhaust' | 'impact' | 'impact-rear'; motion: 'smoke' | 'dust' | 'spray' | 'mud'; burst?: boolean; opacity?: number };
 const PARTICLES: Partial<Record<SompoVisualEffect, ParticleStyle>> = {
   'road-dust': { color: 0xb5a17b, count: 36, size: 0.8, life: 1.8, origin: 'wheels', motion: 'dust', opacity: 0.19 },
   'shoulder-dust': { color: 0xb5a17b, count: 48, size: 1.2, life: 2, origin: 'wheels', motion: 'dust', opacity: 0.30 },
@@ -15,6 +15,7 @@ const PARTICLES: Partial<Record<SompoVisualEffect, ParticleStyle>> = {
   exhaust: { color: 0x575e60, count: 24, size: 0.65, life: 2.2, origin: 'exhaust', motion: 'smoke', opacity: 0.22 },
   'blowout-dust': { color: 0xb5b0a4, count: 54, size: 1.15, life: 2.3, origin: 'front-wheel', motion: 'dust', burst: true, opacity: 0.38 },
   'impact-dust': { color: 0xa48e6f, count: 84, size: 1.9, life: 4.2, origin: 'impact', motion: 'dust', burst: true, opacity: 0.42 },
+  'impact-dust-rear': { color: 0xa48e6f, count: 84, size: 1.9, life: 4.2, origin: 'impact-rear', motion: 'dust', burst: true, opacity: 0.42 },
   'wheel-spray': { color: 0xb5c9d2, count: 180, size: 0.07, life: 1.1, origin: 'wheels', motion: 'spray', opacity: 0.55 },
   'mud-spray': { color: 0x58432d, count: 100, size: 0.15, life: 1.4, origin: 'wheels', motion: 'mud', opacity: 0.9 },
   'heat-haze': { color: 0xe9e1ce, count: 18, size: 0.65, life: 1.7, origin: 'engine', motion: 'smoke', opacity: 0.035 },
@@ -143,6 +144,7 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
     else if (style.origin === 'front-wheel') point.copy(front);
     else if (style.origin === 'engine') point.set(3.65, 1.05, 0.72);
     else if (style.origin === 'exhaust') point.set(1.5, 0.68, -0.85);
+    else if (style.origin === 'impact-rear') point.set(-4.4, 0.6, (i % 2 ? 1 : -1) * 0.6);
     else point.set(3.6, 0.6, 0.6);
     return model.root.localToWorld(point);
   }
