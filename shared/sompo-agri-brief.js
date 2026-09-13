@@ -125,6 +125,7 @@ export function getSompoAgriPosition(scenarioId, elapsedMs = 0, outcomeId) {
 const runEpisodes = new Map();
 /** Episódios de faixa (mapa e limite da máquina) do desfecho, ordenados por início; vazio nos cenários sem talhão. */
 export function getSompoAgriGeofenceEpisodes(scenarioId, outcomeId, stepMs = 250) {
+  if (!Number.isFinite(stepMs) || stepMs <= 0) throw new RangeError(`stepMs deve ser positivo: ${stepMs}`);
   const scenario = getSompoAgriScenario(scenarioId);
   const outcome = resolveOutcome(scenario, outcomeId);
   const key = `${scenario.scenarioId}:${outcome.id}:${stepMs}`;
@@ -140,7 +141,7 @@ export function getSompoAgriGeofenceEpisodes(scenarioId, outcomeId, stepMs = 250
       episodes = computeGeofenceEpisodes(samples, site.polygons, site.manifestRules, key, stepMs, SOMPO_AGRI_EQUIPMENT[scenario.equipmentId]).summary.episodes
         .sort((a, b) => a.startMs - b.startMs);
     }
-    runEpisodes.set(key, Object.freeze(episodes));
+    runEpisodes.set(key, Object.freeze(episodes.map(Object.freeze))); // campos escalares: congelar cada episódio basta
   }
   return runEpisodes.get(key);
 }

@@ -378,7 +378,7 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
   'agri-geofencing': scenario({
     scenarioId: 'agri-geofencing',
     label: 'Operação com geofencing',
-    description: 'Colheitadeira parte de um trecho sem perigo no alcance, atravessa um declive mapeado e se aproxima do córrego; o radar de faixas e o limite de inclinação da máquina reagem a cada instante. Fazenda e valores sintéticos.',
+    description: 'Colheitadeira atravessa um declive mapeado e se aproxima do córrego; o radar de faixas e o limite de inclinação da máquina reagem a cada instante. Fazenda e valores sintéticos.',
     equipmentId: 'harvester',
     environmentId: 'geofence-field',
     defaultOutcomeId: 'parada-na-faixa',

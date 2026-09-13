@@ -125,7 +125,7 @@ test('episódios da corrida inteira: mesmo motor do laboratório, coerentes com 
   for (const outcome of ['parada-na-faixa', 'segue-ate-critica', 'declive-alem-do-limite']) {
     const episodes = getSompoAgriGeofenceEpisodes(SCENARIO, outcome);
     assert.ok(episodes.length >= 4, `${outcome} tem episódios de mapa`);
-    assert.ok(Object.isFrozen(episodes) && episodes === getSompoAgriGeofenceEpisodes(SCENARIO, outcome), 'lista congelada e cacheada');
+    assert.ok(Object.isFrozen(episodes) && episodes.every(Object.isFrozen) && episodes === getSompoAgriGeofenceEpisodes(SCENARIO, outcome), 'lista e episódios congelados, cacheados');
     for (let i = 1; i < episodes.length; i += 1) assert.ok(episodes[i].startMs >= episodes[i - 1].startMs, 'ordenados por início');
     for (const episode of episodes) {
       assert.ok(episode.startMs >= 0 && (episode.endMs === null || episode.endMs <= total));
@@ -148,4 +148,5 @@ test('episódios da corrida inteira: mesmo motor do laboratório, coerentes com 
   assert.equal(water.at(-1).bandId, 'critica');
   assert.equal(water.at(-1).quality, 'aberto-no-fim', 'a máquina para dentro da faixa crítica');
   assert.deepEqual([...getSompoAgriGeofenceEpisodes('agri-harvest-dust')], [], 'cenário sem talhão não tem episódios');
+  assert.throws(() => getSompoAgriGeofenceEpisodes(SCENARIO, 'parada-na-faixa', 0), RangeError);
 });

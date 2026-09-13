@@ -43,16 +43,17 @@ interface Props {
   position: { x: number; z: number; headingDeg: number } | null;
   onSeek: (ms: number) => void;
   onOpenMap: () => void;
+  locked?: boolean; // gravação de episódio em curso: saltos e mapa desabilitados, como o slider do simulador
 }
 
-// Régua: um segmento por episódio, faixas externas por baixo das internas (mesma regra da grade: vence a mais interna).
-function Lane({ episodes, totalMs, elapsedMs, label, onSeek }: { episodes: GeofenceEpisode[]; totalMs: number; elapsedMs: number; label: string; onSeek: (ms: number) => void }) {
-  const ordered = [...episodes].sort((a, b) => b.bandMaxM - a.bandMaxM);
+// Régua: uma pista por perigo, um segmento por episódio. Dentro de um perigo os episódios são sequenciais (a troca de
+// faixa fecha um e abre outro), então nada se sobrepõe e todo segmento fica clicável.
+function Lane({ episodes, totalMs, elapsedMs, label, onSeek, locked }: { episodes: GeofenceEpisode[]; totalMs: number; elapsedMs: number; label: string; onSeek: (ms: number) => void; locked: boolean }) {
   return (
     <div className="sompo-geofence-lane">
       <span>{label}</span>
       <div>
-        {ordered.map(episode => {
+        {episodes.map(episode => {
           const end = episode.endMs ?? totalMs;
           return (
             <button
@@ -62,6 +63,7 @@ function Lane({ episodes, totalMs, elapsedMs, label, onSeek }: { episodes: Geofe
               style={{ left: `${episode.startMs / totalMs * 100}%`, width: `${Math.max(0.4, (end - episode.startMs) / totalMs * 100)}%` }}
               title={`${episode.hazardLabel} · ${episode.bandLabel} · ${seconds(episode.startMs)}`}
               aria-label={`Ir para ${episode.hazardLabel}, ${episode.bandLabel}, ${seconds(episode.startMs)}`}
+              disabled={locked}
               onClick={() => onSeek(episode.startMs)}
             />
           );
@@ -72,7 +74,7 @@ function Lane({ episodes, totalMs, elapsedMs, label, onSeek }: { episodes: Geofe
   );
 }
 
-export default function SompoGeofencePanel({ scenarioId, outcomeId, elapsedMs, geofence, rollDeg, position, onSeek, onOpenMap }: Props) {
+export default function SompoGeofencePanel({ scenarioId, outcomeId, elapsedMs, geofence, rollDeg, position, onSeek, onOpenMap, locked = false }: Props) {
   const scenario = getSompoAgriScenario(scenarioId);
   const totalMs = scenario.totalMs;
   const limitDeg = SOMPO_AGRI_EQUIPMENT[scenario.equipmentId].profile.max_roll_deg;
@@ -83,8 +85,15 @@ export default function SompoGeofencePanel({ scenarioId, outcomeId, elapsedMs, g
     return rule ? Math.max(...rule.bands_m.map(band => band.max_m)) : 0;
   }, [scenario.environmentId, scenarioId, outcomeId]);
   const episodes = useMemo(() => getSompoAgriGeofenceEpisodes(scenarioId, outcomeId), [scenarioId, outcomeId]);
-  const mapEpisodes = episodes.filter(episode => !isMachine(episode));
-  const machineEpisodes = episodes.filter(isMachine);
+  // Pistas na ordem em que cada perigo aparece na corrida; o limite da máquina sempre por último.
+  const lanes = useMemo(() => {
+    const byHazard = new Map<string, GeofenceEpisode[]>();
+    for (const episode of episodes) {
+      const label = isMachine(episode) ? 'Limite da máquina' : episode.hazardLabel; // rótulo curto para a pista
+      byHazard.set(label, [...(byHazard.get(label) ?? []), episode]);
+    }
+    return [...byHazard.entries()].sort(([, a], [, b]) => Number(isMachine(a[0])) - Number(isMachine(b[0])));
+  }, [episodes]);
 
   const near = geofence.nearest;
   const tone = bandTone(near?.bandId);
@@ -97,11 +106,11 @@ export default function SompoGeofencePanel({ scenarioId, outcomeId, elapsedMs, g
 
   return (
     <div className="sompo-geofence-panel" data-sompo-geofence-panel>
-      <section className={`sompo-geofence-now sompo-geofence-tone-${tone}`} data-sompo-geofence-now aria-live="polite">
+      <section className={`sompo-geofence-now sompo-geofence-tone-${tone}`} data-sompo-geofence-now>
         <i className="sompo-geofence-stripe" aria-hidden="true" />
         <div>
-          <span>Agora · {seconds(elapsedMs)}</span>
-          <strong>{near ? near.bandLabel : geofence.insideAllowed === false ? 'Fora da área permitida' : 'Sem perigo no alcance'}</strong>
+          <span>Agora · {seconds(Math.min(elapsedMs, totalMs))}</span>
+          <strong aria-live="polite">{near ? near.bandLabel : geofence.insideAllowed === false ? 'Fora da área permitida' : 'Sem perigo no alcance'}</strong>
           <p>{near
             ? <>{near.hazardLabel}{distance && <> <em>·</em> {distance}</>}{approach && <> <em>·</em> {approach}</>}</>
             : 'Nenhum perigo mapeado dentro das faixas declaradas.'}</p>
@@ -120,10 +129,9 @@ export default function SompoGeofencePanel({ scenarioId, outcomeId, elapsedMs, g
         </div>
       </section>
 
-      <h3 className="sompo-geofence-title">Exposição da corrida <small>0 a {Math.round(totalMs / 1000)} s · roteiro · clique salta no tempo</small></h3>
+      <h3 className="sompo-geofence-title">Exposição da corrida <small>0–{Math.round(totalMs / 1000)} s · clique numa faixa para ir ao instante</small></h3>
       <section className="sompo-geofence-strip" data-sompo-geofence-strip aria-label="Faixas de proximidade ao longo da corrida">
-        <Lane label="Perigos do mapa" episodes={mapEpisodes} totalMs={totalMs} elapsedMs={elapsedMs} onSeek={onSeek} />
-        <Lane label="Limite da máquina" episodes={machineEpisodes} totalMs={totalMs} elapsedMs={elapsedMs} onSeek={onSeek} />
+        {lanes.map(([label, laneEpisodes]) => <Lane key={label} label={label} episodes={laneEpisodes} totalMs={totalMs} elapsedMs={elapsedMs} onSeek={onSeek} locked={locked} />)}
         <div className="sompo-geofence-axis"><span /><div>{[0, 0.25, 0.5, 0.75, 1].map(fraction => <span key={fraction}>{Math.round(totalMs * fraction / 1000)}{fraction === 0 || fraction === 1 ? ' s' : ''}</span>)}</div></div>
         <ul className="sompo-geofence-legend" aria-label="Legenda das faixas">
           <li className="sompo-geofence-tone-livre"><i />Sem perigo no alcance</li>
@@ -135,14 +143,14 @@ export default function SompoGeofencePanel({ scenarioId, outcomeId, elapsedMs, g
 
       <h3 className="sompo-geofence-title">Episódios <small>{episodes.length} na corrida</small></h3>
       <table className="sompo-geofence-episodes" data-sompo-geofence-episodes>
-        <thead><tr><th scope="col">Faixa · perigo</th><th scope="col">Entrou</th><th scope="col">Ficou</th><th scope="col">Mínimo</th></tr></thead>
+        <thead><tr><th scope="col">Faixa · perigo</th><th scope="col">Entrada</th><th scope="col">Duração</th><th scope="col">Mínimo</th></tr></thead>
         <tbody>
           {episodes.map(episode => {
             const end = episode.endMs ?? totalMs;
             const state = episode.startMs <= elapsedMs && (episode.endMs === null || elapsedMs < episode.endMs) ? 'open' : episode.startMs > elapsedMs ? 'next' : 'done';
             return (
               <tr key={episode.id} data-state={state} className={`sompo-geofence-tone-${bandTone(episode.bandId)}`}>
-                <td><button type="button" onClick={() => onSeek(seekAt(episode.startMs))}><i aria-hidden="true" /><b>{episode.bandLabel}</b><small>{episode.hazardLabel}</small></button></td>
+                <td><button type="button" disabled={locked} onClick={() => onSeek(seekAt(episode.startMs))}><i aria-hidden="true" /><b>{episode.bandLabel}</b><small>{episode.hazardLabel}</small></button></td>
                 <td>{seconds(episode.startMs)}</td>
                 <td>{state === 'next' ? '—' : seconds(end - episode.startMs)}{episode.endMs === null && state !== 'next' ? <small>até o fim</small> : null}</td>
                 <td>{state === 'next' ? '—' : minimumLabel(episode)}</td>
@@ -155,10 +163,10 @@ export default function SompoGeofencePanel({ scenarioId, outcomeId, elapsedMs, g
       <h3 className="sompo-geofence-title">Mapa do talhão <small>norte para cima</small></h3>
       <section className="sompo-geofence-minimap" data-sompo-geofence-minimap>
         <SompoGeofenceMap compact scenarioId={scenarioId} outcomeId={outcomeId} elapsedMs={elapsedMs} position={position} />
-        <button type="button" onClick={onOpenMap} aria-label="Ampliar o mapa do talhão"><Maximize2 /> Ampliar</button>
+        <button type="button" disabled={locked} onClick={onOpenMap} aria-label="Ampliar o mapa do talhão"><Maximize2 /> Ampliar</button>
         <p>As mesmas faixas pintadas no chão da cena. Máquina e trecho percorrido seguem o relógio.</p>
       </section>
-      <p className="sompo-geofence-foot">Fazenda, distâncias e limite são sintéticos, de demonstração. As faixas descrevem proximidade e margem; nenhuma é rótulo de segurança.</p>
+      <p className="sompo-geofence-foot">Dados sintéticos de demonstração. As faixas indicam proximidade e margem, não um rótulo de segurança.</p>
     </div>
   );
 }

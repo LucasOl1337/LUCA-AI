@@ -844,8 +844,9 @@ export default function SompoTruckSimulator({
       outcomeId={agriRun.outcomeId}
       elapsedMs={preview.deviceTimestamp ?? 0}
       geofence={preview.geofence}
-      rollDeg={preview.readings.roll ?? null}
+      rollDeg={preview.geofence.machine?.valueDeg ?? preview.readings.roll ?? null}
       position={preview.position ?? null}
+      locked={episodeActive}
       onSeek={(ms) => { if (episodeActive) return; historyReplay.current = true; playback.current.seek(ms, performance.now(), startedAtRef.current); }}
       onOpenMap={() => { if (episodeActive) return; setStudioOpen(false); setMapOpen(true); }}
     />
