@@ -67,12 +67,17 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
           sky*=mix(vec3(1.),vec3(1.42,1.05,.60),lowBand*(.5+.5*sunProx)*warmth); // banho âmbar
           sky*=mix(vec3(1.),vec3(.82,.92,1.18),(1.-lowBand)*(.42+.3*(1.-sunProx))); // topo azulado longe do sol
           c=sky;
-          // Nuvens em camadas no céu fotográfico: cirros estirados no alto e
-          // uma faixa de estratos baixa — ambas pegam fogo do lado do sol.
+          // Nuvens em camadas no céu fotográfico: cirros estirados no alto,
+          // altostrato no meio e uma faixa de estratos baixa — ambas pegam
+          // fogo do lado do sol. As faixas sobem o suficiente pra aparecer
+          // no topo do quadro das duas câmeras (rural e agri).
           vec2 cirP=vec2(az*2.4+clock*.0025,d.y*9.5);
-          float cir=fbm(cirP)*smoothstep(.03,.12,d.y)*(1.-smoothstep(.30,.55,d.y));
+          float cir=fbm(cirP)*smoothstep(.04,.16,d.y)*(1.-smoothstep(.5,.78,d.y));
           vec3 cirCol=mix(vec3(.66,.72,.82),sunlight*1.12,sunProx*.7+.15);
-          c=mix(c,cirCol,smoothstep(.55,.8,cir)*.26);
+          c=mix(c,cirCol,smoothstep(.55,.8,cir)*.3);
+          float altN=fbm(vec2(az*1.55+3.7,d.y*13.-clock*.0012));
+          float alto=smoothstep(.6,.85,altN)*smoothstep(.16,.26,d.y)*(1.-smoothstep(.42,.6,d.y));
+          c=mix(c,mix(cirCol,vec3(.9,.87,.82),.45),alto*.22);
           float strN=fbm(vec2(az*1.15-clock*.0018,d.y*22.));
           float strat=smoothstep(.58,.85,strN)*smoothstep(.005,.05,d.y)*(1.-smoothstep(.09,.2,d.y));
           c=mix(c,mix(haze,cirCol,.6),strat*.3);
