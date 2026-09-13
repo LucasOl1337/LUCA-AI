@@ -104,3 +104,18 @@ test('radar: lado e tempo de aproximação na fazenda sintética', () => {
   assert.match(describeGeofence(toward.geofence ?? toward), /à frente · ≈ \d+ s de aproximação$/);
   for (const text of [describeGeofence(beside), describeGeofence(toward)]) assert.doesNotMatch(text, /seguro|risco|acidente/i);
 });
+
+test('bandeira de proximidade: acende na faixa crítica e no limite da máquina, eleva status; atenção/elevada não acendem', () => {
+  const critical = samples('segue-ate-critica').at(-1);
+  assert.equal(critical.geofence.nearest.bandId, 'critica');
+  assert.equal(critical.risks.proximity, true);
+  assert.equal(critical.status, 'alert');
+  const stopped = samples('parada-na-faixa').at(-1);
+  assert.equal(stopped.geofence.nearest.bandId, 'elevada');
+  assert.equal(stopped.risks.proximity, false);
+  assert.equal(stopped.status, 'normal');
+  const over = samples('declive-alem-do-limite').filter(frame => frame.geofence.machine?.bandId === 'acima');
+  assert.ok(over.length > 0 && over.every(frame => frame.risks.proximity === true && frame.status === 'alert'));
+  const inside = samples('parada-na-faixa').filter(frame => frame.geofence.nearest?.bandId === 'dentro');
+  assert.ok(inside.length > 0 && inside.every(frame => frame.risks.proximity === true), 'dentro do declive mapeado também acende');
+});

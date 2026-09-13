@@ -35,6 +35,7 @@ export interface SompoTelemetrySnapshot {
   risks: {
     collision: boolean | null;
     inclination: boolean | null;
+    proximity?: boolean | null; // geofencing: faixa mais interna de um perigo ou limite da máquina atingido
   };
   readings: {
     distance: number | null;

@@ -143,7 +143,10 @@ export function createSompoAgriSimulationSnapshot(scenarioId, outcomeId, {
   const site = getSompoGeofenceSite(scenario.environmentId, Math.abs(2 * getSompoAgriPosition(scenarioId, 0, outcomeId).x));
   // Só o cenário de geofencing tem talhão; nos demais o snapshot leva position e geofence = null (campos só adicionados).
   const geofence = site ? evaluateGeofence({ ...position, speedKph: frame.speedKph, rollDeg: frame.roll }, site.manifestRules, site.polygons, SOMPO_AGRI_EQUIPMENT[scenario.equipmentId]) : null;
-  return { ...snapshot, position, geofence, risks: { ...snapshot.risks, proximity: !!geofence?.nearest } };
+  // Bandeira de proximidade: só a faixa mais interna (crítica na água, dentro no declive/ribanceira) ou o limite da
+  // máquina atingido. Atenção/elevada ficam no radar, não viram alerta do ensaio. Eleva status como as flags do firmware.
+  const proximity = !!geofence && (['critica', 'dentro'].includes(geofence.nearest?.bandId ?? '') || geofence.machine?.bandId === 'acima');
+  return { ...snapshot, position, geofence, status: proximity ? 'alert' : snapshot.status, risks: { ...snapshot.risks, proximity } };
 }
 
 /**

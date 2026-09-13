@@ -7,6 +7,7 @@ import {
   Droplets,
   Gauge,
   Loader2,
+  Radar,
   RefreshCw,
   Ruler,
   ShieldAlert,
@@ -17,6 +18,8 @@ import {
   WifiOff,
 } from 'lucide-react';
 import type { SompoTelemetrySnapshot } from '@/lib/types';
+import { describeGeofence, describeMachineLimit } from '../../shared/sompo-agri-brief.js';
+import type { SompoGeofenceResult } from '../../shared/sompo-geofence.js';
 
 interface SompoTelemetryPanelProps {
   telemetry: SompoTelemetrySnapshot | null;
@@ -195,6 +198,20 @@ export default function SompoTelemetryPanel({
                 <strong>{riskValue(telemetry.risks.inclination, 'Sem flag ativa', historical)}</strong>
               </div>
             </article>
+            {telemetry.risks.proximity !== undefined && (() => {
+              // Geofencing (só no cenário com talhão): a bandeira acende na faixa mais interna ou no limite da máquina.
+              const geofence = (telemetry as { geofence?: SompoGeofenceResult | null }).geofence ?? null;
+              const detail = geofence?.machine?.bandId === 'acima' ? describeMachineLimit(geofence.machine) : geofence?.nearest ? describeGeofence(geofence) : null;
+              return (
+                <article data-active={!!telemetry.risks.proximity} data-unknown={historical} data-geofence-flag>
+                  <Radar />
+                  <div>
+                    <span>Proximidade · geofencing</span>
+                    <strong>{telemetry.risks.proximity && detail ? detail : riskValue(telemetry.risks.proximity ?? null, geofence ? 'Fora da faixa crítica' : 'Sem talhão mapeado', historical)}</strong>
+                  </div>
+                </article>
+              );
+            })()}
           </div>
 
           <div className="sompo-sensor-grid" role="group" aria-label="Leituras dos sensores">
