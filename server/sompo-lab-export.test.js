@@ -128,6 +128,22 @@ test('conversor ordena, deduplica somente amostras exatas e preserva identificad
   assert.throws(() => convertSompoDataset({ samples: [samples[0], { ...samples[1], tractorId: 'outro' }] }), /máquinas/);
 });
 
+test('velocidade do chassi vira ground_speed_kmh e velocidadeRoda fica só no JSON com aviso', t => {
+  const history = memoryHistory(t);
+  history.recordMany([
+    snapshot(1, { sourceKind: 'simulation', tractorId: 'sim-01', raw: { velocidade: 82, velocidadeRoda: 97 } }),
+    snapshot(2, { sourceKind: 'simulation', tractorId: 'sim-01', raw: { velocidade: 80, velocidadeRoda: 96 } }),
+  ]);
+  const samples = history.query({ sourceKind: 'simulation', tractorId: 'sim-01', windowMs: 3600_000 });
+  const converted = convertSompoDataset({ samples });
+  const lab = parsed(converted);
+  assert.equal(lab.samples[0].ground_speed_kmh, 82);
+  assert.equal(lab.samples[1].ground_speed_kmh, 80);
+  assert.equal(lab.samples[0].gnss_fix, null);
+  assert.ok(converted.manifest.conversion_warnings.some((warning) => /chassi/.test(warning)));
+  assert.ok(converted.manifest.conversion_warnings.some((warning) => /velocidadeRoda/.test(warning)));
+});
+
 test('rejeita relógio, unidades, flags e metadados contraditórios antes de criar CSV', t => {
   const history = memoryHistory(t);
   history.recordMany([snapshot(1), snapshot(2)]);

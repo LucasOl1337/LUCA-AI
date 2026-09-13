@@ -6,6 +6,7 @@ const MAX_CSV_BYTES = 5 * 1024 * 1024;
 const SOURCE_KINDS = new Set(['firebase', 'simulation']);
 const SIGNALS = {
   temperatura: 'ambient_temp_c', umidade: 'relative_humidity_pct',
+  velocidade: 'ground_speed_kmh',
   pitch: 'imu_pitch_raw', roll: 'imu_roll_raw',
   accX: 'acceleration_x_raw', accY: 'acceleration_y_raw', accZ: 'acceleration_z_raw',
   rotX: 'rotation_x_raw', rotY: 'rotation_y_raw', rotZ: 'rotation_z_raw',
@@ -59,6 +60,7 @@ export function convertSompoDataset(input) {
   const seen = new Map();
   let timeoutCount = 0;
   const rows = [];
+  let wheelSpeedDropped = false;
   input.samples.forEach((sample, index) => {
     if (!object(sample)) fail(`Amostra ${index + 1}: esperado objeto do histórico SOMPO.`);
     if (!SOURCE_KINDS.has(sample.sourceKind)) fail(`Amostra ${index + 1}: sourceKind deve ser firebase ou simulation.`);
@@ -82,6 +84,7 @@ export function convertSompoDataset(input) {
       if (value != null && typeof value !== 'boolean') fail(`Amostra ${index + 1}: ${field} deve ser true, false ou null.`);
       row[column] = value ?? null;
     }
+    if (sample.velocidadeRoda != null) wheelSpeedDropped = true;
     const distance = number(sample.distancia, 'distancia', index);
     if (distance === 999) timeoutCount += 1;
     row.obstacle_distance_cm = distance === 999 ? null : distance;
@@ -104,10 +107,11 @@ export function convertSompoDataset(input) {
     timestampBasis === 'server_received' ? 'Tempo de recebimento no servidor; não confirma o instante de medição no ESP32.' : 'Tempo observado pelo simulador; não representa aquisição física.',
     'Distância em cm, temperatura ambiente em °C e umidade em % seguem a convenção SOMPO; confirme a calibração do dispositivo.',
     'IMU preservada na unidade de origem, sem converter eixos para orientação geográfica ou inferir trajetória.',
-    'GNSS e ECU não registrados; sinais ausentes permanecem vazios.',
+    'GNSS e ECU não registrados; sinais ausentes permanecem vazios. Velocidade, quando presente, é a do chassi no roteiro, não fix de satélite.',
     'Flags são avisos registrados pelo dispositivo/simulador; não comprovam colisão ou causa de incidente.',
   ];
   if (timeoutCount) warnings.push(`${timeoutCount} leitura(s) de distância 999 tratadas como ausência de eco; o valor original permanece no JSON.`);
+  if (wheelSpeedDropped) warnings.push('velocidadeRoda (perímetro da roda) não tem coluna no esquema do Laboratório; permanece apenas no JSON do episódio.');
   const manifest = {
     version: '1.0', synthetic: sourceKind === 'simulation', profile: 'esp32',
     machine: { id: tractorId }, source_kind: sourceKind, timestamp_basis: timestampBasis,
