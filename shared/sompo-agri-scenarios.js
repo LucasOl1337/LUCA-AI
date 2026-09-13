@@ -236,6 +236,10 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
         [11_000, { direction: -1, speedKph: 2, wheelSpeedKph: 5, sink: 0.3, mud: 0.55, pitch: 2 }],
         [14_000, { direction: -1, speedKph: 5, wheelSpeedKph: 5, sink: 0.08, mud: 0.2, pitch: 0.5 }],
         [16_000, { speedKph: 0, wheelSpeedKph: 0, mud: 0.05, pitch: 0 }],
+      ], [
+        phase('entry', 'Entrada no solo saturado', 0, 4_000),
+        phase('traction-loss', 'Perda de tração', 4_000, 10_000),
+        phase('recovery', 'Recuo pela própria trilha', 10_000, 16_000),
       ]),
       outcome('deep-stall', 'Imobilização profunda', 'Insistência aumenta o afundamento e o trator permanece imobilizado.', [
         [0, { mud: 0.2, wheelSpeedKph: 8, sink: 0.04 }],
@@ -329,6 +333,10 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
         [10_000, { cropCut: 0.82, dust: 0.55 }],
         [13_000, { speedKph: 3, cropCut: 1, headerSpeed: 0.4, yaw: 8, implementLift: 0.5 }],
         [18_000, { speedKph: 0, headerSpeed: 0, dust: 0.05, implementLift: 0.55 }],
+      ], [
+        phase('startup', 'Acendimento e inspeção', 0, 3_000),
+        phase('night-work', 'Colheita noturna', 3_000, 13_000),
+        phase('headland', 'Saída para o carreador', 13_000, 18_000),
       ]),
       outcome('work-light-failure', 'Falha dos projetores', 'Projetores se apagam, a plataforma para e a máquina fica sinalizada.', [
         [0, { implementLift: 0.55, headlights: 0.2, workLights: 0.2, beacon: 1 }],

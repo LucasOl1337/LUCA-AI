@@ -85,9 +85,9 @@ test('desfechos abortivos rotulam a fase pelo estado real da máquina', () => {
   assert.equal(getSompoAgriFrame('agri-harvest-dust', 14_000, 'clean-pass').phaseLabel, 'Saída para o carreador');
   assert.equal(getSompoAgriFrame('agri-field-bogging', 15_000, 'deep-stall').phaseLabel, 'Imobilizado no talhão');
   assert.equal(getSompoAgriFrame('agri-field-bogging', 9_000, 'deep-stall').phaseLabel, 'Patinagem e afundamento');
-  assert.equal(getSompoAgriFrame('agri-field-bogging', 15_000, 'assisted-recovery').phaseLabel, 'Desfecho');
+  assert.equal(getSompoAgriFrame('agri-field-bogging', 15_000, 'assisted-recovery').phaseLabel, 'Recuo pela própria trilha');
   assert.equal(getSompoAgriFrame('agri-night-operation', 12_000, 'work-light-failure').phaseLabel, 'Aguardando iluminação');
-  assert.equal(getSompoAgriFrame('agri-night-operation', 15_000, 'lit-pass').phaseLabel, 'Desfecho');
+  assert.equal(getSompoAgriFrame('agri-night-operation', 15_000, 'lit-pass').phaseLabel, 'Saída para o carreador');
 });
 
 test('ids desconhecidos têm fallback fechado e não escolhem desfecho ao acaso', () => {
