@@ -102,7 +102,7 @@ export const SOMPO_SCENARIO_OUTCOME_EFFECTS = Object.freeze({
     'fogo-alastra': scene([track('engine-smoke', 1800, null, 1, 4000), track('engine-fire', 4000, null, 1, 2000), track('hazard-lights', 4000)]),
   }),
   'tight-reverse': Object.freeze({
-    'toque-na-doca': scene([track('reverse-lights', 800), track('maneuver-guides'), track('shoulder-dust', 5200, 7000, 0.45, 60), track('brake-lights', 5200), track('hazard-lights', 5200)], 'asphalt', 'yard'),
+    'toque-na-doca': scene([track('reverse-lights', 800), track('maneuver-guides'), track('impact-dust-rear', 5200, 7000, 0.35, 60), track('brake-lights', 5200), track('hazard-lights', 5200)], 'asphalt', 'yard'),
     'reinicia-manobra': scene([track('reverse-lights', 800, 5600), track('reverse-lights', 9400), track('maneuver-guides'), track('brake-lights', 4800, 5600), track('brake-lights', 8800, 9400), track('brake-lights', 12800)], 'asphalt', 'yard'),
   }),
   'bogged-down': Object.freeze({
