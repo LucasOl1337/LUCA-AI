@@ -42,7 +42,7 @@ export function wornRoadPaint() {
 /** Tufo de capim baixo: lâminas finas e curtas, algumas deitadas tipo palha
  * seca, base espalhada — lê como gramado e não como agave. `tall` gera a
  * touceira mais alta do pasto. */
-function grassTuftGeometry(blades: number, seed: number, tall = false) {
+export function grassTuftGeometry(blades: number, seed: number, tall = false) {
   const parts: THREE.BufferGeometry[] = [];
   for (let i = 0; i < blades; i += 1) {
     const dry = i % 4 === 3;

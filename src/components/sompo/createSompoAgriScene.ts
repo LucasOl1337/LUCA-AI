@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createSompoCropRows } from './createSompoCropRows';
-import { varySompoSurface } from './createSompoRoadDetails';
+import { grassTuftGeometry, varySompoSurface } from './createSompoRoadDetails';
 import { disposeSompoObject } from './sompoStage';
 import type { SompoAgriVisualFrame } from '../../../shared/sompo-agri-scenarios.js';
 
@@ -83,6 +83,61 @@ function createSilos(slope: number) {
   };
   root.add(cluster(-46, -64, 1), cluster(58, -58, .82));
   return root;
+}
+
+/** Erva-daninha nas bordas do talhão: o mesmo tufo de lâmina fina do rural,
+ * com a rampa sylva (pé escuro → ponta quente) e vento de duas frequências.
+ * Tufos baixos dentro do campo leem como invasora entre as fileiras. */
+function createEdgeWeeds(ground: (x: number, z: number) => number) {
+  const time = { value: 0 }, wind = { value: .65 };
+  const geometry = grassTuftGeometry(8, 91);
+  const material = new THREE.MeshStandardMaterial({ roughness: 1, side: THREE.DoubleSide });
+  material.onBeforeCompile = shader => {
+    shader.uniforms.weedTime = time;
+    shader.uniforms.weedWind = wind;
+    shader.vertexShader = 'uniform float weedTime; uniform float weedWind; attribute float bladeT; varying float vBladeT; varying float vGTone;\n' + shader.vertexShader
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        vBladeT = bladeT;
+        vGTone = fract(sin(instanceMatrix[3].x * 12.9 + instanceMatrix[3].z * 7.7) * 43758.5453);
+        transformed.x += (sin(weedTime * 1.35 + instanceMatrix[3].x * .6) + sin(weedTime * .81 + instanceMatrix[3].z * 1.1) * .6) * position.y * position.y * weedWind * .06;`);
+    shader.fragmentShader = 'varying float vBladeT; varying float vGTone;\n' + shader.fragmentShader
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        vec3 gRamp = mix(vec3(.030,.048,.008), vec3(.11,.17,.028), smoothstep(0., .6, vBladeT));
+        gRamp = mix(gRamp, vec3(.26,.40,.068), smoothstep(.4, 1., vBladeT) * (.4 + .6 * vGTone));
+        gRamp = mix(gRamp, vec3(.55,.8,.16), smoothstep(.78, 1., vBladeT) * vGTone * .5);
+        diffuseColor.rgb = gRamp * (diffuseColor.rgb * 2.3 + .3);`);
+  };
+  material.customProgramCacheKey = () => 'sompo-agri-weeds-v1';
+  const COUNT = 1100;
+  const mesh = new THREE.InstancedMesh(geometry, material, COUNT);
+  mesh.name = 'sompo-agri-edge-weeds';
+  mesh.receiveShadow = true;
+  let seed = 713;
+  const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+  const transform = new THREE.Object3D();
+  for (let i = 0; i < COUNT; i++) {
+    const pick = random();
+    // 65% nas duas bordas do talhão (|z| 11.6→15.5); o resto invade entre as
+    // fileiras, mais baixo — capim de entressafra, não capim de pasto.
+    const edge = pick < .65;
+    const side = random() < .5 ? -1 : 1;
+    const x = random() * 148 - 74;
+    const z = edge ? side * (11.6 + random() * 3.9) : side * (2.5 + random() * 9.2);
+    const size = (edge ? .5 + random() * .75 : .3 + random() * .45);
+    transform.position.set(x, ground(x, z) - .02, z);
+    transform.rotation.set(0, random() * Math.PI, 0);
+    transform.scale.set(size, size * (edge ? .6 + random() * .5 : .42 + random() * .35), size);
+    transform.updateMatrix();
+    mesh.setMatrixAt(i, transform.matrix);
+    const dry = random() < .24;
+    mesh.setColorAt(i, dry
+      ? new THREE.Color().setHSL(.115 + random() * .02, .3 + random() * .14, .3 + random() * .1)
+      : new THREE.Color().setHSL(.185 + random() * .06, .24 + random() * .12, .28 + random() * .13));
+  }
+  return {
+    root: mesh,
+    update(elapsedMs: number, windStrength: number) { time.value = elapsedMs / 1000; wind.value = windStrength; },
+  };
 }
 
 /** Camada de névoa baixa sobre o talhão: planos horizontais com fade macio. */
@@ -285,6 +340,8 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
   root.add(terrain);
   const crops = definition.barn ? null : createSompoCropRows((x,z)=>terrainHeight(x,z,definition.slope), compact, equipmentId === 'tractor' ? .32 : 1);
   if (crops) root.add(crops.root);
+  const weeds = definition.barn ? null : createEdgeWeeds((x, z) => terrainHeight(x, z, definition.slope));
+  if (weeds) root.add(weeds.root);
   const barn = definition.barn ? createBarn() : null;
   if (barn) root.add(barn.root, barn.barnPost);
   const silos = createSilos(definition.slope); root.add(silos);
@@ -361,6 +418,7 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
     },
     update(frame: SompoAgriVisualFrame, machinePosition = new THREE.Vector3(), cameraPosition = new THREE.Vector3(), reducedMotion = false, wind = 0.65, elapsedMs = frame.atMs) {
       crops?.update(elapsedMs, cameraPosition, reducedMotion, wind, machinePosition, frame.equipmentId === 'harvester' ? frame.cropCut : 0);
+      weeds?.update(reducedMotion ? 0 : elapsedMs, wind);
       const yaw = THREE.MathUtils.degToRad(frame.yaw);
       const seconds = elapsedMs / 1000;
       const wheelKph = frame.wheelSpeedKph ?? frame.speedKph;
