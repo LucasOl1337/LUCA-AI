@@ -1,4 +1,4 @@
-export const SOMPO_GEOFENCE_SITE_VERSION: 2;
+export const SOMPO_GEOFENCE_SITE_VERSION: 3;
 export type { SompoGeofenceHit, SompoGeofenceResult } from './sompo-geofence.js';
 export function getSompoGeofenceSite(environmentId: string, totalTravelMeters: number): null | {
   synthetic: true;
@@ -13,3 +13,4 @@ export function getSompoGeofenceSite(environmentId: string, totalTravelMeters: n
   }[];
 };
 export function geofenceFieldRelief(x: number, z: number): number;
+export function geofenceOperacaoRelief(x: number, z: number): number;

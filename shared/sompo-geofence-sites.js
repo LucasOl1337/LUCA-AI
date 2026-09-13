@@ -1,4 +1,4 @@
-export const SOMPO_GEOFENCE_SITE_VERSION = 2;
+export const SOMPO_GEOFENCE_SITE_VERSION = 3;
 
 const justification = 'Distâncias sintéticas de demonstração; não são distâncias de segurança certificadas.';
 const closed = (points) => [...points, points[0]];
@@ -66,13 +66,50 @@ const MACHINE_RULE = { role: 'machine', metric: 'roll_deg', label: 'Limite de in
   justification: 'Limite declarado no perfil do equipamento (demonstração); faixas em graus de margem até o limite.',
   bands_m: [{ id: 'acima', label: 'No limite ou acima', max_m: 0 }, { id: 'proximo', label: 'Próximo do limite', max_m: 5 }] };
 
-/** Fazenda sintética do cenário "Operação com geofencing" (ambiente geofence-field), em metros da cena
- * (x leste, z sul, origem no meio do percurso). Só esse ambiente tem geofencing; os demais devolvem null,
+const OPERACAO_STREAM_LINE = [
+  { x: -84, z: 51 }, { x: -55, z: 59 }, { x: -20, z: 60 }, { x: 10, z: 52 },
+  { x: 30, z: 43 }, { x: 50, z: 53 }, { x: 70, z: 59 }, { x: 84, z: 51 },
+];
+const OPERACAO_GULLY_LINE = [
+  { x: 87, z: -62 }, { x: 85, z: -35 }, { x: 88, z: 0 }, { x: 85, z: 35 }, { x: 87, z: 62 },
+];
+// Relevo sintético de demonstração: morro de 4 m e degrau de 6 m na borda leste.
+export function geofenceOperacaoRelief(x, z) {
+  const hill = 4 * Math.exp(-(((x + 45) / 18) ** 2 + ((z + 20) / 10) ** 2));
+  const stream = -0.9 * Math.max(0, 1 - distanceToLine(x, z, OPERACAO_STREAM_LINE) / 4.5);
+  const index = Math.max(1, OPERACAO_GULLY_LINE.findIndex(p => p.z >= z));
+  const a = OPERACAO_GULLY_LINE[z > 62 ? 3 : index - 1];
+  const b = OPERACAO_GULLY_LINE[z > 62 ? 4 : index];
+  const edge = a.x + (b.x - a.x) * Math.max(0, Math.min(1, (z - a.z) / (b.z - a.z))) - 3;
+  return hill + stream - Math.min(6, Math.max(0, x - edge));
+}
+
+/** Fazendas sintéticas em metros da cena.
+ * (x leste, z sul, origem no meio do percurso). geofence-field e geofence-operacao têm talhão; os demais devolvem null,
  * para os cenários originais do simulador continuarem exatamente como estavam. Tudo aqui é inventado e marcado.
  * Desenhada para a colheitadeira (percurso de até ~47 m em z ≈ 0, centrado em x = 0 por desfecho): começa sem
  * perigo no alcance, atravessa a mancha de declive no centro e termina perto da curva do córrego. */
 export function getSompoGeofenceSite(environmentId, totalTravelMeters) {
   if (!Number.isFinite(totalTravelMeters)) throw new TypeError('Percurso deve ser finito.');
+  if (environmentId === 'geofence-operacao') return {
+    synthetic: true, label: 'Talhão 2 sintético · Operação real · demonstração',
+    manifestRules: { synthetic: true, hazards: [WATER_RULE, SLOPE_RULE, GULLY_RULE, {
+      role: 'hazard', category: 'structure', label: 'Galpão', synthetic: true, justification,
+      bands_m: [{ id: 'dentro', label: 'Dentro do galpão', max_m: 0 }, { id: 'manobra', label: 'Manobra', max_m: 10 }],
+    }, MACHINE_RULE] },
+    polygons: [
+      { id: 'talhao-operacao', role: 'allowed_area', synthetic: true, rings: [closed([
+        { x: -76, z: -70 }, { x: 76, z: -70 }, { x: 90, z: -56 }, { x: 90, z: 56 },
+        { x: 76, z: 70 }, { x: -76, z: 70 }, { x: -90, z: 56 }, { x: -90, z: -56 },
+      ])] },
+      band('corrego-operacao', 'water', OPERACAO_STREAM_LINE, 2.5, 'z'),
+      ellipse('declive-operacao', 'hazard', -45, -20, 25, 15, 'slope'),
+      band('ribanceira-operacao', 'hazard', OPERACAO_GULLY_LINE, 3, 'x', 'gully'),
+      { id: 'galpao-operacao', role: 'hazard', category: 'structure', synthetic: true, rings: [closed([
+        { x: 53, z: -59 }, { x: 67, z: -59 }, { x: 67, z: -51 }, { x: 53, z: -51 },
+      ])] },
+    ],
+  };
   if (environmentId !== 'geofence-field') return null;
   const polygons = [
     { id: 'talhao-sintetico', role: 'allowed_area', synthetic: true, rings: [closed([
