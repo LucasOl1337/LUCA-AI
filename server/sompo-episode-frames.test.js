@@ -116,22 +116,26 @@ test('frames de episódio: upload 1-por-request, GET com metadados e leitura bin
   await getHandler({ params: { publicId: episode.publicId } }, fetched);
   assert.equal(fetched.statusCode, 200);
   assert.equal(fetched.body.frames.length, 5);
-  const impactFrame = fetched.body.frames[2];
-  assert.equal(impactFrame.seq, 3);
+  // O clímax é a evidência principal: a grade pode variar a posição conforme o
+  // roteiro, mas a fase de impacto precisa estar capturada.
+  const impactIndex = EPISODE_FRAME_MOMENTS.findIndex((moment) => moment.fase === 'impacto-com-o-animal');
+  assert.ok(impactIndex >= 0, 'plano precisa capturar a fase de impacto');
+  const impactFrame = fetched.body.frames[impactIndex];
+  assert.equal(impactFrame.seq, impactIndex + 1);
   assert.equal(impactFrame.fase, 'impacto-com-o-animal');
   assert.equal(impactFrame.label, 'Impacto com o animal');
-  assert.equal(impactFrame.offsetMs, EPISODE_FRAME_MOMENTS[2].offsetMs);
+  assert.equal(impactFrame.offsetMs, EPISODE_FRAME_MOMENTS[impactIndex].offsetMs);
   assert.equal(impactFrame.mimeType, 'image/jpeg');
-  assert.equal(impactFrame.size, buffers[2].length);
-  assert.equal(impactFrame.url, `/api/sompo/telemetry/episode/${episode.publicId}/frames/3`);
+  assert.equal(impactFrame.size, buffers[impactIndex].length);
+  assert.equal(impactFrame.url, `/api/sompo/telemetry/episode/${episode.publicId}/frames/${impactIndex + 1}`);
 
   const binary = mockRes();
-  await frameGetHandler({ params: { publicId: episode.publicId, seq: '3' } }, binary);
+  await frameGetHandler({ params: { publicId: episode.publicId, seq: String(impactIndex + 1) } }, binary);
   assert.equal(binary.statusCode, 200);
   assert.equal(binary.headers['Content-Type'], 'image/jpeg');
   assert.equal(binary.headers['Cache-Control'], 'private, max-age=3600');
-  assert.equal(binary.headers['Content-Length'], String(buffers[2].length));
-  assert.ok(Buffer.isBuffer(binary.body) && binary.body.equals(buffers[2]));
+  assert.equal(binary.headers['Content-Length'], String(buffers[impactIndex].length));
+  assert.ok(Buffer.isBuffer(binary.body) && binary.body.equals(buffers[impactIndex]));
 
   const missingFrame = mockRes();
   await frameGetHandler({ params: { publicId: episode.publicId, seq: '99' } }, missingFrame);
@@ -139,8 +143,8 @@ test('frames de episódio: upload 1-por-request, GET com metadados e leitura bin
   assert.equal(missingFrame.body.error, 'sompo_telemetry_episode_frame_not_found');
 
   // Arquivo real no disco, dentro do diretório do episódio.
-  const stored = fs.readFileSync(path.join(framesDir, episode.publicId, 'frame-3.jpg'));
-  assert.ok(stored.equals(buffers[2]));
+  const stored = fs.readFileSync(path.join(framesDir, episode.publicId, `frame-${impactIndex + 1}.jpg`));
+  assert.ok(stored.equals(buffers[impactIndex]));
 });
 
 test('frames de episódio: teto de 6, teto de 300KB e assinatura de bytes — 400 com código claro', async (t) => {
