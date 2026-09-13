@@ -207,7 +207,7 @@ export function parseChatCompletionPayload(payloadText) {
         const message = choice?.message || {};
         if (Array.isArray(message.tool_calls)) mergeToolCallDelta(toolCalls, message.tool_calls);
         // Claude/Anthropic via 9Router streams tool_calls fragmentados em delta,
-        // com arguments fatiados em varios chunks — precisa acumular por index.
+        // com arguments fatiados em varios chunks: precisa acumular por index.
         if (Array.isArray(choice?.delta?.tool_calls)) mergeToolCallDelta(toolCalls, choice.delta.tool_calls);
         if (choice?.finish_reason) finishReason = choice.finish_reason;
       } catch {
@@ -224,7 +224,7 @@ export function parseChatCompletionPayload(payloadText) {
       };
     }
     // Valid SSE that carried no text (e.g. budget spent on a reasoning block and
-    // finish_reason=length). Degrade to an empty answer — re-parsing the raw
+    // finish_reason=length). Degrade to an empty answer: re-parsing the raw
     // stream here used to throw a misleading "Unexpected token 'd'" JSON error.
     if (raw) {
       return { content: '', toolCalls: [], finishReason, raw };

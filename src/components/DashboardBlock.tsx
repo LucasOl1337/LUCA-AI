@@ -2,7 +2,7 @@ import { useTheme } from '@/hooks/useTheme';
 import type { DashboardBlockData } from '@/lib/types';
 import { formatTopicLabel, normalizeChartItems, pieGradient } from '@/lib/canvas';
 
-/** Bloco de visualização do canvas — porta de main.jsx:778. */
+/** Bloco de visualização do canvas: porta de main.jsx:778. */
 export default function DashboardBlock({ block }: { block: DashboardBlockData }) {
   const theme = useTheme();
   const items = Array.isArray(block.items) ? block.items.slice(0, 8) : [];

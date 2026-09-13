@@ -17,7 +17,7 @@ function sliceBetween(source, startMarker, endMarker) {
   return source.slice(start, end);
 }
 
-test('Enter only submits when canRun — otherwise typing/newlines still work', () => {
+test('Enter only submits when canRun: otherwise typing/newlines still work', () => {
   const onKey = sliceBetween(page, 'function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>)', 'function onPaste');
   assert.ok(onKey.includes('if (!canRun) return'), 'Enter without ready team must not preventDefault');
   assert.ok(onKey.includes('event.preventDefault()'), 'Enter still submits when ready');

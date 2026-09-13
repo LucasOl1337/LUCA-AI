@@ -29,14 +29,14 @@ interface SompoTelemetryPanelProps {
 }
 
 function number(value: number | null | undefined, maximumFractionDigits = 2): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return '—';
+  if (value === null || value === undefined || !Number.isFinite(value)) return '-';
   return new Intl.NumberFormat('pt-BR', { maximumFractionDigits }).format(value);
 }
 
 function clock(value: string | null | undefined): string {
-  if (!value) return '—';
+  if (!value) return '-';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
+  if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
@@ -243,8 +243,8 @@ export default function SompoTelemetryPanel({
                 <strong>{telemetry.source.provider}</strong>
                 <span>
                   {simulation
-                    ? `cena local · ${telemetry.source.scenarioLabel || 'cenário virtual'} · relógio ${telemetry.deviceTimestamp ?? '—'} ms`
-                    : `assinatura SSE · ${telemetry.source.path} · timestamp bruto ${telemetry.deviceTimestamp ?? '—'}`}
+                    ? `cena local · ${telemetry.source.scenarioLabel || 'cenário virtual'} · relógio ${telemetry.deviceTimestamp ?? '-'} ms`
+                    : `assinatura SSE · ${telemetry.source.path} · timestamp bruto ${telemetry.deviceTimestamp ?? '-'}`}
                 </span>
               </div>
             </div>

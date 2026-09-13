@@ -150,7 +150,7 @@ interface PersonaPickerConfig {
 
 interface WorkflowRoleConfig extends PersonaPickerConfig {
   id: WorkflowRoleId;
-  /** Se true, vazio nao bloqueia canRun — etapa so roda quando preenchida. */
+  /** Se true, vazio nao bloqueia canRun: etapa so roda quando preenchida. */
   optional?: boolean;
 }
 
@@ -651,7 +651,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
   const [busyPersonaSlug, setBusyPersonaSlug] = useState<string | null>(null);
   const [applyingPresetId, setApplyingPresetId] = useState<string | null>(null);
-  // SHARE_LINKS_V1 — public read-only link for the active session.
+  // SHARE_LINKS_V1: public read-only link for the active session.
   const [shareOpen, setShareOpen] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
   const [shareInfo, setShareInfo] = useState<LucaAiChatSessionShare | null>(null);
@@ -723,7 +723,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       if (templates?.individual) setIndividualPresets(templates.individual.map(hydrateIndividualTemplate));
     } catch (err) {
       setError(pickFailureCopy(err, {
-        offline: 'Sem internet. A bancada não montou a equipe — reconecte e tente de novo.',
+        offline: 'Sem internet. A bancada não montou a equipe. Reconecte e tente de novo.',
         forbidden: 'Esta conta não pode ver as personas da bancada. Peça acesso a quem opera o Yume.',
         server: 'As personas do Yume não chegaram. Tente de novo ou abra o catálogo.',
       }));
@@ -966,7 +966,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     await persistSession(id, payload, { throwOnError: true });
   }, [buildPersistPayload, persistSession]);
 
-  // SHARE_LINKS_V1 — reset panel when switching sessions.
+  // SHARE_LINKS_V1: reset panel when switching sessions.
   useEffect(() => {
     setShareOpen(false);
     setShareInfo(null);
@@ -998,7 +998,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setShareInfo(data.share ?? null);
     } catch (err) {
       setShareError(pickFailureCopy(err, {
-        offline: 'Sem internet. O painel de compartilhamento continua aberto — reconecte e consulte de novo.',
+        offline: 'Sem internet. O painel de compartilhamento continua aberto. Reconecte e consulte de novo.',
         forbidden: 'Esta conta não pode ver o link público desta sessão.',
         server: 'O link de compartilhamento não foi consultado. Tente de novo.',
       }));
@@ -1031,7 +1031,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       if (data.share) void copyShareUrl(data.share);
     } catch (err) {
       setShareError(pickFailureCopy(err, {
-        offline: 'Sem internet. A sessão continua aqui — reconecte e gere o link de novo.',
+        offline: 'Sem internet. A sessão continua aqui. Reconecte e gere o link de novo.',
         forbidden: 'Esta conta não pode gerar link público.',
         server: 'O link público não foi gerado. Tente de novo.',
       }));
@@ -1050,7 +1050,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setShareCopied(false);
     } catch (err) {
       setShareError(pickFailureCopy(err, {
-        offline: 'Sem internet. O link continua ativo — reconecte e revogue de novo.',
+        offline: 'Sem internet. O link continua ativo. Reconecte e revogue de novo.',
         forbidden: 'Esta conta não pode revogar o link.',
         server: 'O link não foi revogado. Tente de novo.',
       }));
@@ -1073,7 +1073,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     if (boundSessionIdRef.current !== activeSessionId) return undefined;
     if (hydratedSessionId !== activeSessionId) return undefined;
     // Debounce while typing/configuring. Run path also flushes immediately.
-    // Do NOT gate on `running` — that blocked the only write path during long
+    // Do NOT gate on `running`: that blocked the only write path during long
     // team/individual runs, so F5 mid-run or right after lost the transcript.
     const sessionId = activeSessionId;
     if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
@@ -1115,7 +1115,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
           keepalive: true,
         });
       } catch {
-        // ignore — best effort on unload
+        // ignore: best effort on unload
       }
     }
     window.addEventListener('pagehide', flushOnLeave);
@@ -1131,7 +1131,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     for (const key of LUCA_AI_LEGACY_LOCAL_KEYS) {
       try { window.localStorage.removeItem(key); } catch { /* ignore */ }
     }
-    // Only purge legacy localStorage keys. Never wipe React transcript here —
+    // Only purge legacy localStorage keys. Never wipe React transcript here -
     // that raced applySession on first paint after F5 and blanked recovered chat.
     window.localStorage.setItem(LUCA_AI_CLEAN_UI_STORAGE_KEY, LUCA_AI_CLEAN_UI_VERSION);
   }, []);
@@ -1256,9 +1256,9 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     } catch (err) {
       if (stillOwner()) {
         setError(pickFailureCopy(err, {
-          offline: 'Sem internet. O arquivo não foi anexado — o texto da missão continua no compositor.',
+          offline: 'Sem internet. O arquivo não foi anexado. O texto da missão continua no compositor.',
           forbidden: 'Esta conta não pode anexar arquivos.',
-          server: 'O arquivo não foi anexado. A missão digitada continua no compositor — tente de novo.',
+          server: 'O arquivo não foi anexado. A missão digitada continua no compositor. Tente de novo.',
         }));
         setErrorRetry(null);
       }
@@ -1277,7 +1277,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       await lucaApi.deleteChatAttachment(ownerSessionId, attachment.id, bridgeBase);
     } catch (err) {
       setError(pickFailureCopy(err, {
-        offline: 'Sem internet. O anexo continua na missão — reconecte e tente remover de novo.',
+        offline: 'Sem internet. O anexo continua na missão. Reconecte e tente remover de novo.',
         forbidden: 'Esta conta não pode remover anexos.',
         server: 'O anexo não foi removido. Tente de novo.',
       }));
@@ -1308,9 +1308,9 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       return true;
     } catch (err) {
       setError(pickFailureCopy(err, {
-        offline: `Sem internet. ${persona.name || slug} não foi preparada — a seleção continua como estava.`,
+        offline: `Sem internet. ${persona.name || slug} não foi preparada. A seleção continua como estava.`,
         forbidden: `Esta conta não pode preparar ${persona.name || slug}.`,
-        server: `${persona.name || slug} não ficou pronta. A seleção continua — tente de novo.`,
+        server: `${persona.name || slug} não ficou pronta. A seleção continua. Tente de novo.`,
       }));
       setErrorRetry('personas');
       return false;
@@ -1332,7 +1332,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       if (runtimeMode === 'backend') await refresh();
     } catch (err) {
       setError(pickFailureCopy(err, {
-        offline: `Sem internet. O modelo de ${slug} não mudou — reconecte e tente de novo.`,
+        offline: `Sem internet. O modelo de ${slug} não mudou. Reconecte e tente de novo.`,
         forbidden: `Esta conta não pode trocar o modelo de ${slug}.`,
         server: `O modelo de ${slug} não mudou. Tente de novo.`,
       }));
@@ -1401,7 +1401,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       participants: uniqueSlugs(prev?.participants || [], 5),
       judge: prev?.judge || null,
       visual: slug || null,
-      // Escolher persona com o módulo desligado liga na hora — intenção óbvia.
+      // Escolher persona com o módulo desligado liga na hora: intenção óbvia.
       visualEnabled: slug ? true : Boolean(prev?.visualEnabled),
     }));
     if (slug) setActivePersonaSlug(slug);
@@ -1602,7 +1602,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setOperationMode(next);
     navigate({ modo: next === 'individual' ? 'individual' : '' }, 'replace');
     setPickerTarget(null);
-    // Keep transcript/finalResult/mission — mode is view/config, not a new session.
+    // Keep transcript/finalResult/mission: mode is view/config, not a new session.
     setProcessEvents([]);
     setActiveTraceId(null);
   }
@@ -1658,7 +1658,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       durationMs: 0,
       attachments: attachmentsToRun,
     };
-    // Capture next transcript eagerly — setState is async and F5 must not lose the question.
+    // Capture next transcript eagerly: setState is async and F5 must not lose the question.
     const transcriptWithOperator = [...transcript, operatorEntry].slice(-100);
     setTranscript(transcriptWithOperator);
     // Codex-style send: message is committed to the thread; composer leaves empty.
@@ -1677,9 +1677,9 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setMission(trimmedMission);
       setDraftAttachments(attachmentsToRun);
       setError(pickFailureCopy(err, {
-        offline: 'Sem internet. A missão digitada continua no compositor — reconecte e envie de novo.',
+        offline: 'Sem internet. A missão digitada continua no compositor. Reconecte e envie de novo.',
         forbidden: 'Esta conta não pode gravar a missão.',
-        server: 'A missão não foi gravada antes de iniciar. O texto continua no compositor — tente de novo.',
+        server: 'A missão não foi gravada antes de iniciar. O texto continua no compositor. Tente de novo.',
       }));
       setErrorRetry('run');
       setRunning(false);
@@ -2012,7 +2012,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
               if (errorRetry === 'run') void runMission();
               else if (errorRetry === 'personas') void loadPersonas();
               else {
-                // Soft edge: limpa trava de resume e recarrega — se o job ainda
+                // Soft edge: limpa trava de resume e recarrega: se o job ainda
                 // estiver running no servidor, o effect retoma o poll sozinho.
                 setError(null);
                 setErrorRetry(null);
@@ -2523,7 +2523,7 @@ function LucaIndividualPanel({
                 <span className="block truncate text-[10px]" style={{ color: theme.textGhost }}>
                   {assignments.visualEnabled
                     ? 'relatório, gráficos e imagens após o veredito'
-                    : 'desligado — a rodada termina no juiz'}
+                    : 'desligado. A rodada termina no juiz'}
                 </span>
               </span>
               {!locked && (
@@ -2924,7 +2924,7 @@ function WorkflowRoleRow({
           </span>
           <span className="block truncate text-[10px]" style={{ color: theme.textGhost }}>
             {role.optional
-              ? 'opcional — roda só se preenchido'
+              ? 'opcional: roda só se preenchido'
               : role.multiple ? `até ${role.maxSlugs} personas` : 'uma persona'}
           </span>
         </span>
@@ -3791,7 +3791,7 @@ function VisualPackCard({ pack }: { pack: LucaAiVisualPack }) {
           </span>
         ) : null}
         {pack.localImageFallback ? (
-          <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px]" style={{ background: 'rgba(255,255,255,0.05)', color: theme.textGhost }} title="9Router sem provider de imagem — infográfico SVG gerado localmente">
+          <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px]" style={{ background: 'rgba(255,255,255,0.05)', color: theme.textGhost }} title="9Router sem provider de imagem. Infográfico SVG gerado localmente">
             fallback local
           </span>
         ) : null}
@@ -3939,7 +3939,7 @@ function LucaMissionBar({
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const canAttach = !running && !uploadingAttachment && attachments.length < 4;
 
-  // Composer cresce com o texto — missões longas (SOMPO) não cabem em 1 linha.
+  // Composer cresce com o texto: missões longas (SOMPO) não cabem em 1 linha.
   useEffect(() => {
     const el = inputRef.current;
     if (!el) return;
@@ -3960,7 +3960,7 @@ function LucaMissionBar({
   function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
     // Enter só envia quando a rodada pode rodar. Sem equipe pronta, deixa
-    // quebrar linha — senão o usuário “não consegue escrever”.
+    // quebrar linha: senão o usuário “não consegue escrever”.
     if (!canRun) return;
     event.preventDefault();
     submit();
@@ -4014,14 +4014,14 @@ function LucaMissionBar({
 
   const isReady = operationMode === 'individual' ? isIndividualReady : isWorkflowReady;
   // Pill only earns screen space while it informs: progress during a run or
-  // guidance while the selection is incomplete. "Pronta" idle state is noise —
+  // guidance while the selection is incomplete. "Pronta" idle state is noise -
   // it used to stick permanently over the chat (reported as a stuck button).
   const showStatus = running || !isReady;
   const statusText = running
     ? operationMode === 'individual' ? '9Router executa as respostas; o juiz entra em seguida' : '9Router está executando o fluxo'
     : operationMode === 'individual'
       ? 'Escolha participantes e uma persona juíza'
-      : `${readyRoles} de ${requiredRoleCount} etapas obrigatórias — clique para montar a equipe`;
+      : `${readyRoles} de ${requiredRoleCount} etapas obrigatórias. Clique para montar a equipe`;
   const statusColor = running ? theme.goldDeep : theme.textMute;
   const sendTitle = canRun
     ? 'Enviar missão'
@@ -4389,7 +4389,7 @@ function RichMessageBody({ content, compact = false }: { content: string; compac
                 <tbody>
                   {block.rows.map((row, rowIndex) => (
                     <tr key={`row-${rowIndex}`} className="border-b last:border-b-0" style={{ borderColor: theme.border }}>
-                      {block.headers.map((_, cellIndex) => <td key={`cell-${cellIndex}`} className="px-3 py-2.5 align-top luca-wrap sm:px-4 sm:py-3"><InlineText value={row[cellIndex] || '—'} /></td>)}
+                      {block.headers.map((_, cellIndex) => <td key={`cell-${cellIndex}`} className="px-3 py-2.5 align-top luca-wrap sm:px-4 sm:py-3"><InlineText value={row[cellIndex] || '-'} /></td>)}
                     </tr>
                   ))}
                 </tbody>

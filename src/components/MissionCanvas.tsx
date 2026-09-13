@@ -132,7 +132,7 @@ export default function MissionCanvas() {
             </p>
           </div>
         ) : (
-          // Estado ocioso — medalhão compacto (o herói grande está no topo da página).
+          // Estado ocioso: medalhão compacto (o herói grande está no topo da página).
           <div className="h-full flex flex-col items-center justify-center text-center px-6 py-8">
             <LucaOwl size={150} alive={backendReady} />
             <p className="text-sm mt-4 max-w-xs leading-relaxed" style={{ color: theme.textMute }}>

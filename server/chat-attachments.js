@@ -1,9 +1,9 @@
-// CHAT_ATTACHMENTS_V1 — private per-account chat attachments for LUCA-AI.
+// CHAT_ATTACHMENTS_V1: private per-account chat attachments for LUCA-AI.
 //
 // Files live outside the chat library JSON: one directory per (account, session),
 // both derived from a hash so nothing user-controlled ever reaches the filesystem
 // path. Every entry point resolves the session through getChatSession(), which
-// throws outside the caller's workspace — that is the cross-account boundary.
+// throws outside the caller's workspace: that is the cross-account boundary.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
@@ -94,7 +94,7 @@ function normalizeAttachmentType(name, requestedMimeType, buffer) {
     // Nenhum modelo do catalogo 9Router le PDF hoje (probes em gpt-5.6-sol,
     // claude-fable-5 e grok-4.5, com input_file e file/file_data: todos
     // respondem sem enxergar o arquivo). Aceitar aqui produziria persona
-    // confiante sobre documento que nunca leu — recusamos na porta.
+    // confiante sobre documento que nunca leu: recusamos na porta.
     throw attachmentError('attachment_pdf_not_supported', 415);
   }
 

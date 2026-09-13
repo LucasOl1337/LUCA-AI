@@ -11,7 +11,7 @@ interface OperacionalPageProps {
 }
 
 /**
- * Operacional — o cockpit de trabalho (aba 2).
+ * Operacional. O cockpit de trabalho (aba 2).
  *
  *  ┌────────────────────────────────────────────┐
  *  │  AgentRail (trilho de corujas)              │

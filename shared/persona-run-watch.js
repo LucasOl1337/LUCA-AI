@@ -17,7 +17,7 @@ function defaultWait(ms) {
 
 /**
  * Acompanha um job assíncrono de persona-team com tolerância a 524/timeout/rede.
- * Falhas transitórias de borda NÃO abortam a rodada — só estouro de prazo ou
+ * Falhas transitórias de borda NÃO abortam a rodada: só estouro de prazo ou
  * erros consecutivos longos demais.
  */
 export async function watchPersonaTeamRun({
@@ -107,7 +107,7 @@ export async function watchPersonaTeamRun({
       const consecutiveMs = now() - consecutiveErrorStartedAt;
       if (consecutiveMs >= Math.max(5_000, Number(maxConsecutiveErrorMs) || 0)) {
         throw new PersonaRunWatchError(
-          'A conexão com o runtime ficou instável por tempo demais. A rodada pode continuar em segundo plano — atualize em instantes ou reabra a sessão.',
+          'A conexão com o runtime ficou instável por tempo demais. A rodada pode continuar em segundo plano. Atualize em instantes ou reabra a sessão.',
           {
             runId: cleanRunId,
             traceId,

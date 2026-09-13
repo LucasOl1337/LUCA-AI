@@ -53,7 +53,7 @@ function mesh(parent: THREE.Object3D, geometry: THREE.BufferGeometry, material: 
 
 /**
  * Estrada rural em trilha infinita: o caminhão avança de verdade no mundo e cada
- * elemento recicla à frente em múltiplos exatos do seu período visual — chão por
+ * elemento recicla à frente em múltiplos exatos do seu período visual: chão por
  * repetição de textura, objetos discretos por wrap em torno do caminhão. Nada de
  * scroll de textura fingindo deslocamento: marcas, detritos e postes ficam para
  * trás quando o caminhão passa.
@@ -161,7 +161,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const vegetation = createSompoVegetation(root, camera, sompoTerrainHeight);
 
   const puddles = new THREE.Group(); root.add(puddles);
-  const water = new THREE.MeshPhysicalMaterial({ color: 0x192426, roughness: 0.18, metalness: 0, transparent: true, opacity: 0.32, clearcoat: 0.55, clearcoatRoughness: 0.12, envMapIntensity: 0.35, depthWrite: false });
+  const water = new THREE.MeshPhysicalMaterial({ color: 0x192426, roughness: 0.1, metalness: 0, transparent: true, opacity: 0.44, clearcoat: 0.55, clearcoatRoughness: 0.12, envMapIntensity: 0.35, depthWrite: false });
   const puddleSlots: { mesh: THREE.Mesh; x: number }[] = [];
   for (let i = 0; i < 12; i += 1) {
     const baseX = i * 16.5 - 92;
@@ -174,7 +174,28 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
     patch.rotation.x = -Math.PI / 2;
     puddleSlots.push({ mesh: patch, x: baseX });
   }
-  // Lago do vale: lâmina d'água na bacia esculpida no relevo — a incidência
+  // Spray das rodas: a névoa de água que o pneu levanta em pista molhada.
+  // Pontos nascem nas caixas de roda e o movimento do caminhão joga pra trás.
+  const SPRAY_COUNT = 150;
+  const sprayGeometry = new THREE.BufferGeometry();
+  const sprayPositions = new Float32Array(SPRAY_COUNT * 3);
+  sprayGeometry.setAttribute('position', new THREE.BufferAttribute(sprayPositions, 3));
+  const sprayCanvas = document.createElement('canvas'); sprayCanvas.width = sprayCanvas.height = 64;
+  const sprayCtx = sprayCanvas.getContext('2d')!;
+  const sprayGrad = sprayCtx.createRadialGradient(32, 32, 2, 32, 32, 30);
+  sprayGrad.addColorStop(0, 'rgba(255,255,255,.85)'); sprayGrad.addColorStop(.55, 'rgba(255,255,255,.28)'); sprayGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  sprayCtx.fillStyle = sprayGrad; sprayCtx.fillRect(0, 0, 64, 64);
+  const sprayTexture = new THREE.CanvasTexture(sprayCanvas);
+  const sprayMaterial = new THREE.PointsMaterial({ map: sprayTexture, size: 0.85, transparent: true, opacity: 0, depthWrite: false, color: 0xcfd9de });
+  const spray = new THREE.Points(sprayGeometry, sprayMaterial);
+  spray.frustumCulled = false; spray.name = 'sompo-road-wheel-spray'; spray.visible = false; root.add(spray);
+  let spraySeed = 4242;
+  const sprayRandom = () => { spraySeed ^= spraySeed << 13; spraySeed ^= spraySeed >>> 17; spraySeed ^= spraySeed << 5; return (spraySeed >>> 0) / 4294967296; };
+  const sprayOrigins = Array.from({ length: SPRAY_COUNT }, () => {
+    const axle = [2.45, -1.35, -2.7][Math.floor(sprayRandom() * 3)];
+    return { axle, side: sprayRandom() < 0.5 ? -1 : 1, seed: sprayRandom(), jitter: sprayRandom() };
+  });
+  // Lago do vale: lâmina d'água na bacia esculpida no relevo. A incidência
   // rasante devolve o reflexo do céu (Fresnel), como no lago da referência.
   const lakeWater = new THREE.Mesh(
     new THREE.CircleGeometry(1, 48),
@@ -266,7 +287,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       fog.color.set(wet ? 0x919b9c : 0xbebca9); fog.near = wet ? 55 : 100; fog.far = wet ? 220 : 260;
       earth.color.setScalar(wet ? 0.58 : 1);
       shoulderMaterial.color.set(wet ? 0x96856c : 0xe1c9aa);
-      asphalt.color.set(mud ? 0x604331 : gravel ? 0x998467 : wet ? 0x687882 : 0xffffff);
+      asphalt.color.set(mud ? 0x604331 : gravel ? 0x998467 : wet ? 0x45545f : 0xffffff);
       asphalt.roughness = wet && !mud ? 0.2 : 0.95;
       asphalt.normalScale.setScalar(wet ? 0.20 : 1.0);
       markings.visible = !mud && !gravel;
@@ -278,6 +299,20 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       animal.update(effects.has('animal'), animalZ, elapsed, reduceMotion, extras?.animalAnchorX, walking, animalImpact?.ageMs ?? null);
       details.update(elapsed, wet, reduceMotion, truckX, extras?.wind ?? 0.65);
       rainMaterial.opacity = (effects.get('rain') ?? 0) * 0.4;
+      const sprayAmt = wet ? THREE.MathUtils.clamp(((frame?.speedKph ?? 0) - 18) / 45, 0, 1) : 0;
+      spray.visible = sprayAmt > 0.02;
+      sprayMaterial.opacity = sprayAmt * 0.36;
+      if (spray.visible) {
+        const drift = 1 + (frame?.speedKph ?? 0) / 60;
+        for (let i = 0; i < SPRAY_COUNT; i += 1) {
+          const origin = sprayOrigins[i];
+          const age = (t * 1.6 + origin.seed) % 1;
+          sprayPositions[i * 3] = truckX + origin.axle - age * 2.6 * drift;
+          sprayPositions[i * 3 + 1] = 0.18 + age * 0.85 - age * age * 0.55;
+          sprayPositions[i * 3 + 2] = truck.z + origin.side * (0.72 + origin.jitter * 0.35 + age * 0.5);
+        }
+        sprayGeometry.attributes.position.needsUpdate = true;
+      }
       const clock = reduceMotion ? 0 : t;
       const rainPositions = rainGeometry.attributes.position as THREE.BufferAttribute;
       for (let i = 0; i < 240; i += 1) {

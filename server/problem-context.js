@@ -97,7 +97,7 @@ export function formatSignalLine(signal = {}) {
     ? `: ${s.value}${s.unit ? ` ${s.unit}` : ''}`
     : '';
   const note = s.note ? ` (${s.note})` : '';
-  return `[${s.severity || 'info'}] ${s.label || 'sinal'}${value}${note} — fonte ${s.source || 'realtime'} @ ${s.at || ''}`.trim();
+  return `[${s.severity || 'info'}] ${s.label || 'sinal'}${value}${note}: fonte ${s.source || 'realtime'} @ ${s.at || ''}`.trim();
 }
 
 export function summarizeSignalsForPrompt(signals = [], { max = 8 } = {}) {

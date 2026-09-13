@@ -10,7 +10,7 @@ const useAuth = readSource('../src/hooks/useAuth.tsx');
 const config = readSource('../server/config.js');
 
 // O painel caia na tela de login sozinho: qualquer falha do /api/auth/session
-// — 429 do limitador, 5xx de reinicio, rede oscilando — passava pelo mesmo
+// (429 do limitador, 5xx de reinicio, rede oscilando) passava pelo mesmo
 // catch e zerava o usuario, com a sessao viva por 30 dias no servidor.
 test('so 401/403 derruba a sessao; falha de transporte nao zera o usuario', () => {
   assert.match(useAuth, /export function isSessionRejection\(status: number\): boolean \{\s*return status === 401 \|\| status === 403;/);

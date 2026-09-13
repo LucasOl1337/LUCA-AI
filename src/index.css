@@ -330,7 +330,7 @@
   gap: 0;
 }
 
-/* Topbar removida do layout — classe mantida só por compatibilidade se reaparecer */
+/* Topbar removida do layout: classe mantida só por compatibilidade se reaparecer */
 .luca-topbar {
   display: none !important;
   min-height: 0;
@@ -385,7 +385,7 @@
   margin-left: auto;
 }
 
-/* SHARE_LINKS_V1 — toolbar actions + share popover */
+/* SHARE_LINKS_V1: toolbar actions + share popover */
 .luca-ai-toolbar-actions {
   margin-left: auto;
   display: flex;
@@ -2185,7 +2185,7 @@ a.luca-ai-attachment:focus-visible {
   .rift-item.active { color: HighlightText; background: Highlight; }
 }
 
-/* Autenticação e administração — tokens do produto (liquid glass / --l-*) */
+/* Autenticação e administração: tokens do produto (liquid glass / --l-*) */
 .auth-loading {
   width: 100vw; height: 100dvh; display: grid; place-content: center; justify-items: center; gap: 14px;
   color: var(--l-text-mute); background: var(--l-void); font-size: 12px; letter-spacing: .08em;

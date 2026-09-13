@@ -156,7 +156,7 @@ test('normalizePersonaTeamRunInput bloqueia workflow explicito incompleto', () =
 
   assert.equal(input.ok, false);
   assert.equal(input.error, 'workflow_role_required');
-  // visual e opcional — nao entra em missingRoles
+  // visual e opcional: nao entra em missingRoles
   assert.deepEqual(input.missingRoles.sort(), ['approval', 'display', 'mission']);
 });
 
@@ -217,7 +217,7 @@ test('normalizePersonaTeamRunInput aceita especialista visual opcional no modo i
   assert.equal(withoutVisual.ok, true);
   assert.equal(withoutVisual.visualSlug, undefined);
 
-  // Modo equipe ignora visualSlug — a etapa visual vem do workflow.
+  // Modo equipe ignora visualSlug. A etapa visual vem do workflow.
   const team = normalizePersonaTeamRunInput({
     mission: 'Missao',
     slugs: ['aurora', 'maestro'],

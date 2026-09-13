@@ -113,7 +113,7 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       setReady(true);
       setError(pickFailureCopy(err, {
-        offline: 'Sem internet. As sessões que já estavam na barra continuam visíveis — reconecte e recarregue.',
+        offline: 'Sem internet. As sessões que já estavam na barra continuam visíveis. Reconecte e recarregue.',
         forbidden: 'Esta conta não pode ver as sessões. Peça acesso a um administrador.',
         server: 'As sessões não chegaram. Tente de novo; o que já estava na barra permanece.',
       }));
@@ -142,7 +142,7 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
       return session;
     } catch (err) {
       setError(pickFailureCopy(err, {
-        offline: 'Sem internet. A sessão nova não foi criada — reconecte e tente de novo.',
+        offline: 'Sem internet. A sessão nova não foi criada. Reconecte e tente de novo.',
         forbidden: 'Esta conta não pode criar sessões. Peça acesso a um administrador.',
         server: 'A sessão nova não foi criada. Tente de novo em instantes.',
       }));
@@ -185,7 +185,7 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       if (seq === activateSeqRef.current) {
         setError(pickFailureCopy(err, {
-          offline: 'Sem internet. A sessão não abriu — reconecte e escolha de novo.',
+          offline: 'Sem internet. A sessão não abriu. Reconecte e escolha de novo.',
           forbidden: 'Esta conta não pode abrir essa sessão. Peça acesso a quem a compartilhou.',
           server: 'A sessão não abriu. Tente escolhê-la de novo.',
         }));
@@ -206,7 +206,7 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
       return data.activeSession || null;
     } catch (err) {
       setError(pickFailureCopy(err, {
-        offline: 'Sem internet. A sessão não foi apagada — reconecte e tente de novo.',
+        offline: 'Sem internet. A sessão não foi apagada. Reconecte e tente de novo.',
         forbidden: 'Esta conta não pode apagar essa sessão.',
         server: 'A sessão continua na lista. Tente apagar de novo.',
       }));
@@ -224,7 +224,7 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
       applySnapshot(data, { replaceSessionOrder: false, setActive: false });
     } catch (err) {
       setError(pickFailureCopy(err, {
-        offline: 'Sem internet. O projeto não foi criado — reconecte e tente de novo.',
+        offline: 'Sem internet. O projeto não foi criado. Reconecte e tente de novo.',
         forbidden: 'Esta conta não pode criar projetos.',
         server: 'O projeto não foi criado. Tente de novo em instantes.',
       }));
@@ -244,7 +244,7 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
       applySnapshot(data, { replaceSessionOrder: false, setActive: false });
     } catch (err) {
       setError(pickFailureCopy(err, {
-        offline: 'Sem internet. O nome do projeto não mudou — reconecte e tente de novo.',
+        offline: 'Sem internet. O nome do projeto não mudou. Reconecte e tente de novo.',
         forbidden: 'Esta conta não pode renomear projetos.',
         server: 'O nome do projeto não mudou. Tente de novo em instantes.',
       }));
@@ -262,7 +262,7 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
       applySnapshot(data, { replaceSessionOrder: false, setActive: false });
     } catch (err) {
       setError(pickFailureCopy(err, {
-        offline: 'Sem internet. O projeto não foi removido — reconecte e tente de novo.',
+        offline: 'Sem internet. O projeto não foi removido. Reconecte e tente de novo.',
         forbidden: 'Esta conta não pode remover projetos.',
         server: 'O projeto continua na barra. Tente remover de novo.',
       }));
@@ -280,7 +280,7 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
       applySnapshot(data, { replaceSessionOrder: false, setActive: false });
     } catch (err) {
       setError(pickFailureCopy(err, {
-        offline: 'Sem internet. A sessão não foi movida — reconecte e tente de novo.',
+        offline: 'Sem internet. A sessão não foi movida. Reconecte e tente de novo.',
         forbidden: 'Esta conta não pode mover sessões.',
         server: 'A sessão não mudou de projeto. Tente mover de novo.',
       }));
@@ -325,7 +325,7 @@ export function ChatLibraryProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       if (options.throwOnError) throw err;
-      // best-effort — runMission also flushes; silent here keeps typing smooth.
+      // best-effort: runMission also flushes; silent here keeps typing smooth.
     }
   }, []);
 

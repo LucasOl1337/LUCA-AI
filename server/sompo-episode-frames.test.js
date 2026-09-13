@@ -143,7 +143,7 @@ test('frames de episódio: upload 1-por-request, GET com metadados e leitura bin
   assert.ok(stored.equals(buffers[2]));
 });
 
-test('frames de episódio: teto de 6, teto de 300KB e assinatura de bytes — 400 com código claro', async (t) => {
+test('frames de episódio: teto de 6, teto de 300KB e assinatura de bytes: 400 com código claro', async (t) => {
   const { dbPath, framesDir, cleanup } = tempStore();
   let clock = BASE_MS;
   const history = createSompoTelemetryHistory({ dbPath, framesDir, now: () => clock });

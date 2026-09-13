@@ -425,7 +425,7 @@ function persistLibrary(userId, library) {
   const filePath = libraryPathFor(userId);
   const dir = path.dirname(filePath);
   fs.mkdirSync(dir, { recursive: true });
-  // Atomic replace — partial write + crash must not wipe chat-library.json.
+  // Atomic replace: partial write + crash must not wipe chat-library.json.
   const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(library, null, 2));
   fs.renameSync(tmp, filePath);
@@ -974,7 +974,7 @@ export function clearPersonaRunOnSession(sessionId) {
 
 /**
  * Grava a rodada no chat-library no servidor (fonte de verdade).
- * Independente do flush do browser — falha de juíz/F5 não apaga o histórico.
+ * Independente do flush do browser: falha de juíz/F5 não apaga o histórico.
  */
 export function recordPersonaRunOnSession(sessionId, run = {}, meta = {}) {
   const sid = String(sessionId || '').trim();
@@ -1006,7 +1006,7 @@ export function recordPersonaRunOnSession(sessionId, run = {}, meta = {}) {
     const replyEntries = transcriptEntriesFromPersonaRun(run);
 
     session.transcript = mergeTranscript(existing, replyEntries);
-    // Message is committed on the operator bubble — draft leaves empty (Codex-style send).
+    // Message is committed on the operator bubble: draft leaves empty (Codex-style send).
     session.missionDraft = '';
     session.operationMode = mode;
 
@@ -1028,7 +1028,7 @@ export function recordPersonaRunOnSession(sessionId, run = {}, meta = {}) {
         ok: run.ok,
       });
     }
-    // Job terminou — limpa marcador de rodada em andamento.
+    // Job terminou: limpa marcador de rodada em andamento.
     session.activePersonaRun = null;
 
     if (!String(session.title || '').trim() || session.title === 'Nova sessão') {
@@ -1113,7 +1113,7 @@ export function activateChatSession(sessionId) {
       error.status = 404;
       throw error;
     }
-    // Open only — do not bump updatedAt (would reshuffle UI if sorted by activity).
+    // Open only: do not bump updatedAt (would reshuffle UI if sorted by activity).
     library.activeSessionId = session.id;
     return session;
   });

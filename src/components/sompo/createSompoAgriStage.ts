@@ -47,7 +47,7 @@ function fallbackMachine(equipmentId: 'tractor' | 'harvester') {
 
 /**
  * Palco agrícola autocontido: renderer, campo, equipamento gerado e movimento
- * real em forma fechada — separado do loop do caminhão para não arriscar o
+ * real em forma fechada: separado do loop do caminhão para não arriscar o
  * fluxo rural. Desmontado e remontado a cada troca de cenário/desfecho.
  */
 export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats }: {
@@ -57,7 +57,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   startedAtRef: { current: number };
   onModelStatus: (status: 'loading' | 'gltf' | 'fallback', asset: string | null) => void;
   onWebglError: () => void;
-  // Chamado no mesmo rAF do renderer.render — é o ponto seguro para capturar o canvas.
+  // Chamado no mesmo rAF do renderer.render: é o ponto seguro para capturar o canvas.
   onAfterRender?: (canvas: HTMLCanvasElement) => void;
   studioRef?: { current: SompoStudioConfig };
   getElapsed?: (time: number) => number;
@@ -138,7 +138,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   }));
   if (scenario.environmentId === 'farm-barn') {
     // O barracão gira para a manobra de ré terminar estacionada lá dentro.
-    // A porta fica ~1 m atrás da ponta do implemento em t=0 — o conjunto
+    // A porta fica ~1 m atrás da ponta do implemento em t=0. O conjunto
     // começa fora e a ré termina com o implemento dentro do vão.
     const barn = field.root.getObjectByName('sompo-agri-barn');
     if (barn) { barn.rotation.y = Math.PI; barn.position.set(startX - 10, 0, 0); }

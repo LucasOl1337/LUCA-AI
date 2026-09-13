@@ -1,4 +1,4 @@
-// VISUAL_STAGE_V1 — pós-etapa de artefatos no modo equipe (charts, relatório, imagens).
+// VISUAL_STAGE_V1: pós-etapa de artefatos no modo equipe (charts, relatório, imagens).
 // A persona Yume `especialista-visual` planeja em JSON; o runtime materializa e guarda.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,7 +18,7 @@ export const MAX_VISUAL_REPORT_CHARS = 12_000;
 export const MAX_IMAGE_PROMPT_CHARS = 2_000;
 export const MAX_CHART_ITEMS = 8;
 
-const PT_BR_IMAGE_LANGUAGE_GUARD = 'Requisito obrigatório de idioma: todo texto visível na arte — título, subtítulo, rótulos, eixos, legendas, chamadas e notas — deve estar em português do Brasil (pt-BR). Não traduza o texto visível para inglês.';
+const PT_BR_IMAGE_LANGUAGE_GUARD = 'Requisito obrigatório de idioma: todo texto visível na arte (título, subtítulo, rótulos, eixos, legendas, chamadas e notas) deve estar em português do Brasil (pt-BR). Não traduza o texto visível para inglês.';
 
 const ALLOWED_CHART_TYPES = new Set(['pie', 'tower', 'bar', 'line']);
 const ALLOWED_ASPECT = new Set(['1:1', '16:9', '9:16', '4:3', '3:4']);
@@ -152,7 +152,7 @@ export function synthesizeVisualImageSpecs(plan = {}, { mission = '' } = {}) {
         .slice(0, 6)
         .map((item) => `${item.label}: ${item.value}`)
         .join(', ');
-      return items ? `${chart.title} (${chart.type || 'chart'}) — ${items}` : chart.title;
+      return items ? `${chart.title} (${chart.type || 'chart'}): ${items}` : chart.title;
     })
     .filter(Boolean);
   const topic = clip(
@@ -247,14 +247,14 @@ export function parseVisualPlanOutput(output = '', { mission = '' } = {}) {
 /**
  * Plano inutilizável para artefatos ricos (sem JSON ou fallback textual):
  * o runtime deve re-promptar a persona uma vez antes de aceitar degradação.
- * Também re-tenta quando o JSON veio sem images — a etapa visual precisa gerar imagem.
+ * Também re-tenta quando o JSON veio sem images. A etapa visual precisa gerar imagem.
  */
 export function visualPlanNeedsRetry(plan, { mission = '' } = {}) {
   if (!plan) return true;
   if (plan.source === 'text-fallback') return true;
   if (!plan.report && !plan.charts?.length && !plan.images?.length) return true;
   // Missão de episódio SOMPO: a peça principal (linha do tempo) é desenhada pelo
-  // runtime com os dados reais — o plano não precisa trazer images[].
+  // runtime com os dados reais. O plano não precisa trazer images[].
   if (parseSompoEpisodeVisualData(mission)) return false;
   return !plan.images?.length;
 }
@@ -265,7 +265,7 @@ export function buildVisualRetryContext(previousOutput = '') {
     '## Correção obrigatória da etapa visual',
     'Sua resposta anterior NÃO seguiu o contrato de artefatos.',
     'Responda novamente SOMENTE com o objeto JSON combinado (summary, report, charts, images, imageEngine), sem nenhum texto fora do JSON.',
-    'OBRIGATÓRIO: escreva summary, report, títulos, rótulos e prompts em pt-BR. Inclua pelo menos 1 item em images[] com prompt em pt-BR de infográfico/gráfico explicado (título legível, rótulos, chamadas e legenda). Todo texto visível da arte deve permanecer em pt-BR e não ser traduzido para inglês. Não diga que não há imagens — crie um gráfico fiel ao contexto.',
+    'OBRIGATÓRIO: escreva summary, report, títulos, rótulos e prompts em pt-BR. Inclua pelo menos 1 item em images[] com prompt em pt-BR de infográfico/gráfico explicado (título legível, rótulos, chamadas e legenda). Todo texto visível da arte deve permanecer em pt-BR e não ser traduzido para inglês. Não diga que não há imagens. Crie um gráfico fiel ao contexto.',
     excerpt ? `Resposta anterior (para referência do conteúdo, não do formato):\n${excerpt}` : '',
   ].filter(Boolean).join('\n');
 }
@@ -357,7 +357,7 @@ export function renderLocalInfographicSvg({
 
   const fallbackBlocks = items.length
     ? barRows
-    : wrapSvgText(subtitle || 'Sem série numérica — resumo visual da sessão.', 48)
+    : wrapSvgText(subtitle || 'Sem série numérica: resumo visual da sessão.', 48)
       .map((line, index) => `<text x="80" y="${240 + index * 34}" fill="#d7e6f5" font-size="22" font-family="Segoe UI, Arial, sans-serif">${escapeXml(line)}</text>`)
       .join('\n');
 
@@ -448,7 +448,7 @@ function polylineSegments(points) {
 
 /**
  * A peça principal do episódio gravado: série temporal autoral em SVG,
- * desenhada pelo runtime com os dados reais — distância (cm) e aceleração (g)
+ * desenhada pelo runtime com os dados reais: distância (cm) e aceleração (g)
  * ao longo dos segundos, com marcadores nomeados de início, PICO e disparo
  * da flag. O "pico" é a amostra de maior |aceleração| (heurística; pode ser
  * frenagem, manobra, varredura de sensor ou batida). A distância entre os
@@ -481,7 +481,7 @@ export function renderSompoEpisodeTimelineSvg(data, { headline, subtitle } = {})
   const maxDist = Math.max(...serie.map((point) => point.dist ?? 0), 1);
   const distScale = niceScale(maxDist, [5, 10, 20, 25, 40, 50, 100, 200, 250, 500, 1_000]);
   // O pico entra na escala: o marcador usa picoAccMs2, que é maior
-  // que qualquer amostra decimada quando a decimação não pegou o topo — sem
+  // que qualquer amostra decimada quando a decimação não pegou o topo, sem
   // isto o ponto do pico era desenhado fora da área do gráfico.
   const maxG = Math.max(
     ...serie.map((point) => point.accG ?? 0),
@@ -559,7 +559,7 @@ export function renderSompoEpisodeTimelineSvg(data, { headline, subtitle } = {})
   );
   // Única menção a m/s² da peça: g é a unidade primária do evento.
   const accLegend = picoAccMs2 !== null
-    ? `Aceleração (g) — pico de ${ptFixed(picoAccMs2 / GRAVITY_MS2, 1)} g (${ptFixed(picoAccMs2, 1)} m/s²)`
+    ? `Aceleração (g): pico de ${ptFixed(picoAccMs2 / GRAVITY_MS2, 1)} g (${ptFixed(picoAccMs2, 1)} m/s²)`
     : 'Aceleração (g)';
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
@@ -571,7 +571,7 @@ export function renderSompoEpisodeTimelineSvg(data, { headline, subtitle } = {})
     </linearGradient>
   </defs>
   <rect width="1280" height="720" fill="url(#bg)"/>
-  <text x="90" y="58" fill="#64d2ff" font-size="15" letter-spacing="3" font-family="${font}">SOMPO · EPISÓDIO GRAVADO — LINHA DO TEMPO</text>
+  <text x="90" y="58" fill="#64d2ff" font-size="15" letter-spacing="3" font-family="${font}">SOMPO · EPISÓDIO GRAVADO: LINHA DO TEMPO</text>
   <text x="90" y="108" fill="#f4f8ff" font-size="38" font-weight="700" font-family="${font}">${escapeXml(heading)}</text>
   <text x="90" y="142" fill="#9fb4c8" font-size="18" font-family="${font}">${escapeXml(sub)}</text>
   <rect x="90" y="168" width="16" height="5" rx="2" fill="#64d2ff"/>
@@ -586,7 +586,7 @@ export function renderSompoEpisodeTimelineSvg(data, { headline, subtitle } = {})
 }
 
 /**
- * Pack visual do episódio gravado: no máximo DUAS peças — a linha do tempo
+ * Pack visual do episódio gravado: no máximo DUAS peças. A linha do tempo
  * (desenhada aqui, com os dados reais) e o cartão de decisão da persona. Os
  * charts do plano são descartados de propósito: barra de média por fase e
  * séries repetidas eram a redundância que o dono reprovou.
@@ -603,7 +603,7 @@ function materializeSompoEpisodePack({ episodeData, plan, ownerId, traceId, retr
       id: artifactId,
       kind: 'image',
       title: headline,
-      prompt: 'Linha do tempo desenhada pelo runtime a partir das amostras reais do episódio — sem geração por IA.',
+      prompt: 'Linha do tempo desenhada pelo runtime a partir das amostras reais do episódio, sem geração por IA.',
       aspectRatio: '16:9',
       style: 'episode-timeline',
       mimeType: meta.mimeType,
@@ -769,7 +769,7 @@ export async function materializeVisualPack({
     };
   }
 
-  // Persona frequentemente devolve só summary/report sem images — sintetiza 1 prompt.
+  // Persona frequentemente devolve só summary/report sem images: sintetiza 1 prompt.
   const imageSpecs = synthesizeVisualImageSpecs(plan, { mission });
   const synthesizedImages = imageSpecs.some((item) => item.synthesized);
 

@@ -78,7 +78,7 @@ export default function EstadosProofPage() {
             <p>Nenhum caso agrícola corresponde a esse termo.</p>
             <button type="button">Limpar busca e filtros</button>
           </div>,
-          <p className="estados-na">Casos são locais — sem erro de rede.</p>,
+          <p className="estados-na">Casos são locais, sem erro de rede.</p>,
           <p className="estados-na">Sem espera de rede.</p>,
         ]}
       />

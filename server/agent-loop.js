@@ -70,7 +70,7 @@ Ferramentas disponiveis:
 - calc: calcula expressoes aritmeticas com seguranca
 
 Regras:
-1. Se puder responder com o que ja tem, responda direto — ferramenta e excecao.
+1. Se puder responder com o que ja tem, responda direto: ferramenta e excecao.
 2. Ensaio sintetico/local ou dados ja fornecidos: NAO busque a web.
 3. Se houver URL na missao, use fetch_url antes de concluir.
 4. Se a missao depender de fato externo SEM URL conhecida, use web_search e depois abra 1 fonte com fetch_url.
@@ -85,7 +85,7 @@ const MAX_INLINED_ATTACHMENT_CHARS = 120_000;
 
 /**
  * Attachment blocks are NOT portable across the 9Router catalog: Claude silently
- * ignores `input_file` (the persona answers as if no file existed — worst case,
+ * ignores `input_file` (the persona answers as if no file existed: worst case,
  * confident and wrong), while `image_url` works everywhere. Text-like files are
  * already plain text on our side, so we inline them into the prompt where every
  * model can read them, and keep only images as native multimodal parts.
@@ -248,7 +248,7 @@ async function runAgentWithToolsOnce({
     }
 
     // Continuation: only recover empty/tiny length cuts. A long truncated
-    // reply is already too verbose for the operator — publish it.
+    // reply is already too verbose for the operator: publish it.
     if (response.finishReason === 'length' && !continuationUsed) {
       const mode = truncatedReplyMode(response.content);
       if (mode === 'skip') {

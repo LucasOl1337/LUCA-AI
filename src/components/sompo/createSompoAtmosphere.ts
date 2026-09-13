@@ -56,6 +56,28 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
         vec3 c;
         if(night>.5){
           c=mix(vec3(.10,.16,.21),vec3(.016,.038,.075),pow(clamp(d.y*1.4,0.,1.),.55));
+          // Estrelas pontuais: células Voronoi com brilho variável e
+          // cintilação lenta. Sobem acima do horizonte e as serras pintadas
+          // mais abaixo cobrem as que ficariam na linha do relevo.
+          vec2 sg=vec2(az*40.,d.y*40.);
+          vec2 scell=floor(sg),sfr=fract(sg);
+          vec2 sp=vec2(hash(scell+7.31),hash(scell+3.17));
+          float sh=hash(scell+11.7);
+          float star=smoothstep(.1,.02,length(sfr-sp))*step(.972,sh)*smoothstep(.14,.34,d.y);
+          c+=vec3(.72,.8,.95)*star*(.35+.5*hash(scell+5.3))*(.75+.25*sin(clock*2.2+sh*43.));
+          // Lua: disco alto no azimute da luz da cena — o lado iluminado do
+          // cenário concorda com a lua visível, e ela fica onde a câmera olha.
+          vec3 moonDir=normalize(vec3(sd.x,.46,sd.z));
+          float mAmt=max(0.,dot(d,moonDir));
+          c+=vec3(.88,.92,1.)*smoothstep(.9990,.99955,mAmt)*2.2;
+          c+=vec3(.4,.5,.68)*pow(mAmt,220.)*.32;
+          // Nuvens noturnas: corpo mais escuro que o céu, beirada pegando um
+          // resto de luar só do lado da lua. Estrutura sem clarear a noite.
+          float ncl=fbm(vec2(az*1.8+clock*.0015,d.y*11.));
+          float nclMask=smoothstep(.07,.18,d.y)*(1.-smoothstep(.45,.72,d.y));
+          c=mix(c,c*vec3(.5,.56,.68),smoothstep(.5,.74,ncl)*nclMask*.6);
+          float nEdge=(smoothstep(.46,.6,ncl)-smoothstep(.6,.78,ncl))*nclMask;
+          c+=vec3(.3,.37,.48)*nEdge*pow(mAmt,14.)*.4;
           c+=sunlight*pow(sunAmt,40.)*.05;
         } else if(useHdri>.5){
           vec3 sky=mix(equirect(d,skyDry),equirect(d,skyWet),wetSky);

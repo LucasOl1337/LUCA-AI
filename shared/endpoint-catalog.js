@@ -124,7 +124,7 @@ export function buildEndpointCatalog({ mode = 'backend' } = {}) {
             '/api/sompo/telemetry/episode/:publicId/frames',
             'anexa frames do canvas Three.js ao episódio (máx. 6 por episódio, ~300KB cada, mime validado pelos bytes; aceito em gravação ou logo após o finish)',
             'local',
-            '{\n  "frames": [\n    {"dataUrl": "data:image/jpeg;base64,...", "offsetMs": 14750, "fase": "impacto", "label": "Impacto — pico de aceleração"}\n  ]\n}',
+            '{\n  "frames": [\n    {"dataUrl": "data:image/jpeg;base64,...", "offsetMs": 14750, "fase": "impacto", "label": "Impacto: pico de aceleração"}\n  ]\n}',
           ),
         ],
       },

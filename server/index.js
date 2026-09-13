@@ -363,7 +363,7 @@ createDeliberations({
 }).registerRoutes(app);
 
 app.use('/api', authService.requireUser);
-// ACCOUNT_WORKSPACE_ISOLATION_V1 — every authenticated API call runs inside the caller's workspace.
+// ACCOUNT_WORKSPACE_ISOLATION_V1: every authenticated API call runs inside the caller's workspace.
 app.use('/api', (req, res, next) => {
   const userId = req.auth?.user?.id;
   if (!userId) {
@@ -2470,7 +2470,7 @@ async function runLucaAiPersonaWorkflow({ mission, workflow, teamNames, loadedBy
 }
 
 // ---------------------------------------------------------------------------
-// VISUAL_STAGE_V2 — etapa de artefatos compartilhada (workflow e individual).
+// VISUAL_STAGE_V2: etapa de artefatos compartilhada (workflow e individual).
 // ---------------------------------------------------------------------------
 
 const VISUAL_WORKFLOW_ROLE = PERSONA_WORKFLOW_ROLES.find((role) => role.id === 'visual');
@@ -3049,7 +3049,7 @@ app.post('/api/mission/signal', (req, res) => {
   publishChatMessage({
     agentId: 'supervisor',
     type: signal.severity === 'critical' ? 'alerta' : 'info',
-    content: `Sinal em tempo real recebido — ${formatSignalLine(signal)}. Vou considerar na orquestracao.`,
+    content: `Sinal em tempo real recebido: ${formatSignalLine(signal)}. Vou considerar na orquestracao.`,
     meta: { signal },
   });
   emitEvent({ type: 'mission.signal', signal });
@@ -3216,7 +3216,7 @@ app.post('/api/luca-ai/chat/sessions/:sessionId/activate', (req, res) => {
 app.delete('/api/luca-ai/chat/sessions/:sessionId', (req, res) => {
   try {
     // Soft-delete: mantém transcript/anexos para o admin (suporte).
-    // Não remove arquivos — o usuário só deixa de ver a sessão.
+    // Não remove arquivos. O usuário só deixa de ver a sessão.
     const result = deleteChatSession(req.params.sessionId);
     res.json({ ok: true, ...result, ...getChatLibrarySnapshot() });
   } catch (error) {
@@ -3224,7 +3224,7 @@ app.delete('/api/luca-ai/chat/sessions/:sessionId', (req, res) => {
   }
 });
 
-// CHAT_ATTACHMENTS_V1 — upload/serve/remove private files of a chat session.
+// CHAT_ATTACHMENTS_V1: upload/serve/remove private files of a chat session.
 // Raw body (not multipart) keeps the parser trivial and the size cap enforced
 // by Express itself; the filename travels in a header.
 app.post(
@@ -3272,7 +3272,7 @@ app.delete('/api/luca-ai/chat/sessions/:sessionId/attachments/:attachmentId', (r
   }
 });
 
-// SHARE_LINKS_V1 — owner-side management of public share links.
+// SHARE_LINKS_V1: owner-side management of public share links.
 app.get('/api/luca-ai/chat/sessions/:sessionId/share', (req, res) => {
   try {
     getChatSession(req.params.sessionId); // ownership check inside caller workspace
@@ -3330,7 +3330,7 @@ app.post('/api/luca-ai/team-templates', (req, res) => {
   }
 });
 
-// /order must be registered before /:id — otherwise Express binds id="order"
+// /order must be registered before /:id: otherwise Express binds id="order"
 // and updateTeamTemplate throws template_not_found (404) on every reorder.
 app.put('/api/luca-ai/team-templates/:kind/order', (req, res) => {
   try {
@@ -4030,7 +4030,7 @@ app.post('/api/luca-ai/persona-team/run', (req, res) => {
     return;
   }
 
-  // 202 imediato — a borda Cloudflare (~100s) não espera a rodada multi-agente.
+  // 202 imediato. A borda Cloudflare (~100s) não espera a rodada multi-agente.
   res.status(202).json({
     ok: true,
     runId: job.runId,

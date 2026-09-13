@@ -80,7 +80,7 @@ test('CHAT_ATTACHMENTS_V1 recusa PDF enquanto nenhum modelo do catalogo souber l
     // Probes contra o 9Router local: gpt-5.6-sol, claude-fable-5 e grok-4.5
     // respondem sem enxergar o PDF, em input_file e em file/file_data.
     // Aceitar o upload faria a persona responder com confianca sobre um arquivo
-    // que nunca leu — pior que recusar na porta.
+    // que nunca leu: pior que recusar na porta.
     assert.throws(() => attachments.storeChatAttachment({
       sessionId: session.id,
       name: 'relatorio.pdf',
@@ -99,7 +99,7 @@ test('CHAT_ATTACHMENTS_V1 rejects spoofed image content and cross-account reads'
   workspace.runWithWorkspaceUser('owner-security', () => {
     const session = chatLibrary.createChatSession({ title: 'Seguro' });
     sessionId = session.id;
-    // Extension/MIME lie about the bytes — must not be trusted.
+    // Extension/MIME lie about the bytes: must not be trusted.
     assert.throws(() => attachments.storeChatAttachment({
       sessionId,
       name: 'falso.png',

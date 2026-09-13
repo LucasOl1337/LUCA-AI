@@ -10,7 +10,7 @@ import { sompoRenderBudget } from './sompoStage';
  * Cadeia real de pós: render HDR (alvo HalfFloat com MSAA) → bloom só do que
  * passa de 1.0 (sol, reflexos, céu) → tone mapping/sRGB no OutputPass → grade
  * cinematográfica leve (vinheta, saturação, split quente/frio) em sRGB.
- * No perfil compacto segue o passe único anterior — sem custo extra.
+ * No perfil compacto segue o passe único anterior, sem custo extra.
  */
 export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
   if (sompoRenderBudget().compact) {
@@ -24,7 +24,7 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
   const composer = new EffectComposer(renderer, target);
   composer.addPass(new RenderPass(scene, camera));
   // Um texel NaN/Inf contaminaria todos os mips do bloom e apagaria o frame
-  // inteiro — o passe zera qualquer valor inválido antes da extração de altas.
+  // inteiro. O passe zera qualquer valor inválido antes da extração de altas.
   const sanitize = new ShaderPass({
     uniforms: { tDiffuse: { value: null } },
     vertexShader: 'varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',

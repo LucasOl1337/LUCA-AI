@@ -40,7 +40,7 @@ export function wornRoadPaint() {
 }
 
 /** Tufo de capim baixo: lâminas finas e curtas, algumas deitadas tipo palha
- * seca, base espalhada — lê como gramado e não como agave. `tall` gera a
+ * seca, base espalhada: lê como gramado e não como agave. `tall` gera a
  * touceira mais alta do pasto. */
 export function grassTuftGeometry(blades: number, seed: number, tall = false) {
   const parts: THREE.BufferGeometry[] = [];
@@ -79,7 +79,7 @@ export function grassTuftGeometry(blades: number, seed: number, tall = false) {
 }
 
 /** Pé de lavoura: colmo + 9 folhas largas arqueadas que fecham a copa entre
- * plantas da fileira — a lavoura lê como massa contínua, não como talos
+ * plantas da fileira. A lavoura lê como massa contínua, não como talos
  * espaçados. Dois grupos de material: [colmo simples, folhas com textura alfa]. */
 function cropPlantGeometry(leaves = 9) {
   const stalk = new THREE.CylinderGeometry(0.02, 0.036, 1.1, 5);
@@ -189,7 +189,7 @@ export function createSompoRoadDetails(parent: THREE.Group) {
     material.customProgramCacheKey = () => `sompo-wind-${strength}`;
   };
   // Rampa calibrada da técnica sylva (inner-green-3d, MIT): verde fundo no
-  // pé da lâmina, ponta quente iluminada, sombreado por profundidade — o que
+  // pé da lâmina, ponta quente iluminada, sombreado por profundidade. O que
   // separa gramado real de veludo verde chapado. bladeT = altura na lâmina.
   const grassRamp = (material: THREE.MeshStandardMaterial) => {
     const prev = material.onBeforeCompile;
@@ -211,7 +211,7 @@ export function createSompoRoadDetails(parent: THREE.Group) {
   };
 
   // Gramado de beira de pista: tufos baixos e densos sobre faixa já coberta
-  // pelo pasto — lê como capim contínuo, não como espinhos em terra pelada.
+  // pelo pasto: lê como capim contínuo, não como espinhos em terra pelada.
   const tuftGeometry = grassTuftGeometry(10, 11);
   const grassMaterial = new THREE.MeshStandardMaterial({ vertexColors: false, roughness: 1, side: THREE.DoubleSide, color: 0xffffff });
   windify(grassMaterial, 0.055);
@@ -247,7 +247,7 @@ export function createSompoRoadDetails(parent: THREE.Group) {
   const grassTrail = makeTrail(grass, grassSlots, 160, false, 0.03);
 
   // Quebra de repetição no 1º plano: tufos altos e secos (capim barba-de-bode)
-  // entremeados na faixa — silhueta e palheta diferentes do gramado rasteiro.
+  // entremeados na faixa: silhueta e palheta diferentes do gramado rasteiro.
   const tallWeedMaterial = grassMaterial.clone();
   windify(tallWeedMaterial, 0.08);
   grassRamp(tallWeedMaterial);
@@ -264,7 +264,7 @@ export function createSompoRoadDetails(parent: THREE.Group) {
       x: rand(i + 812) * 160 - 80, z, y: -0.03, rotation: rand(i + 842) * Math.PI,
       scale: new THREE.Vector3(size * (0.8 + rand(i + 844) * 0.5), size * (0.75 + rand(i + 846) * 0.6), size * (0.8 + rand(i + 844) * 0.5)),
     });
-    // Maioria seco/dourado; fração verde-oliva — é a textura da beira real.
+    // Maioria seco/dourado; fração verde-oliva: é a textura da beira real.
     tallWeeds.setColorAt(i, rand(i + 877) < 0.7
       ? new THREE.Color().setHSL(0.105 + rand(i + 878) * 0.03, 0.34 + rand(i + 879) * 0.16, 0.3 + rand(i + 880) * 0.12)
       : new THREE.Color().setHSL(0.175 + rand(i + 878) * 0.04, 0.28 + rand(i + 879) * 0.12, 0.26 + rand(i + 880) * 0.1));
@@ -327,7 +327,7 @@ export function createSompoRoadDetails(parent: THREE.Group) {
   const cropRows = 30;
   const cropCols = 215;
   // LOD por faixa: perto da cerca (|z|<20) o pé fica completo (9 folhas);
-  // no fundo do talhão 4 folhas bastam — a copa continua fechada e o custo
+  // no fundo do talhão 4 folhas bastam. A copa continua fechada e o custo
   // de vértice cai ~30% sem rarefazer a leitura do carpete.
   const cropNearCount = 7 * cropCols, cropFarCount = (cropRows - 7) * cropCols;
   const cropsNear = new THREE.InstancedMesh(cropPlantGeometry(9), [cropStalkMaterial, cropLeafMaterial], cropNearCount);

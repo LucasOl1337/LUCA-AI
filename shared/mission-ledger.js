@@ -76,7 +76,7 @@ export function formatMissionLedgerForPrompt(ledger) {
   const normalized = normalizeMissionLedger(ledger);
   if (!missionLedgerHasItems(normalized)) return '';
   const line = (label, items) => (items.length ? `${label}: ${items.join('; ')}` : `${label}: (vazio)`);
-  return `Diario da missao (estado estruturado da bancada — nao e uma fala de persona):
+  return `Diario da missao (estado estruturado da bancada: nao e uma fala de persona):
 ${line('decisoes', normalized.decisions)}
 ${line('evidencias', normalized.evidence)}
 ${line('pendencias', normalized.pending)}

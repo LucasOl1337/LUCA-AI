@@ -190,13 +190,13 @@ test('briefing da bancada explicita alertas, frescor e lacunas de unidade', () =
   assert.match(mission, /não vieram no JSON/);
   assert.match(mission, /Equipe selecionada para avaliar: Risco Agro/);
   assert.match(mission, /Canal do runtime: conectado em tempo real/);
-  assert.match(mission, /Linha do tempo: sem histórico persistido nesta janela — análise baseada em frame único\./);
+  assert.match(mission, /Linha do tempo: sem histórico persistido nesta janela\. Análise baseada em frame único\./);
 
   const delimiterAt = mission.indexOf(SOMPO_MISSION_DOSSIER_DELIMITER);
   assert.ok(delimiterAt > 0, 'dossiê técnico vem depois do resumo');
   const summary = mission.slice(0, delimiterAt);
   const dossier = mission.slice(delimiterAt + SOMPO_MISSION_DOSSIER_DELIMITER.length);
-  assert.match(summary, /Análise de telemetria do trator 001 — equipamento físico via Firebase/);
+  assert.match(summary, /Análise de telemetria do trator 001: equipamento físico via Firebase/);
   assert.match(summary, /ALERTA: risco de colisão detectado/);
   assert.match(summary, /Distância frontal 70,66 cm, inclinação 0,06°\/-0,54°, temperatura 28,6 °C/);
   assert.match(summary, /Sem histórico nesta janela/);
@@ -229,11 +229,11 @@ test('resumo humano de simulação declara ensaio e preserva o briefing sintéti
   const summary = mission.slice(0, delimiterAt);
   const dossier = mission.slice(delimiterAt + SOMPO_MISSION_DOSSIER_DELIMITER.length);
 
-  assert.match(summary, /^\[Ensaio no simulador\] Análise de telemetria do trator SIM-001 — simulador 3D, cenário Operação normal/m);
+  assert.match(summary, /^\[Ensaio no simulador\] Análise de telemetria do trator SIM-001: simulador 3D, cenário Operação normal/m);
   assert.match(summary, /Sem flags de risco ativas/);
   assert.match(summary, /Distância frontal 210 cm, inclinação 1,5°\/1°, temperatura 27 °C/);
   assert.doesNotMatch(summary, /\[SIMULAÇÃO\]/);
-  assert.match(dossier, /\[SIMULAÇÃO\] Telemetria SOMPO — trator SIM-001/);
+  assert.match(dossier, /\[SIMULAÇÃO\] Telemetria SOMPO: trator SIM-001/);
   assert.match(dossier, /dados sintéticos; não enviados ao Firebase/);
 });
 

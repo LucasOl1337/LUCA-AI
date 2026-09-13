@@ -105,11 +105,11 @@ export function buildConsensusTurnPrompt({
   )).join('\n\n');
   const history = String(conversationContext || '').trim();
   const historyAppendix = history
-    ? `\n\nContexto de turnos anteriores desta conversa (gerado pela bancada — nao e sua resposta anterior):\n${history}`
+    ? `\n\nContexto de turnos anteriores desta conversa (gerado pela bancada: nao e sua resposta anterior):\n${history}`
     : '';
   const pressureBlock = pressure
     ? `A partir deste ciclo, voce DEVE convergir para a posicao majoritaria do quadro OU registrar dissenso em um paragrafo. Nao repita a mesma objecao sem evidencia nova.`
-    : `Atualize sua posicao com base no quadro. Voce pode manter, ceder ou divergir — justifique com evidencia.`;
+    : `Atualize sua posicao com base no quadro. Voce pode manter, ceder ou divergir: justifique com evidencia.`;
 
   return {
     name,

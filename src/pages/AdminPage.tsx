@@ -110,13 +110,13 @@ interface UserChatLibrary {
 }
 
 function formatDate(value: string) {
-  if (!value) return '—';
+  if (!value) return '-';
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
 }
 
 function formatRelative(value?: string) {
   const ts = Date.parse(value || '');
-  if (!ts) return '—';
+  if (!ts) return '-';
   const diff = Math.max(0, Date.now() - ts);
   if (diff < 60_000) return `há ${Math.max(1, Math.round(diff / 1000))}s`;
   if (diff < 3_600_000) return `há ${Math.round(diff / 60_000)} min`;
@@ -262,7 +262,7 @@ export default function AdminPage() {
       setReport(reportPayload.report);
     } catch (cause) {
       setError(pickFailureCopy(cause, {
-        offline: 'Sem internet. Os números que já estavam no console continuam na tela — reconecte e atualize.',
+        offline: 'Sem internet. Os números que já estavam no console continuam na tela. Reconecte e atualize.',
         forbidden: 'Esta conta não pode ver o console. Peça acesso a um administrador.',
         server: 'Overview, relatório e contas não chegaram. Tente de novo; o que já estava no console permanece.',
       }));
@@ -286,7 +286,7 @@ export default function AdminPage() {
   const funnel = report?.funnel;
   const generatedLabel = useMemo(() => {
     const stamp = report?.generatedAt || overview?.generatedAt;
-    return stamp ? formatDate(stamp) : '—';
+    return stamp ? formatDate(stamp) : '-';
   }, [overview?.generatedAt, report?.generatedAt]);
 
   async function openUserChats(account: TrackedUser, preferredSessionId?: string) {
@@ -311,7 +311,7 @@ export default function AdminPage() {
       }
     } catch (cause) {
       setChatError(pickFailureCopy(cause, {
-        offline: 'Sem internet. A inspeção não abriu — reconecte e tente de novo.',
+        offline: 'Sem internet. A inspeção não abriu. Reconecte e tente de novo.',
         forbidden: 'Você não pode ver os chats desta conta. Peça acesso de administrador.',
         server: 'Os chats desta conta não chegaram. Tente inspecionar de novo.',
       }));
@@ -331,7 +331,7 @@ export default function AdminPage() {
       setChatSession(sessionPayload.session);
     } catch (cause) {
       setChatError(pickFailureCopy(cause, {
-        offline: 'Sem internet. A sessão não abriu — reconecte e escolha de novo.',
+        offline: 'Sem internet. A sessão não abriu. Reconecte e escolha de novo.',
         forbidden: 'Você não pode abrir esta sessão. Peça acesso de administrador.',
         server: 'A sessão não abriu. Tente escolhê-la de novo.',
       }));
@@ -394,9 +394,9 @@ export default function AdminPage() {
       await impersonateUser(account.id);
     } catch (cause) {
       setEnterError(pickFailureCopy(cause, {
-        offline: 'Sem internet. Você continua no console admin — reconecte e tente entrar de novo.',
+        offline: 'Sem internet. Você continua no console admin. Reconecte e tente entrar de novo.',
         forbidden: 'Você não pode entrar nesta conta. Confira se ainda é administrador.',
-        server: 'Não foi possível entrar na conta. Você continua no console — tente de novo.',
+        server: 'Não foi possível entrar na conta. Você continua no console. Tente de novo.',
       }));
       setEnterBusyId(null);
     }
@@ -436,7 +436,7 @@ export default function AdminPage() {
           <span>ADMINISTRAÇÃO</span>
           <h1>Console de operações</h1>
           <p>
-            Relatórios de contas, ativação e uso do LUCA — no estilo do painel Sharingan.
+            Relatórios de contas, ativação e uso do LUCA, no estilo do painel Sharingan.
             {user?.email ? ` Operando como ${user.email}.` : ''}
           </p>
         </div>
@@ -450,14 +450,14 @@ export default function AdminPage() {
       </header>
 
       <section className="admin-metrics" aria-label="Indicadores">
-        <MetricCard icon={UsersRound} label="Contas cadastradas" value={overview?.totalUsers ?? '—'} />
-        <MetricCard icon={Activity} label="Ativos 24h" value={overview?.activeToday ?? '—'} hint={overview?.activeHour != null ? `${overview.activeHour} na última hora` : undefined} />
-        <MetricCard icon={ShieldCheck} label="Sessões ativas" value={overview?.activeSessions ?? '—'} />
-        <MetricCard icon={Workflow} label="Workspaces" value={overview?.workspaces ?? '—'} />
-        <MetricCard icon={Play} label="Rodadas" value={overview?.totalRuns ?? '—'} hint="envios na bancada" />
-        <MetricCard icon={MessageSquareText} label="Sessões com chat" value={overview?.totalActions ?? '—'} hint="sessões com conteúdo" />
-        <MetricCard icon={Gauge} label="Prompts" value={overview?.totalRequests ?? '—'} hint="1 prompt = 1 envio do operador" />
-        <MetricCard icon={AlertTriangle} label="Erros" value={overview?.totalErrors ?? '—'} />
+        <MetricCard icon={UsersRound} label="Contas cadastradas" value={overview?.totalUsers ?? '-'} />
+        <MetricCard icon={Activity} label="Ativos 24h" value={overview?.activeToday ?? '-'} hint={overview?.activeHour != null ? `${overview.activeHour} na última hora` : undefined} />
+        <MetricCard icon={ShieldCheck} label="Sessões ativas" value={overview?.activeSessions ?? '-'} />
+        <MetricCard icon={Workflow} label="Workspaces" value={overview?.workspaces ?? '-'} />
+        <MetricCard icon={Play} label="Rodadas" value={overview?.totalRuns ?? '-'} hint="envios na bancada" />
+        <MetricCard icon={MessageSquareText} label="Sessões com chat" value={overview?.totalActions ?? '-'} hint="sessões com conteúdo" />
+        <MetricCard icon={Gauge} label="Prompts" value={overview?.totalRequests ?? '-'} hint="1 prompt = 1 envio do operador" />
+        <MetricCard icon={AlertTriangle} label="Erros" value={overview?.totalErrors ?? '-'} />
       </section>
 
       <section className="admin-section" data-admin-product>
@@ -470,25 +470,25 @@ export default function AdminPage() {
         <div className="admin-funnel" aria-label="Funil de ativação">
           <article>
             <span>Cadastradas</span>
-            <strong>{funnel?.registered ?? overview?.totalUsers ?? '—'}</strong>
+            <strong>{funnel?.registered ?? overview?.totalUsers ?? '-'}</strong>
           </article>
           <article>
             <span>Ativas 24h</span>
-            <strong>{funnel?.activeToday ?? overview?.activeToday ?? '—'}</strong>
+            <strong>{funnel?.activeToday ?? overview?.activeToday ?? '-'}</strong>
             <small>{funnel ? `${funnel.activeRate}%` : ''}</small>
           </article>
           <article>
             <span>Com sessões de chat</span>
-            <strong>{funnel?.withActions ?? overview?.usersWithActions ?? '—'}</strong>
+            <strong>{funnel?.withActions ?? overview?.usersWithActions ?? '-'}</strong>
           </article>
           <article>
             <span>Com prompts</span>
-            <strong>{funnel?.withRuns ?? overview?.usersWithRuns ?? '—'}</strong>
+            <strong>{funnel?.withRuns ?? overview?.usersWithRuns ?? '-'}</strong>
             <small>{funnel ? `${funnel.activationRate}% ativação` : ''}</small>
           </article>
           <article>
             <span>Sem prompts</span>
-            <strong>{funnel?.withoutRuns ?? overview?.usersWithoutRuns ?? '—'}</strong>
+            <strong>{funnel?.withoutRuns ?? overview?.usersWithoutRuns ?? '-'}</strong>
           </article>
         </div>
       </section>
@@ -497,7 +497,7 @@ export default function AdminPage() {
         <div className="admin-section-header">
           <div>
             <h2>Ranking de uso</h2>
-            <p>Contas que mais operam a bancada — prompts enviados, sessões de chat e presença.</p>
+            <p>Contas que mais operam a bancada: prompts enviados, sessões de chat e presença.</p>
           </div>
           <Trophy className="admin-section-icon" />
         </div>

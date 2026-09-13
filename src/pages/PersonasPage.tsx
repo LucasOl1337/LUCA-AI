@@ -79,7 +79,7 @@ export default function PersonasPage() {
       setPersonas(normalizePersonaAssetUrls(data.personas ?? [], bridgeBase));
     } catch (err) {
       setError(pickFailureCopy(err, {
-        offline: 'Sem internet. Os cards que já estavam na grade continuam aqui — reconecte e recarregue as fontes.',
+        offline: 'Sem internet. Os cards que já estavam na grade continuam aqui. Reconecte e recarregue as fontes.',
         forbidden: 'Esta conta não pode ver o catálogo. Peça acesso a quem opera o Yume.',
         server: 'As fontes de personas não responderam. Tente de novo; o catálogo que já estava na tela permanece.',
       }));

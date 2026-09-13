@@ -10,7 +10,7 @@ async function loadModules(dataDir) {
   const bust = `${Date.now()}-${Math.random()}`;
   const workspace = await import(pathToFileURL(path.resolve('server/workspace-context.js')).href);
   // NOTE: chat-library must be the CANONICAL instance (no cache-bust) because
-  // share-links.js statically imports './chat-library.js' — a busted copy here
+  // share-links.js statically imports './chat-library.js'. A busted copy here
   // would be a different module instance and share-links would not see sessions.
   const chatLibrary = await import(pathToFileURL(path.resolve('server/chat-library.js')).href);
   const shareLinks = await import(

@@ -35,7 +35,7 @@ function replyEntry(reply, { id, timestamp, stage, phase, content } = {}) {
 
 export function formatPersonaRunDuration(value) {
   const durationMs = typeof value === 'number' ? value : Number.NaN;
-  if (!Number.isFinite(durationMs) || durationMs < 0) return '—';
+  if (!Number.isFinite(durationMs) || durationMs < 0) return '-';
   if (durationMs < 100) return '<0,1 s';
   if (durationMs < 60_000) {
     return `${(durationMs / 1000).toLocaleString('pt-BR', {

@@ -131,7 +131,7 @@ function loadWorkspace(userId) {
   const filePath = statePathFor(id);
   const state = loadStateFromPath(filePath);
   // One-time migration: if user has empty workspace and legacy global file exists,
-  // do NOT share it — leave legacy untouched so accounts stay isolated.
+  // do NOT share it: leave legacy untouched so accounts stay isolated.
   workspaces.set(id, state);
   return state;
 }

@@ -39,7 +39,7 @@ test('durante a gravação os controles manuais ficam travados e o gerador norma
 });
 
 test('falha de rede no episódio aborta com aviso e mantém o simulador vivo', () => {
-  assert.match(simulator, /Falha de rede ao gravar o episódio — gravação abortada\. O simulador continua ativo\./);
+  assert.match(simulator, /Falha de rede ao gravar o episódio. Gravação abortada\. O simulador continua ativo\./);
   assert.match(simulator, /'aborted'/);
   assert.match(simulator, /A gravação não começou; o simulador continua ativo\./);
 });
@@ -53,7 +53,7 @@ test('simulador captura frames nos momentos do plano e sobe 1 por request sem de
   assert.match(simulator, /EPISODE_FRAME_LATE_TOLERANCE_MS/);
   assert.match(simulator, /postSompoTelemetryEpisodeFrames\(run\.publicId, \[frame\]\)/);
   assert.match(simulator, /data-sompo-episode-frames-warning/);
-  assert.match(simulator, /Falha ao enviar os frames do simulador — o episódio foi gravado, mas a análise seguirá sem evidência visual\./);
+  assert.match(simulator, /Falha ao enviar os frames do simulador. O episódio foi gravado, mas a análise seguirá sem evidência visual\./);
   assert.match(simulator, /frames: \{episodeFrameCount\}\/\{episodeFrameTotal\}/);
 });
 
@@ -62,7 +62,7 @@ test('bancada baixa os frames do episódio, reenvia como anexos da sessão e fal
   assert.match(page, /getSompoTelemetryEpisodeFrameBlob/);
   assert.match(page, /uploadChatAttachment\(launchSession\.id, file\)/);
   assert.match(page, /attachments: launchAttachments/);
-  assert.match(page, /Falha ao anexar os frames do episódio à bancada\. Nada foi enviado — tente de novo\./);
+  assert.match(page, /Falha ao anexar os frames do episódio à bancada\. Nada foi enviado. Tente de novo\./);
   const lucaAiPage = readFileSync(join(root, '../src/pages/LucaAiPage.tsx'), 'utf8');
   assert.match(lucaAiPage, /launch\?\.attachments/);
 });

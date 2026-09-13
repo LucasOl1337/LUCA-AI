@@ -60,7 +60,7 @@ interface AdminChatViewerProps {
 
 function formatRelative(value?: string) {
   const ts = Date.parse(value || '');
-  if (!ts) return '—';
+  if (!ts) return '-';
   const diff = Math.max(0, Date.now() - ts);
   if (diff < 60_000) return `há ${Math.max(1, Math.round(diff / 1000))}s`;
   if (diff < 3_600_000) return `há ${Math.round(diff / 60_000)} min`;
@@ -84,10 +84,10 @@ function lastOperatorContent(transcript: AdminChatTranscriptEntry[], missionDraf
   return String(missionDraft || '').trim();
 }
 
-/** Corpo legível: headings, listas, negrito básico — espelha a bancada sem o parser completo. */
+/** Corpo legível: headings, listas, negrito básico: espelha a bancada sem o parser completo. */
 function ReadBody({ content, compact = false }: { content: string; compact?: boolean }) {
   const theme = useTheme();
-  const text = String(content || '').trim() || '—';
+  const text = String(content || '').trim() || '-';
   const lines = text.replace(/\r/g, '').split('\n');
 
   return (
@@ -301,10 +301,10 @@ export default function AdminChatViewer({
       data-admin-chat-inspect-layer
       role="dialog"
       aria-modal="true"
-      aria-label={`Chat de ${account.name} — visão da bancada`}
+      aria-label={`Chat de ${account.name}: visão da bancada`}
     >
       <div className="admin-chat-shell">
-        {/* Top bar — conta + somente leitura */}
+        {/* Top bar: conta + somente leitura */}
         <header className="admin-chat-topbar">
           <div className="admin-chat-topbar-left">
             <button type="button" className="admin-chat-back" onClick={onClose}>
@@ -362,7 +362,7 @@ export default function AdminChatViewer({
 
         {!error || library ? (
           <div className="admin-chat-workspace luca-ai-chat-page">
-            {/* Rail de sessões — espelho da sidebar da bancada */}
+            {/* Rail de sessões: espelho da sidebar da bancada */}
             <aside className="admin-chat-rail" aria-label="Sessões do usuário">
               <div className="admin-chat-rail-head">
                 <MessageSquareText />
@@ -407,7 +407,7 @@ export default function AdminChatViewer({
               </div>
             </aside>
 
-            {/* Coluna principal — mesma estrutura da bancada */}
+            {/* Coluna principal: mesma estrutura da bancada */}
             <div className="luca-ai-chat-column admin-chat-main" data-admin-chat-main>
               <header className="luca-ai-chat-toolbar admin-chat-toolbar">
                 <div className="min-w-0">
@@ -471,7 +471,7 @@ export default function AdminChatViewer({
                           <p>
                             {originalMission
                               ? 'A missão está salva, mas esta sessão ainda não tem respostas das personas.'
-                              : 'Esta sessão existe e está vazia — o usuário ainda não enviou uma missão.'}
+                              : 'Esta sessão existe e está vazia. O usuário ainda não enviou uma missão.'}
                           </p>
                         </div>
                       ) : (
@@ -513,11 +513,11 @@ export default function AdminChatViewer({
                 )}
               </main>
 
-              {/* Composer desativado — só para lembrar a bancada real */}
+              {/* Composer desativado: só para lembrar a bancada real */}
               <div className="admin-chat-composer-ghost" aria-hidden="true">
                 <div>
                   <span>Compositor bloqueado</span>
-                  <p>Modo somente leitura — use “Entrar como usuário” para operar a conta.</p>
+                  <p>Modo somente leitura. Use “Entrar como usuário” para operar a conta.</p>
                 </div>
               </div>
             </div>

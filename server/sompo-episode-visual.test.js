@@ -79,7 +79,7 @@ test('linha do tempo SVG: curvas reais, marcadores nomeados e atraso visível en
   assert.ok(distCurves.length >= 1, 'curva de distância presente');
   assert.ok(accCurves.length >= 1, 'curva de aceleração presente');
 
-  // Marcadores nomeados: início, IMPACTO e disparo da flag — mais a faixa do atraso.
+  // Marcadores nomeados: início, IMPACTO e disparo da flag: mais a faixa do atraso.
   assert.match(svg, /Início da gravação/);
   assert.match(svg, /PICO t\+14,5s/);
   assert.match(svg, /Alerta disparou t\+16,8s/);
@@ -87,7 +87,7 @@ test('linha do tempo SVG: curvas reais, marcadores nomeados e atraso visível en
 
   // Unidades humanas: g primário, m/s² exatamente uma vez, sem jargão.
   assert.match(svg, /Distância frontal \(cm\)/);
-  assert.match(svg, /Aceleração \(g\) — pico de 3,7 g \(36 m\/s²\)/);
+  assert.match(svg, /Aceleração \(g\): pico de 3,7 g \(36 m\/s²\)/);
   assert.equal((svg.match(/m\/s²/g) || []).length, 1, 'm/s² aparece uma única vez');
   assert.doesNotMatch(svg, /por fase/i);
   assert.doesNotMatch(svg, /Δv|saturação|pulso único/i);
@@ -130,7 +130,7 @@ test('materializeVisualPack em missão de episódio: linha do tempo + cartão, c
     },
   });
 
-  // Redundância morta: sem barras por fase, sem infográfico de IA — só a curva e o cartão.
+  // Redundância morta: sem barras por fase, sem infográfico de IA: só a curva e o cartão.
   assert.equal(imageCalls, 0, 'geração de imagem por IA não é chamada');
   assert.deepEqual(pack.charts, []);
   assert.equal(pack.images.length, 1);

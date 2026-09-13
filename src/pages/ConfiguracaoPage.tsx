@@ -101,7 +101,7 @@ export default function ConfiguracaoPage() {
     } catch (err) {
       setErrorScope('load');
       setError(pickFailureCopy(err, {
-        offline: 'Sem internet. Os templates que já estavam na tela continuam aqui — reconecte e recarregue.',
+        offline: 'Sem internet. Os templates que já estavam na tela continuam aqui. Reconecte e recarregue.',
         forbidden: 'Esta conta não pode ver a configuração das equipes. Peça acesso a um administrador.',
         server: 'A configuração das equipes não chegou. Tente de novo; o que já estava na lista permanece.',
       }));
@@ -224,9 +224,9 @@ export default function ConfiguracaoPage() {
     } catch (err) {
       setErrorScope('save');
       setError(pickFailureCopy(err, {
-        offline: 'Sem internet. O rascunho continua no formulário — reconecte e salve de novo.',
+        offline: 'Sem internet. O rascunho continua no formulário. Reconecte e salve de novo.',
         forbidden: 'Esta conta não pode gravar templates. Peça a um administrador.',
-        server: 'O template não foi gravado. O que você preencheu continua aqui — tente salvar de novo.',
+        server: 'O template não foi gravado. O que você preencheu continua aqui. Tente salvar de novo.',
       }));
     } finally {
       setBusy(false);
@@ -245,7 +245,7 @@ export default function ConfiguracaoPage() {
     } catch (err) {
       setErrorScope('mutate');
       setError(pickFailureCopy(err, {
-        offline: 'Sem internet. O template não foi apagado — reconecte e tente de novo.',
+        offline: 'Sem internet. O template não foi apagado. Reconecte e tente de novo.',
         forbidden: 'Esta conta não pode apagar templates. Peça a um administrador.',
         server: 'O template continua na lista. Tente apagar de novo em instantes.',
       }));
@@ -271,7 +271,7 @@ export default function ConfiguracaoPage() {
     } catch (err) {
       setErrorScope('mutate');
       setError(pickFailureCopy(err, {
-        offline: 'Sem internet. A ordem não mudou — reconecte e tente de novo.',
+        offline: 'Sem internet. A ordem não mudou. Reconecte e tente de novo.',
         forbidden: 'Esta conta não pode reordenar templates. Peça a um administrador.',
         server: 'A ordem não foi gravada. Tente mover de novo em instantes.',
       }));

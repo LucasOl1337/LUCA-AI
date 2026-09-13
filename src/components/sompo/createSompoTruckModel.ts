@@ -321,12 +321,12 @@ export function createSompoTruckModel({ sensorLabel }: SompoTruckModelOptions): 
     }
     const branding = addPart(cargo, `cargo-decal-${side}`, new THREE.PlaneGeometry(3.0, 0.75), decal, [-1.24, 2.56, side * 1.221]);
     if (side < 0) branding.rotation.y = Math.PI;
-    // Faixa refletiva contínua na base do baú — alternância vermelho/branco.
+    // Faixa refletiva contínua na base do baú: alternância vermelho/branco.
     for (let i = 0; i < 10; i += 1) {
       addBox(cargo, `reflector-${side}-${i}`, [0.56, 0.055, 0.014], [-3.95 + i * 0.55, 1.43, side * 1.22], i % 2 ? red : lamp);
     }
     // Porta lateral do baú: painel levemente ressaltado + ombreiras, fecho
-    // vertical e trinco — o vinco que a referência mostra na lateral.
+    // vertical e trinco. O vinco que a referência mostra na lateral.
     addBox(cargo, `side-door-panel-${side}`, [1.12, 2.18, 0.035], [-0.42, 2.5, side * 1.195], corrugatedBlue, 0.012);
     for (const y of [1.72, 2.5, 3.28]) {
       addBox(cargo, `side-door-hinge-${side}-${y}`, [0.05, 0.16, 0.045], [-1.0, y, side * 1.215], chrome, 0.008);
@@ -384,7 +384,7 @@ export function createSompoTruckModel({ sensorLabel }: SompoTruckModelOptions): 
   addBox(cab, 'cab-roof-hatch', [0.72, 0.05, 0.88], [2.65, 3.68, 0], paintedBlueDark, 0.035);
   addBox(cab, 'lower-air-intake', [0.035, 0.17, 0.92], [4.483, 0.99, 0], blackPlastic, 0.025);
 
-  // Unidade de refrigeração no topo da face dianteira do baú — silhueta
+  // Unidade de refrigeração no topo da face dianteira do baú: silhueta
   // assinatura do caminhão frigorífico da referência.
   const refrig = new THREE.Group();
   registerPart(nodes, refrig, 'refrigeration-unit');

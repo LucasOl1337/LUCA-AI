@@ -7,7 +7,7 @@ interface StatePillProps {
   color?: string;
 }
 
-/** Pílula de estado no rodapé do cockpit (ONLINE / DB / IDLE) — dirigida por estado real. */
+/** Pílula de estado no rodapé do cockpit (ONLINE / DB / IDLE): dirigida por estado real. */
 export default function StatePill({ label, on, color }: StatePillProps) {
   const theme = useTheme();
   const dot = on ? (color ?? theme.alive) : theme.textGhost;

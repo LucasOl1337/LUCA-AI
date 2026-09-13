@@ -164,7 +164,7 @@ export default function PublicReadingPage({ token }: { token: string }) {
       setShare(payload.share);
     } catch (cause) {
       setError(pickFailureCopy(cause, {
-        offline: 'Sem internet. Reconecte e tente abrir o link de novo — o endereço continua o mesmo.',
+        offline: 'Sem internet. Reconecte e tente abrir o link de novo. O endereço continua o mesmo.',
         forbidden: 'Você não pode ver esta sessão. Peça um novo link a quem compartilhou, ou entre com a conta certa.',
         server: 'A sessão compartilhada não abriu. Tente de novo em instantes.',
       }));
@@ -188,8 +188,8 @@ export default function PublicReadingPage({ token }: { token: string }) {
     }
     robots.content = 'noindex, nofollow';
     document.title = share?.snapshot.title
-      ? `${share.snapshot.title} — LUCA em modo leitura`
-      : 'LUCA — modo leitura';
+      ? `${share.snapshot.title}: LUCA em modo leitura`
+      : 'LUCA: modo leitura';
     return () => {
       document.title = previousTitle;
       if (existingRobots) robots.content = previousRobots || '';
@@ -292,7 +292,7 @@ export default function PublicReadingPage({ token }: { token: string }) {
                     <div className="luca-ai-composer-dock">
                       <div className="luca-reading-composer" role="note">
                         <LockKeyhole className="h-4 w-4 shrink-0" />
-                        <span className="min-w-0 flex-1">Modo leitura — esta sessão não aceita novas mensagens.</span>
+                        <span className="min-w-0 flex-1">Modo leitura. Esta sessão não aceita novas mensagens.</span>
                       </div>
                     </div>
                   ) : null}

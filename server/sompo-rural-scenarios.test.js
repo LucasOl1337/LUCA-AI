@@ -41,7 +41,7 @@ test('casos têm consequências distintas na telemetria e no movimento', () => {
   assert.equal(rain.rain, 1); assert.ok(Math.abs(rain.yawRate) > 1);
   const animal = getSompoRuralFrame('animal-crossing', 8_000);
   // freada-a-tempo: o caminhão para (~7,4 s) com o animal ainda junto à pista,
-  // saindo pelo acostamento — não vale o regime antigo em que ele já tinha ido embora.
+  // saindo pelo acostamento: não vale o regime antigo em que ele já tinha ido embora.
   assert.ok(animal.animalZ > 1 && animal.animalZ < 3.5, `animal junto à pista na parada: ${animal.animalZ}`);
   assert.equal(animal.speedKph, 0); assert.equal(animal.collisionRisk, true);
   assert.ok(getSompoRuralFrame('brake-failure', 10_000).speedKph > getSompoRuralFrame('brake-failure', 0).speedKph);
@@ -83,7 +83,7 @@ test('desvios leem física real: nariz acompanha o vetor de movimento (slip-angl
         `${scenarioId}/${outcomeId} t=${t}: |yaw|=${frame.yaw.toFixed(1)} acima de ${maxYaw}°`,
       );
       // Sob deslocamento lateral forte, o nariz lidera o movimento (mesmo
-      // sinal de lateralRate) — nunca aponta contra a trajetória.
+      // sinal de lateralRate): nunca aponta contra a trajetória.
       if (steered && Math.abs(frame.lateralRate) >= 0.5 && frame.speedKph > 15) {
         assert.ok(
           frame.yaw * frame.lateralRate >= -1 || Math.abs(frame.yaw) <= 2,

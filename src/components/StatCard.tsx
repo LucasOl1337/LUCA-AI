@@ -14,7 +14,7 @@ const fadeUp = {
   show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.4, 0, 0.2, 1] as const } },
 };
 
-/** Card de estatística — estilo Kamui Dimension, tema porcelana. */
+/** Card de estatística: estilo Kamui Dimension, tema porcelana. */
 export default function StatCard({ icon: Icon, label, value, desc, tone }: StatCardProps) {
   const theme = useTheme();
   return (

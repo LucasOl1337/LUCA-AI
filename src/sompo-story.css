@@ -1,4 +1,4 @@
-/* Faixa narrativa de user story — fica acima do canvas na telemetria. */
+/* Faixa narrativa de user story: fica acima do canvas na telemetria. */
 .sompo-story {
   --sompo-story-accent: var(--l-navy, #0a84ff);
   --sompo-story-light: var(--l-gold-deep, #82c7ff);

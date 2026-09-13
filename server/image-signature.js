@@ -1,4 +1,4 @@
-// Assinaturas de imagem por bytes — fonte única usada por chat-attachments e
+// Assinaturas de imagem por bytes: fonte única usada por chat-attachments e
 // pelos frames de episódio SOMPO. Confie nos bytes, nunca no rótulo declarado.
 export const IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 

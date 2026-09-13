@@ -44,7 +44,7 @@ function rangeForDistance(distance: number | null | undefined): number {
   return 1.2 + (((clamped - 5) * (7.2 - 1.2)) / (300 - 5));
 }
 
-/** Altura do solado do pneu no asfalto — quase encostado, sem flutuar. */
+/** Altura do solado do pneu no asfalto: quase encostado, sem flutuar. */
 const SOMPO_WHEEL_CONTACT_Y = 0.025;
 /** Curso máximo da suspensão virtual por roda (m), antes de afundar/flutuar. */
 const SOMPO_SUSPENSION_TRAVEL = 0.55;
@@ -180,7 +180,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
 
     // Contato real das rodas: a carroceria inclina sobre a suspensão, mas os
     // solados ficam no solo. Apoiar o casco inteiro (convex hull) suspendia o
-    // eixo oposto a qualquer mergulho — era o "flutuando" do bug report.
+    // eixo oposto a qualquer mergulho: era o "flutuando" do bug report.
     let wheelContacts: SompoWheelContact[] = [];
     let wheelContactsSource: readonly THREE.Object3D[] = [];
     let contactMeanX = 0;
@@ -373,7 +373,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       // ── Deslocamento real no mundo ────────────────────────────────────────
       if (lastCruiseKph === null) lastCruiseKph = settings.speedKph;
       else if (settings.speedKph !== lastCruiseKph) {
-        // Slider de cruzeiro em cenário livre: a forma fechada v·t saltaria —
+        // Slider de cruzeiro em cenário livre: a forma fechada v·t saltaria -
         // recalibra a origem para a posição ficar contínua.
         if (!motionScript) {
           runOriginX += scenarioTravelMeters({ ...settings, speedKph: lastCruiseKph }, scenarioElapsed)
@@ -469,7 +469,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
         : (ruralFrame?.roughness ?? settings.roughness) * 0.008 * Math.min(1, (ruralFrame?.speedKph ?? brakingState?.speedKph ?? settings.speedKph) / 8);
       // Rampas roteirizadas ("vence a rampa", "desce controlado") mudam o perfil
       // do terreno junto com o pitch do roteiro; a cabine (mergulho de frenagem)
-      // não gira o mundo — por isso brake-failure usa o pitch fixo do preset.
+      // não gira o mundo, por isso brake-failure usa o pitch fixo do preset.
       const slope = !isFirebase && ['steep-climb', 'steep-descent', 'brake-failure'].includes(settings.scenarioId)
         ? THREE.MathUtils.degToRad(settings.scenarioId === 'brake-failure' ? settings.pitch : (ruralFrame?.pitch ?? settings.pitch))
         : 0;
@@ -481,7 +481,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
         ? truckGroundHeight(relativeGroundRotation, truckGroup.userData.groundSupport) / Math.max(0.5, Math.cos(slope))
         : truckGroundHeight(truckPoseGroup.rotation, truckGroup.userData.groundSupport);
       // Em atitudes pequenas o apoio vem das rodas (suspensão virtual); em
-      // inclinações grandes — rampa extrema ou capotamento — o casco apoia.
+      // inclinações grandes (rampa extrema ou capotamento) o casco apoia.
       const groundAngle = Math.max(Math.abs(relativeGroundRotation.z), Math.abs(relativeGroundRotation.x));
       const contactFactor = 1 - THREE.MathUtils.smoothstep(groundAngle, 0.14, 0.34);
       const cosSlope = Math.max(0.5, Math.cos(slope));

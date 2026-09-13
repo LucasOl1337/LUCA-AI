@@ -2,7 +2,7 @@
  * Casos de exemplo SOMPO (foco agrícola).
  *
  * São cenários didáticos construídos a partir de padrões públicos do seguro
- * rural brasileiro e dos produtos/comunicados da Sompo — não são sinistros
+ * rural brasileiro e dos produtos/comunicados da Sompo: não são sinistros
  * reais de apólices confidenciais. Use-os para treinar a bancada LUCA-AI.
  */
 
@@ -44,7 +44,7 @@ export interface SompoExampleCase {
   stage: SompoCaseStage;
   stageLabel: string;
   riskEvent: string;
-  /** Cover image under public/sompo — visual do caso na grade e no launch. */
+  /** Cover image under public/sompo: visual do caso na grade e no launch. */
   image: string;
   tags: string[];
   situation: string;
@@ -90,14 +90,14 @@ export const SOMPO_INDUSTRY_CONTEXT: SompoIndustryFact[] = [
     label: 'Sompo agrícola 2023',
     value: '46% sinistralidade',
     detail: 'Carteira agrícola da Sompo com prêmios de R$ 82,8 mi; penhor/máquinas com prêmios de R$ 362,3 mi no mesmo recorte publicado.',
-    source: 'Valor Econômico — especiais Seguros e Resseguros (abr/2024)',
+    source: 'Valor Econômico: especiais Seguros e Resseguros (abr/2024)',
   },
   {
     id: 'zarc',
     label: 'ZARC',
     value: 'Gate de cobertura',
     detail: 'Plantar fora da janela do ZARC eleva risco de indeferimento em Proagro/seguro rural e subvenção PSR.',
-    source: 'CNA — Guia dos Seguros Rurais; MAPA/ZARC',
+    source: 'CNA: Guia dos Seguros Rurais; MAPA/ZARC',
   },
   {
     id: 'vistoria-digital',
@@ -143,12 +143,12 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
     finance:
       'LMIR e prêmio da apólice ainda não anexados ao dossiê; marcar valores de indenização como pendentes até o laudo fechar a produtividade obtida e a área elegível.',
     decisionGoal:
-      'Montar canvas executivo para underwriting/sinistros agrícolas: priorizar talhões, estimar exposição, listar lacunas (ZARC, apuração, LMIR), plano de vistoria e critério de sucesso para a Sompo — sem inventar números financeiros.',
+      'Montar canvas executivo para underwriting/sinistros agrícolas: priorizar talhões, estimar exposição, listar lacunas (ZARC, apuração, LMIR), plano de vistoria e critério de sucesso para a Sompo, sem inventar números financeiros.',
     patternNote:
       'Seca é o evento que mais aciona seguro agrícola no Brasil; safrinha de milho no Sul/Centro-Oeste é carteira clássica de exposição climática.',
     sources: [
-      'Embrapa — peso da seca nos acionamentos',
-      'Globo Rural/Forbes — seca+granizo+geada ~87% dos sinistros',
+      'Embrapa: peso da seca nos acionamentos',
+      'Globo Rural/Forbes: seca+granizo+geada ~87% dos sinistros',
       'Sompo Agrícola Produtividade (comunicação de produto)',
     ],
     suggestedPresetId: 'risco-agro',
@@ -174,7 +174,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
       'Radar e alertas meteorológicos no horário do evento',
       'Mapa de danos por gleba (drone) com % de desfolha e vagens comprometidas',
       'Histórico de granizo da carteira na mesma microregião',
-      'Prazo de colheita em 12 dias — risco de perda de evidência',
+      'Prazo de colheita em 12 dias: risco de perda de evidência',
     ],
     questions: [
       'Qual protocolo de amostragem por gleba minimiza disputa pós-colheita?',
@@ -186,14 +186,14 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
     telemetry:
       'Célula de granizo confirmada por radar entre 16h20–16h55. Umidade foliar alta e vento >60 km/h no pico. Imagens georreferenciadas disponíveis; nuvem coberta impede satélite óptico por 48h.',
     finance:
-      'Estimativa preliminar de área severamente afetada ~27 ha; valor indenizável depende da produtividade obtida e da franquia — marcar R$ como pendente.',
+      'Estimativa preliminar de área severamente afetada ~27 ha; valor indenizável depende da produtividade obtida e da franquia: marcar R$ como pendente.',
     decisionGoal:
-      'Priorizar regulação de granizo: plano de amostragem, evidências mínimas antes da colheita, ranking de glebas e risco de contestação — canvas acionável para sinistros agrícolas.',
+      'Priorizar regulação de granizo: plano de amostragem, evidências mínimas antes da colheita, ranking de glebas e risco de contestação: canvas acionável para sinistros agrícolas.',
     patternNote:
       'Granizo está entre as três principais causas de sinistro agrícola no Brasil e exige prova rápida de campo.',
     sources: [
       'Levantamentos setoriais seca/granizo/geada',
-      'Sompo — vistoria de campo digital para agilizar indenização',
+      'Sompo: vistoria de campo digital para agilizar indenização',
     ],
     suggestedPresetId: 'risco-agro',
     suggestedMode: 'team',
@@ -230,7 +230,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
     telemetry:
       'INMET: mínimas -1,2 °C e -0,4 °C em noites consecutivas. Índice de risco de geada da região classificado como elevado no mês do evento. Cultivares mistas na carteira (ciclo precoce e médio).',
     finance:
-      'Prêmio e sinistralidade da carteira cooperativa em consolidação; não inventar taxa — listar premissas e lacunas para o comitê de underwriting.',
+      'Prêmio e sinistralidade da carteira cooperativa em consolidação; não inventar taxa: listar premissas e lacunas para o comitê de underwriting.',
     decisionGoal:
       'Canvas de underwriting: impacto da geada na praça, opções de reprecificação/nível de cobertura, condições de renovação e métricas de acompanhamento da carteira de trigo.',
     patternNote:
@@ -257,7 +257,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
     image: '/sompo/chuva-replantio-mt.jpg',
     tags: ['chuva-excessiva', 'replantio', 'custeio', 'stand'],
     situation:
-      'Chuvas concentradas logo após o plantio de soja reduzem o stand em vários talhões. Segurado avalia replantio, mas a janela ZARC está no limite. Apólice de custeio pode cobrir reembolso de despesas de plantio em perda total da unidade — a equipe precisa distinguir falha de emergência coberta de manejo inadequado e de risco excluído.',
+      'Chuvas concentradas logo após o plantio de soja reduzem o stand em vários talhões. Segurado avalia replantio, mas a janela ZARC está no limite. Apólice de custeio pode cobrir reembolso de despesas de plantio em perda total da unidade. A equipe precisa distinguir falha de emergência coberta de manejo inadequado e de risco excluído.',
     signals: [
       'Precipitação >120 mm em 72h após plantio em parte da fazenda',
       'Stand médio 48% do alvo nos talhões alagados',
@@ -274,7 +274,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
     telemetry:
       'Sensores de umidade saturados por 4 dias; drenagem natural lenta em N1/S1. Previsão de nova instabilidade em 72h. Imagens de drone de stand disponíveis.',
     finance:
-      'Custo de replantio e valor de custeio da operação original ainda em planilha do produtor — marcar R$ como pendente; focar elegibilidade e processo.',
+      'Custo de replantio e valor de custeio da operação original ainda em planilha do produtor: marcar R$ como pendente; focar elegibilidade e processo.',
     decisionGoal:
       'Decisão operacional: elegibilidade de custeio/replantio, risco ZARC, plano de evidências e recomendação para o segurado e para a Sompo em 48h.',
     patternNote:
@@ -318,21 +318,21 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
     telemetry:
       'Série Sentinel com início de vigor vegetativo compatível com plantio tardio. Déficit hídrico confirmado 40–70 DAS. Nenhum sensor IoT na propriedade.',
     finance:
-      'Indenização potencial e subvenção PSR não calculadas — não inventar; mapear se a negativa elimina 100% da cobertura ou só o benefício público.',
+      'Indenização potencial e subvenção PSR não calculadas: não inventar; mapear se a negativa elimina 100% da cobertura ou só o benefício público.',
     decisionGoal:
       'Dossiê de governança: elegibilidade ZARC, matriz de decisão (indenizar / parcial / negar), evidências mínimas e texto-base de resposta ao corretor.',
     patternNote:
       'ZARC é gate conhecido de Proagro, PSR e boa prática de underwriting rural; descumprimento é causa clássica de disputa.',
     sources: [
-      'CNA — Guia dos Seguros Rurais (ZARC e indenização)',
-      'MAPA/ZARC — janelas de plantio',
+      'CNA: Guia dos Seguros Rurais (ZARC e indenização)',
+      'MAPA/ZARC: janelas de plantio',
     ],
     suggestedPresetId: 'risco-agro',
     suggestedMode: 'team',
   },
   {
     id: 'penhor-trator-incendio',
-    title: 'Penhor rural — trator sinistrado',
+    title: 'Penhor rural: trator sinistrado',
     subtitle: 'Incêndio em pátio com gravame bancário e salvados',
     culture: 'Patrimônio rural',
     region: 'Triângulo Mineiro (MG)',
@@ -345,7 +345,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
     image: '/sompo/penhor-trator-incendio.jpg',
     tags: ['penhor', 'maquinas', 'incendio', 'credito-rural'],
     situation:
-      'Trator financiado (penhor) sofre incêndio no pátio da fazenda. Banco é beneficiário da apólice; produtor quer reposição rápida para não parar o plantio. Regulador precisa cruzar laudo de bombeiros, valor de mercado, salvados e saldo devedor — linha de negócio relevante na carteira rural da Sompo.',
+      'Trator financiado (penhor) sofre incêndio no pátio da fazenda. Banco é beneficiário da apólice; produtor quer reposição rápida para não parar o plantio. Regulador precisa cruzar laudo de bombeiros, valor de mercado, salvados e saldo devedor: linha de negócio relevante na carteira rural da Sompo.',
     signals: [
       'Boletim de ocorrência e laudo do corpo de bombeiros',
       'Número de série / gravame no sistema do credor',
@@ -362,13 +362,13 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
     telemetry:
       'Sem telemetria embarcada ativa no momento do fogo. Câmera do pátio com falha de gravação entre 02h–04h. Testemunhas do caseiro.',
     finance:
-      'Valor de mercado, saldo devedor e salvados ainda em cotação — marcar todos os R$ como pendentes e listar documentos faltantes.',
+      'Valor de mercado, saldo devedor e salvados ainda em cotação: marcar todos os R$ como pendentes e listar documentos faltantes.',
     decisionGoal:
       'Roteiro de indenização de penhor: partes, documentos, ordem de pagamento, riscos de fraude e próximos passos com prazos.',
     patternNote:
-      'Em recorte público de 2023, penhor/máquinas da Sompo superou em prêmios a carteira agrícola pura — caso típico de operação rural além da lavoura.',
+      'Em recorte público de 2023, penhor/máquinas da Sompo superou em prêmios a carteira agrícola pura: caso típico de operação rural além da lavoura.',
     sources: [
-      'Valor Econômico — prêmios penhor rural Sompo 2023',
+      'Valor Econômico: prêmios penhor rural Sompo 2023',
       'Sompo Penhor Rural (comunicação de produto)',
     ],
     suggestedPresetId: 'risco-agro',
@@ -377,7 +377,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
   {
     id: 'irrigacao-alagamento-aurora',
     title: 'Alagamento e falha de irrigação',
-    subtitle: 'Fazenda Santa Aurora — briefing clássico de sprint com telemetria mista',
+    subtitle: 'Fazenda Santa Aurora: briefing clássico de sprint com telemetria mista',
     culture: 'Culturas irrigadas (misto)',
     region: 'Bacia irrigada (Centro-Sul)',
     product: 'agricola-produtividade',
@@ -409,7 +409,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
     decisionGoal:
       'Canvas executivo para underwriting rural com riscos priorizados, premissas explícitas, lacunas, plano preventivo, valor para a seguradora e critério de sucesso.',
     patternNote:
-      'Caso-base já usado no LUCA (briefing Sompo Sprint 2) — mantido como referência de telemetria + CSV + decisão.',
+      'Caso-base já usado no LUCA (briefing Sompo Sprint 2): mantido como referência de telemetria + CSV + decisão.',
     sources: [
       'Briefing interno LUCA-AI (Santa Aurora)',
       'Padrões de sinistro agrícola com múltiplos perigos',
@@ -449,14 +449,14 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
     telemetry:
       'Mapa de calor de avisos por município (últimas 3 safras). Índice de seca SPEI regional negativo no enchimento do milho safrinha por 2 ciclos consecutivos.',
     finance:
-      'Prêmio total, comissão e resultado técnico da carteira ainda não consolidados neste briefing — marcar como pendente e focar priorização e desenho de ação.',
+      'Prêmio total, comissão e resultado técnico da carteira ainda não consolidados neste briefing: marcar como pendente e focar priorização e desenho de ação.',
     decisionGoal:
       'Canvas de renovação de carteira: ranking de risco, opções comerciais/técnicas, plano de mitigação e métricas de acompanhamento para a diretoria agrícola.',
     patternNote:
-      'Depois de safras secas, renovação com cooperativas concentra decisões de capacidade — padrão recorrente no agrosegurador brasileiro.',
+      'Depois de safras secas, renovação com cooperativas concentra decisões de capacidade: padrão recorrente no agrosegurador brasileiro.',
     sources: [
       'Padrões de concentração de risco em safrinha',
-      'Sompo — papel do seguro na mitigação de riscos no agro (eventos/setor)',
+      'Sompo: papel do seguro na mitigação de riscos no agro (eventos/setor)',
     ],
     suggestedPresetId: 'risco-agro',
     suggestedMode: 'team',
@@ -504,7 +504,7 @@ export function buildSompoCaseMission(caseItem: SompoExampleCase, teamLabel?: st
     : null;
   return [
     `Caso SOMPO: ${caseItem.title}`,
-    `Cultura/região: ${caseItem.culture} — ${caseItem.region}`,
+    `Cultura/região: ${caseItem.culture}: ${caseItem.region}`,
     `Produto: ${caseItem.productLabel} | Estágio: ${caseItem.stageLabel} | Evento: ${caseItem.riskEvent}`,
     teamLine,
     '',

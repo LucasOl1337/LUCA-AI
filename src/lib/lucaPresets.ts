@@ -1,4 +1,4 @@
-// PRESETS_BANCADA_V1 — helpers + ícones. Seed de dados em shared/luca-preset-seed.js.
+// PRESETS_BANCADA_V1: helpers + ícones. Seed de dados em shared/luca-preset-seed.js.
 import {
   Briefcase,
   Crown,
@@ -84,7 +84,7 @@ function hydrateIndividual(seed: (typeof LUCA_INDIVIDUAL_PRESET_SEED)[number]): 
   };
 }
 
-/** Seed embutido — fallback offline; runtime prefer GET /api/luca-ai/team-templates. */
+/** Seed embutido: fallback offline; runtime prefer GET /api/luca-ai/team-templates. */
 export const LUCA_TEAM_PRESETS: LucaTeamPreset[] = LUCA_TEAM_PRESET_SEED.map(hydrateTeam);
 export const LUCA_INDIVIDUAL_PRESETS: LucaIndividualPreset[] = LUCA_INDIVIDUAL_PRESET_SEED.map(hydrateIndividual);
 

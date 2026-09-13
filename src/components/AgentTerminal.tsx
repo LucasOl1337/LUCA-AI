@@ -205,7 +205,7 @@ export default function AgentTerminal({ activeAgent, onClose }: AgentTerminalPro
                   <p>last tick: {heartbeatMonitor?.updatedAt ?? 'n/a'}</p>
                   {heartbeatRows.map((row) => (
                     <p key={row.label}>
-                      <span>{row.label} — </span>
+                      <span>{row.label}: </span>
                       <span style={{ color: stateTone(row.state) }}>{row.state}</span>
                       <span> / </span>
                       <span style={{ color: backendReady ? theme.alive : theme.error }}>{backendReady ? 'ready' : 'offline'}</span>

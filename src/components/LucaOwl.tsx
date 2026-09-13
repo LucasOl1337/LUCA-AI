@@ -1,5 +1,5 @@
 /**
- * LucaOwl — usa a imagem real da coruja cyber (salva em /public/cyber-owl.jpg).
+ * LucaOwl: usa a imagem real da coruja cyber (salva em /public/cyber-owl.jpg).
  * Apenas o enquadramento, recorte circular e animações são customizados.
  * Strokes/halo: rails do produto (navy/goldBright), não ciano ad-hoc.
  */

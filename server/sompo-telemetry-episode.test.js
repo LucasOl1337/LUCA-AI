@@ -217,7 +217,7 @@ test('migração idempotente: DB pré-existente sem episode_id ganha a coluna e 
   const { dbPath, cleanup } = tempDb();
   t.after(() => cleanup());
 
-  // Esquema do commit 07dc535 — sem episode_id e sem tabela de episódios.
+  // Esquema do commit 07dc535, sem episode_id e sem tabela de episódios.
   const legacy = new DatabaseSync(dbPath);
   legacy.exec(`
     CREATE TABLE sompo_telemetry_samples (

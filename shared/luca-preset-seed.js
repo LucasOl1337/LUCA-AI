@@ -1,4 +1,4 @@
-// Seed puro (sem React) — templates de equipe/individual embutidos.
+// Seed puro (sem React): templates de equipe/individual embutidos.
 // Frontend mapeia `icon` → Lucide; server grava no workspace no primeiro GET.
 
 export const VISUAL_PERSONA_SLUG = 'especialista-visual';

@@ -7,7 +7,7 @@ import { describe, it } from 'node:test';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(join(root, 'index.html'), 'utf8');
 
-const siteTitle = 'LUCA — Centro Operacional de Agentes de IA';
+const siteTitle = 'LUCA: Centro Operacional de Agentes de IA';
 const siteDescription =
   'Monte uma equipe de personas, envie uma missão e acompanhe a entrega em uma conversa única no LUCA-AI.';
 const siteUrl = 'https://app.luca-ai.com.br/';

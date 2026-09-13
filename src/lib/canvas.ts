@@ -9,7 +9,7 @@ import type {
 } from './types';
 
 // Detecta canvas "operacional" (logs do sistema, fila, erros) que NÃO deve ser
-// exibido como resultado bonito ao usuário — porta de main.jsx:727.
+// exibido como resultado bonito ao usuário: porta de main.jsx:727.
 export function isOperationalCanvas(dashboard: TemporaryDashboard | null): boolean {
   if (!dashboard) return false;
   const normalize = (value: unknown) => String(value ?? '').toLowerCase();
@@ -92,7 +92,7 @@ export function formatTopicLabel(item: unknown): string {
   return String(item);
 }
 
-// Resolve a lista de blocos a renderizar (metrics/panels → blocks) — porta de main.jsx:746.
+// Resolve a lista de blocos a renderizar (metrics/panels → blocks): porta de main.jsx:746.
 export function resolveBlocks(dashboard: TemporaryDashboard): DashboardBlockData[] {
   const metrics = Array.isArray(dashboard.metrics) ? dashboard.metrics.slice(0, 4) : [];
   const panels = Array.isArray(dashboard.panels) ? dashboard.panels.slice(0, 4) : [];

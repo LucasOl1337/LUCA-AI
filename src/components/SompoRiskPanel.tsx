@@ -55,7 +55,7 @@ export default function SompoRiskPanel({ telemetry, context, onContext }: Props)
         <small>Use a mesma janela de histórico ao comparar avaliações. Ausência de registro não significa zero incidentes.</small>
       </div>
       <div className="sompo-score" data-level={risk.level} data-sompo-score>
-        <span>Score contextual · experimental</span><div className="sompo-score-number">{risk.score ?? '—'}<small>/100</small></div><strong>{risk.level === 'Baixo' ? 'Baixo nesta regra' : risk.level}</strong>
+        <span>Score contextual · experimental</span><div className="sompo-score-number">{risk.score ?? '-'}<small>/100</small></div><strong>{risk.level === 'Baixo' ? 'Baixo nesta regra' : risk.level}</strong>
         <p>{risk.score === null ? `Falta confirmar: ${risk.missing.join(', ')}.` : 'O score não inclui colisão, inclinação ou falhas mecânicas. Confira os alertas do equipamento antes de decidir.'}</p>
         {risk.score !== null && <meter min="0" max="100" low={45} high={75} optimum={0} value={risk.score} aria-label="Score contextual" />}
       </div>

@@ -85,7 +85,7 @@ test('workflow reply ids stay stable while sibling replies arrive', () => {
 });
 
 test('duration formatter stays compact and marks legacy messages', () => {
-  assert.equal(formatPersonaRunDuration(undefined), '—');
+  assert.equal(formatPersonaRunDuration(undefined), '-');
   assert.equal(formatPersonaRunDuration(0), '<0,1 s');
   assert.equal(formatPersonaRunDuration(3500), '3,5 s');
   assert.equal(formatPersonaRunDuration(65_000), '1 min 05 s');

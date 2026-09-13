@@ -144,7 +144,7 @@ function compactKeySample(sample, originMs) {
   return `t+${offsetSec}s dist=${reading(sample.distancia)} pitch=${reading(sample.pitch)} acc=${accText}`;
 }
 
-const EMPTY_TIMELINE = 'Linha do tempo: sem histórico persistido nesta janela — análise baseada em frame único.';
+const EMPTY_TIMELINE = 'Linha do tempo: sem histórico persistido nesta janela. Análise baseada em frame único.';
 const ASK_LINE = 'Avaliem a condição operacional, priorizem risco e recomendem próximas ações de campo.';
 
 function formatPtNumber(value) {
@@ -170,9 +170,9 @@ function humanWhatLine(snapshot, simulation) {
   const tractorId = snapshot.tractorId || '001';
   if (simulation) {
     const scenario = snapshot.source?.scenarioLabel ? `, cenário ${snapshot.source.scenarioLabel}` : '';
-    return `[Ensaio no simulador] Análise de telemetria do trator ${tractorId} — simulador 3D${scenario}`;
+    return `[Ensaio no simulador] Análise de telemetria do trator ${tractorId}: simulador 3D${scenario}`;
   }
-  return `Análise de telemetria do trator ${tractorId} — equipamento físico via Firebase`;
+  return `Análise de telemetria do trator ${tractorId}: equipamento físico via Firebase`;
 }
 
 function humanReadingsLine(readings = {}) {
@@ -284,7 +284,7 @@ function scenarioRunLines(run) {
   ];
   if (run.scripted) {
     const totalSec = Number(run.totalMs) ? Math.round(run.totalMs / 100) / 10 : null;
-    lines.push(`Execução: ${run.completed ? 'roteiro completo' : 'em andamento'} — ${Math.round((run.elapsedMs || 0) / 100) / 10}s de ${totalSec ?? '?'}s${Number.isFinite(run.travelMeters) ? `, ${run.travelMeters} m percorridos no mundo 3D` : ''}.`);
+    lines.push(`Execução: ${run.completed ? 'roteiro completo' : 'em andamento'}: ${Math.round((run.elapsedMs || 0) / 100) / 10}s de ${totalSec ?? '?'}s${Number.isFinite(run.travelMeters) ? `, ${run.travelMeters} m percorridos no mundo 3D` : ''}.`);
     if (Array.isArray(run.phases) && run.phases.length > 0) {
       lines.push('Fases do roteiro:');
       for (const phase of run.phases) {
@@ -370,7 +370,7 @@ function buildEpisodeHumanSummary(episode, summary, frames = []) {
   const framesSuffix = attachedFrames > 0
     ? ` ${attachedFrames} frame${attachedFrames === 1 ? '' : 's'} do simulador anexado${attachedFrames === 1 ? '' : 's'} como evidência visual.`
     : '';
-  const headline = `[Ensaio no simulador] Episódio de ${kindLabel} registrado — ${duration === null ? 'duração não informada' : `${duration}s`}, ${count} amostra${count === 1 ? '' : 's'}.${statusSuffix}${framesSuffix}`;
+  const headline = `[Ensaio no simulador] Episódio de ${kindLabel} registrado: ${duration === null ? 'duração não informada' : `${duration}s`}, ${count} amostra${count === 1 ? '' : 's'}.${statusSuffix}${framesSuffix}`;
   const eventLine = `${episodeImpactLine(summary)}; ${episodeDistanceLine(summary)}; ${episodeFlagLine(summary)}.`;
   return [headline, eventLine, EPISODE_ASK_LINE].join('\n');
 }
@@ -396,7 +396,7 @@ const EPISODE_NO_FRAMES_LINE = 'Sem evidência visual: nenhum frame do simulador
 /**
  * Seção "Evidência visual": lista numerada dos frames ANEXADOS (a numeração dos
  * "Anexo N" segue a ordem dos anexos da missão) + frames registrados mas fora do
- * orçamento de anexos, declarados explicitamente — nunca descartados em silêncio.
+ * orçamento de anexos, declarados explicitamente: nunca descartados em silêncio.
  */
 function episodeVisualEvidenceLines(frames) {
   const list = Array.isArray(frames) ? frames : [];
@@ -411,7 +411,7 @@ function episodeVisualEvidenceLines(frames) {
   };
   const lines = ['Evidência visual (frames do canvas Three.js capturados durante o roteiro e anexados a esta missão como imagens):'];
   attached.forEach((frame, index) => {
-    lines.push(`- Anexo ${index + 1} — ${describe(frame)}`);
+    lines.push(`- Anexo ${index + 1}: ${describe(frame)}`);
   });
   if (attached.length === 0) {
     lines.push('- Nenhum frame pôde ser anexado nesta missão; os registros abaixo existem apenas no episódio.');
@@ -455,7 +455,7 @@ function episodeAlertFindingLine(summary) {
   const impact = summary?.impact;
   if (!impact || !Number.isFinite(Number(impact.offsetMs))) return null;
   if (summary?.first?.riscoColisao) {
-    return 'Achado do alerta: a flag riscoColisao já estava ativa desde o início da gravação — não há instante de disparo para comparar com o pico.';
+    return 'Achado do alerta: a flag riscoColisao já estava ativa desde o início da gravação: não há instante de disparo para comparar com o pico.';
   }
   const flagMs = episodeFlagOffsetMs(summary);
   if (flagMs === null && summary?.unknownCollisionCount > 0) return 'Achado do alerta: flags de colisão ausentes em parte do episódio; não é possível confirmar se houve disparo.';
@@ -464,10 +464,10 @@ function episodeAlertFindingLine(summary) {
   }
   const deltaMs = flagMs - Number(impact.offsetMs);
   if (deltaMs > 100) {
-    return `Achado do alerta: a flag riscoColisao disparou ${formatSecondsOneDecimal(deltaMs)} s DEPOIS do pico de aceleração (pico em ${formatOffsetSeconds(impact.offsetMs)}, alerta em ${formatOffsetSeconds(flagMs)}) — o equipamento avisou tarde.`;
+    return `Achado do alerta: a flag riscoColisao disparou ${formatSecondsOneDecimal(deltaMs)} s DEPOIS do pico de aceleração (pico em ${formatOffsetSeconds(impact.offsetMs)}, alerta em ${formatOffsetSeconds(flagMs)}). O equipamento avisou tarde.`;
   }
   if (deltaMs < -100) {
-    return `Achado do alerta: a flag riscoColisao disparou ${formatSecondsOneDecimal(-deltaMs)} s ANTES do pico de aceleração (alerta em ${formatOffsetSeconds(flagMs)}, pico em ${formatOffsetSeconds(impact.offsetMs)}) — o equipamento avisou a tempo.`;
+    return `Achado do alerta: a flag riscoColisao disparou ${formatSecondsOneDecimal(-deltaMs)} s ANTES do pico de aceleração (alerta em ${formatOffsetSeconds(flagMs)}, pico em ${formatOffsetSeconds(impact.offsetMs)}). O equipamento avisou a tempo.`;
   }
   return `Achado do alerta: a flag riscoColisao disparou no mesmo instante do pico de aceleração (${formatOffsetSeconds(impact.offsetMs)}).`;
 }
@@ -484,7 +484,7 @@ function episodeTractionFindingLine(summary) {
   const ground = formatPtNumber(divergence.groundKph);
   const diff = formatPtNumber(divergence.diffKph);
   if (wheel === null || ground === null || diff === null) return null;
-  return `Achado de tração: rodas a ${wheel} km/h com o solo a ${ground} km/h (${formatOffsetSeconds(divergence.offsetMs)}, diferença de ${diff} km/h) — a divergência roda×solo indica pneus sem contato efetivo (aquaplanagem ou patinação); conferir o instante nos frames anexados.`;
+  return `Achado de tração: rodas a ${wheel} km/h com o solo a ${ground} km/h (${formatOffsetSeconds(divergence.offsetMs)}, diferença de ${diff} km/h). A divergência roda×solo indica pneus sem contato efetivo (aquaplanagem ou patinação); conferir o instante nos frames anexados.`;
 }
 
 /**
@@ -548,10 +548,10 @@ function episodeVisualContractLines(visualData) {
   return [
     '',
     'Contrato da peça visual (etapa de artefatos da bancada):',
-    '- Peça principal ÚNICA: a linha do tempo do episódio — série temporal desenhada pelo runtime com os dados reais do bloco de máquina no fim desta missão (distância frontal em cm e aceleração em g ao longo dos segundos), com marcadores nomeados no início do episódio, no PICO e no instante em que a flag de risco disparou.',
-    '- PROIBIDO: gráfico de barras com média por fase; repetir a mesma série ou os mesmos números em mais de uma peça; jargão sem tradução — escreva em português comum, nada de "Δv", "piso/saturação do sensor" ou "pulso único de contato".',
+    '- Peça principal ÚNICA: a linha do tempo do episódio: série temporal desenhada pelo runtime com os dados reais do bloco de máquina no fim desta missão (distância frontal em cm e aceleração em g ao longo dos segundos), com marcadores nomeados no início do episódio, no PICO e no instante em que a flag de risco disparou.',
+    '- PROIBIDO: gráfico de barras com média por fase; repetir a mesma série ou os mesmos números em mais de uma peça; jargão sem tradução: escreva em português comum, nada de "Δv", "piso/saturação do sensor" ou "pulso único de contato".',
     '- A manchete da peça é o ACHADO acionável (ex.: "O alerta chegou 2,3 s depois do pico"), nunca uma descrição como "Leitura operacional do ensaio".',
-    '- Segunda peça (opcional, no máximo UMA): cartão de decisão curto — veredito, severidade para a seguradora e o que fazer agora, em frases, SEM repetir números que já estão na linha do tempo.',
+    '- Segunda peça (opcional, no máximo UMA): cartão de decisão curto: veredito, severidade para a seguradora e o que fazer agora, em frases, SEM repetir números que já estão na linha do tempo.',
     '- Unidades humanas: aceleração em g (m/s² no máximo uma vez, entre parênteses), distância em cm, tempo em segundos com uma casa decimal.',
     '- Se faltar dado para a severidade física (ex.: velocidade real), diga que está pendente em UMA linha.',
     '',
@@ -581,7 +581,7 @@ export function buildSompoEpisodeMission(episode, samples, summary, teamLabel, f
   const visualData = buildSompoEpisodeVisualData(summary);
 
   const briefing = [
-    `[SIMULAÇÃO] Episódio SOMPO — ${kindLabel} — caminhão ${episode.tractorId || 'SIM-001'}`,
+    `[SIMULAÇÃO] Episódio SOMPO: ${kindLabel}, caminhão ${episode.tractorId || 'SIM-001'}`,
     `Equipe selecionada para avaliar: ${teamLabel || 'equipe de risco agro'}`,
     `Identificador do episódio: ${episode.publicId}`,
     `Status: ${episode.status}`,
@@ -589,10 +589,10 @@ export function buildSompoEpisodeMission(episode, samples, summary, teamLabel, f
     ...(episode.scenarioLabel ? [`Cenário: ${episode.scenarioLabel}`] : []),
     ...(options.outcomeLabel ? [`Desfecho selecionado do roteiro: ${options.outcomeLabel}`] : []),
     ...(episode.kind === 'colisao' && options.outcomeId && options.outcomeId !== 'impacto'
-      ? ['Atenção: neste desfecho NÃO há impacto físico — o pico de |aceleração| que o resumo automático rotula como "impacto" corresponde à manobra/frenagem de emergência, não a uma batida.']
+      ? ['Atenção: neste desfecho NÃO há impacto físico. O pico de |aceleração| que o resumo automático rotula como "impacto" corresponde à manobra/frenagem de emergência, não a uma batida.']
       : []),
     ...(episode.kind === 'roteiro'
-      ? [`Nota de leitura: o "impacto" do resumo é o pico de |aceleração| por heurística — confirmem nos frames e nas amostras se o desfecho "${options.outcomeLabel || 'selecionado'}" teve contato físico (batida, toque, tombamento) ou se o pico corresponde a manobra, frenagem ou varredura do sensor.`]
+      ? [`Nota de leitura: o "impacto" do resumo é o pico de |aceleração| por heurística: confirmem nos frames e nas amostras se o desfecho "${options.outcomeLabel || 'selecionado'}" teve contato físico (batida, toque, tombamento) ou se o pico corresponde a manobra, frenagem ou varredura do sensor.`]
       : []),
     `Início: ${episode.startedAt || 'não informado'} | Fim: ${episode.endedAt || 'não informado'} | Duração: ${duration === null ? 'não informada' : `${duration}s`}`,
     `Amostras gravadas: ${Number(summary.count) || 0} (episódio completo, ordem cronológica)`,
@@ -611,7 +611,7 @@ export function buildSompoEpisodeMission(episode, samples, summary, teamLabel, f
     ...(keySamples.length === 0
       ? []
       : [
-        'Amostras-chave (decimação adaptativa — mais densas ao redor do pico; primeira, última e transições sempre presentes):',
+        'Amostras-chave (decimação adaptativa: mais densas ao redor do pico; primeira, última e transições sempre presentes):',
         ...(() => {
           const originMs = Number(keySamples[0].observedMs ?? Date.parse(keySamples[0].observedAt));
           return keySamples.map((sample) => compactKeySample(sample, originMs));
@@ -620,9 +620,9 @@ export function buildSompoEpisodeMission(episode, samples, summary, teamLabel, f
     '',
     ...episodeVisualEvidenceLines(frames),
     '',
-    'Objetivo: avaliar o EVENTO em sua totalidade — dinâmica, sequência causal e severidade do episódio inteiro, não leituras isoladas — e recomendar a resposta operacional adequada.',
+    'Objetivo: avaliar o EVENTO em sua totalidade (dinâmica, sequência causal e severidade do episódio inteiro, não leituras isoladas) e recomendar a resposta operacional adequada.',
     '',
-    'Regras: este é um ensaio sintético de roteiro gravado no simulador — o desfecho selecionado decide o que acontece no evento. Analisem o episódio completo (preparação, evento e pós-evento) como sequência causal; não tratem amostras isoladas nem flags como evidência do equipamento físico, do firmware ou de sinistro real. Separem fatos do cenário, inferências e lacunas; validem qualquer conclusão em telemetria real antes de uma decisão operacional.',
+    'Regras: este é um ensaio sintético de roteiro gravado no simulador. O desfecho selecionado decide o que acontece no evento. Analisem o episódio completo (preparação, evento e pós-evento) como sequência causal; não tratem amostras isoladas nem flags como evidência do equipamento físico, do firmware ou de sinistro real. Separem fatos do cenário, inferências e lacunas; validem qualquer conclusão em telemetria real antes de uma decisão operacional.',
     'Cobertura pendente: nenhuma apólice foi fornecida neste fluxo. Não concluir cobertura, exclusão, indenização ou sinistro evitado.',
     ...episodeVisualContractLines(visualData),
   ].join('\n');
@@ -670,7 +670,7 @@ export function buildSompoTelemetryMission(snapshot, teamLabel, history, scenari
     : 'Regras: trate as flags de colisão e inclinação como fatos do firmware. Separe fatos, hipóteses e lacunas. Não invente limiares, calibração, localização, apólice ou impacto financeiro. As unidades não vieram no JSON; valide-as contra o firmware antes de sustentar uma decisão técnica ou de sinistro.';
 
   const briefing = [
-    `${simulation ? '[SIMULAÇÃO] ' : ''}Telemetria SOMPO — trator ${snapshot.tractorId || '001'}`,
+    `${simulation ? '[SIMULAÇÃO] ' : ''}Telemetria SOMPO: trator ${snapshot.tractorId || '001'}`,
     `Equipe selecionada para avaliar: ${teamLabel || 'equipe de risco agro'}`,
     originLine,
     ...(simulation && source.scenarioLabel ? [`Cenário virtual: ${source.scenarioLabel}`] : []),

@@ -73,7 +73,7 @@ test('missão de episódio: resumo humano em cima, delimitador e dossiê com fas
   const human = mission.slice(0, delimiterAt);
   const dossier = mission.slice(delimiterAt + SOMPO_MISSION_DOSSIER_DELIMITER.length);
 
-  assert.match(human, /^\[Ensaio no simulador\] Episódio de roteiro de cenário registrado — 24s, 48 amostras\./);
+  assert.match(human, /^\[Ensaio no simulador\] Episódio de roteiro de cenário registrado: 24s, 48 amostras\./);
   assert.match(human, /Pico de aceleração em t\+12,5s \(32 m\/s²\)/);
   assert.match(human, /distância caiu de 210 cm para 12 cm/);
   assert.match(human, /risco de colisão ativo desde o pico/);
@@ -81,7 +81,7 @@ test('missão de episódio: resumo humano em cima, delimitador e dossiê com fas
   assert.doesNotMatch(human, /riscoColisao=/);
   assert.doesNotMatch(human, /Identificador do episódio/);
 
-  assert.match(dossier, /\[SIMULAÇÃO\] Episódio SOMPO — roteiro de cenário — caminhão SIM-001/);
+  assert.match(dossier, /\[SIMULAÇÃO\] Episódio SOMPO: roteiro de cenário, caminhão SIM-001/);
   assert.match(dossier, /Equipe selecionada para avaliar: Risco Agro/);
   assert.match(dossier, /Identificador do episódio: ep-roteiro-teste/);
   assert.match(dossier, /Cenário: Animal na pista · Colisão com o animal/);
@@ -90,8 +90,8 @@ test('missão de episódio: resumo humano em cima, delimitador e dossiê com fas
   assert.match(dossier, /- Pico: /);
   assert.match(dossier, /- Depois do pico: /);
   assert.match(dossier, /Pico de aceleração: t\+12,5s · \|aceleração\| 32 m\/s²/);
-  assert.match(dossier, /Amostras-chave \(decimação adaptativa — mais densas ao redor do pico; primeira, última e transições sempre presentes\):/);
-  assert.match(dossier, /avaliar o EVENTO em sua totalidade — dinâmica, sequência causal e severidade/);
+  assert.match(dossier, /Amostras-chave \(decimação adaptativa: mais densas ao redor do pico; primeira, última e transições sempre presentes\):/);
+  assert.match(dossier, /avaliar o EVENTO em sua totalidade \(dinâmica, sequência causal e severidade/);
   assert.match(dossier, /ensaio sintético de roteiro gravado no simulador/);
   assert.match(dossier, /Nota de leitura: o "impacto" do resumo é o pico de \|aceleração\| por heurística/);
   assert.match(dossier, /riscoColisao false → true/);
@@ -112,7 +112,7 @@ test('missão de episódio com frames: seção "Evidência visual", anexos numer
   const frames = [
     { seq: 1, fase: 'aproximacao', label: 'Início da aproximação', offsetMs: 0, attached: true },
     { seq: 2, fase: 'aproximacao', label: 'Meia aproximação', offsetMs: 7_000, attached: false },
-    { seq: 3, fase: 'impacto', label: 'Impacto — pico de aceleração', offsetMs: 14_750, attached: true },
+    { seq: 3, fase: 'impacto', label: 'Impacto: pico de aceleração', offsetMs: 14_750, attached: true },
     { seq: 4, fase: 'pos-impacto', label: 'Pós-impacto imediato', offsetMs: 16_500, attached: true },
     { seq: 5, fase: 'pos-impacto', label: 'Final do episódio', offsetMs: 21_500, attached: true },
   ];
@@ -120,9 +120,9 @@ test('missão de episódio com frames: seção "Evidência visual", anexos numer
 
   assert.match(mission, /4 frames do simulador anexados como evidência visual\./);
   assert.match(mission, /Evidência visual \(frames do canvas Three\.js capturados durante o roteiro e anexados a esta missão como imagens\):/);
-  assert.match(mission, /- Anexo 1 — Início da aproximação \(fase aproximacao, t\+0s\)/);
-  assert.match(mission, /- Anexo 2 — Impacto — pico de aceleração \(fase impacto, t\+14,75s\)/);
-  assert.match(mission, /- Anexo 4 — Final do episódio \(fase pos-impacto, t\+21,5s\)/);
+  assert.match(mission, /- Anexo 1: Início da aproximação \(fase aproximacao, t\+0s\)/);
+  assert.match(mission, /- Anexo 2: Impacto: pico de aceleração \(fase impacto, t\+14,75s\)/);
+  assert.match(mission, /- Anexo 4: Final do episódio \(fase pos-impacto, t\+21,5s\)/);
   assert.match(mission, /- Registrado no episódio mas NÃO anexado \(orçamento de anexos da bancada\): Meia aproximação \(fase aproximacao, t\+7s\)/);
   assert.match(mission, /cruzem cada imagem com a telemetria do mesmo instante e digam explicitamente se batem ou divergem/);
   assert.match(mission, /a distância registrada no dado confere com a posição do caminhão no Anexo 3\?/);
@@ -161,11 +161,11 @@ test('missão de episódio: contrato da peça visual pede série temporal e pro�
   const mission = buildSompoEpisodeMission(episode, samples, summary, 'Risco Agro');
 
   assert.match(mission, /Contrato da peça visual \(etapa de artefatos da bancada\):/);
-  assert.match(mission, /linha do tempo do episódio — série temporal desenhada pelo runtime com os dados reais/);
+  assert.match(mission, /linha do tempo do episódio: série temporal desenhada pelo runtime com os dados reais/);
   assert.match(mission, /marcadores nomeados no início do episódio, no PICO e no instante em que a flag de risco disparou/);
   assert.match(mission, /PROIBIDO: gráfico de barras com média por fase/);
   assert.match(mission, /A manchete da peça é o ACHADO acionável/);
-  assert.match(mission, /cartão de decisão curto — veredito, severidade para a seguradora e o que fazer agora, em frases, SEM repetir números que já estão na linha do tempo/);
+  assert.match(mission, /cartão de decisão curto: veredito, severidade para a seguradora e o que fazer agora, em frases, SEM repetir números que já estão na linha do tempo/);
   assert.match(mission, /aceleração em g \(m\/s² no máximo uma vez, entre parênteses\)/);
   assert.match(mission, /nada de "Δv", "piso\/saturação do sensor" ou "pulso único de contato"/);
 });
@@ -175,7 +175,7 @@ test('missão de episódio: achado do alerta calculado e bloco de máquina parse
   const mission = buildSompoEpisodeMission(episode, samples, summary, 'Risco Agro');
 
   // Pico em t+12,5s, flag em t+15s: o atraso de 2,5 s vira achado explícito.
-  assert.match(mission, /Achado do alerta: a flag riscoColisao disparou 2,5 s DEPOIS do pico de aceleração \(pico em t\+12,5s, alerta em t\+15s\) — o equipamento avisou tarde\./);
+  assert.match(mission, /Achado do alerta: a flag riscoColisao disparou 2,5 s DEPOIS do pico de aceleração \(pico em t\+12,5s, alerta em t\+15s\). O equipamento avisou tarde\./);
 
   const data = parseSompoEpisodeVisualData(mission);
   assert.ok(data, 'bloco de máquina presente e parseável');
@@ -198,7 +198,7 @@ test('missão de episódio: achado do alerta calculado e bloco de máquina parse
   legacy.episode = { ...legacy.episode, kind: 'colisao', scenarioLabel: 'Colisão frontal roteirizada' };
   const legacyMission = buildSompoEpisodeMission(legacy.episode, legacy.samples, legacy.summary, 'Risco Agro');
   assert.match(legacyMission, /Episódio de colisão registrado/);
-  assert.match(legacyMission, /Episódio SOMPO — colisão — caminhão/);
+  assert.match(legacyMission, /Episódio SOMPO: colisão, caminhão/);
 
   // Missão sem bloco não é episódio para a etapa visual.
   assert.equal(parseSompoEpisodeVisualData('missão comum sem bloco'), null);
@@ -230,7 +230,7 @@ test('missão de episódio: divergência roda x solo vira achado de tração no 
   assert.equal(summary.wheelDivergence.groundKph, 80);
 
   const mission = buildSompoEpisodeMission(episode, samples, summary, 'Risco Agro');
-  assert.match(mission, /Achado de tração: rodas a 30 km\/h com o solo a 80 km\/h \(t\+5s, diferença de 50 km\/h\) — a divergência roda×solo indica pneus sem contato efetivo \(aquaplanagem ou patinação\)/);
+  assert.match(mission, /Achado de tração: rodas a 30 km\/h com o solo a 80 km\/h \(t\+5s, diferença de 50 km\/h\). A divergência roda×solo indica pneus sem contato efetivo \(aquaplanagem ou patinação\)/);
 
   // Sem divergência: a linha não aparece (não há prova de desacoplamento).
   const coupled = Array.from({ length: 40 }, (_, index) => sample(index, {

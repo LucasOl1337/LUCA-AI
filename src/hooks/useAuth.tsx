@@ -95,8 +95,8 @@ async function authRequest(path: string, body?: object) {
   } catch {
     throw new AuthRequestError(
       typeof navigator !== 'undefined' && navigator.onLine === false
-        ? 'Sem internet. O que você digitou continua no formulário — reconecte e tente de novo.'
-        : 'O LUCA não respondeu. O que você digitou continua no formulário — tente de novo em instantes.',
+        ? 'Sem internet. O que você digitou continua no formulário. Reconecte e tente de novo.'
+        : 'O LUCA não respondeu. O que você digitou continua no formulário. Tente de novo em instantes.',
       0,
     );
   }
@@ -110,7 +110,7 @@ async function authRequest(path: string, body?: object) {
       throw new AuthRequestError('Esta conta não pode entrar. Peça acesso a um administrador.', response.status);
     }
     throw new AuthRequestError(
-      authMessages[code] || 'Não foi possível concluir a autenticação. Tente de novo — o que você digitou continua no formulário.',
+      authMessages[code] || 'Não foi possível concluir a autenticação. Tente de novo. O que você digitou continua no formulário.',
       response.status,
     );
   }

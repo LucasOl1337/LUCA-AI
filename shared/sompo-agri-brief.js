@@ -1,7 +1,7 @@
 /**
  * Adaptador entre o catálogo agrícola (shared/sompo-agri-scenarios.js) e o
  * núcleo do simulador: snapshot de telemetria com proveniência correta,
- * deslocamento em forma fechada e resumo do ensaio para a bancada — tudo sem
+ * deslocamento em forma fechada e resumo do ensaio para a bancada: tudo sem
  * alterar o módulo agrícola. Puro: frames e integrais são função do relógio.
  */
 import {
@@ -57,7 +57,7 @@ function cascadedKeyframes(scenario, outcome) {
 }
 
 /**
- * Deslocamento (m, com sinal) — mesma forma fechada do núcleo:
+ * Deslocamento (m, com sinal): mesma forma fechada do núcleo:
  * ∫ smoothstep = p³ − p⁴/2 sobre speedKph·direction por segmento. Válida porque
  * o catálogo agrícola garante troca de direção só entre pontas imobilizadas.
  */
@@ -115,7 +115,7 @@ export function createSompoAgriSimulationSnapshot(scenarioId, outcomeId, {
 }
 
 /**
- * Plano de episódio de um desfecho agrícola — mesmo contrato de
+ * Plano de episódio de um desfecho agrícola: mesmo contrato de
  * getSompoEpisodePlan: todo desfecho agrícola é roteirizado (keyframes), então
  * o plano só é nulo quando o cenário não existe.
  */

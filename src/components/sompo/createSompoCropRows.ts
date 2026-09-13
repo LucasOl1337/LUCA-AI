@@ -7,7 +7,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
  *
  * Cada pé é um leque de 3 planos com textura real de folha de milho
  * (alfa recorta a silhueta): 6 triângulos por planta mantém ~20 mil pés
- * dentro do orçamento do teste de recursos — densidade de lavoura de verdade.
+ * dentro do orçamento do teste de recursos: densidade de lavoura de verdade.
  */
 export function createSompoCropRows(groundHeight: (x: number, z: number) => number, compact: boolean, height = 1) {
   const root = new THREE.Group(); root.name = 'sompo-agri-crop-rows';

@@ -3,7 +3,7 @@ import { type Dispatch, type SetStateAction, useCallback, useState } from 'react
 const STORAGE_PREFIX = 'luca.';
 
 /**
- * Persistent state — localStorage para preferência da máquina (densidade,
+ * Persistent state: localStorage para preferência da máquina (densidade,
  * colunas). Página e filtro moram na URL; o operacional vem do backend.
  */
 export function usePersistentState<T>(
@@ -31,7 +31,7 @@ export function usePersistentState<T>(
       try {
         window.localStorage.setItem(storageKey, JSON.stringify(next));
       } catch {
-        // silent — persistência local é best-effort
+        // silent: persistência local é best-effort
       }
       return next;
     });

@@ -373,7 +373,7 @@ function episodePhaseSlice(id, samples, startIndex, endIndex) {
 export function summarizeSompoEpisodeSamples(samples) {
   const base = summarizeSamples(samples);
 
-  // Divergência roda x solo: o smoking gun da aquaplanagem — roda mede
+  // Divergência roda x solo: o smoking gun da aquaplanagem: roda mede
   // rotação, solo mede deslocamento; separados indicam pneu sem contato.
   let wheelDivergence = null;
   if (samples.length > 0) {

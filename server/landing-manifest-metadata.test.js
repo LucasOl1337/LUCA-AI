@@ -8,7 +8,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(join(root, 'public/manifest.webmanifest'), 'utf8'));
 const html = readFileSync(join(root, 'index.html'), 'utf8');
 
-const siteTitle = 'LUCA — Centro Operacional de Agentes de IA';
+const siteTitle = 'LUCA: Centro Operacional de Agentes de IA';
 const siteDescription =
   'Monte uma equipe de personas, envie uma missão e acompanhe a entrega em uma conversa única no LUCA-AI.';
 
@@ -31,7 +31,7 @@ describe('landing webmanifest commercial metadata', () => {
   });
 
   it('bans short internal-only name/description drift', () => {
-    assert.notEqual(manifest.name, 'LUCA — Centro Operacional');
+    assert.notEqual(manifest.name, 'LUCA: Centro Operacional');
     assert.notEqual(manifest.description, 'Centro operacional de agentes de IA.');
   });
 });

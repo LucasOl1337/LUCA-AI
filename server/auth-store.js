@@ -512,7 +512,7 @@ export class AuthStore {
       return;
     }
 
-    // Writes intencionais (criar pasta, etc.) — não viram "prompt".
+    // Writes intencionais (criar pasta, etc.): não viram "prompt".
     if (classified.isAction) {
       user.usage = {
         ...current,

@@ -132,7 +132,7 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
     sampleIntervalMs: 500,
     speedKph: 12,
     // Campo aberto: o sensor de proximidade satura no teto do modelo (400 cm,
-    // "sem eco em alcance") — nunca há obstáculo à frente neste cenário.
+    // "sem eco em alcance"): nunca há obstáculo à frente neste cenário.
     distance: 400,
     temperature: 29,
     humidity: 48,
@@ -185,7 +185,7 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
     totalMs: 14_000,
     sampleIntervalMs: 500,
     speedKph: 6,
-    // Talhão livre: sem obstáculo no feixe em nenhum desfecho — sensor saturado.
+    // Talhão livre: sem obstáculo no feixe em nenhum desfecho: sensor saturado.
     distance: 400,
     temperature: 32,
     humidity: 44,
@@ -314,7 +314,7 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
     inclinationRisk: false,
     phases: [
       phase('align', 'Alinhamento externo', 0, 4_000),
-      // Cobre a ré e a correção de tração do 'parked' — a fase é compartilhada
+      // Cobre a ré e a correção de tração do 'parked'. A fase é compartilhada
       // com 'post-contact', que não tem avanço de realinhamento.
       phase('reverse', 'Manobra de ré', 4_000, 11_000),
       phase('outcome', 'Posicionamento final', 11_000, 15_000),

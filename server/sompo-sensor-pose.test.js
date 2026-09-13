@@ -63,7 +63,7 @@ test('ruido de guinada nao acumula rumo com o caminhao parado', () => {
 test('rumo de uma curva real fica onde parou em vez de voltar sozinho para zero', () => {
   // O gemeo tem que apontar para onde o caminhao fisico aponta. Um
   // recentramento automatico desfazia a curva poucos segundos depois dela
-  // acontecer — a tela deixava de acompanhar a direcao, que e o defeito.
+  // acontecer. A tela deixava de acompanhar a direcao, que e o defeito.
   const step = 1 / 60;
   let heading = 0;
   const advance = (yawRate, seconds) => {

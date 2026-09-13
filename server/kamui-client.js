@@ -82,7 +82,7 @@ async function kamuiGet(path, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Yume — SOMENTE LEITURA. Personas do Yume viram agentes do LUCA-AI.
+// Yume: SOMENTE LEITURA. Personas do Yume viram agentes do LUCA-AI.
 // ---------------------------------------------------------------------------
 
 /** Lista personas do Yume. -> { personas: [{ slug, name, model, ... }] } */

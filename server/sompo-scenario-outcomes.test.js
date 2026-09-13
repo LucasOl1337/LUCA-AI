@@ -120,7 +120,7 @@ test('deslocamento em forma fechada bate com a integral numérica do perfil de v
     }
   }
   // Frenagem cossenoidal: 3 s constantes + integral do pulso = metade da rampa.
-  // A 80 km/h a parada leva ~4,9 s e ~55 m — distância real de emergência.
+  // A 80 km/h a parada leva ~4,9 s e ~55 m: distância real de emergência.
   const v = 80 / 3.6;
   const brakeSeconds = (v / 4.5);
   assert.equal(getSompoBrakingTravelMeters(0, 80), 0);

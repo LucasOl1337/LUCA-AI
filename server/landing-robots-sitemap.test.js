@@ -31,7 +31,7 @@ describe('landing robots + sitemap discovery', () => {
 
   it('keeps commercial share shell untouched (no reopen of social meta)', () => {
     const html = readFileSync(join(root, 'index.html'), 'utf8');
-    assert.ok(html.includes('LUCA — Centro Operacional de Agentes de IA'));
+    assert.ok(html.includes('LUCA: Centro Operacional de Agentes de IA'));
     assert.ok(html.includes(`property="og:url" content="${siteUrl}"`));
   });
 });

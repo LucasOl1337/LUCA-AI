@@ -19,6 +19,6 @@ describe('landing hero copy residual', () => {
 
   it('keeps commercial share description aligned (personas + missão + conversa)', () => {
     assert.ok(html.includes('Monte uma equipe de personas, envie uma missão e acompanhe a entrega em uma conversa única no LUCA-AI.'));
-    assert.ok(html.includes('LUCA — Centro Operacional de Agentes de IA'));
+    assert.ok(html.includes('LUCA: Centro Operacional de Agentes de IA'));
   });
 });

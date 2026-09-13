@@ -240,7 +240,7 @@ export function buildConversationContextFromTranscript(transcript = [], options 
 export function formatConversationContextForPrompt(rawContext) {
   const text = String(rawContext || '').trim();
   if (!text) return '';
-  return `Contexto de turnos anteriores desta conversa (gerado pela bancada — nao e sua resposta anterior):\n${text}`;
+  return `Contexto de turnos anteriores desta conversa (gerado pela bancada: nao e sua resposta anterior):\n${text}`;
 }
 
 /**
@@ -377,7 +377,7 @@ ${role?.id === 'visual'
     const outputContract = role?.id === 'display'
       ? 'Comece com Veredito: <1 frase direta>. Depois, nesta ordem, seções Decisão, Evidências, Riscos, Próximas ações, cada uma com no máximo 3 bullets curtos. Proibido repetir dados brutos que não sustentam diretamente uma conclusão; proibido preâmbulo e meta-comentário sobre o processo.'
       : role?.id === 'visual'
-        ? `Voce e a etapa final de artefatos da bancada. Com base no contexto acumulado (especialmente Aprovacao, Exibicao final ou veredito do juiz), produza SOMENTE JSON valido — sem markdown fora do JSON — neste formato:
+        ? `Voce e a etapa final de artefatos da bancada. Com base no contexto acumulado (especialmente Aprovacao, Exibicao final ou veredito do juiz), produza SOMENTE JSON valido (sem markdown fora do JSON) neste formato:
 {
   "summary": "1-2 frases em pt-BR sobre o que sera visualizado",
   "report": {
@@ -545,12 +545,12 @@ ${historyBlock ? `\n  ${historyBlock.replace(/\n/g, '\n  ')}\n` : ''}
   ${contributions || 'Nenhuma contribuicao utilizavel foi recebida.'}${originalsAppendix}${consensusAppendix}
 
   Produza obrigatoriamente estas partes, nesta ordem:
-  0. Resposta livre — comece com sua leitura espontanea da missao e das contribuicoes, no formato que preferir (paragrafos, raciocinio aberto, observacoes soltas). Use este espaco para pensar em voz alta como juiz, sem obrigacao de estrutura.
+  0. Resposta livre: comece com sua leitura espontanea da missao e das contribuicoes, no formato que preferir (paragrafos, raciocinio aberto, observacoes soltas). Use este espaco para pensar em voz alta como juiz, sem obrigacao de estrutura.
   Depois da resposta livre, entregue a estrutura final obrigatoria:
-  1. Avaliacao dos participantes — diga o que foi util em cada resposta.
-  2. Alertas de qualidade — identifique, por participante, qualquer trecho falso, nao sustentado ou incompleto. Se nao houver, diga explicitamente.
-  3. Complementacao — combine o que for compativel e corrija as lacunas relevantes.
-  4. Veredito final — apresente a melhor decisao final, sua justificativa e proximas acoes.${ledgerRequest}`,
+  1. Avaliacao dos participantes: diga o que foi util em cada resposta.
+  2. Alertas de qualidade: identifique, por participante, qualquer trecho falso, nao sustentado ou incompleto. Se nao houver, diga explicitamente.
+  3. Complementacao: combine o que for compativel e corrija as lacunas relevantes.
+  4. Veredito final: apresente a melhor decisao final, sua justificativa e proximas acoes.${ledgerRequest}`,
     };
   }
 
@@ -585,7 +585,7 @@ export function buildIndividualRevisionPrompt({
 
 ---
 ${modelTruthBlock(model, { pure: isPureModelAgent({ personaSlug: slug, systemPrompt: basePrompt }) })}
-Voce recebera contribuicoes anonimas de outros participantes sobre a mesma missao. Revise sua resposta: mantenha o que sustenta, corrija o que os outros refutaram com evidencia melhor, aponte erros alheios objetivamente. Nao presuma autoridade por estilo — avalie evidencia.
+Voce recebera contribuicoes anonimas de outros participantes sobre a mesma missao. Revise sua resposta: mantenha o que sustenta, corrija o que os outros refutaram com evidencia melhor, aponte erros alheios objetivamente. Nao presuma autoridade por estilo: avalie evidencia.
 Nao tente identificar os autores das contribuicoes. Responda em pt-BR.`,
     user: `Missao original:
 ${mission}${historyAppendix}

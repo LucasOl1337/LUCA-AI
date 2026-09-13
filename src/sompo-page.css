@@ -1,4 +1,4 @@
-/* SOMPO — tema agrícola limpo: fundo de lavoura, grade de casos, launch sem scroll. */
+/* SOMPO: tema agrícola limpo. Fundo de lavoura, grade de casos, launch sem scroll. */
 
 .sompo-page {
   position: relative;
@@ -46,7 +46,7 @@
 .sompo-page :where(button) { border: 0; font: inherit; cursor: pointer; }
 .sompo-page :where(h1, h2) { text-wrap: balance; }
 
-/* —— Header —— */
+/* Header */
 .sompo-header {
   display: flex;
   flex-wrap: wrap;
@@ -121,7 +121,7 @@
   text-transform: uppercase;
 }
 
-/* —— Modos SOMPO —— */
+/* Modos SOMPO */
 .sompo-view-switch {
   display: inline-grid;
   grid-template-columns: repeat(2, minmax(180px, 1fr));
@@ -197,7 +197,7 @@
   font-size: 10.5px;
 }
 
-/* —— Origem da telemetria —— */
+/* Origem da telemetria */
 .sompo-source-switch {
   display: flex;
   align-items: center;
@@ -288,7 +288,7 @@
   outline-offset: 2px;
 }
 
-/* —— Laboratório 3D —— */
+/* Laboratório 3D */
 .sompo-simulator,
 .sompo-simulator-loading {
   margin-bottom: 14px;
@@ -930,7 +930,7 @@
   box-shadow: inset 0 0 0 1px rgba(232, 201, 106, 0.14);
 }
 
-/* —— Telemetria de campo —— */
+/* Telemetria de campo */
 .sompo-telemetry {
   padding: 18px;
   border-radius: 22px;
@@ -1423,7 +1423,7 @@
 .sompo-telemetry-skeleton-head { height: 72px; }
 .sompo-telemetry-skeleton-grid { height: 120px; }
 
-/* —— Contexto setorial compacto —— */
+/* Contexto setorial compacto */
 .sompo-context {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1463,7 +1463,7 @@
   line-height: 1.4;
 }
 
-/* —— Filtros —— */
+/* Filtros */
 .sompo-toolbar {
   display: flex;
   flex-direction: column;
@@ -1560,7 +1560,7 @@
   text-transform: uppercase;
 }
 
-/* —— Grade de casos —— */
+/* Grade de casos */
 .sompo-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1740,7 +1740,7 @@
   opacity: 0.75;
 }
 
-/* —— Launch stage (sem scroll de página) —— */
+/* Launch stage (sem scroll de página) */
 .sompo-launch {
   position: absolute;
   inset: 0;

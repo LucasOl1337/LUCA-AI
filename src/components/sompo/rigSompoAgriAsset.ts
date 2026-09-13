@@ -150,7 +150,7 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
     lamp.position.set(equipmentId === 'tractor' ? -.86 : -2.7, 1.35, side * .73); body.add(lamp);
   }
   // Fontes visíveis das luzes: sem o emissivo o feixe aparece no chão mas a
-  // lâmpada fica apagada — à noite é isso que lê "farol aceso" com o bloom.
+  // lâmpada fica apagada: à noite é isso que lê "farol aceso" com o bloom.
   const headlampMaterial = new THREE.MeshStandardMaterial({ color: 0x3a3a34, emissive: 0xfff0cd, emissiveIntensity: 0, roughness: .3 });
   const worklampMaterial = new THREE.MeshStandardMaterial({ color: 0x33383c, emissive: 0xe4efff, emissiveIntensity: 0, roughness: .3 });
   const beaconDomeMaterial = new THREE.MeshStandardMaterial({ color: 0x53300a, emissive: 0xff9a1f, emissiveIntensity: 0, roughness: .35 });
@@ -213,7 +213,7 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
       } else {
         // Plataforma: levanta no giro de cabeceira e desce para cortar. O giro
         // no ponto de engate e a subida vertical juntos leem como o cilindro
-        // real trabalhando — sozinho, cada um mal sai do lugar.
+        // real trabalhando: sozinho, cada um mal sai do lugar.
         implement.rotation.z = frame.implementLift * .42 + (1 - frame.headerSpeed) * .05;
         implement.position.y += frame.implementLift * .55;
         rotor.rotation.z = reduced ? 0 : -headerTurns * Math.PI * 2;

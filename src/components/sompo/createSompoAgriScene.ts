@@ -48,7 +48,7 @@ function createTerrain(environment: (typeof SOMPO_AGRI_ENVIRONMENTS)[SompoAgriEn
   return terrain;
 }
 
-/** Silos galvanizados no fundo do talhão — a assinatura do bg-agro. */
+/** Silos galvanizados no fundo do talhão. A assinatura do bg-agro. */
 function createSilos(slope: number) {
   const root = new THREE.Group(); root.name = 'sompo-agri-silos';
   const metal = new THREE.MeshStandardMaterial({ color: 0xdadcda, metalness: .55, roughness: .5 });
@@ -118,7 +118,7 @@ function createEdgeWeeds(ground: (x: number, z: number) => number) {
   for (let i = 0; i < COUNT; i++) {
     const pick = random();
     // 65% nas duas bordas do talhão (|z| 11.6→15.5); o resto invade entre as
-    // fileiras, mais baixo — capim de entressafra, não capim de pasto.
+    // fileiras, mais baixo: capim de entressafra, não capim de pasto.
     const edge = pick < .65;
     const side = random() < .5 ? -1 : 1;
     const x = random() * 148 - 74;
@@ -273,7 +273,7 @@ function dustMap() {
   return new THREE.CanvasTexture(canvas);
 }
 
-/** Pontos com alfa por partícula — base da poeira, da lama e da fumaça. */
+/** Pontos com alfa por partícula: base da poeira, da lama e da fumaça. */
 function createParticleCloud(count: number, size: number, color: number, twoTone = false) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
@@ -304,14 +304,14 @@ function createDust() {
   return dust;
 }
 
-/** Torrões de lama ejetados pelas rodas que patinam — balísticos e curtos. */
+/** Torrões de lama ejetados pelas rodas que patinam: balísticos e curtos. */
 function createMudSpray() {
   const spray = createParticleCloud(130, 0.85, 0x55432c);
   spray.name = 'sompo-agri-mudspray';
   return spray;
 }
 
-/** Fumaça do escapamento sob carga — escura, sobe rápido e dispersa. */
+/** Fumaça do escapamento sob carga: escura, sobe rápido e dispersa. */
 function createExhaust() {
   const exhaust = createParticleCloud(70, 1.0, 0x39332b);
   exhaust.name = 'sompo-agri-exhaust';
@@ -345,7 +345,7 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
   const barn = definition.barn ? createBarn() : null;
   if (barn) root.add(barn.root, barn.barnPost);
   const silos = createSilos(definition.slope); root.add(silos);
-  // Névoa baixa é do talhão aberto — dentro do galpão as faixas horizontais
+  // Névoa baixa é do talhão aberto: dentro do galpão as faixas horizontais
   // atravessavam as paredes (bug reportado pela frente agri-máquina).
   const groundFog = definition.barn ? null : createGroundFog();
   if (groundFog) { root.add(groundFog.root); groundFog.root.visible = !definition.night; }
@@ -358,7 +358,7 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
   mud.geometry.rotateX(-Math.PI / 2);
   const mudPositions = mud.geometry.attributes.position;
   for (let i=1;i<mudPositions.count;i++) { const f=1+Math.sin(i*2.3)*.09; mudPositions.setX(i,mudPositions.getX(i)*f);mudPositions.setZ(i,mudPositions.getZ(i)*f*.65); }
-  // Lâmina d'água parada no centro do trecho saturado — o branco baixo é o que
+  // Lâmina d'água parada no centro do trecho saturado. O branco baixo é o que
   // diferencia solo úmido de solo encharcado.
   const puddle = new THREE.Mesh(
     new THREE.CircleGeometry(3.4, 32),
@@ -423,7 +423,7 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
       const seconds = elapsedMs / 1000;
       const wheelKph = frame.wheelSpeedKph ?? frame.speedKph;
       // Patinagem real: perímetro da roda corre mais que o chão. É o que ejeta
-      // lama e queima embreagem — e o que faz a fumaça sair preta.
+      // lama e queima embreagem, e o que faz a fumaça sair preta.
       const slip = Math.max(0, Math.abs(wheelKph) - Math.abs(frame.speedKph));
       const eject = Math.min(1, frame.mud * slip / 9);
       const load = Math.min(1, frame.roughness * .18 + slip * .06 + frame.headerSpeed * .28);

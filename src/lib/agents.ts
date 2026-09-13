@@ -13,7 +13,7 @@ export interface AgentDef {
   system?: boolean;    // agente sistêmico (maestro / transformador)
 }
 
-// Agentes operacionais clicáveis no trilho (sem o supervisor — controlado à parte,
+// Agentes operacionais clicáveis no trilho (sem o supervisor: controlado à parte,
 // como em main.jsx:382).
 export const AGENT_DEFS: AgentDef[] = [
   { id: 'heartbeat', title: 'heartbeat', role: 'system', icon: '/icons/heartbeat.mp4', accent: '#43d18a', isHeartbeat: true },
@@ -25,7 +25,7 @@ export const AGENT_DEFS: AgentDef[] = [
   { id: 'designer', title: 'designer', role: 'designer', owl: '/v2-design/owl-designer.png', accent: '#0a84ff' },
 ];
 
-// Inclui o supervisor — usado na página Agentes (visão completa).
+// Inclui o supervisor: usado na página Agentes (visão completa).
 export const SUPERVISOR_DEF: AgentDef = {
   id: 'supervisor', title: 'supervisor', role: 'supervisor', owl: '/v2-design/owl-supervisor.png', accent: '#0a84ff',
 };
