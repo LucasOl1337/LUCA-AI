@@ -93,11 +93,12 @@ test('plano de episódio agrícola: todo desfecho é roteirizado e capturável',
       assert.equal(plan.scenarioId, scenario.scenarioId);
       assert.equal(plan.outcomeId, outcome.id);
       assert.equal(plan.totalMs, scenario.totalMs);
-      assert.equal(plan.phases, scenario.phases);
+      const scriptedOutcome = scenario.outcomes[outcome.id];
+      assert.equal(plan.phases, scriptedOutcome.phases ?? scenario.phases);
       assert.ok(plan.frameMoments.length >= 2 && plan.frameMoments.length <= 5);
       for (const moment of plan.frameMoments) {
         assert.ok(moment.offsetMs >= 0 && moment.offsetMs < scenario.totalMs);
-        assert.ok(scenario.phases.some((phase) => phase.id === moment.fase));
+        assert.ok(plan.phases.some((phase) => phase.id === moment.fase));
       }
     }
   }
