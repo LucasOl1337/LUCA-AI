@@ -18,7 +18,7 @@ import SompoGeofenceMap from './SompoGeofenceMap';
 export function bandTone(bandId: string | null | undefined, alertable = true): 'forte' | 'media' | 'fraca' | 'livre' {
   if (!bandId) return 'livre';
   if (['critica', 'dentro', 'acima'].includes(bandId)) return alertable ? 'forte' : 'media';
-  if (['elevada', 'borda', 'proximo'].includes(bandId)) return alertable ? 'media' : 'fraca';
+  if (['elevada', 'borda', 'proximo', 'manobra'].includes(bandId)) return alertable ? 'media' : 'fraca';
   return 'fraca';
 }
 const decimal = (value: number) => value.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -62,7 +62,7 @@ function Lane({ episodes, totalMs, elapsedMs, label, onSeek, locked }: { episode
               key={episode.id}
               type="button"
               className={`sompo-geofence-tone-${bandTone(episode.bandId, episode.alertable)}`}
-              style={{ left: `${episode.startMs / totalMs * 100}%`, width: `${Math.max(0.4, (end - episode.startMs) / totalMs * 100)}%` }}
+              style={{ left: `${episode.startMs / totalMs * 100}%`, width: `${(end - episode.startMs) / totalMs * 100}%` }}
               title={`${episode.hazardLabel} · ${episode.bandLabel} · ${seconds(episode.startMs)}`}
               aria-label={`Ir para ${episode.hazardLabel}, ${episode.bandLabel}, ${seconds(episode.startMs)}`}
               disabled={locked}
@@ -91,12 +91,13 @@ export default function SompoGeofencePanel({ scenarioId, outcomeId, elapsedMs, g
   // Pistas na ordem em que cada perigo aparece na corrida; o limite da máquina sempre por último.
   const lanes = useMemo(() => {
     const byHazard = new Map<string, GeofenceEpisode[]>();
+    if (scenario.environmentId === 'geofence-operacao') for (const hazard of hazards) byHazard.set(hazard.metric ? 'Limite da máquina' : hazard.label, []);
     for (const episode of episodes) {
       const label = isMachine(episode) ? 'Limite da máquina' : episode.hazardLabel; // rótulo curto para a pista
       byHazard.set(label, [...(byHazard.get(label) ?? []), episode]);
     }
-    return [...byHazard.entries()].sort(([, a], [, b]) => Number(isMachine(a[0])) - Number(isMachine(b[0])));
-  }, [episodes]);
+    return [...byHazard.entries()].sort(([a], [b]) => Number(a === 'Limite da máquina') - Number(b === 'Limite da máquina'));
+  }, [episodes, hazards, scenario.environmentId]);
 
   // O perigo que acende a bandeira tem prioridade sobre o mais próximo (dentro do declive, contexto, com água crítica ao lado).
   const near = geofence.alert ?? geofence.nearest;

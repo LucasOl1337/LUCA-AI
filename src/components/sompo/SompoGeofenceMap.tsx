@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { getSompoAgriScenario, SOMPO_AGRI_EQUIPMENT } from '../../../shared/sompo-agri-scenarios.js';
 import { getSompoAgriPosition } from '../../../shared/sompo-agri-brief.js';
-import { getSompoGeofenceSite, geofenceFieldRelief } from '../../../shared/sompo-geofence-sites.js';
+import { getSompoGeofenceSite, geofenceFieldRelief, geofenceOperacaoRelief } from '../../../shared/sompo-geofence-sites.js';
 import { bandGrid, resolveHazards, type LabGeofenceRules } from '../../../shared/lab-geofence.js';
 import { polygonContains, type LabPolygon } from '../../../shared/lab-telemetry.js';
 
@@ -65,11 +65,12 @@ function buildStaticMap(scenarioId: string, outcomeId: string): StaticMap | null
     trace(ring); ctx.fillStyle = '#d9d2b4'; ctx.fill();
   }
   // Relevo: sombreado simples (luz de noroeste) a partir da mesma função de altura da cena, por baixo das faixas.
-  if (scenario.environmentId === 'geofence-field') {
+  if (['geofence-field', 'geofence-operacao'].includes(scenario.environmentId)) {
+    const relief = scenario.environmentId === 'geofence-operacao' ? geofenceOperacaoRelief : geofenceFieldRelief;
     const step = 2;
     for (let z = minZ; z < maxZ; z += step) for (let x = minX; x < maxX; x += step) {
-      const dx = geofenceFieldRelief(x + 1, z) - geofenceFieldRelief(x - 1, z);
-      const dz = geofenceFieldRelief(x, z + 1) - geofenceFieldRelief(x, z - 1);
+      const dx = relief(x + 1, z) - relief(x - 1, z);
+      const dz = relief(x, z + 1) - relief(x, z - 1);
       const shade = (dx + dz) * 0.35; // encostas voltadas para noroeste clareiam, para sudeste escurecem
       if (Math.abs(shade) < 0.02) continue;
       ctx.fillStyle = shade > 0 ? `rgba(40,30,10,${Math.min(0.45, shade)})` : `rgba(255,255,255,${Math.min(0.5, -shade)})`;
@@ -119,7 +120,8 @@ function buildStaticMap(scenarioId: string, outcomeId: string): StaticMap | null
       : ring.reduce((near, p) => Math.hypot(p.x - centroid.x, p.z - centroid.z) < Math.hypot(near.x - centroid.x, near.z - centroid.z) ? p : near);
     const text = POLYGON_NAMES[polygon.id] ?? hazards.find(hazard => hazard.polygon === polygon)?.label ?? polygon.id;
     // 5 m acima do ponto de ancoragem: o percurso (z ≈ 0) cruza o centro do declive e riscava o texto.
-    const x = px(anchor.x), y = py(anchor.z) - 5 * SCALE, width = ctx.measureText(text).width + 14;
+    const width = ctx.measureText(text).width + 14;
+    const x = Math.max(width / 2 + 4, Math.min(canvas.width - width / 2 - 4, px(anchor.x))), y = py(anchor.z) - 5 * SCALE;
     ctx.fillStyle = LABEL_BG; ctx.fillRect(x - width / 2, y - 11, width, 22);
     ctx.fillStyle = '#2b2a24'; ctx.fillText(text, x, y);
   }
