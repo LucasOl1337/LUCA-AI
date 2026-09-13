@@ -8,14 +8,16 @@ export type SompoAgriScenarioId =
   | 'agri-field-bogging'
   | 'agri-barn-maneuver'
   | 'agri-night-operation'
-  | 'agri-geofencing';
+  | 'agri-geofencing'
+  | 'agri-geofencing-operacao';
 export type SompoAgriEnvironmentId =
   | 'row-crop-field'
   | 'sloped-field'
   | 'muddy-field'
   | 'farm-barn'
   | 'row-crop-field-night'
-  | 'geofence-field';
+  | 'geofence-field'
+  | 'geofence-operacao';
 
 export interface SompoAgriEquipment {
   readonly id: SompoAgriEquipmentId;
@@ -39,6 +41,7 @@ export interface SompoAgriKeyframe extends Partial<SompoAgriVisualFrame> {
 }
 
 export interface SompoAgriOutcome {
+  readonly phases?: readonly Readonly<SompoAgriPhase>[];
   readonly id: string;
   readonly label: string;
   readonly description: string;

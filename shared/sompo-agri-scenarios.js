@@ -71,6 +71,62 @@ export const SOMPO_AGRI_EQUIPMENT = freeze({
   }),
 });
 
+// Demonstração em tempo físico: ~450 m não cabem em 90 s a 6–7 km/h.
+// A manobra adicional do C ocupa 56 s; A/B aguardam parados ao final até o mesmo término.
+function operacaoFrames(kind) {
+  const extra = kind === 'gully' ? 56_000 : 0;
+  const frames = [
+    [0, { speedKph: 0, lateral: -45, headerSpeed: 0, implementLift: 0.4 }],
+    [4_000, { speedKph: 7, headerSpeed: 1, implementLift: 0, cropCut: 0.3, dust: 0.35 }],
+    [70_000, { speedKph: 7 }],
+    [74_000, { speedKph: 3, headerSpeed: 0.3, implementLift: 0.4 }],
+    [76_000, { speedKph: 0, brakeLights: 1 }],
+  ];
+  if (extra) frames.push(
+    [78_000, { speedKph: 3, brakeLights: 0 }],
+    [100_000, { speedKph: 3 }],
+    [102_000, { speedKph: 0, brakeLights: 1 }],
+    [104_000, { speedKph: 0, direction: -1 }],
+    [106_000, { speedKph: 3, brakeLights: 0 }],
+    [128_000, { speedKph: 3 }],
+    [130_000, { speedKph: 0, brakeLights: 1 }],
+    [132_000, { speedKph: 0, direction: 1 }],
+  );
+  const rest = [
+    [78_000, { speedKph: 3, brakeLights: 0 }],
+    [91_500, { yaw: -45 }], [105_000, { yaw: -90 }],
+    [118_500, { yaw: -135 }], [132_000, { yaw: -180 }],
+    [136_000, { speedKph: 7, headerSpeed: 1, implementLift: 0, cropCut: 0.6 }],
+    [190_000, { roll: 2 }],
+    [193_000, { roll: kind === 'slope' ? 17 : 4 }],
+    [195_000, { roll: kind === 'slope' ? 17 : 4 }],
+    [198_000, { speedKph: 7, roll: 2 }],
+    [202_000, { speedKph: 3, headerSpeed: 0.3, implementLift: 0.4 }],
+    [215_500, { yaw: -135 }], [229_000, { yaw: -90 }],
+    [242_500, { yaw: -45 }], [256_000, { yaw: 0 }],
+    [260_000, { speedKph: 7, headerSpeed: 1, implementLift: 0, cropCut: 0.9 }],
+    [280_000, { yaw: 0 }],
+    [288_000, { yaw: -24 }],
+    [316_000, { yaw: -24 }],
+    [324_000, { yaw: 0 }],
+    [328_000, { speedKph: 7 }],
+    [332_000, { speedKph: 0, headerSpeed: 0, dust: 0, brakeLights: 1 }],
+  ];
+  frames.push(...rest.map(([at, values]) => [at + extra, values]));
+  frames.push([400_000, { speedKph: 0 }]);
+  return frames;
+}
+
+const operacaoPhases = (extra = 0) => [
+  phase('entrada', 'Entrada no talhão', 0, 4_000),
+  phase('passada-1', 'Primeira passada', 4_000, 74_000),
+  phase('cabeceira-leste', 'Cabeceira leste', 74_000, 132_000 + extra),
+  phase('passada-2', 'Segunda passada · encosta', 132_000 + extra, 202_000 + extra),
+  phase('cabeceira-oeste', 'Cabeceira oeste', 202_000 + extra, 256_000 + extra),
+  phase('passada-3', 'Terceira passada · córrego', 256_000 + extra, 332_000 + extra),
+  phase('parada', 'Operação concluída · parada', 332_000 + extra, 400_000),
+];
+
 export const SOMPO_AGRI_SCENARIOS = freeze({
   'agri-harvest-dust': scenario({
     scenarioId: 'agri-harvest-dust',
@@ -375,6 +431,23 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
     ],
   }),
 
+  'agri-geofencing-operacao': scenario({
+    scenarioId: 'agri-geofencing-operacao',
+    label: 'Operação real com geofencing',
+    description: 'Demonstração sintética: três passadas, cabeceiras, encosta e aproximação do córrego. 6–7 km/h no trabalho e 3 km/h nas manobras; término comum em 6 min 40 s.',
+    synthetic: true,
+    equipmentId: 'harvester', environmentId: 'geofence-operacao', defaultOutcomeId: 'operacao-completa',
+    totalMs: 400_000, sampleIntervalMs: 250, speedKph: 7, distance: 230,
+    temperature: 31, humidity: 38, pitch: 1, roll: 2, roughness: 0.8,
+    collisionRisk: false, inclinationRisk: false,
+    phases: operacaoPhases(),
+    outcomes: [
+      outcome('operacao-completa', 'Operação completa', 'Demonstração: conclui as três passadas e para.', operacaoFrames('complete')),
+      outcome('encosta-alem-do-limite', 'Encosta além do limite', 'Demonstração: na segunda passada, a inclinação cruza o limite de 15° da colheitadeira.', operacaoFrames('slope')),
+      freeze({ ...outcome('cabeceira-na-ribanceira', 'Cabeceira na ribanceira', 'Demonstração: avança na ribanceira, para, recua e retoma as passadas.', operacaoFrames('gully')), phases: freeze(operacaoPhases(56_000)) }),
+    ],
+  }),
+
   'agri-geofencing': scenario({
     scenarioId: 'agri-geofencing',
     label: 'Operação com geofencing',
@@ -474,7 +547,8 @@ export function getSompoAgriFrame(scenarioId, elapsedMs = 0, outcomeId) {
   // A gearbox is discrete. Wheel speed stays continuous through zero at a shift.
   frame.wheelSpeedKph = (from.wheelSpeedKph ?? from.speedKph)
     + ((to.wheelSpeedKph ?? to.speedKph) - (from.wheelSpeedKph ?? from.speedKph)) * blend;
-  const activePhase = selected.phases.find((item) => elapsed < item.endMs) || selected.phases.at(-1);
+  const phases = selectedOutcome.phases ?? selected.phases;
+  const activePhase = phases.find((item) => elapsed < item.endMs) || phases.at(-1);
   return {
     ...frame,
     atMs: elapsed,

@@ -197,7 +197,8 @@ export function getSompoAgriEpisodePlan(scenarioId, outcomeId) {
   if (!isSompoAgriScenarioId(scenarioId)) return null;
   const scenario = getSompoAgriScenario(scenarioId);
   const outcome = resolveOutcome(scenario, outcomeId);
-  const phaseAt = (atMs) => scenario.phases.find((phase) => atMs < phase.endMs) ?? scenario.phases.at(-1);
+  const phases = outcome.phases ?? scenario.phases;
+  const phaseAt = (atMs) => phases.find((phase) => atMs < phase.endMs) ?? phases.at(-1);
   const points = outcome.keyframes.map((keyframe) => {
     const phase = phaseAt(keyframe.atMs);
     return { offsetMs: keyframe.atMs, fase: phase.id, label: phase.label };
@@ -211,8 +212,8 @@ export function getSompoAgriEpisodePlan(scenarioId, outcomeId) {
     scenarioLabel: outcome.id === scenario.defaultOutcomeId ? scenario.label : `${scenario.label} · ${outcome.label}`,
     totalMs: scenario.totalMs,
     sampleIntervalMs: scenario.sampleIntervalMs,
-    phases: scenario.phases,
-    frameMoments: Object.freeze(sompoEpisodeFrameMoments(points, scenario.totalMs, scenario.phases.at(-1).id)),
+    phases,
+    frameMoments: Object.freeze(sompoEpisodeFrameMoments(points, scenario.totalMs, phases.at(-1).id)),
   });
 }
 
@@ -226,7 +227,7 @@ export function buildSompoAgriRunBrief(scenarioId, outcomeId, elapsedMs = 0) {
   const frameAt = (atMs) => frames.findLast?.((frame) => frame.atMs <= atMs)
     ?? [...frames].reverse().find((frame) => frame.atMs <= atMs)
     ?? frames[0];
-  const phases = scenario.phases.map((phase) => {
+  const phases = (outcome.phases ?? scenario.phases).map((phase) => {
     const state = frameAt(phase.startMs);
     return {
       atMs: phase.startMs,

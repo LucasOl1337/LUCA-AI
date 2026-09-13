@@ -12,6 +12,7 @@ const EXPECTED = [
   'agri-barn-maneuver',
   'agri-field-bogging',
   'agri-geofencing',
+  'agri-geofencing-operacao',
   'agri-harvest-dust',
   'agri-hydraulic-failure',
   'agri-night-operation',

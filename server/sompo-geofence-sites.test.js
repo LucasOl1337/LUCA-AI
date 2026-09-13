@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { SOMPO_AGRI_EQUIPMENT, SOMPO_AGRI_SCENARIOS, getSompoAgriFrame } from '../shared/sompo-agri-scenarios.js';
-import { createSompoAgriSimulationSnapshot, getSompoAgriGeofenceEpisodes } from '../shared/sompo-agri-brief.js';
+import { createSompoAgriSimulationSnapshot, getSompoAgriGeofenceEpisodes, getSompoAgriPosition, getSompoAgriEpisodePlan, buildSompoAgriRunBrief } from '../shared/sompo-agri-brief.js';
 import { describeGeofence, describeMachineLimit, evaluateGeofence } from '../shared/sompo-geofence.js';
 import { resolveHazards } from '../shared/lab-geofence.js';
-import { getSompoGeofenceSite, SOMPO_GEOFENCE_SITE_VERSION } from '../shared/sompo-geofence-sites.js';
+import { getSompoGeofenceSite, geofenceOperacaoRelief, SOMPO_GEOFENCE_SITE_VERSION } from '../shared/sompo-geofence-sites.js';
+import { polygonContains, segmentDistance } from '../shared/lab-telemetry.js';
 
 const SCENARIO = 'agri-geofencing';
 const snapshotAt = (outcome, elapsedMs) => createSompoAgriSimulationSnapshot(SCENARIO, outcome, {
@@ -13,11 +14,57 @@ const snapshotAt = (outcome, elapsedMs) => createSompoAgriSimulationSnapshot(SCE
 const samples = (outcome) => Array.from({ length: SOMPO_AGRI_SCENARIOS[SCENARIO].totalMs / 250 + 1 }, (_, i) => snapshotAt(outcome, i * 250));
 const bands = (outcome) => samples(outcome).map(frame => frame.geofence.nearest ? `${frame.geofence.nearest.hazardKey.split(':')[0]}:${frame.geofence.nearest.bandId}` : 'nenhum');
 
+test('talhão 2: geometria, faixas e relevo sintéticos de demonstração', () => {
+  const site = getSompoGeofenceSite('geofence-operacao', 450);
+  const [field, stream, slope, gully, barn] = site.polygons;
+  assert.equal(site.synthetic, true);
+  assert.match(site.label, /demonstração/);
+  assert.deepEqual(site.polygons.map(p => [p.role, p.category ?? null]), [
+    ['allowed_area', null], ['water', null], ['hazard', 'slope'], ['hazard', 'gully'], ['hazard', 'structure'],
+  ]);
+  for (const polygon of site.polygons) {
+    assert.equal(polygon.synthetic, true);
+    const ring = polygon.rings[0];
+    assert.deepEqual(ring[0], ring.at(-1));
+    for (const point of ring) {
+      assert.ok(Number.isFinite(point.x) && Number.isFinite(point.z));
+      if (polygon !== gully) assert.equal(polygonContains(point, field), true, `${polygon.id}: ${JSON.stringify(point)}`);
+    }
+  }
+  // O talhão é convexo: conter todos os vértices contém também cada segmento dos outros polígonos.
+  assert.equal(polygonContains({ x: 90, z: 0 }, gully), true, 'ribanceira cruza a borda leste');
+  assert.equal(polygonContains({ x: 91, z: 0 }, field), false);
+  const bounds = polygon => ['x', 'z'].map(axis => [Math.min(...polygon.rings[0].map(p => p[axis])), Math.max(...polygon.rings[0].map(p => p[axis]))]);
+  assert.deepEqual(bounds(field), [[-90, 90], [-70, 70]]);
+  assert.deepEqual(bounds(slope), [[-70, -20], [-35, -5]]);
+  assert.deepEqual(bounds(barn), [[53, 67], [-59, -51]]);
+  assert.equal(polygonContains({ x: 30, z: 43 }, stream), true);
+  assert.equal(polygonContains({ x: 30, z: 40 }, stream), false);
+  const hazards = resolveHazards(site.manifestRules, site.polygons, SOMPO_AGRI_EQUIPMENT.harvester);
+  assert.deepEqual(hazards.warnings, []);
+  assert.equal(hazards.length, 5);
+  assert.deepEqual(site.manifestRules.hazards.map(r => r.bands_m.map(b => b.max_m)), [[5, 15, 35], [0, 6], [0, 15], [0, 10], [0, 5]]);
+  assert.equal(site.manifestRules.hazards[1].alertable, false);
+  assert.equal(site.manifestRules.hazards[3].label, 'Galpão');
+  for (const rule of site.manifestRules.hazards) {
+    assert.equal(rule.synthetic, true);
+    assert.match(rule.justification, /demonstração/);
+    for (const label of [rule.label, ...rule.bands_m.map(b => b.label)]) assert.doesNotMatch(label, /segur[o]|risco alto|neglig[eê]ncia|vai tombar/i);
+  }
+  assert.equal(geofenceOperacaoRelief(-45, -20), 4);
+  assert.ok(Math.abs(geofenceOperacaoRelief(91, 0) + 6) < 1e-10);
+  assert.ok(Math.abs(geofenceOperacaoRelief(30, 43) + 0.9) < 1e-10);
+  for (const z of [-100, -62, -35, 0, 35, 62, 100]) {
+    assert.ok(Number.isFinite(geofenceOperacaoRelief(85, z)));
+    assert.ok(Math.abs(geofenceOperacaoRelief(85, z - 1e-6) - geofenceOperacaoRelief(85, z + 1e-6)) < 1e-5);
+  }
+});
+
 test('só o ambiente do cenário de geofencing tem talhão; os cenários originais ficam sem radar', () => {
-  assert.equal(SOMPO_GEOFENCE_SITE_VERSION, 2);
+  assert.equal(SOMPO_GEOFENCE_SITE_VERSION, 3);
   for (const scenario of Object.values(SOMPO_AGRI_SCENARIOS)) {
     const site = getSompoGeofenceSite(scenario.environmentId, 40);
-    if (scenario.scenarioId === SCENARIO) { assert.ok(site); continue; }
+    if ([SCENARIO, 'agri-geofencing-operacao'].includes(scenario.scenarioId)) { assert.ok(site); continue; }
     assert.equal(site, null);
     const snapshot = createSompoAgriSimulationSnapshot(scenario.scenarioId, undefined, { elapsedMs: 3000, observedAt: '2026-09-12T12:00:00.000Z' });
     assert.equal(snapshot.geofence, null);
@@ -25,6 +72,82 @@ test('só o ambiente do cenário de geofencing tem talhão; os cenários origina
     assert.ok(Number.isFinite(snapshot.position.x));
   }
   assert.throws(() => getSompoGeofenceSite('geofence-field', NaN), TypeError);
+});
+
+test('operação: série real a 250 ms, três passadas, faixas e alertas nos intervalos declarados', () => {
+  const id = 'agri-geofencing-operacao';
+  const site = getSompoGeofenceSite('geofence-operacao', 450);
+  const scenario = SOMPO_AGRI_SCENARIOS[id];
+  assert.equal(scenario.totalMs, 400_000);
+  const outcomes = ['operacao-completa', 'encosta-alem-do-limite', 'cabeceira-na-ribanceira'];
+  for (const outcome of outcomes) {
+    const extra = outcome === outcomes[2] ? 56_000 : 0;
+    const run = Array.from({ length: 1601 }, (_, i) => createSompoAgriSimulationSnapshot(id, outcome, { elapsedMs: i * 250, observedAt: '2026-09-13T12:00:00Z' }));
+    const episodes = getSompoAgriGeofenceEpisodes(id, outcome);
+    const water = episodes.filter(e => e.hazardKey.startsWith('water'));
+    assert.deepEqual(water.map(e => [e.bandId, e.startMs - extra, e.endMs === null ? null : e.endMs - extra]), [
+      ['atencao', 290000, 303750], ['elevada', 303750, 328000], ['atencao', 328000, 328250], ['elevada', 328250, null],
+    ]);
+    assert.deepEqual(episodes.filter(e => e.hazardLabel === 'Declive mapeado').map(e => e.bandId), ['borda', 'dentro', 'borda']);
+    assert.deepEqual(episodes.filter(e => e.hazardLabel === 'Ribanceira').map(e => e.bandId), extra ? ['borda', 'dentro', 'borda', 'borda', 'borda'] : ['borda', 'borda']);
+    assert.deepEqual(episodes.filter(e => e.hazardKey.startsWith('machine')).map(e => [e.bandId, e.startMs, e.endMs]), outcome === outcomes[1] ? [
+      ['proximo', 191750, 192500], ['acima', 192500, 195750], ['proximo', 195750, 196500],
+    ] : []);
+    const actualAlerts = run.flatMap((s, i) => s.risks.proximity ? [i * 250] : []);
+    const alertStart = extra ? 96250 : 192500, alertCount = extra ? 55 : outcome === outcomes[1] ? 13 : 0;
+    assert.deepEqual(actualAlerts, Array.from({ length: alertCount }, (_, i) => alertStart + i * 250));
+    // Integração independente em 250 ms: detecta salto/lateral variável e divergência entre rumo, velocidade e posição.
+    let x = run[0].position.x, z = -45, distance = 0;
+    for (let i = 0; i < run.length; i++) {
+      const t = i * 250, frame = getSompoAgriFrame(id, t, outcome), s = run[i];
+      assert.equal(s.geofence.insideAllowed, true, `${outcome} @${t}`);
+      assert.ok(frame.speedKph >= 0 && frame.speedKph <= 7);
+      assert.equal(frame.lateral, -45, 'offset inicial constante, não deslocamento lateral durante o movimento');
+      if (i) {
+        const previous = getSompoAgriFrame(id, t - 250, outcome);
+        for (const f of [previous, frame]) {
+          const ds = f.speedKph / 3.6 * 0.125;
+          x += ds * f.direction * Math.cos(f.yaw * Math.PI / 180);
+          z -= ds * f.direction * Math.sin(f.yaw * Math.PI / 180);
+          distance += ds;
+        }
+      }
+      assert.ok(Math.hypot(s.position.x - x, s.position.z - z) < 0.02, `${outcome} @${t}: movimento`);
+      if (s.risks.proximity) {
+        if (extra) {
+          assert.equal(polygonContains(s.position, site.polygons[3]), true);
+          assert.equal(frame.phaseId, 'cabeceira-leste');
+        } else {
+          assert.equal(polygonContains(s.position, site.polygons[2]), true);
+          assert.ok(frame.roll >= 15);
+          assert.equal(frame.phaseId, 'passada-2');
+        }
+      }
+      assert.doesNotMatch(describeGeofence(s.geofence), /segur[o]|risco alto|neglig[eê]ncia|vai tombar/i);
+      for (const hit of s.geofence.all) assert.ok(episodes.some(e => e.hazardKey === hit.hazardKey && e.bandId === hit.bandId && e.startMs <= t && (e.endMs === null || t < e.endMs)), `${outcome} @${t}: episódio ${hit.hazardKey}`);
+    }
+    // Integral dos patamares e rampas simétricas de velocidade: A/B = 1810 / 3,6 m; C soma ida e ré de 20 m.
+    assert.ok(Math.abs(distance - (1810 / 3.6 + (extra ? 40 : 0))) < 0.01, `${outcome}: ${distance} m`);
+    assert.equal(getSompoAgriFrame(id, 400000, outcome).speedKph, 0);
+    const plan = getSompoAgriEpisodePlan(id, outcome);
+    assert.deepEqual(plan.phases.map(p => p.id), ['entrada', 'passada-1', 'cabeceira-leste', 'passada-2', 'cabeceira-oeste', 'passada-3', 'parada']);
+    assert.deepEqual(buildSompoAgriRunBrief(id, outcome).phases.map(p => p.atMs), plan.phases.map(p => p.startMs));
+    for (const phase of plan.phases) assert.equal(getSompoAgriFrame(id, phase.startMs, outcome).phaseId, phase.id);
+    const waterAt = t => run[(t + extra) / 250].geofence.all.find(h => h.hazardKey.startsWith('water'));
+    for (let t = 300000; t <= 306000; t += 250) {
+      assert.equal(waterAt(t).trend, 'aproximando');
+      assert.ok(waterAt(t).timeToNextBandS > 0);
+    }
+    for (let t = 318000; t <= 322000; t += 250) assert.equal(waterAt(t).trend, 'afastando');
+  }
+  const stop = getSompoAgriPosition(id, 102000, outcomes[2]);
+  const ring = site.polygons[3].rings[0];
+  const depth = Math.min(...ring.slice(1).map((p, i) => segmentDistance(stop, ring[i], p)));
+  assert.ok(Math.abs(depth - 2) < 0.05, `parada a ${depth} m dentro da ribanceira`);
+  for (const [t, trend] of [[95000, 'aproximando'], [112000, 'afastando']]) {
+    const s = createSompoAgriSimulationSnapshot(id, outcomes[2], { elapsedMs: t });
+    assert.equal(s.geofence.all.find(h => h.hazardLabel === 'Ribanceira').trend, trend);
+  }
 });
 
 test('fazenda sintética: anéis fechados, formas curvas, regras ordenadas, sem avisos e sem rótulos proibidos', () => {
