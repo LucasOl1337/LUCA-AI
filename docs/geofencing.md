@@ -4,7 +4,7 @@ Leia SOMENTE ao mudar faixas de proximidade, perigos do mapa, o radar do simulad
 
 ## O que é
 
-Geofencing aqui é um framework de delimitação de área e classificação de zonas por proximidade a perigos mapeados (água, declive, estrutura). Ele não decide culpa nem carimba nenhuma zona como livre de perigo: produz distância, faixa, direção, tempo até o perigo, episódios de exposição e área atingida, para o replay, os agentes de análise e o HUD do simulador consumirem. Sem GPS no ESP32 (`docs/sompo.md`), a posição real só existe no simulador 3D e nos CSVs do laboratório; o contrato já aceita `latitude_deg`/`longitude_deg`/`gnss_fix` para quando o hardware tiver GNSS.
+Geofencing aqui é um framework de delimitação de área e classificação de zonas por proximidade a perigos mapeados (água, declive, estrutura). Ele não decide culpa nem carimba nenhuma zona como livre de perigo: produz distância, faixa, direção, tempo até o perigo, episódios de exposição e área atingida, para o replay, os agentes de análise e o HUD do simulador consumirem. Sem GPS no ESP32 (`docs/sompo.md`), a posição vem do simulador 3D (sintética) ou do GNSS registrado no CSV do laboratório; o contrato já aceita `latitude_deg`/`longitude_deg`/`gnss_fix` para quando o hardware tiver GNSS.
 
 Esta PR leva só o núcleo: contrato, motor de episódios, radar, talhões sintéticos e validação do manifesto. As superfícies que consomem isso (painel, mapa, chão da cena, episódio gravado, laboratório, dataset) estão listadas em "Integrações fora desta PR".
 

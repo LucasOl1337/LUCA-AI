@@ -51,7 +51,7 @@ export function evaluateGeofence({ x, z, headingDeg = null, speedKph = 0, rollDe
   for (const hazard of hazards) {
     if (hazard.metric) {
       const value = signals[hazard.metric];
-      if (!Number.isFinite(value)) continue; // sem sinal, sem faixa (regra 2 do SPEC)
+      if (!Number.isFinite(value)) continue; // sem sinal de inclinação não há faixa: amostra sem o sinal não abre nem fecha episódio
       const marginDeg = Math.max(0, hazard.limit - Math.abs(value));
       const band = classifyBand(marginDeg, hazard.bands);
       if (band && (!machineHit || marginDeg < machineHit.marginDeg)) machineHit = { hazardKey: hazard.key, hazardLabel: hazard.label, bandId: band.id, bandLabel: band.label ?? band.id, bandMaxDeg: band.max_m, metric: hazard.metric, valueDeg: Math.abs(value), limitDeg: hazard.limit, marginDeg };

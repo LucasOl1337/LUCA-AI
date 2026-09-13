@@ -136,7 +136,7 @@ export function computeGeofenceEpisodes(samples, polygons, rules, caseId, sample
     }
   }
   events.sort((a, b) => a.elapsedMs - b.elapsedMs);
-  const grid = bandGrid(polygons, hazards); // Calculada uma vez; a cena reaproveita (regra 1 do SPEC).
+  const grid = bandGrid(polygons, hazards); // Calculada uma vez; a cena reaproveita.
   const summary = { episodes, affectedArea: areaFromGrid(grid, hazards), grid, rulesVersion: hashText(JSON.stringify(rules ?? {})), warnings: hazards.warnings };
   return { summary, events };
 }
@@ -161,7 +161,7 @@ function rasterize(polygon, grid, mark) {
   }
 }
 
-// A mesma grade que soma a área pinta as faixas na cena (regra 1 do SPEC). Só células dentro de allowed_area.
+// A mesma grade que soma a área pinta as faixas na cena. Só células dentro de allowed_area.
 // bands[h][cell] = índice da faixa em hazards[h].bands, -1 = nenhuma; inside[cell] = 1 dentro da área permitida.
 // Custo O(arestas × células no alcance), não O(células × arestas): o rio do OSM (1,9 mil arestas) cai de 15 s para dezenas de ms.
 export function bandGrid(polygons, hazards, cellM = 2) {
