@@ -182,9 +182,16 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
         wheel.spin.rotation.z = reduced ? 0 : -wheelTravel / wheel.radius;
       }
       implement.position.copy(initialHitch);
+      // Rattle mecânico: o envelope vem do roteiro e a fase do relógio do frame,
+      // então o tranco é determinístico em qualquer amostragem.
+      const tremor = reduced ? 0 : (frame.shudder ?? 0);
       if (equipmentId === 'tractor') {
-        implement.position.y += -.22 + frame.implementLift * .58;
-        implement.rotation.set(frame.implementRoll * Math.PI / 180, frame.implementYaw * Math.PI / 180, -frame.implementLift * .24, 'YZX');
+        implement.position.y += -.22 + frame.implementLift * .58 + tremor * Math.sin(frame.atMs * .09) * .035;
+        implement.rotation.set(
+          frame.implementRoll * Math.PI / 180 + tremor * Math.sin(frame.atMs * .073 + 1.1) * .05,
+          frame.implementYaw * Math.PI / 180 + tremor * Math.sin(frame.atMs * .061 + .7) * .045,
+          -frame.implementLift * .24 + tremor * Math.sin(frame.atMs * .083 + 2.2) * .03,
+          'YZX');
       } else {
         implement.rotation.z = frame.implementLift * .3 + (1 - frame.headerSpeed) * .065;
         rotor.rotation.z = reduced ? 0 : -headerTurns * Math.PI * 2;
