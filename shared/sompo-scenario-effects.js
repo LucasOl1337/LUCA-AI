@@ -38,8 +38,8 @@ export const SOMPO_SCENARIO_EFFECTS = Object.freeze({
  */
 export const SOMPO_SCENARIO_OUTCOME_EFFECTS = Object.freeze({
   normal: Object.freeze({
-    'viagem-completa': scene([track('road-dust', 0, null, 0.16), track('running-lights'), track('exhaust', 0, 4000, 0.4), track('brake-lights', 15000)]),
-    'parada-tecnica': scene([track('road-dust', 0, null, 0.2), track('running-lights'), track('brake-lights', 7000, 10500), track('hazard-lights', 10000)]),
+    'viagem-completa': scene([track('road-dust', 0, null, 0.16), track('running-lights'), track('exhaust', 0, 4000, 0.4), track('brake-lights', 10500, 18000)]),
+    'parada-tecnica': scene([track('road-dust', 0, null, 0.2), track('running-lights'), track('brake-lights', 4500, 10200), track('hazard-lights', 10000)]),
   }),
   obstacle: Object.freeze({
     'parada-segura': scene([track('sensor-warning', 3000), track('brake-lights', 3000, 7500), track('hazard-lights', 6000), track('road-dust', 0, 6000, 0.15)]),

@@ -501,7 +501,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
     'parada-tecnica': ruralScript('normal', [
       [0, 'Rodagem normal', {}],
       [4_000, 'Vibração incomum percebida', { roughness: 1.6 }],
-      [7_000, 'Redução por precaução', { speedKph: 25 }],
+      [8_000, 'Redução por precaução', { speedKph: 25 }],
       [10_000, 'Parada para inspeção', { speedKph: 0, roughness: 0 }],
       [16_000, 'Checagem concluída — sem avaria', {}],
     ]),
