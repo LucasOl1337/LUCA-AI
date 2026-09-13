@@ -164,7 +164,8 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
           const band = grid.bands[h][cell];
           if (band < 0 || hazards[h].bands[band].max_m >= bestMax) continue;
           bestMax = hazards[h].bands[band].max_m;
-          paint[cell] = BAND_RAMP[Math.min(band, BAND_RAMP.length - 1)];
+          // Perigo de contexto (declive, alertable false) pinta um degrau mais fraco: dentro laranja, borda amarela.
+          paint[cell] = BAND_RAMP[Math.min(band + (hazards[h].alertable ? 0 : 1), BAND_RAMP.length - 1)];
           hatch![cell] = bestMax === 0 && ((cell % grid.cols + Math.floor(cell / grid.cols)) & 1) ? 1 : 0;
         }
       }

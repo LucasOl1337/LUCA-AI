@@ -18,7 +18,7 @@ import SompoGeofenceMap from './SompoGeofenceMap';
 export function bandTone(bandId: string | null | undefined, alertable = true): 'forte' | 'media' | 'fraca' | 'livre' {
   if (!bandId) return 'livre';
   if (['critica', 'dentro', 'acima'].includes(bandId)) return alertable ? 'forte' : 'media';
-  if (['elevada', 'borda', 'proximo'].includes(bandId)) return 'media';
+  if (['elevada', 'borda', 'proximo'].includes(bandId)) return alertable ? 'media' : 'fraca';
   return 'fraca';
 }
 const decimal = (value: number) => value.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });

@@ -86,7 +86,7 @@ function buildStaticMap(scenarioId: string, outcomeId: string): StaticMap | null
       for (let h = 0; h < hazards.length; h += 1) {
         const band = grid.bands[h][cell];
         if (band < 0 || hazards[h].bands[band].max_m >= bestMax) continue;
-        bestMax = hazards[h].bands[band].max_m; best = Math.min(band, BAND_RAMP.length - 1);
+        bestMax = hazards[h].bands[band].max_m; best = Math.min(band + (hazards[h].alertable ? 0 : 1), BAND_RAMP.length - 1); // contexto: um degrau mais fraco
       }
       if (best < 0) continue;
       // Faixa "dentro" (max_m 0: declive, ribanceira) em xadrez, mesma paridade da cena: sem isso o declive virava um disco vermelho
@@ -204,6 +204,7 @@ export default function SompoGeofenceMap({ scenarioId, outcomeId, elapsedMs, pos
         <li><i style={{ background: '#d9d2b4', borderColor: '#4f7d5c' }} />Área permitida</li>
         <li><i style={{ background: '#79b9c0', borderColor: '#398a96' }} />Água</li>
         <li><i style={{ background: `conic-gradient(${BAND_RAMP[0]} 25%, ${BAND_RAMP[0]}40 0 50%, ${BAND_RAMP[0]} 0 75%, ${BAND_RAMP[0]}40 0) 0 0 / 6px 6px` }} />Dentro do perigo (hachura)</li>
+        <li><i style={{ background: `conic-gradient(${BAND_RAMP[1]} 25%, ${BAND_RAMP[1]}40 0 50%, ${BAND_RAMP[1]} 0 75%, ${BAND_RAMP[1]}40 0) 0 0 / 6px 6px` }} />Declive: contexto, um tom abaixo</li>
         <li><i style={{ background: BAND_RAMP[0] }} />Proximidade crítica (água)</li>
         <li><i style={{ background: BAND_RAMP[1] }} />Borda / elevada</li>
         <li><i style={{ background: BAND_RAMP[2] }} />Atenção</li>
