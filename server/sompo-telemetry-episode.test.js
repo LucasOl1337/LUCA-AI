@@ -459,3 +459,82 @@ test('endpoints de episódio: lifecycle 200 e erros 400/404 claros', async (t) =
   assert.equal(missing.statusCode, 404);
   assert.equal(missing.body.error, 'sompo_telemetry_episode_not_found');
 });
+
+// Amostra crua como o cliente envia (snapshotToSimulationRaw em SompoTruckSimulator.tsx), a partir do snapshot agrícola.
+function agriRaw(snapshot) {
+  const { readings, position, geofence } = snapshot;
+  return {
+    posX: position.x, posZ: position.z, headingDeg: position.headingDeg,
+    geofenceHazard: geofence.nearest?.hazardKey ?? null, geofenceBand: geofence.nearest?.bandId ?? null,
+    trator: 'SIM-001', timestamp: snapshot.deviceTimestamp,
+    distancia: readings.distance, temperatura: readings.temperature, umidade: readings.humidity,
+    pitch: readings.pitch, roll: readings.roll,
+    aceleracaoX: readings.acceleration?.x, aceleracaoY: readings.acceleration?.y, aceleracaoZ: readings.acceleration?.z,
+    rotacaoX: readings.rotation?.x, rotacaoY: readings.rotation?.y, rotacaoZ: readings.rotation?.z,
+    riscoColisao: snapshot.risks.collision, riscoInclinacao: snapshot.risks.inclination,
+    scenarioLabel: snapshot.source.scenarioLabel, observedAt: snapshot.observedAt,
+  };
+}
+
+test('episódio do cenário com geofencing: resumo traz talhão, regras e episódios de faixa iguais aos do motor; sem talhão fica null', async (t) => {
+  const { createSompoAgriSimulationSnapshot, getSompoAgriGeofenceEpisodes } = await import('../shared/sompo-agri-brief.js');
+  const { dbPath, cleanup } = tempDb();
+  let clock = BASE_MS;
+  const history = createSompoTelemetryHistory({ dbPath, now: () => clock });
+  t.after(() => {
+    history.close();
+    cleanup();
+  });
+  const stepMs = 500;
+  const outcome = 'segue-ate-critica';
+  const episode = history.startEpisode({ kind: 'roteiro', tractorId: 'SIM-001', scenarioLabel: 'Operação com geofencing', scenarioId: 'agri-geofencing', outcomeId: outcome });
+  const snapshots = Array.from({ length: 24_000 / stepMs + 1 }, (_, i) => createSompoAgriSimulationSnapshot('agri-geofencing', outcome, {
+    elapsedMs: i * stepMs, observedAt: new Date(BASE_MS + i * stepMs).toISOString(),
+  }));
+  const handler = createSompoTelemetrySimulationHttpHandler(history, { now: () => clock });
+  for (let start = 0; start < snapshots.length; start += 10) {
+    const res = mockRes();
+    await handler({ body: { episodeId: episode.publicId, samples: snapshots.slice(start, start + 10).map(agriRaw) } }, res);
+    assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  }
+  clock = BASE_MS + 25_000;
+  history.finishEpisode(episode.publicId, { status: 'complete' });
+  const { samples, summary } = history.getEpisode(episode.publicId);
+  assert.equal(samples.length, snapshots.length);
+  const geofence = summary.geofence;
+  assert.ok(geofence, 'resumo com bloco de geofencing');
+  assert.equal(geofence.site.synthetic, true);
+  assert.equal(geofence.site.scenarioId, 'agri-geofencing');
+  assert.equal(geofence.site.outcomeId, outcome);
+  assert.equal(geofence.machine.maxRollDeg, 15);
+  assert.equal(geofence.sampleIntervalMs, stepMs);
+  assert.equal(geofence.samplesWithPosition, snapshots.length);
+  assert.equal(geofence.recordedBandMismatches, 0, 'radar gravado no instante bate com o recálculo pela geometria');
+  assert.equal(geofence.alertSamples, snapshots.filter((s) => s.risks.proximity).length);
+  assert.deepEqual(geofence.rules.map((rule) => [rule.label, rule.alertable, rule.unit]), [
+    ['Córrego sintético', true, 'm'], ['Declive mapeado', false, 'm'], ['Ribanceira', true, 'm'], ['Limite de inclinação da máquina', true, 'deg'],
+  ]);
+  // Mesmo motor, mesma série a 500 ms: os episódios de faixa do resumo são os do painel do simulador.
+  const expected = getSompoAgriGeofenceEpisodes('agri-geofencing', outcome, stepMs)
+    .filter((e) => !e.hazardKey.startsWith('machine'))
+    .map((e) => [e.hazardKey, e.bandId, e.startMs, e.endMs]);
+  assert.deepEqual(geofence.episodes.filter((e) => e.unit === 'm').map((e) => [e.hazardKey, e.bandId, e.startMs, e.endMs]), expected);
+  assert.ok(expected.length >= 5);
+  for (const item of geofence.episodes) {
+    assert.ok(Number.isFinite(item.observedMs) && item.observedMs >= 0);
+    assert.ok(item.minDistance === null || item.minDistance >= 0);
+  }
+  assert.doesNotMatch(JSON.stringify(geofence), /segur[o]|risco alto|neglig[eê]ncia|vai tombar/i);
+
+  // Episódio de cenário sem talhão e episódio legado sem cenário: null, nada inventado.
+  const plain = history.startEpisode({ kind: 'roteiro', tractorId: 'SIM-001', scenarioId: 'agri-harvest-dust', outcomeId: null });
+  history.recordMany([simSnapshotAt(scriptedRaw(0), new Date(BASE_MS + 30_000).toISOString())], { episodeId: plain.publicId });
+  assert.equal(history.getEpisode(plain.publicId).summary.geofence, null);
+  const legacy = history.startEpisode({ kind: 'colisao' });
+  history.recordMany([simSnapshotAt(scriptedRaw(0), new Date(BASE_MS + 31_000).toISOString())], { episodeId: legacy.publicId });
+  assert.equal(history.getEpisode(legacy.publicId).summary.geofence, null);
+  const unknownOutcome = history.startEpisode({ kind: 'roteiro', scenarioId: 'agri-geofencing', outcomeId: 'nao-existe' });
+  history.recordMany([{ ...snapshots[0], observedAt: new Date(BASE_MS + 32_000).toISOString(), changedAt: new Date(BASE_MS + 32_000).toISOString(), source: { ...snapshots[0].source, kind: 'simulation' } }], { episodeId: unknownOutcome.publicId });
+  assert.equal(history.getEpisode(unknownOutcome.publicId).summary.geofence, null, 'desfecho desconhecido não cai no padrão em silêncio');
+  assert.equal(summarizeSompoEpisodeSamples(samples).geofence, null, 'sem o episódio o resumo não adivinha talhão');
+});

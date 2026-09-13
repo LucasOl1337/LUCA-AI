@@ -189,9 +189,44 @@ export interface SompoTelemetryEpisodeImpact {
   accMagnitude: number | null;
 }
 
+export interface SompoTelemetryEpisodeGeofenceEpisode {
+  id: string;
+  hazardKey: string;
+  hazardLabel: string;
+  bandId: string;
+  bandLabel: string;
+  bandMax: number;
+  unit: 'm' | 'deg';
+  alertable: boolean;
+  startMs: number;
+  endMs: number | null;
+  observedMs: number;
+  gapMs: number;
+  minDistance: number | null;
+  minDistanceAtMs: number;
+  quality: 'observado' | 'com-lacuna' | 'aberto-no-fim';
+}
+
+/** Episódios de faixa do episódio gravado (computeGeofenceEpisodes sobre a série persistida); null sem talhão. */
+export interface SompoTelemetryEpisodeGeofence {
+  notice: string;
+  site: { environmentId: string; label: string; synthetic: true; version: number; scenarioId: string; outcomeId: string };
+  machine: { equipmentId: string; label: string; maxRollDeg: number; synthetic: true };
+  rules: { role: string; category: string | null; label: string; alertable: boolean; unit: 'm' | 'deg'; bands: { id: string; label: string; max: number }[]; justification: string | null }[];
+  sampleIntervalMs: number;
+  samplesWithPosition: number;
+  recordedBandMismatches: number;
+  alertSamples: number;
+  alertMs: number;
+  episodes: SompoTelemetryEpisodeGeofenceEpisode[];
+  affectedArea: { hazardKey: string; bandId: string; areaM2: number; shareOfAllowed: number; method: string }[];
+  warnings: string[];
+}
+
 export interface SompoTelemetryEpisodeSummary extends SompoTelemetryHistorySummary {
   impact: SompoTelemetryEpisodeImpact | null;
   phases: SompoTelemetryEpisodePhase[];
+  geofence?: SompoTelemetryEpisodeGeofence | null;
 }
 
 export interface SompoTelemetryEpisodeFrame {
