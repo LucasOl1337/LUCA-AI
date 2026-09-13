@@ -215,8 +215,9 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
         }
         const cell = cellAt(position.x, position.z);
         const color = cell < 0 ? -1 : paint![cell];
-        // Na hachura, metade dos pés fica na cor natural: a zona se lê como marcação, não como erro de textura.
-        strip.setColorAt(i, color < 0 || hatch![cell] ? tint.setScalar(1) : tint.setHex(color).lerp(tint.clone().setScalar(1), 0.15));
+        // A faixa mais interna não tinge o plantio: o relevo (morro, degrau) e a textura do chão já a mostram, e o
+        // xadrez vermelho sobre a cultura lia como incêndio. Borda/elevada/atenção continuam tingindo.
+        strip.setColorAt(i, color < 0 || color === BAND_RAMP[0] ? tint.setScalar(1) : tint.setHex(color).lerp(tint.clone().setScalar(1), 0.15));
       }
       strip.instanceMatrix.needsUpdate = true;
       if (strip.instanceColor) strip.instanceColor.needsUpdate = true;
