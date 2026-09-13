@@ -301,3 +301,70 @@ test('POST /simulation valida o lote, grava simulation e não persiste item inv�
   assert.equal(missing.statusCode, 400);
   assert.equal(missing.body.error, 'sompo_telemetry_simulation_invalid_body');
 });
+
+test('POST /simulation persiste posição de cena e faixa do radar, amostra sem posição fica null e posição inválida não grava', async (t) => {
+  const { dbPath, cleanup } = tempDb();
+  let clock = Date.parse('2026-09-13T10:00:00.000Z');
+  const history = createSompoTelemetryHistory({ dbPath, now: () => clock });
+  t.after(() => {
+    history.close();
+    cleanup();
+  });
+  const handler = createSompoTelemetrySimulationHttpHandler(history, { now: () => clock });
+
+  const ok = mockRes();
+  await handler({
+    body: {
+      samples: [
+        { ...RAW, timestamp: 1, observedAt: '2026-09-13T10:00:00.000Z', posX: -12.5, posZ: 30.25, headingDeg: 90, geofenceHazard: 'water:corrego-sintetico', geofenceBand: 'atencao' },
+        { ...RAW, timestamp: 2, observedAt: '2026-09-13T10:00:00.250Z', posX: -12, posZ: 30.5, headingDeg: 91 },
+        { ...RAW, timestamp: 3, observedAt: '2026-09-13T10:00:00.500Z' },
+      ],
+    },
+  }, ok);
+  assert.equal(ok.statusCode, 200);
+  assert.equal(ok.body.recorded, 3);
+
+  clock += 1_000;
+  const stored = history.query({ sourceKind: 'simulation', tractorId: '001', windowMs: 60_000 });
+  assert.deepEqual(
+    stored.map((sample) => [sample.posX, sample.posZ, sample.headingDeg, sample.geofenceHazard, sample.geofenceBand]),
+    [[-12.5, 30.25, 90, 'water:corrego-sintetico', 'atencao'], [-12, 30.5, 91, null, null], [null, null, null, null, null]],
+  );
+  // O export sai com os mesmos nomes que o conversor do laboratório lê (posX/posZ/headingDeg).
+  const exported = history.exportDataset({ sourceKind: 'simulation', tractorId: '001', windowMin: 1 });
+  assert.equal(exported.samples[0].posX, -12.5);
+  assert.equal(exported.samples[0].headingDeg, 90);
+  assert.equal(exported.samples[2].posX, null);
+
+  for (const bad of [{ posX: '1', posZ: 1 }, { posX: Infinity, posZ: 1 }, { posX: 1e6, posZ: 1 }, { posX: 1, posZ: 1, geofenceBand: 'x'.repeat(121) }, { geofenceHazard: 42 }]) {
+    const rejected = mockRes();
+    await handler({ body: { samples: [{ ...RAW, observedAt: '2026-09-13T10:00:05.000Z', ...bad }] } }, rejected);
+    assert.equal(rejected.statusCode, 400, JSON.stringify(bad));
+    assert.equal(rejected.body.error, 'sompo_telemetry_simulation_invalid_item');
+    assert.match(rejected.body.message, /inválido/);
+  }
+  assert.equal(history.query({ sourceKind: 'simulation', tractorId: '001', windowMs: 60_000 }).length, 3);
+});
+
+test('posição ou faixa pela metade é rejeitada na borda e, no record direto, nunca grava metade', async (t) => {
+  const { dbPath, cleanup } = tempDb();
+  const clock = Date.parse('2026-09-13T11:00:00.000Z');
+  const history = createSompoTelemetryHistory({ dbPath, now: () => clock });
+  t.after(() => {
+    history.close();
+    cleanup();
+  });
+  const handler = createSompoTelemetrySimulationHttpHandler(history, { now: () => clock });
+  for (const [partial, field] of [[{ posX: 5 }, 'posZ'], [{ posZ: 5 }, 'posX'], [{ headingDeg: 90 }, 'headingDeg'], [{ posX: 1, posZ: 1, headingDeg: 400 }, 'headingDeg'], [{ posX: 1, posZ: 1, geofenceHazard: 'water:c' }, 'geofenceBand'], [{ posX: 1, posZ: 1, geofenceBand: 'critica' }, 'geofenceHazard']]) {
+    const rejected = mockRes();
+    await handler({ body: { samples: [{ ...RAW, observedAt: '2026-09-13T11:00:00.000Z', ...partial }] } }, rejected);
+    assert.equal(rejected.statusCode, 400, JSON.stringify(partial));
+    assert.match(rejected.body.message, new RegExp(`${field} inválido`));
+  }
+  const iso = '2026-09-13T11:00:01.000Z';
+  const base = { ...normalizeSompoTelemetry(RAW, { observedAt: iso }), changedAt: iso, source: { kind: 'simulation', provider: 'x', path: 'y' } };
+  assert.equal(history.record({ ...base, position: { x: '7', z: true, headingDeg: 'abc' }, geofence: { nearest: { hazardKey: {}, bandId: ['a'] } } }), true);
+  const [stored] = history.query({ sourceKind: 'simulation', tractorId: '001', windowMs: 60_000 });
+  assert.deepEqual([stored.posX, stored.posZ, stored.headingDeg, stored.geofenceHazard, stored.geofenceBand], [null, null, null, null, null]);
+});

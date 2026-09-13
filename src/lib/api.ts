@@ -258,7 +258,7 @@ export const lucaApi = {
       timeoutMs,
     ),
   postSompoTelemetryEpisodeStart: (
-    body: { kind: string; trator?: string; scenarioLabel?: string },
+    body: { kind: string; trator?: string; scenarioLabel?: string; scenarioId?: string; outcomeId?: string },
     base?: string,
     timeoutMs = ACTION_REQUEST_TIMEOUT_MS,
   ) =>

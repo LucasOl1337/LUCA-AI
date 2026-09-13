@@ -10,6 +10,7 @@ import {
   Cpu,
   Disc,
   Focus,
+  Map as MapIcon,
   Play,
   Pause,
   SlidersHorizontal,
@@ -20,6 +21,8 @@ import {
   Truck,
 } from 'lucide-react';
 import SompoStudio, { type SompoStudioAsset } from './sompo/SompoStudio';
+import SompoGeofenceMap from './sompo/SompoGeofenceMap';
+import SompoGeofencePanel, { bandTone } from './sompo/SompoGeofencePanel';
 import { createSompoPlayback } from './sompo/sompoPlayback';
 import { downloadSompoFile, loadSompoStudioConfig, type SompoStudioConfig, type SompoRenderStats } from './sompo/sompoStudioConfig';
 import { mountSompoRuralStage } from './sompo/createSompoRuralStage';
@@ -38,6 +41,9 @@ import {
 } from '../../shared/sompo-agri-scenarios.js';
 import {
   createSompoAgriSimulationSnapshot,
+  describeGeofence,
+  describeMachineLimit,
+  type SompoAgriSimulationSnapshot,
   getSompoAgriEpisodePlan,
   getSompoAgriOutcomes,
   isSompoAgriScenarioId,
@@ -179,7 +185,17 @@ function captureEpisodeFrameDataUrl(source: HTMLCanvasElement): string | null {
 
 function snapshotToSimulationRaw(snapshot: SompoTelemetrySnapshot): Record<string, unknown> {
   const readings = snapshot.readings;
+  const { position, geofence } = snapshot as Partial<SompoAgriSimulationSnapshot>;
   return {
+    ...(position && geofence ? {
+      posX: position.x,
+      posZ: position.z,
+      headingDeg: position.headingDeg,
+      geofenceBand: geofence.nearest?.bandId ?? null,
+      geofenceHazard: geofence.nearest?.hazardKey ?? null,
+      geofenceDistanceM: geofence.nearest?.distanceM ?? null,
+      machineBand: geofence.machine?.bandId ?? null,
+    } : {}),
     trator: snapshot.tractorId,
     timestamp: snapshot.deviceTimestamp,
     distancia: readings.distance,
@@ -317,6 +333,7 @@ export default function SompoTruckSimulator({
 }: SompoTruckSimulatorProps) {
   const isFirebase = source === 'firebase';
   const [studioOpen, setStudioOpen] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false); // Mapa do talhão no lugar dos controles; a cena 3D continua rodando.
   const [studioConfig, setStudioConfig] = useState<SompoStudioConfig>(loadSompoStudioConfig);
   const studioRef = useRef(studioConfig);
   studioRef.current = { ...studioConfig, exploded: studioOpen ? studioConfig.exploded : 0, wireframe: studioOpen && studioConfig.wireframe };
@@ -330,7 +347,7 @@ export default function SompoTruckSimulator({
   const [controls, setControls] = useState<SompoSimulationControls>(INITIAL_CONTROLS);
   const [agriRun, setAgriRun] = useState<SompoAgriRun | null>(() => !isFirebase && ['tractor', 'harvester'].includes(studioConfig.equipment) ? { scenarioId: studioConfig.equipment === 'harvester' ? 'agri-harvest-dust' : 'agri-field-bogging', outcomeId: studioConfig.equipment === 'harvester' ? 'clean-pass' : getSompoAgriOutcomes('agri-field-bogging')[0].id } : null);
   const [axisCalibration, setAxisCalibration] = useState<SompoAxisCalibration>(loadAxisCalibration);
-  const [preview, setPreview] = useState<SompoTelemetrySnapshot>(() => (
+  const [preview, setPreview] = useState<SompoTelemetrySnapshot & Partial<Pick<SompoAgriSimulationSnapshot, 'geofence' | 'position'>>>(() => (
     telemetry || createSompoSimulationSnapshot(INITIAL_CONTROLS, { elapsedMs: 0 })
   ));
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -640,6 +657,8 @@ export default function SompoTruckSimulator({
         kind: plan.kind,
         trator: 'SIM-001',
         scenarioLabel: plan.scenarioLabel,
+        scenarioId: plan.scenarioId,
+        outcomeId: plan.outcomeId,
       });
       if (!result?.ok || !result.episode?.publicId) throw new Error('sompo_episode_start_failed');
       publicId = result.episode.publicId;
@@ -877,231 +896,22 @@ export default function SompoTruckSimulator({
     ? preview.freshness === 'stale' ? 'Conectado · leitura parada' : 'Firebase ao vivo'
     : preview.connection.state === 'reconnecting' ? 'Reconectando ao Firebase' : 'Conectando ao Firebase';
 
-  return (
-    <section
-      className={`sompo-simulator${isFirebase ? ' sompo-simulator-live' : ''}${studioOpen ? ' is-studio' : ''}`}
-      aria-labelledby="sompo-simulator-title"
-      data-sompo-simulator
-      data-sompo-simulator-source={source}
-      data-sompo-model={modelStatus}
-      data-sompo-asset={modelAsset ?? undefined}
-    >
-      <header className="sompo-simulator-head">
-        <div>
-          <span><BoxIcon /> {isFirebase ? 'Gêmeo digital' : 'Laboratório virtual'}</span>
-          <h2 id="sompo-simulator-title">
-            {isFirebase ? 'Caminhão 3D acoplado ao dispositivo físico' : agriRun ? 'Operação agrícola · laboratório de sinistros' : 'Estrada rural · laboratório de sinistros'}
-          </h2>
-          <p>
-            {isFirebase
-              ? 'A cena acompanha em tempo real a orientação, a distância frontal e os alertas recebidos do Firebase.'
-              : 'Dados sintéticos locais para testar a mesma leitura da telemetria sem o dispositivo físico.'}
-          </p>
-        </div>
-        <div className="sompo-simulator-head-status">
-          <strong className={isFirebase && firebaseLive ? 'is-live' : ''}>
-            <Cpu /> {isFirebase ? firebaseStatusLabel : 'Telemetria sintética'}
-          </strong>
-          {!isFirebase && historyOffline && (
-            <span className="sompo-simulator-history-offline" role="status" data-sompo-history-offline>
-              histórico offline
-            </span>
-          )}
-        </div>
-      </header>
-
-      {!isFirebase && <div className="sompo-simulator-toolbar">
-        <div className="sompo-simulator-modes"><button type="button" aria-pressed={!studioOpen} disabled={episodeActive} onClick={() => setStudioOpen(false)}><Truck />Simulador</button><button type="button" aria-pressed={studioOpen} disabled={episodeActive} onClick={() => setStudioOpen(true)}><SlidersHorizontal />Oficina 3D</button></div>
-        <div className="sompo-simulator-playback">
-          <button type="button" disabled={episodeActive} aria-label={playing ? 'Pausar simulação' : 'Reproduzir simulação'} onClick={() => { playback.current.setPlaying(!playing, performance.now(), startedAtRef.current); setPlaying(!playing); }}>{playing ? <Pause /> : <Play />}</button>
-          <input aria-label="Instante da simulação" disabled={episodeActive} type="range" min="0" max={scenarioTotalMs || 60000} step="100" value={Math.min(preview.deviceTimestamp || 0, scenarioTotalMs || 60000)} onChange={event => { historyReplay.current = true; playback.current.seek(Number(event.target.value), performance.now(), startedAtRef.current); }} />
-          <output>{((preview.deviceTimestamp || 0) / 1000).toFixed(1)}s</output>
-          <select aria-label="Velocidade de reprodução" disabled={episodeActive} value={playbackRate} onChange={event => { const rate = Number(event.target.value); playback.current.setRate(rate, performance.now(), startedAtRef.current); setPlaybackRate(rate); }}><option value="0.5">0,5×</option><option value="1">1×</option><option value="2">2×</option></select>
-        </div>
-      </div>}
-      <div className="sompo-simulator-workspace">
-        <div className="sompo-simulator-stage">
-          <div
-            ref={mountRef}
-            className="sompo-simulator-canvas"
-            role={webglError ? undefined : 'img'}
-            tabIndex={webglError ? undefined : 0}
-            aria-keyshortcuts={webglError ? undefined : 'ArrowLeft ArrowRight ArrowUp ArrowDown'}
-            onKeyDown={handleCameraKeyDown}
-            aria-label={webglError
-              ? undefined
-              : agriRun
-                ? `Modelo 3D interativo de ${activeScenario.label.toLowerCase()} com telemetria virtual. Setas esquerda e direita giram; setas para cima e para baixo controlam o zoom.`
-                : `Modelo 3D interativo de um caminhão com caixa ESP32 ${isFirebase ? 'movido pela telemetria física' : 'virtual'}. Setas esquerda e direita giram; setas para cima e para baixo controlam o zoom.`}
-          >
-            {webglError && (
-              <div className="sompo-simulator-webgl" role="status">
-                <Truck />
-                <strong>Visualização 3D indisponível</strong>
-                <p>{isFirebase ? 'A telemetria física continua atualizando abaixo.' : 'Os controles e a telemetria simulada continuam funcionando.'}</p>
-              </div>
-            )}
-          </div>
-          <div className="sompo-simulator-stage-badges" aria-hidden="true">
-            <span><span className="sompo-simulator-led" /> {isFirebase ? `ESP32 físico · trator ${preview.tractorId}` : 'ESP32 virtual transmitindo'}</span>
-            <span>{isFirebase ? `tick ${preview.deviceTimestamp ?? '-'}` : `${Math.round(preview.deviceTimestamp || 0)} ms`}</span>
-          </div>
-          {!isFirebase && (
-            <div className="sompo-simulator-readout" aria-label="Resumo do cenário">
-              <div><span>{(ruralPreview ?? agriPreview)?.phaseLabel || 'Condução livre'}</span><strong>{formatReading((ruralPreview ?? agriPreview)?.speedKph ?? controls.speedKph, ' km/h')}</strong></div>
-              <div data-alert={preview.risks.collision || preview.risks.inclination}>
-                <span>{preview.risks.collision ? 'Alerta de colisão' : preview.risks.inclination ? 'Alerta de inclinação' : 'Colisão/inclinação sem alerta'}</span>
-                <strong>{formatReading(preview.readings.distance, ' cm')} <small>{distanceSensorCopy.relative}</small></strong>
-              </div>
-            </div>
-          )}
-          <div className="sompo-simulator-camera" role="group" aria-label="Controles da câmera 3D">
-            <button type="button" onClick={() => sceneApiRef.current?.focus('truck')}>
-              <Truck /> Visão geral
-            </button>
-            <button type="button" onClick={() => sceneApiRef.current?.focus('sensor')}>
-              <Focus /> {agriRun ? 'Inspecionar máquina' : 'Focar ESP32'}
-            </button>
-          </div>
-          {studioOpen && renderStats && <div className="sompo-simulator-stats" aria-label="Métricas do render"><span>{renderStats.fps} FPS</span><span>{renderStats.cpuMs.toFixed(1)} ms CPU</span><span>{renderStats.calls} chamadas</span><span>{Math.round(renderStats.triangles / 1000)} mil triângulos</span></div>}
-          <p className="sompo-simulator-hint">Arraste para girar · use as setas para navegar</p>
-          <p className="sompo-simulator-credit">
-            {agriRun ? (
-              modelStatus === 'gltf'
-                ? `${modelAsset ?? 'Equipamento agrícola'} · imagem → 3D por LUCA-AI`
-                : modelStatus === 'loading' ? 'Carregando equipamento agrícola…' : 'Silhueta nominal · GLB agrícola indisponível'
-            ) : modelAsset === 'SompoModularTruck' ? 'Caminhão modular · peças articuladas · LUCA' : modelAsset === 'GeneratedRuralTruck' ? 'Caminhão rural · imagem → 3D por LUCA-AI · adaptado com sensor' : modelStatus === 'gltf' ? <>
-              <a href="https://sketchfab.com/3d-models/tesla-semi-39ffc7c746184e0c9ebd5bbcd0b405dd" target="_blank" rel="noreferrer">Tesla Semi © 2018 Oleksii Rozumnyi</a>
-              {' · '}<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a> · adaptado com sensor
-            </> : modelStatus === 'loading' ? 'Carregando caminhão detalhado…' : 'Modelo simplificado · arquivo detalhado indisponível'}
-          </p>
-        </div>
-
-        {isFirebase ? (
-          <LiveReadings
-            telemetry={preview}
-            calibration={axisCalibration}
-            onCalibrationChange={(key, value) => setAxisCalibration((current) => ({ ...current, [key]: value }))}
-            onCalibrationReset={() => setAxisCalibration({ ...DEFAULT_SOMPO_AXIS_CALIBRATION })}
-            onRecenterHeading={() => sceneApiRef.current?.recenterHeading()}
-          />
-        ) : studioOpen ? <div><SompoStudio config={studioConfig} onChange={setStudioConfig}
-          asset={agriRun ? getSompoAgriFrame(agriRun.scenarioId, 0).equipmentId === 'harvester' ? 'harvester' : 'tractor' : studioConfig.truck}
-          onAsset={selectStudioAsset} onSnapshot={() => { snapshotRequested.current = true; setCaptureMessage(''); }}
-          onExportModel={async () => { if (!sceneApiRef.current?.exportModel) throw new Error('O modelo ainda está carregando.'); const data = await sceneApiRef.current.exportModel(); downloadSompoFile(new Blob([data], { type: 'model/gltf-binary' }), 'sompo-modelo.glb'); }}
-        /><p className="sompo-studio-message" role="status">{captureMessage}</p></div> : (
-        <aside className="sompo-simulator-controls" aria-label="Controles do simulador">
-          <div className="sompo-simulator-control-head">
-            <div>
-              <span>Cenário ativo</span>
-              <strong>{preview.source.scenarioLabel || activeScenario.label}</strong>
-              <p>{activeScenario.description}</p>
-            </div>
-            <button
-              type="button"
-              onClick={restartScenario}
-              disabled={episodeActive}
-              aria-label="Reiniciar cenário"
-              title="Reiniciar cenário"
-            >
-              <RotateCcw />
-            </button>
-          </div>
-
-          <label className="sompo-scenario-select">
-            <span>Escolha entre {SCENARIO_IDS.length + AGRI_SCENARIO_IDS.length} cenários</span>
-            <select name="sompo-scenario" value={agriRun ? agriRun.scenarioId : controls.scenarioId} disabled={episodeActive} onChange={(event) => selectScenario(event.target.value as SompoSimulationScenarioId | SompoAgriScenarioId)}>
-              <optgroup label="Sinistros e emergências · roteiros">
-                {SCENARIO_IDS.filter((id) => !!SOMPO_RURAL_SCRIPTS[id]).map((id) => <option key={id} value={id}>{SOMPO_SIMULATION_SCENARIOS[id].label}</option>)}
-              </optgroup>
-              <optgroup label="Operação, terreno e manobras">
-                {SCENARIO_IDS.filter((id) => !SOMPO_RURAL_SCRIPTS[id]).map((id) => <option key={id} value={id}>{SOMPO_SIMULATION_SCENARIOS[id].label}</option>)}
-              </optgroup>
-              <optgroup label="Operações agrícolas · trator e colheitadeira">
-                {AGRI_SCENARIO_IDS.map((id) => <option key={id} value={id}>{SOMPO_AGRI_SCENARIOS[id].label}</option>)}
-              </optgroup>
-            </select>
-          </label>
-          {scenarioOutcomes.length > 1 && (
-            <label className="sompo-scenario-select sompo-outcome-select">
-              <span>Desfecho do cenário</span>
-              <select
-                value={activeOutcomeId}
-                name="sompo-scenario-outcome"
-                disabled={episodeActive}
-                data-sompo-outcome
-                onChange={(event) => selectScenario(agriRun ? agriRun.scenarioId : controls.scenarioId, event.target.value)}
-              >
-                {scenarioOutcomes.map((item) => (
-                  <option key={item.id} value={item.id}>{item.label}</option>
-                ))}
-              </select>
-              {activeOutcome && <small>{activeOutcome.description}</small>}
-            </label>
-          )}
-          {(ruralPreview || agriPreview) && (
-            <div className="sompo-scenario-phase">
-              <span role="status">{(ruralPreview ?? agriPreview)!.phaseLabel}</span>
-              <strong>{formatReading((ruralPreview ?? agriPreview)!.speedKph, ' km/h')}{(ruralPreview ?? agriPreview)!.direction < 0 ? ' · ré' : ''}</strong>
-              <progress max={scenarioTotalMs} value={Math.min(preview.deviceTimestamp ?? 0, scenarioTotalMs ?? 1)} />
-              <small>{(preview.deviceTimestamp ?? 0) >= (scenarioTotalMs ?? Infinity)
-                ? 'Roteiro concluído · use ↻ para repetir.'
-                : 'O roteiro conduz os valores abaixo. Use ↻ para repetir.'}</small>
-            </div>
-          )}
-
-          <div className="sompo-simulator-episode" data-sompo-episode-panel>
-            <button
-              type="button"
-              className="sompo-simulator-episode-run"
-              data-sompo-episode-run
-              disabled={episodeActive || !episodePlan}
-              onClick={() => void startEpisodeRun()}
-            >
-              <Disc /> {episodeActive ? 'Gravando episódio…' : 'Gravar episódio deste cenário'}
-            </button>
-            {!episodePlan && !episodeActive && (
-              <p className="sompo-simulator-episode-status" data-sompo-episode-manual>
-                Este desfecho é manual e não gera episódio. Escolha um desfecho roteirizado para gravar.
-              </p>
-            )}
-            {episodeRun.status === 'starting' && (
-              <p className="sompo-simulator-episode-status" role="status">
-                Abrindo episódio no servidor…
-              </p>
-            )}
-            {episodeRun.status === 'recording' && (
-              <p className="sompo-simulator-episode-status" role="status" data-sompo-episode-recording>
-                Gravando episódio… {episodeElapsedSec}s · fase: {episodePhaseLabel}
-                {' '}· frames: {episodeFrameCount}/{episodeFrameTotal}
-              </p>
-            )}
-            {episodeRun.status === 'finishing' && (
-              <p className="sompo-simulator-episode-status" role="status">
-                Fechando episódio…
-              </p>
-            )}
-            {episodeRun.status === 'done' && (
-              <p className="sompo-simulator-episode-status is-done" role="status" data-sompo-episode-done>
-                Episódio registrado. Use “Analisar episódio na bancada” no painel abaixo.
-              </p>
-            )}
-            {episodeRun.status === 'error' && (
-              <p className="sompo-simulator-episode-status is-error" role="alert" data-sompo-episode-error>
-                {episodeRun.message}
-              </p>
-            )}
-            {episodeFramesWarning && (
-              <p
-                className="sompo-simulator-episode-status is-error"
-                role="alert"
-                data-sompo-episode-frames-warning
-              >
-                {episodeFramesWarning}
-              </p>
-            )}
-          </div>
-
+  // Coluna direita vira painel de geofencing só no cenário com talhão (radar presente); os demais cenários ficam como eram.
+  const geofencePanel = !isFirebase && agriRun && preview.geofence ? (
+    <SompoGeofencePanel
+      scenarioId={agriRun.scenarioId}
+      outcomeId={agriRun.outcomeId}
+      elapsedMs={preview.deviceTimestamp ?? 0}
+      geofence={preview.geofence}
+      rollDeg={preview.geofence.machine?.valueDeg ?? preview.readings.roll ?? null}
+      position={preview.position ?? null}
+      locked={episodeActive}
+      onSeek={(ms) => { if (episodeActive) return; historyReplay.current = true; playback.current.seek(ms, performance.now(), startedAtRef.current); }}
+      onOpenMap={() => { if (episodeActive) return; setStudioOpen(false); setMapOpen(true); }}
+    />
+  ) : null;
+  const manualControls = (
+    <>
           <div className="sompo-simulator-ranges">
             {brakingPreview && (
               <p role="status">
@@ -1212,6 +1022,259 @@ export default function SompoTruckSimulator({
           <p className="sompo-simulator-disclaimer">
             As flags são comandos do cenário. Não representam limiares confirmados do firmware.
           </p>
+    </>
+  );
+
+  return (
+    <section
+      className={`sompo-simulator${isFirebase ? ' sompo-simulator-live' : ''}${studioOpen ? ' is-studio' : ''}`}
+      aria-labelledby="sompo-simulator-title"
+      data-sompo-simulator
+      data-sompo-simulator-source={source}
+      data-sompo-model={modelStatus}
+      data-sompo-asset={modelAsset ?? undefined}
+    >
+      <header className="sompo-simulator-head">
+        <div>
+          <span><BoxIcon /> {isFirebase ? 'Gêmeo digital' : 'Laboratório virtual'}</span>
+          <h2 id="sompo-simulator-title">
+            {isFirebase ? 'Caminhão 3D acoplado ao dispositivo físico' : agriRun ? 'Operação agrícola · laboratório de sinistros' : 'Estrada rural · laboratório de sinistros'}
+          </h2>
+          <p>
+            {isFirebase
+              ? 'A cena acompanha em tempo real a orientação, a distância frontal e os alertas recebidos do Firebase.'
+              : 'Dados sintéticos locais para testar a mesma leitura da telemetria sem o dispositivo físico.'}
+          </p>
+        </div>
+        <div className="sompo-simulator-head-status">
+          <strong className={isFirebase && firebaseLive ? 'is-live' : ''}>
+            <Cpu /> {isFirebase ? firebaseStatusLabel : 'Telemetria sintética'}
+          </strong>
+          {!isFirebase && historyOffline && (
+            <span className="sompo-simulator-history-offline" role="status" data-sompo-history-offline>
+              histórico offline
+            </span>
+          )}
+        </div>
+      </header>
+
+      {!isFirebase && <div className="sompo-simulator-toolbar">
+        <div className="sompo-simulator-modes"><button type="button" aria-pressed={!studioOpen && !mapOpen} disabled={episodeActive} onClick={() => { setStudioOpen(false); setMapOpen(false); }}><Truck />Simulador</button>{agriRun && preview.geofence && <button type="button" aria-pressed={mapOpen} disabled={episodeActive} data-sompo-map-toggle onClick={() => { setStudioOpen(false); setMapOpen(true); }}><MapIcon />Mapa do talhão</button>}<button type="button" aria-pressed={studioOpen} disabled={episodeActive} onClick={() => { setMapOpen(false); setStudioOpen(true); }}><SlidersHorizontal />Oficina 3D</button></div>
+        <div className="sompo-simulator-playback">
+          <button type="button" disabled={episodeActive} aria-label={playing ? 'Pausar simulação' : 'Reproduzir simulação'} onClick={() => { playback.current.setPlaying(!playing, performance.now(), startedAtRef.current); setPlaying(!playing); }}>{playing ? <Pause /> : <Play />}</button>
+          <input aria-label="Instante da simulação" disabled={episodeActive} type="range" min="0" max={scenarioTotalMs || 60000} step="100" value={Math.min(preview.deviceTimestamp || 0, scenarioTotalMs || 60000)} onChange={event => { historyReplay.current = true; playback.current.seek(Number(event.target.value), performance.now(), startedAtRef.current); }} />
+          <output>{((preview.deviceTimestamp || 0) / 1000).toFixed(1)}s</output>
+          <select aria-label="Velocidade de reprodução" disabled={episodeActive} value={playbackRate} onChange={event => { const rate = Number(event.target.value); playback.current.setRate(rate, performance.now(), startedAtRef.current); setPlaybackRate(rate); }}><option value="0.5">0,5×</option><option value="1">1×</option><option value="2">2×</option></select>
+        </div>
+      </div>}
+      <div className="sompo-simulator-workspace">
+        <div className="sompo-simulator-stage">
+          <div
+            ref={mountRef}
+            className="sompo-simulator-canvas"
+            role={webglError ? undefined : 'img'}
+            tabIndex={webglError ? undefined : 0}
+            aria-keyshortcuts={webglError ? undefined : 'ArrowLeft ArrowRight ArrowUp ArrowDown'}
+            onKeyDown={handleCameraKeyDown}
+            aria-label={webglError
+              ? undefined
+              : agriRun
+                ? `Modelo 3D interativo de ${activeScenario.label.toLowerCase()} com telemetria virtual. Setas esquerda e direita giram; setas para cima e para baixo controlam o zoom.`
+                : `Modelo 3D interativo de um caminhão com caixa ESP32 ${isFirebase ? 'movido pela telemetria física' : 'virtual'}. Setas esquerda e direita giram; setas para cima e para baixo controlam o zoom.`}
+          >
+            {webglError && (
+              <div className="sompo-simulator-webgl" role="status">
+                <Truck />
+                <strong>Visualização 3D indisponível</strong>
+                <p>{isFirebase ? 'A telemetria física continua atualizando abaixo.' : 'Os controles e a telemetria simulada continuam funcionando.'}</p>
+              </div>
+            )}
+          </div>
+          <div className="sompo-simulator-stage-badges" aria-hidden="true">
+            <span><span className="sompo-simulator-led" /> {isFirebase ? `ESP32 físico · trator ${preview.tractorId}` : 'ESP32 virtual transmitindo'}</span>
+            <span>{isFirebase ? `tick ${preview.deviceTimestamp ?? '-'}` : `${Math.round(preview.deviceTimestamp || 0)} ms`}</span>
+          </div>
+          {!isFirebase && (
+            <div className="sompo-simulator-readout" aria-label="Resumo do cenário">
+              <div><span>{(ruralPreview ?? agriPreview)?.phaseLabel || 'Condução livre'}</span><strong>{formatReading((ruralPreview ?? agriPreview)?.speedKph ?? controls.speedKph, ' km/h')}</strong></div>
+              <div data-alert={preview.risks.collision || preview.risks.inclination}>
+                <span>{preview.risks.collision ? 'Alerta de colisão' : preview.risks.inclination ? 'Alerta de inclinação' : 'Colisão/inclinação sem alerta'}</span>
+                <strong>{formatReading(preview.readings.distance, ' cm')} <small>{distanceSensorCopy.relative}</small></strong>
+              </div>
+              {agriRun && preview.geofence && (
+                <div data-geofence data-alert={!!preview.risks.proximity}
+                  className={(preview.geofence.alert ?? preview.geofence.nearest) ? `sompo-geofence-${bandTone((preview.geofence.alert ?? preview.geofence.nearest)!.bandId, (preview.geofence.alert ?? preview.geofence.nearest)!.alertable)}` : undefined}>
+                  <span>Fazenda sintética · demonstração</span>
+                  <strong>{!preview.geofence.nearest && preview.geofence.insideAllowed
+                    ? 'Radar: sem perigo mapeado no alcance'
+                    : `Radar: ${describeGeofence(preview.geofence)}`}</strong>
+                </div>
+              )}
+              {agriRun && preview.geofence?.machine && (
+                <div data-geofence-machine data-alert className={`sompo-geofence-${preview.geofence.machine.bandId === 'acima' ? 'forte' : 'media'}`}>
+                  <span>Limite da máquina · perfil de demonstração</span>
+                  <strong>{describeMachineLimit(preview.geofence.machine)}</strong>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="sompo-simulator-camera" role="group" aria-label="Controles da câmera 3D">
+            <button type="button" onClick={() => sceneApiRef.current?.focus('truck')}>
+              <Truck /> Visão geral
+            </button>
+            <button type="button" onClick={() => sceneApiRef.current?.focus('sensor')}>
+              <Focus /> {agriRun ? 'Inspecionar máquina' : 'Focar ESP32'}
+            </button>
+          </div>
+          {studioOpen && renderStats && <div className="sompo-simulator-stats" aria-label="Métricas do render"><span>{renderStats.fps} FPS</span><span>{renderStats.cpuMs.toFixed(1)} ms CPU</span><span>{renderStats.calls} chamadas</span><span>{Math.round(renderStats.triangles / 1000)} mil triângulos</span></div>}
+          <p className="sompo-simulator-hint">Arraste para girar · use as setas para navegar</p>
+          <p className="sompo-simulator-credit">
+            {agriRun ? (
+              modelStatus === 'gltf'
+                ? `${modelAsset ?? 'Equipamento agrícola'} · imagem → 3D por LUCA-AI`
+                : modelStatus === 'loading' ? 'Carregando equipamento agrícola…' : 'Silhueta nominal · GLB agrícola indisponível'
+            ) : modelAsset === 'SompoModularTruck' ? 'Caminhão modular · peças articuladas · LUCA' : modelAsset === 'GeneratedRuralTruck' ? 'Caminhão rural · imagem → 3D por LUCA-AI · adaptado com sensor' : modelStatus === 'gltf' ? <>
+              <a href="https://sketchfab.com/3d-models/tesla-semi-39ffc7c746184e0c9ebd5bbcd0b405dd" target="_blank" rel="noreferrer">Tesla Semi © 2018 Oleksii Rozumnyi</a>
+              {' · '}<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a> · adaptado com sensor
+            </> : modelStatus === 'loading' ? 'Carregando caminhão detalhado…' : 'Modelo simplificado · arquivo detalhado indisponível'}
+          </p>
+        </div>
+
+        {isFirebase ? (
+          <LiveReadings
+            telemetry={preview}
+            calibration={axisCalibration}
+            onCalibrationChange={(key, value) => setAxisCalibration((current) => ({ ...current, [key]: value }))}
+            onCalibrationReset={() => setAxisCalibration({ ...DEFAULT_SOMPO_AXIS_CALIBRATION })}
+            onRecenterHeading={() => sceneApiRef.current?.recenterHeading()}
+          />
+        ) : mapOpen && agriRun && preview.geofence ? (
+          <SompoGeofenceMap scenarioId={agriRun.scenarioId} outcomeId={agriRun.outcomeId} elapsedMs={preview.deviceTimestamp ?? 0} position={preview.position ?? null} />
+        ) : studioOpen ? <div><SompoStudio config={studioConfig} onChange={setStudioConfig}
+          asset={agriRun ? getSompoAgriFrame(agriRun.scenarioId, 0).equipmentId === 'harvester' ? 'harvester' : 'tractor' : studioConfig.truck}
+          onAsset={selectStudioAsset} onSnapshot={() => { snapshotRequested.current = true; setCaptureMessage(''); }}
+          onExportModel={async () => { if (!sceneApiRef.current?.exportModel) throw new Error('O modelo ainda está carregando.'); const data = await sceneApiRef.current.exportModel(); downloadSompoFile(new Blob([data], { type: 'model/gltf-binary' }), 'sompo-modelo.glb'); }}
+        /><p className="sompo-studio-message" role="status">{captureMessage}</p></div> : (
+        <aside className={`sompo-simulator-controls${geofencePanel ? ' has-geofence-panel' : ''}`} aria-label="Controles do simulador">
+          <div className="sompo-simulator-control-head">
+            <div>
+              <span>Cenário ativo</span>
+              <strong>{preview.source.scenarioLabel || activeScenario.label}</strong>
+              <p>{activeScenario.description}</p>
+            </div>
+            <button
+              type="button"
+              onClick={restartScenario}
+              disabled={episodeActive}
+              aria-label="Reiniciar cenário"
+              title="Reiniciar cenário"
+            >
+              <RotateCcw />
+            </button>
+          </div>
+
+          <label className="sompo-scenario-select">
+            <span>Escolha entre {SCENARIO_IDS.length + AGRI_SCENARIO_IDS.length} cenários</span>
+            <select name="sompo-scenario" value={agriRun ? agriRun.scenarioId : controls.scenarioId} disabled={episodeActive} onChange={(event) => selectScenario(event.target.value as SompoSimulationScenarioId | SompoAgriScenarioId)}>
+              <optgroup label="Sinistros e emergências · roteiros">
+                {SCENARIO_IDS.filter((id) => !!SOMPO_RURAL_SCRIPTS[id]).map((id) => <option key={id} value={id}>{SOMPO_SIMULATION_SCENARIOS[id].label}</option>)}
+              </optgroup>
+              <optgroup label="Operação, terreno e manobras">
+                {SCENARIO_IDS.filter((id) => !SOMPO_RURAL_SCRIPTS[id]).map((id) => <option key={id} value={id}>{SOMPO_SIMULATION_SCENARIOS[id].label}</option>)}
+              </optgroup>
+              <optgroup label="Operações agrícolas · trator e colheitadeira">
+                {AGRI_SCENARIO_IDS.map((id) => <option key={id} value={id}>{SOMPO_AGRI_SCENARIOS[id].label}</option>)}
+              </optgroup>
+            </select>
+          </label>
+          {scenarioOutcomes.length > 1 && (
+            <label className="sompo-scenario-select sompo-outcome-select">
+              <span>Desfecho do cenário</span>
+              <select
+                value={activeOutcomeId}
+                name="sompo-scenario-outcome"
+                disabled={episodeActive}
+                data-sompo-outcome
+                onChange={(event) => selectScenario(agriRun ? agriRun.scenarioId : controls.scenarioId, event.target.value)}
+              >
+                {scenarioOutcomes.map((item) => (
+                  <option key={item.id} value={item.id}>{item.label}</option>
+                ))}
+              </select>
+              {activeOutcome && <small>{activeOutcome.description}</small>}
+            </label>
+          )}
+          {(ruralPreview || agriPreview) && !geofencePanel && (
+            <div className="sompo-scenario-phase">
+              <span role="status">{(ruralPreview ?? agriPreview)!.phaseLabel}</span>
+              <strong>{formatReading((ruralPreview ?? agriPreview)!.speedKph, ' km/h')}{(ruralPreview ?? agriPreview)!.direction < 0 ? ' · ré' : ''}</strong>
+              <progress max={scenarioTotalMs} value={Math.min(preview.deviceTimestamp ?? 0, scenarioTotalMs ?? 1)} />
+              <small>{(preview.deviceTimestamp ?? 0) >= (scenarioTotalMs ?? Infinity)
+                ? 'Roteiro concluído · use ↻ para repetir.'
+                : 'O roteiro conduz os valores abaixo. Use ↻ para repetir.'}</small>
+            </div>
+          )}
+
+          {geofencePanel}
+
+          <div className="sompo-simulator-episode" data-sompo-episode-panel>
+            <button
+              type="button"
+              className="sompo-simulator-episode-run"
+              data-sompo-episode-run
+              disabled={episodeActive || !episodePlan}
+              onClick={() => void startEpisodeRun()}
+            >
+              <Disc /> {episodeActive ? 'Gravando episódio…' : 'Gravar episódio deste cenário'}
+            </button>
+            {!episodePlan && !episodeActive && (
+              <p className="sompo-simulator-episode-status" data-sompo-episode-manual>
+                Este desfecho é manual e não gera episódio. Escolha um desfecho roteirizado para gravar.
+              </p>
+            )}
+            {episodeRun.status === 'starting' && (
+              <p className="sompo-simulator-episode-status" role="status">
+                Abrindo episódio no servidor…
+              </p>
+            )}
+            {episodeRun.status === 'recording' && (
+              <p className="sompo-simulator-episode-status" role="status" data-sompo-episode-recording>
+                Gravando episódio… {episodeElapsedSec}s · fase: {episodePhaseLabel}
+                {' '}· frames: {episodeFrameCount}/{episodeFrameTotal}
+              </p>
+            )}
+            {episodeRun.status === 'finishing' && (
+              <p className="sompo-simulator-episode-status" role="status">
+                Fechando episódio…
+              </p>
+            )}
+            {episodeRun.status === 'done' && (
+              <p className="sompo-simulator-episode-status is-done" role="status" data-sompo-episode-done>
+                Episódio registrado. Use “Analisar episódio na bancada” no painel abaixo.
+              </p>
+            )}
+            {episodeRun.status === 'error' && (
+              <p className="sompo-simulator-episode-status is-error" role="alert" data-sompo-episode-error>
+                {episodeRun.message}
+              </p>
+            )}
+            {episodeFramesWarning && (
+              <p
+                className="sompo-simulator-episode-status is-error"
+                role="alert"
+                data-sompo-episode-frames-warning
+              >
+                {episodeFramesWarning}
+              </p>
+            )}
+          </div>
+
+          {geofencePanel ? (
+            <details className="sompo-geofence-more" data-sompo-geofence-more>
+              <summary>Leituras do roteiro e flags do cenário</summary>
+              {manualControls}
+            </details>
+          ) : manualControls}
         </aside>
         )}
       </div>

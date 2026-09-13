@@ -1,1 +1,4 @@
 *.sh text eol=lf
+
+# Caso de exemplo do laboratório: bytes exatos, porque o manifesto guarda o sha256 de cada arquivo.
+public/datasets/piracicaba-artemis/** -text

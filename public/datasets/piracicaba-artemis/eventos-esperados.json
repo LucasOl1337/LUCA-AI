@@ -1,0 +1,111 @@
+{
+  "01-colheita-normal.csv": [
+    {
+      "type": "hazard_band",
+      "transition": "start",
+      "elapsedMs": 177600
+    },
+    {
+      "type": "hazard_band",
+      "transition": "end",
+      "elapsedMs": 189700
+    },
+    {
+      "type": "hazard_band",
+      "transition": "start",
+      "elapsedMs": 189700
+    },
+    {
+      "type": "hazard_band",
+      "transition": "end",
+      "elapsedMs": 198000
+    },
+    {
+      "type": "hazard_band",
+      "transition": "start",
+      "elapsedMs": 198000
+    },
+    {
+      "type": "hazard_band",
+      "transition": "end",
+      "elapsedMs": 210100
+    },
+    {
+      "type": "gnss_unavailable",
+      "transition": "start",
+      "elapsedMs": 299800
+    },
+    {
+      "type": "gnss_unavailable",
+      "transition": "end",
+      "elapsedMs": 304800
+    },
+    {
+      "type": "hazard_band",
+      "transition": "start",
+      "elapsedMs": 441000
+    },
+    {
+      "type": "hazard_band",
+      "transition": "end",
+      "elapsedMs": 453100
+    },
+    {
+      "type": "hazard_band",
+      "transition": "start",
+      "elapsedMs": 453100
+    },
+    {
+      "type": "hazard_band",
+      "transition": "end",
+      "elapsedMs": 459000
+    },
+    {
+      "type": "hazard_band",
+      "transition": "start",
+      "elapsedMs": 459000
+    },
+    {
+      "type": "hazard_band",
+      "transition": "end",
+      "elapsedMs": 471100
+    }
+  ],
+  "02-declive-tombamento.csv": [
+    {
+      "type": "hazard_band",
+      "transition": "start",
+      "elapsedMs": 112200
+    },
+    {
+      "type": "hazard_band",
+      "transition": "start",
+      "elapsedMs": 114100
+    },
+    {
+      "type": "hazard_band",
+      "transition": "end",
+      "elapsedMs": 114700
+    },
+    {
+      "type": "hazard_band",
+      "transition": "start",
+      "elapsedMs": 114700
+    },
+    {
+      "type": "hazard_band",
+      "transition": "end",
+      "elapsedMs": 120000
+    },
+    {
+      "type": "hazard_band",
+      "transition": "start",
+      "elapsedMs": 120000
+    },
+    {
+      "type": "device_inclination_warning",
+      "transition": "start",
+      "elapsedMs": 144300
+    }
+  ]
+}
