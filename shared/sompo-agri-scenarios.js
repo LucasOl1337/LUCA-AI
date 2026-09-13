@@ -310,7 +310,7 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
         [8_200, { direction: -1, speedKph: 0, pitch: -0.3 }],
         [8_800, { speedKph: 2.5, yaw: 4, implementYaw: -8, brakeLights: 0, pitch: -0.6 }],
         [11_000, { speedKph: 1.2, yaw: 0, implementYaw: 0, distance: 24, brakeLights: 1, pitch: 0 }],
-        [12_500, { speedKph: 0, pitch: 0.7 }],
+        [12_500, { speedKph: 0, pitch: 0.7, distance: 22 }],
         [15_000, { speedKph: 0, direction: -1, distance: 22, pitch: 0 }],
       ]),
       outcome('post-contact', 'Contato com pilar', 'O implemento toca um pilar em baixa velocidade e o conjunto para.', [
@@ -320,7 +320,7 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
         // A ponta do implemento varre para o lado da câmera e engancha no pilar.
         [6_900, { yaw: -21, implementYaw: 44, collisionRisk: true }],
         // Parada seca: tranco empurra o conjunto e o implemento rebate na articulação.
-        [7_300, { speedKph: 0, yaw: -20, implementYaw: 40, implementRoll: 8, roll: 3.5, pitch: -1.2, lateral: -0.2, shudder: 1, brakeLights: 1, roughness: 2.6, dust: 0.4 }],
+        [7_300, { speedKph: 0, yaw: -20, implementYaw: 40, implementRoll: 8, roll: 3.5, pitch: -1.2, lateral: -0.2, shudder: 1, brakeLights: 1, roughness: 2.6, dust: 0.4, distance: 12 }],
         [8_100, { implementYaw: 43, implementRoll: 3, roll: 1.8, pitch: -0.4, shudder: 0.3 }],
         [11_000, { implementRoll: 0, roll: 1.2, pitch: 0, dust: 0.1, roughness: 0, shudder: 0 }],
         [15_000, { distance: 12, roll: 1 }],
