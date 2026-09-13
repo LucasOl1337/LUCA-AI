@@ -131,7 +131,9 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
     totalMs: 16_000,
     sampleIntervalMs: 500,
     speedKph: 12,
-    distance: 180,
+    // Campo aberto: o sensor de proximidade satura no teto do modelo (400 cm,
+    // "sem eco em alcance") — nunca há obstáculo à frente neste cenário.
+    distance: 400,
     temperature: 29,
     humidity: 48,
     pitch: 1,
@@ -183,7 +185,8 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
     totalMs: 14_000,
     sampleIntervalMs: 500,
     speedKph: 6,
-    distance: 160,
+    // Talhão livre: sem obstáculo no feixe em nenhum desfecho — sensor saturado.
+    distance: 400,
     temperature: 32,
     humidity: 44,
     pitch: 1,
@@ -294,7 +297,10 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
     totalMs: 15_000,
     sampleIntervalMs: 500,
     speedKph: 3,
-    distance: 95,
+    // Ré no galpão: a leitura é o sensor na direção de trabalho (implemento).
+    // Em 'parked' o corredor fica livre (parede do fundo >7 m, ombreiras são
+    // laterais) e o feixe satura; em 'post-contact' o pilar entra no alcance.
+    distance: 400,
     temperature: 27,
     humidity: 62,
     pitch: 0,
@@ -311,7 +317,7 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
       outcome('parked', 'Manobra concluída', 'Conjunto corrige o ângulo e para centralizado dentro do barracão.', [
         [0, { direction: -1, yaw: 12, implementYaw: -18, beacon: 1 }],
         [2_600, { yaw: -4, implementYaw: 8 }],
-        [4_200, { yaw: -15, implementYaw: 24, distance: 62, pitch: 0.5 }],
+        [4_200, { yaw: -15, implementYaw: 24, pitch: 0.5 }],
         // Freia a ré em linha torta: traseira senta, conjunto para um instante.
         [5_800, { speedKph: 0, yaw: -16, implementYaw: 20, brakeLights: 1, pitch: 0.9 }],
         // Troca de marcha parado; traciona para frente alinhando antes da ré final.
@@ -320,21 +326,22 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
         [7_600, { speedKph: 0, yaw: -4, implementYaw: 8, brakeLights: 1, pitch: -0.9 }],
         [8_200, { direction: -1, speedKph: 0, pitch: -0.3 }],
         [8_800, { speedKph: 2.5, yaw: 4, implementYaw: -8, brakeLights: 0, pitch: -0.6 }],
-        [11_000, { speedKph: 1.2, yaw: 0, implementYaw: 0, distance: 24, brakeLights: 1, pitch: 0 }],
-        [12_500, { speedKph: 0, pitch: 0.7, distance: 22 }],
-        [15_000, { speedKph: 0, direction: -1, distance: 22, pitch: 0 }],
+        [11_000, { speedKph: 1.2, yaw: 0, implementYaw: 0, brakeLights: 1, pitch: 0 }],
+        [12_500, { speedKph: 0, pitch: 0.7 }],
+        [15_000, { speedKph: 0, direction: -1, pitch: 0 }],
       ]),
       outcome('post-contact', 'Contato com pilar', 'O implemento toca um pilar em baixa velocidade e o conjunto para.', [
-        [0, { direction: -1, yaw: 12, implementYaw: -18, beacon: 1 }],
-        [4_000, { yaw: -16, implementYaw: 27, distance: 58 }],
-        [6_200, { yaw: -20, implementYaw: 38, distance: 24 }],
+        // Pilar a ~5 m da ponta em t=0: saturado até a ré encurtar o eco.
+        [0, { direction: -1, yaw: 12, implementYaw: -18, distance: 400, beacon: 1 }],
+        [4_000, { yaw: -16, implementYaw: 27, distance: 185 }],
+        [6_200, { yaw: -20, implementYaw: 38, distance: 14 }],
         // A ponta do implemento varre para o lado da câmera e engancha no pilar.
-        [6_900, { yaw: -21, implementYaw: 44, collisionRisk: true }],
+        [6_900, { yaw: -21, implementYaw: 44, distance: 6, collisionRisk: true }],
         // Parada seca: tranco empurra o conjunto e o implemento rebate na articulação.
-        [7_300, { speedKph: 0, yaw: -20, implementYaw: 40, implementRoll: 8, roll: 3.5, pitch: -1.2, lateral: -0.2, shudder: 1, brakeLights: 1, roughness: 2.6, dust: 0.4, distance: 12 }],
-        [8_100, { implementYaw: 43, implementRoll: 3, roll: 1.8, pitch: -0.4, shudder: 0.3 }],
-        [11_000, { implementRoll: 0, roll: 1.2, pitch: 0, dust: 0.1, roughness: 0, shudder: 0 }],
-        [15_000, { distance: 12, roll: 1 }],
+        [7_300, { speedKph: 0, yaw: -20, implementYaw: 40, implementRoll: 8, roll: 3.5, pitch: -1.2, lateral: -0.2, shudder: 1, brakeLights: 1, roughness: 2.6, dust: 0.4, distance: 5 }],
+        [8_100, { implementYaw: 43, implementRoll: 3, roll: 1.8, pitch: -0.4, shudder: 0.3, distance: 7 }],
+        [11_000, { implementRoll: 0, roll: 1.2, pitch: 0, dust: 0.1, roughness: 0, shudder: 0, distance: 8 }],
+        [15_000, { distance: 8, roll: 1 }],
       ]),
     ],
   }),
