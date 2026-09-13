@@ -19,6 +19,8 @@ import {
   Wheat,
 } from 'lucide-react';
 import SompoTelemetryPanel from '@/components/SompoTelemetryPanel';
+import SompoStoryBanner from '@/components/sompo/SompoStoryBanner';
+import { findSompoStoryForScenario } from '@/lib/sompo-stories';
 import SompoRiskPanel from '@/components/SompoRiskPanel';
 import SompoWelcome from '@/components/sompo/SompoWelcome';
 import { useTheme } from '@/hooks/useTheme';
@@ -61,6 +63,7 @@ import { assessSompoRisk, sompoRiskBriefing, type SompoRiskContext } from '../..
 import { buildSompoScenarioRunBrief, createSompoSimulationSnapshot } from '../../shared/sompo-telemetry-simulator.js';
 import { buildSompoAgriRunBrief, isSompoAgriScenarioId } from '../../shared/sompo-agri-brief.js';
 import '@/sompo-page.css';
+import '@/sompo-story.css';
 
 const SompoTruckSimulator = lazy(() => import('@/components/SompoTruckSimulator'));
 
@@ -318,6 +321,12 @@ function SompoWorkspace() {
   }, [telemetrySourceMode]);
   const firebaseTelemetry = currentSompoTelemetry(streamedTelemetry || bootstrapTelemetry, telemetryClock);
   const telemetry = telemetrySourceMode === 'simulation' ? simulatedTelemetry : firebaseTelemetry;
+  // A user story fica ativa quando o cenário em tela casa com um roteiro dela —
+  // seja por link (?cenario=) ou pela seleção manual dentro do simulador.
+  const activeStory = findSompoStoryForScenario(
+    location.cenario || telemetry?.source?.scenarioId || '',
+    location.desfecho || telemetry?.source?.outcomeId || undefined,
+  );
   const visibleTelemetryError = telemetrySourceMode === 'firebase' && !streamedTelemetry ? telemetryError : null;
 
   const selected = useMemo(
@@ -695,6 +704,14 @@ function SompoWorkspace() {
                 </div>
               </section>
 
+              {telemetrySourceMode === 'simulation' && activeStory && (
+                <SompoStoryBanner
+                  story={activeStory}
+                  telemetry={telemetry ?? null}
+                  onSelect={(cenario, desfecho) => navigate({ cenario, desfecho }, 'push')}
+                />
+              )}
+
               <Suspense fallback={(
                 <div className="sompo-simulator-loading" role="status">
                   <Loader2 className="animate-spin" /> Preparando visualização 3D…
@@ -706,6 +723,8 @@ function SompoWorkspace() {
                     source="simulation"
                     onTelemetry={setSimulatedTelemetry}
                     onEpisodeRecorded={setRecordedEpisode}
+                    requestedScenario={location.cenario}
+                    requestedOutcome={location.desfecho}
                   />
                 ) : firebaseTelemetry ? (
                   <SompoTruckSimulator

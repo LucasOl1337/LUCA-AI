@@ -3,6 +3,7 @@ import { Activity, ArrowRight, ArrowUpRight, Wheat, X } from 'lucide-react';
 import { useAppLocation } from '@/hooks/useAppLocation';
 import { SOMPO_EXAMPLE_CASES } from '@/lib/sompo-cases';
 import SompoBrazilMap from './SompoBrazilMap';
+import SompoStoryCards from './SompoStoryCards';
 import '@/sompo-welcome.css';
 
 const AREAS = [
@@ -49,6 +50,8 @@ export default function SompoWelcome() {
           ))}
         </section>
       </div>
+
+      <SompoStoryCards />
 
       <dialog className="sompo-entry-dialog" ref={dialogRef} aria-labelledby="sompo-entry-title" aria-describedby="sompo-entry-description" onClick={(event) => {
         if (event.target === event.currentTarget) dialogRef.current?.close();

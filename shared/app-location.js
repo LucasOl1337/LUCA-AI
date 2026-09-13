@@ -81,6 +81,8 @@ const EMPTY_QUERY = Object.freeze({
   ordem: '',
   fonte: '',
   modo: '',
+  cenario: '',
+  desfecho: '',
 });
 
 export function emptyAppLocation() {
@@ -142,6 +144,8 @@ function parseQuery(search) {
       ? readParam(search, 'fonte')
       : '',
     modo: readParam(search, 'modo') === 'individual' ? 'individual' : '',
+    cenario: readParam(search, 'cenario'),
+    desfecho: readParam(search, 'desfecho'),
   };
 }
 
@@ -221,6 +225,8 @@ export function formatAppUrl(location) {
     setIfPresent(params, 'produto', loc.produto);
     setIfPresent(params, 'gravidade', loc.gravidade);
     setIfPresent(params, 'caso', loc.caso);
+    setIfPresent(params, 'cenario', loc.cenario);
+    setIfPresent(params, 'desfecho', loc.desfecho);
     if (loc.aba !== SOMPO_ABA && loc.fonte === 'simulacao') params.set('fonte', 'simulacao');
     if (loc.aba !== SOMPO_ABA && loc.fonte === 'firebase') params.set('fonte', 'firebase');
   }

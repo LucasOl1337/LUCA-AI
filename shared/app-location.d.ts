@@ -20,6 +20,8 @@ export interface AppLocation {
     ordem: string;
     fonte: string;
     modo: string;
+    cenario: string;
+    desfecho: string;
   }
 
 export const APP_PAGES: readonly AppPageId[];

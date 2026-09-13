@@ -64,6 +64,9 @@ interface SompoTruckSimulatorProps {
   telemetry?: SompoTelemetrySnapshot | null;
   onTelemetry?: (snapshot: SompoTelemetrySnapshot) => void;
   onEpisodeRecorded?: (episode: { publicId: string; kind: string; outcomeId?: string; outcomeLabel?: string } | null) => void;
+  /** Cenário/desfecho pedidos pela URL (?cenario=&desfecho=) — abrem direto no roteiro. */
+  requestedScenario?: string;
+  requestedOutcome?: string;
 }
 
 type EpisodeRunState =
@@ -301,6 +304,8 @@ export default function SompoTruckSimulator({
   telemetry,
   onTelemetry,
   onEpisodeRecorded,
+  requestedScenario = '',
+  requestedOutcome = '',
 }: SompoTruckSimulatorProps) {
   const isFirebase = source === 'firebase';
   const [studioOpen, setStudioOpen] = useState(false);
@@ -768,6 +773,23 @@ export default function SompoTruckSimulator({
     setStudioConfig(current => ({ ...current, equipment: current.truck }));
     setControls(controlsForScenario(scenarioId, outcomeId));
   }
+  const selectScenarioRef = useRef(selectScenario);
+  selectScenarioRef.current = selectScenario;
+
+  // Links de história/caso (?cenario=&desfecho=) abrem o roteiro direto.
+  useEffect(() => {
+    if (isFirebase || episodeActive || !requestedScenario) return;
+    const valid = isSompoAgriScenarioId(requestedScenario)
+      || requestedScenario in SOMPO_SIMULATION_SCENARIOS;
+    if (!valid) return;
+    const currentId = agriRun ? agriRun.scenarioId : controls.scenarioId;
+    const currentOutcome = agriRun ? agriRun.outcomeId : controls.outcomeId;
+    if (currentId === requestedScenario && (!requestedOutcome || currentOutcome === requestedOutcome)) return;
+    selectScenarioRef.current(
+      requestedScenario as SompoSimulationScenarioId | SompoAgriScenarioId,
+      requestedOutcome || undefined,
+    );
+  }, [requestedScenario, requestedOutcome, isFirebase, episodeActive, agriRun, controls.scenarioId, controls.outcomeId]);
 
   function selectStudioAsset(asset: SompoStudioAsset) {
     setStudioConfig(current => ({ ...current, equipment: asset }));
