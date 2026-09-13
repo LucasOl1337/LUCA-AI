@@ -109,7 +109,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   if (scenario.environmentId === 'muddy-field') {
     // Packed roughness and normals keep wet soil from becoming a flat gray mirror.
     assets.surface(field.mud.material, 'dirt', 4, 2.6);
-    field.mud.material.envMapIntensity = 0.35;
+    field.mud.material.envMapIntensity = 0.18;
   }
   field.terrain.material.color.set(night ? 0x8b8b81 : scenario.environmentId === 'muddy-field' ? 0x736b60 : 0xd7c6a5);
   // A cena agrícola traz o próprio sol; só o abrimos para cobrir a máquina inteira.
@@ -155,17 +155,26 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   worldRoot.add(machine);
 
   // Luzes de trabalho/faróis/giroflex comandados pelo frame (essenciais à noite).
-  const headlight = new THREE.SpotLight(0xf3ecd8, 0, 46, Math.PI / 7, 0.45, 1.2);
-  headlight.position.set(scenario.equipmentId === 'harvester' ? 3.4 : 2.6, 2.4, 0);
-  headlight.target.position.set(20, 0, 0);
+  const headlight = new THREE.SpotLight(0xf3ecd8, 0, 52, Math.PI / 6.5, 0.45, 1.2);
+  headlight.position.set(scenario.equipmentId === 'harvester' ? 2.15 : 1.5, scenario.equipmentId === 'harvester' ? 2.9 : 2.3, 0);
+  headlight.target.position.set(20, -0.5, 0);
   machine.add(headlight, headlight.target);
-  const workLight = new THREE.SpotLight(0xeaf2ff, 0, 30, Math.PI / 3.2, 0.7, 1.4);
-  workLight.position.set(1.5, 3.4, 0);
-  workLight.target.position.set(6, 0, 0);
+  // Projetores iluminam onde o trabalho acontece: a plataforma da
+  // colheitadeira à frente, o implemento do trator atrás.
+  const workLight = new THREE.SpotLight(0xeaf2ff, 0, 34, Math.PI / 3.1, 0.7, 1.4);
+  const workAhead = scenario.equipmentId === 'harvester';
+  workLight.position.set(workAhead ? 1.9 : -0.55, workAhead ? 3.55 : 2.45, 0);
+  workLight.target.position.set(workAhead ? 5.6 : -4.8, workAhead ? 0.2 : 0.4, 0);
   machine.add(workLight, workLight.target);
+  const beaconTop = scenario.equipmentId === 'harvester' ? 3.9 : 2.62;
   const beacon = new THREE.PointLight(0xff9a1f, 0, 14, 1.8);
-  beacon.position.set(0, scenario.equipmentId === 'harvester' ? 4.1 : 3.3, 0);
+  const beaconX = scenario.equipmentId === 'harvester' ? 0.6 : -0.1, beaconZ = scenario.equipmentId === 'harvester' ? 0.2 : 0.25;
+  beacon.position.set(beaconX, beaconTop, beaconZ);
   machine.add(beacon);
+  // Giroflex de verdade varre o campo: um feixe estreito girando no topo.
+  const beaconSweep = new THREE.SpotLight(0xff9a1f, 0, 22, 0.5, 0.8, 1.5);
+  beaconSweep.position.set(beaconX, beaconTop, beaconZ);
+  machine.add(beaconSweep, beaconSweep.target);
 
   let disposed = false;
   let model: THREE.Object3D | null = null;
@@ -224,10 +233,22 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     // Only the rollover adds authored lateral slip; normal steering follows its heading.
     const z = pathPoint.z + (outcomeId === 'side-rollover' ? frame.lateral : 0);
     machine.rotation.set(THREE.MathUtils.degToRad(frame.roll), THREE.MathUtils.degToRad(frame.yaw), THREE.MathUtils.degToRad(frame.pitch), 'YZX');
+    // Chacoalho físico: slip de roda e roughness do roteiro viram tremor de
+    // alta frequência + balanço lento das tentativas de desatolamento.
+    const wheelKph = frame.wheelSpeedKph ?? frame.speedKph;
+    const slip = Math.max(0, Math.abs(wheelKph) - Math.abs(frame.speedKph));
+    const effort = reduceMotion.matches ? 0 : Math.min(1, frame.roughness * .14 + slip * .05 + frame.mud * .1);
+    const shakeT = elapsed / 1000;
+    if (effort > 0.02) {
+      machine.rotation.x += effort * .011 * Math.sin(shakeT * 37 + Math.sin(shakeT * 13) * 2);
+      machine.rotation.z += effort * .008 * Math.sin(shakeT * 43 + 1.7);
+      machine.rotation.z += Math.min(1, slip / 15) * .02 * Math.sin(shakeT * 4.6);
+    }
     rig?.update(frame, integrateSompoMotion(keyframes, elapsed) / 3.6,
       integrateSompoMotion(keyframes, elapsed, 'headerSpeed', false) * .8, reduceMotion.matches);
     const contactHeight = rig?.supportHeight(machine.rotation, x, z, field.groundHeight) ?? 0;
     machine.position.set(x, field.groundHeight(x, z) + contactHeight + Math.max(0, frame.vertical) - frame.sink * .5, z);
+    if (effort > 0.02) machine.position.y += effort * .014 * (0.5 + 0.5 * Math.sin(shakeT * 51));
     const studio = studioRef?.current ?? SOMPO_STUDIO_DEFAULT;
     field.update(frame, machine.position, camera.position, reduceMotion.matches, studio.wind, elapsed);
     field.sun.position.set(x - 24, 34, z + 18);
@@ -237,6 +258,9 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     headlight.intensity = frame.headlights * 80;
     workLight.intensity = frame.workLights * 65;
     beacon.intensity = frame.beacon * (reduceMotion.matches ? 6 : 4.5 + Math.max(0, Math.sin(clock * 7)) * 6);
+    beaconSweep.intensity = reduceMotion.matches ? 0 : frame.beacon * 34;
+    const sweepAngle = clock * 5.4;
+    beaconSweep.target.position.set(beaconX + Math.cos(sweepAngle) * 11, -beaconTop, beaconZ + Math.sin(sweepAngle) * 11);
     focusPoint.set(machine.position.x + (focusTarget === 'sensor' ? 2.5 : 0), machine.position.y + (focusTarget === 'sensor' ? 2.2 : 1.6), machine.position.z);
     cameraShift.copy(focusPoint).sub(orbit.target);
     camera.position.add(cameraShift);
