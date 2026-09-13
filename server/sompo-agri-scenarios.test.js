@@ -90,6 +90,33 @@ test('desfechos abortivos rotulam a fase pelo estado real da máquina', () => {
   assert.equal(getSompoAgriFrame('agri-night-operation', 15_000, 'lit-pass').phaseLabel, 'Saída para o carreador');
 });
 
+test('desfechos felizes contam a prova: tracao volta, sinalizacao desde o inicio, sem flag', () => {
+  const slipAt = (atMs) => {
+    const frame = getSompoAgriFrame('agri-field-bogging', atMs, 'assisted-recovery');
+    return Math.abs(frame.wheelSpeedKph) - Math.abs(frame.speedKph);
+  };
+  assert.ok(slipAt(7_000) > 10, 'a recuperação ainda mostra o sufoco da patinagem');
+  assert.ok(slipAt(12_000) < slipAt(7_000), 'slip cai quando a máquina engata a saída');
+  assert.ok(slipAt(15_000) <= 1, 'tração de volta: rodado quase igual ao avanço');
+  const recovered = getSompoAgriFrame('agri-field-bogging', 16_000, 'assisted-recovery');
+  assert.ok(recovered.roll <= 3.5 && recovered.sink <= 0.05, 'conjunto sai nivelado do atoleiro');
+  const nightStart = getSompoAgriFrame('agri-night-operation', 500, 'lit-pass');
+  assert.ok(nightStart.headlights >= 0.5 && nightStart.workLights >= 0.4, 'farol e projetores ligados do início');
+  assert.ok(nightStart.beacon >= 1, 'giroflex sinalizando desde a inspeção');
+  for (const [scenarioId, outcomeId] of [
+    ['agri-harvest-dust', 'clean-pass'],
+    ['agri-field-bogging', 'assisted-recovery'],
+    ['agri-night-operation', 'lit-pass'],
+  ]) {
+    const scenario = getSompoAgriScenario(scenarioId);
+    for (const atMs of [2_000, scenario.totalMs / 2, scenario.totalMs - 1]) {
+      const frame = getSompoAgriFrame(scenarioId, atMs, outcomeId);
+      assert.equal(frame.collisionRisk, false, `${scenarioId}/${outcomeId}: sem alerta de colisão`);
+      assert.equal(frame.inclinationRisk, false, `${scenarioId}/${outcomeId}: sem alerta de inclinação`);
+    }
+  }
+});
+
 test('ids desconhecidos têm fallback fechado e não escolhem desfecho ao acaso', () => {
   assert.equal(getSompoAgriScenario('unknown').scenarioId, 'agri-harvest-dust');
   assert.equal(getSompoAgriFrame('agri-tractor-rollover', 12_000, 'unknown').outcomeId, 'controlled-stop');
