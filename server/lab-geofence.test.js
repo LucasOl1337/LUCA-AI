@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { classifyBand, resolveHazards, computeGeofenceEpisodes, affectedArea } from '../shared/lab-geofence.js';
-import { parseLabCase } from '../shared/lab-telemetry.js';
+import { parseLabCase, getReplayFrame } from '../shared/lab-telemetry.js';
 
 const dataset = new URL('../datasets/laboratorio-virtual-v1/', import.meta.url);
 const read = file => readFileSync(new URL(file, dataset), 'utf8');
@@ -195,4 +195,16 @@ test('perigo de máquina: margem em graus até o limite do perfil abre/fecha fai
   const fixed = resolveHazards({ hazards: [{ ...machineRules.hazards[0], limit_deg: 20 }] }, [allowed, water], { profile: { max_roll_deg: 15 } });
   assert.equal(fixed[0].limit, 20, 'limit_deg na regra prevalece sobre o perfil');
   assert.doesNotMatch(JSON.stringify(events), /seguro|acidente/i);
+});
+
+test('replay: episódio de limite da máquina continua ativo em amostra sem GNSS; faixa de água não', () => {
+  const samples = [{ elapsedMs: 0, gnss_fix: 'no_fix', x: null, z: null, roll_deg: 20 }];
+  const rules = { hazards: [{ role: 'machine', limit_deg: 15, bands_m: [{ id: 'limite', label: 'No limite', max_m: 0 }] }] };
+  const { events } = computeGeofenceEpisodes(samples, [], rules, 'c');
+  assert.equal(events.length, 1);
+  const frame = getReplayFrame({ samples, events, durationMs: 0, sampleIntervalMs: 250 }, 0);
+  assert.equal(frame.hasGps, false);
+  assert.deepEqual(frame.activeEvents.map(event => event.evidence.metric), ['roll_deg']);
+  const water = { ...events[0], evidence: { ...events[0].evidence, metric: undefined, hazard: 'w' } };
+  assert.equal(getReplayFrame({ samples, events: [water], durationMs: 0, sampleIntervalMs: 250 }, 0).activeEvents.length, 0);
 });

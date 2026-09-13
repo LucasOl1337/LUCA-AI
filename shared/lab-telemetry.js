@@ -454,7 +454,7 @@ export function getReplayFrame(labCase, requestedElapsedMs) {
     else active.delete(key);
   }
   const activeEvents = [...active.values()].filter(event => !recordingGap
-    && (hasGps || !['outside_fence', 'near_water', 'hazard_band'].includes(event.type))
+    && (hasGps || !(['outside_fence', 'near_water'].includes(event.type) || (event.type === 'hazard_band' && !event.evidence?.metric))) // limite da máquina não depende de GNSS
     && (!DEVICE_WARNING_FIELDS[event.type] || sample[DEVICE_WARNING_FIELDS[event.type]] === true));
   return { elapsedMs, sample, sampleIndex: low, position: hasGps ? { x: sample.x, z: sample.z } : null, hasGps, gap: gpsGap || recordingGap, gpsGap, recordingGap, activeEvents };
 }

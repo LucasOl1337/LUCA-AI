@@ -37,11 +37,20 @@ function distanceToLine(x, z, line) {
   }
   return best;
 }
+// Crista da ribanceira interpolada ao longo de z (sem degrau entre vértices).
+function ravineCrestX(z) {
+  const line = RAVINE_LINE;
+  if (z <= line[0].z) return line[0].x;
+  for (let i = 1; i < line.length; i++) {
+    if (z <= line[i].z) { const a = line[i - 1], b = line[i]; return a.x + (b.x - a.x) * (z - a.z) / (b.z - a.z); }
+  }
+  return line[line.length - 1].x;
+}
 export function geofenceFieldRelief(x, z) {
   const hill = 3.4 * Math.exp(-(((x / 8) ** 2) + ((z / 14) ** 2)) * 1.1);            // crista ≈ 3,4 m, encosta até ~22°
   const pond = -1.2 * Math.exp(-((((x + 60) / 16) ** 2) + (((z + 48) / 10) ** 2)) * 1.4);
   const stream = -0.9 * Math.max(0, 1 - distanceToLine(x, z, STREAM_LINE) / 4.5);
-  const ravineSide = x - (RAVINE_LINE[Math.min(RAVINE_LINE.length - 1, Math.max(0, Math.round((z + 70) / 35)))].x - 3);
+  const ravineSide = x - (ravineCrestX(z) - 3);
   const ravine = ravineSide > 0 ? -Math.min(6, ravineSide * 0.9) : 0;                  // degrau para leste da crista da ribanceira
   return hill + pond + stream + ravine;
 }
