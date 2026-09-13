@@ -17,6 +17,7 @@ import {
   WifiOff,
 } from 'lucide-react';
 import type { SompoTelemetrySnapshot } from '@/lib/types';
+import { sompoDistanceSensorCopy } from '../../shared/sompo-distance-sensor.js';
 
 interface SompoTelemetryPanelProps {
   telemetry: SompoTelemetrySnapshot | null;
@@ -67,6 +68,7 @@ export default function SompoTelemetryPanel({
   const connectionState = telemetry?.connection.state || 'connecting';
   const live = connectionState === 'live';
   const historical = telemetry?.freshness !== 'fresh' || !live;
+  const distanceSensorCopy = sompoDistanceSensorCopy(telemetry?.source.distanceSensorPosition);
   const connectionWarning = simulation ? null : error
     || (connectionState === 'reconnecting'
       ? `Canal com o Firebase caiu; reconexão automática em andamento (tentativa ${telemetry?.connection.retryAttempt || 1}).`
@@ -200,7 +202,7 @@ export default function SompoTelemetryPanel({
           <div className="sompo-sensor-grid" role="group" aria-label="Leituras dos sensores">
             <article>
               <span className="sompo-sensor-icon"><Ruler /></span>
-              <div><span>Distância frontal</span><strong>{number(telemetry.readings.distance)} <small>cm*</small></strong></div>
+              <div><span>{distanceSensorCopy.label}</span><strong>{number(telemetry.readings.distance)} <small>cm*</small></strong></div>
             </article>
             <article>
               <span className="sompo-sensor-icon"><Thermometer /></span>

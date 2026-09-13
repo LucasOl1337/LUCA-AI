@@ -65,9 +65,16 @@ test('snapshot agrícola: proveniência correta, roll amplo e gravidade rotacion
   assert.equal(clean.source.scenarioLabel, getSompoAgriScenario('agri-harvest-dust').label);
   assert.equal(clean.source.outcomeId, 'clean-pass');
   assert.equal(clean.source.kind, 'simulation');
+  assert.equal(clean.source.distanceSensorPosition, 'front');
   const frame = getSompoAgriFrame('agri-harvest-dust', 5_000, 'clean-pass');
   assert.equal(clean.risks.collision, frame.collisionRisk);
   assert.ok(Math.abs(clean.readings.pitch - frame.pitch) <= frame.roughness * 0.28 + 0.01);
+});
+
+test('snapshot da manobra no barracão identifica o sensor traseiro', () => {
+  const contact = createSompoAgriSimulationSnapshot('agri-barn-maneuver', 'post-contact', { elapsedMs: 6_900, observedAt });
+  assert.equal(contact.source.distanceSensorPosition, 'rear');
+  assert.equal(contact.readings.distance, 5.75);
 });
 
 test('resumo do ensaio agrícola no contrato da bancada; nulo para id desconhecido', () => {

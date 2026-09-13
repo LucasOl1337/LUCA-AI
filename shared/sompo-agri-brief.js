@@ -110,6 +110,7 @@ export function createSompoAgriSimulationSnapshot(scenarioId, outcomeId, {
         : `${frame.scenarioLabel} · ${frame.outcomeLabel}`,
       outcomeId: frame.outcomeId,
       outcomeLabel: frame.outcomeLabel,
+      distanceSensorPosition: frame.distanceSensorPosition,
     },
   });
 }

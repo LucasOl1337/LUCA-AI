@@ -95,6 +95,18 @@ test('desfechos alternativos terminam em estados fisicamente distintos', () => {
   assert.equal(done('steep-climb', 'perda-de-tracao').direction, -1);
 });
 
+test('obstáculo: parada segura cumpre 38 cm e toque imobiliza no contato', () => {
+  const safe = getSompoRuralFrame('obstacle', 6_800, 'parada-segura');
+  const touch = getSompoRuralFrame('obstacle', 4_900, 'toque-leve');
+  assert.equal(safe.distance, 38);
+  assert.equal(touch.speedKph, 0);
+  assert.equal(
+    getSompoRuralTravelMeters('obstacle', 4_900, 'toque-leve'),
+    getSompoRuralTravelMeters('obstacle', 6_200, 'toque-leve'),
+    'a barreira não acompanha nem atravessa o caminhão depois do contato',
+  );
+});
+
 test('deslocamento em forma fechada bate com a integral numérica do perfil de velocidade', () => {
   for (const [scenarioId, outcomes] of Object.entries(SOMPO_SCENARIO_OUTCOMES)) {
     for (const outcome of outcomes) {

@@ -44,6 +44,10 @@ function rangeForDistance(distance: number | null | undefined): number {
   return 1.2 + (((clamped - 5) * (7.2 - 1.2)) / (300 - 5));
 }
 
+// A barreira tem 56 cm no eixo longitudinal; a âncora usa o centro para que
+// sua face próxima, e não o centro da malha, encontre o para-choque.
+const SOMPO_OBSTACLE_HALF_X = 0.28;
+
 /** Altura do solado do pneu no asfalto: quase encostado, sem flutuar. */
 const SOMPO_WHEEL_CONTACT_Y = 0.025;
 /** Curso máximo da suspensão virtual por roda (m), antes de afundar/flutuar. */
@@ -355,11 +359,11 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
      */
     function yardContactFor(settings: SompoSimulationControls, originX: number) {
       const contact = settings.scenarioId === 'yard-maneuver' && settings.outcomeId === 'encosta-na-doca'
-        ? { atMs: 10_800, bumperX: SOMPO_TRUCK_FRONT_X, gap: 0.12, kind: 'dock' as const }
+        ? { atMs: 10_800, bumperX: SOMPO_TRUCK_FRONT_X, gap: 0.12, kind: 'dock' as const, facing: 'front' as const }
         : settings.scenarioId === 'yard-maneuver' && settings.outcomeId === 'toque-no-portao'
-          ? { atMs: 5_400, bumperX: SOMPO_TRUCK_FRONT_X, gap: 0, kind: 'gate' as const }
+          ? { atMs: 5_400, bumperX: SOMPO_TRUCK_FRONT_X, gap: 0, kind: 'gate' as const, facing: 'front' as const }
           : settings.scenarioId === 'tight-reverse' && settings.outcomeId === 'toque-na-doca'
-            ? { atMs: 5_200, bumperX: -SOMPO_TRUCK_HALF_SIZE.x, gap: 0, kind: 'dock' as const }
+            ? { atMs: 5_200, bumperX: -SOMPO_TRUCK_HALF_SIZE.x, gap: 0, kind: 'dock' as const, facing: 'rear' as const }
             : null;
       if (!contact) return null;
       const frame = getSompoRuralFrame(settings.scenarioId, contact.atMs, settings.outcomeId);
@@ -371,7 +375,14 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
         z: (frame?.lateral ?? 0) - Math.sin(yaw) * offset,
         yaw,
         kind: contact.kind,
+        facing: contact.facing,
       };
+    }
+
+    function obstacleContactFor(settings: SompoSimulationControls, originX: number) {
+      if (settings.scenarioId !== 'obstacle' || settings.outcomeId !== 'toque-leve') return null;
+      return originX + scenarioTravelMeters(settings, 4_900)
+        + SOMPO_TRUCK_FRONT_X + SOMPO_OBSTACLE_HALF_X;
     }
 
     function render(time: number) {
@@ -580,9 +591,15 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
         : settings.scenarioId === 'obstacle' || settings.scenarioId === 'brake-failure';
       rayGroup.visible = obstacleGroup.visible;
       const rangeLength = rangeForDistance(isFirebase ? snapshot.readings.distance : ruralFrame?.distance ?? settings.distance);
-      rayGroup.scale.x = rangeLength;
-      // Alvo do feixe ultrassônico: anotação de sensor à frente do caminhão.
-      obstacleGroup.position.x = truckWorldX + SOMPO_TRUCK_FRONT_X + rangeLength;
+      const obstacleContactAnchor = isFirebase ? null : obstacleContactFor(settings, runOriginX);
+      // No desfecho de contato, a barreira fica fixa no mundo e sua face toca
+      // o para-choque no keyframe de 4,9 s. Nos demais casos ela continua sendo
+      // a anotação visual do alcance do sensor.
+      obstacleGroup.position.x = obstacleContactAnchor
+        ?? truckWorldX + SOMPO_TRUCK_FRONT_X + rangeLength;
+      rayGroup.scale.x = obstacleContactAnchor === null
+        ? rangeLength
+        : Math.max(0.02, obstacleGroup.position.x - truckWorldX - SOMPO_TRUCK_FRONT_X - SOMPO_OBSTACLE_HALF_X);
       obstacleGroup.position.y = Math.tan(slope) * (obstacleGroup.position.x - truckWorldX);
       const uncertain = isFirebase && (!physicalCurrent || snapshot.status === 'unknown');
       rayMaterial.color.set(uncertain ? 0xc9ad74 : snapshot.risks.collision ? 0xff5d52 : 0x7dff9a);

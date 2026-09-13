@@ -55,6 +55,7 @@ export interface SompoTelemetrySnapshot {
     scenarioLabel?: string;
     outcomeId?: string;
     outcomeLabel?: string;
+    distanceSensorPosition?: 'front' | 'rear';
   };
 }
 

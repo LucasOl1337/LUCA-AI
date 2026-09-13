@@ -52,6 +52,7 @@ export interface SompoAgriScenario extends Omit<SompoSimulationControls, 'scenar
   readonly defaultOutcomeId: string;
   readonly totalMs: number;
   readonly sampleIntervalMs: number;
+  readonly distanceSensorPosition: 'front' | 'rear';
   readonly phases: readonly Readonly<SompoAgriPhase>[];
   readonly outcomes: Readonly<Record<string, Readonly<SompoAgriOutcome>>>;
 }
@@ -62,6 +63,7 @@ export interface SompoAgriVisualFrame extends Omit<SompoSimulationControls, 'sce
   scenarioLabel: string;
   equipmentId: SompoAgriEquipmentId;
   environmentId: SompoAgriEnvironmentId;
+  distanceSensorPosition: 'front' | 'rear';
   outcomeId: string;
   outcomeLabel: string;
   phaseId: string;

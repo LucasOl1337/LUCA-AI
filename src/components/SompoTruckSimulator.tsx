@@ -59,6 +59,7 @@ import {
   type SompoSimulationControls,
   type SompoSimulationScenarioId,
 } from '../../shared/sompo-telemetry-simulator.js';
+import { sompoDistanceSensorCopy } from '../../shared/sompo-distance-sensor.js';
 
 interface SompoTruckSimulatorProps {
   source: 'firebase' | 'simulation';
@@ -87,6 +88,7 @@ interface EpisodeRunHandle {
   queue: Record<string, unknown>[];
   lastSampleMs: number;
   plan: SompoEpisodePlan;
+  controls: SompoSimulationControls;
 }
 
 interface EpisodeFrameCapture {
@@ -368,6 +370,7 @@ export default function SompoTruckSimulator({
     () => (agriRun ? getSompoAgriScenario(agriRun.scenarioId) : SOMPO_SIMULATION_SCENARIOS[controls.scenarioId]),
     [agriRun, controls.scenarioId],
   );
+  const distanceSensorCopy = sompoDistanceSensorCopy(preview.source.distanceSensorPosition);
 
   // Plano de gravação do cenário + desfecho atuais: null quando o desfecho
   // é manual ("livre"), sem roteiro não há instantes conhecidos de captura.
@@ -579,7 +582,7 @@ export default function SompoTruckSimulator({
           connectedAt: connectedAtRef.current,
         })
         : createSompoSimulationSnapshot(
-          { scenarioId: run.plan.scenarioId as SompoSimulationScenarioId, outcomeId: run.plan.outcomeId },
+          run.controls,
           { elapsedMs: elapsed, connectedAt: connectedAtRef.current },
         );
       previewRef.current = snapshot;
@@ -596,7 +599,7 @@ export default function SompoTruckSimulator({
             connectedAt: connectedAtRef.current,
           })
           : createSompoSimulationSnapshot(
-            { scenarioId: run.plan.scenarioId as SompoSimulationScenarioId, outcomeId: run.plan.outcomeId },
+            run.controls,
             { elapsedMs: offset, observedAt: new Date(run.observedStartMs + offset).toISOString(), connectedAt: connectedAtRef.current },
           );
         run.queue.push(snapshotToSimulationRaw(sample));
@@ -661,6 +664,11 @@ export default function SompoTruckSimulator({
       queue: [],
       lastSampleMs: Number.NEGATIVE_INFINITY,
       plan,
+      controls: {
+        ...controls,
+        scenarioId: plan.scenarioId as SompoSimulationScenarioId,
+        outcomeId: plan.outcomeId,
+      },
     };
     const firstSnapshot = plan.catalog === 'agri'
       ? createSompoAgriSimulationSnapshot(plan.scenarioId, plan.outcomeId, {
@@ -669,7 +677,7 @@ export default function SompoTruckSimulator({
         connectedAt: connectedAtRef.current,
       })
       : createSompoSimulationSnapshot(
-        { scenarioId: plan.scenarioId as SompoSimulationScenarioId, outcomeId: plan.outcomeId },
+        episodeRunRef.current.controls,
         { elapsedMs: 0, observedAt: new Date(episodeRunRef.current.observedStartMs).toISOString(), connectedAt: connectedAtRef.current },
       );
     previewRef.current = firstSnapshot;
@@ -943,7 +951,7 @@ export default function SompoTruckSimulator({
               <div><span>{(ruralPreview ?? agriPreview)?.phaseLabel || 'Condução livre'}</span><strong>{formatReading((ruralPreview ?? agriPreview)?.speedKph ?? controls.speedKph, ' km/h')}</strong></div>
               <div data-alert={preview.risks.collision || preview.risks.inclination}>
                 <span>{preview.risks.collision ? 'Alerta de colisão' : preview.risks.inclination ? 'Alerta de inclinação' : 'Colisão/inclinação sem alerta'}</span>
-                <strong>{formatReading(preview.readings.distance, ' cm')} <small>à frente</small></strong>
+                <strong>{formatReading(preview.readings.distance, ' cm')} <small>{distanceSensorCopy.relative}</small></strong>
               </div>
             </div>
           )}
@@ -1115,7 +1123,7 @@ export default function SompoTruckSimulator({
               />
             </label>
             <label>
-              <span>Distância frontal <strong>{scenarioScripted ? (preview.readings.distance ?? controls.distance) : controls.distance} cm</strong></span>
+              <span>{distanceSensorCopy.label} <strong>{scenarioScripted ? (preview.readings.distance ?? controls.distance) : controls.distance} cm</strong></span>
               <input
                 type="range"
                 min="5"

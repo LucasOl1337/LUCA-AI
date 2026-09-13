@@ -225,9 +225,12 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const dockConcrete = new THREE.MeshStandardMaterial({ color: 0x9b8f7d, roughness: 0.96 });
   const dockDark = new THREE.MeshStandardMaterial({ color: 0x263036, roughness: 0.85, metalness: 0.2 });
   mesh(dockWall, new THREE.BoxGeometry(0.34, 4.4, 7.2), dockConcrete, [0.17, 2.2, 0]);
-  mesh(dockWall, new THREE.BoxGeometry(0.08, 3.15, 3.8), dockDark, [-0.045, 1.58, 0]);
+  // Todas as peças começam no plano local x=0 e crescem para dentro da
+  // estrutura. Assim a âncora representa a face que o para-choque enxerga,
+  // sem esconder centímetros de penetração dentro da espessura da malha.
+  mesh(dockWall, new THREE.BoxGeometry(0.08, 3.15, 3.8), dockDark, [0.04, 1.58, 0]);
   for (const side of [-1, 1]) {
-    mesh(dockWall, new THREE.BoxGeometry(0.34, 0.55, 0.38), dockDark, [-0.12, 0.38, side * 2.25]);
+    mesh(dockWall, new THREE.BoxGeometry(0.34, 0.55, 0.38), dockDark, [0.17, 0.38, side * 2.25]);
   }
   const yardGate = new THREE.Group(); yardContact.add(yardGate);
   const gateMetal = new THREE.MeshStandardMaterial({ color: 0x4f5c57, roughness: 0.68, metalness: 0.55 });
@@ -235,10 +238,10 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
     mesh(yardGate, new THREE.BoxGeometry(0.34, 3.7, 0.34), dockConcrete, [0.17, 1.85, side * 3.25]);
   }
   for (let index = -3; index <= 3; index += 1) {
-    mesh(yardGate, new THREE.BoxGeometry(0.12, 3.1, 0.09), gateMetal, [-0.06, 1.58, index * 0.9]);
+    mesh(yardGate, new THREE.BoxGeometry(0.12, 3.1, 0.09), gateMetal, [0.06, 1.58, index * 0.9]);
   }
   for (const y of [0.15, 1.55, 3.05]) {
-    mesh(yardGate, new THREE.BoxGeometry(0.12, 0.1, 6.4), gateMetal, [-0.06, y, 0]);
+    mesh(yardGate, new THREE.BoxGeometry(0.12, 0.1, 6.4), gateMetal, [0.06, y, 0]);
   }
   yardContact.visible = false;
   const animal = createSompoAnimal(root);
@@ -252,7 +255,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   return {
     update(effectFrame: SompoEffectFrame, frame: SompoRuralFrame | null, elapsed: number, truck: THREE.Vector3, reduceMotion: boolean, slope: number, extras?: {
       animalAnchorX?: number;
-      yardContactAnchor?: { x: number; z: number; yaw: number; kind: 'dock' | 'gate' } | null;
+      yardContactAnchor?: { x: number; z: number; yaw: number; kind: 'dock' | 'gate'; facing: 'front' | 'rear' } | null;
       wind?: number;
     }) {
       const t = elapsed / 1000;
@@ -325,7 +328,8 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       yardContact.visible = effectFrame.setting === 'yard' && Boolean(extras?.yardContactAnchor);
       if (extras?.yardContactAnchor) {
         yardContact.position.set(extras.yardContactAnchor.x, 0, extras.yardContactAnchor.z);
-        yardContact.rotation.y = extras.yardContactAnchor.yaw;
+        yardContact.rotation.y = extras.yardContactAnchor.yaw
+          + (extras.yardContactAnchor.facing === 'rear' ? Math.PI : 0);
         dockWall.visible = extras.yardContactAnchor.kind === 'dock';
         yardGate.visible = extras.yardContactAnchor.kind === 'gate';
       }

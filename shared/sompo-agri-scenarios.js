@@ -44,6 +44,7 @@ const BASE_FRAME = freeze({
 
 function scenario(definition) {
   return freeze({
+    distanceSensorPosition: 'front',
     ...definition,
     phases: freeze(definition.phases),
     outcomes: freeze(Object.fromEntries(definition.outcomes.map((item) => [item.id, item]))),
@@ -300,6 +301,7 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
     defaultOutcomeId: 'parked',
     totalMs: 15_000,
     sampleIntervalMs: 500,
+    distanceSensorPosition: 'rear',
     speedKph: 3,
     // Ré no galpão: a leitura é o sensor na direção de trabalho (implemento).
     // Em 'parked' o corredor fica livre (parede do fundo >7 m, ombreiras são
@@ -469,6 +471,7 @@ export function getSompoAgriFrame(scenarioId, elapsedMs = 0, outcomeId) {
     scenarioLabel: selected.label,
     equipmentId: selected.equipmentId,
     environmentId: selected.environmentId,
+    distanceSensorPosition: selected.distanceSensorPosition,
     outcomeId: selectedOutcome.id,
     outcomeLabel: selectedOutcome.label,
     phaseId: activePhase.id,
