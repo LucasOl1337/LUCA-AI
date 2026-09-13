@@ -147,9 +147,10 @@ export interface SompoGeofenceMapProps {
   outcomeId: string;
   elapsedMs: number;
   position: { x: number; z: number; headingDeg: number } | null;
+  compact?: boolean; // só o desenho, para o painel de geofencing; legenda e regras ficam no modo grande
 }
 
-export default function SompoGeofenceMap({ scenarioId, outcomeId, elapsedMs, position }: SompoGeofenceMapProps) {
+export default function SompoGeofenceMap({ scenarioId, outcomeId, elapsedMs, position, compact = false }: SompoGeofenceMapProps) {
   const map = useMemo(() => buildStaticMap(scenarioId, outcomeId), [scenarioId, outcomeId]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -188,6 +189,7 @@ export default function SompoGeofenceMap({ scenarioId, outcomeId, elapsedMs, pos
   }, [map, elapsedMs, position]);
 
   if (!map) return null;
+  if (compact) return <canvas ref={canvasRef} className="sompo-geofence-map-canvas" role="img" aria-label="Talhão, perigos mapeados, faixas de proximidade, percurso e posição da máquina" />;
   return (
     <aside className="sompo-geofence-map" aria-label="Mapa do talhão com geofencing" data-sompo-geofence-map>
       <div className="sompo-simulator-control-head">

@@ -2519,3 +2519,41 @@
 .sompo-geofence-more > summary { cursor: pointer; font-size: 11px; color: #a8b9af; }
 .sompo-geofence-more > summary:hover { color: #fff; }
 @media (prefers-reduced-motion: reduce) { .sompo-geofence-bar i { transition: none; } }
+.sompo-geofence-title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 0; font-size: 9.5px; font-weight: 750; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(210, 230, 215, 0.48); }
+.sompo-geofence-title small { font-size: 10px; font-weight: 400; letter-spacing: 0; text-transform: none; text-align: right; color: rgba(220, 235, 225, 0.5); }
+.sompo-geofence-strip { display: grid; gap: 6px; padding: 16px 12px 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.035); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.075); }
+.sompo-geofence-lane { display: grid; grid-template-columns: 64px 1fr; gap: 8px; align-items: center; font-size: 10px; line-height: 1.2; color: rgba(220, 235, 225, 0.5); }
+.sompo-geofence-lane > div { position: relative; height: 14px; border-radius: 4px; background: rgba(185, 199, 123, 0.16); }
+.sompo-geofence-lane button { position: absolute; top: 0; bottom: 0; padding: 0; border: 0; border-radius: 0; background: var(--geo-tone); cursor: pointer; }
+.sompo-geofence-lane button:hover, .sompo-geofence-lane button:focus-visible { outline: 2px solid #fff; outline-offset: 1px; z-index: 1; }
+.sompo-geofence-lane u { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5); z-index: 2; pointer-events: none; }
+.sompo-geofence-axis { display: grid; grid-template-columns: 64px 1fr; gap: 8px; }
+.sompo-geofence-axis > div { display: flex; justify-content: space-between; font-size: 9px; color: rgba(210, 230, 215, 0.36); }
+.sompo-geofence-legend { display: flex; flex-wrap: wrap; gap: 5px 10px; margin: 4px 0 0; padding: 0; list-style: none; font-size: 9.5px; color: rgba(220, 235, 225, 0.5); }
+.sompo-geofence-legend li { display: flex; align-items: center; gap: 4px; }
+.sompo-geofence-legend i { width: 9px; height: 9px; border-radius: 2px; background: var(--geo-tone); }
+.sompo-geofence-legend .sompo-geofence-tone-livre i { background: rgba(185, 199, 123, 0.35); }
+.sompo-geofence-episodes { width: 100%; border-collapse: collapse; font-size: 10.5px; line-height: 1.3; color: #f3f5ef; }
+.sompo-geofence-episodes th { padding: 0 4px 6px; font-size: 9px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; text-align: right; color: rgba(210, 230, 215, 0.36); }
+.sompo-geofence-episodes th:first-child { text-align: left; }
+.sompo-geofence-episodes td { padding: 5px 4px; border-top: 1px solid rgba(255, 255, 255, 0.075); vertical-align: top; text-align: right; white-space: nowrap; }
+.sompo-geofence-episodes td:first-child { text-align: left; white-space: normal; }
+.sompo-geofence-episodes td small { display: block; font-size: 9.5px; color: rgba(220, 235, 225, 0.5); }
+.sompo-geofence-episodes td button { display: grid; grid-template-columns: 7px 1fr; column-gap: 5px; align-items: start; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.sompo-geofence-episodes td button i { width: 7px; height: 7px; margin-top: 3px; border-radius: 2px; background: var(--geo-tone); }
+.sompo-geofence-episodes td button small { grid-column: 2; }
+.sompo-geofence-episodes td button b { font-weight: 600; }
+.sompo-geofence-episodes td button:hover b, .sompo-geofence-episodes td button:focus-visible b { text-decoration: underline; }
+.sompo-geofence-episodes tr[data-state='open'] td { background: rgba(255, 255, 255, 0.05); }
+.sompo-geofence-episodes tr[data-state='next'] td { color: rgba(210, 230, 215, 0.36); }
+.sompo-geofence-episodes tr[data-state='next'] td button b { font-weight: 500; color: rgba(220, 235, 225, 0.5); }
+.sompo-geofence-minimap { position: relative; display: grid; gap: 6px; padding: 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.035); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.075); }
+.sompo-geofence-minimap .sompo-geofence-map-canvas { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.12); }
+.sompo-geofence-minimap > button { position: absolute; top: 16px; right: 16px; display: flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(18, 36, 31, 0.85); color: #edf3ed; font-size: 10px; font-weight: 600; cursor: pointer; }
+.sompo-geofence-minimap > button:hover { background: rgba(18, 36, 31, 1); }
+.sompo-geofence-minimap > button svg { width: 12px; height: 12px; }
+.sompo-geofence-minimap > p { margin: 0; font-size: 9.5px; line-height: 1.4; color: rgba(220, 235, 225, 0.5); }
+.sompo-geofence-foot { margin: 0; font-size: 9.5px; line-height: 1.45; color: rgba(210, 230, 215, 0.36); }
+/* Com o painel de geofencing a coluna cresce; rola por dentro para o palco 3D não esticar junto. */
+.sompo-simulator-controls.has-geofence-panel { max-height: 940px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.18) transparent; }
+@media (max-width: 900px) { .sompo-simulator-controls.has-geofence-panel { max-height: none; overflow: visible; } }

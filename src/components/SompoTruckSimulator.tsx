@@ -839,7 +839,16 @@ export default function SompoTruckSimulator({
 
   // Coluna direita vira painel de geofencing só no cenário com talhão (radar presente); os demais cenários ficam como eram.
   const geofencePanel = !isFirebase && agriRun && preview.geofence ? (
-    <SompoGeofencePanel scenarioId={agriRun.scenarioId} outcomeId={agriRun.outcomeId} elapsedMs={preview.deviceTimestamp ?? 0} geofence={preview.geofence} rollDeg={preview.readings.roll ?? null} />
+    <SompoGeofencePanel
+      scenarioId={agriRun.scenarioId}
+      outcomeId={agriRun.outcomeId}
+      elapsedMs={preview.deviceTimestamp ?? 0}
+      geofence={preview.geofence}
+      rollDeg={preview.readings.roll ?? null}
+      position={preview.position ?? null}
+      onSeek={(ms) => { if (episodeActive) return; historyReplay.current = true; playback.current.seek(ms, performance.now(), startedAtRef.current); }}
+      onOpenMap={() => { if (episodeActive) return; setStudioOpen(false); setMapOpen(true); }}
+    />
   ) : null;
   const manualControls = (
     <>
@@ -1086,7 +1095,7 @@ export default function SompoTruckSimulator({
           onAsset={selectStudioAsset} onSnapshot={() => { snapshotRequested.current = true; setCaptureMessage(''); }}
           onExportModel={async () => { if (!sceneApiRef.current?.exportModel) throw new Error('O modelo ainda está carregando.'); const data = await sceneApiRef.current.exportModel(); downloadSompoFile(new Blob([data], { type: 'model/gltf-binary' }), 'sompo-modelo.glb'); }}
         /><p className="sompo-studio-message" role="status">{captureMessage}</p></div> : (
-        <aside className="sompo-simulator-controls" aria-label="Controles do simulador">
+        <aside className={`sompo-simulator-controls${geofencePanel ? ' has-geofence-panel' : ''}`} aria-label="Controles do simulador">
           <div className="sompo-simulator-control-head">
             <div>
               <span>Cenário ativo</span>
@@ -1135,7 +1144,7 @@ export default function SompoTruckSimulator({
               {activeOutcome && <small>{activeOutcome.description}</small>}
             </label>
           )}
-          {(ruralPreview || agriPreview) && (
+          {(ruralPreview || agriPreview) && !geofencePanel && (
             <div className="sompo-scenario-phase">
               <span role="status">{(ruralPreview ?? agriPreview)!.phaseLabel}</span>
               <strong>{formatReading((ruralPreview ?? agriPreview)!.speedKph, ' km/h')}{(ruralPreview ?? agriPreview)!.direction < 0 ? ' · ré' : ''}</strong>
