@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { createSompoCropRows } from './createSompoCropRows';
-import { geofenceFieldRelief } from '../../../shared/sompo-geofence-sites.js';
+import { geofenceFieldRelief, geofenceOperacaoRelief } from '../../../shared/sompo-geofence-sites.js';
 import { varySompoSurface } from './createSompoRoadDetails';
 import { disposeSompoObject } from './sompoStage';
 import type { SompoAgriVisualFrame } from '../../../shared/sompo-agri-scenarios.js';
 
 export const SOMPO_AGRI_ENVIRONMENTS = Object.freeze({
+  'geofence-operacao': Object.freeze({ sky: 0xb8d6dd, ground: 0x6f542d, crop: 0xb99438, slope: 0, mud: 0, night: false, barn: false, relief: geofenceOperacaoRelief as (x: number, z: number) => number }),
   'row-crop-field': Object.freeze({ sky: 0xb8d6dd, ground: 0x6f542d, crop: 0xb99438, slope: 0.025, mud: 0, night: false, barn: false }),
   'sloped-field': Object.freeze({ sky: 0xb8d6dd, ground: 0x79613a, crop: 0x769247, slope: 0.17, mud: 0, night: false, barn: false }),
   'muddy-field': Object.freeze({ sky: 0x92a6a5, ground: 0x4a3829, crop: 0x6d8449, slope: 0.035, mud: 1, night: false, barn: false }),
@@ -285,11 +286,21 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
   root.name = `sompo-agri-environment-${environmentId}`;
   const terrain = createTerrain(definition);
   root.add(terrain);
-  const crops = definition.barn ? null : createSompoCropRows((x,z)=>terrainHeight(x,z,definition.slope,(definition as { relief?: (x: number, z: number) => number }).relief), compact, equipmentId === 'tractor' ? .32 : 1);
+  const operation = environmentId === 'geofence-operacao';
+  const crops = definition.barn ? null : createSompoCropRows((x,z)=>terrainHeight(x,z,definition.slope,(definition as { relief?: (x: number, z: number) => number }).relief), compact, equipmentId === 'tractor' ? .32 : 1, operation);
   if (crops) root.add(crops.root);
-  const barn = definition.barn ? createBarn() : null;
+  const barn = definition.barn || operation ? createBarn() : null;
   if (barn) root.add(barn.root, barn.barnPost);
+  if (operation && barn) {
+    barn.root.scale.set(14 / 12.9, 1, 8 / 11.9);
+    barn.root.position.set(60, terrainHeight(60, -55, 0, geofenceOperacaoRelief), -55);
+    barn.barnPost.position.copy(barn.root.position);
+  }
   const silos = createSilos(definition.slope); root.add(silos);
+  if (operation) for (const cluster of silos.children) {
+    cluster.position.z -= 25; // libera o footprint do galpão mapeado
+    cluster.position.y = terrainHeight(cluster.position.x, cluster.position.z, 0, geofenceOperacaoRelief) - 0.15;
+  }
   const groundFog = createGroundFog(); root.add(groundFog.root);
   groundFog.root.visible = !definition.night;
 
@@ -355,7 +366,7 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
   return {
     root, terrain, mud, sun, placeMud,
     barnPost: barn?.barnPost,
-    setHarvestPath(points: readonly { x: number; z: number }[]) { crops?.setHarvestPath(points); },
+    setHarvestPath(points: readonly { x: number; z: number; atMs?: number; yaw?: number; harvesting?: boolean }[]) { crops?.setHarvestPath(points); },
     groundHeight(x: number, z: number) {
       return terrainHeight(x, z, definition.slope, (definition as { relief?: (x: number, z: number) => number }).relief);
     },
