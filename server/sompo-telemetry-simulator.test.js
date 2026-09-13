@@ -84,7 +84,7 @@ test('cenários rurais são completos, distintos e determinísticos no contrato 
       assert.equal(snapshot.source.scenarioId, scenarioId);
       assert.equal(snapshot.source.scenarioLabel, profile.label);
       assert.deepEqual(snapshot.risks, { collision: profile.collisionRisk, inclination: profile.inclinationRisk });
-      assert.deepEqual(Object.keys(snapshot.readings).sort(), ['acceleration', 'distance', 'humidity', 'pitch', 'roll', 'rotation', 'temperature']);
+      assert.deepEqual(Object.keys(snapshot.readings).sort(), ['acceleration', 'distance', 'humidity', 'pitch', 'roll', 'rotation', 'speedKph', 'temperature', 'wheelSpeedKph']);
       for (const key of ['distance', 'temperature', 'humidity', 'pitch', 'roll']) {
         assert.ok(Number.isFinite(snapshot.readings[key]), `${scenarioId}: ${key}`);
       }

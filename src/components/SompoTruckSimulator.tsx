@@ -188,6 +188,8 @@ function snapshotToSimulationRaw(snapshot: SompoTelemetrySnapshot): Record<strin
     rotacaoX: readings.rotation?.x,
     rotacaoY: readings.rotation?.y,
     rotacaoZ: readings.rotation?.z,
+    velocidade: readings.speedKph,
+    velocidadeRoda: readings.wheelSpeedKph,
     riscoColisao: snapshot.risks.collision,
     riscoInclinacao: snapshot.risks.inclination,
     scenarioLabel: snapshot.source.scenarioLabel,

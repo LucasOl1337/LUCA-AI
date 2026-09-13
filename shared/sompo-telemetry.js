@@ -97,6 +97,8 @@ export function normalizeSompoTelemetry(raw, { observedAt = new Date().toISOStri
       roll: finiteNumber(raw.roll),
       acceleration,
       rotation,
+      speedKph: finiteNumber(raw.velocidade),
+      wheelSpeedKph: finiteNumber(raw.velocidadeRoda),
     },
     source: {
       kind: 'firebase',
@@ -471,6 +473,21 @@ function episodeAlertFindingLine(summary) {
 }
 
 /**
+ * Divergência roda x solo: roda e solo em velocidades diferentes é a prova
+ * de pneu sem contato efetivo (aquaplanagem, patinação). Só existe quando o
+ * dispositivo mede os dois canais; ausência de divergência não prova aderência.
+ */
+function episodeTractionFindingLine(summary) {
+  const divergence = summary?.wheelDivergence;
+  if (!divergence) return null;
+  const wheel = formatPtNumber(divergence.wheelKph);
+  const ground = formatPtNumber(divergence.groundKph);
+  const diff = formatPtNumber(divergence.diffKph);
+  if (wheel === null || ground === null || diff === null) return null;
+  return `Achado de tração: rodas a ${wheel} km/h com o solo a ${ground} km/h (${formatOffsetSeconds(divergence.offsetMs)}, diferença de ${diff} km/h) — a divergência roda×solo indica pneus sem contato efetivo (aquaplanagem ou patinação); conferir o instante nos frames anexados.`;
+}
+
+/**
  * Série compacta para a peça visual: usa as amostras-chave já decimadas
  * (≤30, densas ao redor do pico). Cada ponto é [tMs, distanciaCm, accMs2].
  */
@@ -560,6 +577,7 @@ export function buildSompoEpisodeMission(episode, samples, summary, teamLabel, f
   const transitions = Array.isArray(summary.flagTransitions) ? summary.flagTransitions : [];
   const keySamples = Array.isArray(summary.keySamples) ? summary.keySamples : [];
   const alertFinding = episodeAlertFindingLine(summary);
+  const tractionFinding = episodeTractionFindingLine(summary);
   const visualData = buildSompoEpisodeVisualData(summary);
 
   const briefing = [
@@ -589,6 +607,7 @@ export function buildSompoEpisodeMission(episode, samples, summary, teamLabel, f
         ...transitions.map((item) => `- ${item.at} ${item.flag} ${Boolean(item.from)} → ${Boolean(item.to)}`),
       ]),
     ...(alertFinding ? [alertFinding] : []),
+    ...(tractionFinding ? [tractionFinding] : []),
     ...(keySamples.length === 0
       ? []
       : [
