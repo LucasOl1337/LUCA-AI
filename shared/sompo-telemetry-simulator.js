@@ -360,8 +360,8 @@ export const SOMPO_RURAL_SCRIPTS = Object.freeze({
     [2_400, 'Ré — traseira entra no acesso', { speedKph: 2.5, yaw: -10, lateral: 0.4, distance: 165 }],
     [4_500, 'Correção de esterco', { yaw: -18, lateral: 0.95, distance: 200 }],
     [5_600, 'Segura — confere a lateral', { speedKph: 0 }],
-    [6_400, 'Ré — endireita o conjunto', { speedKph: 2, yaw: 4, lateral: 1.15, distance: 235 }],
-    [8_600, 'Pausa final', { speedKph: 0, yaw: 5 }],
+    [7_200, 'Ré — endireita o conjunto', { speedKph: 2, yaw: -8, lateral: 1.05, distance: 220 }],
+    [8_600, 'Pausa final', { speedKph: 0, yaw: 0, distance: 235 }],
     [9_600, 'Encosta os últimos metros', { speedKph: 1.2, yaw: 0 }],
     [11_500, 'Manobra concluída', { speedKph: 0, roughness: 0, distance: 250 }],
     [13_000, 'Imobilizado junto ao acesso', {}],
@@ -649,10 +649,11 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [2_400, 'Entra no declive', { pitch: -17, speedKph: 92 }],
       [5_000, 'Freio no limite — velocidade cresce', { pitch: -22, speedKph: 100, temperature: 27 }],
       [7_600, 'Fade do freio de serviço', { speedKph: 106, temperature: 32, roughness: 1.6 }],
-      [9_600, 'Reduz marcha — freio motor pega', { speedKph: 68, temperature: 34, roughness: 2, pitch: -18 }],
-      [11_500, 'Busca o acostamento', { speedKph: 30, lateral: 1.4, yaw: -4, pitch: -8 }],
-      [13_000, 'Parada técnica para resfriar', { speedKph: 0, lateral: 2, yaw: 0, pitch: -2, roughness: 0, inclinationRisk: false }],
-      [17_000, 'Aguardando os freios resfriarem', { temperature: 30, pitch: -1 }],
+      [10_800, 'Reduz marcha — freio motor pega', { speedKph: 90, temperature: 34, roughness: 2, pitch: -18 }],
+      [14_400, 'Freio de serviço volta aos poucos', { speedKph: 56, lateral: 0.7, yaw: -2, pitch: -12 }],
+      [17_200, 'Busca o acostamento', { speedKph: 24, lateral: 1.6, yaw: -4, pitch: -6, temperature: 33 }],
+      [19_000, 'Parada técnica para resfriar', { speedKph: 0, lateral: 2, yaw: 0, pitch: -2, roughness: 0, inclinationRisk: false }],
+      [21_000, 'Aguardando os freios resfriarem', { temperature: 30, pitch: -1 }],
     ]),
   }),
   'yard-maneuver': Object.freeze({
@@ -842,7 +843,7 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [800, 'Engata a ré', { direction: -1 }],
       [2_200, 'Ré rápida demais', { speedKph: 3.5, yaw: -12, lateral: 0.6, distance: 175 }],
       [3_800, 'Sem corrigir o ângulo', { yaw: -16, lateral: 1, distance: 220, collisionRisk: true }],
-      [5_200, 'Toque na doca', { speedKph: 0, pitch: -1.5, yaw: -14, roll: -2, roughness: 2.2, distance: 240 }],
+      [5_200, 'Toque na doca', { speedKph: 0, pitch: 1.5, yaw: -14, roll: -2, roughness: 2.2, distance: 240 }],
       [6_400, 'Parado — impacto leve', { pitch: 0, roll: 0, roughness: 0.4 }],
       [13_000, 'Manobra suspensa', { roughness: 0 }],
     ]),
@@ -853,12 +854,12 @@ const SOMPO_OUTCOME_SCRIPTS = Object.freeze({
       [3_600, 'Ângulo insuficiente', { yaw: -20, lateral: 1.1, distance: 210, collisionRisk: true }],
       [4_800, 'Para para corrigir', { speedKph: 0 }],
       [5_600, 'Engata à frente', { direction: 1 }],
-      [6_800, 'Avanço de correção', { speedKph: 2.5, yaw: -4, lateral: 0.7, distance: 185 }],
-      [8_200, 'Pausa para a nova ré', { speedKph: 0, yaw: -2 }],
-      [9_000, 'Engata a ré', { direction: -1 }],
-      [10_400, 'Nova ré alinhada', { speedKph: 2, yaw: 3, lateral: 1, distance: 235 }],
-      [12_500, 'Encosta no ponto', { speedKph: 0, yaw: 0 }],
-      [14_000, 'Manobra concluída', { roughness: 0, distance: 250 }],
+      [7_400, 'Avanço de correção', { speedKph: 2.5, yaw: -8, lateral: 0.8, distance: 190 }],
+      [8_800, 'Pausa para a nova ré', { speedKph: 0, yaw: -2 }],
+      [9_400, 'Engata a ré', { direction: -1 }],
+      [11_000, 'Nova ré alinhada', { speedKph: 2, yaw: 3, lateral: 1, distance: 235 }],
+      [12_800, 'Encosta no ponto', { speedKph: 0, yaw: 0 }],
+      [14_000, 'Manobra concluída', { roughness: 0, distance: 250, collisionRisk: false }],
     ]),
   }),
   'bogged-down': Object.freeze({
@@ -961,13 +962,13 @@ export function getSompoRuralFrame(scenarioId, elapsedMs = 0, outcomeId) {
   frame.wheelSpeedKph = (from.wheelSpeedKph ?? from.speedKph)
     + ((to.wheelSpeedKph ?? to.speedKph) - (from.wheelSpeedKph ?? from.speedKph)) * blend;
   frame.phaseLabel = from.phaseLabel;
-  frame.accelerationX = (to.speedKph - from.speedKph) / 3.6 * derivative;
+  frame.accelerationX = (to.speedKph - from.speedKph) / 3.6 * derivative * (from.direction ?? 1);
   frame.yawRate = (to.yaw - from.yaw) * derivative;
   frame.lateralRate = (to.lateral - from.lateral) * derivative;
   frame.animalRate = (to.animalZ - from.animalZ) * derivative;
   frame.pitchRate = (to.pitch - from.pitch) * derivative;
   frame.rollRate = (to.roll - from.roll) * derivative;
-  frame.lateralAcceleration = frame.speedKph / 3.6 * frame.yawRate * Math.PI / 180;
+  frame.lateralAcceleration = frame.speedKph / 3.6 * (frame.direction ?? 1) * frame.yawRate * Math.PI / 180;
   return frame;
 }
 

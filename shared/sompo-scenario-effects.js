@@ -63,7 +63,7 @@ export const SOMPO_SCENARIO_OUTCOME_EFFECTS = Object.freeze({
   }),
   'steep-descent': Object.freeze({
     'desce-controlado': scene([track('brake-glow', 2200, 13500, 0.3, 3000), track('brake-lights', 2200, 13500), track('running-lights')]),
-    'freio-aquece': scene([track('brake-glow', 3000, 13000, 0.85, 3000), track('brake-smoke', 5200, null, 0.55), track('brake-lights', 2400, 13000), track('hazard-lights', 13000)]),
+    'freio-aquece': scene([track('brake-glow', 3000, 19000, 0.85, 3000), track('brake-smoke', 5200, null, 0.55), track('brake-lights', 2400, 19000), track('hazard-lights', 19000)]),
   }),
   'yard-maneuver': Object.freeze({
     'encosta-na-doca': scene([track('maneuver-guides'), track('sensor-warning', 4600), track('brake-lights', 6800, 8200), track('brake-lights', 10800), track('road-dust', 0, null, 0.12)], 'asphalt', 'yard'),
@@ -103,7 +103,7 @@ export const SOMPO_SCENARIO_OUTCOME_EFFECTS = Object.freeze({
   }),
   'tight-reverse': Object.freeze({
     'toque-na-doca': scene([track('reverse-lights', 800, 5200), track('maneuver-guides'), track('impact-dust', 5200, 7000, 0.35, 60), track('brake-lights', 5200), track('hazard-lights', 5200)], 'asphalt', 'yard'),
-    'reinicia-manobra': scene([track('reverse-lights', 800, 5600), track('reverse-lights', 9000, 12500), track('maneuver-guides'), track('brake-lights', 4800, 5600), track('brake-lights', 8200, 9000), track('brake-lights', 12500)], 'asphalt', 'yard'),
+    'reinicia-manobra': scene([track('reverse-lights', 800, 5600), track('reverse-lights', 9400, 12800), track('maneuver-guides'), track('brake-lights', 4800, 5600), track('brake-lights', 8800, 9400), track('brake-lights', 12800)], 'asphalt', 'yard'),
   }),
   'bogged-down': Object.freeze({
     desatola: scene([track('mud-spray', 2200, 9500), track('mud-ruts', 2200), track('rain', 0, null, 0.2), track('hazard-lights', 4800, 9000)], 'mud'),
