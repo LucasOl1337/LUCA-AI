@@ -196,6 +196,9 @@ test('coreografia por desfecho: impacto do animal, fogo contido e cena padrão i
   assert.equal(cue('animal-crossing', 6_000, 'impact-dust', 'freada-a-tempo'), undefined);
   assert.equal(cue('engine-fire', 12_000, 'engine-fire', 'fogo-contido'), undefined, 'extintor encerra as chamas');
   assert.ok(cue('engine-fire', 12_000, 'engine-fire', 'fogo-alastra'));
+  // Contato de ré na doca solta poeira na traseira, nunca na frente.
+  assert.ok(cue('tight-reverse', 6_000, 'impact-dust-rear', 'toque-na-doca'), 'poeira de impacto na traseira');
+  assert.equal(cue('tight-reverse', 6_000, 'impact-dust', 'toque-na-doca'), undefined, 'sem poeira frontal em contato de ré');
   // Determinismo e intensidades válidas nas variantes.
   for (const [scenarioId, outcomes] of Object.entries(SOMPO_SCENARIO_OUTCOMES)) {
     for (const outcome of outcomes) {
