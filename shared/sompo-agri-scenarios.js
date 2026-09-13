@@ -233,9 +233,9 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
         [7_200, { speedKph: 0.3, wheelSpeedKph: 16, sink: 0.38, pitch: 4, mud: 0.95 }],
         [9_000, { speedKph: 0, wheelSpeedKph: 6, sink: 0.42, mud: 1, pitch: 4.5 }],
         [10_000, { direction: -1, speedKph: 0, wheelSpeedKph: 0, sink: 0.34, mud: 0.6, pitch: 3 }],
-        [11_000, { direction: -1, speedKph: 2, wheelSpeedKph: 5, sink: 0.3, mud: 0.55, pitch: 2 }],
-        [14_000, { direction: -1, speedKph: 5, wheelSpeedKph: 5, sink: 0.08, mud: 0.2, pitch: 0.5 }],
-        [16_000, { speedKph: 0, wheelSpeedKph: 0, mud: 0.05, pitch: 0 }],
+        [11_000, { direction: -1, speedKph: 2, wheelSpeedKph: 3, sink: 0.3, mud: 0.55, pitch: 2, roll: 6 }],
+        [14_000, { direction: -1, speedKph: 5, wheelSpeedKph: 5.5, sink: 0.08, mud: 0.2, pitch: 0.5, roll: 4 }],
+        [16_000, { speedKph: 0, wheelSpeedKph: 0, mud: 0.05, pitch: 0, sink: 0, roll: 3 }],
       ], [
         phase('entry', 'Entrada no solo saturado', 0, 4_000),
         phase('traction-loss', 'Perda de tração', 4_000, 10_000),
@@ -327,7 +327,7 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
     ],
     outcomes: [
       outcome('lit-pass', 'Passada iluminada', 'Faróis e projetores permanecem ativos durante toda a passada.', [
-        [0, { implementLift: 0.55, headlights: 0.2, workLights: 0.2, beacon: 1, headerSpeed: 0 }],
+        [0, { implementLift: 0.55, headlights: 0.6, workLights: 0.5, beacon: 1, headerSpeed: 0 }],
         [2_600, { implementLift: 0.12, headerSpeed: 0.4 }],
         [3_000, { implementLift: 0, headlights: 1, workLights: 1, headerSpeed: 1, cropCut: 0.2, dust: 0.25 }],
         [10_000, { cropCut: 0.82, dust: 0.55 }],
