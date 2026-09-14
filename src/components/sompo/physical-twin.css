@@ -1,0 +1,32 @@
+.sompo-physical-vignette { position:absolute; inset:0; pointer-events:none; z-index:2; border-radius:inherit; transition:box-shadow .3s, background .3s; }
+.sompo-physical-vignette[data-severity="danger"] { box-shadow:inset 0 0 95px 20px #ef302866; background:#e62f2410; }
+.sompo-physical-vignette[data-severity="danger"][data-motion="true"] { animation:sompo-physical-pulse 1.6s ease-in-out infinite; }
+.sompo-physical-vignette[data-severity="attention"] { box-shadow:inset 0 0 65px 6px #ffb63835; }
+@keyframes sompo-physical-pulse { 50% { box-shadow:inset 0 0 130px 28px #ef302895; background:#e62f241f; } }
+.sompo-physical-hud { position:absolute; left:18px; top:60px; z-index:3; pointer-events:none; max-width:min(340px,calc(100% - 36px)); display:grid; gap:5px; padding:13px 16px; border:1px solid #6bbdac66; border-left:3px solid #7fe0bd; border-radius:10px; background:#071a23e8; color:#f0faf8; box-shadow:0 8px 30px #0002; }
+.sompo-physical-hud small { font-size:10px; letter-spacing:.12em; color:#acd7ce; }
+.sompo-physical-hud strong { font-size:17px; line-height:1.25; }
+.sompo-physical-hud span { font-size:12px; color:#d3e0e7; }
+.sompo-physical-hud[data-severity="danger"] { border-color:#ff786f; }
+.sompo-physical-hud[data-severity="offline"] { border-color:#a7acb1; }
+.sompo-physical-panel { padding:18px; border:1px solid var(--border,#33415533); border-radius:14px; margin:0 0 14px; background:var(--card, #ffffff08); color:inherit; }
+.sompo-physical-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.sompo-physical-panel button { font:inherit; cursor:pointer; color:inherit; background:transparent; border:1px solid var(--border,#8294a355); border-radius:8px; padding:9px 12px; font-size:12px; }
+.sompo-physical-panel button[aria-pressed="true"] { background:#14b8a621; border-color:#14b8a6; }
+.sompo-physical-panel button:focus-visible { outline:2px solid #14b8a6; outline-offset:3px; }
+.sompo-physical-panel details { margin-top:14px; font-size:12px; }
+.sompo-physical-panel summary { cursor:pointer; }
+.sompo-physical-panel p { font-size:12px; line-height:1.65; opacity:.8; }
+.sompo-physical-panel label { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:8px; }
+.sompo-physical-panel input { width:75px; padding:5px; color:inherit; background:transparent; border:1px solid #8294a355; border-radius:5px; }
+.sompo-physical-event-head { display:grid; gap:4px; margin:18px 0 10px; }
+.sompo-physical-event-head span { font-size:11px; opacity:.7; }
+.sompo-physical-events { list-style:none; padding:0; margin:0; display:grid; gap:6px; }
+.sompo-physical-events button { width:100%; text-align:left; display:grid; grid-template-columns:60px 1fr; gap:4px 10px; }
+.sompo-physical-events time { opacity:.65; }
+.sompo-physical-events b { grid-column:2; font-size:11px; color:#0d9488; }
+.sompo-physical-replay { display:grid; gap:10px; padding:12px; margin-bottom:10px; border:1px solid #14b8a6; border-radius:8px; font-size:12px; }
+.sompo-physical-replay progress { width:100%; accent-color:#14b8a6; }
+.sompo-physical-timeline { padding-left:18px; font-size:11px; line-height:1.8; }
+@media (prefers-reduced-motion:reduce) { .sompo-physical-vignette { animation:none!important; transition:none; } }
+@media (max-width:600px) { .sompo-physical-hud { top:54px; left:12px; padding:9px 12px; } .sompo-physical-hud strong { font-size:14px; } }

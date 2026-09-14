@@ -104,7 +104,8 @@ test('modo Firebase acopla o snapshot em tempo real ao gêmeo 3D sem outro canal
   assert.match(sompoPage, /source="firebase"/);
   assert.match(sompoPage, /telemetry=\{firebaseTelemetry\}/);
   assert.match(sompoSimulator, /data-sompo-simulator-source=\{source\}/);
-  assert.match(sompoSimulator, /previewRef\.current = telemetry/);
+  assert.match(sompoSimulator, /usePhysicalTwin\(telemetry, isFirebase\)/);
+  assert.match(sompoSimulator, /previewRef\.current = physicalTwin\.snapshot/);
   assert.match(sompoSimulator, /snapshot\.readings\.pitch/);
   assert.match(sompoSimulator, /snapshot\.readings\.roll/);
   assert.match(sompoSimulator, /snapshot\.readings\.rotation\?\.z/);

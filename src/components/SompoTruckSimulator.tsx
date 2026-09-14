@@ -67,6 +67,8 @@ import {
   type SompoSimulationScenarioId,
 } from '../../shared/sompo-telemetry-simulator.js';
 import { sompoDistanceSensorCopy } from '../../shared/sompo-distance-sensor.js';
+import { usePhysicalTwin } from './sompo/usePhysicalTwin';
+import PhysicalTwinPanel, { PhysicalTwinOverlay } from './sompo/PhysicalTwinPanel';
 
 interface SompoTruckSimulatorProps {
   source: 'firebase' | 'simulation';
@@ -222,12 +224,14 @@ function formatReading(value: number | null | undefined, suffix: string) {
 
 function LiveReadings({
   telemetry,
+  replaying = false,
   calibration,
   onCalibrationChange,
   onCalibrationReset,
   onRecenterHeading,
 }: {
   telemetry: SompoTelemetrySnapshot;
+  replaying?: boolean;
   calibration: SompoAxisCalibration;
   onCalibrationChange: (key: keyof SompoAxisCalibration, value: boolean) => void;
   onCalibrationReset: () => void;
@@ -237,9 +241,9 @@ function LiveReadings({
     <aside className="sompo-simulator-controls sompo-simulator-live-readings" aria-label="Leituras que movimentam o gêmeo digital">
       <div className="sompo-simulator-control-head">
         <div>
-          <span>Telemetria acoplada</span>
+          <span>{replaying ? 'Leituras gravadas · replay' : 'Telemetria acoplada'}</span>
           <strong>Trator {telemetry.tractorId}</strong>
-          <p>{telemetry.freshness === 'fresh' && telemetry.connection.state === 'live' ? 'Cena atualizada pelo snapshot; nenhum comando é enviado ao equipamento.' : 'Último snapshot preservado. Movimento interrompido até confirmar a atualização dos sensores.'}</p>
+          <p>{replaying ? 'Valores do evento selecionado. Volte ao vivo para acompanhar o dispositivo agora.' : telemetry.freshness === 'fresh' && telemetry.connection.state === 'live' ? 'Cena atualizada pelo snapshot; nenhum comando é enviado ao equipamento.' : 'Último snapshot preservado. Movimento interrompido até confirmar a atualização dos sensores.'}</p>
         </div>
       </div>
 
@@ -329,6 +333,7 @@ export default function SompoTruckSimulator({
   onScenarioSelect,
 }: SompoTruckSimulatorProps) {
   const isFirebase = source === 'firebase';
+  const physicalTwin = usePhysicalTwin(telemetry, isFirebase);
   const [studioOpen, setStudioOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false); // Mapa do talhão no lugar dos controles; a cena 3D continua rodando.
   const [studioConfig, setStudioConfig] = useState<SompoStudioConfig>(loadSompoStudioConfig);
@@ -425,10 +430,10 @@ export default function SompoTruckSimulator({
   }, [onEpisodeRecorded]);
 
   useEffect(() => {
-    if (!isFirebase || !telemetry) return;
-    previewRef.current = telemetry;
-    setPreview(telemetry);
-  }, [isFirebase, telemetry]);
+    if (!isFirebase || !physicalTwin.snapshot) return;
+    previewRef.current = physicalTwin.snapshot;
+    setPreview(physicalTwin.snapshot);
+  }, [isFirebase, physicalTwin.snapshot]);
 
   useEffect(() => {
     // Durante a gravação de episódio, quem emite os valores é o relógio do run.
@@ -774,6 +779,7 @@ export default function SompoTruckSimulator({
 
     const stage = mountSompoRuralStage({
       mount, isFirebase, controlsRef, previewRef, axisCalibrationRef, startedAtRef,
+      physicalVisualRef: physicalTwin.visual,
       setModelStatus, setModelAsset, setWebglError,
       onAfterRender: captureDueEpisodeFrames,
       studioRef, getElapsed, onStats: setRenderStats,
@@ -889,7 +895,7 @@ export default function SompoTruckSimulator({
   const activeOutcomeId = agriRun ? agriRun.outcomeId : controls.outcomeId;
   const activeOutcome = scenarioOutcomes.find((item) => item.id === activeOutcomeId) || scenarioOutcomes[0];
   const firebaseLive = preview.connection.state === 'live';
-  const firebaseStatusLabel = firebaseLive
+  const firebaseStatusLabel = physicalTwin.replay ? 'Replay · leituras gravadas' : firebaseLive
     ? preview.freshness === 'stale' ? 'Conectado · leitura parada' : 'Firebase ao vivo'
     : preview.connection.state === 'reconnecting' ? 'Reconectando ao Firebase' : 'Conectando ao Firebase';
 
@@ -1087,8 +1093,9 @@ export default function SompoTruckSimulator({
               </div>
             )}
           </div>
+          {isFirebase && <PhysicalTwinOverlay twin={physicalTwin} />}
           <div className="sompo-simulator-stage-badges" aria-hidden="true">
-            <span><span className="sompo-simulator-led" /> {isFirebase ? `ESP32 físico · trator ${preview.tractorId}` : 'ESP32 virtual transmitindo'}</span>
+            <span><span className="sompo-simulator-led" /> {isFirebase ? `${physicalTwin.replay ? 'Replay' : 'ESP32 físico'} · trator ${preview.tractorId}` : 'ESP32 virtual transmitindo'}</span>
             <span>{isFirebase ? `tick ${preview.deviceTimestamp ?? '-'}` : `${Math.round(preview.deviceTimestamp || 0)} ms`}</span>
           </div>
           {!isFirebase && (
@@ -1124,13 +1131,17 @@ export default function SompoTruckSimulator({
         </div>
 
         {isFirebase ? (
+          <div>
+          <PhysicalTwinPanel twin={physicalTwin} />
           <LiveReadings
             telemetry={preview}
+            replaying={!!physicalTwin.replay}
             calibration={axisCalibration}
             onCalibrationChange={(key, value) => setAxisCalibration((current) => ({ ...current, [key]: value }))}
             onCalibrationReset={() => setAxisCalibration({ ...DEFAULT_SOMPO_AXIS_CALIBRATION })}
             onRecenterHeading={() => sceneApiRef.current?.recenterHeading()}
           />
+          </div>
         ) : mapOpen && agriRun && preview.geofence ? (
           <SompoGeofenceMap scenarioId={agriRun.scenarioId} outcomeId={agriRun.outcomeId} elapsedMs={preview.deviceTimestamp ?? 0} position={preview.position ?? null} />
         ) : studioOpen ? <div><SompoStudio config={studioConfig} onChange={setStudioConfig}

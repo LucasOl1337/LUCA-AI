@@ -16,6 +16,8 @@ import { sompoRenderBudget, createSompoRenderer, disposeSompoObject, createSompo
 import { refineSompoTruck, exportSompoModel } from './refineSompoTruck';
 import { createSompoAtmosphere } from './createSompoAtmosphere';
 import { SOMPO_STUDIO_DEFAULT, type SompoStudioConfig, type SompoRenderStats } from './sompoStudioConfig';
+import { createPhysicalTwinEffects } from './createPhysicalTwinEffects';
+import type { PhysicalTwin } from './usePhysicalTwin';
 
 function dampAngle(current: number, target: number, factor: number) {
   const shortestTurn = Math.atan2(Math.sin(target - current), Math.cos(target - current));
@@ -80,7 +82,7 @@ function addBox(
 
 
 /** Owns the rural WebGL lifecycle. React keeps telemetry, controls and recording. */
-export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRef, axisCalibrationRef, startedAtRef, setModelStatus, setModelAsset, setWebglError, onAfterRender, studioRef, getElapsed, onStats }: {
+export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRef, axisCalibrationRef, startedAtRef, setModelStatus, setModelAsset, setWebglError, onAfterRender, studioRef, getElapsed, onStats, physicalVisualRef }: {
   mount: HTMLElement;
   isFirebase: boolean;
   controlsRef: { current: SompoSimulationControls };
@@ -94,6 +96,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
   studioRef?: { current: SompoStudioConfig };
   getElapsed?: (time: number) => number;
   onStats?: (stats: SompoRenderStats) => void;
+  physicalVisualRef?: PhysicalTwin['visual'];
 }): SompoStageApi | undefined {
     let renderer: THREE.WebGLRenderer;
     try {
@@ -163,6 +166,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     truckPoseGroup.name = 'sompo-rural-machine';
     truckPoseGroup.position.y = SOMPO_TRUCK_PIVOT_Y + 0.05;
     scene.add(truckPoseGroup);
+    const physicalEffects = isFirebase ? createPhysicalTwinEffects(scene, truckPoseGroup) : null;
 
     const warning = new THREE.MeshStandardMaterial({ color: 0xff4f45, roughness: 0.45, metalness: 0.2 });
     const truckModel = createSompoTruckModel({
@@ -275,6 +279,9 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     // O rumo integrado nao tem referencia absoluta (o firmware nao manda
     // magnetometro): curvas reais deixam residuo. Recentrar e do operador.
     let liveHeading = 0;
+    let savedLiveHeading = 0;
+    let replayId = 0;
+    let replayTime = 0;
 
     const api: Omit<SompoStageApi, 'dispose'> = {
       exportModel: () => exportSompoModel(truckGroup),
@@ -392,6 +399,17 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       previousTime = time;
       const settings = controlsRef.current;
       const snapshot = previewRef.current;
+      const physical = isFirebase ? physicalVisualRef?.current : undefined;
+      const isReplay = physical?.replay === true;
+      if (physical && physical.replayId !== replayId) {
+        if (isReplay) { if (!replayId) savedLiveHeading = liveHeading; liveHeading = 0; }
+        else liveHeading = savedLiveHeading;
+        replayId = physical.replayId;
+        replayTime = 0;
+      }
+      if (isReplay && physical!.replayTime < replayTime) { liveHeading = 0; replayTime = 0; }
+      const poseDelta = isReplay ? Math.max(0, physical!.replayTime - replayTime) / 1000 : delta;
+      replayTime = physical?.replayTime ?? 0;
       const physicalCurrent = snapshot.freshness === 'fresh' && snapshot.connection.state === 'live';
       const attitudeKnown = Number.isFinite(snapshot.readings.pitch) && Number.isFinite(snapshot.readings.roll);
       const visualScenario = isFirebase ? 'normal' : settings.scenarioId;
@@ -446,7 +464,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
         roll: snapshot.readings.roll,
         yawRate: snapshot.readings.rotation?.z,
         currentHeading: liveHeading,
-        deltaSeconds: reduceMotion.matches || (isFirebase && !physicalCurrent) ? 0 : delta,
+        deltaSeconds: reduceMotion.matches || (isFirebase && !physicalCurrent) ? 0 : poseDelta,
       }, axisCalibrationRef.current);
       const drivingSpeed = ruralFrame?.speedKph ?? brakingState?.speedKph ?? settings.speedKph;
       // Micro-vibração de rodagem: a carroceria fica viva em velocidade de pista
@@ -587,7 +605,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       // Sem leitura de distância não há alvo do feixe: esconde obstáculo e raio
       // em vez de desenhá-los numa posição inventada.
       obstacleGroup.visible = isFirebase
-        ? Number.isFinite(snapshot.readings.distance)
+        ? !!physical?.effects.live && physical.effects.distance !== null
         : settings.scenarioId === 'obstacle' || settings.scenarioId === 'brake-failure';
       rayGroup.visible = obstacleGroup.visible;
       const rangeLength = rangeForDistance(isFirebase ? snapshot.readings.distance : ruralFrame?.distance ?? settings.distance);
@@ -601,6 +619,13 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
         ? rangeLength
         : Math.max(0.02, obstacleGroup.position.x - truckWorldX - SOMPO_TRUCK_FRONT_X - SOMPO_OBSTACLE_HALF_X);
       obstacleGroup.position.y = Math.tan(slope) * (obstacleGroup.position.x - truckWorldX);
+      if (isFirebase) {
+        // Keep the ultrasonic target in front of the sensor as the vehicle turns.
+        obstacleGroup.position.set(SOMPO_TRUCK_FRONT_X + rangeLength, 0, 0)
+          .applyAxisAngle(new THREE.Vector3(0, 1, 0), truckPoseGroup.rotation.y)
+          .add(new THREE.Vector3(truckWorldX, 0, truckPoseGroup.position.z));
+        obstacleGroup.rotation.y = truckPoseGroup.rotation.y;
+      }
       const uncertain = isFirebase && (!physicalCurrent || snapshot.status === 'unknown');
       rayMaterial.color.set(uncertain ? 0xc9ad74 : snapshot.risks.collision ? 0xff5d52 : 0x7dff9a);
       rayMaterial.opacity = snapshot.risks.collision ? 1 : 0.68;
@@ -610,11 +635,15 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       if (!isFirebase) scenarioEffects.update(effectFrame, visualElapsed, visualScenario, drivingSpeed * (ruralFrame?.direction ?? 1), reduceMotion.matches, slope, effectOutcomeId ?? '', truckWorldX, ruralFrame?.direction ?? 1, at => runOriginX + scenarioTravelMeters(settings, at));
       atmosphere.update(studio, camera, truckPoseGroup.position, visualElapsed, (ruralFrame?.rain ?? 0) > 0);
       orbit.update();
+      const shake = physical && physicalEffects ? physicalEffects.update(physical.effects,
+        isReplay ? physical.replayTime : time, delta, physical.cargoView, reduceMotion.matches || !physical.motion) : 0;
+      camera.position.y += shake;
       postProcessing.render(delta);
       // Captura síncrona no mesmo rAF do render: o framebuffer WebGL ainda está
       // válido sem precisar de preserveDrawingBuffer.
       meter.end();
       onAfterRender(renderer.domElement);
+      camera.position.y -= shake;
       if (!document.hidden) frameId = window.requestAnimationFrame(render);
     }
 

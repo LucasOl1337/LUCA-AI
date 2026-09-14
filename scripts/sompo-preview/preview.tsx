@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { normalizeSompoTelemetry } from '../../shared/sompo-telemetry.js';
 import { createRoot } from 'react-dom/client';
 import { lucaApi } from '../../src/lib/api';
 import { createSompoSimulationSnapshot } from '../../shared/sompo-telemetry-simulator.js';
@@ -30,4 +31,15 @@ const physical = new URLSearchParams(location.search).get('source') === 'firebas
 const snapshot = createSompoSimulationSnapshot({ scenarioId: 'normal', pitch: 12, roll: 7 }, { elapsedMs: 0 });
 snapshot.source.kind = 'firebase';
 snapshot.source.provider = 'Fixture local, sem conexão física';
-createRoot(document.getElementById('root')!).render(<SompoTruckSimulator source={physical ? 'firebase' : 'simulation'} telemetry={physical ? snapshot : undefined} onTelemetry={(snapshot) => { fixture.snapshot = snapshot; }} />);
+function Preview() {
+  const [reading, setReading] = useState(snapshot);
+  fixture.setPhysicalReading = (raw: Record<string, unknown>) => {
+    const next = normalizeSompoTelemetry({ trator: '001', timestamp: Date.now(), distancia: 250, pitch: 0, roll: 0, aceleracaoX: 9.81, aceleracaoY: 0, aceleracaoZ: 0, rotacaoX: 0, rotacaoY: 0, rotacaoZ: 0, temperatura: 23, umidade: 55, riscoColisao: false, riscoInclinacao: false, ...raw });
+    next.connection.state = 'live';
+    next.freshness = 'fresh';
+    next.source.provider = 'Fixture local, sem conexão física';
+    setReading(next);
+  };
+  return <SompoTruckSimulator source={physical ? 'firebase' : 'simulation'} telemetry={physical ? reading : undefined} onTelemetry={(snapshot) => { fixture.snapshot = snapshot; }} />;
+}
+createRoot(document.getElementById('root')!).render(<Preview />);
