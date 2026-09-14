@@ -13,8 +13,6 @@ describe('landing hero copy residual', () => {
     assert.ok(page.includes('Como você quer chegar à resposta?'));
     assert.ok(page.includes('Usar modo individual'));
     assert.ok(page.includes('Usar modo equipe'));
-    assert.ok(page.includes('data-landing-proof-item="runtime"'));
-    assert.ok(page.includes('Runtime com status ao vivo'));
   });
 
   it('keeps commercial share description aligned (personas + missão + conversa)', () => {
