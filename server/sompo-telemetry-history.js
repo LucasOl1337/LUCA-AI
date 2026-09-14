@@ -4,6 +4,8 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { normalizeSompoTelemetry } from '../shared/sompo-telemetry.js';
 import { convertSompoDataset, SOMPO_EXPORT_MAX_SAMPLES, SOMPO_EXPORT_MAX_JSON_BYTES } from '../shared/sompo-lab-export.js';
+// geofencing (módulo server/geofencing): recalcula os episódios de faixa sobre a série gravada; null sem talhão.
+import { summarizeEpisodeGeofence } from './geofencing/episode-geofence.js';
 import { inferredImageMime } from './image-signature.js';
 
 export const SOMPO_TELEMETRY_HISTORY_DEFAULT_LIMIT = 2000;
@@ -172,6 +174,44 @@ function mapSampleRow(row) {
     riscoInclinacao: row.inclinationKnown ? Boolean(row.riscoInclinacao) : null,
     velocidade: finiteNumber(row.velocidade),
     velocidadeRoda: finiteNumber(row.velocidadeRoda),
+    // Posição de cena (metros locais, sintética) e faixa lida pelo radar no instante; null quando a origem não tem posição.
+    posX: finiteNumber(row.posX),
+    posZ: finiteNumber(row.posZ),
+    headingDeg: finiteNumber(row.headingDeg),
+    geofenceHazard: row.geofenceHazard ?? null,
+    geofenceBand: row.geofenceBand ?? null,
+  };
+}
+
+const SCENE_LIMIT_M = 100_000;
+function sceneNumber(value, name) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) > SCENE_LIMIT_M) {
+    throw new Error(`sompo_telemetry_position_invalid:${name}`);
+  }
+  return value;
+}
+function sceneId(value, name) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string' || !/^[\p{L}\p{N}_:./-]{1,120}$/u.test(value)) {
+    throw new Error(`sompo_telemetry_position_invalid:${name}`);
+  }
+  return value;
+}
+/** Posição de cena e faixa do radar vindas da amostra crua do simulador; mesmo formato de snapshot.position/geofence do cliente. */
+function scenePositionFromRaw(raw) {
+  const x = sceneNumber(raw?.posX, 'posX');
+  const z = sceneNumber(raw?.posZ, 'posZ');
+  const headingDeg = sceneNumber(raw?.headingDeg, 'headingDeg');
+  const hazardKey = sceneId(raw?.geofenceHazard, 'geofenceHazard');
+  const bandId = sceneId(raw?.geofenceBand, 'geofenceBand');
+  // Metade de uma posição ou de uma faixa é erro do cliente, não amostra sem posição: falha alto em vez de gravar null.
+  if ((x === null) !== (z === null)) throw new Error(`sompo_telemetry_position_invalid:${x === null ? 'posX' : 'posZ'}`);
+  if (headingDeg !== null && (x === null || Math.abs(headingDeg) > 360)) throw new Error('sompo_telemetry_position_invalid:headingDeg');
+  if ((hazardKey === null) !== (bandId === null)) throw new Error(`sompo_telemetry_position_invalid:${hazardKey === null ? 'geofenceHazard' : 'geofenceBand'}`);
+  return {
+    position: x !== null ? { x, z, headingDeg } : null,
+    geofence: hazardKey !== null ? { nearest: { hazardKey, bandId } } : null,
   };
 }
 
@@ -205,7 +245,18 @@ function snapshotToRow(snapshot, observedMs) {
     riscoInclinacao: snapshot.risks?.inclination ? 1 : 0,
     velocidade: finiteNumber(readings.speedKph),
     velocidadeRoda: finiteNumber(readings.wheelSpeedKph),
+    // Atômico: posição só com x e z numéricos; faixa só com perigo e faixa em texto (o handler já rejeita o resto na borda).
+    ...(isFiniteNumber(snapshot.position?.x) && isFiniteNumber(snapshot.position?.z)
+      ? { posX: snapshot.position.x, posZ: snapshot.position.z, headingDeg: isFiniteNumber(snapshot.position.headingDeg) ? snapshot.position.headingDeg : null }
+      : { posX: null, posZ: null, headingDeg: null }),
+    ...(typeof snapshot.geofence?.nearest?.hazardKey === 'string' && typeof snapshot.geofence?.nearest?.bandId === 'string'
+      ? { geofenceHazard: snapshot.geofence.nearest.hazardKey, geofenceBand: snapshot.geofence.nearest.bandId }
+      : { geofenceHazard: null, geofenceBand: null }),
   };
+}
+
+function isFiniteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value);
 }
 
 function statOf(values) {
@@ -370,7 +421,13 @@ function episodePhaseSlice(id, samples, startIndex, endIndex) {
  * |acc| cruza a metade entre a mediana e o pico) e aplica decimação adaptativa
  * nas amostras-chave (pico e vizinhança sempre presentes, teto de 30).
  */
-export function summarizeSompoEpisodeSamples(samples) {
+export function summarizeSompoEpisodeSamples(samples, episode = null) {
+  // geofencing (módulo server/geofencing): summary.geofence só existe quando o episódio lembra um cenário com talhão.
+  const geofence = summarizeEpisodeGeofence(samples, episode);
+  return { ...summarizeEpisodeMotion(samples), ...(geofence ? { geofence } : {}) };
+}
+
+function summarizeEpisodeMotion(samples) {
   const base = summarizeSamples(samples);
 
   // Divergência roda x solo: o smoking gun da aquaplanagem: roda mede
@@ -499,6 +556,7 @@ function describeNormalizeError(error) {
   if (code === 'sompo_telemetry_invalid_payload') return 'payload inválido.';
   if (code === 'sompo_telemetry_empty_payload') return 'payload vazio.';
   if (code.startsWith('sompo_telemetry_timestamp_invalid')) return 'observedAt inválido.';
+  if (code.startsWith('sompo_telemetry_position_invalid')) return `${code.split(':')[1]} inválido: posição de cena deve ser número finito e faixa um identificador curto.`;
   return code || 'amostra rejeitada.';
 }
 
@@ -572,6 +630,10 @@ export function createSompoTelemetryHistory({
     for (const column of ['velocidade', 'velocidade_roda']) {
       if (!sampleColumns.some((item) => item.name === column)) db.exec(`ALTER TABLE sompo_telemetry_samples ADD COLUMN ${column} REAL NULL`);
     }
+    // Posição de cena e faixa do radar (geofencing): nulas nas amostras antigas e na origem física, que não tem GNSS.
+    for (const [column, type] of [['pos_x', 'REAL'], ['pos_z', 'REAL'], ['heading_deg', 'REAL'], ['geofence_hazard', 'TEXT'], ['geofence_band', 'TEXT']]) {
+      if (!sampleColumns.some((item) => item.name === column)) db.exec(`ALTER TABLE sompo_telemetry_samples ADD COLUMN ${column} ${type} NULL`);
+    }
     db.exec(`
       CREATE TABLE IF NOT EXISTS sompo_risk_assessments (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, tractor_id TEXT NOT NULL, source_kind TEXT NOT NULL, created_at TEXT NOT NULL, evidence_json TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS sompo_telemetry_samples_episode
@@ -603,6 +665,11 @@ export function createSompoTelemetryHistory({
         UNIQUE (episode_id, seq)
       );
     `);
+    // O episódio lembra o roteiro gravado: é por ele que o servidor resolve o talhão (polígonos e regras) depois.
+    const episodeColumns = db.prepare('PRAGMA table_info(sompo_telemetry_episodes)').all();
+    for (const column of ['scenario_id', 'outcome_id']) {
+      if (!episodeColumns.some((item) => item.name === column)) db.exec(`ALTER TABLE sompo_telemetry_episodes ADD COLUMN ${column} TEXT NULL`);
+    }
   } catch (error) {
     rethrowSqlite(error, 'open');
   }
@@ -614,15 +681,16 @@ export function createSompoTelemetryHistory({
       distancia, temperatura, umidade, pitch, roll,
       acc_x, acc_y, acc_z, rot_x, rot_y, rot_z,
       risco_colisao, risco_inclinacao, episode_id, collision_known, inclination_known,
-      velocidade, velocidade_roda
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      velocidade, velocidade_roda,
+      pos_x, pos_z, heading_deg, geofence_hazard, geofence_band
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const insertEpisodeStatement = db.prepare(`
     INSERT INTO sompo_telemetry_episodes (
       public_id, kind, tractor_id, source_kind, scenario_label,
-      started_at, started_ms, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'recording')
+      started_at, started_ms, status, scenario_id, outcome_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'recording', ?, ?)
   `);
 
   const episodeByPublicIdStatement = db.prepare(`
@@ -637,7 +705,9 @@ export function createSompoTelemetryHistory({
       started_ms AS startedMs,
       ended_at AS endedAt,
       ended_ms AS endedMs,
-      status
+      status,
+      scenario_id AS scenarioId,
+      outcome_id AS outcomeId
     FROM sompo_telemetry_episodes
     WHERE public_id = ?
   `);
@@ -706,7 +776,9 @@ export function createSompoTelemetryHistory({
       risco_inclinacao AS riscoInclinacao,
       collision_known AS collisionKnown, inclination_known AS inclinationKnown,
       velocidade,
-      velocidade_roda AS velocidadeRoda
+      velocidade_roda AS velocidadeRoda,
+      pos_x AS posX, pos_z AS posZ, heading_deg AS headingDeg,
+      geofence_hazard AS geofenceHazard, geofence_band AS geofenceBand
     FROM sompo_telemetry_samples
   `;
   const episodeSamplesStatement = db.prepare(`${sampleSelect} WHERE episode_id = ?
@@ -793,6 +865,11 @@ export function createSompoTelemetryHistory({
       typeof snapshot.risks?.inclination === 'boolean' ? 1 : 0,
       row.velocidade,
       row.velocidadeRoda,
+      row.posX,
+      row.posZ,
+      row.headingDeg,
+      row.geofenceHazard,
+      row.geofenceBand,
     );
     pending.set(originKey(row.sourceKind, row.tractorId, episodeRowId), changedMs);
     return true;
@@ -856,6 +933,8 @@ export function createSompoTelemetryHistory({
       endedMs,
       status: String(row.status),
       durationMs: endedMs === null ? null : Math.max(0, endedMs - startedMs),
+      scenarioId: row.scenarioId ?? null,
+      outcomeId: row.outcomeId ?? null,
     };
   }
 
@@ -906,8 +985,13 @@ export function createSompoTelemetryHistory({
     return episode;
   }
 
-  function startEpisode({ kind, tractorId = '001', sourceKind = 'simulation', scenarioLabel = null } = {}) {
+  function startEpisode({ kind, tractorId = '001', sourceKind = 'simulation', scenarioLabel = null, scenarioId = null, outcomeId = null } = {}) {
     assertOpen();
+    for (const [name, value] of [['scenarioId', scenarioId], ['outcomeId', outcomeId]]) {
+      if (value !== null && value !== undefined && value !== '' && (typeof value !== 'string' || !/^[a-z0-9-]{1,80}$/i.test(value))) {
+        throw httpError(400, 'sompo_telemetry_episode_scenario_invalid', `${name} do episódio inválido: use o id do roteiro (letras, números e hífen).`);
+      }
+    }
     if (!EPISODE_KIND_SET.has(kind)) {
       throw httpError(
         400,
@@ -933,6 +1017,8 @@ export function createSompoTelemetryHistory({
         optionalText(scenarioLabel),
         new Date(startedMs).toISOString(),
         startedMs,
+        optionalText(scenarioId),
+        optionalText(outcomeId),
       );
     } catch (error) {
       rethrowSqlite(error, 'startEpisode');
@@ -1097,7 +1183,7 @@ export function createSompoTelemetryHistory({
     return {
       episode,
       samples,
-      summary: summarizeSompoEpisodeSamples(samples),
+      summary: summarizeSompoEpisodeSamples(samples, episode),
       frames: listEpisodeFrameRows(episode).map((row) => mapFrameRow(episode, row)),
     };
   }
@@ -1281,7 +1367,7 @@ export function createSompoTelemetrySimulationHttpHandler(history, { now = Date.
         const raw = samples[index];
         try {
           const observedAt = parseOptionalObservedAt(raw?.observedAt) || new Date(baseMs + index).toISOString();
-          const snapshot = normalizeSompoTelemetry(raw, { observedAt });
+          const snapshot = { ...normalizeSompoTelemetry(raw, { observedAt }), ...scenePositionFromRaw(raw) };
           snapshot.source = {
             ...snapshot.source,
             kind: 'simulation',
@@ -1340,6 +1426,8 @@ export function createSompoTelemetryEpisodeStartHttpHandler(history) {
         tractorId: body.trator,
         sourceKind: 'simulation',
         scenarioLabel: body.scenarioLabel,
+        scenarioId: body.scenarioId,
+        outcomeId: body.outcomeId,
       });
       res.json({ ok: true, episode });
     } catch (error) {

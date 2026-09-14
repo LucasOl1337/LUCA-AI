@@ -5,6 +5,11 @@ import { getReplayFrame, toLocalCoordinate, type LabCase, type LabSite, type Lab
 import { createLabTractor } from './createLabTractor';
 import { createSompoTruckModel, SOMPO_TRUCK_PIVOT_Y } from '../sompo/createSompoTruckModel';
 import { parseLabTerrain, createTerrainSampler, type LabTerrain } from '../../../shared/lab-terrain.js';
+// geofencing (módulo src/geofencing/lab): faixas na cena do laboratório.
+import { bandGrid } from '../../../shared/geofencing/index.js';
+import { hazardsOf, bandColor, innermostEpisodeAt, episodeColor, ROUTE_COLOR, slopeZones, SLOPE_ZONE_COLORS, machineRollLimit } from '../../geofencing/lab/labBands';
+import { createCropField } from './createCropField';
+import { loadLabHarvester } from './loadLabHarvester';
 
 export type LabCameraMode = 'free' | 'top' | 'follow';
 
@@ -16,6 +21,7 @@ interface LabSceneProps {
   selectedEventId?: string | null;
   onSelectEvent?: (eventId: string) => void;
   showDetails?: boolean;
+  onTerrain?: (sample: ((x: number, z: number) => number | null) | null) => void;
 }
 
 type Point = { x: number; z: number };
@@ -72,7 +78,7 @@ function disposeScene(scene: THREE.Scene) {
   geometries.forEach((geometry) => geometry.dispose());
 }
 
-export default function LabScene({ labCase, site, elapsedMs, cameraMode, selectedEventId, onSelectEvent, showDetails = false }: LabSceneProps) {
+export default function LabScene({ labCase, site, elapsedMs, cameraMode, selectedEventId, onSelectEvent, showDetails = false, onTerrain }: LabSceneProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const elapsedRef = useRef(elapsedMs);
   const modeRef = useRef(cameraMode);
@@ -83,6 +89,7 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
   const scaleLabelRef = useRef<HTMLSpanElement>(null);
   const cameraActions = useRef<((key: string) => void) | null>(null);
   const detailsRef = useRef(showDetails); detailsRef.current = showDetails;
+  const terrainCallback = useRef(onTerrain); terrainCallback.current = onTerrain;
   const [webglError, setWebglError] = useState(false);
   const [satelliteState, setSatelliteState] = useState<'none' | 'loading' | 'ready' | 'error'>('none');
   elapsedRef.current = elapsedMs;
@@ -93,6 +100,7 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
   const frame = useMemo(() => labCase ? getReplayFrame(labCase, elapsedMs) : null, [labCase, elapsedMs]);
   const geography = labCase || site || null;
   const satellite = useMemo(() => satelliteFor(geography), [geography]);
+
   const terrainReference = geography?.manifest?.terrain;
   const [terrainResult, setTerrainResult] = useState<{ reference: typeof terrainReference; grid?: LabTerrain; error?: string }>();
   const [terrainEnabled, setTerrainEnabled] = useState(true);
@@ -121,6 +129,43 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
 
   const sampleTerrain = useMemo(() => terrain && geography ? createTerrainSampler(terrain, geography.origin) : null, [terrain, geography]);
   const outsideTerrain = !!(frame?.position && sampleTerrain && sampleTerrain(frame.position.x, frame.position.z) === null);
+
+  // Faixas: a MESMA grade que soma a área atingida pinta a cena (SPEC regra 1).
+  // Só os bytes RGBA moram no memo; a DataTexture nasce e morre com a cena (disposeScene).
+  const bandLayer = useMemo(() => {
+    const hazards = hazardsOf(labCase);
+    const limit = machineRollLimit(labCase);
+    const slope = sampleTerrain && limit !== null ? { sample: sampleTerrain, limit } : null;
+    if (!labCase || (!hazards.length && !slope)) return null;
+    const grid = labCase.geofence?.grid ?? bandGrid(labCase.polygons, hazards, 2); // Mesma grade que somou a área.
+    if (!grid) return null;
+    const zones = slope ? slopeZones(grid, slope.sample, slope.limit) : null;
+    const { cols, rows } = grid;
+    const rgba = new Uint8Array(cols * rows * 4);
+    for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
+      const cell = row * cols + col;
+      if (!grid.inside[cell]) continue;
+      let bestHazard = -1, bestBand = -1, bestMax = Infinity;
+      for (let h = 0; h < hazards.length; h++) {
+        const band = grid.bands[h][cell];
+        if (band < 0) continue;
+        const max = hazards[h].bands[band].max_m;
+        if (max < bestMax) { bestMax = max; bestHazard = h; bestBand = band; } // empate fica com o primeiro perigo
+      }
+      const zone = zones ? zones[cell] : 0;
+      // A inclinação do terreno frente ao limite da máquina prevalece sobre a faixa de água/declive na célula.
+      const color = zone ? SLOPE_ZONE_COLORS[zone] : bestHazard < 0 ? null : bandColor(hazards[bestHazard], bestBand);
+      if (!color) continue; // dentro da área permitida, fora de faixa e fora de zona: alpha 0
+      const hex = parseInt(color.slice(1), 16);
+      // Linha 0 da DataTexture é v=0 e, com rotation.x=-PI/2, v=0 cai em +Z: grava invertido para a faixa abraçar o polígono.
+      const at = ((rows - 1 - row) * cols + col) * 4;
+      rgba[at] = hex >> 16 & 255; rgba[at + 1] = hex >> 8 & 255; rgba[at + 2] = hex & 255; rgba[at + 3] = zone ? 128 : 107;
+    }
+    return { grid, rgba };
+  }, [labCase, sampleTerrain]);
+
+  // O minimapa usa o mesmo relevo da cena; nunca chamado dentro do loop de render.
+  useEffect(() => { terrainCallback.current?.(sampleTerrain); }, [sampleTerrain]);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -180,7 +225,12 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
     scene.add(sunlight, sunlight.target);
 
     const bounds = new THREE.Box3();
-    for (const polygon of geography?.polygons || []) for (const ring of polygon.rings) for (const point of ring) bounds.expandByPoint(new THREE.Vector3(point.x, 0, point.z));
+    // Com área permitida no mapa, o enquadramento é o talhão: o rio do OSM tem 1,3 km e esconderia as faixas na vista superior.
+    const hasAllowed = geography?.polygons.some(polygon => polygon.role === 'allowed_area');
+    for (const polygon of geography?.polygons || []) {
+      if (hasAllowed && (polygon.role === 'water' || polygon.role === 'hazard')) continue;
+      for (const ring of polygon.rings) for (const point of ring) bounds.expandByPoint(new THREE.Vector3(point.x, 0, point.z));
+    }
     if (satellite && geography) {
       for (const [lon, lat] of [[satellite.bbox[0], satellite.bbox[1]], [satellite.bbox[2], satellite.bbox[3]]]) {
         const point = toLocalCoordinate(lon, lat, geography.origin);
@@ -267,13 +317,43 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
       }, undefined, () => { if (!disposed) setSatelliteState('error'); });
     }
 
+    if (bandLayer) {
+      const { grid, rgba } = bandLayer;
+      const texture = new THREE.DataTexture(rgba, grid.cols, grid.rows, THREE.RGBAFormat);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.magFilter = THREE.LinearFilter;
+      texture.needsUpdate = true;
+      const width = grid.cols * grid.cellM, depth = grid.rows * grid.cellM;
+      const centerX = grid.minX + width / 2, centerZ = grid.minZ + depth / 2;
+      const geometry = new THREE.PlaneGeometry(width, depth, terrain?.width || 1, terrain?.height || 1);
+      if (terrain) {
+        const vertices = geometry.getAttribute('position');
+        for (let row = 0; row <= terrain.height; row++) for (let col = 0; col <= terrain.width; col++) {
+          vertices.setZ(row * (terrain.width + 1) + col, groundHeight({ x: grid.minX + width * col / terrain.width, z: grid.minZ + depth * row / terrain.height }) ?? 0);
+        }
+      }
+      const bandMesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false }));
+      bandMesh.rotation.x = -Math.PI / 2;
+      bandMesh.position.set(centerX, 0.03, centerZ);
+      bandMesh.renderOrder = 1;
+      scene.add(bandMesh);
+    }
+
     const routePositions: number[] = [];
     const routeCounts: number[] = [];
+    const routeColors: number[] = [];
     if (labCase) {
+      const colorCache = new Map<string, THREE.Color>();
       labCase.samples.forEach((sample, index) => {
         const previous = labCase.samples[index - 1];
         if (previous && previous.x !== null && previous.z !== null && sample.x !== null && sample.z !== null && sample.elapsedMs - previous.elapsedMs <= Math.max(1_000, labCase.sampleIntervalMs * 2)) {
-          routePositions.push(...drapeSegment({ x: previous.x, z: previous.z }, { x: sample.x, z: sample.z }, .12));
+          const segment = drapeSegment({ x: previous.x, z: previous.z }, { x: sample.x, z: sample.z }, .12);
+          routePositions.push(...segment);
+          const episode = innermostEpisodeAt(labCase, sample.elapsedMs);
+          const key = episode?.id ?? 'rota';
+          let color = colorCache.get(key);
+          if (!color) colorCache.set(key, color = new THREE.Color(episode ? episodeColor(labCase, episode) : ROUTE_COLOR));
+          for (let vertex = segment.length / 3; vertex > 0; vertex--) routeColors.push(color.r, color.g, color.b);
         }
         routeCounts.push(routePositions.length / 3);
       });
@@ -282,8 +362,9 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
     routeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(routePositions, 3));
     scene.add(new THREE.LineSegments(routeGeometry, new THREE.LineBasicMaterial({ color: 0x638271, transparent: true, opacity: 0.3 })));
     const playedGeometry = routeGeometry.clone();
+    playedGeometry.setAttribute('color', new THREE.Float32BufferAttribute(routeColors, 3));
     playedGeometry.setDrawRange(0, 0);
-    scene.add(new THREE.LineSegments(playedGeometry, new THREE.LineBasicMaterial({ color: 0x215f47, transparent: true, opacity: 0.88 })));
+    scene.add(new THREE.LineSegments(playedGeometry, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.88 })));
 
     const eventMarkers: THREE.Mesh[] = [];
     for (const event of labCase?.events || []) {
@@ -301,13 +382,64 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
     }
 
     const isTruck = labCase?.manifest?.machine?.model === 'Caminhão SOMPO';
+    const wantsHarvester = !isTruck && /colheitadeira|harvester/i.test(String(labCase?.manifest?.machine?.model ?? ''));
     const tractor = isTruck ? createSompoTruckModel({ sensorLabel: 'DEMONSTRAÇÃO' }) : createLabTractor();
-    const pivot = isTruck ? SOMPO_TRUCK_PIVOT_Y : 1.1;
+    let pivot = isTruck ? SOMPO_TRUCK_PIVOT_Y : 1.1;
     if ('rayGroup' in tractor) tractor.rayGroup.visible = false;
     const vehicle = new THREE.Group();
     tractor.root.position.y = -pivot;
     vehicle.add(tractor.root);
     scene.add(vehicle);
+    // Colheitadeira: o GLB gerado para o simulador (e8c1535). O trator fica até o GLB carregar e volta se ele falhar.
+    const assetController = new AbortController();
+    let harvester: Awaited<ReturnType<typeof loadLabHarvester>> = null;
+    if (wantsHarvester) void loadLabHarvester(assetController.signal).then((loaded) => {
+      if (!loaded || disposed) { loaded?.dispose(); return; }
+      harvester = loaded; pivot = loaded.pivotY;
+      vehicle.remove(tractor.root); loaded.root.position.y = -pivot; vehicle.add(loaded.root);
+    });
+    // Plantio dentro da área permitida. Onde a colheitadeira já passou, as plantas ficam achatadas: o percurso conta a colheita.
+    const crop = geography ? createCropField({ polygons: geography.polygons, groundHeight, crop: 'cana' }) : null;
+    if (crop) scene.add(crop.mesh);
+    const HARVEST_REACH = 3, BUCKET = 4;
+    const plantBuckets = new Map<string, number[]>();
+    const plantXZ = crop ? new Float32Array(crop.count * 2) : null;
+    const originalMatrices = crop ? crop.mesh.instanceMatrix.array.slice() : null;
+    if (crop && plantXZ) {
+      const matrix = new THREE.Matrix4();
+      for (let i = 0; i < crop.count; i++) {
+        crop.mesh.getMatrixAt(i, matrix);
+        const x = matrix.elements[12], z = matrix.elements[14];
+        plantXZ[i * 2] = x; plantXZ[i * 2 + 1] = z;
+        const key = `${Math.floor(x / BUCKET)}:${Math.floor(z / BUCKET)}`;
+        const bucket = plantBuckets.get(key); if (bucket) bucket.push(i); else plantBuckets.set(key, [i]);
+      }
+    }
+    const harvested = new Uint8Array(crop?.count ?? 0);
+    let harvestedUpTo = -1;
+    const harvestUpTo = (sampleIndex: number) => {
+      if (!crop || !plantXZ || !originalMatrices || !wantsHarvester || !labCase) return;
+      if (sampleIndex < harvestedUpTo) { // Voltou no tempo: replanta tudo e recolhe de novo até o instante.
+        crop.mesh.instanceMatrix.array.set(originalMatrices); harvested.fill(0); harvestedUpTo = -1;
+      }
+      const matrix = new THREE.Matrix4();
+      for (let i = harvestedUpTo + 1; i <= sampleIndex; i++) {
+        const sample = labCase.samples[i];
+        if (!sample || sample.x === null || sample.z === null) continue;
+        const cx = Math.floor(sample.x / BUCKET), cz = Math.floor(sample.z / BUCKET);
+        for (let bx = cx - 1; bx <= cx + 1; bx++) for (let bz = cz - 1; bz <= cz + 1; bz++) {
+          for (const j of plantBuckets.get(`${bx}:${bz}`) ?? []) {
+            if (harvested[j] || Math.hypot(plantXZ[j * 2] - sample.x, plantXZ[j * 2 + 1] - sample.z) > HARVEST_REACH) continue;
+            harvested[j] = 1;
+            crop.mesh.getMatrixAt(j, matrix);
+            matrix.elements[4] *= 0.06; matrix.elements[5] *= 0.06; matrix.elements[6] *= 0.06; // achata o eixo Y da instância
+            crop.mesh.setMatrixAt(j, matrix);
+          }
+        }
+      }
+      harvestedUpTo = sampleIndex;
+      crop.mesh.instanceMatrix.needsUpdate = true;
+    };
     const locator = new THREE.Mesh(new THREE.RingGeometry(3.1, 3.3, 48), new THREE.MeshBasicMaterial({ color: 0x2c6952, transparent: true, opacity: 0.5, side: THREE.DoubleSide }));
     locator.rotation.x = -Math.PI / 2;
     scene.add(locator);
@@ -418,6 +550,7 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
       headingArrow.setDirection(forward);
       if (current && previousSampleIndex !== current.sampleIndex) {
         playedGeometry.setDrawRange(0, routeCounts[current.sampleIndex] || 0);
+        harvestUpTo(current.sampleIndex);
         previousSampleIndex = current.sampleIndex;
       }
       if (current) {
@@ -426,8 +559,9 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
         mount.dataset.position = current.position ? `${current.position.x},${current.position.z}` : 'unavailable';
       }
       const outsideFence = current?.activeEvents.some((event) => event.type === 'outside_fence');
-      const nearWater = current?.activeEvents.some((event) => event.type === 'near_water');
-      const hasAlert = outsideFence || nearWater || current?.activeEvents.some((event) => event.type === 'coolant_warning');
+      const bandAlert = current?.activeEvents.filter((event) => event.type === 'hazard_band') || [];
+      const nearWater = current?.activeEvents.some((event) => event.type === 'near_water') || bandAlert.some((event) => String(event.evidence.hazard ?? '').startsWith('water'));
+      const hasAlert = outsideFence || nearWater || bandAlert.length > 0 || current?.activeEvents.some((event) => event.type === 'coolant_warning');
       (locator.material as THREE.MeshBasicMaterial).color.setHex(hasAlert ? 0xc9823e : 0x2c6952);
       headingArrow.setColor(hasAlert ? 0xc9823e : 0x377158);
       for (const zone of zoneOutlines) {
@@ -468,7 +602,7 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
         // Camera composition follows the sample; the vehicle is never interpolated.
         followTarget.copy(lastKnownPosition).addScaledVector(forward, camera.aspect < 1 ? 0 : 2.5);
         followTarget.y += isTruck ? 1.4 : .6;
-        followOffset.set(-forward.x * 12 + forward.z * 12, 7.5, -forward.z * 12 - forward.x * 12).multiplyScalar(followDistance * Math.max(1, .95 / camera.aspect));
+        followOffset.set(-forward.x * 14, 8, -forward.z * 14).multiplyScalar(followDistance * Math.max(1, .95 / camera.aspect));
         camera.position.copy(lastKnownPosition).add(followOffset);
         controls.target.copy(followTarget);
       }
@@ -503,12 +637,15 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
       controls.dispose();
       cameraActions.current = null;
       sunlight.shadow.dispose();
+      assetController.abort();
+      harvester?.dispose();
+      crop?.dispose();
       disposeScene(scene);
       renderer.dispose();
       renderer.forceContextLoss();
       renderer.domElement.remove();
     };
-  }, [labCase, geography, satellite, terrain, sampleTerrain]);
+  }, [labCase, geography, satellite, terrain, sampleTerrain, bandLayer]);
 
   const handleCameraKey = (event: KeyboardEvent<HTMLDivElement>) => {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
@@ -519,7 +656,7 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
   return (
     <div className="lab-scene" data-lab-scene data-camera={cameraMode} data-terrain={terrain ? 'ready' : terrainError ? 'error' : terrainReference && terrainEnabled ? 'loading' : 'flat'} data-satellite={satelliteState} data-site={geography?.manifest?.site?.id} style={{ position: 'relative', height: '100%', minHeight: 360 }}>
       <div ref={mountRef} className="lab-scene-canvas" data-lab-canvas tabIndex={0} role="img"
-        aria-label={`Mapa da área. ${cameraMode === 'follow' && frame?.position ? 'Câmera acompanha a posição registrada.' : 'Arraste e use a roda do mouse ou as setas para navegar.'} ${terrain ? 'Relevo LiDAR, escala vertical 1:1' : 'Superfície plana'}, uma unidade equivale a um metro. ${!frame?.position ? 'Posição do equipamento indisponível.' : ''}`}
+        aria-label={`Mapa da área. ${cameraMode === 'follow' && frame?.position ? 'Câmera acompanha a posição registrada.' : 'Arraste e use a roda do mouse ou as setas para navegar.'} ${terrain ? `Relevo ${terrain.vertical_datum === 'SIMULADO' ? 'simulado' : 'LiDAR'}, escala vertical 1:1` : 'Superfície plana'}, uma unidade equivale a um metro. ${!frame?.position ? 'Posição do equipamento indisponível.' : ''}`}
         onKeyDown={handleCameraKey} style={{ position: 'absolute', inset: 0 }} />
       <div className="lab-scene-overlay" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <div className="lab-scene-topline">
@@ -530,6 +667,7 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
           {geography?.polygons.some(p => p.role === 'property_boundary') && <span><i style={{ background: '#ffd16a' }} />Limite da propriedade (mapeado)</span>}
           <span><i style={{ background: '#6c9476' }} />{geography?.polygons.some(p => p.role === 'allowed_area') ? 'Área operacional permitida' : 'Área operacional não fornecida'}</span>
           <span><i style={{ background: '#79b9c0' }} />{geography?.polygons.some(p => p.role === 'water') ? 'Água mapeada' : 'Água não cadastrada'}</span>
+          {machineRollLimit(labCase) !== null && sampleTerrain && <span><i style={{ background: SLOPE_ZONE_COLORS[2] }} />Terreno acima do limite da máquina ({machineRollLimit(labCase)}°)</span>}
           {labCase && <span><i style={{ background: '#215f47' }} />{labCase.synthetic ? 'Percurso sintético' : 'Trajetória GNSS'}{!labCase.samples.some(s => s.x !== null) ? ' indisponível' : ''}</span>}
         </div>
         {!!frame?.activeEvents.length && frame.position && (
@@ -544,7 +682,7 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
         <div className="lab-scene-scale" aria-label="Escala do mapa"><span ref={scaleRef} /><span ref={scaleLabelRef} /></div>
         {!showDetails && (terrainError || outsideTerrain) && <p className="lab-terrain-alert" role="status">{terrainError ? 'Relevo indisponível · mapa plano' : 'Posição fora da cobertura do relevo'}</p>}
         {terrainReference && <div className="lab-scene-terrain">
-          <button type="button" aria-pressed={terrainEnabled} onClick={() => setTerrainEnabled(value => !value)}>Relevo LiDAR {terrainEnabled ? 'ativado' : 'desativado'}</button>
+          <button type="button" aria-pressed={terrainEnabled} onClick={() => setTerrainEnabled(value => !value)}>Relevo {terrainReference?.vertical_datum === 'SIMULADO' ? 'simulado' : 'LiDAR'} {terrainEnabled ? 'ativado' : 'desativado'}</button>
           <span role="status">{terrainError ? `${terrainError} Superfície plana mantida.` : terrain ? `Grade ~${terrainReference.resolution_m} m · vertical 1:1 · ${terrain.minimum.toFixed(1)}–${terrain.maximum.toFixed(1)} m (${terrain.vertical_datum})` : terrainEnabled ? 'Carregando e verificando relevo…' : 'Mapa plano'}{outsideTerrain ? ' · Posição fora do recorte de relevo; marcador oculto.' : ''}</span>
         </div>}
         <p className="lab-scene-hint">{cameraMode === 'free' ? 'Arraste para orbitar · role para aproximar · ' : cameraMode === 'top' ? 'Arraste para mover · role para aproximar · ' : ''}{terrain ? 'Altura do solo; não medida pelo ESP32' : 'Superfície plana'}</p>

@@ -7,15 +7,9 @@
  * match SompoSimulationScenario and can be passed to the existing simulator.
  */
 
-const freeze = (value) => Object.freeze(value);
-const phase = (id, label, startMs, endMs) => freeze({ id, label, startMs, endMs });
-const outcome = (id, label, description, keyframes, phases) => freeze({
-  id,
-  label,
-  description,
-  keyframes: freeze(keyframes.map(([atMs, values]) => freeze({ atMs, ...values }))),
-  ...(phases ? { phases: freeze(phases) } : {}),
-});
+import { freeze, phase, outcome, scenario } from './sompo-agri-scenario-builders.js';
+// geofencing (módulo shared/geofencing): os dois cenários com talhão entram no catálogo pelo spread abaixo.
+import { GEOFENCING_AGRI_SCENARIOS } from './geofencing/agri-scenarios.js';
 
 const BASE_FRAME = freeze({
   yaw: 0,
@@ -41,15 +35,6 @@ const BASE_FRAME = freeze({
   beacon: 0,
   engineSmoke: 0,
 });
-
-function scenario(definition) {
-  return freeze({
-    distanceSensorPosition: 'front',
-    ...definition,
-    phases: freeze(definition.phases),
-    outcomes: freeze(Object.fromEntries(definition.outcomes.map((item) => [item.id, item]))),
-  });
-}
 
 export const SOMPO_AGRI_EQUIPMENT = freeze({
   tractor: freeze({
@@ -409,6 +394,8 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
       ]),
     ],
   }),
+
+  ...GEOFENCING_AGRI_SCENARIOS,
 });
 
 const finite = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;

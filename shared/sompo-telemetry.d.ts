@@ -35,6 +35,7 @@ export interface SompoTelemetrySnapshot {
   risks: {
     collision: boolean | null;
     inclination: boolean | null;
+    proximity?: boolean | null; // geofencing: faixa mais interna de um perigo alertável (água, ribanceira; não o declive) ou limite da máquina atingido
   };
   readings: {
     distance: number | null;
@@ -94,6 +95,12 @@ export interface SompoTelemetryHistorySample {
   riscoInclinacao: boolean;
   velocidade?: number | null;
   velocidadeRoda?: number | null;
+  /** Posição de cena do simulador (metros locais, sintética) e faixa do radar no instante; null sem posição. */
+  posX?: number | null;
+  posZ?: number | null;
+  headingDeg?: number | null;
+  geofenceHazard?: string | null;
+  geofenceBand?: string | null;
 }
 
 export interface SompoTelemetryFlagTransition {
@@ -154,6 +161,9 @@ export interface SompoTelemetryEpisode {
   endedMs: number | null;
   status: SompoTelemetryEpisodeStatus;
   durationMs: number | null;
+  /** Roteiro gravado (id do cenário e do desfecho); null nos episódios antigos. */
+  scenarioId?: string | null;
+  outcomeId?: string | null;
 }
 
 export interface SompoTelemetryEpisodePhase {
@@ -193,10 +203,45 @@ export interface SompoTelemetryEpisodeWheelDivergence {
   diffKph: number;
 }
 
+export interface SompoTelemetryEpisodeGeofenceEpisode {
+  id: string;
+  hazardKey: string;
+  hazardLabel: string;
+  bandId: string;
+  bandLabel: string;
+  bandMax: number;
+  unit: 'm' | 'deg';
+  alertable: boolean;
+  startMs: number;
+  endMs: number | null;
+  observedMs: number;
+  gapMs: number;
+  minDistance: number | null;
+  minDistanceAtMs: number;
+  quality: 'observado' | 'com-lacuna' | 'aberto-no-fim';
+}
+
+/** Episódios de faixa do episódio gravado (computeGeofenceEpisodes sobre a série persistida); null sem talhão. */
+export interface SompoTelemetryEpisodeGeofence {
+  notice: string;
+  site: { environmentId: string; label: string; synthetic: true; version: number; scenarioId: string; outcomeId: string };
+  machine: { equipmentId: string; label: string; maxRollDeg: number; synthetic: true };
+  rules: { role: string; category: string | null; label: string; alertable: boolean; unit: 'm' | 'deg'; bands: { id: string; label: string; max: number }[]; justification: string | null }[];
+  sampleIntervalMs: number;
+  samplesWithPosition: number;
+  recordedBandMismatches: number;
+  alertSamples: number;
+  alertMs: number;
+  episodes: SompoTelemetryEpisodeGeofenceEpisode[];
+  affectedArea: { hazardKey: string; bandId: string; areaM2: number; shareOfAllowed: number; method: string }[];
+  warnings: string[];
+}
+
 export interface SompoTelemetryEpisodeSummary extends SompoTelemetryHistorySummary {
   impact: SompoTelemetryEpisodeImpact | null;
   phases: SompoTelemetryEpisodePhase[];
   wheelDivergence?: SompoTelemetryEpisodeWheelDivergence | null;
+  geofence?: SompoTelemetryEpisodeGeofence | null;
 }
 
 export interface SompoTelemetryEpisodeFrame {

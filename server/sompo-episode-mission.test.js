@@ -301,3 +301,44 @@ test('missão de episódio sem frames diz explicitamente que não há evidência
   assert.doesNotMatch(mission, /Anexo 1/);
   assert.doesNotMatch(mission, /frames? do simulador anexado/);
 });
+
+test('missão de episódio com geofencing: dossiê lista talhão, regras, episódios de faixa e coerência; sem talhão o dossiê não menciona geofencing', async () => {
+  const [{ createSompoTelemetryHistory }, { createSompoAgriGeofenceSnapshot: createSompoAgriSimulationSnapshot }] = await Promise.all([
+    import('./sompo-telemetry-history.js'), import('../shared/geofencing/index.js'),
+  ]);
+  const base = 1_800_000_000_000;
+  const history = createSompoTelemetryHistory({ dbPath: ':memory:', now: () => base });
+  try {
+    const outcome = 'declive-alem-do-limite';
+    const episode = history.startEpisode({ kind: 'roteiro', tractorId: 'SIM-001', scenarioLabel: 'Operação com geofencing', scenarioId: 'agri-geofencing', outcomeId: outcome });
+    const snapshots = Array.from({ length: 49 }, (_, i) => createSompoAgriSimulationSnapshot('agri-geofencing', outcome, { elapsedMs: i * 500, observedAt: new Date(base + i * 500).toISOString() }));
+    history.recordMany(snapshots.map((s) => ({ ...s, changedAt: s.observedAt, source: { ...s.source, kind: 'simulation' } })), { episodeId: episode.publicId });
+    history.finishEpisode(episode.publicId, { status: 'complete' });
+    const read = history.getEpisode(episode.publicId);
+    const mission = buildSompoEpisodeMission(read.episode, read.samples, read.summary, 'Risco Agro');
+    const human = mission.slice(0, mission.indexOf(SOMPO_MISSION_DOSSIER_DELIMITER));
+    const dossier = mission.slice(mission.indexOf(SOMPO_MISSION_DOSSIER_DELIMITER));
+    // O que acendeu a bandeira lidera a linha: o limite da máquina, não o declive de contexto.
+    assert.match(human, /^Geofencing: \d+ episódios de faixa no talhão sintético; Limite de inclinação da máquina em "No limite ou acima" com margem mínima 0° em t\+[\d,]+s; bandeira de proximidade acesa em \d+ amostras \(≈ [\d,]+ s\)\.$/m);
+    assert.match(dossier, /mínimo 0,58 m · contexto/);
+    const geofencingSection = dossier.slice(dossier.indexOf('Geofencing — talhão'), dossier.indexOf('Leitura: Faixas'));
+    assert.doesNotMatch(geofencingSection, /\d\.\d/, 'números da seção de geofencing em pt-BR, sem ponto decimal');
+    assert.match(dossier, /Geofencing — talhão "Fazenda sintética · Operação com geofencing" \(polígonos, regras e posição de cena sintéticos de demonstração/);
+    assert.match(dossier, /Regras declaradas: Córrego sintético → Proximidade crítica até 5 m \/ Proximidade elevada até 15 m \/ Atenção até 35 m/);
+    assert.match(dossier, /Declive mapeado \[contexto: não acende alerta sozinho\]/);
+    assert.match(dossier, /Limite da máquina: Colheitadeira de grãos, inclinação máxima declarada 15°/);
+    assert.match(dossier, /^- Declive mapeado · Dentro do declive: t\+[\d,]+s → t\+[\d,]+s · [\d,]+ s · mínimo [\d,.]+ m · contexto$/m);
+    assert.match(dossier, /^- Limite de inclinação da máquina · No limite ou acima: t\+[\d,]+s → t\+[\d,]+s · [\d,]+ s · margem mínima 0°$/m);
+    assert.match(dossier, /Bandeira de proximidade .*: acesa em \d+ amostras/);
+    assert.match(dossier, /Coerência: 49 amostras com posição; a faixa gravada pelo radar no instante difere do recálculo pela geometria em 0 amostras\./);
+    assert.match(dossier, /Leitura: Faixas são parâmetros declarados no talhão sintético/);
+    assert.doesNotMatch(mission, /segur[o]|risco alto|neglig[eê]ncia|vai tombar/i);
+
+    const plain = scriptedEpisodeFixture();
+    const plainMission = buildSompoEpisodeMission(plain.episode, plain.samples, plain.summary, 'Risco Agro');
+    // Módulo isolado: cenário sem talhão não ganha linha nem bloco de geofencing, nem no resumo nem no dossiê.
+    assert.doesNotMatch(plainMission, /[Gg]eofencing/);
+  } finally {
+    history.close();
+  }
+});

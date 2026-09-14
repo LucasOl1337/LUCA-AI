@@ -69,6 +69,10 @@ function evidenceContext(parsed) {
     const i = parsed.samples.findIndex((sample) => sample.elapsedMs >= event.elapsedMs);
     if (i >= 0) for (const offset of [-10, 0, 10]) indices.add(Math.min(parsed.samples.length - 1, Math.max(0, i + offset)));
   }
+  for (const episode of parsed.geofence?.episodes ?? []) {
+    const i = parsed.samples.findIndex((sample) => sample.elapsedMs >= episode.minDistanceAtMs);
+    if (i >= 0) indices.add(i);
+  }
   const ranges = {};
   for (const key of Object.keys(parsed.samples[0] || {})) {
     if (['x', 'z', 'timeMs', 'elapsedMs'].includes(key)) continue;
@@ -110,7 +114,16 @@ function evidenceContext(parsed) {
       rules: {
         water_warning_distance_m: parsed.manifest?.rules?.water_warning_distance_m,
         coolant_warning_c: parsed.manifest?.rules?.coolant_warning_c,
+        hazards: parsed.manifest?.rules?.hazards ?? null,
       },
+      // Episódios por faixa (shared/geofencing/engine.js). Distâncias horizontais a polígonos do mapa; não medem contato nem causa.
+      geofence: parsed.geofence ? {
+        notice: 'Faixas são parâmetros declarados no manifesto, não distâncias de segurança calibradas. Área atingida é estimativa por grade; o restante da área não foi avaliado como seguro.',
+        rulesVersion: parsed.geofence.rulesVersion,
+        warnings: parsed.geofence.warnings,
+        affectedArea: parsed.geofence.affectedArea,
+        episodes: parsed.geofence.episodes.map(({ id, hazardLabel, bandLabel, bandMaxM, startMs, endMs, observedMs, gapMs, minDistanceM, minDistanceAtMs, quality }) => ({ id, hazardLabel, bandLabel, bandMaxM, startMs, endMs, observedMs, gapMs, minDistanceM, minDistanceAtMs, quality })),
+      } : null,
       events: parsed.events,
       ranges,
       samples: selected.map((sampleIndex) => ({ sampleIndex, ...parsed.samples[sampleIndex] })),

@@ -1,0 +1,133 @@
+{
+  "version": "1.0",
+  "coordinate_reference": "WGS84 / GeoJSON longitude,latitude",
+  "local_origin": [
+    -47.8055,
+    -22.6708
+  ],
+  "synthetic": true,
+  "site": {
+    "id": "piracicaba-artemis-demo-v1",
+    "name": "Piracicaba · Artemis (demonstração)",
+    "location": "Piracicaba/SP, Brasil",
+    "boundary_kind": "Limite de propriedade e área permitida fictícios, desenhados sobre o talhão de cana (way OSM 201798960, landuse=farmland, crop=sugarcane).",
+    "water_coverage": "Superfície do rio Piracicaba conforme relação OSM 2708872 (multipolygon completo: 7 ways externos encadeados e a ilha interna), sem simplificação.",
+    "vector_attribution": "© OpenStreetMap contributors, ODbL",
+    "retrieved_at": "2026-09-11"
+  },
+  "map_warning": "Água conforme OpenStreetMap (ODbL); limite de propriedade, área permitida e declive são fictícios, desenhados sobre o talhão de cana para fins de demonstração. Não representam cadastro real nem levantamento de campo.",
+  "machine": {
+    "id": "COLH-DEMO-01",
+    "model": "Colheitadeira (demonstração)",
+    "profile": {
+      "max_roll_deg": 15,
+      "platform_width_m": 9,
+      "operating_speed_kmh": 6,
+      "reaction_time_s": 1.5
+    }
+  },
+  "satellite": {
+    "url": "/datasets/piracicaba-artemis/imagem-aerea-sintetica.png",
+    "bbox": [
+      -47.80715501100169,
+      -22.67044067388635,
+      -47.800534966994945,
+      -22.665949097465756
+    ],
+    "attribution": "Imagem aérea SINTÉTICA gerada para demonstração (não é ortofoto nem satélite)",
+    "crs": "EPSG:4326",
+    "resolution_m": 1,
+    "synthetic": true
+  },
+  "terrain": {
+    "url": "/datasets/piracicaba-artemis/relevo-sintetico.json",
+    "sha256": "eef4d9d5517a838ac5089da688ce9dcd46ee8eb98f1df5d32e021f14250ffceb",
+    "bbox": [
+      -47.80715501100169,
+      -22.67044067388635,
+      -47.800534966994945,
+      -22.665949097465756
+    ],
+    "vertical_datum": "SIMULADO",
+    "attribution": "Relevo SINTÉTICO gerado para demonstração (não é levantamento topográfico)",
+    "resolution_m": 4,
+    "synthetic": true
+  },
+  "export_rate_hz": 10,
+  "rules": {
+    "water_warning_distance_m": 35,
+    "hazards": [
+      {
+        "role": "water",
+        "label": "Água mapeada (OSM)",
+        "bands_m": [
+          {
+            "id": "critica",
+            "label": "Proximidade crítica",
+            "max_m": 5
+          },
+          {
+            "id": "elevada",
+            "label": "Proximidade elevada",
+            "max_m": 15
+          },
+          {
+            "id": "atencao",
+            "label": "Atenção",
+            "max_m": 35
+          }
+        ],
+        "justification": "Valores de demonstração; não são distâncias de segurança calibradas."
+      },
+      {
+        "role": "hazard",
+        "category": "slope",
+        "label": "Declive acentuado",
+        "bands_m": [
+          {
+            "id": "dentro",
+            "label": "Dentro do declive",
+            "max_m": 0
+          },
+          {
+            "id": "borda",
+            "label": "Borda do declive",
+            "max_m": 10
+          }
+        ],
+        "justification": "Polígono fictício para demonstração."
+      },
+      {
+        "role": "machine",
+        "metric": "roll_deg",
+        "label": "Limite de inclinação da máquina",
+        "bands_m": [
+          {
+            "id": "acima",
+            "label": "Acima do limite",
+            "max_m": 0
+          },
+          {
+            "id": "proximo",
+            "label": "Próximo do limite",
+            "max_m": 5
+          }
+        ],
+        "justification": "Limite declarado em machine.profile.max_roll_deg (demonstração); faixas em graus de margem até o limite."
+      }
+    ]
+  },
+  "provenance": "Água: OpenStreetMap, relação 2708872, consultada em 2026-09-11 via api.openstreetmap.org, licença ODbL, atribuição obrigatória. Limite de propriedade, área permitida, declive e percurso: fictícios, gerados por scripts/geofencing/generate-piracicaba-dataset.mjs para demonstração, sem correspondência com uma fazenda real.",
+  "files": [
+    {
+      "file": "01-colheita-normal.csv",
+      "samples": 6001,
+      "sha256": "f2c413b8f304b2adb68fd6339fa2cd6c000f35d4db02e542abf61bb30b305777"
+    },
+    {
+      "file": "02-declive-tombamento.csv",
+      "samples": 2401,
+      "sha256": "98a8e2debcce9a5a394f8fb6131dc82a4366f75148e0aa512ac855fcba41af5a"
+    }
+  ]
+}

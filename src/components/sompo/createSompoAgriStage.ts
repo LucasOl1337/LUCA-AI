@@ -13,6 +13,7 @@ import {
   getSompoAgriScenario,
   type SompoAgriScenarioId,
 } from '../../../shared/sompo-agri-scenarios.js';
+import { createSompoGeofenceLayer } from '../../geofencing/createSompoGeofenceLayer';
 import { createSompoRenderer, sompoRenderBudget, disposeSompoObject, type SompoStageApi } from './sompoStage';
 import { createSompoEnvironmentAssets } from './createSompoEnvironmentAssets';
 import { createSompoAtmosphere } from './createSompoAtmosphere';
@@ -64,6 +65,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   onStats?: (stats: SompoRenderStats) => void;
 }): SompoAgriStageApi | null {
   const scenario = getSompoAgriScenario(scenarioId);
+  const operation = scenario.environmentId === 'geofence-operacao';
   let renderer: THREE.WebGLRenderer;
   try {
     renderer = createSompoRenderer(mount).renderer;
@@ -72,7 +74,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     return null;
   }
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(37, 1, 0.1, 360);
+  const camera = new THREE.PerspectiveCamera(37, 1, 0.1, operation ? 800 : 360);
 
   const environmentScene = new RoomEnvironment();
   const pmrem = new THREE.PMREMGenerator(renderer);
@@ -132,10 +134,17 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   const path = createSompoMotionPath(at => getSompoAgriFrame(scenarioId, at, outcomeId), scenario.totalMs);
   const pathPoint = new THREE.Vector3();
   const totalTravel = path.sample(scenario.totalMs, pathPoint).x;
-  const startX = -totalTravel / 2;
-  if (scenario.equipmentId === 'harvester') field.setHarvestPath(Array.from({ length: 8 }, (_, i) => {
+  const startX = scenario.startX ?? -totalTravel / 2;
+  if (operation) field.setHarvestPath(Array.from({ length: scenario.totalMs / 250 + 1 }, (_, i) => {
+    const atMs = i * 250, frame = getSompoAgriFrame(scenarioId, atMs, outcomeId);
+    const point = path.sample(atMs, { x: 0, z: 0 });
+    return { x: startX + point.x, z: point.z + frame.lateral, atMs, yaw: frame.yaw, harvesting: frame.headerSpeed > 0.8 && frame.implementLift < 0.1 && frame.speedKph > 0 };
+  }));
+  else if (scenario.equipmentId === 'harvester') field.setHarvestPath(Array.from({ length: 8 }, (_, i) => {
     const point = path.sample(scenario.totalMs * i / 7, { x: 0, z: 0 }); point.x += startX; return point;
   }));
+  // geofencing (módulo src/geofencing): faixas no chão, tinta no plantio e contornos do talhão; grupo vazio sem talhão.
+  worldRoot.add(createSompoGeofenceLayer({ scenarioId, outcomeId, field, operation }));
   if (scenario.environmentId === 'farm-barn') {
     // O barracão gira para a manobra de ré terminar estacionada lá dentro.
     // A porta fica ~1 m atrás da ponta do implemento em t=0. O conjunto
@@ -211,11 +220,13 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   orbit.dampingFactor = 0.07;
   orbit.enablePan = false;
   orbit.minDistance = 6;
-  orbit.maxDistance = 30;
+  orbit.maxDistance = operation ? 650 : 30;
   orbit.maxPolarAngle = Math.PI * 0.49;
   orbit.target.set(startX, 1.6, 0);
   camera.position.set(startX + 10.5, 5.2, 12.5);
 
+  let focusTarget: 'truck' | 'sensor' = 'truck';
+  let overviewPending = operation; // Visão geral do talhão inteiro: só na montagem e ao clicar, não a cada relayout.
   function resize() {
     const { width, height } = mount.getBoundingClientRect();
     renderer.setSize(Math.max(1, width), Math.max(1, height), false);
@@ -224,6 +235,13 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
       camera.fov = Math.min(72, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(37 / 2)) * Math.max(1, 1.25 / camera.aspect))));
       camera.updateProjectionMatrix();
     post.resize(Math.max(1, width), Math.max(1, height));
+    if (overviewPending) {
+      overviewPending = false;
+      orbit.target.set(0, 0, 0);
+      const elevation = 1.15 * Math.max(90 / (Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect), 70 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+      camera.position.set(0, elevation, elevation * 0.25);
+      orbit.update();
+    }
   }
   const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(mount);
@@ -231,7 +249,6 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const focusPoint = new THREE.Vector3();
-  let focusTarget: 'truck' | 'sensor' = 'truck';
   let frameId = 0;
   const cameraShift = new THREE.Vector3();
 
@@ -280,11 +297,13 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     const sweepAngle = clock * 5.4;
     beaconSweep.target.position.set(beaconX + Math.cos(sweepAngle) * 11, -beaconTop, beaconZ + Math.sin(sweepAngle) * 11);
     focusPoint.set(machine.position.x + (focusTarget === 'sensor' ? 2.5 : 0), machine.position.y + (focusTarget === 'sensor' ? 2.2 : 1.6), machine.position.z);
+    if (operation && focusTarget === 'truck') focusPoint.set(0, 0, 0);
     cameraShift.copy(focusPoint).sub(orbit.target);
     camera.position.add(cameraShift);
     orbit.target.copy(focusPoint);
     orbit.update();
     atmosphere.update(studio, camera, machine.position, elapsed, scenario.environmentId === 'muddy-field', night);
+    if (operation && focusTarget === 'truck' && scene.fog instanceof THREE.Fog) { scene.fog.near = 500; scene.fog.far = 800; }
     post.render(elapsed);
     meter.end();
     onAfterRender?.(renderer.domElement);
@@ -303,6 +322,11 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     exportModel: () => { if (!model) return Promise.reject(new Error('Aguarde o carregamento da máquina.')); return exportSompoModel(model); },
     focus(target) {
       focusTarget = target;
+      if (operation && target === 'truck') {
+        overviewPending = true;
+        resize();
+        return;
+      }
       const anchor = target === 'sensor'
         ? focusPoint.set(machine.position.x + 2.5, machine.position.y + 2.2, machine.position.z)
         : focusPoint.set(machine.position.x, machine.position.y + 1.6, machine.position.z);

@@ -1,3 +1,6 @@
+// geofencing (módulo shared/geofencing): linha do resumo humano e bloco do dossiê do episódio gravado.
+import { episodeGeofenceHeadline, episodeGeofenceLines } from './geofencing/episode-dossier.js';
+
 export const SOMPO_TELEMETRY_PATH = '/trator/001/sensores';
 export const SOMPO_MISSION_DOSSIER_DELIMITER = '--- DOSSIÊ TÉCNICO ---';
 
@@ -372,7 +375,8 @@ function buildEpisodeHumanSummary(episode, summary, frames = []) {
     : '';
   const headline = `[Ensaio no simulador] Episódio de ${kindLabel} registrado: ${duration === null ? 'duração não informada' : `${duration}s`}, ${count} amostra${count === 1 ? '' : 's'}.${statusSuffix}${framesSuffix}`;
   const eventLine = `${episodeImpactLine(summary)}; ${episodeDistanceLine(summary)}; ${episodeFlagLine(summary)}.`;
-  return [headline, eventLine, EPISODE_ASK_LINE].join('\n');
+  const geofenceLine = episodeGeofenceHeadline(summary, formatOffsetSeconds); // geofencing (módulo shared/geofencing)
+  return [headline, eventLine, ...(geofenceLine ? [geofenceLine] : []), EPISODE_ASK_LINE].join('\n');
 }
 
 function episodePhaseLines(summary) {
@@ -630,6 +634,8 @@ export function buildSompoEpisodeMission(episode, samples, summary, teamLabel, f
       ]),
     ...(alertFinding ? [alertFinding] : []),
     ...(tractionFinding ? [tractionFinding] : []),
+    // geofencing (módulo shared/geofencing): bloco do dossiê só quando o episódio tem talhão; sem talhão o dossiê fica como era.
+    ...(summary?.geofence ? ['', ...episodeGeofenceLines(summary, formatOffsetSeconds), ''] : []),
     ...(keySamples.length === 0
       ? []
       : [

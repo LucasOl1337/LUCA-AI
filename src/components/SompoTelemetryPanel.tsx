@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import type { SompoTelemetrySnapshot } from '@/lib/types';
 import { sompoDistanceSensorCopy } from '../../shared/sompo-distance-sensor.js';
+import SompoGeofenceFlag from '../geofencing/SompoGeofenceFlag'; // geofencing (módulo src/geofencing): null fora dos cenários com talhão
 
 interface SompoTelemetryPanelProps {
   telemetry: SompoTelemetrySnapshot | null;
@@ -197,6 +198,7 @@ export default function SompoTelemetryPanel({
                 <strong>{riskValue(telemetry.risks.inclination, 'Sem flag ativa', historical)}</strong>
               </div>
             </article>
+            <SompoGeofenceFlag telemetry={telemetry} historical={historical} riskValue={riskValue} />
           </div>
 
           <div className="sompo-sensor-grid" role="group" aria-label="Leituras dos sensores">
