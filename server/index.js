@@ -212,6 +212,7 @@ import {
   createSompoTelemetryExportHttpHandler,
   createSompoTelemetryHistory,
   createSompoTelemetryHistoryHttpHandler,
+  createSompoTelemetryFleetHttpHandler,
   createSompoTelemetrySimulationHttpHandler,
 } from './sompo-telemetry-history.js';
 import { registerSompoRiskRoutes } from './sompo-risk.js';
@@ -2928,6 +2929,7 @@ app.get('/api/router/models', (_req, res) => {
 
 registerSompoRiskRoutes(app, sompoTelemetryHistory, sompoTelemetrySource);
 app.get('/api/sompo/telemetry', createSompoTelemetryHttpHandler());
+app.get('/api/sompo/telemetry/fleet', createSompoTelemetryFleetHttpHandler(sompoTelemetryHistory));
 app.get('/api/sompo/telemetry/history', createSompoTelemetryHistoryHttpHandler(sompoTelemetryHistory));
 app.get('/api/sompo/telemetry/export', createSompoTelemetryExportHttpHandler(sompoTelemetryHistory));
 app.post('/api/sompo/telemetry/simulation', createSompoTelemetrySimulationHttpHandler(sompoTelemetryHistory));

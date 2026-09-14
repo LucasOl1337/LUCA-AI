@@ -152,19 +152,16 @@ export default function LandingPage(_props: LandingPageProps) {
                 <span className="home-story-horizon"><TrendingUp aria-hidden="true" />Longo prazo · Na carteira</span>
               </div>
               <div className="home-story-body">
-                <span className="home-story-eyebrow">Inteligência para renovar</span>
-                <h2>Decidir hoje o risco da próxima safra.</h2>
-                <p className="home-story-lead">Como seguradora, quero usar o histórico do campo e dos sinistros para decidir quais riscos manter na renovação.</p>
-                <p>Histórico de telemetria e CSV de sinistros dão contexto à Equipe Risco Agro: manter a carteira, cortar municípios, ajustar a franquia ou exigir prevenção. O dossiê aponta prioridades e dados financeiros que faltam.</p>
+                <span className="home-story-eyebrow">Aprendizado para a próxima safra</span>
+                <h2>Aprender com o que já aconteceu.</h2>
+                <p className="home-story-lead">Como gestor da frota e seguradora, quero comparar a telemetria de várias máquinas e usar os episódios passados pra decidir a próxima safra.</p>
+                <p>Jornadas, alertas e episódios viram estatísticas por máquina. A Equipe Risco Agro usa essas evidências para recomendar treinamento, mudanças na operação e decisões para a próxima safra.</p>
                 <div className="home-story-actions">
-                  <button type="button" data-landing-cta="portfolio" onClick={() => navigate({ page: 'sompo', aba: 'casos', caso: 'carteira-renovacao-cooperativa' }, 'push')}>
-                    Analisar a renovação <ArrowRight aria-hidden="true" />
-                  </button>
-                  <button type="button" className="home-story-secondary" data-landing-cta="lab" onClick={() => navigate({ page: 'laboratorio' }, 'push')}>
-                    Rever evidências no Laboratório <ArrowRight aria-hidden="true" />
+                  <button type="button" data-landing-cta="portfolio" onClick={() => navigate({ page: 'sompo', aba: 'safra' }, 'push')}>
+                    Ver o desempenho da frota <ArrowRight aria-hidden="true" />
                   </button>
                 </div>
-                <small>Caso demonstrativo · Análise por município · Valores pendentes</small>
+                <small>Histórico da instalação e frota demonstrativa em blocos separados</small>
               </div>
             </motion.article>
           </div>

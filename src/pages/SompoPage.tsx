@@ -5,6 +5,7 @@ import {
   ArrowRight,
   Box as BoxIcon,
   Building2,
+  ChartColumn,
   Database,
   Download,
   Filter,
@@ -28,7 +29,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useChatLibrary } from '@/hooks/useChatLibrary';
 import { useAppLocation } from '@/hooks/useAppLocation';
 import { useLuca } from '@/hooks/useLucaState';
-import { getSompoView, GRAVIDADE_VALUES, PRODUTO_PARAM, PRODUTO_VALUE, SOMPO_ABA, SOMPO_TELEMETRY_ABA } from '../../shared/app-location.js';
+import { getSompoView, GRAVIDADE_VALUES, PRODUTO_PARAM, PRODUTO_VALUE, SOMPO_ABA, SOMPO_TELEMETRY_ABA, SOMPO_FLEET_ABA } from '../../shared/app-location.js';
 import { lucaApi } from '@/lib/api';
 import { downloadFile } from '@/lib/lab-client';
 import { pickFailureCopy } from '@/lib/surface-failure';
@@ -66,11 +67,12 @@ import { buildSompoAgriRunBrief, isSompoAgriScenarioId } from '../../shared/somp
 import '@/sompo-page.css';
 import '@/sompo-story.css';
 
+const SompoFleetPanel = lazy(() => import('@/components/sompo/SompoFleetPanel'));
 const SompoTruckSimulator = lazy(() => import('@/components/SompoTruckSimulator'));
 
 type ProductFilter = 'all' | SompoProductLine;
 type SeverityFilter = 'all' | SompoCaseSeverity;
-type SompoViewMode = 'telemetry' | 'cases';
+type SompoViewMode = 'telemetry' | 'cases' | 'fleet';
 type TelemetrySourceMode = 'firebase' | 'simulation';
 
 /** Orçamento de anexos da bancada (mesmo teto do chat: 4 por rodada). */
@@ -151,7 +153,7 @@ function SompoWorkspace() {
   const { createSession, busy: sessionsBusy } = useChatLibrary();
   const { sompoTelemetry: streamedTelemetry } = useLuca();
   const { location, navigate } = useAppLocation();
-  const viewMode: SompoViewMode = getSompoView(location) === 'cases' ? 'cases' : 'telemetry';
+  const viewMode = getSompoView(location) as SompoViewMode;
   const query = location.busca;
   const mappedProduct = PRODUTO_VALUE[location.produto];
   const productFilter: ProductFilter = mappedProduct === 'agricola-produtividade'
@@ -272,7 +274,7 @@ function SompoWorkspace() {
   }, [loadTemplates]);
 
   useEffect(() => {
-    if (viewMode !== 'telemetry') return undefined;
+    if (viewMode !== 'telemetry' && viewMode !== 'fleet') return undefined;
     void loadTelemetry('initial');
     return undefined;
   }, [loadTelemetry, viewMode]);
@@ -316,10 +318,10 @@ function SompoWorkspace() {
   // sem update o snapshot vira 'stale' e a cena/painel marcam "último valor".
   const [telemetryClock, setTelemetryClock] = useState(Date.now);
   useEffect(() => {
-    if (telemetrySourceMode !== 'firebase') return;
+    if (telemetrySourceMode !== 'firebase' && viewMode !== 'fleet') return;
     const timer = window.setInterval(() => setTelemetryClock(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, [telemetrySourceMode]);
+  }, [telemetrySourceMode, viewMode]);
   const firebaseTelemetry = currentSompoTelemetry(streamedTelemetry || bootstrapTelemetry, telemetryClock);
   const telemetry = telemetrySourceMode === 'simulation' ? simulatedTelemetry : firebaseTelemetry;
   // A faixa segue o que está no canvas. O deep-link só entra se o simulador
@@ -376,9 +378,9 @@ function SompoWorkspace() {
 
   function setViewMode(mode: SompoViewMode) {
     navigate({
-      aba: mode === 'cases' ? SOMPO_ABA : SOMPO_TELEMETRY_ABA,
+      aba: mode === 'fleet' ? SOMPO_FLEET_ABA : mode === 'cases' ? SOMPO_ABA : SOMPO_TELEMETRY_ABA,
       caso: mode === 'cases' ? location.caso : '',
-      fonte: mode === 'cases' ? '' : (location.fonte === 'firebase' ? 'firebase' : ''),
+      fonte: mode === 'telemetry' && location.fonte === 'firebase' ? 'firebase' : '',
     }, 'replace');
   }
 
@@ -638,8 +640,8 @@ function SompoWorkspace() {
             </div>
             <div className="sompo-metrics">
               <div className="sompo-metric">
-                <strong>{telemetry?.tractorId || '001'}</strong>
-                <span>{telemetrySourceMode === 'simulation' ? 'caminhão' : 'trator'}</span>
+                <strong>{(viewMode === 'fleet' ? firebaseTelemetry : telemetry)?.tractorId || '001'}</strong>
+                <span>{viewMode !== 'fleet' && telemetrySourceMode === 'simulation' ? 'caminhão' : 'trator'}</span>
               </div>
               <div className="sompo-metric">
                 <strong>{SOMPO_EXAMPLE_CASES.length}</strong>
@@ -669,9 +671,17 @@ function SompoWorkspace() {
               <Wheat />
               <span><strong>Casos agrícolas</strong><small>Cenários para avaliação</small></span>
             </button>
+            <button type="button" aria-pressed={viewMode === 'fleet'} onClick={() => setViewMode('fleet')}>
+              <ChartColumn />
+              <span><strong>Safra</strong><small>Desempenho da frota</small></span>
+            </button>
           </section>
 
-          {viewMode === 'telemetry' ? (
+          {viewMode === 'fleet' ? (
+            <Suspense fallback={<div className="sompo-simulator-loading" role="status">Carregando desempenho da frota…</div>}>
+              <SompoFleetPanel telemetry={firebaseTelemetry ?? null} episodeVersion={recordedEpisode?.publicId || ''} onRefreshTelemetry={() => loadTelemetry('manual')} />
+            </Suspense>
+          ) : viewMode === 'telemetry' ? (
             <>
               <section className="sompo-source-switch" aria-label="Origem dos dados da telemetria">
                 <div className="sompo-source-switch-label">

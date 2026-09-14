@@ -28,6 +28,7 @@ export const PAGE_PATHS = Object.freeze({
 export const PERSONA_FILTRO = Object.freeze(['all', 'visiveis', 'ocultas', 'editadas', 'principais', 'ativadas']);
 export const SOMPO_ABA = 'casos';
 export const SOMPO_TELEMETRY_ABA = 'telemetria';
+export const SOMPO_FLEET_ABA = 'safra';
 export const LUCA_ABA = 'atividade';
 export const ADMIN_ABAS = Object.freeze(['personas', 'configuracao']);
 export const CONFIG_TIPO = Object.freeze(['team', 'individual']);
@@ -125,7 +126,7 @@ function parseQuery(search) {
     ? (ORDEM_PARAM[ordemRaw] ? ordemRaw : ORDEM_API[ordemRaw])
     : '';
   const abaRaw = readParam(search, 'aba');
-  const aba = [SOMPO_ABA, SOMPO_TELEMETRY_ABA, LUCA_ABA, ...ADMIN_ABAS].includes(abaRaw) ? abaRaw : '';
+  const aba = [SOMPO_ABA, SOMPO_TELEMETRY_ABA, SOMPO_FLEET_ABA, LUCA_ABA, ...ADMIN_ABAS].includes(abaRaw) ? abaRaw : '';
 
   return {
     busca: readParam(search, 'busca'),
@@ -220,6 +221,7 @@ export function formatAppUrl(location) {
   }
 
   if (page === 'sompo') {
+    if (loc.aba === SOMPO_FLEET_ABA) params.set('aba', SOMPO_FLEET_ABA);
     if (loc.aba === SOMPO_ABA) params.set('aba', SOMPO_ABA);
     if (loc.aba === SOMPO_TELEMETRY_ABA) params.set('aba', SOMPO_TELEMETRY_ABA);
     setIfPresent(params, 'busca', loc.busca);
@@ -278,6 +280,7 @@ export function mergeAppLocation(current, patch) {
 
 /** A entrada fica em /sompo; links compartilhados continuam abrindo a área escolhida. */
 export function getSompoView(location) {
+  if (location.aba === SOMPO_FLEET_ABA) return 'fleet';
   if (location.aba === SOMPO_ABA) return 'cases';
   if (location.aba === SOMPO_TELEMETRY_ABA || location.fonte) return 'telemetry';
   if (location.caso || location.produto || location.gravidade || location.busca) return 'cases';

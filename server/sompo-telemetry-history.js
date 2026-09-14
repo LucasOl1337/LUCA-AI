@@ -6,6 +6,7 @@ import { normalizeSompoTelemetry } from '../shared/sompo-telemetry.js';
 import { convertSompoDataset, SOMPO_EXPORT_MAX_SAMPLES, SOMPO_EXPORT_MAX_JSON_BYTES } from '../shared/sompo-lab-export.js';
 // geofencing (módulo server/geofencing): recalcula os episódios de faixa sobre a série gravada; null sem talhão.
 import { summarizeEpisodeGeofence } from './geofencing/episode-geofence.js';
+import { aggregateSompoFleet } from '../shared/sompo-fleet.js';
 import { inferredImageMime } from './image-signature.js';
 
 export const SOMPO_TELEMETRY_HISTORY_DEFAULT_LIMIT = 2000;
@@ -1255,7 +1256,35 @@ export function createSompoTelemetryHistory({
     return dataset;
   }
 
+  function fleet() {
+    assertOpen();
+    // Exclude samples copied into an episode at an identical timestamp from the statistics.
+    // Episodes still retain their complete evidence separately.
+    const statement = db.prepare(`${sampleSelect}
+      WHERE id IN (SELECT MAX(id) FROM sompo_telemetry_samples GROUP BY source_kind, tractor_id, observed_ms)
+      ORDER BY source_kind, tractor_id, observed_ms, id`);
+    function* samples() {
+      for (const row of statement.iterate()) yield mapSampleRow(row);
+    }
+    const aggregation = aggregateSompoFleet(samples());
+    const episodeIds = db.prepare('SELECT public_id AS publicId FROM sompo_telemetry_episodes ORDER BY started_ms DESC, id DESC').all();
+    const episodes = episodeIds.map(({ publicId }) => {
+      const { episode, summary, samples, frames } = getEpisode(publicId);
+      return {
+        publicId, tractorId: episode.tractorId, sourceKind: episode.sourceKind,
+        scenarioLabel: episode.scenarioLabel, status: episode.status,
+        startedAt: episode.startedAt, endedAt: episode.endedAt,
+        sampleCount: samples.length, peakAcceleration: summary.impact?.accMagnitude ?? null,
+        peakAt: summary.impact?.at ?? null,
+        phases: summary.phases.map(({ id, label, startAt, endAt, durationMs }) => ({ id, label, startedAt: startAt, endedAt: endAt, durationMs })),
+        frameCount: frames.length,
+      };
+    });
+    return { ...aggregation, generatedAt: new Date(now()).toISOString(), episodes };
+  }
+
   return {
+    fleet,
     saveAssessment(userId, evidence) {
       const id = randomUUID();
       const result = { ...evidence, id, createdAt: new Date(now()).toISOString() };
@@ -1482,6 +1511,18 @@ export function createSompoTelemetryEpisodeFrameGetHttpHandler(history) {
       res.send(frame.buffer);
     } catch (error) {
       sendEpisodeError(res, error, 'Não foi possível ler o frame do episódio.');
+    }
+  };
+}
+
+
+export function createSompoTelemetryFleetHttpHandler(history) {
+  return (req, res) => {
+    if (!req.auth?.user?.id) return res.status(401).json({ ok: false, error: 'authentication_required' });
+    try {
+      res.json({ ok: true, ...history.fleet() });
+    } catch (error) {
+      sendHistoryError(res, error, 'Não foi possível agregar o histórico da frota. Tente atualizar.');
     }
   };
 }
