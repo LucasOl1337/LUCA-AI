@@ -59,7 +59,7 @@ test('home puts two stories before the unchanged mode entry and uses existing im
   }
 });
 
-test('story CTAs navigate to the preventive scenario, cooperative case and lab', () => {
+test('story CTAs navigate to the preventive scenario and fleet performance', () => {
   let href;
   const nodes = elements(homeTree((patch, history) => {
     assert.equal(history, 'push');
@@ -67,8 +67,7 @@ test('story CTAs navigate to the preventive scenario, cooperative case and lab',
   }));
   for (const [cta, expected] of [
     ['field', '/sompo?aba=telemetria&cenario=agri-tractor-rollover&desfecho=controlled-stop'],
-    ['portfolio', '/sompo?aba=casos&caso=carteira-renovacao-cooperativa'],
-    ['lab', '/laboratorio'],
+    ['portfolio', '/sompo?aba=safra'],
   ]) {
     nodes.find((node) => node.props['data-landing-cta'] === cta).props.onClick();
     assert.equal(href, expected);

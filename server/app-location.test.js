@@ -82,6 +82,7 @@ test('toda tela alcançável redonda no parser sem perder o endereço', () => {
     ['/sompo?aba=telemetria&fonte=simulacao', '/sompo?aba=telemetria&fonte=simulacao'],
     ['/sompo?fonte=simulacao', '/sompo?fonte=simulacao'],
     ['/sompo?aba=casos', '/sompo?aba=casos'],
+    ['/sompo?aba=safra', '/sompo?aba=safra'],
     ['/sompo?aba=casos&produto=penhor&gravidade=alta&caso=penhor-trator-incendio', '/sompo?aba=casos&produto=penhor&gravidade=alta&caso=penhor-trator-incendio'],
     ['/luca-ai', '/luca-ai'],
     ['/luca-ai?modo=individual', '/luca-ai?modo=individual'],
@@ -152,4 +153,10 @@ test('App lê a barra em vez de luca.activePage', () => {
   assert.match(auth, /location\.assign\('\/luca-ai'\)/);
   assert.match(auth, /location\.assign\('\/admin'\)/);
   assert.doesNotMatch(auth, /luca\.activePage/);
+});
+
+
+test('Safra is a distinct view even with legacy scenario parameters', () => {
+  assert.equal(getSompoView(parseAppLocation('/sompo?aba=safra')), 'fleet');
+  assert.equal(getSompoView(parseAppLocation('/sompo?aba=safra&fonte=firebase&caso=old')), 'fleet');
 });

@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Activity, ArrowRight, ArrowUpRight, Wheat, X } from 'lucide-react';
+import { Activity, ArrowRight, ArrowUpRight, ChartColumn, Wheat, X } from 'lucide-react';
 import { useAppLocation } from '@/hooks/useAppLocation';
 import { SOMPO_EXAMPLE_CASES } from '@/lib/sompo-cases';
 import SompoBrazilMap from './SompoBrazilMap';
@@ -9,6 +9,7 @@ import '@/sompo-welcome.css';
 const AREAS = [
   { aba: 'telemetria', icon: Activity, title: 'Telemetria', description: 'Sinais do equipamento e cenários de risco para apoiar a prevenção em tempo real.', detail: 'Sinais em tempo real' },
   { aba: 'casos', icon: Wheat, title: 'Casos agrícolas', description: 'Evidências e ocorrências analisadas com os agentes para reduzir perdas e custos.', detail: `${SOMPO_EXAMPLE_CASES.length} cenários de exemplo` },
+  { aba: 'safra', icon: ChartColumn, title: 'Safra', description: 'Compare jornadas, alertas e episódios para decidir o que mudar na próxima safra.', detail: 'Desempenho da frota' },
 ];
 
 const MISSIONS = [
@@ -29,7 +30,7 @@ export default function SompoWelcome() {
 
         <div className="sompo-welcome-stage">
           <div className="sompo-welcome-copy">
-            <p className="sompo-welcome-eyebrow">Telemetria · Casos agrícolas</p>
+            <p className="sompo-welcome-eyebrow">Telemetria · Casos agrícolas · Safra</p>
             <h1 id="sompo-welcome-title">Antecipar riscos.<br /><span>Proteger o agro.</span></h1>
             <p className="sompo-welcome-lead">Sinais do campo orientam a prevenção em tempo real. Cada caso reúne inteligência para reduzir perdas e custos ao longo das safras.</p>
             <div className="sompo-welcome-actions">
@@ -59,7 +60,7 @@ export default function SompoWelcome() {
         <div className="sompo-entry-content">
           <button type="button" className="sompo-entry-close" aria-label="Fechar escolha de área" onClick={() => dialogRef.current?.close()}><X size={20} /></button>
           <h2 id="sompo-entry-title">Por onde começar?</h2>
-          <p id="sompo-entry-description">Acompanhe o campo em tempo real ou aprofunde a análise de um caso.</p>
+          <p id="sompo-entry-description">Acompanhe o campo, analise um caso ou compare o desempenho da frota.</p>
           <div className="sompo-entry-options">
             {AREAS.map(({ aba, icon: Icon, title, description, detail }) => (
               <a href={`/sompo?aba=${aba}`} key={aba} className="sompo-entry-option" onClick={(event) => {
