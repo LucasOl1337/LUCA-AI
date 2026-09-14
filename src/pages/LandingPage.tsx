@@ -5,17 +5,23 @@ import {
   GitBranch,
   RefreshCw,
   Scale,
+  ShieldCheck,
+  TrendingUp,
   UserRound,
   UsersRound,
 } from 'lucide-react';
 import { useLuca } from '@/hooks/useLucaState';
-import { useAuth } from '@/hooks/useAuth';
 import { useDeferredFlag } from '@/hooks/useDeferredFlag';
 import { useAppLocation } from '@/hooks/useAppLocation';
 import type { PageId } from '@/components/Layout';
+import { SOMPO_USER_STORIES } from '@/lib/sompo-stories';
 import '@/home-page.css';
 
 export type HomeEntryMode = 'individual' | 'team';
+
+const FIELD_STORY = SOMPO_USER_STORIES.find((story) => story.id === 'risco-agro-maquinas')!;
+const PORTFOLIO_STORY = SOMPO_USER_STORIES.find((story) => story.id === 'prevencao-frota')!;
+const PITCH_STEPS = ['Telemetria real', 'Simulação 3D e coleta', 'IA coordenada', 'Prevenção antes e inteligência depois'];
 
 const AGENTS = [
   {
@@ -44,18 +50,6 @@ interface LandingPageProps {
   onNavigate: (page: PageId) => void;
 }
 
-function AgentPortrait({ agent, className = '' }: { agent: (typeof AGENTS)[number]; className?: string }) {
-  return (
-    <figure className={className}>
-      <img src={agent.image} alt="" loading="lazy" />
-      <figcaption>
-        <strong>{agent.name}</strong>
-        <span>{agent.role}</span>
-      </figcaption>
-    </figure>
-  );
-}
-
 function ModeArtwork({ mode }: { mode: HomeEntryMode }) {
   const portraits = mode === 'individual' ? AGENTS.slice(1, 4) : AGENTS;
   return (
@@ -66,9 +60,8 @@ function ModeArtwork({ mode }: { mode: HomeEntryMode }) {
   );
 }
 
-export default function LandingPage({ onNavigate }: LandingPageProps) {
+export default function LandingPage(_props: LandingPageProps) {
   const reduceMotion = useReducedMotion();
-  const { user } = useAuth();
   const { navigate } = useAppLocation();
   const {
     backendReady,
@@ -114,6 +107,69 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
   return (
     <div className="home-page-scroll">
       <main className="home-page home-page-a">
+        <section className="home-stories" aria-label="Do campo à decisão com o LUCA">
+          <ol className="home-stories-flow" aria-label="Do sensor à decisão em quatro passos">
+            {PITCH_STEPS.map((step, index) => (
+              <li key={step}><span>{String(index + 1).padStart(2, '0')}</span>{step}{index < PITCH_STEPS.length - 1 && <ArrowRight aria-hidden="true" />}</li>
+            ))}
+          </ol>
+
+          <div className="home-stories-grid">
+            <motion.article
+              className="home-story"
+              data-home-story="field"
+              initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className="home-story-art">
+                <img src="/sompo/bg-agro.jpg" alt="" fetchPriority="high" />
+                <span className="home-story-horizon"><ShieldCheck aria-hidden="true" />Curto prazo · No campo</span>
+              </div>
+              <div className="home-story-body">
+                <span className="home-story-eyebrow">Prevenção em campo</span>
+                <h2>Ver o risco a tempo de parar.</h2>
+                <p className="home-story-lead">Como operador, quero receber o alerta antes de o trator tombar e entender o que aconteceu.</p>
+                <p>O sensor mede inclinação e aceleração em tempo real. No roteiro 3D, o alerta aparece antes da parada preventiva; ao gravar o episódio, 5 imagens datadas ajudam a equipe de IA a explicar a sequência.</p>
+                <div className="home-story-actions">
+                  <button type="button" data-landing-cta="field" onClick={() => navigate({ page: 'sompo', aba: 'telemetria', cenario: FIELD_STORY.lead.scenarioId, desfecho: 'controlled-stop' }, 'push')}>
+                    Ver a parada preventiva <ArrowRight aria-hidden="true" />
+                  </button>
+                </div>
+                <small>Demonstração simulada · Alerta, episódio e parecer</small>
+              </div>
+            </motion.article>
+
+            <motion.article
+              className="home-story"
+              data-home-story="portfolio"
+              initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className="home-story-art">
+                <img src={PORTFOLIO_STORY.image} alt="" />
+                <span className="home-story-horizon"><TrendingUp aria-hidden="true" />Longo prazo · Na carteira</span>
+              </div>
+              <div className="home-story-body">
+                <span className="home-story-eyebrow">Inteligência para renovar</span>
+                <h2>Decidir hoje o risco da próxima safra.</h2>
+                <p className="home-story-lead">Como seguradora, quero usar o histórico do campo e dos sinistros para decidir quais riscos manter na renovação.</p>
+                <p>Histórico de telemetria e CSV de sinistros dão contexto à Equipe Risco Agro: manter a carteira, cortar municípios, ajustar a franquia ou exigir prevenção. O dossiê aponta prioridades e dados financeiros que faltam.</p>
+                <div className="home-story-actions">
+                  <button type="button" data-landing-cta="portfolio" onClick={() => navigate({ page: 'sompo', aba: 'casos', caso: 'carteira-renovacao-cooperativa' }, 'push')}>
+                    Analisar a renovação <ArrowRight aria-hidden="true" />
+                  </button>
+                  <button type="button" className="home-story-secondary" data-landing-cta="lab" onClick={() => navigate({ page: 'laboratorio' }, 'push')}>
+                    Rever evidências no Laboratório <ArrowRight aria-hidden="true" />
+                  </button>
+                </div>
+                <small>Caso demonstrativo · Análise por município · Valores pendentes</small>
+              </div>
+            </motion.article>
+          </div>
+        </section>
+
         <section className="home-a-hero">
           <motion.header
             initial={reduceMotion ? false : { opacity: 0, y: 14 }}
@@ -172,29 +228,6 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
               </button>
             </motion.article>
           </div>
-        </section>
-
-        <section className="home-a-agents" data-landing-proof aria-label="Personas especializadas do LUCA-AI">
-          <div className="home-agents-heading">
-            <div>
-              <h2>Personas especializadas. Uma entrega só.</h2>
-              <p>Você escolhe quem pensa. O LUCA organiza como cada persona participa.</p>
-            </div>
-            {user?.role === 'admin' && (
-              <button type="button" data-landing-cta="personas" onClick={() => onNavigate('personas')}>
-                Ver catálogo de personas <ArrowRight aria-hidden="true" />
-              </button>
-            )}
-          </div>
-          <div className="home-a-agent-grid">
-            <AgentPortrait agent={AGENTS[0]} className="home-a-agent-lead" />
-            {AGENTS.slice(1).map((agent) => <AgentPortrait key={agent.name} agent={agent} />)}
-          </div>
-          <ul className="home-proof-strip" data-landing-proof-list>
-            <li data-landing-proof-item="personas">Equipe de personas</li>
-            <li data-landing-proof-item="missao">Missão em conversa única</li>
-            <li data-landing-proof-item="runtime">Runtime com status ao vivo</li>
-          </ul>
         </section>
 
         <aside
