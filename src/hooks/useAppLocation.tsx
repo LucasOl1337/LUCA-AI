@@ -42,6 +42,13 @@ export function AppLocationProvider({ children }: { children: ReactNode }) {
 
   const apply = useCallback((next: AppLocation, history: HistoryMode) => {
     const nextHref = formatAppUrl(next);
+    // Camera permission belongs only to the /sonolencia document. Crossing
+    // this boundary must fetch the corresponding Permissions-Policy header.
+    if ((locationRef.current.page === 'sonolencia') !== (next.page === 'sonolencia')) {
+      if (history === 'replace') window.location.replace(nextHref);
+      else window.location.assign(nextHref);
+      return;
+    }
     locationRef.current = parseAppLocation(nextHref);
     const now = currentHref();
     if (nextHref === now) {

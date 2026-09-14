@@ -11,6 +11,7 @@
 | `deploy/` | SOMENTE ao alterar publicacao pela VM (service, Tunnel, proxy de borda `luca-ai-vm-proxy.js`) ou scripts de instalacao. |
 | `worker/` e `wrangler.jsonc` | SOMENTE ao inspecionar o runtime Cloudflare legado (Durable Object / `app.luca-ai.com.br`); nao e o caminho de producao. |
 | `public/` | SOMENTE ao alterar assets estaticos do app principal. |
+| `src/sonolencia/` e `public/sonolencia-assets/` | SOMENTE ao alterar webcam, detecção de olhos fechados ou alarme; ver `docs/sonolencia.md`. |
 | `site/` | SOMENTE ao trabalhar no site visual separado do app principal. |
 | `promo/` | SOMENTE ao trabalhar no comercial Remotion. |
 | `praisonai-tests/` e `PraisonAI/` | SOMENTE ao executar os exemplos Python ou inspecionar o submodulo. |

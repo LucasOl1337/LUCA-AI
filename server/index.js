@@ -260,11 +260,15 @@ const PERSONA_ROSTER_SYNC_INTERVAL_MS = Math.max(
 app.disable('x-powered-by');
 app.set('trust proxy', 'loopback');
 app.use((req, res, next) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; base-uri 'self'; connect-src 'self' ws: wss:; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; media-src 'self' blob:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'");
+  const visionWorker = /^\/assets\/drowsiness-worker-[\w-]+\.js$/.test(req.path);
+  const scriptPolicy = visionWorker ? "'self' 'wasm-unsafe-eval'" : "'self'";
+  res.setHeader('Content-Security-Policy', `default-src 'self'; base-uri 'self'; connect-src 'self' ws: wss:; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; media-src 'self' blob:; object-src 'none'; script-src ${scriptPolicy}; style-src 'self' 'unsafe-inline'`);
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Permissions-Policy', /^\/sonolencia\/?$/.test(req.path)
+    ? 'camera=(self), microphone=(), geolocation=()'
+    : 'camera=(), microphone=(), geolocation=()');
   if (req.path.startsWith('/api/')) {
     res.setHeader('Cache-Control', 'no-store');
   }

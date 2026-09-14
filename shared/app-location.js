@@ -11,6 +11,7 @@ export const APP_PAGES = Object.freeze([
   'configuracao',
   'sompo',
   'laboratorio',
+  'sonolencia',
   'admin',
 ]);
 
@@ -21,6 +22,7 @@ export const PAGE_PATHS = Object.freeze({
   configuracao: '/configuracao',
   sompo: '/sompo',
   laboratorio: '/laboratorio',
+  sonolencia: '/sonolencia',
   admin: '/admin',
 });
 

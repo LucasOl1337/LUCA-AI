@@ -1,0 +1,31 @@
+.drowsiness-page{max-width:1440px;margin:auto;padding:32px;color:#eef3fa}
+.drowsiness-heading{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;margin-bottom:28px}
+.drowsiness-eyebrow{font-size:10px;letter-spacing:.14em;font-weight:700;color:#91a7c2}
+.drowsiness-heading h1{font-size:clamp(26px,3vw,36px);letter-spacing:-.035em;font-weight:650;margin:8px 0}
+.drowsiness-heading p,.drowsiness-message{font-size:14px;line-height:1.6;color:#a7b5c7}
+.drowsiness-private{display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid #2b3a4b;border-radius:24px;font-size:11px;color:#a8cbe6;white-space:nowrap}
+.drowsiness-grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(290px,1fr);gap:20px}
+.drowsiness-camera{position:relative;min-height:430px;background:radial-gradient(ellipse at center,#142333,#080e16 75%);border:1px solid #263443;border-radius:20px;overflow:hidden}
+.drowsiness-camera video{width:100%;height:100%;position:absolute;inset:0;object-fit:contain;transform:scaleX(-1)}
+.drowsiness-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#7993ae;padding:24px;gap:14px}
+.drowsiness-placeholder h2{font-size:23px;color:#d2e0ee;letter-spacing:-.025em}.drowsiness-placeholder p{font-size:13px;line-height:1.8}
+.drowsiness-camera-badge{position:absolute;top:18px;left:18px;display:flex;gap:8px;align-items:center;font-size:9px;letter-spacing:.1em;background:#080e16dc;padding:8px 11px;border-radius:20px;color:#a1b0bf}
+.drowsiness-camera-badge i{width:6px;height:6px;border-radius:50%;background:#738297}
+.drowsiness-page[data-state="running"] .drowsiness-camera-badge i{background:#55d6ad}
+.drowsiness-overlay{position:absolute;bottom:20px;left:20px;right:20px;padding:16px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:#08121ce8;border:1px solid #33465c;border-radius:12px;font-size:14px}
+.drowsiness-overlay span{width:100%;font-size:13px}
+.drowsiness-panel{padding:26px;border:1px solid #263443;border-radius:20px;background:#111923}
+.drowsiness-panel h2{font-size:22px;line-height:1.3;margin:10px 0 8px;font-weight:600}
+.drowsiness-message{min-height:66px;font-size:13px}
+.drowsiness-timer{display:flex;flex-direction:column;gap:2px;margin:24px 0 12px}.drowsiness-timer strong{font-size:46px;font-variant-numeric:tabular-nums;line-height:1.2;letter-spacing:-.04em;font-weight:500}.drowsiness-timer small{font-size:21px;color:#8497ac}.drowsiness-timer span{font-size:11px;color:#a7b5c7}
+.drowsiness-panel progress{display:block;width:100%;height:6px;border:0;border-radius:8px;overflow:hidden;accent-color:#5aaaff;background:#263443}.drowsiness-panel progress::-webkit-progress-bar{background:#263443}.drowsiness-panel progress::-webkit-progress-value{background:#5aaaff}
+.drowsiness-eye-meters{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:20px 0;color:#a7b5c7;font-size:11px}.drowsiness-eye-meters meter{display:block;width:100%;height:10px;margin:5px 0}.drowsiness-eye-meters meter::-webkit-meter-bar{background:#263443;border:0}.drowsiness-eye-meters meter::-webkit-meter-optimum-value{background:#70b5ff}.drowsiness-eye-meters small{font-size:10px;color:#8497ac}
+.drowsiness-sensitivity{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:#a7b5c7;margin:22px 0}.drowsiness-sensitivity select{background:#1c2938;border:1px solid #36485d;border-radius:8px;padding:8px 12px;color:#e6eef7}
+.drowsiness-actions{display:flex;flex-direction:column;gap:10px}.drowsiness-actions button{display:flex;align-items:center;justify-content:center;gap:9px;min-height:44px;padding:10px 14px;border:1px solid #374b61;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;background:#192635;color:#e6eef7}.drowsiness-actions button:hover{filter:brightness(1.12)}.drowsiness-actions button:disabled{opacity:.45;cursor:default}.drowsiness-actions .drowsiness-start{background:#2581ec;border-color:#499dff;color:white}.drowsiness-actions .drowsiness-stop{background:#38222a;border-color:#79414c;color:#ffb4be}
+.drowsiness-page button:focus-visible,.drowsiness-page select:focus-visible{outline:2px solid #95d0ff;outline-offset:3px}
+.drowsiness-hint{font-size:11px;line-height:1.6;color:#91a3b8;margin-top:14px}
+.drowsiness-guidance{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin:28px 0}.drowsiness-guidance>div{border-top:1px solid #263443;padding-top:18px}.drowsiness-guidance span{color:#70b5ff;font-size:11px}.drowsiness-guidance h3{font-size:14px;margin:7px 0;color:#dfebf7}.drowsiness-guidance p{font-size:12px;line-height:1.7;color:#99aabe}
+.drowsiness-notice{font-size:11px;line-height:1.7;color:#c9b695;padding:14px 18px;border:1px solid #493e2c;border-radius:12px;background:#221e17}
+.drowsiness-page[data-eyes="alarm"] .drowsiness-overlay{background:#47191eea;border-color:#ef7a80;color:#ffdadc}.drowsiness-page[data-eyes="alarm"] .drowsiness-timer{color:#ff9299}.drowsiness-page[data-eyes="alarm"] .drowsiness-camera{border-color:#ef7a80;box-shadow:0 0 0 2px #ef7a8033}
+@media(max-width:1100px){.drowsiness-heading{flex-direction:column;gap:12px}.drowsiness-page{padding:24px}.drowsiness-panel{padding:20px}}
+@media(max-width:720px){.drowsiness-page{padding:18px 14px 32px}.drowsiness-grid{grid-template-columns:minmax(0,1fr)}.drowsiness-camera{min-height:0;height:280px;width:100%}.drowsiness-guidance{grid-template-columns:1fr;gap:16px}.drowsiness-message{min-height:0}.drowsiness-timer{margin-top:18px}.drowsiness-private{font-size:10px}.drowsiness-camera-badge{top:12px;left:12px}}
