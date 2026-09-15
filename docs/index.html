@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LUCA-AI — Uma missão. Uma equipe inteira.</title>
-<meta name="description" content="Painel para criar, acompanhar e revisar missões executadas por equipes de agentes de IA — cada etapa com dono, entrega final auditável e laboratório de replay 3D.">
+<title>LUCA-AI: Uma missão. Uma equipe inteira.</title>
+<meta name="description" content="Painel para criar, acompanhar e revisar missões executadas por equipes de agentes de IA. Inclui SOMPO (telemetria e simulador) e Laboratório Virtual (replay 3D a partir de CSV).">
 <link rel="icon" href="media/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,7 +21,6 @@
   .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
   .mono{font-family:'JetBrains Mono',monospace}
   a{color:var(--cyan)}
-  /* hero */
   header.hero{padding:88px 0 56px;text-align:center;background:radial-gradient(900px 480px at 50% 0%,rgba(10,132,255,.16),transparent 70%)}
   .hero img.logo{width:104px;height:104px;border-radius:24px;box-shadow:0 0 70px rgba(10,132,255,.4)}
   .hero h1{font-size:clamp(40px,6vw,72px);font-weight:800;letter-spacing:-2px;margin:28px 0 8px}
@@ -32,7 +31,6 @@
   .btn.primary{background:var(--navy);color:#fff;border-color:transparent}
   .btn.ghost{color:var(--soft);background:rgba(255,255,255,.03)}
   video{display:block;width:100%;border-radius:18px;border:1px solid var(--line);box-shadow:0 30px 80px rgba(0,0,0,.55);background:#000}
-  /* sections */
   section{padding:64px 0;border-top:1px solid var(--line)}
   h2{font-size:clamp(28px,4vw,40px);font-weight:800;letter-spacing:-1px;margin-bottom:14px}
   .lead{color:var(--mute);max-width:680px;margin-bottom:36px}
@@ -54,19 +52,16 @@
   figure figcaption{color:var(--mute);font-size:13px;margin-top:10px;font-family:'JetBrains Mono',monospace}
   .screen h3{font-size:22px;margin-bottom:8px}
   .screen p{color:var(--mute);font-size:15px}
-  /* numbers */
   .numbers{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px}
   .num{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;text-align:center}
   .num b{display:block;font-size:34px;font-weight:800;color:var(--cyan);letter-spacing:-1px}
   .num span{color:var(--mute);font-size:13px}
-  /* table */
   table{width:100%;border-collapse:collapse;font-size:14.5px}
   th,td{text-align:left;padding:13px 14px;border-bottom:1px solid var(--line);vertical-align:top}
   th{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:1px;color:var(--mute);text-transform:uppercase}
   td:first-child{color:var(--soft);font-weight:600}
   .yes{color:var(--green)} .no{color:var(--mute)}
   .src{color:var(--mute);font-size:12.5px;margin-top:14px}
-  /* install */
   pre{background:#0a0e14;border:1px solid var(--line);border-radius:14px;padding:22px;overflow:auto;font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--soft)}
   footer{padding:44px 0 60px;color:var(--mute);font-size:14px;border-top:1px solid var(--line)}
   footer .row{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
@@ -79,16 +74,15 @@
   <div class="wrap">
     <img class="logo" src="media/icon-512.png" alt="LUCA-AI">
     <h1>Uma missão.<br><em>Uma equipe inteira.</em></h1>
-    <p class="sub">O LUCA-AI transforma um pedido em uma missão executada por personas especializadas — supervisor, executores, aprovador e relator — e entrega a decisão em uma conversa só.</p>
+    <p class="sub">O LUCA-AI transforma um pedido em uma missão executada por personas especializadas. Cada etapa tem dono. A decisão chega numa conversa só. No campo, o SOMPO lê a máquina e o laboratório reconstrói o incidente.</p>
     <div class="cta">
       <a class="btn primary" href="https://luca-ai.com.br">Abrir o LUCA-AI</a>
-      <a class="btn ghost" href="https://github.com/LucasOl1337/LUCA-AI/releases">Baixar</a>
       <a class="btn ghost" href="https://github.com/LucasOl1337/LUCA-AI">Código-fonte</a>
     </div>
     <video src="media/luca-ai-promo-web.mp4" poster="media/poster.jpg" controls playsinline preload="metadata">
       <track kind="subtitles" srclang="pt-BR" label="Português" src="media/legendas.vtt" default>
     </video>
-    <p class="src">Vídeo narrado, 66 s — gravado na instância real do app, set/2026. Narração sem watermark invisível (AudioSeal off).</p>
+    <p class="src">Vídeo narrado, 65 s. Gravado na instância local de demonstração (não na VM de produção), 15/09/2026. Narração OmniVoice, perfil oficial, watermark invisível desligado.</p>
   </div>
 </header>
 
@@ -97,9 +91,9 @@
     <h2>Três pilares</h2>
     <p class="lead">Feito para quem já perdeu uma tarde costurando respostas de cinco chats de IA diferentes.</p>
     <div class="pillars">
-      <div class="card"><span class="k">Equipe com dono</span><h3>Cada etapa tem responsável</h3><p>O fluxo exige supervisor, decisor da missão, executores, aprovação e exibição final — com persona e modelo nomeados em cada papel. Sem “alguém respondeu” implícito.</p></div>
-      <div class="card"><span class="k">Entrega auditável</span><h3>A decisão chega com o caminho</h3><p>A missão termina em uma entrega final — veredito, evidências, riscos e próximas ações — com a contribuição de cada etapa visível e expansível na mesma conversa.</p></div>
-      <div class="card"><span class="k">Além do chat</span><h3>Laboratório e telemetria</h3><p>O módulo SOMPO acompanha o trator por telemetria e o Laboratório Virtual reconstrói incidentes em 3D a partir de arquivos CSV/JSON reais.</p></div>
+      <div class="card"><span class="k">Equipe com dono</span><h3>Cada etapa tem responsável</h3><p>O fluxo exige supervisor, decisor da missão, executores, aprovação e exibição final. Presets como Equipe Risco Agro preenchem os cinco papéis de uma vez. Sem “alguém respondeu” implícito.</p></div>
+      <div class="card"><span class="k">Entrega auditável</span><h3>A decisão chega com o caminho</h3><p>A missão termina numa entrega final: veredito, evidências, riscos e próximas ações. A contribuição de cada etapa fica na mesma conversa.</p></div>
+      <div class="card"><span class="k">Além do chat</span><h3>SOMPO e laboratório</h3><p>O módulo SOMPO ensaia telemetria no simulador 3.2 (28 cenários) e traz 8 casos agrícolas. O Laboratório Virtual reconstrói o incidente em 3D a partir de CSV.</p></div>
     </div>
   </div>
 </section>
@@ -107,12 +101,12 @@
 <section>
   <div class="wrap">
     <h2>Como funciona</h2>
-    <p class="lead">Do pedido à decisão em quatro passos.</p>
+    <p class="lead">Do pedido à decisão em quatro passos. Do campo, o mesmo painel abre telemetria e replay.</p>
     <ol class="steps">
-      <li><h3>Monte a equipe</h3><p>Escolha um preset pronto (Equipe Risco Agro, Conselho de Estratégia…) ou monte o fluxo persona a persona no catálogo.</p></li>
+      <li><h3>Monte a equipe</h3><p>Escolha um preset pronto (Equipe Risco Agro, Conselho de Estratégia…) ou monte o fluxo persona a persona.</p></li>
       <li><h3>Escreva a missão</h3><p>Uma frase no compositor. Anexos de foto e texto entram junto, se precisar.</p></li>
-      <li><h3>A equipe executa</h3><p>Cada etapa roda com a persona e o modelo definidos — e cada resposta fica registrada na conversa.</p></li>
-      <li><h3>Revise a entrega</h3><p>O relator fecha com veredito, evidências e próximas ações. A sessão inteira fica salva e compartilhável por link.</p></li>
+      <li><h3>A equipe executa</h3><p>Cada etapa roda com a persona e o modelo definidos. Cada resposta fica registrada na conversa.</p></li>
+      <li><h3>Revise a entrega</h3><p>O relator fecha com veredito, evidências e próximas ações. No SOMPO e no laboratório, o dossiê do campo entra na mesma bancada.</p></li>
     </ol>
   </div>
 </section>
@@ -120,23 +114,27 @@
 <section>
   <div class="wrap">
     <h2>Por dentro</h2>
-    <p class="lead">Capturas da instância real — sem mockup.</p>
+    <p class="lead">Capturas da instância real de demonstração, 15/09/2026. Sem mockup.</p>
     <div class="screens">
       <div class="screen">
-        <figure><img src="media/tela-bancada.png" alt="Bancada de missão com fluxo de personas 5/5 e missão digitada"><figcaption>bancada · fluxo 5/5 · missão no compositor</figcaption></figure>
-        <div><h3>A bancada de missões</h3><p>O painel lateral mostra o fluxo da equipe — supervisor, decisor, executores, aprovação e exibição — e fecha em 5/5 quando cada papel tem dono. Presets como “Equipe Risco Agro” preenchem tudo com um clique.</p></div>
+        <figure><img src="media/tela-inicio.png" alt="Início do LUCA-AI com histórias de prevenção em campo e aprendizado da frota"><figcaption>início · prevenção em campo · desempenho da frota</figcaption></figure>
+        <div><h3>Duas histórias de campo</h3><p>A entrada não é um chat vazio. Mostra o que o painel faz no curto prazo (parar o trator a tempo) e no longo prazo (aprender com a frota para a próxima safra).</p></div>
       </div>
       <div class="screen">
-        <figure><img src="media/tela-entrega.png" alt="Conversa da missão com etapas e entrega final"><figcaption>entrega final · veredito, riscos e próximas ações</figcaption></figure>
-        <div><h3>Uma conversa, uma decisão</h3><p>As contribuições entram por etapa — Supervisor, Execução, Aprovação — e o Relator Executivo fecha com a entrega final em formato executivo. O que a equipe decidiu e por quê fica à vista.</p></div>
+        <figure><img src="media/tela-bancada.png" alt="Bancada de missão com Equipe Risco Agro aplicada, fluxo 5/5 e missão no compositor"><figcaption>bancada · Equipe Risco Agro · fluxo 5/5</figcaption></figure>
+        <div><h3>A bancada de missões</h3><p>O painel lateral mostra o fluxo da equipe. Equipe Risco Agro aplica supervisor, execução, aprovação e entrega. A missão entra numa frase; as respostas aparecem nesta mesma tela.</p></div>
       </div>
       <div class="screen">
-        <figure><img src="media/tela-personas.png" alt="Catálogo Persona Cards"><figcaption>persona cards · catálogo global editável</figcaption></figure>
-        <div><h3>Catálogo de personas</h3><p>Persona Cards lista o catálogo que vem do Yume via Kamui (somente leitura) mais as personas builtin. O admin oculta, renomeia, troca modelo e ajusta o system prompt sem sair do painel.</p></div>
+        <figure><img src="media/tela-sompo.png" alt="SOMPO com simulador 3.2, caminhão na estrada rural e telemetria ao vivo"><figcaption>sompo · simulador 3.2 · ESP32 virtual SIM-001</figcaption></figure>
+        <div><h3>SOMPO, telemetria no simulador</h3><p>O ensaio local gera a mesma leitura da telemetria sem o dispositivo físico: velocidade, distância frontal, pitch/roll. Origem do snapshot preservada. 28 cenários no catálogo do simulador.</p></div>
       </div>
       <div class="screen">
-        <figure><img src="media/tela-lab.png" alt="Laboratório virtual com replay 3D e linha do tempo"><figcaption>laboratório · replay 3D · eventos na linha do tempo</figcaption></figure>
-        <div><h3>Laboratório virtual</h3><p>Um CSV de telemetria vira uma cena 3D navegável: trajetória, eventos calculados (GPS indisponível, temperatura acima do limite) e relatório exportável — sem imagem de satélite, sem invenção.</p></div>
+        <figure><img src="media/tela-sompo-casos.png" alt="Aba Casos agrícolas do SOMPO com oito cenários de exemplo"><figcaption>sompo · 8 casos agrícolas · seca, granizo, geada, chuva</figcaption></figure>
+        <div><h3>Oito casos agrícolas prontos</h3><p>Seca na safrinha, granizo na soja, geada no trigo. Cada card leva situação, sinais e a pergunta que a equipe precisa responder. Catálogo em <code>src/lib/sompo-cases.ts</code>.</p></div>
+      </div>
+      <div class="screen">
+        <figure><img src="media/tela-lab.png" alt="Laboratório virtual com replay superior, 6001 amostras e eventos na linha do tempo"><figcaption>laboratório · 6.001 amostras · 10:00 · 3 eventos</figcaption></figure>
+        <div><h3>Laboratório virtual</h3><p>Um CSV vira replay navegável. O caso “Aquecimento e falha de GPS” traz 6.001 amostras em 10 minutos, com eventos de GPS indisponível, GPS recuperado e temperatura acima do limite didático.</p></div>
       </div>
     </div>
   </div>
@@ -145,50 +143,53 @@
 <section>
   <div class="wrap">
     <h2>Números medidos</h2>
-    <p class="lead">Medidos na instância de demonstração desta página, 13/09/2026.</p>
+    <p class="lead">Medidos na instância de demonstração desta página e no código deste commit, 15/09/2026.</p>
     <div class="numbers">
-      <div class="num"><b>5</b><span>etapas com dono no fluxo de equipe (visual opcional)</span></div>
-      <div class="num"><b>6.001</b><span>amostras de telemetria no caso demo do laboratório</span></div>
-      <div class="num"><b>10 min</b><span>de replay navegável por caso, com eventos na timeline</span></div>
-      <div class="num"><b>3</b><span>cenas de exemplo prontas para abrir com um clique</span></div>
+      <div class="num"><b>5/5</b><span>etapas com dono no fluxo de equipe</span></div>
+      <div class="num"><b>4</b><span>presets de equipe prontos (mais 5 individuais)</span></div>
+      <div class="num"><b>8</b><span>casos agrícolas de exemplo no SOMPO</span></div>
+      <div class="num"><b>28</b><span>cenários no simulador 3.2 (20 de pista + 8 agrícolas)</span></div>
+      <div class="num"><b>6.001</b><span>amostras de telemetria em cada caso demo de 10 min</span></div>
+      <div class="num"><b>5</b><span>exemplos de laboratório com um clique (3 sintéticos + 2 Piracicaba)</span></div>
     </div>
+    <p class="src">Fontes: <code>shared/luca-preset-seed.js</code>, <code>src/lib/sompo-cases.ts</code>, <code>shared/sompo-telemetry-simulator.js</code> (20) + <code>shared/sompo-agri-scenarios.js</code> (8), <code>datasets/laboratorio-virtual-v1/manifest.json</code>, <code>src/lib/lab-client.ts</code> (<code>LAB_EXAMPLES</code>). UI conferida na demo em 15/09/2026.</p>
   </div>
 </section>
 
 <section>
   <div class="wrap">
     <h2>Comparado a quê</h2>
-    <p class="lead">O que muda na prática, medido contra o fluxo comum de chat único — verificado no código deste repositório em 13/09/2026.</p>
+    <p class="lead">O que muda na prática contra o fluxo comum de um chat único. Verificado no código deste repositório em 15/09/2026.</p>
     <table>
       <thead><tr><th></th><th>Chat único de IA</th><th>LUCA-AI</th></tr></thead>
       <tbody>
-        <tr><td>Papel por etapa</td><td class="no">não existe — tudo é uma resposta só</td><td class="yes">supervisor, execução, aprovação e exibição nomeados</td></tr>
-        <tr><td>Trilha de execução</td><td class="no">resposta final sem contexto</td><td class="yes">cada etapa vira um bloco expansível na conversa</td></tr>
-        <tr><td>Entrega consolidada</td><td class="no">o usuário consolida na mão</td><td class="yes">veredito + evidências + riscos + próximas ações</td></tr>
-        <tr><td>Sessões persistentes</td><td class="no">depende do produto</td><td class="yes">biblioteca de sessões por conta, com compartilhamento por link</td></tr>
-        <tr><td>Além do texto</td><td class="no">—</td><td class="yes">artefatos visuais, telemetria SOMPO e replay 3D de incidentes</td></tr>
+        <tr><td>Papel por etapa</td><td class="no">não existe. tudo é uma resposta só</td><td class="yes">supervisor, execução, aprovação e exibição nomeados</td></tr>
+        <tr><td>Trilha de execução</td><td class="no">resposta final sem contexto de papéis</td><td class="yes">cada etapa vira um bloco na mesma conversa</td></tr>
+        <tr><td>Entrega consolidada</td><td class="no">o usuário consolida na mão</td><td class="yes">veredito, evidências, riscos e próximas ações</td></tr>
+        <tr><td>Telemetria de campo</td><td class="no">não faz parte do chat</td><td class="yes">SOMPO: simulador 3.2, 28 cenários, origem do snapshot</td></tr>
+        <tr><td>Replay de incidente</td><td class="no">não existe</td><td class="yes">laboratório 3D a partir de CSV/JSON, eventos na timeline</td></tr>
       </tbody>
     </table>
-    <p class="src">Fonte: <a href="https://github.com/LucasOl1337/LUCA-AI">LucasOl1337/LUCA-AI</a> — <code>shared/persona-workflow.js</code>, <code>src/pages/LucaAiPage.tsx</code>, <code>docs/</code>. Em produção em <a href="https://luca-ai.com.br">luca-ai.com.br</a> (health check 200 em 13/09/2026).</p>
+    <p class="src">Fonte: <a href="https://github.com/LucasOl1337/LUCA-AI">LucasOl1337/LUCA-AI</a>: <code>shared/persona-workflow.js</code>, <code>src/pages/LucaAiPage.tsx</code>, <code>src/pages/SompoPage.tsx</code>, <code>src/pages/LaboratorioPage.tsx</code>. Produção em <a href="https://luca-ai.com.br">luca-ai.com.br</a> (<code>GET /api/health</code> 200, versão 0.5.0, 15/09/2026).</p>
   </div>
 </section>
 
 <section>
   <div class="wrap">
     <h2>Instalação</h2>
-    <p class="lead">Node.js + Python 3. Roda local em <code>127.0.0.1:4242</code>.</p>
+    <p class="lead">Node.js + Python 3. Roda local em <code>127.0.0.1:4242</code>. A vitrine não publica o app: o produto vivo está em luca-ai.com.br.</p>
     <pre>git clone https://github.com/LucasOl1337/LUCA-AI.git
 cd LUCA-AI
 npm ci
 npm start        # build Vite + Express em http://127.0.0.1:4242</pre>
-    <p class="src">Saúde: <code>GET /api/health</code> · Estado local em <code>.luca/</code> · Documentação operacional em <a href="https://github.com/LucasOl1337/LUCA-AI/tree/main/docs">docs/</a>.</p>
+    <p class="src">Saúde: <code>GET /api/health</code> · Demo SOMPO isolada: <code>npm run demo:sompo</code> · Estado local em <code>.luca/</code> · Documentação em <a href="https://github.com/LucasOl1337/LUCA-AI/tree/main/docs">docs/</a>.</p>
   </div>
 </section>
 
 <footer>
   <div class="wrap row">
-    <span>LUCA-AI — Centro operacional de agentes</span>
-    <span><a href="https://luca-ai.com.br">luca-ai.com.br</a> · <a href="https://github.com/LucasOl1337/LUCA-AI">GitHub</a> · <a href="https://github.com/LucasOl1337/LUCA-AI/releases">Releases</a></span>
+    <span>LUCA-AI. Centro operacional de agentes</span>
+    <span><a href="https://luca-ai.com.br">luca-ai.com.br</a> · <a href="https://github.com/LucasOl1337/LUCA-AI">GitHub</a></span>
   </div>
 </footer>
 
