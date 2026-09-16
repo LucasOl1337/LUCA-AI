@@ -56,6 +56,7 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
         c=mix(c,c*c*(3.-2.*c),.24);                                // contraste suave
         c*=mix(vec3(1.),vec3(1.085,1.,.90),smoothstep(.55,1.,lum)*.55); // altas quentes
         c*=mix(vec3(1.),vec3(.955,1.,1.06),smoothstep(.5,0.,lum)*.38); // sombras frias
+        c*=1.-.105*(1.-smoothstep(.10,.61,vUv.y));                    // primeiro plano em sombra
         vec2 p=(vUv-.5)*vec2(resolution.x/max(1.,resolution.y),1.);
         c*=1.-.22*smoothstep(.42,1.15,length(p));                  // vinheta
         // Grain subpixelar discreto evita gradientes digitais lisos no céu e

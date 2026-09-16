@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { sompoTerrainHeight, sompoVegetationDensity } from './createSompoTerrain';
+import { createSompoMountainSetpiece } from './createSompoMountainSetpiece';
 
 const rand = (i: number) => { const n = Math.sin(i * 127.1 + 21.7) * 43758.5453; return n - Math.floor(n); };
 
@@ -153,6 +154,7 @@ function makeTrail(mesh: THREE.InstancedMesh, slots: InstanceSlot[], span: numbe
 export function createSompoRoadDetails(parent: THREE.Group) {
   let disposed = false;
   const root = new THREE.Group(); root.name = 'rural-surface-details'; parent.add(root);
+  const mountainSetpiece = createSompoMountainSetpiece(root);
   const transform = new THREE.Object3D();
   const canvas = document.createElement('canvas'); canvas.width = canvas.height = 256;
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
@@ -178,7 +180,7 @@ export function createSompoRoadDetails(parent: THREE.Group) {
   rutMap.wrapS = THREE.RepeatWrapping; rutMap.repeat.x = 65; rutMap.anisotropy = 16;
   const rutMaterial = new THREE.MeshBasicMaterial({ map: rutMap, color: 0x372b1f, transparent: true, opacity: 0.75, depthWrite: false });
   const ruts: THREE.Mesh[] = [];
-  for (const shoulder of [2.7, -6.85]) for (const side of [-1, 1]) {
+  for (const shoulder of [1.82, -5.92]) for (const side of [-1, 1]) {
     // 260/65 = período de 4 m: o plano recicla em saltos de 20 m sem costura visível.
     const rut = new THREE.Mesh(new THREE.PlaneGeometry(260, 0.25), rutMaterial); rut.name = 'shoulder-tyre-impressions'; rut.rotation.x = -Math.PI / 2; rut.position.set(0, -0.006, shoulder + side * 0.36); root.add(rut); ruts.push(rut);
   }
@@ -357,7 +359,9 @@ export function createSompoRoadDetails(parent: THREE.Group) {
       cropLeafMaterial.map = map; cropLeafMaterial.needsUpdate = true;
     });
   }
-  const cropRows = 8;
+  // The hero corridor is alpine rather than a tilled plain. A few distant rows
+  // preserve the agricultural identity without competing with the mountain.
+  const cropRows = 0;
   const nearSlots: InstanceSlot[] = [], farSlots: InstanceSlot[] = [];
   const nearColors: THREE.Color[] = [], farColors: THREE.Color[] = [];
   for (let row = 0; row < cropRows; row += 1) {
@@ -366,8 +370,8 @@ export function createSompoRoadDetails(parent: THREE.Group) {
     const spacing = 2.35;
     for (let column = 0; column < cols; column += 1) {
       const i = row * 320 + column;
-      const z = -24 - row * 1.7 + (rand(i + 401) - 0.5) * 0.5;
-      if (rand(i + 419) < 0.58) continue;
+      const z = -31 - row * 2.1 + (rand(i + 401) - 0.5) * 0.5;
+      if (rand(i + 419) < 0.76) continue;
       const height = (near ? 2.12 : 1.92) + rand(i + 403) * (near ? 0.22 : 0.16);
       const width = 0.86 + rand(i + 412) * 0.20;
       (near ? nearSlots : farSlots).push({
@@ -403,11 +407,11 @@ export function createSompoRoadDetails(parent: THREE.Group) {
       canopyMaterial.map = map; canopyMaterial.needsUpdate = true;
     });
   }
-  const canopy = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), canopyMaterial, 12);
+  const canopy = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), canopyMaterial, 0);
   canopy.name = 'astra-corn-canopy-cards'; canopy.receiveShadow = true; root.add(canopy);
   const canopySlots: InstanceSlot[] = [];
-  for (let i = 0; i < 12; i++) canopySlots.push({
-    x: (i % 4) * 22 - 88, z: -42 - Math.floor(i / 4) * 8.5,
+  for (let i = 0; i < 0; i++) canopySlots.push({
+    x: i * 34 - 58, z: -46,
     y: 2.15, rotation: (rand(i + 901) - .5) * .4,
     scale: new THREE.Vector3(1.7 + rand(i + 903) * .35, 3.4 + rand(i + 902) * .25, 1),
   });
@@ -415,7 +419,7 @@ export function createSompoRoadDetails(parent: THREE.Group) {
 
   // Pedras e cupinzeiros de cerrado espalhados no pasto.
   const rockMaterial = new THREE.MeshStandardMaterial({ color: 0xa69d91, roughness: 0.94, metalness: 0 });
-  const rockColor = new THREE.TextureLoader().load('/environments/sompo/dirt-color-2k.jpg');
+  const rockColor = new THREE.TextureLoader().load('/sompo/gen/r13-mountain-ground.webp');
   rockColor.colorSpace = THREE.SRGBColorSpace; rockColor.wrapS = rockColor.wrapT = THREE.RepeatWrapping; rockColor.repeat.set(1.7, 1.7);
   const rockNormal = new THREE.TextureLoader().load('/environments/sompo/dirt-normal-2k.jpg');
   rockNormal.colorSpace = THREE.NoColorSpace; rockNormal.wrapS = rockNormal.wrapT = THREE.RepeatWrapping; rockNormal.repeat.set(1.7, 1.7);
@@ -467,10 +471,12 @@ export function createSompoRoadDetails(parent: THREE.Group) {
       cropNearTrail.update(truckX);
       cropFarTrail.update(truckX);
       rockTrail.update(truckX);
+      mountainSetpiece.update(truckX, wet);
     },
     dispose() {
       disposed = true; patchMap.dispose(); rutMap.dispose(); pineMap.dispose(); pineMaterial.dispose();
       rockColor.dispose(); rockNormal.dispose(); rockMaterial.dispose();
+      mountainSetpiece.dispose();
     },
   };
 }

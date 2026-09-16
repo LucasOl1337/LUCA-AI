@@ -53,7 +53,7 @@ function mesh(parent: THREE.Object3D, geometry: THREE.BufferGeometry, material: 
 
 function roadCurveZ(x: number) {
   const ahead = Math.max(0, x - 8);
-  return -2.05 - ahead * ahead * 0.00055 + Math.sin(ahead * 0.032) * Math.min(1.8, ahead * 0.018);
+  return -2.05 - ahead * ahead * 0.00032 + Math.sin(ahead * 0.028) * Math.min(1.15, ahead * 0.013);
 }
 
 function roadCurveSlope(x: number) {
@@ -61,16 +61,18 @@ function roadCurveSlope(x: number) {
   return (roadCurveZ(x + step) - roadCurveZ(x - step)) / (step * 2);
 }
 
-function curvedRoadStrip(width: number, lateral = 0, length = 260, segments = 128) {
+function curvedRoadStrip(width: number, lateral = 0, length = 260, segments = 128, irregular = 0) {
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
   for (let i = 0; i <= segments; i += 1) {
     const t = i / segments;
     const x = -length / 2 + t * length;
-    const centerZ = roadCurveZ(x) + lateral;
+    const edgeNoise = irregular * (Math.sin(x * 0.21 + lateral) * 0.58 + Math.sin(x * 0.071 - lateral * 0.7) * 0.42);
+    const centerZ = roadCurveZ(x) + lateral + edgeNoise * 0.18 * Math.sign(lateral || 1);
+    const halfWidth = width * (1 + edgeNoise * 0.16) / 2;
     for (const side of [-1, 1]) {
-      positions.push(x, 0, centerZ + side * width / 2);
+      positions.push(x, 0, centerZ + side * halfWidth);
       uvs.push(t, side < 0 ? 0 : 1);
     }
     if (i < segments) {
@@ -106,15 +108,20 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   });
   const clearSky = sky(false); const rainSky = sky(true);
   scene.background = clearSky;
-  scene.fog = new THREE.Fog(0xbebca9, 75, 220);
+  scene.fog = new THREE.Fog(0xaebfca, 72, 238);
   const assets = createSompoEnvironmentAssets(scene, renderer, { background: false, onHdri: hooks?.onHdri });
   const earthMap = groundTexture('earth');
-  const earth = new THREE.MeshStandardMaterial({ map: earthMap, roughness: 1, color: 0xffffff });
+  const mountainGroundMap = new THREE.TextureLoader().load('/sompo/gen/r13-mountain-ground.webp');
+  mountainGroundMap.colorSpace = THREE.SRGBColorSpace;
+  mountainGroundMap.wrapS = mountainGroundMap.wrapT = THREE.MirroredRepeatWrapping;
+  mountainGroundMap.repeat.set(88, 48);
+  mountainGroundMap.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const earth = new THREE.MeshStandardMaterial({ map: mountainGroundMap, roughness: 1, color: 0xffffff });
   const terrain = createSompoTerrainMesh(earth);
   terrain.position.y = -0.055;
   root.add(terrain);
-  assets.surface(earth, 'dirt', 45, 30);
-  varySompoSurface(earth, 0.24);
+  assets.surface(earth, 'dirt', 88, 48, { keepMap: true, normalScale: 1.15 });
+  varySompoSurface(earth, 0.18);
   const pasture = createSompoPastureSurface(earth);
   const details = createSompoRoadDetails(root);
   const roadMap = groundTexture('road');
@@ -131,7 +138,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
     detail.anisotropy = renderer.capabilities.getMaxAnisotropy();
     asphalt.map = detail;
   }
-  const road = mesh(root, curvedRoadStrip(8.2), asphalt, [0, 0, 0]);
+  const road = mesh(root, curvedRoadStrip(6.8), asphalt, [0, 0, 0]);
   assets.surface(asphalt, 'asphalt', 100, 5, { keepMap: true, normalScale: 0.7 });
   varySompoSurface(asphalt, 0.24);
   const unpaved = new THREE.MeshStandardMaterial({ map: earthMap, roughness: 1, color: 0xb09b7e });
@@ -150,8 +157,8 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   assets.surface(shoulderMaterial, 'dirt', 65, 0.375);
   varySompoSurface(shoulderMaterial, 0.3);
   const shoulders: THREE.Mesh[] = [];
-  for (const lateral of [4.77, -4.77]) {
-    const shoulder = mesh(root, curvedRoadStrip(1.5, lateral), shoulderMaterial, [0, -0.015, 0]);
+  for (const lateral of [3.9, -3.9]) {
+    const shoulder = mesh(root, curvedRoadStrip(1.35, lateral, 260, 128, 0.42), shoulderMaterial, [0, -0.015, 0]);
     shoulders.push(shoulder);
   }
   const markings = new THREE.Group(); root.add(markings);
@@ -159,7 +166,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const white = new THREE.MeshStandardMaterial({ map: edgePaint, alphaTest: 0.45, color: 0xe3e0ce, roughness: 0.82 });
   const yellow = new THREE.MeshStandardMaterial({ map: wornPaint, alphaTest: 0.45, color: 0xe5b744, roughness: 0.8 });
   const edgeLines: THREE.Mesh[] = [];
-  for (const lateral of [3.9, -3.91]) edgeLines.push(mesh(markings, curvedRoadStrip(0.12, lateral), white, [0, 0.012, 0]));
+  for (const lateral of [3.24, -3.24]) edgeLines.push(mesh(markings, curvedRoadStrip(0.11, lateral), white, [0, 0.012, 0]));
   const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(3.7, 0.015, 0.11), yellow, 52);
   const transform = new THREE.Object3D();
   for (let i = 0; i < 52; i += 1) {
@@ -376,10 +383,10 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       unpaved.roughness = mud ? 0.82 : 1;
       assets.update(wet);
       const fog = scene.fog as THREE.Fog;
-      fog.color.set(wet ? 0x919b9c : 0xbebca9); fog.near = wet ? 55 : 100; fog.far = wet ? 220 : 260;
+      fog.color.set(wet ? 0x87969d : 0xaebfca); fog.near = wet ? 52 : 78; fog.far = wet ? 205 : 244;
       earth.color.setScalar(wet ? 0.58 : 1);
       shoulderMaterial.color.set(wet ? 0x96856c : 0xe1c9aa);
-      asphalt.color.set(mud ? 0x604331 : gravel ? 0x998467 : wet ? 0x45545f : 0xffffff);
+      asphalt.color.set(mud ? 0x604331 : gravel ? 0x998467 : wet ? 0x45545f : 0xc1c5c3);
       asphalt.roughness = wet && !mud ? 0.2 : 0.95;
       asphalt.normalScale.setScalar(wet ? 0.20 : 1.0);
       markings.visible = !mud && !gravel;
@@ -425,7 +432,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
     },
     get hasHdri() { return assets.hasHdri; },
     dispose() {
-      pasture.dispose(); vegetation.dispose(); animal.dispose(); details.dispose(); assets.dispose(); asphalt.dispose(); unpaved.dispose(); clearSky.dispose(); rainSky.dispose();
+      pasture.dispose(); vegetation.dispose(); animal.dispose(); details.dispose(); assets.dispose(); asphalt.dispose(); unpaved.dispose(); clearSky.dispose(); rainSky.dispose(); mountainGroundMap.dispose();
       mountainBackdrop.removeFromParent(); mountainBackdropMaterial.dispose(); mountainBackdropMap.dispose(); },
   };
 }

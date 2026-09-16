@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { SompoStudioConfig } from './sompoStudioConfig';
 
 const palettes = {
-  day: { top: '#407fa8', horizon: '#b9ccd1', sun: '#fff2d5', ground: '#40553d', direction: [26, 38, 18], strength: 1.85, warmth: 0.06 },
+  day: { top: '#407fa8', horizon: '#a9bec9', sun: '#fff0d2', ground: '#344638', direction: [18, 25, -16], strength: 2.55, warmth: 0.08 },
   // Low sun gives the road, wheel chrome and long grass the same direction as
   // the reference while keeping the HDRI responsible for the actual sky detail.
   // The default camera looks from +Z toward -Z. Keep the low sun in front of
@@ -244,13 +244,13 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
       uniforms.ridgeNear.value.set(night ? '#14211f' : mode === 'overcast' ? '#3d4c40' : mode === 'golden' ? '#465038' : '#4c5e3e');
       sun.color.set(night ? '#9bbaca' : palette.sun); sun.intensity = night ? 0.45 : palette.strength;
       renderer.toneMappingExposure = config.exposure * (night ? 0.92 : mode === 'golden' ? 1.00 : 1.06);
-      scene.environmentIntensity = night ? 0.28 : mode === 'overcast' ? 0.72 : mode === 'golden' ? 0.40 : 0.95;
+      scene.environmentIntensity = night ? 0.28 : mode === 'overcast' ? 0.62 : mode === 'golden' ? 0.40 : 0.68;
       if (scene.fog instanceof THREE.Fog) {
         // Névoa de distância esfria e perde saturação: serras ficam azuladas
         // em camadas como na referência em vez de virarem uma parede âmbar.
-        scene.fog.color.set(night ? '#172733' : mode === 'overcast' ? '#a9b2ae' : mode === 'golden' ? '#bd925f' : '#b6c8ce');
-        scene.fog.near = wet ? 78 : mode === 'day' ? 105 : 68;
-        scene.fog.far = wet ? 270 : mode === 'day' ? 315 : 255;
+        scene.fog.color.set(night ? '#172733' : mode === 'overcast' ? '#a9b2ae' : mode === 'golden' ? '#bd925f' : '#9fb6c2');
+        scene.fog.near = wet ? 68 : mode === 'day' ? 58 : 68;
+        scene.fog.far = wet ? 235 : mode === 'day' ? 212 : 255;
       }
     },
     dispose() {

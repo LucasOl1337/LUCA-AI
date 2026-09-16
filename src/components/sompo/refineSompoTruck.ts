@@ -50,19 +50,22 @@ function toCabinGlass(material: THREE.MeshStandardMaterial) {
   // the cabin readable while preserving the reflection from the rural IBL.
   glass.color.set(0x6a8aa0);
   glass.metalness = 0;
-  glass.roughness = 0.045;
-  glass.transmission = 0.72;
-  glass.thickness = 0.045;
+  glass.roughness = 0.11;
+  // Alpha-blended physical glass keeps the cab readable on WebGL/SwiftShader.
+  // Transmission generated an invalid IBL refraction shader on that backend,
+  // making the entire windscreen disappear during captures and low-end use.
+  glass.transmission = 0;
+  glass.thickness = 0;
   glass.ior = 1.45;
   glass.transparent = true;
-  glass.opacity = 1;
-  glass.clearcoat = 1;
-  glass.clearcoatRoughness = 0.03;
-  glass.envMapIntensity = 1.7;
+  glass.opacity = 0.46;
+  glass.clearcoat = 0.72;
+  glass.clearcoatRoughness = 0.08;
+  glass.envMapIntensity = 1.25;
   glass.attenuationColor = new THREE.Color(0x1a3344);
   glass.attenuationDistance = 0.8;
   glass.side = THREE.DoubleSide;
-  glass.depthWrite = true;
+  glass.depthWrite = false;
   return glass;
 }
 
@@ -91,9 +94,9 @@ function assignVisualMaps(root: THREE.Object3D) {
             material.map = map;
             material.bumpMap = null;
             material.roughnessMap = null;
-            material.color.set('#f2f0ea');
-            material.roughness = 0.42;
-            material.metalness = 0.16;
+            material.color.set('#d7d8d2');
+            material.roughness = 0.55;
+            material.metalness = 0.10;
           }
           if (kind === 'cabin') {
             material.map = map;
@@ -262,9 +265,9 @@ export function refineSompoTruck(model: SompoTruckModel) {
           if (material.name === 'Pintura da cabine') { material.color.set(config.paint); material.roughness = Math.min(0.28, config.roughness * 0.55); material.metalness = 0.38; }
           if (material.name === 'Acabamentos da cabine') { material.color.set(config.paint).multiplyScalar(0.62); material.roughness = Math.min(0.4, config.roughness * 0.7 + 0.08); }
           if (material.name === 'Painéis do baú' || material.name === 'Alumínio do baú' || material.name === 'Astra box shell') {
-            material.color.set('#f2f0ea');
-            material.roughness = material.map ? 0.42 : 0.58;
-            material.metalness = 0.16;
+            material.color.set('#d7d8d2');
+            material.roughness = material.map ? 0.55 : 0.64;
+            material.metalness = 0.10;
           }
           if (material instanceof THREE.MeshPhysicalMaterial && material.name === 'Pintura da cabine') { material.clearcoat = 0.9; material.clearcoatRoughness = 0.12; }
         }

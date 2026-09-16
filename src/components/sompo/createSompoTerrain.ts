@@ -53,7 +53,8 @@ export function sompoLakeDistance(x: number, z: number) {
 
 /** Faixa da rodovia (pista + acostamentos) permanece plana; o campo ondula suave. */
 export function sompoTerrainHeight(x: number, z: number) {
-  const corridor = Math.abs(z + 2.05);
+  const side = z + 2.05;
+  const corridor = Math.abs(side);
   const mask = THREE.MathUtils.smoothstep(corridor, 9, 20);
   if (mask <= 0) return 0;
   const broad = (periodicNoise(x, z, 40, SOMPO_TERRAIN_PERIOD_X / 40) * 2) - 1;
@@ -61,6 +62,20 @@ export function sompoTerrainHeight(x: number, z: number) {
   const fine = (periodicNoise(x + 37, z + 91, 5, SOMPO_TERRAIN_PERIOD_X / 5) * 2) - 1;
   const amplitude = 1.8 + (THREE.MathUtils.smoothstep(corridor, 24, 100) * 4.8);
   let h = mask * ((broad * amplitude) + (middle * amplitude * 0.35) + (fine * 0.22));
+  // Authored mountain pass: the camera rides between a rising cut bank on its
+  // left and a real valley drop on the right. The previous symmetric pasture
+  // could never create the RDR2-like near/mid/far depth stack.
+  const uphillSide = -side;
+  const uphill = THREE.MathUtils.smoothstep(uphillSide, 4.6, 24);
+  const uphillTerrace = THREE.MathUtils.smoothstep(uphillSide, 7, 13) * 2.8
+    + THREE.MathUtils.smoothstep(uphillSide, 14, 29) * 4.7;
+  const cliffGrain = (periodicNoise(x + 127, z - 73, 11, SOMPO_TERRAIN_PERIOD_X / 11) * 2 - 1) * 1.6
+    + (periodicNoise(x - 49, z + 19, 4, SOMPO_TERRAIN_PERIOD_X / 4) * 2 - 1) * 0.42;
+  h += uphill * (uphillTerrace + 2.2 + cliffGrain);
+  const downhillDistance = side;
+  const valleyDrop = THREE.MathUtils.smoothstep(downhillDistance, 5.4, 22)
+    * (1 - THREE.MathUtils.smoothstep(downhillDistance, 62, 104));
+  h -= valleyDrop * (3.8 + periodicNoise(x + 313, z - 91, 23, SOMPO_TERRAIN_PERIOD_X / 23) * 2.6);
   // Serra ao fundo: crista rolando dos dois lados, abrindo uma forquilha no lago.
   // MathUtils.smoothstep não inverte bordas como o GLSL: máscaras de raio usam 1-smoothstep.
   const lakeX = periodicX(x - SOMPO_LAKE.x);

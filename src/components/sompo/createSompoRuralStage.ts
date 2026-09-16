@@ -113,10 +113,12 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     // Capture pose: between live-8 (6.5, 3.5, 8.8) and the live-12 pull-back
     // (10.6, 4.25, 15.2) fov 32. Roof should sit near 28–32% of frame height,
     // truck ~78–85% of width, chrome face inside a small margin.
-    const viewFov = 42;
-    const compositionAspect = 1.25;
-    const viewOffset = { x: -15.8, y: 3.55, z: 5.8 };
-    const viewLook = { x: 6.4, y: 1.35, z: -1.85 };
+    const viewFov = 40;
+    const compositionAspect = 16 / 9;
+    // Centered chase framing: the truck anchors the lower third while the road
+    // pulls into the mountain pass, matching the target's rider/path hierarchy.
+    const viewOffset = { x: -17.2, y: 4.25, z: 0.65 };
+    const viewLook = { x: 9.5, y: 1.28, z: -1.72 };
     const camera = new THREE.PerspectiveCamera(viewFov, 1, 0.1, 360);
     camera.position.set(viewOffset.x, viewOffset.y, viewOffset.z);
 
@@ -138,19 +140,19 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     orbit.maxPolarAngle = Math.PI * 0.49;
     orbit.target.set(viewLook.x, viewLook.y, viewLook.z);
 
-    scene.add(new THREE.HemisphereLight(0xc8e0ef, 0x314331, 0.72));
-    const keyLight = new THREE.DirectionalLight(0xffd39a, 2.85);
-    keyLight.position.set(12, 8, 18);
-    const rimLight = new THREE.DirectionalLight(0xc8e5f3, 0.34);
+    scene.add(new THREE.HemisphereLight(0xc8dfeb, 0x263428, 0.38));
+    const keyLight = new THREE.DirectionalLight(0xffddb0, 2.5);
+    keyLight.position.set(8, 13, 15);
+    const rimLight = new THREE.DirectionalLight(0xb9d7e8, 0.25);
     rimLight.position.set(16, 7, -11);
     scene.add(rimLight);
-    const fillLight = new THREE.DirectionalLight(0xd6e5e8, 0.24);
+    const fillLight = new THREE.DirectionalLight(0xcbdce3, 0.08);
     fillLight.position.set(-8, 6.5, 10);
     scene.add(fillLight);
     // Tight sky-colored specular on the 1.70 chrome surround / hood only.
     // Directional #b7d4c4 @ 0.82 at (18,13,12) lifted the whole truck; a
     // camera-right / +Y cone hits grille+hood without filling the reefer.
-    const skyCatch = new THREE.SpotLight(0xc5e8d4, 3.2, 14, THREE.MathUtils.degToRad(11), 0.35, 1.5);
+    const skyCatch = new THREE.SpotLight(0xc5e8d4, 2.45, 14, THREE.MathUtils.degToRad(11), 0.35, 1.5);
     skyCatch.name = 'grille-sky-catch';
     skyCatch.position.set(9.2, 4.8, 4.2);
     skyCatch.target.position.set(4.50, 1.45, 0);

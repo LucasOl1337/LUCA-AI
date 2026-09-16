@@ -2484,15 +2484,15 @@
 }
 .sompo-simulator-stage { container-type: inline-size; }
 @container (min-width: 950px) {
-  .sompo-simulator-stage-badges { top: 20px; left: 18px; right: 18px; }
-  .sompo-simulator-stage-badges > span { min-height: 38px; padding-inline: 13px; font-size: 14px; gap: 9px; }
-  .sompo-simulator-led { width: 9px; height: 9px; }
-  .sompo-simulator-readout { top: 78px; left: 18px; gap: 8px; }
-  .sompo-simulator-readout > div { padding: 12px 16px; border-radius: 12px; }
-  .sompo-simulator-readout span, .sompo-simulator-readout small { font-size: 14px; }
-  .sompo-simulator-readout strong { font-size: 21px; margin-top: 4px; }
-  .sompo-simulator-camera { right: 18px; bottom: 80px; gap: 9px; }
-  .sompo-simulator-camera button { min-height: 54px; padding-inline: 16px; font-size: 14px; border-radius: 14px; }
-  .sompo-simulator-hint { left: 18px; bottom: 48px; font-size: 12px; }
-  .sompo-simulator-credit { left: 18px; bottom: 12px; font-size: 14px; }
+  .sompo-simulator-stage-badges { top: 14px; left: 14px; right: 14px; }
+  .sompo-simulator-stage-badges > span { min-height: 29px; padding-inline: 10px; font-size: 11px; gap: 7px; }
+  .sompo-simulator-led { width: 7px; height: 7px; }
+  .sompo-simulator-readout { top: 55px; left: 14px; gap: 6px; }
+  .sompo-simulator-readout > div { padding: 8px 11px; border-radius: 9px; }
+  .sompo-simulator-readout span, .sompo-simulator-readout small { font-size: 10.5px; }
+  .sompo-simulator-readout strong { font-size: 16px; margin-top: 3px; }
+  .sompo-simulator-camera { right: 14px; bottom: 55px; gap: 6px; }
+  .sompo-simulator-camera button { min-height: 39px; padding-inline: 11px; font-size: 10.5px; border-radius: 10px; }
+  .sompo-simulator-hint { left: 14px; bottom: 38px; font-size: 9.5px; }
+  .sompo-simulator-credit { left: 14px; bottom: 10px; font-size: 10.5px; }
 }
