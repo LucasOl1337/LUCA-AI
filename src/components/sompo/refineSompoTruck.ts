@@ -46,26 +46,22 @@ function toCabinGlass(material: THREE.MeshStandardMaterial) {
   const glass = new THREE.MeshPhysicalMaterial();
   THREE.MeshStandardMaterial.prototype.copy.call(glass, material);
   glass.name = material.name;
-  // Same greenhouse as the modular cab: a transparent physical pane keeps
-  // the cabin readable while preserving the reflection from the rural IBL.
+  // Same greenhouse as the modular cab: a 8% alpha plate reads as "no window".
   glass.color.set(0x6a8aa0);
   glass.metalness = 0;
-  glass.roughness = 0.11;
-  // Alpha-blended physical glass keeps the cab readable on WebGL/SwiftShader.
-  // Transmission generated an invalid IBL refraction shader on that backend,
-  // making the entire windscreen disappear during captures and low-end use.
-  glass.transmission = 0;
-  glass.thickness = 0;
+  glass.roughness = 0.045;
+  glass.transmission = 0.72;
+  glass.thickness = 0.045;
   glass.ior = 1.45;
   glass.transparent = true;
-  glass.opacity = 0.46;
-  glass.clearcoat = 0.72;
-  glass.clearcoatRoughness = 0.08;
-  glass.envMapIntensity = 1.25;
+  glass.opacity = 1;
+  glass.clearcoat = 1;
+  glass.clearcoatRoughness = 0.03;
+  glass.envMapIntensity = 1.7;
   glass.attenuationColor = new THREE.Color(0x1a3344);
   glass.attenuationDistance = 0.8;
   glass.side = THREE.DoubleSide;
-  glass.depthWrite = false;
+  glass.depthWrite = true;
   return glass;
 }
 
@@ -94,9 +90,9 @@ function assignVisualMaps(root: THREE.Object3D) {
             material.map = map;
             material.bumpMap = null;
             material.roughnessMap = null;
-            material.color.set('#bec1bb');
-            material.roughness = 0.62;
-            material.metalness = 0.14;
+            material.color.set('#f2f0ea');
+            material.roughness = 0.42;
+            material.metalness = 0.16;
           }
           if (kind === 'cabin') {
             material.map = map;
@@ -119,30 +115,9 @@ function assignVisualMaps(root: THREE.Object3D) {
       });
     });
   };
-  paint('/sompo/gen/r10-corrugation.webp', ['Painéis do baú', 'Astra box shell'], 'cargo');
+  paint('/sompo/gen/r10-corrugation.webp', ['Painéis do baú'], 'cargo');
   paint('/sompo/gen/r9-cabin-through-glass.webp', ['Astra cabin interior'], 'cabin');
   paint('/sompo/gen/r6-grille-front.webp', ['Astra grille face'], 'grille');
-}
-
-/**
- * Generated Astra meshes arrive mostly as MeshStandardMaterial. Promote the
- * visible shell surfaces to the physical material path so the same local HDRI
- * produces a clean broad reflection instead of a flat diffuse response.
- * Textures are intentionally shared by the promoted material; disposal remains
- * owned by the scene graph.
- */
-function promoteTruckShellMaterial(material: THREE.MeshStandardMaterial, label: string) {
-  if (material instanceof THREE.MeshPhysicalMaterial || !/cab|cargo|box|shell/i.test(label)) return material;
-  // MeshPhysicalMaterial.copy expects physical-only fields such as
-  // clearcoatNormalScale to exist on the source. GLTFLoader gives us a plain
-  // MeshStandardMaterial, so copy the shared base fields explicitly first.
-  const physical = new THREE.MeshPhysicalMaterial();
-  THREE.MeshStandardMaterial.prototype.copy.call(physical, material);
-  physical.clearcoat = /cab|shell/i.test(label) ? 0.78 : 0.34;
-  physical.clearcoatRoughness = /cab|shell/i.test(label) ? 0.13 : 0.2;
-  physical.envMapIntensity = Math.max(material.envMapIntensity, /cab|shell/i.test(label) ? 1.2 : 0.9);
-  material.dispose();
-  return physical;
 }
 
 export function refineSompoTruck(model: SompoTruckModel) {
@@ -232,19 +207,7 @@ export function refineSompoTruck(model: SompoTruckModel) {
       const replacements = [['astra-cab', cab], ['astra-cargo', cargo]] as const;
       if (replacements.some(([name]) => !visual.getObjectByName(name))) throw new Error('Incomplete Astra truck');
       for (const [name, assembly] of replacements) {
-        for (const child of assembly.children) {
-          // The generated Astra skin supplies the large silhouette, but its
-          // rear is intentionally sparse. Preserve the modular rig's metallic
-          // corrugation, hinges, locking bars and marker lamps as fitted detail
-          // over the skin instead of throwing the whole authored assembly away.
-          const materials = child instanceof THREE.Mesh
-            ? (Array.isArray(child.material) ? child.material : [child.material])
-            : [];
-          child.visible = name === 'astra-cargo' && materials.some((material) => {
-            const standard = material as THREE.MeshStandardMaterial;
-            return (standard.metalness ?? 0) >= 0.74 || (standard.emissiveIntensity ?? 0) >= 0.25;
-          });
-        }
+        for (const child of assembly.children) child.visible = false;
         const skin = visual.getObjectByName(name)!;
         assembly.add(skin);
         skin.traverse(node => {
@@ -255,8 +218,7 @@ export function refineSompoTruck(model: SompoTruckModel) {
             if (!(item instanceof THREE.MeshStandardMaterial)) return item;
             const label = `${mesh.name} ${item.name}`;
             const converted = /glass|windscreen|window/i.test(label) && !/mirror/i.test(label)
-              ? toCabinGlass(item)
-              : promoteTruckShellMaterial(item, label);
+              ? toCabinGlass(item) : item;
             if (converted !== item) mesh.renderOrder = 3;
             if (!materials.has(converted)) { materials.add(converted); wearTruck(converted); }
             return converted;
@@ -277,9 +239,9 @@ export function refineSompoTruck(model: SompoTruckModel) {
           if (material.name === 'Pintura da cabine') { material.color.set(config.paint); material.roughness = Math.min(0.28, config.roughness * 0.55); material.metalness = 0.38; }
           if (material.name === 'Acabamentos da cabine') { material.color.set(config.paint).multiplyScalar(0.62); material.roughness = Math.min(0.4, config.roughness * 0.7 + 0.08); }
           if (material.name === 'Painéis do baú' || material.name === 'Alumínio do baú' || material.name === 'Astra box shell') {
-            material.color.set('#bec1bb');
-            material.roughness = material.map ? 0.62 : 0.7;
-            material.metalness = 0.14;
+            material.color.set('#f2f0ea');
+            material.roughness = material.map ? 0.42 : 0.58;
+            material.metalness = 0.16;
           }
           if (material instanceof THREE.MeshPhysicalMaterial && material.name === 'Pintura da cabine') { material.clearcoat = 0.9; material.clearcoatRoughness = 0.12; }
         }

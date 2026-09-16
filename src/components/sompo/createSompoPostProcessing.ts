@@ -38,11 +38,7 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
       }`,
   });
   composer.addPass(sanitize);
-  // Keep the threshold low enough for chrome, wet asphalt and the sensor LED,
-  // while retaining a restrained highlight rolloff around the sun.
-  // Thresholding keeps the headlamp lens from washing the grille while still
-  // allowing the sun, sensor LED and chrome catches to bloom naturally.
-  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.13, 0.28, 1.18);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.22, 0.35, 1.1);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
   const grade = new ShaderPass({
@@ -53,16 +49,11 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
         vec3 c=texture2D(tDiffuse,vUv).rgb;
         float lum=dot(c,vec3(.2126,.7152,.0722));
         c=mix(vec3(lum),c,1.03);                                   // saturação
-        c=mix(c,c*c*(3.-2.*c),.24);                                // contraste suave
+        c=mix(c,c*c*(3.-2.*c),.28);                                // contraste suave
         c*=mix(vec3(1.),vec3(1.085,1.,.90),smoothstep(.55,1.,lum)*.55); // altas quentes
         c*=mix(vec3(1.),vec3(.955,1.,1.06),smoothstep(.5,0.,lum)*.38); // sombras frias
-        c*=1.-.105*(1.-smoothstep(.10,.61,vUv.y));                    // primeiro plano em sombra
         vec2 p=(vUv-.5)*vec2(resolution.x/max(1.,resolution.y),1.);
-        c*=1.-.22*smoothstep(.42,1.15,length(p));                  // vinheta
-        // Grain subpixelar discreto evita gradientes digitais lisos no céu e
-        // continua proporcionalmente imperceptível quando o viewport escala.
-        float grain=fract(sin(dot(gl_FragCoord.xy+resolution*.37,vec2(12.9898,78.233)))*43758.5453)-.5;
-        c+=grain*.006*mix(.45,1.,1.-lum);
+        c*=1.-.30*smoothstep(.42,1.15,length(p));                  // vinheta
         gl_FragColor=vec4(c,1.);
       }`,
   });

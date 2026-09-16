@@ -232,7 +232,7 @@ export function createSompoTruckModel({ sensorLabel }: SompoTruckModelOptions): 
     ior: 1.5,
     transparent: true,
     emissive: 0xd7ecff,
-    emissiveIntensity: 0.14,
+    emissiveIntensity: 0.35,
     clearcoat: 1,
     clearcoatRoughness: 0.04,
   });

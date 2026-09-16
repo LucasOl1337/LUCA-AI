@@ -2,12 +2,8 @@ import * as THREE from 'three';
 import type { SompoStudioConfig } from './sompoStudioConfig';
 
 const palettes = {
-  day: { top: '#407fa8', horizon: '#a9bec9', sun: '#fff0d2', ground: '#344638', direction: [18, 25, -16], strength: 2.55, warmth: 0.08 },
-  // Low sun gives the road, wheel chrome and long grass the same direction as
-  // the reference while keeping the HDRI responsible for the actual sky detail.
-  // The default camera looks from +Z toward -Z. Keep the low sun in front of
-  // it and slightly screen-right, where the target reads the glowing disc.
-  golden: { top: '#f0d4ad', horizon: '#f4bd78', sun: '#ffe6b8', ground: '#4d4b2e', direction: [12, 6.5, -30], strength: 2.85, warmth: 0.46 },
+  day: { top: '#5596b6', horizon: '#c6d7d2', sun: '#fff3d7', ground: '#45563b', direction: [26, 42, 18], strength: 2.2, warmth: 0.15 },
+  golden: { top: '#e6eee8', horizon: '#f2eee0', sun: '#ffe6b8', ground: '#4d5a38', direction: [22, 16, 16], strength: 2.7, warmth: 0.28 },
   overcast: { top: '#758992', horizon: '#bec9c5', sun: '#d8e8ee', ground: '#424b3c', direction: [12, 40, 16], strength: 0.65, warmth: 0 },
 };
 
@@ -96,7 +92,7 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
           // Cream lift at the top of the frame from palette top/horizon.
           // Does not raise environmentIntensity on the truck.
           float creamHigh=smoothstep(.16,.70,d.y);
-          c=mix(c,mix(horizon,top,.62),creamHigh*warmth*.95);
+          c=mix(c,mix(horizon,top,.62),creamHigh*warmth*1.75);
           // Nuvens em camadas no céu fotográfico, modeladas como corpo +
           // borda: o centro da nuvem sombreia o céu e a beirada pega fogo do
           // lado do sol: é o que faz a camada ler de verdade em vez de só
@@ -125,7 +121,7 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
         } else {
           float h=max(d.y,0.);c=mix(horizon,top,pow(h,.32));
           vec2 p=d.xz/max(.12,d.y+.18)*3.0+vec2(clock*.0015,0);
-          float n=fbm(p);float cloud=smoothstep(.62-cloudiness*.08,.82-cloudiness*.08,n)*smoothstep(0.,.2,h)*.12;
+          float n=fbm(p);float cloud=smoothstep(.59-cloudiness*.12,.77-cloudiness*.12,n)*smoothstep(0.,.2,h)*.65;
           c=mix(c,mix(horizon,vec3(1.),.45),cloud);
           c+=sunlight*(pow(sunAmt,70.)*.06+pow(sunAmt,1600.)*.7);
         }
@@ -138,8 +134,8 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
         float sunGap=exp(-pow(wrapDelta(az-sunAzimuth)/.5,2.));   // sol nasce numa forquilha
         float farTop=(.034+ridge1(az)*.105)*(1.-.5*sunGap*.4);
         float nearTop=(.018+ridge2(az+2.7)*.068)*(1.-.62*sunGap);
-        vec3 farCol=mix(hazeCol,ridgeFar,.84);
-        vec3 nearCol=mix(hazeCol,ridgeNear,.9);
+        vec3 farCol=mix(hazeCol,ridgeFar,.74);
+        vec3 nearCol=mix(hazeCol,ridgeNear,.82);
         if(d.y<farTop){
           float soft=smoothstep(farTop,farTop-.012,d.y);
           c=mix(c,farCol,soft*.9);
@@ -151,13 +147,7 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
         // ── Abaixo do horizonte: chão distante some na névoa ────────────
         if(d.y<0.) c=mix(hazeCol,groundNear,smoothstep(-.02,-.3,d.y));
         // ── Sol: disco HDR + glow para o bloom segurar ──────────────────
-        if(night<.5) {
-          // Disc plus a broad, low-energy atmospheric shaft. The disc remains
-          // distinct after ACES/bloom, while the shaft gives the distant field
-          // the warm depth seen through the haze.
-          c+=sunlight*(smoothstep(.99988,.99996,sunAmt)*6.+pow(sunAmt,900.)*1.4+pow(sunAmt,34.)*.12*warmth);
-          c+=sunlight*(pow(sunAmt,18.)*.10+pow(sunAmt,7.)*.018)*warmth;
-        }
+        if(night<.5) c+=sunlight*(smoothstep(.99988,.99996,sunAmt)*6.+pow(sunAmt,900.)*1.4+pow(sunAmt,34.)*.12*warmth);
         gl_FragColor=vec4(c,1.);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -202,13 +192,7 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
   dome.name = 'sompo-sky-dome'; dome.renderOrder = -99; dome.frustumCulled = false; scene.add(dome);
   const sunOffset = new THREE.Vector3();
   const textures: Partial<Record<'dry' | 'wet', THREE.Texture>> = {};
-  let backdropActive = false;
   return {
-    setBackdropActive(active: boolean) {
-      backdropActive = active;
-      sky.visible = !active;
-      dome.visible = !active;
-    },
     /** Recebe o equirect cru do loader de ambiente (foto real, não PMREM). */
     setSkyTexture(kind: 'dry' | 'wet', texture: THREE.Texture) {
       textures[kind] = texture;
@@ -220,19 +204,16 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
       const mode = wet ? 'overcast' : config.lighting;
       const palette = palettes[mode];
       sky.position.copy(camera.position); dome.position.copy(camera.position); scene.background = null;
-      sky.visible = !backdropActive;
       camera.getWorldDirection(domeUniforms.cameraForward.value);
       domeUniforms.cameraUp.value.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
-      dome.visible = !night && !backdropActive;
-      domeUniforms.domeStrength.value = night ? 0 : mode === 'golden' ? 0.48 : mode === 'overcast' ? 0.24 : 0.18;
-      domeUniforms.domeTop.value.set(mode === 'golden' ? '#efd2a5' : mode === 'overcast' ? '#d5d8d4' : '#86b4d0');
-      domeUniforms.domeHorizon.value.set(mode === 'golden' ? '#d99b58' : mode === 'overcast' ? '#c4c6c0' : '#d5dede');
+      dome.visible = !night;
+      domeUniforms.domeStrength.value = night ? 0 : mode === 'golden' ? 1 : mode === 'overcast' ? 0.32 : 0.55;
+      domeUniforms.domeTop.value.set(mode === 'overcast' ? '#d5d8d4' : '#e8e2d4');
+      domeUniforms.domeHorizon.value.set(mode === 'overcast' ? '#c4c6c0' : '#cfc6b4');
       uniforms.clock.value = elapsed / 1000;
       uniforms.night.value = night ? 1 : 0;
       uniforms.wetSky.value = wet ? 1 : 0;
-      // Keep the HDR as the reflection environment, but use the continuous
-      // analytic sky for the visible background at every viewport size.
-      uniforms.useHdri.value = 0;
+      uniforms.useHdri.value = textures.dry || textures.wet ? 1 : 0;
       sunOffset.set(...palette.direction as [number, number, number]).normalize();
       sun.position.copy(anchor).addScaledVector(sunOffset, 46);
       sun.target.position.copy(anchor); sun.target.updateMatrixWorld();
@@ -247,17 +228,16 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
       uniforms.warmth.value = palette.warmth;
       uniforms.haze.value.set(night ? '#172733' : palette.horizon);
       uniforms.groundNear.value.set(night ? '#0d1820' : palette.ground);
-      uniforms.ridgeFar.value.set(night ? '#101c26' : mode === 'overcast' ? '#4d5d63' : mode === 'golden' ? '#75634d' : '#68798f');
-      uniforms.ridgeNear.value.set(night ? '#14211f' : mode === 'overcast' ? '#3d4c40' : mode === 'golden' ? '#465038' : '#4c5e3e');
+      uniforms.ridgeFar.value.set(night ? '#101c26' : mode === 'overcast' ? '#4d5d63' : '#68798f');
+      uniforms.ridgeNear.value.set(night ? '#14211f' : mode === 'overcast' ? '#3d4c40' : '#4c5e3e');
       sun.color.set(night ? '#9bbaca' : palette.sun); sun.intensity = night ? 0.45 : palette.strength;
       renderer.toneMappingExposure = config.exposure * (night ? 0.92 : mode === 'golden' ? 1.00 : 1.06);
-      scene.environmentIntensity = night ? 0.28 : mode === 'overcast' ? 0.62 : mode === 'golden' ? 0.40 : 0.68;
+      scene.environmentIntensity = night ? 0.28 : mode === 'overcast' ? 0.72 : mode === 'golden' ? 0.40 : 0.95;
       if (scene.fog instanceof THREE.Fog) {
         // Névoa de distância esfria e perde saturação: serras ficam azuladas
         // em camadas como na referência em vez de virarem uma parede âmbar.
-        scene.fog.color.set(night ? '#172733' : mode === 'overcast' ? '#a9b2ae' : mode === 'golden' ? '#bd925f' : '#9fb6c2');
-        scene.fog.near = wet ? 68 : mode === 'day' ? 58 : 68;
-        scene.fog.far = wet ? 235 : mode === 'day' ? 212 : 255;
+        scene.fog.color.set(night ? '#172733' : mode === 'overcast' ? '#a9b2ae' : '#d6dcc8');
+        scene.fog.near = wet ? 70 : 45; scene.fog.far = wet ? 260 : 230;
       }
     },
     dispose() {

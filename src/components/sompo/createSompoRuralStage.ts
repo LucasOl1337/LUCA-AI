@@ -110,23 +110,15 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
 
     const scene = new THREE.Scene();
 
-    // Target chase pose: enough subject scale to anchor the lower third while
-    // preserving the mountain corridor as the dominant part of the frame.
-    const viewFov = 41;
-    const compositionAspect = 16 / 9;
-    // Centered chase framing: the truck anchors the lower third while the road
-    // pulls into the mountain pass, matching the target's rider/path hierarchy.
-    const viewOffset = { x: -37, y: 5.35, z: 1.65 };
-    const viewLook = { x: 17, y: 1.5, z: -0.8 };
-    const camera = new THREE.PerspectiveCamera(viewFov, 1, 0.1, 360);
-    camera.position.set(viewOffset.x, viewOffset.y, viewOffset.z);
+    const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 360);
+    camera.position.set(5.15, 2.55, 8.6);
 
     // Small local fallback while the rural HDRIs load; the real HDRIs replace this IBL.
     const environmentScene = new RoomEnvironment();
     const pmrem = new THREE.PMREMGenerator(renderer);
     const environment = pmrem.fromScene(environmentScene, 0.04);
     scene.environment = environment.texture;
-    scene.environmentIntensity = 0.40;
+    scene.environmentIntensity = 0.55;
     environmentScene.dispose();
     pmrem.dispose();
 
@@ -135,44 +127,32 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     orbit.dampingFactor = 0.07;
     orbit.enablePan = false;
     orbit.minDistance = 4;
-    orbit.maxDistance = 44;
+    orbit.maxDistance = 24;
     orbit.maxPolarAngle = Math.PI * 0.49;
-    orbit.target.set(viewLook.x, viewLook.y, viewLook.z);
+    orbit.target.set(0.35, 1.28, 0);
 
-    scene.add(new THREE.HemisphereLight(0xc8dfeb, 0x263428, 0.38));
-    const keyLight = new THREE.DirectionalLight(0xffddb0, 2.5);
-    keyLight.position.set(8, 13, 15);
-    const rimLight = new THREE.DirectionalLight(0xb9d7e8, 0.25);
+    scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x776346, 0.42));
+    const keyLight = new THREE.DirectionalLight(0xffefcd, 2.7);
+    keyLight.position.set(-10, 12, 9);
+    const rimLight = new THREE.DirectionalLight(0xc5ddff, 0.95);
     rimLight.position.set(16, 7, -11);
     scene.add(rimLight);
-    const fillLight = new THREE.DirectionalLight(0xcbdce3, 0.08);
-    fillLight.position.set(-8, 6.5, 10);
+    const fillLight = new THREE.DirectionalLight(0xffe4c4, 0.4);
+    fillLight.position.set(8, 3.2, 14);
     scene.add(fillLight);
-    // Tight sky-colored specular on the 1.70 chrome surround / hood only.
-    // Directional #b7d4c4 @ 0.82 at (18,13,12) lifted the whole truck; a
-    // camera-right / +Y cone hits grille+hood without filling the reefer.
-    const skyCatch = new THREE.SpotLight(0xc5e8d4, 2.45, 14, THREE.MathUtils.degToRad(11), 0.35, 1.5);
-    skyCatch.name = 'grille-sky-catch';
-    skyCatch.position.set(9.2, 4.8, 4.2);
-    skyCatch.target.position.set(4.50, 1.45, 0);
-    scene.add(skyCatch);
-    scene.add(skyCatch.target);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.set(sompoRenderBudget().shadowSize, sompoRenderBudget().shadowSize);
-    // A tighter frustum spends the same 2K shadow map on the truck and the
-    // near shoulder, producing a readable tire/chassis contact shadow.
-    keyLight.shadow.camera.left = -18; keyLight.shadow.camera.right = 18;
-    keyLight.shadow.camera.top = 14; keyLight.shadow.camera.bottom = -12;
+    keyLight.shadow.camera.left = -26; keyLight.shadow.camera.right = 26;
+    keyLight.shadow.camera.top = 26; keyLight.shadow.camera.bottom = -26;
     keyLight.shadow.camera.near = 0.5; keyLight.shadow.camera.far = 110;
-    keyLight.shadow.normalBias = 0.008;
-    keyLight.shadow.bias = -0.00012;
-    keyLight.shadow.radius = 1.8;
+    keyLight.shadow.normalBias = 0.018;
+    keyLight.shadow.bias = -0.0001;
+    keyLight.shadow.radius = 4;
     scene.add(keyLight);
     // A sombra acompanha o caminhão pelo mundo: luz e alvo transladam juntos.
     scene.add(keyLight.target);
     const atmosphere = createSompoAtmosphere(scene, renderer, keyLight);
     const roadScene = createSompoRoadScene(scene, renderer, camera, { onHdri: (kind, tex) => atmosphere.setSkyTexture(kind, tex) });
-    atmosphere.setBackdropActive(true);
     const meter = createSompoRenderMeter(renderer, onStats);
     const postProcessing = createSompoPostProcessing(renderer, scene, camera);
     const frontArrow = new THREE.ArrowHelper(
@@ -209,15 +189,6 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     } = truckModel;
     truckGroup.position.y = -SOMPO_TRUCK_PIVOT_Y;
     truckPoseGroup.add(truckGroup);
-    // Local headlamp fill is intentionally shadowless: it catches the grille,
-    // wet road and chrome without changing any telemetry or light state.
-    for (const z of [-0.83, 0.83]) {
-      const headlampFill = new THREE.PointLight(0xffe6c6, 0.07, 5.2, 2);
-      headlampFill.name = `sompo-headlamp-fill-${z}`;
-      headlampFill.position.set(4.5, 1.34, z);
-      headlampFill.castShadow = false;
-      truckGroup.add(headlampFill);
-    }
     const modular = !isFirebase && (studioRef?.current.truck ?? 'modular') === 'modular' ? refineSompoTruck(truckModel) : null;
     const scenarioEffects = createSompoScenarioEffects(scene, truckModel, camera);
     const assetAbort = new AbortController();
@@ -306,13 +277,8 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       const safeHeight = Math.max(1, height);
       renderer.setSize(safeWidth, safeHeight, false);
       camera.aspect = safeWidth / safeHeight;
-      // Keep the target composition at its reference aspect, but pull the
-      // vertical FOV back slightly on narrower/maximized viewports so the
-      // entire truck keeps breathing room instead of touching both edges.
-      const aspectCompensation = Math.max(1, compositionAspect / camera.aspect);
-      camera.fov = Math.min(72, THREE.MathUtils.radToDeg(
-        2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(viewFov / 2)) * aspectCompensation),
-      ));
+      // Preserve horizontal room for the full vehicle in a portrait canvas.
+      camera.fov = Math.min(58, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(32 / 2)) * Math.max(1, 1.18 / camera.aspect))));
       camera.updateProjectionMatrix();
       postProcessing.resize(safeWidth, safeHeight);
     }
@@ -343,8 +309,8 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
           camera.position.set(orbit.target.x + 3, 4.7, 4.1);
           orbit.minDistance = 2.5;
         } else {
-          orbit.target.set(truckPoseGroup.position.x + viewLook.x, viewLook.y, truckPoseGroup.position.z);
-          camera.position.set(truckPoseGroup.position.x + viewOffset.x, viewOffset.y, viewOffset.z);
+          orbit.target.set(truckPoseGroup.position.x + 0.35, 1.28, truckPoseGroup.position.z);
+          camera.position.set(truckPoseGroup.position.x + 5.15, 2.55, 8.6);
           orbit.minDistance = 4;
         }
         orbit.update();
@@ -603,11 +569,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       if (focusTarget === 'sensor') {
         sensorGroup.getWorldPosition(focusPoint);
       } else {
-        focusPoint.set(
-          truckPoseGroup.position.x + viewLook.x + effectFrame.focusX,
-          viewLook.y,
-          truckPoseGroup.position.z,
-        );
+        focusPoint.set(truckPoseGroup.position.x + effectFrame.focusX, truckPoseGroup.position.y, truckPoseGroup.position.z);
       }
       // A câmera acompanha o deslocamento: o alvo persegue o caminhão e a câmera
       // translada junto, preservando o ângulo escolhido pelo operador no orbit.
@@ -684,17 +646,6 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       ledMaterial.emissive.set(uncertain ? 0x473d20 : snapshot.status === 'alert' ? 0xff2d22 : 0x2dff6b);
       ledMaterial.emissiveIntensity = reduceMotion.matches ? 2.4 : 2.2 + (Math.sin(visualElapsed * 0.007) * 1.1);
       if (!isFirebase) scenarioEffects.update(effectFrame, visualElapsed, visualScenario, drivingSpeed * (ruralFrame?.direction ?? 1), reduceMotion.matches, slope, effectOutcomeId ?? '', truckWorldX, ruralFrame?.direction ?? 1, at => runOriginX + scenarioTravelMeters(settings, at));
-      skyCatch.position.set(
-        truckPoseGroup.position.x + 9.2,
-        4.8,
-        truckPoseGroup.position.z + 4.2,
-      );
-      skyCatch.target.position.set(
-        truckPoseGroup.position.x + 4.50,
-        1.45,
-        truckPoseGroup.position.z,
-      );
-      skyCatch.target.updateMatrixWorld();
       atmosphere.update(studio, camera, truckPoseGroup.position, visualElapsed, (ruralFrame?.rain ?? 0) > 0);
       orbit.update();
       const shake = physical && physicalEffects ? physicalEffects.update(physical.effects,
