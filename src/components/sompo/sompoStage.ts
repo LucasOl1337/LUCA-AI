@@ -22,9 +22,14 @@ export function createSompoRenderer(mount: HTMLElement) {
   renderer.setClearColor(0x07100c, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.autoUpdate = true;
   renderer.info.autoReset = false;
+  renderer.domElement.style.display = 'block';
+  renderer.domElement.style.width = '100%';
+  renderer.domElement.style.height = '100%';
   renderer.domElement.setAttribute('aria-hidden', 'true');
   mount.appendChild(renderer.domElement);
   return { renderer, budget };

@@ -67,8 +67,8 @@ export function sompoTerrainHeight(x: number, z: number) {
   const lakeDist = sompoLakeDistance(x, z);
   const notch = 1 - THREE.MathUtils.smoothstep(lakeDist, 14, 36);
   const ridge = THREE.MathUtils.smoothstep(corridor, 45, 95)
-    * (4.5 + periodicNoise(x + 501, z + 77, 80, SOMPO_TERRAIN_PERIOD_X / 80) * 9.5
-      + periodicNoise(x + 97, z + 11, 32, SOMPO_TERRAIN_PERIOD_X / 32) * 3.6);
+    * (2.8 + periodicNoise(x + 501, z + 77, 80, SOMPO_TERRAIN_PERIOD_X / 80) * 6.2
+      + periodicNoise(x + 97, z + 11, 32, SOMPO_TERRAIN_PERIOD_X / 32) * 2.4);
   h += ridge * (1 - notch * 0.55);
   // Vale que desce da rodovia até a bacia do lago: linha de visada aberta.
   const valleyWindow = THREE.MathUtils.smoothstep(corridor, 40, 54) * (1 - THREE.MathUtils.smoothstep(corridor, 82, 96));

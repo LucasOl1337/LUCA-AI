@@ -46,7 +46,8 @@ function toCabinGlass(material: THREE.MeshStandardMaterial) {
   const glass = new THREE.MeshPhysicalMaterial();
   THREE.MeshStandardMaterial.prototype.copy.call(glass, material);
   glass.name = material.name;
-  // Same greenhouse as the modular cab: a 8% alpha plate reads as "no window".
+  // Same greenhouse as the modular cab: a transparent physical pane keeps
+  // the cabin readable while preserving the reflection from the rural IBL.
   glass.color.set(0x6a8aa0);
   glass.metalness = 0;
   glass.roughness = 0.045;
@@ -118,6 +119,27 @@ function assignVisualMaps(root: THREE.Object3D) {
   paint('/sompo/gen/r10-corrugation.webp', ['Painéis do baú'], 'cargo');
   paint('/sompo/gen/r9-cabin-through-glass.webp', ['Astra cabin interior'], 'cabin');
   paint('/sompo/gen/r6-grille-front.webp', ['Astra grille face'], 'grille');
+}
+
+/**
+ * Generated Astra meshes arrive mostly as MeshStandardMaterial. Promote the
+ * visible shell surfaces to the physical material path so the same local HDRI
+ * produces a clean broad reflection instead of a flat diffuse response.
+ * Textures are intentionally shared by the promoted material; disposal remains
+ * owned by the scene graph.
+ */
+function promoteTruckShellMaterial(material: THREE.MeshStandardMaterial, label: string) {
+  if (material instanceof THREE.MeshPhysicalMaterial || !/cab|cargo|box|shell/i.test(label)) return material;
+  // MeshPhysicalMaterial.copy expects physical-only fields such as
+  // clearcoatNormalScale to exist on the source. GLTFLoader gives us a plain
+  // MeshStandardMaterial, so copy the shared base fields explicitly first.
+  const physical = new THREE.MeshPhysicalMaterial();
+  THREE.MeshStandardMaterial.prototype.copy.call(physical, material);
+  physical.clearcoat = /cab|shell/i.test(label) ? 0.78 : 0.34;
+  physical.clearcoatRoughness = /cab|shell/i.test(label) ? 0.13 : 0.2;
+  physical.envMapIntensity = Math.max(material.envMapIntensity, /cab|shell/i.test(label) ? 1.2 : 0.9);
+  material.dispose();
+  return physical;
 }
 
 export function refineSompoTruck(model: SompoTruckModel) {
@@ -218,7 +240,8 @@ export function refineSompoTruck(model: SompoTruckModel) {
             if (!(item instanceof THREE.MeshStandardMaterial)) return item;
             const label = `${mesh.name} ${item.name}`;
             const converted = /glass|windscreen|window/i.test(label) && !/mirror/i.test(label)
-              ? toCabinGlass(item) : item;
+              ? toCabinGlass(item)
+              : promoteTruckShellMaterial(item, label);
             if (converted !== item) mesh.renderOrder = 3;
             if (!materials.has(converted)) { materials.add(converted); wearTruck(converted); }
             return converted;

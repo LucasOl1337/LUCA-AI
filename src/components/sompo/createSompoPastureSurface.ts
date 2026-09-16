@@ -91,8 +91,9 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
         parcela *= .75 + cell2 * .5;
         grassland = mix(grassland, parcela, hills * .72);
       }
-      // Keep foreground grass in shade and distant hills muted in the cream haze.
-      ${field ? '' : 'grassland *= mix(vec3(.23,.25,.22), vec3(.68,.58,.54), smoothstep(16., 75., abs(ruralWorld.z)));'}
+      // Separate the close roadside grass from the warm, lower-contrast valley
+      // planes without bleaching the entire background into one beige layer.
+      ${field ? '' : 'float depthLayer = smoothstep(16., 88., abs(ruralWorld.z + 2.05)); grassland *= mix(vec3(.30,.31,.21), vec3(.56,.45,.30), depthLayer);'}
       diffuseColor.rgb = mix(diffuseColor.rgb, grassland, pasture);
       // Talhão do agri: sulcos na direção das fileiras (o v da textura segue
       // o x do mundo) com resteva nas valetas, escurecido sob a copa. A faixa
