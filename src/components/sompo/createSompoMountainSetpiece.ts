@@ -43,6 +43,45 @@ function crossedCardGeometry() {
   return merged;
 }
 
+function mountainCutGeometry(centerX: number, seed: number) {
+  const length = 82;
+  const heightSegments = 9;
+  const lengthSegments = 24;
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  for (let xIndex = 0; xIndex <= lengthSegments; xIndex += 1) {
+    const along = xIndex / lengthSegments;
+    const x = centerX - length / 2 + along * length;
+    const base = sompoTerrainHeight(x, -9.4) - 0.6;
+    const crown = 7.8
+      + Math.sin(along * Math.PI * 2.4 + seed) * 0.82
+      + Math.sin(along * Math.PI * 5.1 + seed * 0.37) * 0.34;
+    for (let yIndex = 0; yIndex <= heightSegments; yIndex += 1) {
+      const up = yIndex / heightSegments;
+      const fracture = (seeded(seed + xIndex * 97 + yIndex * 31) - 0.5) * 0.72
+        + Math.sin(x * 0.19 + up * 8.3) * 0.23;
+      // Lean the crown back into the mountain. The broken silhouette, varied
+      // depth and dense texture stop the cut from reading as a flat billboard.
+      const z = -10.1 - up * 1.85 + fracture * (0.22 + Math.sin(up * Math.PI) * 0.58);
+      const y = base + up * crown + (seeded(seed + xIndex * 11 + yIndex * 43) - 0.5) * 0.28;
+      positions.push(x, y, z);
+      uvs.push(along, up);
+      if (xIndex < lengthSegments && yIndex < heightSegments) {
+        const row = heightSegments + 1;
+        const a = xIndex * row + yIndex;
+        indices.push(a, a + row, a + 1, a + 1, a + row, a + row + 1);
+      }
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 interface PlantSlot {
   x: number;
   z: number;
@@ -95,8 +134,30 @@ export function createSompoMountainSetpiece(parent: THREE.Group) {
     metalness: 0,
     envMapIntensity: 0.45,
   });
+  const cliffTexture = new THREE.TextureLoader().load('/sompo/gen/r14-granite-cliff.webp');
+  cliffTexture.colorSpace = THREE.SRGBColorSpace;
+  cliffTexture.wrapS = cliffTexture.wrapT = THREE.MirroredRepeatWrapping;
+  cliffTexture.repeat.set(4.2, 2.15);
+  cliffTexture.anisotropy = 8;
+  const cliffMaterial = new THREE.MeshStandardMaterial({
+    map: cliffTexture,
+    color: 0xd7d8d1,
+    roughness: 0.93,
+    metalness: 0,
+    envMapIntensity: 0.5,
+    side: THREE.DoubleSide,
+  });
+  const cliffCenters = [28, 108];
+  const cliffWalls = cliffCenters.map((center, index) => {
+    const wall = new THREE.Mesh(mountainCutGeometry(center, 141 + index * 509), cliffMaterial);
+    wall.name = `r14-granite-road-cut-${index}`;
+    wall.castShadow = true;
+    wall.receiveShadow = true;
+    root.add(wall);
+    return wall;
+  });
   const plantSlots: PlantSlot[] = [];
-  for (let i = 0; i < 420; i += 1) {
+  for (let i = 0; i < 580; i += 1) {
     const left = i % 7 < 4;
     const edge = seeded(i + 12) < 0.58;
     const z = left
@@ -188,6 +249,10 @@ export function createSompoMountainSetpiece(parent: THREE.Group) {
       }
       plants.instanceMatrix.needsUpdate = true;
       foliageMaterial.color.set(wet ? 0xa4ad98 : 0xe5ead7);
+      cliffWalls.forEach((wall, index) => {
+        const center = cliffCenters[index];
+        wall.position.x = wrapMountainX(center, truckX, 160) - center;
+      });
       for (const [index, slot] of rockSlots.entries()) {
         const x = wrapMountainX(slot.x, truckX, 259.2);
         const groundY = sompoTerrainHeight(x, slot.z);
@@ -213,6 +278,9 @@ export function createSompoMountainSetpiece(parent: THREE.Group) {
       plantGeometry.dispose();
       rockTexture.dispose();
       rockMaterial.dispose();
+      cliffTexture.dispose();
+      cliffMaterial.dispose();
+      cliffWalls.forEach((wall) => wall.geometry.dispose());
       shadowTexture.dispose();
       shadowMaterial.dispose();
       shadowGeometry.dispose();

@@ -117,8 +117,8 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     const compositionAspect = 16 / 9;
     // Centered chase framing: the truck anchors the lower third while the road
     // pulls into the mountain pass, matching the target's rider/path hierarchy.
-    const viewOffset = { x: -17.2, y: 4.25, z: 0.65 };
-    const viewLook = { x: 9.5, y: 1.28, z: -1.72 };
+    const viewOffset = { x: -22.3, y: 3.8, z: 0 };
+    const viewLook = { x: 15.5, y: 2.25, z: 0 };
     const camera = new THREE.PerspectiveCamera(viewFov, 1, 0.1, 360);
     camera.position.set(viewOffset.x, viewOffset.y, viewOffset.z);
 
@@ -136,7 +136,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     orbit.dampingFactor = 0.07;
     orbit.enablePan = false;
     orbit.minDistance = 4;
-    orbit.maxDistance = 24;
+    orbit.maxDistance = 40;
     orbit.maxPolarAngle = Math.PI * 0.49;
     orbit.target.set(viewLook.x, viewLook.y, viewLook.z);
 
@@ -173,6 +173,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     scene.add(keyLight.target);
     const atmosphere = createSompoAtmosphere(scene, renderer, keyLight);
     const roadScene = createSompoRoadScene(scene, renderer, camera, { onHdri: (kind, tex) => atmosphere.setSkyTexture(kind, tex) });
+    atmosphere.setBackdropActive(true);
     const meter = createSompoRenderMeter(renderer, onStats);
     const postProcessing = createSompoPostProcessing(renderer, scene, camera);
     const frontArrow = new THREE.ArrowHelper(

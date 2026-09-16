@@ -504,6 +504,8 @@
   bottom: 14px;
   display: flex;
   gap: 6px;
+  transform: scale(0.86);
+  transform-origin: right bottom;
 }
 
 .sompo-simulator-camera button {
@@ -2383,16 +2385,17 @@
 
 /* Compact operational reading stays with the machine when the controls scroll. */
 .sompo-simulator-readout {
-  position: absolute; top: 53px; left: 14px; display: flex; gap: 6px;
+  position: absolute; top: 47px; left: 14px; display: flex; gap: 5px;
   max-width: calc(100% - 28px); pointer-events: none;
+  transform: scale(0.9); transform-origin: left top;
 }
 .sompo-simulator-readout > div {
-  padding: 8px 11px; border: 1px solid #ffffff26; border-radius: 9px;
+  padding: 6px 8px; border: 1px solid #ffffff26; border-radius: 8px;
   background: #12241fd9; color: #edf3ed;
 }
-.sompo-simulator-readout span { display: block; max-width: 240px; font-size: 10px; line-height: 1.4; color: #d0dfd4; }
-.sompo-simulator-readout strong { display: block; margin-top: 2px; font-size: 15px; font-variant-numeric: tabular-nums; }
-.sompo-simulator-readout small { font-size: 10px; font-weight: 400; }
+.sompo-simulator-readout span { display: block; max-width: 205px; font-size: 9px; line-height: 1.35; color: #d0dfd4; }
+.sompo-simulator-readout strong { display: block; margin-top: 2px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.sompo-simulator-readout small { font-size: 9px; font-weight: 400; }
 .sompo-simulator-readout [data-alert='true'] { background: #6c261ee8; border-color: #ffb39787; }
 @media(max-width:700px) {
   .sompo-simulator-readout { top: 48px; left: 10px; max-width: calc(100% - 20px); }

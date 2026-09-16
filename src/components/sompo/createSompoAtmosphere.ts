@@ -202,7 +202,13 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
   dome.name = 'sompo-sky-dome'; dome.renderOrder = -99; dome.frustumCulled = false; scene.add(dome);
   const sunOffset = new THREE.Vector3();
   const textures: Partial<Record<'dry' | 'wet', THREE.Texture>> = {};
+  let backdropActive = false;
   return {
+    setBackdropActive(active: boolean) {
+      backdropActive = active;
+      sky.visible = !active;
+      dome.visible = !active;
+    },
     /** Recebe o equirect cru do loader de ambiente (foto real, não PMREM). */
     setSkyTexture(kind: 'dry' | 'wet', texture: THREE.Texture) {
       textures[kind] = texture;
@@ -214,9 +220,10 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
       const mode = wet ? 'overcast' : config.lighting;
       const palette = palettes[mode];
       sky.position.copy(camera.position); dome.position.copy(camera.position); scene.background = null;
+      sky.visible = !backdropActive;
       camera.getWorldDirection(domeUniforms.cameraForward.value);
       domeUniforms.cameraUp.value.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
-      dome.visible = !night;
+      dome.visible = !night && !backdropActive;
       domeUniforms.domeStrength.value = night ? 0 : mode === 'golden' ? 0.48 : mode === 'overcast' ? 0.24 : 0.18;
       domeUniforms.domeTop.value.set(mode === 'golden' ? '#efd2a5' : mode === 'overcast' ? '#d5d8d4' : '#86b4d0');
       domeUniforms.domeHorizon.value.set(mode === 'golden' ? '#d99b58' : mode === 'overcast' ? '#c4c6c0' : '#d5dede');

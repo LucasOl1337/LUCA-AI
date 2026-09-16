@@ -94,9 +94,9 @@ function assignVisualMaps(root: THREE.Object3D) {
             material.map = map;
             material.bumpMap = null;
             material.roughnessMap = null;
-            material.color.set('#d7d8d2');
-            material.roughness = 0.55;
-            material.metalness = 0.10;
+            material.color.set('#bec1bb');
+            material.roughness = 0.62;
+            material.metalness = 0.14;
           }
           if (kind === 'cabin') {
             material.map = map;
@@ -119,7 +119,7 @@ function assignVisualMaps(root: THREE.Object3D) {
       });
     });
   };
-  paint('/sompo/gen/r10-corrugation.webp', ['Painéis do baú'], 'cargo');
+  paint('/sompo/gen/r10-corrugation.webp', ['Painéis do baú', 'Astra box shell'], 'cargo');
   paint('/sompo/gen/r9-cabin-through-glass.webp', ['Astra cabin interior'], 'cabin');
   paint('/sompo/gen/r6-grille-front.webp', ['Astra grille face'], 'grille');
 }
@@ -232,7 +232,19 @@ export function refineSompoTruck(model: SompoTruckModel) {
       const replacements = [['astra-cab', cab], ['astra-cargo', cargo]] as const;
       if (replacements.some(([name]) => !visual.getObjectByName(name))) throw new Error('Incomplete Astra truck');
       for (const [name, assembly] of replacements) {
-        for (const child of assembly.children) child.visible = false;
+        for (const child of assembly.children) {
+          // The generated Astra skin supplies the large silhouette, but its
+          // rear is intentionally sparse. Preserve the modular rig's metallic
+          // corrugation, hinges, locking bars and marker lamps as fitted detail
+          // over the skin instead of throwing the whole authored assembly away.
+          const materials = child instanceof THREE.Mesh
+            ? (Array.isArray(child.material) ? child.material : [child.material])
+            : [];
+          child.visible = name === 'astra-cargo' && materials.some((material) => {
+            const standard = material as THREE.MeshStandardMaterial;
+            return (standard.metalness ?? 0) >= 0.74 || (standard.emissiveIntensity ?? 0) >= 0.25;
+          });
+        }
         const skin = visual.getObjectByName(name)!;
         assembly.add(skin);
         skin.traverse(node => {
@@ -265,9 +277,9 @@ export function refineSompoTruck(model: SompoTruckModel) {
           if (material.name === 'Pintura da cabine') { material.color.set(config.paint); material.roughness = Math.min(0.28, config.roughness * 0.55); material.metalness = 0.38; }
           if (material.name === 'Acabamentos da cabine') { material.color.set(config.paint).multiplyScalar(0.62); material.roughness = Math.min(0.4, config.roughness * 0.7 + 0.08); }
           if (material.name === 'Painéis do baú' || material.name === 'Alumínio do baú' || material.name === 'Astra box shell') {
-            material.color.set('#d7d8d2');
-            material.roughness = material.map ? 0.55 : 0.64;
-            material.metalness = 0.10;
+            material.color.set('#bec1bb');
+            material.roughness = material.map ? 0.62 : 0.7;
+            material.metalness = 0.14;
           }
           if (material instanceof THREE.MeshPhysicalMaterial && material.name === 'Pintura da cabine') { material.clearcoat = 0.9; material.clearcoatRoughness = 0.12; }
         }

@@ -53,7 +53,12 @@ function mesh(parent: THREE.Object3D, geometry: THREE.BufferGeometry, material: 
 
 function roadCurveZ(x: number) {
   const ahead = Math.max(0, x - 8);
-  return -2.05 - ahead * ahead * 0.00032 + Math.sin(ahead * 0.028) * Math.min(1.15, ahead * 0.013);
+  return -2.05 - ahead * ahead * 0.00018 + Math.sin(ahead * 0.045) * Math.min(2.15, ahead * 0.105);
+}
+
+function roadSurfaceY(x: number) {
+  const envelope = THREE.MathUtils.smoothstep(Math.abs(x), 1.8, 8);
+  return envelope * (Math.sin(x * 0.16) * 0.055 + Math.sin(x * 0.51 + 1.7) * 0.024);
 }
 
 function roadCurveSlope(x: number) {
@@ -72,7 +77,7 @@ function curvedRoadStrip(width: number, lateral = 0, length = 260, segments = 12
     const centerZ = roadCurveZ(x) + lateral + edgeNoise * 0.18 * Math.sign(lateral || 1);
     const halfWidth = width * (1 + edgeNoise * 0.16) / 2;
     for (const side of [-1, 1]) {
-      positions.push(x, 0, centerZ + side * halfWidth);
+      positions.push(x, roadSurfaceY(x), centerZ + side * halfWidth);
       uvs.push(t, side < 0 ? 0 : 1);
     }
     if (i < segments) {
@@ -99,6 +104,25 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const root = new THREE.Group();
   root.name = 'rural-road-environment';
   scene.add(root);
+  // Keep the physically interactive foreground in 3D, then hand the distant
+  // view to the target-aligned environmental plate. Without this cut, the
+  // legacy 440 m procedural terrain occludes the plate and recreates the same
+  // sparse synthetic horizon we are replacing.
+  const heroDepthClip = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 20);
+  renderer.localClippingEnabled = true;
+  let nextClippingAuditMs = 0;
+  const attachHeroDepthClip = () => {
+    root.traverse((object) => {
+      if (!(object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.Points)) return;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      for (const material of materials) {
+        if (material.clippingPlanes?.includes(heroDepthClip)) continue;
+        material.clippingPlanes = [...(material.clippingPlanes ?? []), heroDepthClip];
+        material.clipShadows = true;
+        material.needsUpdate = true;
+      }
+    });
+  };
   const sky = (wet: boolean) => texture(8, 512, (context) => {
     const gradient = context.createLinearGradient(0, 0, 0, 512);
     gradient.addColorStop(0, wet ? '#435c70' : '#508fbd');
@@ -125,22 +149,23 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const pasture = createSompoPastureSurface(earth);
   const details = createSompoRoadDetails(root);
   const roadMap = groundTexture('road');
-  const asphalt = new THREE.MeshStandardMaterial({ map: roadMap, roughness: 0.90, metalness: 0.03 });
-  // Asfalto fotográfico com agregado/trincas: a faixa de brita das bordas corre
-  // no sentido longitudinal (u da textura atravessa a pista, v repete a cada 4m).
+  const asphalt = new THREE.MeshStandardMaterial({ map: roadMap, roughness: 0.98, metalness: 0 });
+  // Rugged mountain service track: generated top-down from the immutable
+  // target, with transverse weathered timber, gravel, ruts and encroaching
+  // vegetation. The source is pre-rotated so U follows travel direction.
   if (typeof document !== 'undefined') {
-    const detail = new THREE.TextureLoader().load('/sompo/gen/r11-asphalt.webp');
+    const detail = new THREE.TextureLoader().load('/sompo/gen/r14-mountain-track.webp');
     detail.colorSpace = THREE.SRGBColorSpace;
     detail.wrapS = detail.wrapT = THREE.RepeatWrapping;
     detail.center.set(0.5, 0.5);
     detail.rotation = 0;
-    detail.repeat.set(65, 4.1);
+    detail.repeat.set(18, 1);
     detail.anisotropy = renderer.capabilities.getMaxAnisotropy();
     asphalt.map = detail;
   }
-  const road = mesh(root, curvedRoadStrip(6.8), asphalt, [0, 0, 0]);
-  assets.surface(asphalt, 'asphalt', 100, 5, { keepMap: true, normalScale: 0.7 });
-  varySompoSurface(asphalt, 0.24);
+  const road = mesh(root, curvedRoadStrip(6.8, 0, 260, 160, 0.64), asphalt, [0, 0, 0]);
+  assets.surface(asphalt, 'dirt', 72, 4, { keepMap: true, normalScale: 1.05 });
+  varySompoSurface(asphalt, 0.15);
   const unpaved = new THREE.MeshStandardMaterial({ map: earthMap, roughness: 1, color: 0xb09b7e });
   assets.surface(unpaved, 'dirt', 65, 2.05);
   varySompoSurface(unpaved, 0.38);
@@ -157,11 +182,19 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   assets.surface(shoulderMaterial, 'dirt', 65, 0.375);
   varySompoSurface(shoulderMaterial, 0.3);
   const shoulders: THREE.Mesh[] = [];
-  for (const lateral of [3.9, -3.9]) {
-    const shoulder = mesh(root, curvedRoadStrip(1.35, lateral, 260, 128, 0.42), shoulderMaterial, [0, -0.015, 0]);
+  for (const lateral of [3.62, -3.62]) {
+    const shoulder = mesh(root, curvedRoadStrip(0.82, lateral, 260, 128, 0.92), shoulderMaterial, [0, -0.015, 0]);
+    // The generated track already contains eroded gravel/grass edges. A second
+    // geometric shoulder created two clean orange rails and broke the natural
+    // transition into the mountain ground.
+    shoulder.visible = false;
     shoulders.push(shoulder);
   }
-  const markings = new THREE.Group(); root.add(markings);
+  const markings = new THREE.Group();
+  // Mountain-pass hero presentation follows the target's unmarked rugged
+  // trail language; telemetry and road physics do not depend on paint meshes.
+  markings.visible = false;
+  root.add(markings);
   const wornPaint = wornRoadPaint(); const edgePaint = wornPaint.clone(); edgePaint.repeat.x = 65;
   const white = new THREE.MeshStandardMaterial({ map: edgePaint, alphaTest: 0.45, color: 0xe3e0ce, roughness: 0.82 });
   const yellow = new THREE.MeshStandardMaterial({ map: wornPaint, alphaTest: 0.45, color: 0xe5b744, roughness: 0.8 });
@@ -209,16 +242,25 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   }
   const vegetation = createSompoVegetation(root, camera, sompoTerrainHeight);
 
-  const mountainBackdropMap = new THREE.TextureLoader().load('/sompo/gen/r12-mountain-valley-backdrop.webp');
+  const mountainBackdropMap = new THREE.TextureLoader().load('/sompo/gen/r14-rdr2-mountain-pass-haze.webp');
   mountainBackdropMap.colorSpace = THREE.SRGBColorSpace;
   mountainBackdropMap.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  const mountainBackdropMaterial = new THREE.SpriteMaterial({
-    map: mountainBackdropMap, fog: false, depthWrite: false, toneMapped: true,
+  const mountainBackdropMaterial = new THREE.MeshBasicMaterial({
+    map: mountainBackdropMap,
+    fog: false,
+    depthTest: false,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    toneMapped: true,
   });
-  const mountainBackdrop = new THREE.Sprite(mountainBackdropMaterial);
+  const mountainBackdrop = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mountainBackdropMaterial);
   mountainBackdrop.name = 'mountain-valley-distant-plate';
-  mountainBackdrop.scale.set(210, 70.8, 1);
-  mountainBackdrop.renderOrder = -20;
+  mountainBackdrop.frustumCulled = false;
+  mountainBackdrop.scale.set(210, 118.2, 1);
+  // Atmosphere draws its opaque sky shell at -100. The plate must follow that
+  // shell but precede every physical mesh (default 0), otherwise the analytic
+  // sky paints over the photograph or the photograph paints over the truck.
+  mountainBackdrop.renderOrder = -50;
   scene.add(mountainBackdrop);
   const backdropDirection = new THREE.Vector3();
 
@@ -322,6 +364,12 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
     }) {
       const t = elapsed / 1000;
       const truckX = truck.x;
+      heroDepthClip.constant = truckX + 20;
+      // Re-audit occasionally because detailed GLB rocks arrive asynchronously.
+      if (elapsed >= nextClippingAuditMs) {
+        attachHeroDepthClip();
+        nextClippingAuditMs = elapsed + 1500;
+      }
       const effects = new Map(effectFrame.cues.map((cue) => [cue.effect, cue.intensity]));
       // Rampa gira o mundo em torno do próprio caminhão, não da origem da cena.
       root.rotation.z = slope;
@@ -331,7 +379,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       terrain.position.x = Math.round(truckX / SOMPO_TERRAIN_PERIOD_X) * SOMPO_TERRAIN_PERIOD_X;
       camera.getWorldDirection(backdropDirection);
       mountainBackdrop.position.copy(camera.position).addScaledVector(backdropDirection, 135);
-      mountainBackdrop.position.y += 24;
+      mountainBackdrop.quaternion.copy(camera.quaternion);
       road.position.x = truckX;
       for (const shoulder of shoulders) shoulder.position.x = truckX;
       for (const line of edgeLines) line.position.x = truckX;
@@ -389,7 +437,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       asphalt.color.set(mud ? 0x604331 : gravel ? 0x998467 : wet ? 0x45545f : 0xc1c5c3);
       asphalt.roughness = wet && !mud ? 0.2 : 0.95;
       asphalt.normalScale.setScalar(wet ? 0.20 : 1.0);
-      markings.visible = !mud && !gravel;
+      markings.visible = false;
       puddles.visible = wet;
       shed.visible = effectFrame.setting === 'yard' && !extras?.yardContactAnchor;
       yardContact.visible = effectFrame.setting === 'yard' && Boolean(extras?.yardContactAnchor);
@@ -433,6 +481,6 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
     get hasHdri() { return assets.hasHdri; },
     dispose() {
       pasture.dispose(); vegetation.dispose(); animal.dispose(); details.dispose(); assets.dispose(); asphalt.dispose(); unpaved.dispose(); clearSky.dispose(); rainSky.dispose(); mountainGroundMap.dispose();
-      mountainBackdrop.removeFromParent(); mountainBackdropMaterial.dispose(); mountainBackdropMap.dispose(); },
+      mountainBackdrop.removeFromParent(); mountainBackdrop.geometry.dispose(); mountainBackdropMaterial.dispose(); mountainBackdropMap.dispose(); },
   };
 }
