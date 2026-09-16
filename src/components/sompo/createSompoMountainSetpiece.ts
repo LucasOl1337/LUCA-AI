@@ -97,6 +97,14 @@ interface RockSlot {
   group?: THREE.Object3D;
 }
 
+interface PineSlot {
+  x: number;
+  z: number;
+  scale: number;
+  yaw: number;
+  group?: THREE.Object3D;
+}
+
 /**
  * A authored mountain corridor: dense undergrowth, repeated Blender boulder
  * clusters and deliberate cliff/valley placement. This replaces the old
@@ -179,12 +187,12 @@ export function createSompoMountainSetpiece(parent: THREE.Group) {
   const plantTransform = new THREE.Object3D();
   const plantLastX = new Float64Array(plantSlots.length).fill(Number.NaN);
 
-  const rockSlots: RockSlot[] = Array.from({ length: 16 }, (_, index) => {
+  const rockSlots: RockSlot[] = Array.from({ length: 28 }, (_, index) => {
     const leftCliff = index % 3 !== 2;
     return {
-      x: index * 16.2 - 126 + (seeded(index + 401) - 0.5) * 5,
+      x: seeded(index + 401) * 238 - 119,
       z: leftCliff ? -10.8 - seeded(index + 402) * 8.5 : 7.5 + seeded(index + 402) * 14,
-      scale: leftCliff ? 0.72 + seeded(index + 403) * 0.62 : 0.58 + seeded(index + 403) * 0.5,
+      scale: leftCliff ? 0.78 + seeded(index + 403) * 0.72 : 0.82 + seeded(index + 403) * 0.68,
       yaw: seeded(index + 404) * Math.PI * 2,
     };
   });
@@ -234,6 +242,146 @@ export function createSompoMountainSetpiece(parent: THREE.Group) {
     }
   }).catch(() => { /* Existing procedural stones remain as a graceful fallback. */ });
 
+  // R15 replaces the generic tropical skyline with target-aligned alpine pine
+  // layers. Mid/far trees use crossed cards; only the near silhouettes carry
+  // the Blender-authored branch/trunk geometry so parallax stays convincing
+  // without sacrificing the simulator's 60 FPS budget.
+  const pineBillboardTexture = new THREE.TextureLoader().load('/sompo/gen/r15-mountain-pine-billboard.webp');
+  pineBillboardTexture.colorSpace = THREE.SRGBColorSpace;
+  pineBillboardTexture.anisotropy = 8;
+  const pineBillboardMaterial = new THREE.MeshBasicMaterial({
+    map: pineBillboardTexture,
+    color: 0xffffff,
+    fog: true,
+    side: THREE.DoubleSide,
+    transparent: true,
+    alphaTest: 0.14,
+    depthWrite: true,
+  });
+  const pineCardGeometry = crossedCardGeometry();
+  const pineCardSlots: PlantSlot[] = Array.from({ length: 132 }, (_, index) => {
+    const left = index % 5 < 2;
+    const height = 6.8 + seeded(index + 1211) * 8.4;
+    return {
+      x: 18 + seeded(index + 1201) * 128,
+      z: left
+        ? -13.5 - seeded(index + 1207) * 48
+        : 9.5 + seeded(index + 1207) * 65,
+      yaw: seeded(index + 1213) * Math.PI,
+      scale: new THREE.Vector3(height * (0.47 + seeded(index + 1217) * 0.13), height, height * 0.56),
+    };
+  });
+  const pineCards = new THREE.InstancedMesh(pineCardGeometry, pineBillboardMaterial, pineCardSlots.length);
+  pineCards.name = 'r15-alpine-pine-midground';
+  pineCards.castShadow = false;
+  pineCards.receiveShadow = true;
+  pineCards.boundingSphere = new THREE.Sphere(new THREE.Vector3(60, 5, 0), 180);
+  root.add(pineCards);
+  const pineCardTransform = new THREE.Object3D();
+  const pineCardLastX = new Float64Array(pineCardSlots.length).fill(Number.NaN);
+
+  const pineBarkTexture = new THREE.TextureLoader().load('/sompo/gen/r15-pine-bark.webp');
+  pineBarkTexture.colorSpace = THREE.SRGBColorSpace;
+  pineBarkTexture.wrapS = pineBarkTexture.wrapT = THREE.RepeatWrapping;
+  pineBarkTexture.repeat.set(1.4, 3.2);
+  pineBarkTexture.anisotropy = 8;
+  const pineBarkHeight = new THREE.TextureLoader().load('/sompo/gen/r15-pine-bark-height.webp');
+  pineBarkHeight.colorSpace = THREE.NoColorSpace;
+  pineBarkHeight.wrapS = pineBarkHeight.wrapT = THREE.RepeatWrapping;
+  pineBarkHeight.repeat.copy(pineBarkTexture.repeat);
+  pineBarkHeight.anisotropy = 8;
+  const pineNeedleTexture = new THREE.TextureLoader().load('/sompo/gen/r15-pine-branch-spray.webp');
+  pineNeedleTexture.colorSpace = THREE.SRGBColorSpace;
+  pineNeedleTexture.wrapS = pineNeedleTexture.wrapT = THREE.ClampToEdgeWrapping;
+  pineNeedleTexture.anisotropy = 8;
+  const pineBarkMaterial = new THREE.MeshStandardMaterial({
+    map: pineBarkTexture, bumpMap: pineBarkHeight, bumpScale: 0.17,
+    color: 0xa49b8b, roughness: 0.96, metalness: 0,
+  });
+  const pineNeedleDarkMaterial = new THREE.MeshStandardMaterial({
+    map: pineNeedleTexture, color: 0xe3e8d8, roughness: 0.94, metalness: 0,
+    emissive: 0x172015, emissiveIntensity: 0.32,
+    transparent: true, alphaTest: 0.14, depthWrite: true, side: THREE.DoubleSide,
+  });
+  const pineNeedleLightMaterial = new THREE.MeshStandardMaterial({
+    map: pineNeedleTexture, color: 0xffffff, roughness: 0.92, metalness: 0,
+    emissive: 0x1d2618, emissiveIntensity: 0.38,
+    transparent: true, alphaTest: 0.14, depthWrite: true, side: THREE.DoubleSide,
+  });
+  const pineSlots: PineSlot[] = Array.from({ length: 28 }, (_, index) => {
+    const left = index % 4 < 2;
+    return {
+      x: 8 + seeded(index + 1401) * 94,
+      z: left
+        ? -12.5 - seeded(index + 1407) * 23
+        : 9.5 + seeded(index + 1407) * 34,
+      scale: 0.72 + seeded(index + 1411) * 0.72,
+      yaw: seeded(index + 1417) * Math.PI * 2,
+    };
+  });
+  const pineLastX = new Float64Array(pineSlots.length).fill(Number.NaN);
+  const pineGeometries = new Set<THREE.BufferGeometry>();
+  void loader.loadAsync('/models/sompo/r15-mountain-pine.glb').then((gltf) => {
+    if (disposed) return;
+    gltf.scene.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      pineGeometries.add(child.geometry);
+      child.castShadow = true;
+      child.receiveShadow = true;
+      child.material = child.name.includes('trunk')
+        ? pineBarkMaterial
+        : child.name.includes('sunlit') ? pineNeedleLightMaterial : pineNeedleDarkMaterial;
+    });
+    for (const [index, slot] of pineSlots.entries()) {
+      const group = gltf.scene.clone(true);
+      group.name = `r15-physical-lodgepole-pine-${index}`;
+      group.rotation.y = slot.yaw;
+      group.scale.set(slot.scale * (0.88 + seeded(index + 1421) * 0.18), slot.scale, slot.scale * (0.88 + seeded(index + 1427) * 0.18));
+      slot.group = group;
+      root.add(group);
+    }
+  }).catch(() => { /* Crossed-card forest remains complete if the GLB cannot load. */ });
+
+  const mistCanvas = document.createElement('canvas');
+  mistCanvas.width = 256; mistCanvas.height = 128;
+  const mistContext = mistCanvas.getContext('2d')!;
+  const mistHorizontal = mistContext.createLinearGradient(0, 0, 256, 0);
+  mistHorizontal.addColorStop(0, 'rgba(220,229,225,0)');
+  mistHorizontal.addColorStop(0.25, 'rgba(220,229,225,.38)');
+  mistHorizontal.addColorStop(0.68, 'rgba(220,229,225,.46)');
+  mistHorizontal.addColorStop(1, 'rgba(220,229,225,0)');
+  mistContext.fillStyle = mistHorizontal;
+  mistContext.fillRect(0, 0, 256, 128);
+  const mistVertical = mistContext.createLinearGradient(0, 0, 0, 128);
+  mistVertical.addColorStop(0, 'rgba(0,0,0,0)');
+  mistVertical.addColorStop(0.30, 'rgba(255,255,255,.36)');
+  mistVertical.addColorStop(0.72, 'rgba(255,255,255,.74)');
+  mistVertical.addColorStop(1, 'rgba(0,0,0,0)');
+  mistContext.globalCompositeOperation = 'destination-in';
+  mistContext.fillStyle = mistVertical;
+  mistContext.fillRect(0, 0, 256, 128);
+  const mistTexture = new THREE.CanvasTexture(mistCanvas);
+  const mistGeometry = new THREE.PlaneGeometry(1, 1);
+  const mistLayers = [
+    { baseX: 42, mesh: null as THREE.Mesh | null, width: 44, height: 10, z: 11, opacity: 0.17 },
+    { baseX: 67, mesh: null as THREE.Mesh | null, width: 62, height: 15, z: 16, opacity: 0.22 },
+    { baseX: 94, mesh: null as THREE.Mesh | null, width: 82, height: 20, z: 18, opacity: 0.28 },
+  ];
+  for (const layer of mistLayers) {
+    const material = new THREE.MeshBasicMaterial({
+      map: mistTexture, color: 0xdce5e1, transparent: true, opacity: layer.opacity,
+      depthWrite: false, depthTest: true, fog: false, side: THREE.DoubleSide,
+    });
+    const plane = new THREE.Mesh(mistGeometry, material);
+    plane.name = `r15-valley-mist-${layer.baseX}`;
+    plane.rotation.y = Math.PI / 2;
+    plane.scale.set(layer.width, layer.height, 1);
+    plane.position.set(layer.baseX, 5.2, layer.z);
+    plane.renderOrder = 3;
+    layer.mesh = plane;
+    root.add(plane);
+  }
+
   return {
     update(truckX: number, wet: boolean) {
       plants.boundingSphere!.center.x = truckX;
@@ -249,6 +397,23 @@ export function createSompoMountainSetpiece(parent: THREE.Group) {
       }
       plants.instanceMatrix.needsUpdate = true;
       foliageMaterial.color.set(wet ? 0xa4ad98 : 0xe5ead7);
+      pineCards.boundingSphere!.center.x = truckX + 52;
+      for (const [index, slot] of pineCardSlots.entries()) {
+        const x = wrapMountainX(slot.x, truckX + 54, 220);
+        if (pineCardLastX[index] === x) continue;
+        pineCardLastX[index] = x;
+        pineCardTransform.position.set(x, sompoTerrainHeight(x, slot.z) - 0.1, slot.z);
+        pineCardTransform.rotation.set(
+          (seeded(index + 1511) - 0.5) * 0.07,
+          slot.yaw,
+          (seeded(index + 1517) - 0.5) * 0.085,
+        );
+        pineCardTransform.scale.copy(slot.scale);
+        pineCardTransform.updateMatrix();
+        pineCards.setMatrixAt(index, pineCardTransform.matrix);
+      }
+      pineCards.instanceMatrix.needsUpdate = true;
+      pineBillboardMaterial.color.set(wet ? 0x748074 : 0xc2c9bd);
       cliffWalls.forEach((wall, index) => {
         const center = cliffCenters[index];
         wall.position.x = wrapMountainX(center, truckX, 160) - center;
@@ -270,6 +435,20 @@ export function createSompoMountainSetpiece(parent: THREE.Group) {
         }
       }
       rockShadows.instanceMatrix.needsUpdate = true;
+      for (const [index, slot] of pineSlots.entries()) {
+        const x = wrapMountainX(slot.x, truckX + 38, 160);
+        if (!slot.group || pineLastX[index] === x) continue;
+        pineLastX[index] = x;
+        slot.group.position.set(x, sompoTerrainHeight(x, slot.z) - 0.08, slot.z);
+      }
+      pineNeedleDarkMaterial.color.set(wet ? 0x748074 : 0xc7cfc1);
+      pineNeedleLightMaterial.color.set(wet ? 0x87927f : 0xdce3d4);
+      for (const layer of mistLayers) {
+        if (!layer.mesh) continue;
+        layer.mesh.position.x = wrapMountainX(layer.baseX, truckX + 54, 160);
+        const material = layer.mesh.material as THREE.MeshBasicMaterial;
+        material.opacity = layer.opacity * (wet ? 1.35 : 1);
+      }
     },
     dispose() {
       disposed = true;
@@ -281,6 +460,19 @@ export function createSompoMountainSetpiece(parent: THREE.Group) {
       cliffTexture.dispose();
       cliffMaterial.dispose();
       cliffWalls.forEach((wall) => wall.geometry.dispose());
+      pineBillboardTexture.dispose();
+      pineBillboardMaterial.dispose();
+      pineCardGeometry.dispose();
+      pineBarkTexture.dispose();
+      pineBarkHeight.dispose();
+      pineNeedleTexture.dispose();
+      pineBarkMaterial.dispose();
+      pineNeedleDarkMaterial.dispose();
+      pineNeedleLightMaterial.dispose();
+      for (const geometry of pineGeometries) geometry.dispose();
+      mistTexture.dispose();
+      mistGeometry.dispose();
+      for (const layer of mistLayers) (layer.mesh?.material as THREE.Material | undefined)?.dispose();
       shadowTexture.dispose();
       shadowMaterial.dispose();
       shadowGeometry.dispose();

@@ -1,0 +1,20 @@
+{
+  "asset": "r15-mountain-pine.glb",
+  "created": "2026-09-16",
+  "generator": "Blender 5.2 via scripts/generate-r15-mountain-pine.py",
+  "purpose": "Target-aligned lodgepole pine for the LUCA-AI SOMPO mountain simulator",
+  "reference": ".dream-loop/target.png (RDR2 gameplay frame supplied by the owner)",
+  "source_images": {
+    "billboard": "built-in image generation, transparent lodgepole pine derived from the target species and palette",
+    "branch_spray": "built-in image generation, transparent pine branch spray derived from the target species and palette",
+    "bark": "built-in image generation, neutral pine bark material atlas derived from the target palette"
+  },
+  "sha256": {
+    "r15-mountain-pine.glb": "d4e95f20381b2834de12c21f37c7e6fa36dbc5ec9ff382f8b4dca6f17af83910",
+    "r15-mountain-pine-billboard.webp": "9d166ef1692d01ec68ead3faf4b6e89202ba98fde10b9ba237e8fcfb157eedc1",
+    "r15-pine-branch-spray.webp": "d3428cc0d89f60067d43f6eba2de913ecb7e89fe2ce070c76d2f1033b31be317",
+    "r15-pine-bark.webp": "141ec2e3d6464289ea6aef232e57e715c445fcbac2f1a531428ef2a912c3b6e9",
+    "r15-pine-bark-height.webp": "6768c1661d5c6c700036961a5218970216db33929389a374eee96f4f48a57c1c"
+  },
+  "notes": "Original locally modeled trunk and branch geometry. Runtime uses alpha foliage sprays for near trees and crossed-card billboards only in the mid/far field. No third-party mesh was redistributed."
+}

@@ -88,3 +88,11 @@ via scripts/sompo/build-astra-truck.py. This is original generated output,
 not a redistributed third-party truck library. It is a visual skin only:
 the existing modular rig keeps wheel pivots, ground support and the ESP32
 aperture. Source notes: ASTRA.md.
+
+R15 mountain pine — r15-mountain-pine.glb
+Created locally for LUCA-AI, 2026-09-16. Original trunk and branch geometry
+modeled in Blender 5.2 by scripts/generate-r15-mountain-pine.py. Pine billboard,
+branch spray and bark material were produced with built-in image generation,
+using the owner-supplied RDR2 gameplay frame only as species, realism and palette
+reference. No third-party mesh is redistributed. Exact asset hashes and source
+notes: r15-mountain-pine.provenance.json.
