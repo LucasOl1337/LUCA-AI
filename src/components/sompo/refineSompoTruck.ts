@@ -46,18 +46,22 @@ function toCabinGlass(material: THREE.MeshStandardMaterial) {
   const glass = new THREE.MeshPhysicalMaterial();
   THREE.MeshStandardMaterial.prototype.copy.call(glass, material);
   glass.name = material.name;
-  glass.color.set(0xc5d2d8);
-  glass.metalness = 0.02;
-  glass.roughness = 0.04;
-  glass.transmission = 0;
-  glass.thickness = 0;
+  // Same greenhouse as the modular cab: a 8% alpha plate reads as "no window".
+  glass.color.set(0x6a8aa0);
+  glass.metalness = 0;
+  glass.roughness = 0.045;
+  glass.transmission = 0.72;
+  glass.thickness = 0.045;
+  glass.ior = 1.45;
   glass.transparent = true;
-  glass.opacity = 0.08;
+  glass.opacity = 1;
   glass.clearcoat = 1;
   glass.clearcoatRoughness = 0.03;
-  glass.envMapIntensity = 1.65;
+  glass.envMapIntensity = 1.7;
+  glass.attenuationColor = new THREE.Color(0x1a3344);
+  glass.attenuationDistance = 0.8;
   glass.side = THREE.DoubleSide;
-  glass.depthWrite = false;
+  glass.depthWrite = true;
   return glass;
 }
 

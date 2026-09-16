@@ -44,4 +44,18 @@ test('Blender skin fits the existing rig and preserves spinning wheels and senso
   assert.ok(wheelBefore.angleTo(wheels[0].quaternion) > .01);
   assert.ok(oldCab.every(node => !node.visible));
   assert.equal(model.root.userData.visualAsset, 'AstraSompoTruck');
+  const glasses = [];
+  model.root.traverse((node) => {
+    const mesh = node;
+    if (!mesh.isMesh) return;
+    const label = `${mesh.name} ${[].concat(mesh.material).map((item) => item?.name || '').join(' ')}`;
+    if (/glass|windscreen|window/i.test(label) && !/mirror/i.test(label) && mesh.visible) glasses.push(mesh);
+  });
+  assert.ok(glasses.length >= 1, `missing cabin glass (${glasses.length})`);
+  for (const mesh of glasses) {
+    for (const material of [].concat(mesh.material)) {
+      assert.ok(material.opacity >= 0.85, `${mesh.name} opacity ${material.opacity}`);
+      assert.ok(material.transmission >= 0.5, `${mesh.name} transmission ${material.transmission}`);
+    }
+  }
 });

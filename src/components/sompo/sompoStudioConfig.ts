@@ -19,7 +19,7 @@ export const SOMPO_STUDIO_DEFAULT: SompoStudioConfig = {
   paint: '#14213d', cargo: '#f3f1e8', roughness: 0.4, exposure: 1, wind: 0.65,
   wireframe: false, exploded: 0,
 };
-const KEY = 'luca:sompo-studio:v1';
+const KEY = 'luca:sompo-studio:v2';
 const clamp = (value: unknown, min: number, max: number, fallback: number) =>
   typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 const color = (value: unknown, fallback: string) => typeof value === 'string' && /^#[\da-f]{6}$/i.test(value) ? value : fallback;
