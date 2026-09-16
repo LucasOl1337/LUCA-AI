@@ -9,12 +9,12 @@ import { sompoLakeDistance } from './createSompoTerrain';
 export const SOMPO_TREE_SPECIES = [
   {
     asset: 'generated-jacaranda', height: 7,
-    placements: [[-12, -13], [30, 12], [-42, 17], [62, -24], [-84, -38], [92, 38], [4, 26], [-58, -30], [76, 14],
+    placements: [[-12, -13], [8.4, 7.2], [-7.5, 8.6], [30, 12], [-42, 17], [62, -24], [-84, -38], [92, 38], [4, 26], [-58, -30], [76, 14],
       [-25, -66], [18, -72], [-70, -80], [96, -78], [-105, -68], [-40, -88], [112, -95], [-16, 78], [55, 84], [-88, 92]],
   },
   {
     asset: 'generated-eucalyptus', height: 10,
-    placements: [[14, -16], [-30, -19], [46, 18], [-66, 26], [80, -36], [-96, 34], [-8, 33], [38, -32], [-100, -14],
+    placements: [[14, -16], [11.2, 8.1], [-9.4, 9.4], [-30, -19], [46, 18], [-66, 26], [80, -36], [-96, 34], [-8, 33], [38, -32], [-100, -14],
       [-50, -70], [8, -80], [-90, -88], [72, -68], [-118, -76], [120, -84], [34, -98], [-55, 72], [20, 88], [85, 96], [-110, 82]],
   },
   {
@@ -105,8 +105,8 @@ export function createSompoVegetation(parent: THREE.Group, camera: THREE.Camera,
         mesh.userData.sompoTree = true;
         for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
           if (material instanceof THREE.MeshStandardMaterial) {
-            material.metalness = 0; material.roughness = 0.95; material.envMapIntensity = 0.42;
-            material.color.setHex(0x6d8548); // atlas gerado é claro; multiplica pra verde de verdade
+            material.metalness = 0; material.roughness = 0.95; material.envMapIntensity = 0.65;
+            material.color.setHex(0xa3ac7d); // atlas gerado é claro; multiplica pra verde de verdade
           }
         }
       });
@@ -138,7 +138,7 @@ export function createSompoVegetation(parent: THREE.Group, camera: THREE.Camera,
         mesh.visible = !!image?.naturalWidth;
         if (image?.naturalWidth) mesh.scale.x = image.naturalWidth / image.naturalHeight;
         mesh.rotation.y = Math.atan2(localCamera.x - lod.position.x, localCamera.z - lod.position.z) - lod.rotation.y;
-        mesh.material.color.set(wet ? 0x414f38 : 0x52653f);
+        mesh.material.color.set(wet ? 0x414f38 : 0x859063);
       }
     },
     dispose() {

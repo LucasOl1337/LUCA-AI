@@ -2472,3 +2472,27 @@
 .sompo-telemetry-export-actions button:disabled, .sompo-telemetry-export-actions select:disabled { opacity: .5; cursor: not-allowed; }
 .sompo-telemetry-export-actions button svg { width: 16px; height: 16px; }
 .sompo-telemetry-export .sompo-launch-error { color: #ffd8ca; }
+
+/* A near-square rural viewport keeps the full truck and the landscape in view. */
+@media (min-width: 1001px) {
+  .sompo-simulator:not(.is-studio) .sompo-simulator-stage { aspect-ratio: 1040 / 992; }
+}
+
+@media (min-width: 1600px) {
+  .sompo-page-inner:has(.sompo-simulator) { width: min(100%, 1442px); }
+  .sompo-simulator:not(.is-studio) .sompo-simulator-workspace { grid-template-columns: minmax(0, 1fr) 400px; }
+}
+.sompo-simulator-stage { container-type: inline-size; }
+@container (min-width: 950px) {
+  .sompo-simulator-stage-badges { top: 20px; left: 18px; right: 18px; }
+  .sompo-simulator-stage-badges > span { min-height: 38px; padding-inline: 13px; font-size: 14px; gap: 9px; }
+  .sompo-simulator-led { width: 9px; height: 9px; }
+  .sompo-simulator-readout { top: 78px; left: 18px; gap: 8px; }
+  .sompo-simulator-readout > div { padding: 12px 16px; border-radius: 12px; }
+  .sompo-simulator-readout span, .sompo-simulator-readout small { font-size: 14px; }
+  .sompo-simulator-readout strong { font-size: 21px; margin-top: 4px; }
+  .sompo-simulator-camera { right: 18px; bottom: 80px; gap: 9px; }
+  .sompo-simulator-camera button { min-height: 54px; padding-inline: 16px; font-size: 14px; border-radius: 14px; }
+  .sompo-simulator-hint { left: 18px; bottom: 48px; font-size: 12px; }
+  .sompo-simulator-credit { left: 18px; bottom: 12px; font-size: 14px; }
+}

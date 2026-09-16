@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { integrateSompoMotion, sompoSteeringAngle } from '../../../shared/sompo-motion.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { loadSompoTruckAsset } from './loadSompoTruckAsset';
@@ -109,8 +110,8 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
 
     const scene = new THREE.Scene();
 
-    const camera = new THREE.PerspectiveCamera(37, 1, 0.1, 360);
-    camera.position.set(7.2, 4.9, 15.4);
+    const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 360);
+    camera.position.set(5.15, 2.55, 8.6);
 
     // Small local fallback while the rural HDRIs load; the real HDRIs replace this IBL.
     const environmentScene = new RoomEnvironment();
@@ -125,14 +126,20 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     orbit.enableDamping = true;
     orbit.dampingFactor = 0.07;
     orbit.enablePan = false;
-    orbit.minDistance = 6;
+    orbit.minDistance = 4;
     orbit.maxDistance = 24;
     orbit.maxPolarAngle = Math.PI * 0.49;
-    orbit.target.set(0, 1.5, 0);
+    orbit.target.set(0.35, 1.28, 0);
 
-    scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x776346, 0.3));
-    const keyLight = new THREE.DirectionalLight(0xffefcd, 2.4);
+    scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x776346, 0.42));
+    const keyLight = new THREE.DirectionalLight(0xffefcd, 2.7);
     keyLight.position.set(-10, 12, 9);
+    const rimLight = new THREE.DirectionalLight(0xc5ddff, 0.95);
+    rimLight.position.set(16, 7, -11);
+    scene.add(rimLight);
+    const fillLight = new THREE.DirectionalLight(0xffe4c4, 0.4);
+    fillLight.position.set(8, 3.2, 14);
+    scene.add(fillLight);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.set(sompoRenderBudget().shadowSize, sompoRenderBudget().shadowSize);
     keyLight.shadow.camera.left = -26; keyLight.shadow.camera.right = 26;
@@ -233,7 +240,13 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     setModelStatus('loading');
     setModelAsset(null);
     truckGroup.visible = !!modular;
-    if (modular) { setModelAsset('SompoModularTruck'); setModelStatus('modular'); }
+    if (modular) {
+      setModelAsset('SompoModularTruck'); setModelStatus('modular');
+      void new GLTFLoader().loadAsync('/models/sompo/astra-sompo-truck.glb').then(gltf => {
+        if (assetAbort.signal.aborted) { disposeSompoObject(gltf.scene); return; }
+        modular.replaceVisual(gltf.scene);
+      }).catch(error => { if (!assetAbort.signal.aborted) console.warn('Astra visual unavailable; retaining modular rig', error); });
+    }
     else void loadSompoTruckAsset(truckModel, assetAbort.signal)
       .then((loaded) => {
         if (!assetAbort.signal.aborted) {
@@ -265,7 +278,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       renderer.setSize(safeWidth, safeHeight, false);
       camera.aspect = safeWidth / safeHeight;
       // Preserve horizontal room for the full vehicle in a portrait canvas.
-      camera.fov = Math.min(72, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(37 / 2)) * Math.max(1, 1.25 / camera.aspect))));
+      camera.fov = Math.min(58, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(32 / 2)) * Math.max(1, 1.18 / camera.aspect))));
       camera.updateProjectionMatrix();
       postProcessing.resize(safeWidth, safeHeight);
     }
@@ -296,9 +309,9 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
           camera.position.set(orbit.target.x + 3, 4.7, 4.1);
           orbit.minDistance = 2.5;
         } else {
-          orbit.target.set(truckPoseGroup.position.x, 1.9, truckPoseGroup.position.z);
-          camera.position.set(truckPoseGroup.position.x + 7.0, 4.6, 13.4);
-          orbit.minDistance = 6;
+          orbit.target.set(truckPoseGroup.position.x + 0.35, 1.28, truckPoseGroup.position.z);
+          camera.position.set(truckPoseGroup.position.x + 5.15, 2.55, 8.6);
+          orbit.minDistance = 4;
         }
         orbit.update();
       },

@@ -37,6 +37,9 @@ tmp-live-ui/
 .grok-fable/
 
 
+# Dream Loop working files (targets, live screenshots, judge artifacts).
+.dream-loop/
+
 # Local SOMPO workshop builds and review evidence
 .sompo-preview*/
 .sompo-agri-preview/

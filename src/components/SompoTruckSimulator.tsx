@@ -1123,7 +1123,7 @@ export default function SompoTruckSimulator({
               modelStatus === 'gltf'
                 ? `${modelAsset ?? 'Equipamento agrícola'} · imagem → 3D por LUCA-AI`
                 : modelStatus === 'loading' ? 'Carregando equipamento agrícola…' : 'Silhueta nominal · GLB agrícola indisponível'
-            ) : modelAsset === 'SompoModularTruck' ? 'Caminhão modular · peças articuladas · LUCA' : modelAsset === 'GeneratedRuralTruck' ? 'Caminhão rural · imagem → 3D por LUCA-AI · adaptado com sensor' : modelStatus === 'gltf' ? <>
+            ) : modelAsset === 'SompoModularTruck' ? 'Caminhão rural · imagem → 3D por LUCA-AI · adaptado com sensor' : modelAsset === 'GeneratedRuralTruck' ? 'Caminhão rural · imagem → 3D por LUCA-AI · adaptado com sensor' : modelStatus === 'gltf' ? <>
               <a href="https://sketchfab.com/3d-models/tesla-semi-39ffc7c746184e0c9ebd5bbcd0b405dd" target="_blank" rel="noreferrer">Tesla Semi © 2018 Oleksii Rozumnyi</a>
               {' · '}<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a> · adaptado com sensor
             </> : modelStatus === 'loading' ? 'Carregando caminhão detalhado…' : 'Modelo simplificado · arquivo detalhado indisponível'}

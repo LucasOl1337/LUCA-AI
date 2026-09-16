@@ -42,6 +42,80 @@ function batchAssembly(parent: THREE.Object3D) {
   new Set(removed.map(mesh => mesh.geometry)).forEach(geometry => geometry.dispose());
 }
 
+function toCabinGlass(material: THREE.MeshStandardMaterial) {
+  const glass = new THREE.MeshPhysicalMaterial();
+  THREE.MeshStandardMaterial.prototype.copy.call(glass, material);
+  glass.name = material.name;
+  glass.color.set(0xc5d2d8);
+  glass.metalness = 0.02;
+  glass.roughness = 0.04;
+  glass.transmission = 0;
+  glass.thickness = 0;
+  glass.transparent = true;
+  glass.opacity = 0.08;
+  glass.clearcoat = 1;
+  glass.clearcoatRoughness = 0.03;
+  glass.envMapIntensity = 1.65;
+  glass.side = THREE.DoubleSide;
+  glass.depthWrite = false;
+  return glass;
+}
+
+function assignVisualMaps(root: THREE.Object3D) {
+  if (typeof document === 'undefined' || typeof document.createElementNS !== 'function') return;
+  const loader = new THREE.TextureLoader();
+  const paint = (url: string, names: string[], kind: 'cargo' | 'cabin' | 'grille') => {
+    loader.load(url, map => {
+      map.colorSpace = THREE.SRGBColorSpace;
+      map.anisotropy = 8;
+      if (kind === 'cargo') {
+        map.wrapS = map.wrapT = THREE.RepeatWrapping;
+        // Blender UVs put length on U and height on V so r10's horizontal
+        // cold-white ribs stay horizontal. Do not rotate.
+        map.repeat.set(1, 1);
+        map.offset.set(0, 0);
+      } else {
+        map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
+      }
+      root.traverse(node => {
+        const mesh = node as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        for (const material of (Array.isArray(mesh.material) ? mesh.material : [mesh.material])) {
+          if (!(material instanceof THREE.MeshStandardMaterial) || !names.includes(material.name)) continue;
+          if (kind === 'cargo') {
+            material.map = map;
+            material.bumpMap = null;
+            material.roughnessMap = null;
+            material.color.set('#f2f0ea');
+            material.roughness = 0.42;
+            material.metalness = 0.16;
+          }
+          if (kind === 'cabin') {
+            material.map = map;
+            material.emissiveMap = map;
+            material.emissive.set(0xd4ccc4);
+            material.emissiveIntensity = 1.0;
+            material.color.set('#d4ccc4');
+          }
+          if (kind === 'grille') {
+            material.map = map;
+            material.color.set('#ffffff');
+            material.metalness = 0.78;
+            material.roughness = 0.16;
+            material.envMapIntensity = 2.15;
+            material.emissive.set(0xcdd6dc);
+            material.emissiveIntensity = 0.28;
+          }
+          material.needsUpdate = true;
+        }
+      });
+    });
+  };
+  paint('/sompo/gen/r10-corrugation.webp', ['Painéis do baú'], 'cargo');
+  paint('/sompo/gen/r9-cabin-through-glass.webp', ['Astra cabin interior'], 'cabin');
+  paint('/sompo/gen/r6-grille-front.webp', ['Astra grille face'], 'grille');
+}
+
 export function refineSompoTruck(model: SompoTruckModel) {
   const root = model.root;
   const cab = root.getObjectByName('cab-assembly')!;
@@ -62,7 +136,11 @@ export function refineSompoTruck(model: SompoTruckModel) {
     pivot.position.set(4.28, 2.46, side * 0.43); cab.add(pivot); root.updateMatrixWorld(true); pivot.attach(blade); wipers.push(pivot);
   }
   const sensorLabel = model.sensorGroup.getObjectByName('sensor-label');
-  if (sensorLabel) sensorLabel.visible = false;
+  if (sensorLabel) {
+    sensorLabel.visible = true;
+    sensorLabel.position.set(-1.9, 4.9, 0);
+    sensorLabel.scale.set(3.0, 0.75, 1);
+  }
   // Keep the measurement aperture at FRONT_X, with a compact real-world enclosure.
   model.sensorGroup.scale.setScalar(0.5);
   model.sensorGroup.position.set(4.51, 0.78, 0); model.rayGroup.position.y = 0.78; model.rayGroup.scale.z = 0.5;
@@ -93,7 +171,7 @@ export function refineSompoTruck(model: SompoTruckModel) {
   // Película de estrada: poeira acumulada nas partes baixas e filetes finos de
   // água/sujeira escorrendo no baú. É o que separa pintura real de plástico.
   const wearTruck = (material: THREE.MeshStandardMaterial) => {
-    const box = material.name === 'Painéis do baú' || material.name === 'Alumínio do baú';
+    const box = material.name === 'Painéis do baú' || material.name === 'Alumínio do baú' || material.name === 'Astra box shell';
     const paint = material.name === 'Pintura da cabine' || material.name === 'Acabamentos da cabine';
     if (!box && !paint) return;
     const compile = material.onBeforeCompile;
@@ -107,7 +185,7 @@ export function refineSompoTruck(model: SompoTruckModel) {
           return mix(mix(truckHash(i),truckHash(i+vec2(1,0)),f.x),mix(truckHash(i+vec2(0,1)),truckHash(i+vec2(1,1)),f.x),f.y);}\n` + shader.fragmentShader
         .replace('#include <color_fragment>', `#include <color_fragment>
           float truckDust = smoothstep(1.9, .35, truckW.y) * (.4 + .6 * truckNoise(truckW.xz * 1.9));
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.42, .35, .24), clamp(truckDust, 0., 1.) * ${paint ? '.3' : '.42'});
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.42, .35, .24), clamp(truckDust, 0., 1.) * ${paint ? '.22' : '.16'});
           ${box ? `float streak = truckNoise(vec2(truckW.z * 14.0 + truckW.x * 9.0, truckW.y * .6));
           diffuseColor.rgb *= 1.0 - smoothstep(.55, .95, streak) * .09 * smoothstep(3.7, 2.4, truckW.y);` : ''}`)
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
@@ -120,16 +198,48 @@ export function refineSompoTruck(model: SompoTruckModel) {
   const steering = new THREE.Quaternion(), spin = new THREE.Quaternion();
   let finishKey = '';
   return {
+    /** Replace only the skin; wheel pivots, ground support and sensor stay on the rig. */
+    replaceVisual(visual: THREE.Group) {
+      const replacements = [['astra-cab', cab], ['astra-cargo', cargo]] as const;
+      if (replacements.some(([name]) => !visual.getObjectByName(name))) throw new Error('Incomplete Astra truck');
+      for (const [name, assembly] of replacements) {
+        for (const child of assembly.children) child.visible = false;
+        const skin = visual.getObjectByName(name)!;
+        assembly.add(skin);
+        skin.traverse(node => {
+          const mesh = node as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          mesh.castShadow = mesh.receiveShadow = true;
+          const apply = (item: THREE.Material) => {
+            if (!(item instanceof THREE.MeshStandardMaterial)) return item;
+            const label = `${mesh.name} ${item.name}`;
+            const converted = /glass|windscreen|window/i.test(label) && !/mirror/i.test(label)
+              ? toCabinGlass(item) : item;
+            if (converted !== item) mesh.renderOrder = 3;
+            if (!materials.has(converted)) { materials.add(converted); wearTruck(converted); }
+            return converted;
+          };
+          mesh.material = Array.isArray(mesh.material) ? mesh.material.map(apply) : apply(mesh.material);
+        });
+      }
+      finishKey = '';
+      assignVisualMaps(root);
+      root.userData.visualAsset = 'AstraSompoTruck';
+    },
     update(config: SompoStudioConfig, elapsed: number, wheelTravel: number, steerAngle: number, roughness: number, rain: number, reduced: boolean, speedKph = 0) {
       const key = `${config.paint}:${config.cargo}:${config.roughness}:${config.wireframe}`;
       if (key !== finishKey) {
         finishKey = key;
         for (const material of materials) {
           material.wireframe = config.wireframe;
-          if (material.name === 'Pintura da cabine') { material.color.set(config.paint); material.roughness = config.roughness; material.metalness = 0.15; }
-          if (material.name === 'Acabamentos da cabine') { material.color.set(config.paint).multiplyScalar(0.62); material.roughness = config.roughness + 0.12; }
-          if (material.name === 'Painéis do baú' || material.name === 'Alumínio do baú') { material.color.set(config.cargo); material.roughness = 0.68; material.metalness = 0.16; }
-          if (material instanceof THREE.MeshPhysicalMaterial && material.name === 'Pintura da cabine') { material.clearcoat = 0.35; material.clearcoatRoughness = 0.38; }
+          if (material.name === 'Pintura da cabine') { material.color.set(config.paint); material.roughness = Math.min(0.28, config.roughness * 0.55); material.metalness = 0.38; }
+          if (material.name === 'Acabamentos da cabine') { material.color.set(config.paint).multiplyScalar(0.62); material.roughness = Math.min(0.4, config.roughness * 0.7 + 0.08); }
+          if (material.name === 'Painéis do baú' || material.name === 'Alumínio do baú' || material.name === 'Astra box shell') {
+            material.color.set('#f2f0ea');
+            material.roughness = material.map ? 0.42 : 0.58;
+            material.metalness = 0.16;
+          }
+          if (material instanceof THREE.MeshPhysicalMaterial && material.name === 'Pintura da cabine') { material.clearcoat = 0.9; material.clearcoatRoughness = 0.12; }
         }
       }
       const explode = config.exploded;

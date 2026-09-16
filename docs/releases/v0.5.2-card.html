@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>LUCA-AI v0.5.2</title>
+  <style>
+    html, body { margin: 0; padding: 0; background: #160D31; }
+    body {
+      width: 1200px;
+      font-family: Inter, ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+      color: #F7F3FF;
+      background: linear-gradient(165deg, #160D31 0%, #28184D 100%);
+    }
+    .page { padding: 56px 64px 48px; box-sizing: border-box; min-height: 900px; position: relative; }
+    .page:before, .page:after {
+      content: ""; position: absolute; width: 18px; height: 18px; border: 1px solid rgba(255,255,255,.18);
+    }
+    .page:before { top: 22px; left: 22px; border-right: 0; border-bottom: 0; }
+    .page:after { top: 22px; right: 22px; border-left: 0; border-bottom: 0; }
+    header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .name { font-size: 28px; font-weight: 700; letter-spacing: .02em; }
+    .ver {
+      font-size: 14px; font-weight: 600; letter-spacing: .08em;
+      padding: 6px 12px; border-radius: 999px; background: rgba(170,136,250,.18); color: #E4D7FF;
+    }
+    .meta { text-align: right; color: #BCB1D2; font-size: 15px; line-height: 1.4; }
+    h1 {
+      margin: 36px 0 8px; font-size: 13px; font-weight: 700;
+      letter-spacing: .28em; color: #BCB1D2;
+    }
+    .lead { margin: 0 0 28px; font-size: 22px; line-height: 1.35; font-weight: 500; max-width: 920px; }
+    section { border-top: 1px solid rgba(188,177,210,.22); padding: 18px 0 6px; }
+    .sec-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+    .dot { width: 10px; height: 10px; border-radius: 2px; }
+    .sec-title { font-size: 13px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+    .count { color: #BCB1D2; font-size: 13px; }
+    .item { display: grid; grid-template-columns: 1fr 160px; gap: 16px; padding: 8px 0 10px; }
+    .item h3 { margin: 0 0 4px; font-size: 24px; font-weight: 700; }
+    .item p { margin: 0; font-size: 20px; line-height: 1.35; color: #BCB1D2; }
+    .area { text-align: right; font-size: 14px; color: #9B8FBA; padding-top: 6px; }
+    footer { margin-top: 28px; color: #9B8FBA; font-size: 14px; letter-spacing: .04em; }
+    .nov .dot, .nov .sec-title { color: #FFC61A; background: transparent; }
+    .nov .dot { background: #FFC61A; }
+    .mel .dot { background: #2DD29A; } .mel .sec-title { color: #2DD29A; }
+    .cor .dot { background: #30BCEF; } .cor .sec-title { color: #30BCEF; }
+    .sis .dot { background: #AA88FA; } .sis .sec-title { color: #AA88FA; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="brand"><div class="name">LUCA-AI</div><div class="ver">v0.5.2</div></div>
+      <div class="meta">16 set 2026<br>luca-ai.com.br</div>
+    </header>
+    <h1>NOTAS DA ATUALIZAÇÃO</h1>
+    <p class="lead">O gêmeo rural do SOMPO deixa de parecer um bloco azul no horizonte. O caminhão preenche o quadro; o sensor continua no mesmo lugar.</p>
+
+    <section class="nov">
+      <div class="sec-head"><span class="dot"></span><span class="sec-title">Novidades</span><span class="count">4</span></div>
+      <div class="item"><div><h3>Caminhão com pele de verdade</h3><p>Cabine marinho, grade cromada e baú corrugado no Blender, sem mexer no ESP32.</p></div><div class="area">SOMPO 3D</div></div>
+      <div class="item"><div><h3>Geofencing no talhão</h3><p>Radar, mapa e episódios de faixa no simulador agrícola e no laboratório.</p></div><div class="area">Campo</div></div>
+      <div class="item"><div><h3>Aba Safra</h3><p>Desempenho da frota e história de longo prazo na home.</p></div><div class="area">Home</div></div>
+      <div class="item"><div><h3>Alarme de sonolência</h3><p>Webcam isolada dispara depois de 3 segundos com os olhos fechados.</p></div><div class="area">Sonolência</div></div>
+    </section>
+
+    <section class="mel">
+      <div class="sec-head"><span class="dot"></span><span class="sec-title">Melhorias</span><span class="count">2</span></div>
+      <div class="item"><div><h3>Câmera no olho</h3><p>O caminhão ocupa o centro; milho mais denso atrás da cerca.</p></div><div class="area">SOMPO 3D</div></div>
+      <div class="item"><div><h3>Luz de fim de tarde</h3><p>Contorno, bloom e sombra de contato no asfalto.</p></div><div class="area">SOMPO 3D</div></div>
+    </section>
+
+    <section class="cor">
+      <div class="sec-head"><span class="dot"></span><span class="sec-title">Correções</span><span class="count">1</span></div>
+      <div class="item"><div><h3>Sensor no lugar</h3><p>A pele nova não desloca a abertura ultrassônica nem o giro das rodas.</p></div><div class="area">Gêmeo</div></div>
+    </section>
+
+    <footer>Notas completas · github.com/LucasOl1337/LUCA-AI/releases/tag/v0.5.2</footer>
+  </div>
+</body>
+</html>

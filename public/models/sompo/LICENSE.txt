@@ -80,3 +80,11 @@ fetching embedded blob URLs (blocked by production connect-src). External
 maps replace those slots before the asset is attached. No CSP relaxation is
 needed. Tesla geometry expansion preserves the decoded data and original
 embedded image bytes; source/result hashes: tesla-semi.provenance.json.
+
+Astra SOMPO truck — astra-sompo-truck.glb
+Created locally for LUCA-AI, 2026-09-15/16.
+Modeled in Blender 5.2 from image-generation references (Grok Imagine)
+via scripts/sompo/build-astra-truck.py. This is original generated output,
+not a redistributed third-party truck library. It is a visual skin only:
+the existing modular rig keeps wheel pivots, ground support and the ESP32
+aperture. Source notes: ASTRA.md.

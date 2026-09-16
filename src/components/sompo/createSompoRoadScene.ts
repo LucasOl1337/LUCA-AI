@@ -87,12 +87,12 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   // Asfalto fotográfico com agregado/trincas: a faixa de brita das bordas corre
   // no sentido longitudinal (u da textura atravessa a pista, v repete a cada 4m).
   if (typeof document !== 'undefined') {
-    const detail = new THREE.TextureLoader().load('/sompo/gen/asfalto-detalhe.webp');
+    const detail = new THREE.TextureLoader().load('/sompo/gen/astra-asphalt.webp');
     detail.colorSpace = THREE.SRGBColorSpace;
     detail.wrapS = detail.wrapT = THREE.RepeatWrapping;
     detail.center.set(0.5, 0.5);
-    detail.rotation = Math.PI / 2;
-    detail.repeat.set(65, 1);
+    detail.rotation = 0;
+    detail.repeat.set(32.5, 2.05);
     detail.anisotropy = renderer.capabilities.getMaxAnisotropy();
     asphalt.map = detail;
   }
@@ -107,10 +107,10 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const contactMap = texture(256, 64, (context) => {
     context.scale(4, 1);
     const fade = context.createRadialGradient(32, 32, 4, 32, 32, 32);
-    fade.addColorStop(0, 'rgba(0,0,0,.55)'); fade.addColorStop(0.55, 'rgba(0,0,0,.28)'); fade.addColorStop(1, 'rgba(0,0,0,0)');
+    fade.addColorStop(0, 'rgba(0,0,0,.72)'); fade.addColorStop(0.45, 'rgba(0,0,0,.38)'); fade.addColorStop(1, 'rgba(0,0,0,0)');
     context.fillStyle = fade; context.fillRect(0, 0, 64, 64);
   });
-  const contact = new THREE.Mesh(new THREE.PlaneGeometry(9.2, 2.8), new THREE.MeshBasicMaterial({ map: contactMap, transparent: true, depthWrite: false, opacity: 0.6 }));
+  const contact = new THREE.Mesh(new THREE.PlaneGeometry(10.4, 3.4), new THREE.MeshBasicMaterial({ map: contactMap, transparent: true, depthWrite: false, opacity: 0.82 }));
   contact.name = 'truck-ambient-contact'; contact.rotation.x = -Math.PI / 2; root.add(contact);
   const shoulderMaterial = new THREE.MeshStandardMaterial({ map: earthMap, color: 0xe1c9aa, roughness: 1 });
   assets.surface(shoulderMaterial, 'dirt', 65, 0.375);

@@ -15,8 +15,8 @@ export interface SompoStudioConfig {
 }
 
 export const SOMPO_STUDIO_DEFAULT: SompoStudioConfig = {
-  version: 1, name: 'Frota rural · fim de tarde', truck: 'generated', equipment: 'modular', lighting: 'golden',
-  paint: '#1d5680', cargo: '#eceade', roughness: 0.4, exposure: 1, wind: 0.65,
+  version: 1, name: 'Frota rural · fim de tarde', truck: 'modular', equipment: 'modular', lighting: 'golden',
+  paint: '#14213d', cargo: '#f3f1e8', roughness: 0.4, exposure: 1, wind: 0.65,
   wireframe: false, exploded: 0,
 };
 const KEY = 'luca:sompo-studio:v1';

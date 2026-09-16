@@ -17,6 +17,47 @@ export const SOMPO_TRUCK_ASSET_URL = '/models/sompo/generated-rural-truck.glb';
 // Bust previously cached Draco bytes: this revision can load under the existing CSP.
 export const SOMPO_TESLA_ASSET_URL = '/models/sompo/tesla-semi.glb?geometry=plain-v1';
 
+function upgradeGeneratedSurface(material: THREE.MeshStandardMaterial): THREE.Material {
+  const name = material.name.toLowerCase();
+  const hex = material.color.getHex();
+  const r = (hex >> 16) & 255;
+  const g = (hex >> 8) & 255;
+  const b = hex & 255;
+  const looksGlass = /glass|wind|window|lens/.test(name) || (r < 90 && g < 130 && b > 90 && material.roughness < 0.35 && material.metalness < 0.4);
+  const looksPaint = /paint|cab|body|car/.test(name) || (b > r + 20 && g > 60 && material.metalness < 0.55);
+  const looksMetal = /chrome|alum|steel|metal/.test(name) || material.metalness > 0.7;
+  if (looksGlass) {
+    const glass = new THREE.MeshPhysicalMaterial();
+    THREE.MeshStandardMaterial.prototype.copy.call(glass, material);
+    glass.color.set(0x6a8aa0);
+    glass.metalness = 0;
+    glass.roughness = 0.05;
+    glass.transmission = 0.62;
+    glass.thickness = 0.04;
+    glass.ior = 1.45;
+    glass.transparent = true;
+    glass.clearcoat = 1;
+    glass.clearcoatRoughness = 0.04;
+    glass.envMapIntensity = 1.6;
+    glass.name = material.name;
+    return glass;
+  }
+  if (looksPaint || looksMetal) {
+    const coat = new THREE.MeshPhysicalMaterial();
+    THREE.MeshStandardMaterial.prototype.copy.call(coat, material);
+    coat.clearcoat = looksPaint ? 0.82 : 0.35;
+    coat.clearcoatRoughness = looksPaint ? 0.12 : 0.22;
+    coat.roughness = Math.min(material.roughness, looksPaint ? 0.28 : 0.32);
+    coat.metalness = looksPaint ? Math.max(0.32, material.metalness) : Math.max(0.7, material.metalness);
+    coat.envMapIntensity = 1.25;
+    coat.name = material.name;
+    return coat;
+  }
+  material.envMapIntensity = 1.05;
+  material.roughness = Math.min(material.roughness, 0.86);
+  return material;
+}
+
 function disposeAsset(root: THREE.Object3D) {
   const materials = new Set<THREE.Material>();
   root.traverse((object) => {
@@ -205,7 +246,8 @@ async function loadGeneratedTruck(model: SompoTruckModel, signal: AbortSignal): 
   const patched = new Set<THREE.Material>();
   const wearGenerated = (material: THREE.Material) => {
     if (!(material instanceof THREE.MeshStandardMaterial) || patched.has(material)) return;
-    if (material.emissive.getHex() !== 0) return; // luzes e lanternas ficam limpas
+    if (material.emissive.getHex() !== 0) return;
+    if (material.transparent || (material instanceof THREE.MeshPhysicalMaterial && material.transmission > 0)) return;
     patched.add(material);
     const compile = material.onBeforeCompile;
     material.onBeforeCompile = (shader, renderer) => {
@@ -234,9 +276,16 @@ async function loadGeneratedTruck(model: SompoTruckModel, signal: AbortSignal): 
     mesh.castShadow = mesh.receiveShadow = true;
     for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
       if (!(material instanceof THREE.MeshStandardMaterial)) continue;
-      material.envMapIntensity = 0.85;
-      for (const value of Object.values(material)) if (value instanceof THREE.Texture) value.anisotropy = 8;
-      wearGenerated(material);
+      const upgraded = upgradeGeneratedSurface(material);
+      if (upgraded !== material) {
+        if (Array.isArray(mesh.material)) {
+          mesh.material = mesh.material.map((item) => item === material ? upgraded : item);
+        } else {
+          mesh.material = upgraded;
+        }
+      }
+      for (const value of Object.values(upgraded)) if (value instanceof THREE.Texture) value.anisotropy = 8;
+      wearGenerated(upgraded instanceof THREE.MeshStandardMaterial ? upgraded : material);
     }
     // The offline export includes convex-hull vertices: exact support under any pitch/roll,
     // without scanning the 160k-triangle render mesh on every animation frame.

@@ -76,6 +76,9 @@ export function sompoTerrainHeight(x: number, z: number) {
   h = THREE.MathUtils.lerp(h, valleyFloor, valleyWindow * (1 - THREE.MathUtils.smoothstep(Math.abs(lakeX), 12, 40)) * 0.92);
   // Bacia do lago: o terreno mergulha abaixo do nível d'água no centro.
   h = THREE.MathUtils.lerp(h, SOMPO_LAKE.bedY, 1 - THREE.MathUtils.smoothstep(lakeDist, 11, 30));
+  // Broad pasture hill behind the reefer; period matches the infinite road.
+  const hillX = periodicX(x - 78);
+  h += 6.5 * Math.exp(-(hillX * hillX / 1450 + (z + 65) ** 2 / 1000)) * mask;
   return h;
 }
 

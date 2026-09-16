@@ -202,34 +202,63 @@ export function createSompoTruckModel({ sensorLabel }: SompoTruckModelOptions): 
     metalness: 0.12,
     clearcoat: 0.48,
   });
-  const corrugatedBlue = new THREE.MeshStandardMaterial({
-    color: 0x3b9bc5,
-    roughness: 0.36,
-    metalness: 0.56,
-    bumpMap: createSurfaceTexture('metal'),
-    bumpScale: 0.012,
-  });
-  const corrugationHighlight = new THREE.MeshStandardMaterial({
-    color: 0x9bc8d7,
-    roughness: 0.3,
-    metalness: 0.72,
-  });
   const chassisMaterial = new THREE.MeshStandardMaterial({ color: 0x0a1115, roughness: 0.72, metalness: 0.35 });
   const blackPlastic = new THREE.MeshPhysicalMaterial({ color: 0x070b10, roughness: 0.27, clearcoat: 0.35 });
   const glass = new THREE.MeshPhysicalMaterial({
-    color: 0x20465b,
-    roughness: 0.08,
-    metalness: 0.08,
+    color: 0x6a8aa0,
+    roughness: 0.045,
+    metalness: 0,
+    transmission: 0.72,
+    thickness: 0.045,
+    ior: 1.45,
+    transparent: true,
+    opacity: 1,
+    clearcoat: 1,
+    clearcoatRoughness: 0.03,
+    side: THREE.DoubleSide,
+    envMapIntensity: 1.7,
+    attenuationColor: 0x1a3344,
+    attenuationDistance: 0.8,
+  });
+  const cabinDark = new THREE.MeshStandardMaterial({ color: 0x12161a, roughness: 0.86, metalness: 0.08 });
+  const cabinSeat = new THREE.MeshStandardMaterial({ color: 0x1c2228, roughness: 0.78, metalness: 0.04 });
+  const dashPlastic = new THREE.MeshStandardMaterial({ color: 0x0c1014, roughness: 0.62, metalness: 0.12 });
+  const headlightLens = new THREE.MeshPhysicalMaterial({
+    color: 0xf4fbff,
+    roughness: 0.04,
+    metalness: 0.05,
+    transmission: 0.55,
+    thickness: 0.02,
+    ior: 1.5,
+    transparent: true,
+    emissive: 0xd7ecff,
+    emissiveIntensity: 0.35,
     clearcoat: 1,
     clearcoatRoughness: 0.04,
-    side: THREE.DoubleSide,
-    envMapIntensity: 1.5,
   });
+  const headlightReflector = new THREE.MeshStandardMaterial({ color: 0xdce8ee, roughness: 0.18, metalness: 0.92 });
   const tireMaterial = new THREE.MeshStandardMaterial({
     color: 0x171c20, roughness: 0.94, bumpMap: createSurfaceTexture('rubber'), bumpScale: 0.028,
   });
   const chrome = new THREE.MeshStandardMaterial({ color: 0xd4e1e5, roughness: 0.18, metalness: 0.94 });
-  const lamp = new THREE.MeshPhysicalMaterial({ color: 0xe9f5ff, emissive: 0xb5dcff, emissiveIntensity: 0.7, roughness: 0.12, clearcoat: 0.9 });
+  const lamp = new THREE.MeshPhysicalMaterial({ color: 0xf7fcff, emissive: 0xd6ecff, emissiveIntensity: 1.15, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.05 });
+  const corrugatedBlue = new THREE.MeshPhysicalMaterial({
+    color: 0x3b9bc5,
+    roughness: 0.28,
+    metalness: 0.62,
+    clearcoat: 0.35,
+    clearcoatRoughness: 0.28,
+    bumpMap: createSurfaceTexture('metal'),
+    bumpScale: 0.018,
+    envMapIntensity: 1.15,
+  });
+  const corrugationHighlight = new THREE.MeshPhysicalMaterial({
+    color: 0xb7d7e4,
+    roughness: 0.22,
+    metalness: 0.78,
+    clearcoat: 0.45,
+    clearcoatRoughness: 0.18,
+  });
   const amber = new THREE.MeshStandardMaterial({ color: 0xffa52b, emissive: 0xff8008, emissiveIntensity: 0.6, roughness: 0.28 });
   const red = new THREE.MeshStandardMaterial({ color: 0xc82730, emissive: 0xff182a, emissiveIntensity: 0.4, roughness: 0.3 });
   const decal = new THREE.MeshStandardMaterial({ map: createSurfaceTexture('branding'), roughness: 0.5 });
@@ -349,6 +378,16 @@ export function createSompoTruckModel({ sensorLabel }: SompoTruckModelOptions): 
   registerPart(nodes, cab, 'cab-assembly');
   root.add(cab);
   addPart(cab, 'cab-shell', makeCabGeometry(), paintedBlue, [0, 0, 0]);
+  addBox(cab, 'cabin-floor', [2.02, 0.05, 1.70], [2.78, 1.18, 0], cabinDark, 0.02);
+  addBox(cab, 'cabin-dash', [0.36, 0.26, 1.56], [3.70, 2.06, 0], dashPlastic, 0.04);
+  addBox(cab, 'cabin-dash-top', [0.40, 0.05, 1.58], [3.58, 2.22, 0], dashPlastic, 0.02);
+  addBox(cab, 'steering-column', [0.07, 0.40, 0.07], [3.46, 1.80, 0.36], dashPlastic, 0.015);
+  const wheel = addPart(cab, 'steering-wheel', new THREE.TorusGeometry(0.17, 0.016, 8, 18), dashPlastic, [3.40, 2.00, 0.36]);
+  wheel.rotation.z = 0.55;
+  for (const side of [-1, 1]) {
+    addBox(cab, `cabin-seat-${side}`, [0.50, 0.38, 0.46], [2.55, 1.50, side * 0.40], cabinSeat, 0.05);
+    addBox(cab, `cabin-seat-back-${side}`, [0.10, 0.58, 0.46], [2.32, 1.88, side * 0.40], cabinSeat, 0.04);
+  }
   addBox(cab, 'front-bumper', [0.26, 0.28, 2.34], [4.34, 0.98, 0], paintedBlueDark, 0.055);
   addBox(cab, 'bumper-trim', [0.03, 0.045, 2.18], [4.48, 0.89, 0], chrome, 0.01);
   addBox(cab, 'front-grille', [0.08, 0.61, 1.48], [4.35, 1.79, 0], blackPlastic, 0.04);
@@ -373,7 +412,9 @@ export function createSompoTruckModel({ sensorLabel }: SompoTruckModelOptions): 
     addBox(cab, `mirror-glass-${side}`, [0.018, 0.34, 0.11], [3.767, 2.78, side * 1.29], chrome, 0.012);
     addBox(cab, `headlight-housing-${side}`, [0.10, 0.30, 0.56], [4.35, 1.29, side * 0.83], blackPlastic, 0.035);
     for (const lampZ of [0.70, 0.91]) {
-      const light = addPart(cab, `headlight-projector-${side}-${lampZ}`, new THREE.CylinderGeometry(0.08, 0.08, 0.025, 16), lamp, [4.408, 1.30, side * lampZ]);
+      const reflector = addPart(cab, `headlight-reflector-${side}-${lampZ}`, new THREE.CylinderGeometry(0.09, 0.07, 0.055, 16), headlightReflector, [4.375, 1.30, side * lampZ]);
+      reflector.rotation.z = Math.PI / 2;
+      const light = addPart(cab, `headlight-projector-${side}-${lampZ}`, new THREE.CylinderGeometry(0.078, 0.078, 0.016, 16), headlightLens, [4.418, 1.30, side * lampZ]);
       light.rotation.z = Math.PI / 2;
     }
     addBox(cab, `daytime-led-${side}`, [0.02, 0.035, 0.43], [4.412, 1.19, side * 0.83], lamp, 0.009);

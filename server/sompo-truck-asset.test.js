@@ -168,7 +168,7 @@ test('GLBs reais recuperam texturas sem ImageBitmap, preservam sensores/rodas e 
     const trees = landscape.getObjectByName('rural-3d-vegetation');
     await vegetation.ready;
     assert.equal(trees.userData.loadedSpecies, 3, 'All three real tree assets recover through the Image element loader');
-    assert.equal(trees.children.length, 59, 'Finite LOD population');
+    assert.equal(trees.children.length, 63, 'Finite LOD population');
     const geometries = new Set();
     trees.traverse((node) => { if (node.isMesh && node.geometry.type !== 'PlaneGeometry') geometries.add(node.geometry); });
     assert.equal(geometries.size, 3, 'Instances share each species geometry');

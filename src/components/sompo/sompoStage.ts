@@ -12,7 +12,7 @@ export interface SompoStageApi {
 /** A bounded rendering budget, shared by both stages; selected at mount. */
 export function sompoRenderBudget() {
   const compact = window.matchMedia('(max-width: 700px), (pointer: coarse)').matches;
-  return { compact, pixelRatio: Math.min(window.devicePixelRatio || 1, compact ? 1 : 1.5), shadowSize: compact ? 1024 : 2048, postEffects: false };
+  return { compact, pixelRatio: Math.min(window.devicePixelRatio || 1, compact ? 1 : 2), shadowSize: compact ? 1024 : 2048, postEffects: !compact };
 }
 
 export function createSompoRenderer(mount: HTMLElement) {
