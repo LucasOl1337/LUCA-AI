@@ -113,10 +113,10 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     // Capture pose: between live-8 (6.5, 3.5, 8.8) and the live-12 pull-back
     // (10.6, 4.25, 15.2) fov 32. Roof should sit near 28–32% of frame height,
     // truck ~78–85% of width, chrome face inside a small margin.
-    const viewFov = 36;
+    const viewFov = 42;
     const compositionAspect = 1.25;
-    const viewOffset = { x: 8.4, y: 3.85, z: 12.0 };
-    const viewLook = { x: 0.35, y: 1.55, z: 0 };
+    const viewOffset = { x: -15.8, y: 3.55, z: 5.8 };
+    const viewLook = { x: 6.4, y: 1.35, z: -1.85 };
     const camera = new THREE.PerspectiveCamera(viewFov, 1, 0.1, 360);
     camera.position.set(viewOffset.x, viewOffset.y, viewOffset.z);
 
@@ -138,19 +138,19 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     orbit.maxPolarAngle = Math.PI * 0.49;
     orbit.target.set(viewLook.x, viewLook.y, viewLook.z);
 
-    scene.add(new THREE.HemisphereLight(0xffe5bd, 0x263721, 0.32));
+    scene.add(new THREE.HemisphereLight(0xc8e0ef, 0x314331, 0.72));
     const keyLight = new THREE.DirectionalLight(0xffd39a, 2.85);
     keyLight.position.set(12, 8, 18);
-    const rimLight = new THREE.DirectionalLight(0xb8d8e2, 0.26);
+    const rimLight = new THREE.DirectionalLight(0xc8e5f3, 0.34);
     rimLight.position.set(16, 7, -11);
     scene.add(rimLight);
-    const fillLight = new THREE.DirectionalLight(0xf0d6ac, 0.19);
+    const fillLight = new THREE.DirectionalLight(0xd6e5e8, 0.24);
     fillLight.position.set(-8, 6.5, 10);
     scene.add(fillLight);
     // Tight sky-colored specular on the 1.70 chrome surround / hood only.
     // Directional #b7d4c4 @ 0.82 at (18,13,12) lifted the whole truck; a
     // camera-right / +Y cone hits grille+hood without filling the reefer.
-    const skyCatch = new THREE.SpotLight(0xc5e8d4, 14, 14, THREE.MathUtils.degToRad(11), 0.35, 1.5);
+    const skyCatch = new THREE.SpotLight(0xc5e8d4, 3.2, 14, THREE.MathUtils.degToRad(11), 0.35, 1.5);
     skyCatch.name = 'grille-sky-catch';
     skyCatch.position.set(9.2, 4.8, 4.2);
     skyCatch.target.position.set(4.50, 1.45, 0);
@@ -210,7 +210,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     // Local headlamp fill is intentionally shadowless: it catches the grille,
     // wet road and chrome without changing any telemetry or light state.
     for (const z of [-0.83, 0.83]) {
-      const headlampFill = new THREE.PointLight(0xffd9a6, 0.38, 6.5, 2);
+      const headlampFill = new THREE.PointLight(0xffe6c6, 0.07, 5.2, 2);
       headlampFill.name = `sompo-headlamp-fill-${z}`;
       headlampFill.position.set(4.5, 1.34, z);
       headlampFill.castShadow = false;

@@ -15,8 +15,8 @@ export interface SompoStudioConfig {
 }
 
 export const SOMPO_STUDIO_DEFAULT: SompoStudioConfig = {
-  version: 1, name: 'Frota rural · fim de tarde', truck: 'modular', equipment: 'modular', lighting: 'golden',
-  paint: '#14213d', cargo: '#f3f1e8', roughness: 0.4, exposure: 1, wind: 0.65,
+  version: 1, name: 'Frota rural · serra em luz natural', truck: 'modular', equipment: 'modular', lighting: 'day',
+  paint: '#14213d', cargo: '#f3f1e8', roughness: 0.4, exposure: 0.94, wind: 0.65,
   wireframe: false, exploded: 0,
 };
 const KEY = 'luca:sompo-studio:v2';
@@ -33,7 +33,7 @@ export function parseSompoStudioConfig(input: unknown): SompoStudioConfig {
     version: 1, name: typeof value.name === 'string' ? value.name.trim().slice(0, 70) || base.name : base.name,
     truck: value.truck === 'generated' ? 'generated' : 'modular',
     equipment: value.equipment === 'tractor' || value.equipment === 'harvester' || value.equipment === 'generated' ? value.equipment : value.truck === 'generated' ? 'generated' : 'modular',
-    lighting: value.lighting === 'day' || value.lighting === 'overcast' ? value.lighting : 'golden',
+    lighting: value.lighting === 'day' || value.lighting === 'overcast' || value.lighting === 'golden' ? value.lighting : base.lighting,
     paint: color(value.paint, base.paint), cargo: color(value.cargo, base.cargo),
     roughness: clamp(value.roughness, 0.2, 1, base.roughness), exposure: clamp(value.exposure, 0.65, 1.4, base.exposure),
     wind: clamp(value.wind, 0, 2, base.wind), wireframe: value.wireframe === true,

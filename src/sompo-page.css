@@ -2473,9 +2473,9 @@
 .sompo-telemetry-export-actions button svg { width: 16px; height: 16px; }
 .sompo-telemetry-export .sompo-launch-error { color: #ffd8ca; }
 
-/* A near-square rural viewport keeps the full truck and the landscape in view. */
+/* Cinematic rural viewport keeps the journey readable beside telemetry. */
 @media (min-width: 1001px) {
-  .sompo-simulator:not(.is-studio) .sompo-simulator-stage { aspect-ratio: 1040 / 992; }
+  .sompo-simulator:not(.is-studio) .sompo-simulator-stage { aspect-ratio: 16 / 9; min-height: 0; }
 }
 
 @media (min-width: 1600px) {

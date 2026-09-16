@@ -97,6 +97,20 @@ function cropPlantGeometry(detail: 'near' | 'far' = 'near') {
   return geometry;
 }
 
+function crossedBillboardGeometry(width = 1, height = 1) {
+  const parts: THREE.BufferGeometry[] = [];
+  for (const yaw of [0, Math.PI / 2]) {
+    const card = new THREE.PlaneGeometry(width, height);
+    card.translate(0, height / 2, 0);
+    card.rotateY(yaw);
+    parts.push(card);
+  }
+  const geometry = mergeGeometries(parts);
+  parts.forEach((part) => part.dispose());
+  if (!geometry) throw new Error('crossed billboard');
+  return geometry;
+}
+
 function lumpyGeometry(base: THREE.BufferGeometry, roughness: number, seed: number) {
   const positions = base.attributes.position as THREE.BufferAttribute;
   for (let v = 0; v < positions.count; v += 1) {
@@ -302,6 +316,34 @@ export function createSompoRoadDetails(parent: THREE.Group) {
   }
   const bushTrail = makeTrail(bushes, bushSlots, 230, true, 0.04);
 
+  const pineMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffffff, roughness: 0.96, metalness: 0, side: THREE.DoubleSide,
+    transparent: true, alphaTest: 0.32, depthWrite: true,
+  });
+  const pineMap = new THREE.TextureLoader().load('/sompo/gen/r12-pine-cutout.webp', (map) => {
+    if (disposed) { map.dispose(); return; }
+    map.colorSpace = THREE.SRGBColorSpace;
+    map.anisotropy = 8;
+    pineMaterial.map = map;
+    pineMaterial.needsUpdate = true;
+  });
+  const pines = new THREE.InstancedMesh(crossedBillboardGeometry(), pineMaterial, 92);
+  pines.name = 'mountain-pine-groves'; pines.castShadow = pines.receiveShadow = true; root.add(pines);
+  const pineSlots: InstanceSlot[] = [];
+  for (let i = 0; i < 92; i += 1) {
+    const side = i % 5 < 3 ? -1 : 1;
+    const distance = side < 0 ? 16 + rand(i + 1101) * 58 : 14 + rand(i + 1101) * 42;
+    const height = 7.5 + rand(i + 1102) * 9.5;
+    const width = height * (0.29 + rand(i + 1103) * 0.09);
+    pineSlots.push({
+      x: rand(i + 1104) * 238 - 119,
+      z: -2.05 + side * distance,
+      rotation: rand(i + 1105) * Math.PI,
+      scale: new THREE.Vector3(width, height, width),
+    });
+  }
+  const pineTrail = makeTrail(pines, pineSlots, 238, true, 0.08);
+
   // Lavoura em fileiras: cutout r7 with tassel. Densify only the near 8 m
   // fence (skip 0.12); mid/far stay open so they are not a green wall.
   const cropLeafMaterial = new THREE.MeshStandardMaterial({
@@ -315,23 +357,17 @@ export function createSompoRoadDetails(parent: THREE.Group) {
       cropLeafMaterial.map = map; cropLeafMaterial.needsUpdate = true;
     });
   }
-  const cropRows = 26;
+  const cropRows = 8;
   const nearSlots: InstanceSlot[] = [], farSlots: InstanceSlot[] = [];
   const nearColors: THREE.Color[] = [], farColors: THREE.Color[] = [];
   for (let row = 0; row < cropRows; row += 1) {
-    const dist = 8.4 + row * (row < 8 ? 1.12 : 1.02);
-    const near = dist < 16.5;
-    const farField = dist >= 26.4;
-    const cols = near ? 96 : farField ? 72 : 128;
-    const spacing = near ? 1.55 : farField ? 2.35 : 1.22;
+    const near = false;
+    const cols = 52;
+    const spacing = 2.35;
     for (let column = 0; column < cols; column += 1) {
       const i = row * 320 + column;
-      const z = -8.4 - row * (near ? 1.12 : 1.02) + (rand(i + 401) - 0.5) * (near ? 0.48 : 0.22);
-      const nearFence = row < 4;
-      if (nearFence && rand(i + 419) < 0.12) continue;
-      if (near && !nearFence && rand(i + 419) < 0.32) continue;
-      if (!near && !farField && rand(i + 419) < 0.08) continue;
-      if (farField && rand(i + 419) < 0.48) continue;
+      const z = -24 - row * 1.7 + (rand(i + 401) - 0.5) * 0.5;
+      if (rand(i + 419) < 0.58) continue;
       const height = (near ? 2.12 : 1.92) + rand(i + 403) * (near ? 0.22 : 0.16);
       const width = 0.86 + rand(i + 412) * 0.20;
       (near ? nearSlots : farSlots).push({
@@ -378,21 +414,29 @@ export function createSompoRoadDetails(parent: THREE.Group) {
   const canopyTrail = makeTrail(canopy, canopySlots, 240, false);
 
   // Pedras e cupinzeiros de cerrado espalhados no pasto.
+  const rockMaterial = new THREE.MeshStandardMaterial({ color: 0xa69d91, roughness: 0.94, metalness: 0 });
+  const rockColor = new THREE.TextureLoader().load('/environments/sompo/dirt-color-2k.jpg');
+  rockColor.colorSpace = THREE.SRGBColorSpace; rockColor.wrapS = rockColor.wrapT = THREE.RepeatWrapping; rockColor.repeat.set(1.7, 1.7);
+  const rockNormal = new THREE.TextureLoader().load('/environments/sompo/dirt-normal-2k.jpg');
+  rockNormal.colorSpace = THREE.NoColorSpace; rockNormal.wrapS = rockNormal.wrapT = THREE.RepeatWrapping; rockNormal.repeat.set(1.7, 1.7);
+  rockMaterial.map = rockColor; rockMaterial.normalMap = rockNormal; rockMaterial.normalScale.setScalar(0.75);
   const rocks = new THREE.InstancedMesh(
-    lumpyGeometry(new THREE.IcosahedronGeometry(1, 1), 0.55, 7),
-    new THREE.MeshStandardMaterial({ color: 0x8d8171, roughness: 0.95 }),
-    26,
+    lumpyGeometry(new THREE.IcosahedronGeometry(1, 2), 0.48, 7),
+    rockMaterial,
+    72,
   );
   rocks.name = 'pasture-rocks'; rocks.castShadow = rocks.receiveShadow = true; root.add(rocks);
   const rockSlots: InstanceSlot[] = [];
-  for (let i = 0; i < 26; i += 1) {
-    const size = 0.16 + rand(i + 501) * 0.55;
+  for (let i = 0; i < 72; i += 1) {
+    const distance = 12 + rand(i + 503) * 58;
+    const size = 0.28 + rand(i + 501) * (distance > 30 ? 2.15 : 1.15);
     rockSlots.push({
       x: rand(i + 502) * 240 - 120,
-      z: (i % 3 === 0 ? -1 : 1) * (7.8 + rand(i + 503) * 26),
+      z: (i % 3 === 0 ? -1 : 1) * distance - 2.05,
       rotation: rand(i + 504) * Math.PI * 2,
-      scale: new THREE.Vector3(size * (1 + rand(i + 505) * 0.6), size, size),
+      scale: new THREE.Vector3(size * (1.15 + rand(i + 505) * 0.95), size * (0.65 + rand(i + 506) * 0.5), size),
     });
+    rocks.setColorAt(i, new THREE.Color().setHSL(0.08 + rand(i + 507) * 0.05, 0.08, 0.42 + rand(i + 508) * 0.18));
   }
   const rockTrail = makeTrail(rocks, rockSlots, 240, true, 0.06);
 
@@ -418,11 +462,15 @@ export function createSompoRoadDetails(parent: THREE.Group) {
       weedTrail.update(truckX);
       clumpTrail.update(truckX);
       bushTrail.update(truckX);
+      pineTrail.update(truckX);
       canopyTrail.update(truckX);
       cropNearTrail.update(truckX);
       cropFarTrail.update(truckX);
       rockTrail.update(truckX);
     },
-    dispose() { disposed = true; patchMap.dispose(); rutMap.dispose(); },
+    dispose() {
+      disposed = true; patchMap.dispose(); rutMap.dispose(); pineMap.dispose(); pineMaterial.dispose();
+      rockColor.dispose(); rockNormal.dispose(); rockMaterial.dispose();
+    },
   };
 }

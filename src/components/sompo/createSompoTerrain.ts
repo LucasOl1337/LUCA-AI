@@ -59,7 +59,7 @@ export function sompoTerrainHeight(x: number, z: number) {
   const broad = (periodicNoise(x, z, 40, SOMPO_TERRAIN_PERIOD_X / 40) * 2) - 1;
   const middle = (periodicNoise(x + 137, z + 29, 16, SOMPO_TERRAIN_PERIOD_X / 16) * 2) - 1;
   const fine = (periodicNoise(x + 37, z + 91, 5, SOMPO_TERRAIN_PERIOD_X / 5) * 2) - 1;
-  const amplitude = 1.4 + (THREE.MathUtils.smoothstep(corridor, 26, 100) * 3.4);
+  const amplitude = 1.8 + (THREE.MathUtils.smoothstep(corridor, 24, 100) * 4.8);
   let h = mask * ((broad * amplitude) + (middle * amplitude * 0.35) + (fine * 0.22));
   // Serra ao fundo: crista rolando dos dois lados, abrindo uma forquilha no lago.
   // MathUtils.smoothstep não inverte bordas como o GLSL: máscaras de raio usam 1-smoothstep.
@@ -70,6 +70,12 @@ export function sompoTerrainHeight(x: number, z: number) {
     * (2.8 + periodicNoise(x + 501, z + 77, 80, SOMPO_TERRAIN_PERIOD_X / 80) * 6.2
       + periodicNoise(x + 97, z + 11, 32, SOMPO_TERRAIN_PERIOD_X / 32) * 2.4);
   h += ridge * (1 - notch * 0.55);
+  const foothillMask = THREE.MathUtils.smoothstep(corridor, 15, 42);
+  const mountainMask = THREE.MathUtils.smoothstep(corridor, 34, 82);
+  const mountainA = 4.5 + periodicNoise(x + 811, z - 43, 54, SOMPO_TERRAIN_PERIOD_X / 54) * 8.5;
+  const mountainB = 3.2 + periodicNoise(x - 277, z + 133, 28, SOMPO_TERRAIN_PERIOD_X / 28) * 5.8;
+  h += foothillMask * (1.8 + broad * 1.5);
+  h += mountainMask * (mountainA + mountainB * 0.55) * (1 - notch * 0.72);
   // Vale que desce da rodovia até a bacia do lago: linha de visada aberta.
   const valleyWindow = THREE.MathUtils.smoothstep(corridor, 40, 54) * (1 - THREE.MathUtils.smoothstep(corridor, 82, 96));
   const valleyFloor = 0.55 + broad * 0.35;

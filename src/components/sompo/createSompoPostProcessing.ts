@@ -42,7 +42,7 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
   // while retaining a restrained highlight rolloff around the sun.
   // Thresholding keeps the headlamp lens from washing the grille while still
   // allowing the sun, sensor LED and chrome catches to bloom naturally.
-  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.22, 0.36, 1.08);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.13, 0.28, 1.18);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
   const grade = new ShaderPass({

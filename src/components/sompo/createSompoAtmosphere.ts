@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { SompoStudioConfig } from './sompoStudioConfig';
 
 const palettes = {
-  day: { top: '#5596b6', horizon: '#c6d7d2', sun: '#fff3d7', ground: '#45563b', direction: [26, 42, 18], strength: 2.2, warmth: 0.15 },
+  day: { top: '#407fa8', horizon: '#b9ccd1', sun: '#fff2d5', ground: '#40553d', direction: [26, 38, 18], strength: 1.85, warmth: 0.06 },
   // Low sun gives the road, wheel chrome and long grass the same direction as
   // the reference while keeping the HDRI responsible for the actual sky detail.
   // The default camera looks from +Z toward -Z. Keep the low sun in front of
@@ -125,7 +125,7 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
         } else {
           float h=max(d.y,0.);c=mix(horizon,top,pow(h,.32));
           vec2 p=d.xz/max(.12,d.y+.18)*3.0+vec2(clock*.0015,0);
-          float n=fbm(p);float cloud=smoothstep(.59-cloudiness*.12,.77-cloudiness*.12,n)*smoothstep(0.,.2,h)*.65;
+          float n=fbm(p);float cloud=smoothstep(.62-cloudiness*.08,.82-cloudiness*.08,n)*smoothstep(0.,.2,h)*.12;
           c=mix(c,mix(horizon,vec3(1.),.45),cloud);
           c+=sunlight*(pow(sunAmt,70.)*.06+pow(sunAmt,1600.)*.7);
         }
@@ -217,13 +217,15 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
       camera.getWorldDirection(domeUniforms.cameraForward.value);
       domeUniforms.cameraUp.value.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
       dome.visible = !night;
-      domeUniforms.domeStrength.value = night ? 0 : mode === 'golden' ? 0.48 : mode === 'overcast' ? 0.32 : 0.55;
-      domeUniforms.domeTop.value.set(mode === 'golden' ? '#efd2a5' : mode === 'overcast' ? '#d5d8d4' : '#e8e2d4');
-      domeUniforms.domeHorizon.value.set(mode === 'golden' ? '#d99b58' : mode === 'overcast' ? '#c4c6c0' : '#cfc6b4');
+      domeUniforms.domeStrength.value = night ? 0 : mode === 'golden' ? 0.48 : mode === 'overcast' ? 0.24 : 0.18;
+      domeUniforms.domeTop.value.set(mode === 'golden' ? '#efd2a5' : mode === 'overcast' ? '#d5d8d4' : '#86b4d0');
+      domeUniforms.domeHorizon.value.set(mode === 'golden' ? '#d99b58' : mode === 'overcast' ? '#c4c6c0' : '#d5dede');
       uniforms.clock.value = elapsed / 1000;
       uniforms.night.value = night ? 1 : 0;
       uniforms.wetSky.value = wet ? 1 : 0;
-      uniforms.useHdri.value = textures.dry || textures.wet ? 1 : 0;
+      // Keep the HDR as the reflection environment, but use the continuous
+      // analytic sky for the visible background at every viewport size.
+      uniforms.useHdri.value = 0;
       sunOffset.set(...palette.direction as [number, number, number]).normalize();
       sun.position.copy(anchor).addScaledVector(sunOffset, 46);
       sun.target.position.copy(anchor); sun.target.updateMatrixWorld();
@@ -246,8 +248,9 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
       if (scene.fog instanceof THREE.Fog) {
         // Névoa de distância esfria e perde saturação: serras ficam azuladas
         // em camadas como na referência em vez de virarem uma parede âmbar.
-        scene.fog.color.set(night ? '#172733' : mode === 'overcast' ? '#a9b2ae' : mode === 'golden' ? '#bd925f' : '#d6dcc8');
-        scene.fog.near = wet ? 70 : 58; scene.fog.far = wet ? 260 : 245;
+        scene.fog.color.set(night ? '#172733' : mode === 'overcast' ? '#a9b2ae' : mode === 'golden' ? '#bd925f' : '#b6c8ce');
+        scene.fog.near = wet ? 78 : mode === 'day' ? 105 : 68;
+        scene.fog.far = wet ? 270 : mode === 'day' ? 315 : 255;
       }
     },
     dispose() {
