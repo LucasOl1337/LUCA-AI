@@ -150,20 +150,23 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const details = createSompoRoadDetails(root);
   const roadMap = groundTexture('road');
   const asphalt = new THREE.MeshStandardMaterial({ map: roadMap, roughness: 0.98, metalness: 0 });
-  // Rugged mountain service track: generated top-down from the immutable
-  // target, with transverse weathered timber, gravel, ruts and encroaching
-  // vegetation. The source is pre-rotated so U follows travel direction.
+  let trailMap: THREE.Texture | null = null;
+  // R16 pack trail: target-derived, top-down alpine soil with embedded granite,
+  // paired compression and grass invading the margins. Keeping this as the
+  // continuous base (rather than a procession of timber boxes) makes the road
+  // read as eroded terrain instead of railway infrastructure.
   if (typeof document !== 'undefined') {
-    const detail = new THREE.TextureLoader().load('/sompo/gen/r14-mountain-track.webp');
+    const detail = new THREE.TextureLoader().load('/sompo/gen/r16-alpine-pack-trail.webp');
     detail.colorSpace = THREE.SRGBColorSpace;
     detail.wrapS = detail.wrapT = THREE.RepeatWrapping;
     detail.center.set(0.5, 0.5);
     detail.rotation = 0;
-    detail.repeat.set(18, 1);
+    detail.repeat.set(10, 1);
     detail.anisotropy = renderer.capabilities.getMaxAnisotropy();
     asphalt.map = detail;
+    trailMap = detail;
   }
-  const road = mesh(root, curvedRoadStrip(6.8, 0, 260, 160, 0.64), asphalt, [0, 0, 0]);
+  const road = mesh(root, curvedRoadStrip(5.75, 0, 260, 192, 0.82), asphalt, [0, 0, 0]);
   assets.surface(asphalt, 'dirt', 72, 4, { keepMap: true, normalScale: 1.05 });
   varySompoSurface(asphalt, 0.15);
   const unpaved = new THREE.MeshStandardMaterial({ map: earthMap, roughness: 1, color: 0xb09b7e });
@@ -212,9 +215,9 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const wood = new THREE.MeshStandardMaterial({ color: 0x70614b, roughness: 1 });
   assets.surface(wood, 'wood', 0.18, 1.2);
   wood.color.set(0xb9b2a0);
-  // Real geometry on the track gives the foreground the same readable scale
-  // cues as the target's weathered timber trail. Each sleeper follows the
-  // road's curve and micro elevation, with deterministic wear/width variation.
+  // The reference has occasional old drainage logs embedded in the path, not
+  // railroad ties. Sparse, narrow, heavily sunk pieces preserve that cue while
+  // leaving soil and gravel as the dominant surface.
   const sleeperMap = new THREE.TextureLoader().load('/sompo/gen/r15-pine-bark.webp');
   sleeperMap.colorSpace = THREE.SRGBColorSpace;
   sleeperMap.wrapS = sleeperMap.wrapT = THREE.MirroredRepeatWrapping;
@@ -224,26 +227,27 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
     map: sleeperMap, color: 0xffffff, roughness: 0.98, metalness: 0,
     emissive: 0x30271e, emissiveIntensity: 0.28,
   });
-  const sleeperCount = 150;
-  const sleepers = new THREE.InstancedMesh(new THREE.BoxGeometry(0.46, 0.085, 5.9), sleeperMaterial, sleeperCount);
-  sleepers.name = 'r15-weathered-timber-track';
+  const sleeperCount = 22;
+  const sleepers = new THREE.InstancedMesh(new THREE.BoxGeometry(0.34, 0.07, 1), sleeperMaterial, sleeperCount);
+  sleepers.name = 'r16-embedded-drainage-logs';
   sleepers.castShadow = true;
   sleepers.receiveShadow = true;
   const sleeperTransform = new THREE.Object3D();
   const sleeperColor = new THREE.Color();
   const sleeperRand = (i: number) => { const n = Math.sin(i * 127.1 + 311.7) * 43758.5453; return n - Math.floor(n); };
-  let sleeperX = -43;
+  let sleeperX = -42;
   for (let index = 0; index < sleeperCount; index += 1) {
-    sleeperX += 0.65 + sleeperRand(index + 2691) * 0.42;
+    sleeperX += 3.3 + sleeperRand(index + 2691) * 4.1;
     const x = sleeperX;
     const wear = sleeperRand(index + 2701);
-    const missing = sleeperRand(index + 2761) < 0.11;
-    sleeperTransform.position.set(x, roadSurfaceY(x) + 0.024 + wear * 0.009, roadCurveZ(x) + (sleeperRand(index + 2767) - 0.5) * 0.18);
-    sleeperTransform.rotation.set((sleeperRand(index + 2711) - 0.5) * 0.025, -Math.atan(roadCurveSlope(x)) + (sleeperRand(index + 2721) - 0.5) * 0.025, (sleeperRand(index + 2731) - 0.5) * 0.022);
+    const broken = sleeperRand(index + 2761) < 0.56;
+    const brokenOffset = broken ? (sleeperRand(index + 2771) < 0.5 ? -1 : 1) * (0.62 + sleeperRand(index + 2777) * 0.58) : 0;
+    sleeperTransform.position.set(x, roadSurfaceY(x) + 0.009 + wear * 0.005, roadCurveZ(x) + brokenOffset + (sleeperRand(index + 2767) - 0.5) * 0.42);
+    sleeperTransform.rotation.set((sleeperRand(index + 2711) - 0.5) * 0.04, -Math.atan(roadCurveSlope(x)) + (sleeperRand(index + 2721) - 0.5) * 0.12, (sleeperRand(index + 2731) - 0.5) * 0.035);
     sleeperTransform.scale.set(
-      missing ? 0 : 0.72 + wear * 0.43,
-      missing ? 0 : 0.60 + sleeperRand(index + 2741) * 0.62,
-      missing ? 0 : 0.78 + sleeperRand(index + 2751) * 0.30,
+      0.72 + wear * 0.64,
+      0.35 + sleeperRand(index + 2741) * 0.38,
+      (broken ? 0.85 : 3.25) + sleeperRand(index + 2751) * (broken ? 1.15 : 0.95),
     );
     sleeperTransform.updateMatrix();
     sleepers.setMatrixAt(index, sleeperTransform.matrix);
@@ -253,6 +257,40 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   sleepers.instanceMatrix.needsUpdate = true;
   if (sleepers.instanceColor) sleepers.instanceColor.needsUpdate = true;
   root.add(sleepers);
+  // Real pebbles bridge the otherwise flat albedo and catch low-angle light.
+  // Edge-weighted placement creates the gravel shoulders visible in the target
+  // without covering the compressed wheel corridor.
+  const gravelCount = 320;
+  const gravelMaterial = new THREE.MeshStandardMaterial({
+    color: 0x8d8b82, roughness: 0.97, metalness: 0, envMapIntensity: 0.38,
+  });
+  const gravelChips = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.12, 0), gravelMaterial, gravelCount);
+  gravelChips.name = 'r16-embedded-granite-chips';
+  gravelChips.castShadow = true;
+  gravelChips.receiveShadow = true;
+  const gravelTransform = new THREE.Object3D();
+  const gravelColor = new THREE.Color();
+  for (let index = 0; index < gravelCount; index += 1) {
+    const x = sleeperRand(index + 3101) * 254 - 127;
+    const side = sleeperRand(index + 3107) < 0.5 ? -1 : 1;
+    const edgeBias = Math.pow(sleeperRand(index + 3113), 0.42);
+    const lateral = side * (0.34 + edgeBias * 2.47);
+    const size = 0.34 + sleeperRand(index + 3119) * 1.28;
+    gravelTransform.position.set(x, roadSurfaceY(x) + 0.018 + size * 0.012, roadCurveZ(x) + lateral);
+    gravelTransform.rotation.set(
+      sleeperRand(index + 3121) * Math.PI,
+      sleeperRand(index + 3127) * Math.PI,
+      sleeperRand(index + 3131) * Math.PI,
+    );
+    gravelTransform.scale.set(size * (0.65 + sleeperRand(index + 3137) * 0.8), size * 0.42, size);
+    gravelTransform.updateMatrix();
+    gravelChips.setMatrixAt(index, gravelTransform.matrix);
+    gravelColor.setHSL(0.09 + sleeperRand(index + 3161) * 0.045, 0.025, 0.39 + sleeperRand(index + 3167) * 0.24);
+    gravelChips.setColorAt(index, gravelColor);
+  }
+  gravelChips.instanceMatrix.needsUpdate = true;
+  if (gravelChips.instanceColor) gravelChips.instanceColor.needsUpdate = true;
+  root.add(gravelChips);
   const rutMaterial = new THREE.MeshBasicMaterial({ color: 0x241f18, transparent: true, opacity: 0.24, depthWrite: false });
   const ruts = new THREE.Group();
   ruts.name = 'r15-truck-wheel-ruts';
@@ -433,6 +471,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       mountainBackdrop.quaternion.copy(camera.quaternion);
       road.position.x = truckX;
       sleepers.position.x = truckX;
+      gravelChips.position.x = truckX;
       ruts.position.x = truckX;
       for (const shoulder of shoulders) shoulder.position.x = truckX;
       for (const line of edgeLines) line.position.x = truckX;
@@ -533,8 +572,8 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
     },
     get hasHdri() { return assets.hasHdri; },
     dispose() {
-      pasture.dispose(); vegetation.dispose(); animal.dispose(); details.dispose(); assets.dispose(); asphalt.dispose(); unpaved.dispose(); clearSky.dispose(); rainSky.dispose(); mountainGroundMap.dispose();
-      sleeperMap.dispose(); sleeperMaterial.dispose(); sleepers.geometry.dispose(); rutMaterial.dispose();
+      pasture.dispose(); vegetation.dispose(); animal.dispose(); details.dispose(); assets.dispose(); asphalt.dispose(); unpaved.dispose(); clearSky.dispose(); rainSky.dispose(); mountainGroundMap.dispose(); roadMap.dispose(); trailMap?.dispose();
+      sleeperMap.dispose(); sleeperMaterial.dispose(); sleepers.geometry.dispose(); gravelMaterial.dispose(); gravelChips.geometry.dispose(); rutMaterial.dispose();
       ruts.children.forEach((child) => { if (child instanceof THREE.Mesh) child.geometry.dispose(); });
       mountainBackdrop.removeFromParent(); mountainBackdrop.geometry.dispose(); mountainBackdropMaterial.dispose(); mountainBackdropMap.dispose(); },
   };

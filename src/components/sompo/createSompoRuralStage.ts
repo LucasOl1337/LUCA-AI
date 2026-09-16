@@ -110,15 +110,14 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
 
     const scene = new THREE.Scene();
 
-    // Capture pose: between live-8 (6.5, 3.5, 8.8) and the live-12 pull-back
-    // (10.6, 4.25, 15.2) fov 32. Roof should sit near 28–32% of frame height,
-    // truck ~78–85% of width, chrome face inside a small margin.
-    const viewFov = 42;
+    // Target chase pose: enough subject scale to anchor the lower third while
+    // preserving the mountain corridor as the dominant part of the frame.
+    const viewFov = 41;
     const compositionAspect = 16 / 9;
     // Centered chase framing: the truck anchors the lower third while the road
     // pulls into the mountain pass, matching the target's rider/path hierarchy.
-    const viewOffset = { x: -34, y: 6.4, z: 2.0 };
-    const viewLook = { x: 18.5, y: 1.5, z: -0.9 };
+    const viewOffset = { x: -37, y: 5.35, z: 1.65 };
+    const viewLook = { x: 17, y: 1.5, z: -0.8 };
     const camera = new THREE.PerspectiveCamera(viewFov, 1, 0.1, 360);
     camera.position.set(viewOffset.x, viewOffset.y, viewOffset.z);
 
@@ -136,7 +135,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     orbit.dampingFactor = 0.07;
     orbit.enablePan = false;
     orbit.minDistance = 4;
-    orbit.maxDistance = 40;
+    orbit.maxDistance = 44;
     orbit.maxPolarAngle = Math.PI * 0.49;
     orbit.target.set(viewLook.x, viewLook.y, viewLook.z);
 

@@ -1,0 +1,13 @@
+{
+  "asset": "r16-alpine-pack-trail.webp",
+  "purpose": "Target-aligned alpine pack-trail albedo for the LUCA-AI SOMPO mountain simulator",
+  "source": "OpenAI built-in image generation",
+  "reference": ".dream-loop/target.png (RDR2 mountain gameplay frame supplied by the user)",
+  "generated_source": "/home/lol/.codex/generated_images/01a0aa39-b468-7061-a25b-f9e14ee51983/exec-9206899f-c984-453a-9875-d6f6e11da2fd.png",
+  "constraints": [
+    "top-down orthographic terrain material",
+    "natural compacted soil and embedded granite",
+    "no railway ties, asphalt, markings, text or watermark"
+  ],
+  "sha256": "c0cc070b8115c9acf6c3f3442cabe36051f527f0289cc3107845670c065f017c"
+}
