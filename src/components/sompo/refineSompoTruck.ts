@@ -46,22 +46,25 @@ function toCabinGlass(material: THREE.MeshStandardMaterial) {
   const glass = new THREE.MeshPhysicalMaterial();
   THREE.MeshStandardMaterial.prototype.copy.call(glass, material);
   glass.name = material.name;
-  // Same greenhouse as the modular cab: a 8% alpha plate reads as "no window".
+  // Blender exports this pane at ~10% alpha. Transmission refraction also
+  // compiles an invalid IBL shader on WebGL/SwiftShader, so the windscreen
+  // disappears and the cab reads as a solid block with no window.
   glass.color.set(0x6a8aa0);
   glass.metalness = 0;
-  glass.roughness = 0.045;
-  glass.transmission = 0.72;
-  glass.thickness = 0.045;
+  glass.roughness = 0.11;
+  glass.transmission = 0;
+  glass.thickness = 0;
   glass.ior = 1.45;
   glass.transparent = true;
-  glass.opacity = 1;
-  glass.clearcoat = 1;
-  glass.clearcoatRoughness = 0.03;
-  glass.envMapIntensity = 1.7;
+  glass.opacity = 0.46;
+  glass.alphaMap = null;
+  glass.clearcoat = 0.72;
+  glass.clearcoatRoughness = 0.08;
+  glass.envMapIntensity = 1.25;
   glass.attenuationColor = new THREE.Color(0x1a3344);
   glass.attenuationDistance = 0.8;
   glass.side = THREE.DoubleSide;
-  glass.depthWrite = true;
+  glass.depthWrite = false;
   return glass;
 }
 

@@ -54,8 +54,9 @@ test('Blender skin fits the existing rig and preserves spinning wheels and senso
   assert.ok(glasses.length >= 1, `missing cabin glass (${glasses.length})`);
   for (const mesh of glasses) {
     for (const material of [].concat(mesh.material)) {
-      assert.ok(material.opacity >= 0.85, `${mesh.name} opacity ${material.opacity}`);
-      assert.ok(material.transmission >= 0.5, `${mesh.name} transmission ${material.transmission}`);
+      assert.ok(material.transparent, `${mesh.name} should stay a see-through pane`);
+      assert.ok(material.opacity >= 0.35 && material.opacity <= 0.7, `${mesh.name} opacity ${material.opacity}`);
+      assert.equal(material.transmission, 0, `${mesh.name} transmission ${material.transmission}`);
     }
   }
 });
