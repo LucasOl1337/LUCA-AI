@@ -71,28 +71,24 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       // Solo de preparo sob a lavoura em fileiras (z −15…−42): terra escura
       // faz o verde das fileiras saltar, como na referência.
       ${field ? '' : `
-      float fieldSoil = smoothstep(11.4, 14.5, -ruralWorld.z) * (1.0 - smoothstep(48.0, 54.0, -ruralWorld.z));
+      float fieldSoil = smoothstep(11.4, 14.5, -ruralWorld.z) * (1.0 - smoothstep(31.0, 36.0, -ruralWorld.z));
       vec3 tilled = mix(vec3(.28, .21, .125), texture2D(soilMap, ruralWorld.xz * .38).rgb * vec3(.82, .72, .62), soilReady);
       // Sombra de copa: sob milho denso o chão lê verde-escuro, não barro claro.
       vec3 canopyFloor = mix(tilled, texture2D(canopyMap, ruralWorld.xz * .14).rgb * vec3(.42, .5, .38), .55 * canopyReady);
       tilled = mix(tilled, canopyFloor, .6);
       tilled *= .72 + macro * .56;
       grassland = mix(grassland, tilled, fieldSoil * .85);`}
-      // Mosaic de talhões nas encostas: parcelas de trigo, verde e terra virada.
+      // Broad continuous vegetation variation; no square colour tiles on hills.
       float corridorZ = ${field ? 'abs(ruralWorld.z)' : 'abs(ruralWorld.z+2.05)'};
       float hills = smoothstep(38.0, 72.0, corridorZ);
       if (hills > 0.001) {
-        float cell = ruralNoise(floor(ruralWorld.xz / 17.0) + .5);
-        float cell2 = ruralNoise(floor(ruralWorld.xz / 17.0) + 19.31);
-        vec3 parcela = cell < .28 ? vec3(.46,.40,.16)      // trigo/amarelo
-          : cell < .60 ? vec3(.20,.345,.115)                // verde escuro
-          : cell < .82 ? vec3(.30,.225,.125)                // terra virada
-          : vec3(.26,.42,.15);                              // pasto claro
-        parcela *= .75 + cell2 * .5;
-        grassland = mix(grassland, parcela, hills * .72);
+        float moisture = ruralNoise(ruralWorld.xz / 26.0 + .5);
+        float cover = ruralNoise(ruralWorld.xz / 7.0 + 19.31);
+        vec3 vegetationTint = mix(vec3(.70,.64,.47), vec3(.60,.76,.52), smoothstep(.22,.78,moisture));
+        grassland *= mix(vec3(1.), vegetationTint * (1.0 + cover * .18), hills * .55);
       }
       // Keep foreground grass in shade and distant hills muted in the cream haze.
-      ${field ? '' : 'grassland *= mix(vec3(.23,.25,.22), vec3(.68,.58,.54), smoothstep(16., 75., abs(ruralWorld.z)));'}
+      ${field ? '' : 'grassland *= mix(vec3(.50,.56,.42), vec3(.62,.70,.57), smoothstep(16., 75., abs(ruralWorld.z)));'}
       diffuseColor.rgb = mix(diffuseColor.rgb, grassland, pasture);
       // Talhão do agri: sulcos na direção das fileiras (o v da textura segue
       // o x do mundo) com resteva nas valetas, escurecido sob a copa. A faixa
@@ -104,6 +100,6 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       diffuseColor.rgb = mix(diffuseColor.rgb, tilled, fieldZone);` : ''}
       #include <roughnessmap_fragment>`);
   };
-  material.customProgramCacheKey = () => `sompo-pasture-albedo-v4-${field}`;
+  material.customProgramCacheKey = () => `sompo-pasture-albedo-v5-${field}`;
   return { dispose() { disposed = true; texture.dispose(); soilTexture.dispose(); bladeTexture.dispose(); if (field) tilledTexture.dispose(); else canopyTexture.dispose(); } };
 }

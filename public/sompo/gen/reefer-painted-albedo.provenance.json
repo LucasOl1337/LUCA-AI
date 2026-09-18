@@ -1,0 +1,10 @@
+{
+  "asset": "reefer-painted-albedo.png",
+  "generatedAt": "2026-09-18",
+  "generator": "built-in image_gen",
+  "source": "/home/lol/.codex/generated_images/01a0aa39-b468-7061-a25b-f9e14ee51983/exec-9d9ae0c1-4016-455a-ba0c-f44a75d5c514.png",
+  "role": "Diffuse albedo only. Corrugation is live Blender geometry; this is not a normal or roughness map.",
+  "prompt": "Use case: photorealistic-natural. Asset type: a single seamless diffuse ALBEDO texture for the painted aluminium refrigerated truck body of the LUCA-AI rural 3D simulator. Generate a square high resolution production texture, edge-to-edge, orthographic flat surface, neutral cool off-white paint (approximately RGB 215 222 225), extremely subtle powder-coat grain, sparse tiny grey scratches and pin-point road dirt, restrained slightly irregular vertical rain residue. This is the flat surface material before corrugation geometry is applied. Completely even shadow-free illumination, no highlights, no vignette, no perspective. No ribs, grooves, panels, rivets, seams, logos, letters, objects, background, or baked lighting. Keep the large-scale colour nearly uniform and tileable on every edge. The wear must be subtle at human scale, suitable for a maintained real working truck, not a rusty abandoned vehicle. Output the texture itself only.",
+  "processing": "Original generated PNG copied without modification. Tiled at approximately 2.12 metres per repeat on the reefer side panels.",
+  "limitations": "Generated resolution 1254x1254, not 4K. Seamlessness is requested, not numerically certified. Neutral fine grain inspected visually before integration."
+}

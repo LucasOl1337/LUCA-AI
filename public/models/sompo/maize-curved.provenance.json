@@ -1,0 +1,13 @@
+{
+  "asset": "maize-curved.glb",
+  "createdAt": "2026-09-18",
+  "generator": "Blender 5.2, scripts/sompo/build-maize.py",
+  "geometry": "Unit-height plant, true curved leaf meshes, stem and branching tassel, three instanced materials. Instance Y scale is plant height in metres.",
+  "albedo": "/sompo/gen/maize-leaf-albedo.png",
+  "imageGenerator": "built-in image_gen",
+  "source": "/home/lol/.codex/generated_images/01a0aa39-b468-7061-a25b-f9e14ee51983/exec-76e4610c-fc6c-410d-a365-0c32914e68da.png",
+  "prompt": "Use case: photorealistic-natural. Asset type: a UV albedo texture for a modeled 3D maize leaf in a rural realtime simulator. A single mature maize leaf blade flattened and straightened, shown orthographically from above, oriented vertically with the broad cut base centered at the very bottom and the long pointed tip at the very top. The leaf fills almost the entire height; long slender lanceolate silhouette, widest near lower third about one quarter of the image width. Mature muted olive green, authentic tiny longitudinal parallel veins and central pale midrib, subtle yellow-brown wear at small parts of the edge, healthy maintained crop. Even neutral diffuse illumination, no shadows, no highlights, no perspective or depth. Genuinely transparent background, clean alpha with no green-screen spill or opaque rectangle. No other leaves, no stalk, no corn cob, no text, no labels, no white border. This is a flat texture to wrap on curved mesh geometry; keep the leaf straight and centered.",
+  "distantAlbedo": "/sompo/gen/maize-distant-albedo.png",
+  "distantSource": "Existing generated image /home/lol/Projects/LUCA-AI/.dream-loop/r10-scene/corn-plant-cut.png; copied unchanged, original plate generated 2026-09-16 and cutout prepared in prior work.",
+  "notes": "Albedo source contains soft alpha outside the leaf, discarded at alphaTest 0.5. Realistic quality must be judged from runtime captures, not asset export success."
+}

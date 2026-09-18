@@ -67,8 +67,8 @@ export function sompoTerrainHeight(x: number, z: number) {
   const lakeDist = sompoLakeDistance(x, z);
   const notch = 1 - THREE.MathUtils.smoothstep(lakeDist, 14, 36);
   const ridge = THREE.MathUtils.smoothstep(corridor, 45, 95)
-    * (4.5 + periodicNoise(x + 501, z + 77, 80, SOMPO_TERRAIN_PERIOD_X / 80) * 9.5
-      + periodicNoise(x + 97, z + 11, 32, SOMPO_TERRAIN_PERIOD_X / 32) * 3.6);
+    * (3.4 + periodicNoise(x + 501, z + 77, 80, SOMPO_TERRAIN_PERIOD_X / 80) * 7.1
+      + periodicNoise(x + 97, z + 11, 32, SOMPO_TERRAIN_PERIOD_X / 32) * 2.7);
   h += ridge * (1 - notch * 0.55);
   // Vale que desce da rodovia até a bacia do lago: linha de visada aberta.
   const valleyWindow = THREE.MathUtils.smoothstep(corridor, 40, 54) * (1 - THREE.MathUtils.smoothstep(corridor, 82, 96));
@@ -78,7 +78,7 @@ export function sompoTerrainHeight(x: number, z: number) {
   h = THREE.MathUtils.lerp(h, SOMPO_LAKE.bedY, 1 - THREE.MathUtils.smoothstep(lakeDist, 11, 30));
   // Broad pasture hill behind the reefer; period matches the infinite road.
   const hillX = periodicX(x - 78);
-  h += 6.5 * Math.exp(-(hillX * hillX / 1450 + (z + 65) ** 2 / 1000)) * mask;
+  h += 4.5 * Math.exp(-(hillX * hillX / 1450 + (z + 65) ** 2 / 1000)) * mask;
   return h;
 }
 

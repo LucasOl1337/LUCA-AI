@@ -241,7 +241,8 @@ export function createSompoTruckModel({ sensorLabel }: SompoTruckModelOptions): 
   const tireMaterial = new THREE.MeshStandardMaterial({
     color: 0x171c20, roughness: 0.94, bumpMap: createSurfaceTexture('rubber'), bumpScale: 0.028,
   });
-  const chrome = new THREE.MeshStandardMaterial({ color: 0xd4e1e5, roughness: 0.18, metalness: 0.94 });
+  tireMaterial.name = 'Sompo tire rubber';
+  const chrome = new THREE.MeshStandardMaterial({ color: 0xaebac0, roughness: 0.34, metalness: 0.88 });
   const lamp = new THREE.MeshPhysicalMaterial({ color: 0xf7fcff, emissive: 0xd6ecff, emissiveIntensity: 1.15, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.05 });
   const corrugatedBlue = new THREE.MeshPhysicalMaterial({
     color: 0x3b9bc5,

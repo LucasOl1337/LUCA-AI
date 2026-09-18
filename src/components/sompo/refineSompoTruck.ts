@@ -49,14 +49,14 @@ function toCabinGlass(material: THREE.MeshStandardMaterial) {
   // Blender exports this pane at ~10% alpha. Transmission refraction also
   // compiles an invalid IBL shader on WebGL/SwiftShader, so the windscreen
   // disappears and the cab reads as a solid block with no window.
-  glass.color.set(0x6a8aa0);
+  glass.color.set(0xb6cbd2);
   glass.metalness = 0;
-  glass.roughness = 0.11;
+  glass.roughness = 0.055;
   glass.transmission = 0;
   glass.thickness = 0;
   glass.ior = 1.45;
   glass.transparent = true;
-  glass.opacity = 0.46;
+  glass.opacity = 0.36;
   glass.alphaMap = null;
   glass.clearcoat = 0.72;
   glass.clearcoatRoughness = 0.08;
@@ -65,65 +65,64 @@ function toCabinGlass(material: THREE.MeshStandardMaterial) {
   glass.attenuationDistance = 0.8;
   glass.side = THREE.DoubleSide;
   glass.depthWrite = false;
+  glass.onBeforeCompile = shader => {
+    shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
+      float viewFresnel = pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 5.0);
+      diffuseColor.a = mix(0.10, 0.72, viewFresnel);
+      #include <opaque_fragment>`);
+  };
+  glass.customProgramCacheKey = () => 'sompo-cabin-fresnel-v1';
   return glass;
 }
 
-function assignVisualMaps(root: THREE.Object3D) {
+function assignVisualMaps(root: THREE.Object3D, isDisposed: () => boolean) {
   if (typeof document === 'undefined' || typeof document.createElementNS !== 'function') return;
   const loader = new THREE.TextureLoader();
-  const paint = (url: string, names: string[], kind: 'cargo' | 'cabin' | 'grille') => {
+  const paint = (url: string, names: string[]) => {
     loader.load(url, map => {
+      if (isDisposed()) { map.dispose(); return; }
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;
-      if (kind === 'cargo') {
-        map.wrapS = map.wrapT = THREE.RepeatWrapping;
-        // Blender UVs put length on U and height on V so r10's horizontal
-        // cold-white ribs stay horizontal. Do not rotate.
-        map.repeat.set(1, 1);
-        map.offset.set(0, 0);
-      } else {
-        map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
-      }
+      map.wrapS = map.wrapT = THREE.RepeatWrapping;
       root.traverse(node => {
         const mesh = node as THREE.Mesh;
         if (!mesh.isMesh) return;
         for (const material of (Array.isArray(mesh.material) ? mesh.material : [mesh.material])) {
           if (!(material instanceof THREE.MeshStandardMaterial) || !names.includes(material.name)) continue;
-          if (kind === 'cargo') {
-            material.map = map;
-            material.bumpMap = null;
-            material.roughnessMap = null;
-            material.color.set('#f2f0ea');
-            material.roughness = 0.42;
-            material.metalness = 0.16;
-          }
-          if (kind === 'cabin') {
-            material.map = map;
-            material.emissiveMap = map;
-            material.emissive.set(0xd4ccc4);
-            material.emissiveIntensity = 1.0;
-            material.color.set('#d4ccc4');
-          }
-          if (kind === 'grille') {
-            material.map = map;
-            material.color.set('#ffffff');
-            material.metalness = 0.78;
-            material.roughness = 0.16;
-            material.envMapIntensity = 2.15;
-            material.emissive.set(0xcdd6dc);
-            material.emissiveIntensity = 0.28;
-          }
+          material.map = map;
+          material.bumpMap = null;
+          material.roughnessMap = null;
+          material.color.set('#ffffff');
+          material.roughness = 0.48;
+          material.metalness = 0.02; // Painted metal reflects as paint, not bare aluminium.
           material.needsUpdate = true;
         }
       });
     });
   };
-  paint('/sompo/gen/r10-corrugation.webp', ['Painéis do baú'], 'cargo');
-  paint('/sompo/gen/r9-cabin-through-glass.webp', ['Astra cabin interior'], 'cabin');
-  paint('/sompo/gen/r6-grille-front.webp', ['Astra grille face'], 'grille');
+  paint('/sompo/gen/reefer-painted-albedo.png', ['Painéis do baú']);
+  loader.load('/sompo/gen/truck-rubber-albedo.png', map => {
+    if (isDisposed()) { map.dispose(); return; }
+    map.colorSpace = THREE.SRGBColorSpace;
+    map.wrapS = map.wrapT = THREE.RepeatWrapping;
+    map.repeat.set(3, 2); map.anisotropy = 8;
+    root.traverse(node => {
+      const mesh = node as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+        if (material instanceof THREE.MeshStandardMaterial && material.name === 'Sompo tire rubber') {
+          material.map = map;
+          material.color.set(0xaeb4ba);
+          material.roughness = .88;
+          material.needsUpdate = true;
+        }
+      }
+    });
+  });
 }
 
 export function refineSompoTruck(model: SompoTruckModel) {
+  let disposed = false;
   const root = model.root;
   const cab = root.getObjectByName('cab-assembly')!;
   const cargo = root.getObjectByName('cargo-assembly')!;
@@ -185,20 +184,20 @@ export function refineSompoTruck(model: SompoTruckModel) {
     material.onBeforeCompile = (shader, renderer) => {
       compile?.call(material, shader, renderer);
       shader.vertexShader = 'varying vec3 truckW;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
-        truckW = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
+        truckW = transformed;`);
       shader.fragmentShader = `varying vec3 truckW;
         float truckHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
         float truckNoise(vec2 p){vec2 i=floor(p),f=fract(p);f*=f*(3.-2.*f);
           return mix(mix(truckHash(i),truckHash(i+vec2(1,0)),f.x),mix(truckHash(i+vec2(0,1)),truckHash(i+vec2(1,1)),f.x),f.y);}\n` + shader.fragmentShader
         .replace('#include <color_fragment>', `#include <color_fragment>
-          float truckDust = smoothstep(1.9, .35, truckW.y) * (.4 + .6 * truckNoise(truckW.xz * 1.9));
+          float truckDust = (1.0 - smoothstep(.35, 1.9, truckW.y)) * (.4 + .6 * truckNoise(truckW.xz * 1.9));
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.42, .35, .24), clamp(truckDust, 0., 1.) * ${paint ? '.22' : '.16'});
           ${box ? `float streak = truckNoise(vec2(truckW.z * 14.0 + truckW.x * 9.0, truckW.y * .6));
-          diffuseColor.rgb *= 1.0 - smoothstep(.55, .95, streak) * .09 * smoothstep(3.7, 2.4, truckW.y);` : ''}`)
+          diffuseColor.rgb *= 1.0 - smoothstep(.55, .95, streak) * .09 * (1.0 - smoothstep(2.4, 3.7, truckW.y));` : ''}`)
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
           roughnessFactor = mix(roughnessFactor, .92, clamp(truckDust, 0., 1.) * .5);`);
     };
-    material.customProgramCacheKey = () => `sompo-truck-wear-v1-${box}`;
+    material.customProgramCacheKey = () => `sompo-truck-wear-local-v2-${box}`;
   };
   materials.forEach(wearTruck);
   const axisY = new THREE.Vector3(0, 1, 0), axle = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
@@ -217,20 +216,49 @@ export function refineSompoTruck(model: SompoTruckModel) {
           const mesh = node as THREE.Mesh;
           if (!mesh.isMesh) return;
           mesh.castShadow = mesh.receiveShadow = true;
+          if (mesh.geometry.hasAttribute('color')) {
+            mesh.geometry.setAttribute('sompoCavity', mesh.geometry.getAttribute('color'));
+            mesh.geometry.deleteAttribute('color');
+          }
           const apply = (item: THREE.Material) => {
             if (!(item instanceof THREE.MeshStandardMaterial)) return item;
-            const label = `${mesh.name} ${item.name}`;
-            const converted = /glass|windscreen|window/i.test(label) && !/mirror/i.test(label)
+            // Window gaskets and wipers also contain "window/windscreen" in
+            // their mesh names. Only the authored optical material is glass.
+            const converted = item.name === 'Astra cabin glass'
               ? toCabinGlass(item) : item;
             if (converted !== item) mesh.renderOrder = 3;
-            if (!materials.has(converted)) { materials.add(converted); wearTruck(converted); }
+            if (converted.name === 'Astra cabin glass') {
+              // Transparent panes must not cast an opaque sheet across the cabin
+              // or self-shadow into striped glass at shallow light angles.
+              mesh.castShadow = false;
+              mesh.receiveShadow = false;
+            }
+            if (!materials.has(converted)) {
+              materials.add(converted); wearTruck(converted);
+              if (mesh.geometry.hasAttribute('sompoCavity')) {
+                converted.vertexColors = false;
+                const compile = converted.onBeforeCompile;
+                const cacheKey = converted.customProgramCacheKey();
+                converted.onBeforeCompile = (shader, renderer) => {
+                  compile.call(converted, shader, renderer);
+                  shader.vertexShader = 'attribute vec4 sompoCavity; varying float vSompoCavity;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvSompoCavity = sompoCavity.r;');
+                  shader.fragmentShader = 'varying float vSompoCavity;\n' + shader.fragmentShader.replace('#include <aomap_fragment>', `#include <aomap_fragment>
+                    reflectedLight.indirectDiffuse *= vSompoCavity;
+                    reflectedLight.indirectSpecular *= vSompoCavity;
+                    #ifdef USE_CLEARCOAT
+                      clearcoatSpecularIndirect *= vSompoCavity;
+                    #endif`);
+                };
+                converted.customProgramCacheKey = () => `${cacheKey}-baked-cavity-v1`;
+              }
+            }
             return converted;
           };
           mesh.material = Array.isArray(mesh.material) ? mesh.material.map(apply) : apply(mesh.material);
         });
       }
       finishKey = '';
-      assignVisualMaps(root);
+      assignVisualMaps(root, () => disposed);
       root.userData.visualAsset = 'AstraSompoTruck';
     },
     update(config: SompoStudioConfig, elapsed: number, wheelTravel: number, steerAngle: number, roughness: number, rain: number, reduced: boolean, speedKph = 0) {
@@ -242,9 +270,10 @@ export function refineSompoTruck(model: SompoTruckModel) {
           if (material.name === 'Pintura da cabine') { material.color.set(config.paint); material.roughness = Math.min(0.28, config.roughness * 0.55); material.metalness = 0.38; }
           if (material.name === 'Acabamentos da cabine') { material.color.set(config.paint).multiplyScalar(0.62); material.roughness = Math.min(0.4, config.roughness * 0.7 + 0.08); }
           if (material.name === 'Painéis do baú' || material.name === 'Alumínio do baú' || material.name === 'Astra box shell') {
-            material.color.set('#f2f0ea');
-            material.roughness = material.map ? 0.42 : 0.58;
-            material.metalness = 0.16;
+            const bareMetal = material.name === 'Alumínio do baú';
+            material.color.set(material.map ? '#ffffff' : '#f2f0ea');
+            material.roughness = bareMetal ? 0.32 : 0.48;
+            material.metalness = bareMetal ? 0.8 : 0.02;
           }
           if (material instanceof THREE.MeshPhysicalMaterial && material.name === 'Pintura da cabine') { material.clearcoat = 0.9; material.clearcoatRoughness = 0.12; }
         }
@@ -260,6 +289,9 @@ export function refineSompoTruck(model: SompoTruckModel) {
       }
       for (const pivot of wipers) pivot.rotation.x = reduced || !rain ? 0 : (1 - Math.cos(elapsed * .0055)) * .42 * Math.min(1, rain * 2);
     },
+    // Stage disposal owns existing resources; late image callbacks must not
+    // attach newly allocated textures to already retired materials.
+    dispose() { disposed = true; },
   };
 }
 

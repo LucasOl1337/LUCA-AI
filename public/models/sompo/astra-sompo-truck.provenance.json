@@ -1,0 +1,11 @@
+{
+  "asset": "astra-sompo-truck.glb",
+  "createdAt": "2026-09-18",
+  "generator": "Blender 5.2; scripts/sompo/build-astra-truck.py",
+  "sha256": "863e4b7115f800750197d9bfbaf56aa7baf7adf8a34f61b387beb9d22da301eb",
+  "geometry": "Original scripted truck skin, swept hollow greenhouse with optical panes, compound-curved hood, curved steer-axle fenders, horizontal grille, shallow reefer corrugation and cabin interior.",
+  "lightingData": "24-ray short-range hemispherical visibility baked to active vertex colour CavityAO. Runtime consumes the channel only for indirect illumination.",
+  "runtime": "Replaces cab/cargo skin only. Existing wheel pivots, travel, road contact and sensor aperture remain owned by the simulator rig.",
+  "textures": ["/sompo/gen/reefer-painted-albedo.png", "/sompo/gen/truck-rubber-albedo.png"],
+  "evaluation": "Experimental. Independent screenshot evaluation 6.0/10 against the current target. Not a claim of RDR2 fidelity."
+}

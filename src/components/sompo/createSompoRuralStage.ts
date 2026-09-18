@@ -19,6 +19,7 @@ import { createSompoAtmosphere } from './createSompoAtmosphere';
 import { SOMPO_STUDIO_DEFAULT, type SompoStudioConfig, type SompoRenderStats } from './sompoStudioConfig';
 import { createPhysicalTwinEffects } from './createPhysicalTwinEffects';
 import type { PhysicalTwin } from './usePhysicalTwin';
+import { sompoOverviewOffset, SOMPO_OVERVIEW_TARGET } from './fitSompoOverview';
 
 function dampAngle(current: number, target: number, factor: number) {
   const shortestTurn = Math.atan2(Math.sin(target - current), Math.cos(target - current));
@@ -127,19 +128,15 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     orbit.dampingFactor = 0.07;
     orbit.enablePan = false;
     orbit.minDistance = 4;
-    orbit.maxDistance = 24;
+    orbit.maxDistance = 48;
     orbit.maxPolarAngle = Math.PI * 0.49;
     orbit.target.set(0.35, 1.28, 0);
 
-    scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x776346, 0.42));
+    scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x776346, 0.18));
     const keyLight = new THREE.DirectionalLight(0xffefcd, 2.7);
     keyLight.position.set(-10, 12, 9);
-    const rimLight = new THREE.DirectionalLight(0xc5ddff, 0.95);
-    rimLight.position.set(16, 7, -11);
-    scene.add(rimLight);
-    const fillLight = new THREE.DirectionalLight(0xffe4c4, 0.4);
-    fillLight.position.set(8, 3.2, 14);
-    scene.add(fillLight);
+    // One physical sun plus environment illumination. Unshadowed studio fill
+    // lights used to shine straight through the roof and flatten cabin depth.
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.set(sompoRenderBudget().shadowSize, sompoRenderBudget().shadowSize);
     keyLight.shadow.camera.left = -26; keyLight.shadow.camera.right = 26;
@@ -271,6 +268,13 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       addBox(obstacleGroup, [0.59, 0.2, 2.68], [0.02, y, 0], obstacleStripe);
     }
 
+    let overviewFraming = true;
+    orbit.addEventListener('start', () => { overviewFraming = false; });
+    function frameOverview() {
+      orbit.target.copy(SOMPO_OVERVIEW_TARGET).add(new THREE.Vector3(truckPoseGroup.position.x, 0, truckPoseGroup.position.z));
+      camera.position.copy(orbit.target).add(sompoOverviewOffset(camera.aspect, camera.fov));
+      orbit.update();
+    }
     function resize() {
       const { width, height } = mount!.getBoundingClientRect();
       const safeWidth = Math.max(1, width);
@@ -280,6 +284,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       // Preserve horizontal room for the full vehicle in a portrait canvas.
       camera.fov = Math.min(58, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(32 / 2)) * Math.max(1, 1.18 / camera.aspect))));
       camera.updateProjectionMatrix();
+      if (overviewFraming) frameOverview();
       postProcessing.resize(safeWidth, safeHeight);
     }
 
@@ -304,18 +309,19 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       },
       focus(target) {
         focusTarget = target;
+        overviewFraming = target === 'truck';
         if (target === 'sensor') {
           sensorGroup.getWorldPosition(orbit.target);
           camera.position.set(orbit.target.x + 3, 4.7, 4.1);
           orbit.minDistance = 2.5;
         } else {
-          orbit.target.set(truckPoseGroup.position.x + 0.35, 1.28, truckPoseGroup.position.z);
-          camera.position.set(truckPoseGroup.position.x + 5.15, 2.55, 8.6);
+          frameOverview();
           orbit.minDistance = 4;
         }
         orbit.update();
       },
       adjust(action) {
+        overviewFraming = false;
         const offset = camera.position.clone().sub(orbit.target);
         if (action === 'rotate-left' || action === 'rotate-right') {
           const direction = action === 'rotate-left' ? 1 : -1;
@@ -673,6 +679,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
 
     return { ...api, dispose() {
       assetAbort.abort();
+      modular?.dispose();
       atmosphere.dispose();
       roadScene.dispose();
       scenarioEffects.dispose();

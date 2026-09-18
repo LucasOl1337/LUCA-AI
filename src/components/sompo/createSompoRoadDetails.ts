@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { restoreSompoTextures, useSompoExternalTextures } from './restoreSompoTextures';
+import { disposeSompoObject } from './sompoStage';
 import { sompoTerrainHeight, sompoVegetationDensity } from './createSompoTerrain';
 
 const rand = (i: number) => { const n = Math.sin(i * 127.1 + 21.7) * 43758.5453; return n - Math.floor(n); };
@@ -93,6 +96,7 @@ function cropPlantGeometry(detail: 'near' | 'far' = 'near') {
   const geometry = mergeGeometries(leafParts);
   leafParts.forEach((part) => part.dispose());
   if (!geometry) throw new Error('crop plant');
+  geometry.scale(1, 1 / (cardH + 0.08), 1); // Instance Y scale is height in metres.
   geometry.computeVertexNormals();
   return geometry;
 }
@@ -138,6 +142,9 @@ function makeTrail(mesh: THREE.InstancedMesh, slots: InstanceSlot[], span: numbe
 
 export function createSompoRoadDetails(parent: THREE.Group) {
   let disposed = false;
+  const assetAbort = new AbortController();
+  const maizeTrails: ReturnType<typeof makeTrail>[] = [];
+  let latestTruckX = 0;
   const root = new THREE.Group(); root.name = 'rural-surface-details'; parent.add(root);
   const transform = new THREE.Object3D();
   const canvas = document.createElement('canvas'); canvas.width = canvas.height = 256;
@@ -302,14 +309,14 @@ export function createSompoRoadDetails(parent: THREE.Group) {
   }
   const bushTrail = makeTrail(bushes, bushSlots, 230, true, 0.04);
 
-  // Lavoura em fileiras: cutout r7 with tassel. Densify only the near 8 m
-  // fence (skip 0.12); mid/far stay open so they are not a green wall.
+  // Continuous cultivated rows across the full wrapping span. The former
+  // cols*spacing covered only ~150 of 240 metres, leaving a moving bare gap.
   const cropLeafMaterial = new THREE.MeshStandardMaterial({
     color: 0xf2f4e8, roughness: 0.78, side: THREE.DoubleSide, alphaTest: 0.38,
   });
   windify(cropLeafMaterial, 0.04);
   if (typeof document !== 'undefined' && typeof document.createElementNS === 'function') {
-    new THREE.TextureLoader().load('/sompo/gen/r7-corn-plant-cutout.webp', (map) => {
+    new THREE.TextureLoader().load('/sompo/gen/maize-distant-albedo.png', (map) => {
       if (disposed) { map.dispose(); return; }
       map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8;
       cropLeafMaterial.map = map; cropLeafMaterial.needsUpdate = true;
@@ -322,26 +329,28 @@ export function createSompoRoadDetails(parent: THREE.Group) {
     const dist = 8.4 + row * (row < 8 ? 1.12 : 1.02);
     const near = dist < 16.5;
     const farField = dist >= 26.4;
-    const cols = near ? 96 : farField ? 72 : 128;
-    const spacing = near ? 1.55 : farField ? 2.35 : 1.22;
+    const cols = near ? 192 : farField ? 128 : 160;
+    const spacing = 240 / cols;
     for (let column = 0; column < cols; column += 1) {
       const i = row * 320 + column;
       const z = -8.4 - row * (near ? 1.12 : 1.02) + (rand(i + 401) - 0.5) * (near ? 0.48 : 0.22);
       const nearFence = row < 4;
-      if (nearFence && rand(i + 419) < 0.12) continue;
-      if (near && !nearFence && rand(i + 419) < 0.32) continue;
-      if (!near && !farField && rand(i + 419) < 0.08) continue;
-      if (farField && rand(i + 419) < 0.48) continue;
+      if (nearFence && rand(i + 419) < 0.03) continue;
+      if (near && !nearFence && rand(i + 419) < 0.05) continue;
+      if (!near && !farField && rand(i + 419) < 0.04) continue;
+      if (farField && rand(i + 419) < 0.08) continue;
       const height = (near ? 2.12 : 1.92) + rand(i + 403) * (near ? 0.22 : 0.16);
       const width = 0.86 + rand(i + 412) * 0.20;
       (near ? nearSlots : farSlots).push({
-        x: column * spacing - 116 + (rand(i + 402) - 0.5) * (near ? 0.95 : 0.45),
+        x: column * spacing - 120 + (rand(i + 402) - 0.5) * .35,
         z,
         rotation: rand(i + 404) * Math.PI * 2,
         tilt: (rand(i + 407) - 0.5) * (near ? 0.08 : 0.06),
-        scale: new THREE.Vector3(width, height, width),
+        // Authored maize is normalized in all axes: preserve leaf proportions
+        // when taking its one-metre plant to the requested field height.
+        scale: new THREE.Vector3(near ? width * height : width, height, near ? width * height : width),
       });
-      const tone = new THREE.Color().setHSL(0.22 + rand(i + 405) * 0.025, 0.28 + rand(i + 408) * 0.04, 0.62 + rand(i + 406) * 0.06);
+      const tone = new THREE.Color().setHSL(0.28 + rand(i + 405) * 0.025, 0.34 + rand(i + 408) * 0.06, 0.56 + rand(i + 406) * 0.08);
       (near ? nearColors : farColors).push(tone);
     }
   }
@@ -355,13 +364,65 @@ export function createSompoRoadDetails(parent: THREE.Group) {
   const cropNearTrail = makeTrail(cropsNear, nearSlots, 240, true, 0.04);
   const cropFarTrail = makeTrail(cropsFar, farSlots, 240, true, 0.04);
 
+  // Near plants have independently curved leaves in 3D. Reuse each geometry
+  // across the field; distant plants retain the lightweight photographic cutout.
+  if (typeof document !== 'undefined' && typeof document.createElementNS === 'function') {
+    void fetch('/models/sompo/maize-curved.glb', { signal: assetAbort.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error(`Maize HTTP ${response.status}`);
+        const gltf = await useSompoExternalTextures(new GLTFLoader()).parseAsync(await response.arrayBuffer(), '/models/sompo/');
+        try {
+          await restoreSompoTextures(gltf, '/models/sompo/maize-curved.glb', assetAbort.signal);
+          return gltf;
+        } catch (error) {
+          disposeSompoObject(gltf.scene);
+          throw error;
+        }
+      }).then(gltf => {
+        gltf.scene.updateMatrixWorld(true);
+        gltf.scene.traverse(node => {
+          const source = node as THREE.Mesh;
+          if (!source.isMesh) return;
+          if (disposed) {
+            source.geometry.dispose();
+            for (const m of Array.isArray(source.material) ? source.material : [source.material]) {
+              for (const value of Object.values(m)) if (value instanceof THREE.Texture) value.dispose();
+              m.dispose();
+            }
+            return;
+          }
+          const material = source.material as THREE.MeshStandardMaterial;
+          material.transparent = false;
+          material.alphaTest = material.map ? 0.5 : 0;
+          material.side = THREE.DoubleSide;
+          material.roughness = .86;
+          material.metalness = 0;
+          if (material.map) {
+            material.color.set(0xffffff);
+            material.map.anisotropy = 8;
+          }
+          windify(material, .035);
+          source.geometry.applyMatrix4(source.matrixWorld);
+          const plants = new THREE.InstancedMesh(source.geometry, material, nearSlots.length);
+          plants.name = `maize-near-${source.name}`;
+          plants.castShadow = plants.receiveShadow = true;
+          root.add(plants);
+          nearColors.forEach((color,index) => plants.setColorAt(index,color));
+          const trail = makeTrail(plants, nearSlots, 240, true, .025);
+          trail.update(latestTruckX);
+          maizeTrails.push(trail);
+        });
+        if (!disposed && maizeTrails.length) cropsNear.visible = false;
+      }).catch(() => { /* Preserve cutout vegetation if the detailed asset is unavailable. */ });
+  }
+
   // Distant mass only, well behind the fence so it is not a green wall.
   const canopyMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff, roughness: 1, side: THREE.DoubleSide, alphaTest: 0.42,
   });
   windify(canopyMaterial, 0.025);
   if (typeof document !== 'undefined' && typeof document.createElementNS === 'function') {
-    new THREE.TextureLoader().load('/sompo/gen/r7-corn-plant-cutout.webp', map => {
+    new THREE.TextureLoader().load('/sompo/gen/maize-distant-albedo.png', map => {
       if (disposed) { map.dispose(); return; }
       map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8;
       canopyMaterial.map = map; canopyMaterial.needsUpdate = true;
@@ -398,6 +459,8 @@ export function createSompoRoadDetails(parent: THREE.Group) {
 
   return {
     update(elapsed: number, wet: boolean, reducedMotion: boolean, truckX: number, windStrength = 0.65) {
+      latestTruckX = truckX;
+      maizeTrails.forEach(trail => trail.update(truckX));
       wind.value = windStrength;
       time.value = reducedMotion ? 0 : elapsed / 1000;
       grassMaterial.color.set(wet ? 0x9aa383 : 0xffffff);
@@ -423,6 +486,6 @@ export function createSompoRoadDetails(parent: THREE.Group) {
       cropFarTrail.update(truckX);
       rockTrail.update(truckX);
     },
-    dispose() { disposed = true; patchMap.dispose(); rutMap.dispose(); },
+    dispose() { disposed = true; assetAbort.abort(); patchMap.dispose(); rutMap.dispose(); },
   };
 }
