@@ -1,29 +1,29 @@
 WEBVTT
 
 1
-00:00:00.500 --> 00:00:04.240
-Uma missão não precisa virar cinco conversas abertas.
+00:00:00.400 --> 00:00:05.340
+O LUCA-AI transforma um pedido em uma missão. Cada etapa da equipe tem dono.
 
 2
-00:00:05.100 --> 00:00:09.460
-No LUCA, o painel já abre com a equipe montada. Não com um campo vazio.
+00:00:07.100 --> 00:00:13.120
+Na entrada, duas histórias de campo: prevenir risco na máquina e entender a carteira da frota.
 
 3
-00:00:14.200 --> 00:00:20.580
-Cada card é um especialista: função, modelo e prompt próprios. Do supervisor ao engenheiro agrícola.
+00:00:16.470 --> 00:00:23.690
+Você escolhe a equipe. O fluxo fecha em cinco de cinco quando supervisor, execução, aprovação e entrega têm nome.
 
 4
-00:00:25.500 --> 00:00:31.600
-Você decide quem supervisiona, quem executa e quem aprova. Depois escreve a missão uma vez só.
+00:00:24.070 --> 00:00:28.850
+A missão entra numa frase só. A conversa da equipe fica nesta mesma tela.
 
 5
-00:00:39.900 --> 00:00:46.580
-A equipe trabalha em etapas com dono. E a decisão chega numa conversa só, com a entrega pronta pra revisar.
+00:00:31.140 --> 00:00:38.200
+No SOMPO, a telemetria do equipamento aparece localmente. Oito cenários agrícolas de exemplo já vêm prontos.
 
 6
-00:00:48.967 --> 00:00:57.057
-E quando o problema é no campo, o laboratório reconstrói o incidente em 3D. Telemetria, trajetória e eventos na linha do tempo.
+00:00:43.710 --> 00:00:52.030
+O laboratório reconstrói o incidente em 3D a partir de um CSV. Seis mil amostras. Dez minutos de replay. Eventos na linha do tempo.
 
 7
-00:01:01.833 --> 00:01:04.693
-LUCA-AI. Sua missão. Uma equipe inteira.
+00:00:56.140 --> 00:01:03.440
+Menos tempo costurando respostas. Mais tempo decidindo o que fazer. LUCA-AI. Aberto em luca-ai.com.br.
