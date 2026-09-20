@@ -639,10 +639,10 @@ function Metric({ label, value }: { label: string; value: number }) {
 function Field({ label, children }: { label: string; children: ReactNode }) {
   const theme = useTheme();
   return (
-    <label className="block space-y-1.5">
+    <div className="block space-y-1.5">
       <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: theme.textGhost }}>{label}</span>
       {children}
-    </label>
+    </div>
   );
 }
 
@@ -690,6 +690,8 @@ function RolePicker({
   const [query, setQuery] = useState('');
   const term = query.trim().toLowerCase();
   const visible = personas.filter((persona) => {
+    // Persona oculta pelo admin some da montagem de equipe, salvo se já estiver no papel.
+    if (persona.visible === false && !selected.includes(persona.slug)) return false;
     if (!term) return true;
     return [persona.name, persona.slug, persona.description]
       .filter(Boolean)
@@ -716,12 +718,16 @@ function RolePicker({
             <p className="text-xs font-semibold" style={{ color: theme.textSoft }}>
               {personas.length === 0
                 ? 'Nenhuma persona no catálogo'
-                : `Nenhuma persona para “${query.trim()}”`}
+                : term
+                  ? `Nenhuma persona para “${query.trim()}”`
+                  : 'Nenhuma persona visível para este papel'}
             </p>
             <p className="mt-1 text-[11px] leading-relaxed" style={{ color: theme.textGhost }}>
               {personas.length === 0
                 ? 'Peça a quem opera o Yume para publicar o roster. Sem personas não dá para montar o template.'
-                : 'Limpe a busca para ver o catálogo completo.'}
+                : term
+                  ? 'Limpe a busca para ver o catálogo visível.'
+                  : 'O admin ocultou essas personas no catálogo global. Elas não entram em equipes novas.'}
             </p>
             {personas.length > 0 && term ? (
               <button

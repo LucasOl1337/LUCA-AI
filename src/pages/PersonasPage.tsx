@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import {
   AlertCircle,
@@ -459,7 +460,7 @@ function PersonaCard({ persona, delay, busy, onEdit, onToggleVisible }: PersonaC
       initial={{ opacity: 0, y: 14, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.25, delay, ease: [0.4, 0, 0.2, 1] }}
-      className="group relative aspect-square overflow-hidden rounded-[18px]"
+      className="group relative aspect-square cursor-pointer overflow-hidden rounded-[18px]"
       style={{
         background: theme.input,
         boxShadow: persona.customized ? `inset 3px 0 0 ${theme.gold}` : 'var(--l-shadow-card)',
@@ -467,6 +468,7 @@ function PersonaCard({ persona, delay, busy, onEdit, onToggleVisible }: PersonaC
       }}
       data-persona-card={persona.slug}
       data-persona-visible={visible ? 'true' : 'false'}
+      onClick={onEdit}
     >
       <div className="absolute inset-0 flex items-center justify-center" style={{ background: theme.goldSoft, color: theme.goldDeep }}>
         <span className="font-display text-6xl font-bold">{initial}</span>
@@ -507,7 +509,10 @@ function PersonaCard({ persona, delay, busy, onEdit, onToggleVisible }: PersonaC
               type="button"
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition"
               style={{ background: theme.goldSoft, color: theme.text }}
-              onClick={onEdit}
+              onClick={(event) => {
+                event.stopPropagation();
+                onEdit();
+              }}
               disabled={busy}
               data-persona-edit
             >
@@ -518,7 +523,10 @@ function PersonaCard({ persona, delay, busy, onEdit, onToggleVisible }: PersonaC
               type="button"
               className="inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition"
               style={{ background: 'rgba(255,255,255,0.10)', color: theme.text }}
-              onClick={onToggleVisible}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleVisible();
+              }}
               disabled={busy}
               title={visible ? 'Ocultar para todos' : 'Mostrar para todos'}
               aria-label={visible ? 'Ocultar para todos' : 'Mostrar para todos'}
@@ -680,18 +688,12 @@ function PersonaEditor({ persona, profiles, busy, onClose, onSave, onReset }: Pe
           </Field>
 
           <Field label="Modelo no 9Router" hint={persona.yumeModel ? `Vazio = segue o Yume (${persona.yumeModel})` : 'Vazio = padrão do LUCA'}>
-            <select
+            <ModelSelect
               value={model}
-              onChange={(event) => setModel(event.target.value)}
-              className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none"
-              style={fieldStyle}
-              data-persona-field="model"
-            >
-              <option value="">Seguir o Yume / padrão do LUCA</option>
-              {modelOptions.map((option) => (
-                <option key={option.id} value={option.id}>{option.label}</option>
-              ))}
-            </select>
+              options={modelOptions}
+              emptyLabel="Seguir o Yume / padrão do LUCA"
+              onChange={setModel}
+            />
           </Field>
 
           <Field label="Avatar (URL)" hint="http(s) ou caminho do próprio LUCA. Vazio = avatar do Yume.">
@@ -751,12 +753,156 @@ function PersonaEditor({ persona, profiles, busy, onClose, onSave, onReset }: Pe
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   const theme = useTheme();
   return (
-    <label className="block">
+    <div className="block">
       <span className="mb-1.5 flex items-baseline justify-between gap-3">
         <span className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: theme.textSoft }}>{label}</span>
         {hint && <span className="truncate text-[11px]" style={{ color: theme.textGhost }}>{hint}</span>}
       </span>
       {children}
-    </label>
+    </div>
+  );
+}
+
+const MODEL_SELECT_SURFACE = '#12161d';
+
+function ModelSelect({
+  value,
+  options,
+  emptyLabel,
+  onChange,
+}: {
+  value: string;
+  options: Array<{ id: string; label: string }>;
+  emptyLabel: string;
+  onChange: (value: string) => void;
+}) {
+  const theme = useTheme();
+  const [open, setOpen] = useState(false);
+  const [menuBox, setMenuBox] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const current = options.find((option) => option.id === value);
+
+  const placeMenu = useCallback(() => {
+    const trigger = rootRef.current?.getBoundingClientRect();
+    if (!trigger) return;
+    const maxHeight = 256;
+    const spaceBelow = window.innerHeight - trigger.bottom - 8;
+    const openUp = spaceBelow < 160 && trigger.top > spaceBelow;
+    const height = Math.min(maxHeight, Math.max(120, openUp ? trigger.top - 8 : spaceBelow));
+    setMenuBox({
+      top: openUp ? Math.max(8, trigger.top - height) : trigger.bottom + 4,
+      left: trigger.left,
+      width: trigger.width,
+      maxHeight: height,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    placeMenu();
+    function onPointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target) || listRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+    }
+    window.addEventListener('resize', placeMenu);
+    window.addEventListener('scroll', placeMenu, true);
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      window.removeEventListener('resize', placeMenu);
+      window.removeEventListener('scroll', placeMenu, true);
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, [open, placeMenu]);
+
+  function pick(next: string) {
+    onChange(next);
+    setOpen(false);
+  }
+
+  const menu = open && menuBox
+    ? createPortal(
+      <ul
+        ref={listRef}
+        role="listbox"
+        className="fixed z-[80] overflow-y-auto rounded-lg border py-1 shadow-lg"
+        style={{
+          top: menuBox.top,
+          left: menuBox.left,
+          width: menuBox.width,
+          maxHeight: menuBox.maxHeight,
+          background: MODEL_SELECT_SURFACE,
+          borderColor: theme.border,
+          color: theme.text,
+        }}
+        data-persona-model-list
+      >
+        <li>
+          <button
+            type="button"
+            role="option"
+            aria-selected={!value}
+            className="w-full px-3 py-2 text-left text-sm hover:bg-white/10"
+            style={{ background: !value ? theme.goldSoft : 'transparent', color: theme.text }}
+            onClick={() => pick('')}
+            data-persona-model-option=""
+          >
+            {emptyLabel}
+          </button>
+        </li>
+        {options.map((option) => {
+          const selected = value === option.id;
+          return (
+            <li key={option.id}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={selected}
+                className="w-full px-3 py-2 text-left text-sm hover:bg-white/10"
+                style={{ background: selected ? theme.goldSoft : 'transparent', color: theme.text }}
+                onClick={() => pick(option.id)}
+                data-persona-model-option={option.id}
+              >
+                {option.label}
+              </button>
+            </li>
+          );
+        })}
+      </ul>,
+      document.body,
+    )
+    : null;
+
+  return (
+    <div ref={rootRef} className="relative" data-persona-field="model">
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="luca-persona-model-select w-full rounded-lg border px-3 py-2.5 text-left text-sm outline-none"
+        style={{ background: MODEL_SELECT_SURFACE, borderColor: theme.border, color: theme.text }}
+        onClick={() => {
+          if (open) {
+            setOpen(false);
+            return;
+          }
+          placeMenu();
+          setOpen(true);
+        }}
+        data-persona-model-trigger
+      >
+        {current?.label || emptyLabel}
+      </button>
+      {menu}
+    </div>
   );
 }
