@@ -3150,7 +3150,7 @@ app.get('/api/personas/avatar', async (req, res) => {
 
 app.get('/api/personas/available', async (_req, res) => {
   try {
-    res.json({ ok: true, ...await personaSource.listAvailable() });
+    res.json({ ok: true, ...await personaSource.listAvailable({ includeHidden: false }) });
   } catch (error) {
     res.status(502).json({ ok: false, error: error?.message || String(error), source: 'kamui' });
   }

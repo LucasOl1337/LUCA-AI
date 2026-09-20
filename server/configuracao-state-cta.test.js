@@ -29,3 +29,8 @@ test('configuracao loading keeps list shape instead of a lone spinner', () => {
   assert.ok(source.includes('showListSkeleton'), 'deferred skeleton');
   assert.ok(source.includes('loading && list.length === 0'), 'does not replace a filled list');
 });
+
+test('configuracao picker hides admin-hidden personas unless already assigned', () => {
+  assert.ok(source.includes('persona.visible === false && !selected.includes(persona.slug)'), 'hidden filter');
+  assert.ok(source.includes('Nenhuma persona visível para este papel'), 'empty copy when all hidden');
+});

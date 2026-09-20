@@ -23,7 +23,7 @@ function memoryCache(initial = []) {
   };
 }
 
-function sourceFixture({ catalog = [], prompts = {}, versions = {}, initial = [], listError = null } = {}) {
+function sourceFixture({ catalog = [], prompts = {}, versions = {}, initial = [], listError = null, overrides = null } = {}) {
   const calls = { list: 0, prompt: [], version: [] };
   const cache = memoryCache(initial);
   const source = createPersonaSource({
@@ -50,6 +50,7 @@ function sourceFixture({ catalog = [], prompts = {}, versions = {}, initial = []
     },
     builtin: { list: () => [BUILTIN] },
     cache,
+    overrides,
     now: () => new Date('2026-08-11T12:00:00.000Z'),
   });
   return { source, cache, calls };
@@ -185,4 +186,26 @@ test('Persona Source falha alto em catalogo sem contrato editorial', async () =>
 test('Persona Source falha alto quando o catalogo nao e uma lista', async () => {
   const { source } = sourceFixture({ catalog: null });
   await assert.rejects(() => source.listAvailable(), /yume_persona_catalog_contract_invalid/);
+});
+
+test('listAvailable omite persona oculta pelo admin quando includeHidden e false', async () => {
+  const { source } = sourceFixture({
+    catalog: [
+      { slug: 'aurora', name: 'Aurora', model: 'gcli/grok-4.6(high)', is_official: true },
+      { slug: 'jinx', name: 'Jinx', model: 'cx/gpt-5.6-sol(high)', is_official: false },
+    ],
+    overrides: {
+      get: (slug) => (slug === 'jinx' ? { visible: false } : {}),
+    },
+  });
+
+  const adminList = await source.listAvailable();
+  assert.equal(adminList.personas.find((persona) => persona.slug === 'jinx')?.visible, false);
+  assert.ok(adminList.personas.some((persona) => persona.slug === 'aurora'));
+
+  const publicList = await source.listAvailable({ includeHidden: false });
+  assert.deepEqual(
+    publicList.personas.map((persona) => persona.slug).sort(),
+    ['aurora', 'especialista-visual'],
+  );
 });

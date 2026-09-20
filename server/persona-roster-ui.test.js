@@ -29,6 +29,17 @@ test('bancada respeita o catalogo global: persona oculta nao aparece para ningue
   assert.doesNotMatch(lucaAiPage, /YUME_DASHBOARD_URL/);
 });
 
+test('catalogo publico e montagem de equipe omitem persona oculta pelo admin', () => {
+  assert.match(serverIndex, /listAvailable\(\{ includeHidden: false \}\)/);
+  assert.match(configPage, /persona\.visible === false && !selected\.includes\(persona\.slug\)/);
+});
+
+test('editor de persona usa lista propria em vez de select nativo no overlay', () => {
+  assert.match(personasPage, /data-persona-model-trigger/);
+  assert.match(personasPage, /data-persona-model-list/);
+  assert.doesNotMatch(personasPage, /<select[\s\S]*data-persona-field="model"/);
+});
+
 test('Express expoe o catalogo global de personas so para admin e nao emite snapshot vazio sem conta', () => {
   assert.match(serverIndex, /app\.get\('\/api\/admin\/personas', authService\.requireAdmin/);
   assert.match(serverIndex, /app\.put\('\/api\/admin\/personas\/:slug', authService\.requireAdmin/);

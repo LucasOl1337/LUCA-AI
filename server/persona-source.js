@@ -456,10 +456,11 @@ export function createPersonaSource({
     return { entries, rosterSource: snapshot.rosterSource, warning: snapshot.warning };
   }
 
-  async function listAvailable() {
+  async function listAvailable({ includeHidden = true } = {}) {
     const snapshot = await syncRoster();
+    const personas = normalizeYumePersonasForLuca(snapshot.personas, snapshot.roster, overrides);
     return {
-      personas: normalizeYumePersonasForLuca(snapshot.personas, snapshot.roster, overrides),
+      personas: includeHidden ? personas : personas.filter((persona) => persona.visible !== false),
       rosterSource: snapshot.rosterSource,
       warning: snapshot.warning || undefined,
     };
