@@ -16,7 +16,9 @@ Teste com o veículo parado, rosto iluminado e sem óculos escuros. Este protót
 
 ## Detector
 
-MediaPipe Tasks Vision **0.10.32**, dependência fixa. Face Landmarker modelo **float16/1**, com scores `eyeBlinkLeft` e `eyeBlinkRight`. A classificação combina a média dos dois olhos com um piso para o olho de menor score, nos limiares 0,55 (normal), 0,65 (baixa) ou 0,45 (alta). Isso aceita diferenças moderadas entre os lados sem confundir uma piscada de um olho com fechamento bilateral. Histerese e uma tolerância máxima de 200 ms para leituras marginais evitam que um frame ruidoso apague a contagem; rosto perdido ou olhos claramente abertos continuam zerando imediatamente. As confianças de detecção, presença e rastreamento facial usam 0,5. Os indicadores são estimativas do modelo, não medições físicas da pálpebra.
+MediaPipe Tasks Vision **0.10.32**, dependência fixa. Face Landmarker modelo **float16/1**, com scores `eyeBlinkLeft` e `eyeBlinkRight`. A classificação combina a média dos dois olhos com um piso para o olho de menor score, nos limiares 0,40 (normal), 0,50 (baixa) ou 0,30 (alta). Isso aceita diferenças moderadas entre os lados sem confundir uma piscada de um olho com fechamento bilateral. Histerese e uma tolerância máxima de 200 ms para leituras marginais evitam que um frame ruidoso apague a contagem; rosto perdido ou olhos claramente abertos continuam zerando imediatamente. As confianças de detecção, presença e rastreamento facial usam 0,5.
+
+Os medidores convertem o score bruto em uma escala calibrada pelo limiar selecionado: até 0,10 aparece como 0% e o limiar de fechamento aparece como 100%. Portanto, eles mostram quanto cada olho se aproxima do estado que o monitor considera fechado, e não uma medição física da pálpebra. Apenas o fechamento bilateral alimenta o cronômetro e o alarme.
 
 Referência de API: [guia oficial do Face Landmarker para Web](https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker/web_js).
 

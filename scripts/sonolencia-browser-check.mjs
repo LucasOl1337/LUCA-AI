@@ -36,7 +36,7 @@ try {
   // monotonic clock, UI and Web Audio remain under test.
   await context.addInitScript(() => {
     const NativeWorker = window.Worker;
-    window.__eyeSample = { left: 0.1, right: 0.1 };
+    window.__eyeSample = { left: 0.06, right: 0.05 };
     window.__silentWorker = false;
     window.__workersTerminated = 0;
     window.__audioPulses = 0;
@@ -60,16 +60,27 @@ try {
     };
   });
   await page.reload();
+  await page.getByLabel('Sensibilidade').selectOption('high');
   await page.getByRole('button', { name: 'Ativar webcam' }).click();
   await page.locator('[data-eyes="open"]').waitFor();
-  await page.evaluate(() => { window.__eyeSample = { left: 0.9, right: 0.9 }; });
+  assert.deepEqual(await page.locator('.drowsiness-eye-meters meter').evaluateAll(nodes => nodes.map(node => node.value)), [0, 0]);
+  assert.deepEqual(await page.locator('.drowsiness-eye-meters small').allTextContents(), ['0% fechado', '0% fechado']);
+  await page.evaluate(() => { window.__eyeSample = { left: 0.08, right: 0.32 }; });
+  await page.waitForFunction(() => document.querySelectorAll('.drowsiness-eye-meters meter')[1]?.value === 1);
+  assert.equal(await page.locator('.drowsiness-page').getAttribute('data-eyes'), 'open');
+  assert.deepEqual(await page.locator('.drowsiness-eye-meters meter').evaluateAll(nodes => nodes.map(node => node.value)), [0, 1]);
+  assert.deepEqual(await page.locator('.drowsiness-eye-meters small').allTextContents(), ['0% fechado', '100% fechado']);
+  await page.evaluate(() => { window.__eyeSample = { left: 0.54, right: 0.65 }; });
   await page.locator('[data-eyes="closed"]').waitFor();
+  assert.deepEqual(await page.locator('.drowsiness-eye-meters meter').evaluateAll(nodes => nodes.map(node => node.value)), [1, 1]);
+  assert.deepEqual(await page.locator('.drowsiness-eye-meters small').allTextContents(), ['100% fechado', '100% fechado']);
+  console.log('PASS: frames reais normalizam olhos abertos/fechados sem confundir piscada unilateral');
   await page.waitForTimeout(600);
   assert.equal(await page.evaluate(() => window.__audioPulses), 0);
   await page.locator('[data-eyes="alarm"]').waitFor({ timeout: 1500 });
   assert.ok(await page.evaluate(() => window.__audioPulses > 0));
   await page.screenshot({ path: `${out}/alerta.png`, fullPage: true });
-  await page.evaluate(() => { window.__eyeSample = { left: 0.1, right: 0.1 }; });
+  await page.evaluate(() => { window.__eyeSample = { left: 0.06, right: 0.05 }; });
   await page.locator('[data-eyes="open"]').waitFor();
   const pulses = await page.evaluate(() => window.__audioPulses);
   await page.waitForTimeout(800);

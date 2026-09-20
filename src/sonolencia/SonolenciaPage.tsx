@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Camera, CameraOff, Eye, ShieldCheck, Square, Volume2 } from 'lucide-react';
 import { DrowsinessAlarm } from './alarm';
-import { CLOSED_DURATION_MS, createEyeMonitor, type EyeReading, type EyeSample } from './eye-state.js';
+import { CLOSED_DURATION_MS, SENSITIVITY_THRESHOLDS, createEyeMonitor, normalizeEyeClosure, type EyeReading, type EyeSample } from './eye-state.js';
 import './sonolencia.css';
 
 type Phase = 'idle' | 'starting' | 'running' | 'error';
+type Sensitivity = keyof typeof SENSITIVITY_THRESHOLDS;
 type Session = {
   disposed: boolean; alarm?: DrowsinessAlarm; stream?: MediaStream; worker?: Worker;
   tick?: number; timeout?: number; rejectInit?: () => void;
@@ -39,7 +40,7 @@ export default function SonolenciaPage() {
   const [message, setMessage] = useState('Ative a webcam para começar.');
   const [reading, setReading] = useState<EyeReading>(EMPTY);
   const [scores, setScores] = useState<EyeSample>(null);
-  const [sensitivity, setSensitivity] = useState('normal');
+  const [sensitivity, setSensitivity] = useState<Sensitivity>('normal');
   const [soundTesting, setSoundTesting] = useState(false);
 
   function stop(detail = 'Monitor desligado. A webcam foi liberada.', error = false) {
@@ -135,7 +136,7 @@ export default function SonolenciaPage() {
       });
       clearTimeout(session.timeout); session.rejectInit = undefined;
       if (session.disposed) return;
-      const monitor = createEyeMonitor(sensitivity === 'high' ? 0.45 : sensitivity === 'low' ? 0.65 : 0.55);
+      const monitor = createEyeMonitor(SENSITIVITY_THRESHOLDS[sensitivity]);
       let inFlight = false;
       let lastVideoTime = -1;
       let lastResultAt = performance.now();
@@ -176,6 +177,7 @@ export default function SonolenciaPage() {
 
   const active = phase === 'running' || phase === 'starting';
   const label = phase === 'running' ? STATUS[reading.status] : phase === 'starting' ? 'Preparando monitor' : phase === 'error' ? 'Monitor indisponível' : 'Webcam desligada';
+  const sensitivityThreshold = SENSITIVITY_THRESHOLDS[sensitivity];
   return (
     <div className="drowsiness-page" data-state={phase} data-eyes={reading.status}>
       <header className="drowsiness-heading">
@@ -196,9 +198,12 @@ export default function SonolenciaPage() {
           <div className="drowsiness-timer"><strong>{(Math.min(reading.closedMs, CLOSED_DURATION_MS) / 1000).toFixed(1).replace('.', ',')}<small> / {CLOSED_DURATION_SECONDS} s</small></strong><span>de olhos fechados continuamente</span></div>
           <progress value={Math.min(reading.closedMs, CLOSED_DURATION_MS)} max={CLOSED_DURATION_MS} aria-label="Tempo de olhos fechados" />
           <div className="drowsiness-eye-meters">
-            {(['left', 'right'] as const).map((eye, index) => <div key={eye}><span>Olho {index === 0 ? 'esquerdo' : 'direito'}</span><meter min="0" max="1" value={scores?.[eye] ?? 0} aria-label={`Fechamento do olho ${index === 0 ? 'esquerdo' : 'direito'}`} /><small>{scores ? `${Math.round(scores[eye] * 100)}% fechado` : 'Sem leitura'}</small></div>)}
+            {(['left', 'right'] as const).map((eye, index) => {
+              const closure = scores ? normalizeEyeClosure(scores[eye], sensitivityThreshold) : 0;
+              return <div key={eye}><span>Seu olho {index === 0 ? 'esquerdo' : 'direito'}</span><meter min="0" max="1" value={closure} aria-label={`Fechamento do seu olho ${index === 0 ? 'esquerdo' : 'direito'}`} /><small>{scores ? `${Math.round(closure * 100)}% fechado` : 'Sem leitura'}</small></div>;
+            })}
           </div>
-          <label className="drowsiness-sensitivity">Sensibilidade<select value={sensitivity} onChange={e => setSensitivity(e.target.value)} disabled={active}><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option></select></label>
+          <label className="drowsiness-sensitivity">Sensibilidade<select value={sensitivity} onChange={e => setSensitivity(e.target.value as Sensitivity)} disabled={active}><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option></select></label>
           <div className="drowsiness-actions">
             {active ? <button className="drowsiness-stop" onClick={() => stop()}><Square size={16} />{phase === 'starting' ? 'Cancelar' : 'Parar monitor'}</button> : <button className="drowsiness-start" onClick={() => void start()}><Camera size={18} />Ativar webcam</button>}
             <button onClick={() => void playTest()} disabled={active || soundTesting}><Volume2 size={18} />{soundTesting ? 'Tocando alerta…' : 'Testar som'}</button>
