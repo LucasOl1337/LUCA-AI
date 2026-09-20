@@ -1,6 +1,6 @@
 # Monitor de sonolência
 
-Módulo experimental em `/sonolencia`, acessível pelo menu **Sonolência** após login. Ativa a webcam somente por clique e emite pulsos de 880 Hz quando os dois olhos permanecem fechados por 3 segundos consecutivos. **Testar som** permite conferir o volume antes de iniciar; sensibilidade baixa/normal/alta ajusta a classificação, mantendo os 3 segundos.
+Módulo experimental em `/sonolencia`, acessível pelo menu **Sonolência** após login. Ativa a webcam somente por clique e emite pulsos de 880 Hz quando os dois olhos permanecem fechados por 1 segundo. **Testar som** permite conferir o volume antes de iniciar; sensibilidade baixa/normal/alta ajusta a classificação, mantendo 1 segundo.
 
 Teste com o veículo parado, rosto iluminado e sem óculos escuros. Este protótipo não é um sistema de segurança veicular: pode errar, perder o rosto ou não reconhecer olhos fechados. Sem imagens reais de usuários, os testes automatizados não medem precisão de detecção nem audibilidade no equipamento final.
 
@@ -16,7 +16,7 @@ Teste com o veículo parado, rosto iluminado e sem óculos escuros. Este protót
 
 ## Detector
 
-MediaPipe Tasks Vision **0.10.32**, dependência fixa. Face Landmarker modelo **float16/1**, com scores `eyeBlinkLeft` e `eyeBlinkRight`. Ambos precisam superar 0,55 (normal), 0,65 (baixa) ou 0,45 (alta); histerese de 0,12 evita oscilações no limiar durante o fechamento. Os indicadores são estimativas do modelo, não medições físicas da pálpebra.
+MediaPipe Tasks Vision **0.10.32**, dependência fixa. Face Landmarker modelo **float16/1**, com scores `eyeBlinkLeft` e `eyeBlinkRight`. A classificação combina a média dos dois olhos com um piso para o olho de menor score, nos limiares 0,55 (normal), 0,65 (baixa) ou 0,45 (alta). Isso aceita diferenças moderadas entre os lados sem confundir uma piscada de um olho com fechamento bilateral. Histerese e uma tolerância máxima de 200 ms para leituras marginais evitam que um frame ruidoso apague a contagem; rosto perdido ou olhos claramente abertos continuam zerando imediatamente. As confianças de detecção, presença e rastreamento facial usam 0,5. Os indicadores são estimativas do modelo, não medições físicas da pálpebra.
 
 Referência de API: [guia oficial do Face Landmarker para Web](https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker/web_js).
 

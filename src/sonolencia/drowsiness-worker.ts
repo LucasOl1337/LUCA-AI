@@ -8,7 +8,7 @@ self.onmessage = async ({ data }) => {
       detector = await FaceLandmarker.createFromOptions(files, {
         baseOptions: { modelAssetPath: '/sonolencia-assets/face_landmarker.task', delegate: 'CPU' },
         runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true,
-        minFaceDetectionConfidence: 0.6, minFacePresenceConfidence: 0.6, minTrackingConfidence: 0.6,
+        minFaceDetectionConfidence: 0.5, minFacePresenceConfidence: 0.5, minTrackingConfidence: 0.5,
       });
       self.postMessage({ type: 'ready' });
     } else if (data.type === 'frame') {

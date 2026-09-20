@@ -11,6 +11,7 @@ type Session = {
 };
 const EMPTY: EyeReading = { status: 'unknown', closedMs: 0, alarm: false };
 const STATUS = { unknown: 'Posicione seu rosto', open: 'Olhos abertos', closed: 'Olhos fechados', alarm: 'Alerta de sonolência' };
+const CLOSED_DURATION_SECONDS = CLOSED_DURATION_MS / 1000;
 
 function release(session: Session) {
   session.disposed = true;
@@ -178,7 +179,7 @@ export default function SonolenciaPage() {
   return (
     <div className="drowsiness-page" data-state={phase} data-eyes={reading.status}>
       <header className="drowsiness-heading">
-        <div><span className="drowsiness-eyebrow">LUCA · VISÃO COMPUTACIONAL</span><h1>Monitor de sonolência</h1><p>Olhos fechados por 3 segundos. Um alerta para chamar sua atenção.</p></div>
+        <div><span className="drowsiness-eyebrow">LUCA · VISÃO COMPUTACIONAL</span><h1>Monitor de sonolência</h1><p>Olhos fechados por 1 segundo. Um alerta para chamar sua atenção.</p></div>
         <span className="drowsiness-private"><ShieldCheck size={16} /> Processamento neste computador</span>
       </header>
       <div className="drowsiness-grid">
@@ -192,7 +193,7 @@ export default function SonolenciaPage() {
           <span className="drowsiness-eyebrow">ESTADO DO MONITOR</span>
           <h2 role="status" aria-live="polite">{label}</h2>
           <p className="drowsiness-message" role={phase === 'error' ? 'alert' : undefined}>{message}</p>
-          <div className="drowsiness-timer"><strong>{(Math.min(reading.closedMs, CLOSED_DURATION_MS) / 1000).toFixed(1).replace('.', ',')}<small> / 3 s</small></strong><span>de olhos fechados continuamente</span></div>
+          <div className="drowsiness-timer"><strong>{(Math.min(reading.closedMs, CLOSED_DURATION_MS) / 1000).toFixed(1).replace('.', ',')}<small> / {CLOSED_DURATION_SECONDS} s</small></strong><span>de olhos fechados continuamente</span></div>
           <progress value={Math.min(reading.closedMs, CLOSED_DURATION_MS)} max={CLOSED_DURATION_MS} aria-label="Tempo de olhos fechados" />
           <div className="drowsiness-eye-meters">
             {(['left', 'right'] as const).map((eye, index) => <div key={eye}><span>Olho {index === 0 ? 'esquerdo' : 'direito'}</span><meter min="0" max="1" value={scores?.[eye] ?? 0} aria-label={`Fechamento do olho ${index === 0 ? 'esquerdo' : 'direito'}`} /><small>{scores ? `${Math.round(scores[eye] * 100)}% fechado` : 'Sem leitura'}</small></div>)}
@@ -207,7 +208,7 @@ export default function SonolenciaPage() {
       </div>
       <div className="drowsiness-guidance">
         <div><span>01</span><h3>Prepare a câmera</h3><p>Fique de frente e ilumine bem o rosto. Óculos escuros e reflexos podem impedir a leitura.</p></div>
-        <div><span>02</span><h3>Experimente parado</h3><p>Feche os dois olhos por 3 segundos. Piscadas rápidas não completam a contagem.</p></div>
+        <div><span>02</span><h3>Experimente parado</h3><p>Feche os dois olhos por 1 segundo. Piscadas rápidas não completam a contagem.</p></div>
         <div><span>03</span><h3>Mantenha a aba visível</h3><p>Trocar de aba pausa o monitor e libera a webcam. Sem rosto visível, a contagem é zerada.</p></div>
       </div>
       <p className="drowsiness-notice">Protótipo experimental: pode falhar e não substitui um sistema de segurança veicular. Faça testes somente com o veículo parado. Se sentir sono, pare em local seguro e descanse.</p>
