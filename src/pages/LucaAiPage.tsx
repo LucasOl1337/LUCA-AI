@@ -617,8 +617,8 @@ function plannedRuntimeEvents(traceId: string, mission: string, assignments: Wor
 export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
   const { runtimeMode, refresh } = useLuca();
   const { user } = useAuth();
-  // Catálogo livre, edição de equipe e modelos ficam restritos ao admin;
-  // usuário comum roda exatamente os presets configurados na plataforma.
+  // Catálogo editorial e modelos ficam restritos ao admin.
+  // Usuário comum escolhe personas do catálogo visível e aplica presets.
   const presetsOnly = user?.role !== 'admin';
   const { location, navigate } = useAppLocation();
   const modoRef = useRef(location.modo);
@@ -1181,7 +1181,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
 
   useEffect(() => {
     if (loading || !personas.length) return;
-    const rosterSet = new Set(personas.filter((persona) => persona.imported).map((persona) => persona.slug));
+    const rosterSet = new Set(personas.filter((persona) => persona.visible !== false).map((persona) => persona.slug));
     setWorkflowState((prev) => {
       const normalized = resolvePersonaWorkflow(prev).assignments;
       const requested: Partial<WorkflowAssignments> = {};
@@ -1195,7 +1195,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
 
   useEffect(() => {
     if (loading || !personas.length) return;
-    const rosterSet = new Set(personas.filter((persona) => persona.imported).map((persona) => persona.slug));
+    const rosterSet = new Set(personas.filter((persona) => persona.visible !== false).map((persona) => persona.slug));
     setIndividualState((prev) => {
       const participants = uniqueSlugs(
         (Array.isArray(prev?.participants) ? prev.participants : []).filter((slug) => rosterSet.has(slug)),
@@ -2114,7 +2114,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
                 onDepthChange={setIndividualDepth}
                 onApplyPreset={(preset) => void applyIndividualPreset(preset)}
                 onOpenPersonas={presetsOnly ? undefined : () => onNavigate('personas')}
-                locked={presetsOnly}
+                locked={false}
                 onClose={() => setTeamPanelOpen(false)}
               />
             ) : (
@@ -2140,7 +2140,7 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
                 onSetModel={setPersonaModel}
                 onApplyPreset={(preset) => void applyTeamPreset(preset)}
                 onOpenPersonas={presetsOnly ? undefined : () => onNavigate('personas')}
-                locked={presetsOnly}
+                locked={false}
                 onClose={() => setTeamPanelOpen(false)}
               />
             )}

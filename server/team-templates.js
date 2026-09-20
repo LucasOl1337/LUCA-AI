@@ -19,7 +19,13 @@ import {
 const rootStateDir = path.resolve(process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'));
 const MAX_TEMPLATES_PER_KIND = 40;
 const ICON_SET = new Set(PRESET_ICON_IDS);
-const TEMPLATE_STORE_VERSION = 4;
+const TEMPLATE_STORE_VERSION = 5;
+const RETIRED_PLATFORM_TEMPLATE_IDS = new Set([
+  'risco-agro',
+  'engenharia-projetos',
+  'comite-risco-agro',
+  'plantao-de-saude',
+]);
 
 let cachedStore = null;
 
@@ -153,16 +159,32 @@ function seedStore() {
   };
 }
 
+function refreshPlatformCatalog(store) {
+  const seed = seedStore();
+  const keep = (list, seeded, kind) => list
+    .filter((item) => (
+      !RETIRED_PLATFORM_TEMPLATE_IDS.has(item.id)
+      && !seeded.some((platform) => platform.id === item.id)
+    ))
+    .map((item) => (kind === 'team' ? sanitizeTeamTemplate(item, { forceVisualModel: true }) : sanitizeIndividualTemplate(item, { forceVisualModel: true })));
+  return {
+    version: TEMPLATE_STORE_VERSION,
+    team: [...seed.team, ...keep(Array.isArray(store.team) ? store.team : [], seed.team, 'team')].slice(0, MAX_TEMPLATES_PER_KIND),
+    individual: [...seed.individual, ...keep(Array.isArray(store.individual) ? store.individual : [], seed.individual, 'individual')].slice(0, MAX_TEMPLATES_PER_KIND),
+  };
+}
+
 function normalizeStore(raw) {
   if (!raw || typeof raw !== 'object') return seedStore();
-  const forceVisualModel = Number(raw.version || 0) < TEMPLATE_STORE_VERSION;
+  const previousVersion = Number(raw.version || 0);
+  if (previousVersion < 5) return refreshPlatformCatalog(raw);
+  const forceVisualModel = previousVersion < TEMPLATE_STORE_VERSION;
   const team = Array.isArray(raw.team)
     ? raw.team.map((item) => sanitizeTeamTemplate(item, { forceVisualModel })).slice(0, MAX_TEMPLATES_PER_KIND)
     : [];
   const individual = Array.isArray(raw.individual)
     ? raw.individual.map((item) => sanitizeIndividualTemplate(item, { forceVisualModel })).slice(0, MAX_TEMPLATES_PER_KIND)
     : [];
-  // Empty both kinds → first-touch seed. Partial data is kept as-is.
   if (!team.length && !individual.length) return seedStore();
   return { version: TEMPLATE_STORE_VERSION, team, individual };
 }

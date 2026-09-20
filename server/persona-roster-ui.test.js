@@ -50,6 +50,8 @@ test('picker mostra oficiais e secundárias selecionáveis via cache local', () 
   assert.match(lucaAiPage, /importYumePersona/);
   assert.match(lucaAiPage, /disponíveis via cache local do LUCA/);
   assert.doesNotMatch(lucaAiPage, /disabled=\{secondary \|\|/);
+  assert.match(lucaAiPage, /locked=\{false\}/);
+  assert.doesNotMatch(lucaAiPage, /locked=\{presetsOnly\}/);
 });
 
 test('Express usa a interface profunda de Persona Source', () => {
