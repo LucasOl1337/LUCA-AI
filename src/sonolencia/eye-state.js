@@ -1,19 +1,28 @@
 export const CLOSED_DURATION_MS = 1000;
 export const MAX_FRAME_GAP_MS = 500;
+export const SENSITIVITY_THRESHOLDS = Object.freeze({ low: 0.5, normal: 0.4, high: 0.3 });
+const OPEN_EYE_SCORE = 0.1;
 const MAX_AMBIGUOUS_MS = 200;
+
+export function normalizeEyeClosure(score, threshold = SENSITIVITY_THRESHOLDS.normal) {
+  if (!Number.isFinite(score) || !Number.isFinite(threshold) || threshold <= OPEN_EYE_SCORE) return 0;
+  if (score <= OPEN_EYE_SCORE) return 0;
+  if (score >= threshold) return 1;
+  return (score - OPEN_EYE_SCORE) / (threshold - OPEN_EYE_SCORE);
+}
 
 function classifyClosure(sample, threshold, continuing) {
   const average = (sample.left + sample.right) / 2;
   const weakestEye = Math.min(sample.left, sample.right);
-  const averageLimit = continuing ? threshold - 0.12 : threshold;
-  const weakestEyeLimit = continuing ? threshold - 0.24 : threshold - 0.18;
+  const averageLimit = continuing ? threshold * 0.8 : threshold;
+  const weakestEyeLimit = continuing ? threshold * 0.55 : threshold * 0.6;
   if (average >= averageLimit && weakestEye >= weakestEyeLimit) return 'closed';
-  if (continuing && average >= threshold - 0.2 && weakestEye >= threshold - 0.3) return 'ambiguous';
+  if (continuing && average >= threshold * 0.5 && weakestEye >= threshold * 0.35) return 'ambiguous';
   return 'open';
 }
 
 /** Only consecutive, fresh observations of BOTH eyes count as closed time. */
-export function createEyeMonitor(threshold = 0.55) {
+export function createEyeMonitor(threshold = SENSITIVITY_THRESHOLDS.normal) {
   let closedSince = null;
   let lastAt = null;
   let wasClosed = false;
