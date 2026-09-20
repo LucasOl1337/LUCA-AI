@@ -1,7 +1,7 @@
 {
   "name": "luca-ai-heartbeat",
   "private": true,
-  "version": "0.5.6",
+  "version": "0.5.7",
   "type": "module",
   "scripts": {
     "dev:full": "node server/index.js",

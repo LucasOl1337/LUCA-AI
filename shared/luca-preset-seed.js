@@ -1,7 +1,7 @@
 // Seed puro (sem React): templates de equipe/individual embutidos.
 // Frontend mapeia `icon` → Lucide; server grava no workspace no primeiro GET.
-// Slugs precisam existir no catálogo Yume (ou no builtin visual). Personas
-// ausentes tornam o preset inaplicável e travam o envio para conta não-admin.
+// Slugs devem existir no catálogo visível (Yume oficial, secundária ou builtin).
+// Visual é opcional: persona oculta/ausente não bloqueia o restante da equipe.
 
 export const VISUAL_PERSONA_SLUG = 'especialista-visual';
 export const VISUAL_PERSONA_MODEL = 'cc/claude-fable-5(high)';

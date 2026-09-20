@@ -84,6 +84,11 @@ import {
   VISUAL_PERSONA_SLUG,
 } from '../../shared/luca-preset-seed.js';
 import {
+  optionalSlugsForTeamPreset,
+  partitionPresetCatalogSlugs,
+  presetCatalogApplyMessage,
+} from '../../shared/luca-preset-catalog.js';
+import {
   PERSONA_WORKFLOW_ROLES,
   resolvePersonaWorkflow,
   samePersonaWorkflow,
@@ -1438,7 +1443,8 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setIndividualState(createEmptyIndividualAssignments());
   }
 
-  // Presets usam qualquer persona do catálogo Yume (oficial ou secundária).
+  // Presets usam o catálogo visível (Yume oficial, secundária cacheada ou builtin).
+  // Persona oculta pelo admin não entra aqui; visual ausente não derruba a equipe.
   async function resolveCatalogPresetSlugs(slugs: string[]): Promise<{ ok: Set<string>; failed: string[] }> {
     const ok = new Set<string>();
     const failed: string[] = [];
@@ -1452,34 +1458,28 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     return { ok, failed };
   }
 
-  function presetApplyError(label: string, missing: string[], failed: string[]): string | null {
-    if (missing.length) {
-      return `Preset "${label}": persona${missing.length === 1 ? '' : 's'} fora do catálogo Yume: ${missing.join(', ')}.`;
-    }
-    if (failed.length) {
-      return `Preset "${label}" aplicado sem ${failed.length} persona${failed.length === 1 ? '' : 's'}: ${failed.join(', ')}.`;
-    }
-    return null;
-  }
-
   async function applyTeamPreset(preset: LucaTeamPreset) {
     if (running || applyingPresetId) return;
     setApplyingPresetId(preset.id);
     setError(null);
     setErrorRetry(null);
     try {
-      const wanted = uniqueSlugs([...teamPresetSlugs(preset), VISUAL_PERSONA_SLUG]);
-      const missing = wanted.filter((slug) => !personaBySlug.has(slug));
-      if (missing.length) {
-        setError(presetApplyError(preset.label, missing, []) || '');
+      const catalogSlugs = [...personaBySlug.keys()];
+      const partition = partitionPresetCatalogSlugs(
+        teamPresetSlugs(preset),
+        catalogSlugs,
+        optionalSlugsForTeamPreset(preset.assignments),
+      );
+      if (partition.blocked) {
+        setError(presetCatalogApplyMessage(preset.label, partition) || '');
         setErrorRetry('personas');
         return;
       }
-      const { ok, failed } = await resolveCatalogPresetSlugs(wanted);
+      const { ok, failed } = await resolveCatalogPresetSlugs(partition.present);
       const requested: Partial<WorkflowAssignments> = {};
       for (const role of WORKFLOW_ROLES) {
         const configured = role.id === 'visual' && !(preset.assignments.visual ?? []).length
-          ? [VISUAL_PERSONA_SLUG]
+          ? (ok.has(VISUAL_PERSONA_SLUG) ? [VISUAL_PERSONA_SLUG] : [])
           : (preset.assignments[role.id] ?? []);
         requested[role.id] = configured.filter((slug) => ok.has(slug));
       }
@@ -1488,10 +1488,10 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setOperationMode('team');
       const first = resolvePersonaWorkflow(next).slugs[0];
       if (first) setActivePersonaSlug(first);
-      const message = presetApplyError(preset.label, [], failed);
+      const message = presetCatalogApplyMessage(preset.label, partition, failed);
       if (message) {
         setError(message);
-        setErrorRetry('personas');
+        setErrorRetry(ok.size ? null : 'personas');
       }
     } finally {
       setApplyingPresetId(null);
@@ -1563,14 +1563,21 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
     setError(null);
     setErrorRetry(null);
     try {
-      const wanted = uniqueSlugs([...individualPresetSlugs(preset), VISUAL_PERSONA_SLUG]);
-      const missing = wanted.filter((slug) => !personaBySlug.has(slug));
-      if (missing.length) {
-        setError(presetApplyError(preset.label, missing, []) || '');
+      const catalogHasVisual = personaBySlug.has(VISUAL_PERSONA_SLUG);
+      const partition = partitionPresetCatalogSlugs(
+        individualPresetSlugs(preset),
+        [...personaBySlug.keys()],
+        [VISUAL_PERSONA_SLUG],
+      );
+      if (partition.blocked) {
+        setError(presetCatalogApplyMessage(preset.label, partition) || '');
         setErrorRetry('personas');
         return;
       }
-      const { ok, failed } = await resolveCatalogPresetSlugs(wanted);
+      const resolveSlugs = catalogHasVisual
+        ? uniqueSlugs([...partition.present, VISUAL_PERSONA_SLUG])
+        : partition.present;
+      const { ok, failed } = await resolveCatalogPresetSlugs(resolveSlugs);
       const participants = uniqueSlugs(preset.participants.filter((slug) => ok.has(slug)), 5);
       const judge = ok.has(preset.judge) ? preset.judge : null;
       setIndividualState({
@@ -1582,10 +1589,10 @@ export default function LucaAiPage({ onNavigate }: LucaAiPageProps) {
       setOperationMode('individual');
       const first = participants[0] ?? judge;
       if (first) setActivePersonaSlug(first);
-      const message = presetApplyError(preset.label, [], failed);
+      const message = presetCatalogApplyMessage(preset.label, partition, failed);
       if (message) {
         setError(message);
-        setErrorRetry('personas');
+        setErrorRetry(ok.size ? null : 'personas');
       }
     } finally {
       setApplyingPresetId(null);
