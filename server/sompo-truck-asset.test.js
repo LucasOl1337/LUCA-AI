@@ -6,7 +6,9 @@ import ts from 'typescript';
 function moduleUrl(source) {
   return `data:text/javascript;base64,${Buffer.from(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText).toString('base64')}`;
 }
+const wheelUrl = moduleUrl(readFileSync(new URL('../src/components/sompo/sompoWheelGeometry.ts', import.meta.url), 'utf8').replace("'three'", JSON.stringify(import.meta.resolve('three'))));
 const modelSource = readFileSync(new URL('../src/components/sompo/createSompoTruckModel.ts', import.meta.url), 'utf8')
+  .replace("'./sompoWheelGeometry'", JSON.stringify(wheelUrl))
   .replace("'three'", JSON.stringify(import.meta.resolve('three')))
   .replace("'three/addons/geometries/RoundedBoxGeometry.js'", JSON.stringify(import.meta.resolve('three/addons/geometries/RoundedBoxGeometry.js')));
 const modelUrl = moduleUrl(modelSource);

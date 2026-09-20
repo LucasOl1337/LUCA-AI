@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { sompoTireGeometry, sompoRimGeometry } from './sompoWheelGeometry';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 // Physical envelope stays compatible with ground clearance and the distance beam.
@@ -449,6 +450,7 @@ export function createSompoTruckModel({ sensorLabel }: SompoTruckModelOptions): 
   const axlePositions = [3.14, -2.27, -3.53];
   const treadGeometry = new THREE.BoxGeometry(0.078, 0.12, 0.035);
   const lugGeometry = new THREE.CylinderGeometry(0.026, 0.026, 0.035, 6);
+  const ventilatedRim = sompoRimGeometry();
   for (const [axleIndex, x] of axlePositions.entries()) {
     addRod(chassis, `axle-${axleIndex}`, [x, 0.6, -1.22], [x, 0.6, 1.22], 0.10, chassisMaterial);
     addPart(chassis, `differential-${axleIndex}`, new THREE.SphereGeometry(0.22, 16, 12), chassisMaterial, [x, 0.60, 0]);
@@ -459,7 +461,7 @@ export function createSompoTruckModel({ sensorLabel }: SompoTruckModelOptions): 
       const positions = axleIndex === 0 ? [1.10] : [0.80, 1.145];
       for (const [tireIndex, lateral] of positions.entries()) {
         const name = `${axleIndex}-${side}-${tireIndex}`;
-        const tire = addPart(wheelsGroup, `tire-${name}`, new THREE.CylinderGeometry(0.58, 0.58, width, 40), tireMaterial, [x, 0.60, side * lateral]);
+        const tire = addPart(wheelsGroup, `tire-${name}`, sompoTireGeometry(width), tireMaterial, [x, 0.60, side * lateral]);
         tire.rotation.x = Math.PI / 2;
         wheels.push(tire);
         // Every rim, lug and tread is a child: wheels[] still exposes spinning Meshes.
@@ -477,16 +479,17 @@ export function createSompoTruckModel({ sensorLabel }: SompoTruckModelOptions): 
         tread.castShadow = true;
         tire.add(tread);
         for (const face of [-1, 1]) {
-          const ring = addPart(tire, `sidewall-${name}-${face}`, new THREE.TorusGeometry(0.455, 0.035, 8, 40), tireMaterial, [0, face * width / 2, 0]);
+          const ring = addPart(tire, `sidewall-${name}-${face}`, new THREE.TorusGeometry(0.362, 0.013, 6, 48), chrome, [0, face * (width / 2 + .009), 0]);
           ring.rotation.x = Math.PI / 2;
-          addPart(tire, `rim-${name}-${face}`, new THREE.CylinderGeometry(0.33, 0.33, 0.025, 32), chrome, [0, face * (width / 2 + 0.008), 0]);
-          addPart(tire, `rim-recess-${name}-${face}`, new THREE.CylinderGeometry(0.26, 0.26, 0.028, 32), chassisMaterial, [0, face * (width / 2 + 0.025), 0]);
-          addPart(tire, `hub-${name}-${face}`, new THREE.CylinderGeometry(0.15, 0.18, 0.07, 24), chrome, [0, face * (width / 2 + 0.04), 0]);
-          const lugs = new THREE.InstancedMesh(lugGeometry, chrome, 8);
+          const rim = addPart(tire, `rim-${name}-${face}`, ventilatedRim, chrome, [0, face * (width / 2 + 0.006), 0]);
+          if (face < 0) rim.rotation.x = Math.PI;
+          addPart(tire, `rim-recess-${name}-${face}`, new THREE.CylinderGeometry(0.33, 0.33, 0.028, 48), chassisMaterial, [0, face * (width / 2 - 0.045), 0]);
+          addPart(tire, `hub-${name}-${face}`, new THREE.CylinderGeometry(0.105, 0.13, 0.095, 32), chrome, [0, face * (width / 2 + 0.03), 0]);
+          const lugs = new THREE.InstancedMesh(lugGeometry, chrome, 10);
           lugs.name = `wheel-lugs-${name}-${face}`;
-          for (let lug = 0; lug < 8; lug += 1) {
-            const angle = lug * Math.PI / 4;
-            transform.position.set(Math.sin(angle) * 0.213, face * (width / 2 + 0.049), Math.cos(angle) * 0.213);
+          for (let lug = 0; lug < 10; lug += 1) {
+            const angle = lug * Math.PI / 5;
+            transform.position.set(Math.sin(angle) * 0.176, face * (width / 2 + 0.049), Math.cos(angle) * 0.176);
             transform.rotation.set(0, 0, 0);
             transform.updateMatrix();
             lugs.setMatrixAt(lug, transform.matrix);

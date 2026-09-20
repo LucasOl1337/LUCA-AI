@@ -132,19 +132,19 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     orbit.maxPolarAngle = Math.PI * 0.49;
     orbit.target.set(0.35, 1.28, 0);
 
-    scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x776346, 0.18));
+    scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x776346, 0.48));
     const keyLight = new THREE.DirectionalLight(0xffefcd, 2.7);
     keyLight.position.set(-10, 12, 9);
     // One physical sun plus environment illumination. Unshadowed studio fill
     // lights used to shine straight through the roof and flatten cabin depth.
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.set(sompoRenderBudget().shadowSize, sompoRenderBudget().shadowSize);
-    keyLight.shadow.camera.left = -26; keyLight.shadow.camera.right = 26;
-    keyLight.shadow.camera.top = 26; keyLight.shadow.camera.bottom = -26;
-    keyLight.shadow.camera.near = 0.5; keyLight.shadow.camera.far = 110;
-    keyLight.shadow.normalBias = 0.018;
-    keyLight.shadow.bias = -0.0001;
-    keyLight.shadow.radius = 4;
+    keyLight.shadow.camera.left = -90; keyLight.shadow.camera.right = 90;
+    keyLight.shadow.camera.top = 90; keyLight.shadow.camera.bottom = -90;
+    keyLight.shadow.camera.near = 0.5; keyLight.shadow.camera.far = 320;
+    keyLight.shadow.normalBias = 0.05;
+    keyLight.shadow.bias = -0.0003;
+    keyLight.shadow.radius = 2;
     scene.add(keyLight);
     // A sombra acompanha o caminhão pelo mundo: luz e alvo transladam juntos.
     scene.add(keyLight.target);
@@ -152,6 +152,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     const roadScene = createSompoRoadScene(scene, renderer, camera, { onHdri: (kind, tex) => atmosphere.setSkyTexture(kind, tex) });
     const meter = createSompoRenderMeter(renderer, onStats);
     const postProcessing = createSompoPostProcessing(renderer, scene, camera);
+    if (location.hostname === '127.0.0.1') Object.assign(window, { __sompoDebug: { scene, camera, renderer, postProcessing } });
     const frontArrow = new THREE.ArrowHelper(
       new THREE.Vector3(1, 0, 0),
       new THREE.Vector3(1.4, 0.06, -2.25),

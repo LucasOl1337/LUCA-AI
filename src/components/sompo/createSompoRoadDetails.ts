@@ -393,7 +393,7 @@ export function createSompoRoadDetails(parent: THREE.Group) {
           }
           const material = source.material as THREE.MeshStandardMaterial;
           material.transparent = false;
-          material.alphaTest = material.map ? 0.5 : 0;
+          material.alphaTest = material.map ? 0.18 : 0;
           material.side = THREE.DoubleSide;
           material.roughness = .86;
           material.metalness = 0;
@@ -402,12 +402,20 @@ export function createSompoRoadDetails(parent: THREE.Group) {
             material.map.anisotropy = 8;
           }
           windify(material, .035);
+          const compileLeaves = material.onBeforeCompile;
+          material.onBeforeCompile = (shader, renderer) => {
+            compileLeaves.call(material, shader, renderer);
+            shader.fragmentShader = shader.fragmentShader.replace('#include <alphatest_fragment>',
+              'diffuseColor.rgb /= max(.3, sqrt(diffuseColor.a));\n#include <alphatest_fragment>');
+          };
+          material.customProgramCacheKey = () => 'sompo-maize-coverage-v1';
           source.geometry.applyMatrix4(source.matrixWorld);
           const plants = new THREE.InstancedMesh(source.geometry, material, nearSlots.length);
           plants.name = `maize-near-${source.name}`;
           plants.castShadow = plants.receiveShadow = true;
           root.add(plants);
-          nearColors.forEach((color,index) => plants.setColorAt(index,color));
+          // The authored atlas already contains the leaf albedo; multiplying it
+          // by a second dark green tint made the complete field nearly black.
           const trail = makeTrail(plants, nearSlots, 240, true, .025);
           trail.update(latestTruckX);
           maizeTrails.push(trail);

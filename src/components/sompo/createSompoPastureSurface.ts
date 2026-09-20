@@ -9,7 +9,7 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
   const load = (url: string, onReady: (map: THREE.Texture) => void) =>
     canLoad ? new THREE.TextureLoader().load(url, onReady) : new THREE.Texture();
   const ready = { value: 0 };
-  const texture = load('/sompo/gen/pasto-albedo.webp', map => {
+  const texture = load(field ? '/sompo/gen/pasto-albedo.webp' : '/environments/sompo/grass-color.jpg', map => {
     if (disposed) { map.dispose(); return; }
     ready.value = 1;
   });
@@ -66,7 +66,7 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       vec3 grassland = mix(vec3(.10,.135,.04), texture2D(pastureMap,ruralWorld.xz*.23).rgb, pastureReady);
       // Oitava fina com foto de lâminas: só perto da câmera, senão o horizonte suja.
       float bladeNear = (1.0 - smoothstep(9.0, 34.0, distance(cameraPosition, ruralWorld))) * bladeReady;
-      grassland = mix(grassland, grassland * texture2D(bladeMap, ruralWorld.xz*1.63 + 7.7).rgb * 2.1, .3 * bladeNear);
+      grassland = mix(grassland, grassland * texture2D(bladeMap, ruralWorld.xz*1.63 + 7.7).rgb * 2.1, ${field ? '.3' : '.08'} * bladeNear);
       grassland *= .64 + macro * .48;
       // Solo de preparo sob a lavoura em fileiras (z −15…−42): terra escura
       // faz o verde das fileiras saltar, como na referência.
@@ -88,7 +88,7 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
         grassland *= mix(vec3(1.), vegetationTint * (1.0 + cover * .18), hills * .55);
       }
       // Keep foreground grass in shade and distant hills muted in the cream haze.
-      ${field ? '' : 'grassland *= mix(vec3(.50,.56,.42), vec3(.62,.70,.57), smoothstep(16., 75., abs(ruralWorld.z)));'}
+      ${field ? '' : 'grassland *= vec3(.45,.58,.29);'}
       diffuseColor.rgb = mix(diffuseColor.rgb, grassland, pasture);
       // Talhão do agri: sulcos na direção das fileiras (o v da textura segue
       // o x do mundo) com resteva nas valetas, escurecido sob a copa. A faixa
@@ -100,6 +100,6 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       diffuseColor.rgb = mix(diffuseColor.rgb, tilled, fieldZone);` : ''}
       #include <roughnessmap_fragment>`);
   };
-  material.customProgramCacheKey = () => `sompo-pasture-albedo-v5-${field}`;
+  material.customProgramCacheKey = () => `sompo-pasture-albedo-v6-${field}`;
   return { dispose() { disposed = true; texture.dispose(); soilTexture.dispose(); bladeTexture.dispose(); if (field) tilledTexture.dispose(); else canopyTexture.dispose(); } };
 }

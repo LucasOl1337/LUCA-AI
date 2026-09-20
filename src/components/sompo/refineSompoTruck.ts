@@ -177,7 +177,8 @@ export function refineSompoTruck(model: SompoTruckModel) {
   // Película de estrada: poeira acumulada nas partes baixas e filetes finos de
   // água/sujeira escorrendo no baú. É o que separa pintura real de plástico.
   const wearTruck = (material: THREE.MeshStandardMaterial) => {
-    const box = material.name === 'Painéis do baú' || material.name === 'Alumínio do baú' || material.name === 'Astra box shell';
+    const panel = material.name === 'Painéis do baú';
+    const box = panel || material.name === 'Alumínio do baú' || material.name === 'Astra box shell';
     const paint = material.name === 'Pintura da cabine' || material.name === 'Acabamentos da cabine';
     if (!box && !paint) return;
     const compile = material.onBeforeCompile;
@@ -185,6 +186,10 @@ export function refineSompoTruck(model: SompoTruckModel) {
       compile?.call(material, shader, renderer);
       shader.vertexShader = 'varying vec3 truckW;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
         truckW = transformed;`);
+      if (panel) shader.vertexShader = shader.vertexShader.replace('#include <shadowmap_vertex>', `#include <shadowmap_vertex>
+        #if NUM_DIR_LIGHT_SHADOWS > 0
+          vDirectionalShadowCoord[0].z -= .0006 * vDirectionalShadowCoord[0].w;
+        #endif`);
       shader.fragmentShader = `varying vec3 truckW;
         float truckHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
         float truckNoise(vec2 p){vec2 i=floor(p),f=fract(p);f*=f*(3.-2.*f);
@@ -197,7 +202,7 @@ export function refineSompoTruck(model: SompoTruckModel) {
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
           roughnessFactor = mix(roughnessFactor, .92, clamp(truckDust, 0., 1.) * .5);`);
     };
-    material.customProgramCacheKey = () => `sompo-truck-wear-local-v2-${box}`;
+    material.customProgramCacheKey = () => `sompo-truck-wear-local-v3-${box}-${panel}`;
   };
   materials.forEach(wearTruck);
   const axisY = new THREE.Vector3(0, 1, 0), axle = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
@@ -216,6 +221,10 @@ export function refineSompoTruck(model: SompoTruckModel) {
           const mesh = node as THREE.Mesh;
           if (!mesh.isMesh) return;
           mesh.castShadow = mesh.receiveShadow = true;
+          // The insulated body beneath these millimetre-deep ribs already casts
+          // the box silhouette. Let ribs receive other shadows without a second
+          // nearly coincident depth surface producing a chequerboard of acne.
+          if (mesh.name.startsWith('astra-reefer-side-skin')) mesh.castShadow = false;
           if (mesh.geometry.hasAttribute('color')) {
             mesh.geometry.setAttribute('sompoCavity', mesh.geometry.getAttribute('color'));
             mesh.geometry.deleteAttribute('color');

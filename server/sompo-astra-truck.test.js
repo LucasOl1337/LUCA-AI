@@ -7,7 +7,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 function compiled(file) {
   const source = readFileSync(new URL(file, import.meta.url), 'utf8')
-    .replace(/from '(three(?:\/[^']+)?)'/g, (_, name) => `from '${import.meta.resolve(name)}'`);
+    .replace(/from '(three(?:\/[^']+)?)'/g, (_, name) => `from '${import.meta.resolve(name)}'`)
+    .replace("'./sompoWheelGeometry'", () => JSON.stringify(compiled('../src/components/sompo/sompoWheelGeometry.ts')));
   return `data:text/javascript;base64,${Buffer.from(ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
   }).outputText).toString('base64')}`;

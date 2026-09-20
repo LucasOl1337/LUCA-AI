@@ -7,7 +7,10 @@ import * as THREE from 'three';
 // Transpile the actual model so the test works on Node versions without TS loading.
 // Canvas rendering is checked in the browser; geometry only needs a canvas object.
 test('modelo preserva envelope, eixos de roda, janelas e origem física do sensor', async () => {
+  const wheelSource = readFileSync(new URL('../src/components/sompo/sompoWheelGeometry.ts', import.meta.url), 'utf8').replace("'three'", JSON.stringify(import.meta.resolve('three')));
+  const wheelUrl = `data:text/javascript;base64,${Buffer.from(ts.transpileModule(wheelSource, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText).toString('base64')}`;
   const source = readFileSync(new URL('../src/components/sompo/createSompoTruckModel.ts', import.meta.url), 'utf8')
+    .replace("'./sompoWheelGeometry'", JSON.stringify(wheelUrl))
     .replace("'three'", JSON.stringify(import.meta.resolve('three')))
     .replace("'three/addons/geometries/RoundedBoxGeometry.js'", JSON.stringify(import.meta.resolve('three/addons/geometries/RoundedBoxGeometry.js')));
   const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } });

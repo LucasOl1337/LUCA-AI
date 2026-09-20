@@ -3,12 +3,12 @@ import type { SompoStudioConfig } from './sompoStudioConfig';
 
 const palettes = {
   day: { top: '#5596b6', horizon: '#c6d7d2', sun: '#fff3d7', ground: '#45563b', direction: [26, 42, 18], strength: 2.2, warmth: 0.15 },
-  golden: { top: '#bacfda', horizon: '#f2e3c8', sun: '#ffd393', ground: '#4d5a38', direction: [-26, 20, 18], strength: 3.2, warmth: 0.62 },
+  golden: { top: '#6ea4d3', horizon: '#c5d2da', sun: '#ffe3b6', ground: '#4d5a38', direction: [-26, 30, 18], strength: 3.6, warmth: 0.28 },
   overcast: { top: '#758992', horizon: '#bec9c5', sun: '#d8e8ee', ground: '#424b3c', direction: [12, 40, 16], strength: 0.65, warmth: 0 },
 };
 
-/** Posição U do sol dentro do equirect kloppenheim_06 (medida no HDR: texel mais brilhante). */
-const HDRI_SUN_U = 0.613;
+/** Brightest texel in the unmodified Poly Haven HDR, measured at 2K. */
+const HDRI_SUN_U = 0.5947265625;
 
 /**
  * Céu real: o domo amostra o HDRI equiretangolar (foto de verdade) e pinta por
@@ -45,7 +45,7 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
       float ridge2(float a){return noise1(a*1.3+17.9)*.6+noise1(a*3.1+71.3)*.28+noise1(a*6.9+11.1)*.12;}
       vec3 equirect(vec3 d,sampler2D map){
         float u=fract(atan(d.z,d.x)*.15915494+.5+skyYaw);
-        float v=asin(clamp(d.y,-1.,1.))*.31830988+.535; // puxa a faixa de nuvens pra dentro do quadro
+        float v=asin(clamp(d.y,-1.,1.))*.31830988+.5;
         return texture2D(map,vec2(u,v)).rgb;
       }
       void main(){
@@ -82,39 +82,9 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
           c+=sunlight*pow(sunAmt,40.)*.05;
         } else if(useHdri>.5){
           vec3 sky=mix(equirect(d,skyDry),equirect(d,skyWet),wetSky);
-          float lum=dot(sky,vec3(.299,.587,.114));
-          sky=mix(vec3(lum),sky,1.5);                        // saturação da foto
-          sky=sky/(1.+sky*.3);                               // soft clip: o glow da foto é largo
-          float sunProx=pow(max(dot(normalize(d.xz),normalize(sd.xz)),0.)*.5+.5,3.);
-          float lowBand=1.-smoothstep(.0,.34,d.y);
-          sky*=mix(vec3(1.),vec3(1.42,1.05,.60),lowBand*(.5+.5*sunProx)*warmth); // banho âmbar
-          sky*=mix(vec3(1.),vec3(.82,.92,1.18),(1.-lowBand)*(.42+.3*(1.-sunProx))*clamp(1.-warmth*2.2,0.,1.));
+          // The authored HDR sky supplies cloud structure and dynamic range.
+          // Do not paint procedural clouds or amber haze over its fine detail.
           c=sky;
-          // Nuvens em camadas no céu fotográfico, modeladas como corpo +
-          // borda: o centro da nuvem sombreia o céu e a beirada pega fogo do
-          // lado do sol: é o que faz a camada ler de verdade em vez de só
-          // clarear. Cirros estirados no alto, altostrato no meio, estratos
-          // baixos na linha do horizonte.
-          vec2 cirP=vec2(az*2.4+clock*.0025,d.y*9.5);
-          float cir=fbm(cirP)*smoothstep(.04,.16,d.y)*(1.-smoothstep(.5,.78,d.y));
-          vec3 cirCol=mix(vec3(.66,.72,.82),sunlight*1.12,sunProx*.7+.15);
-          float cirBody=smoothstep(.55,.72,cir);
-          float cirEdge=smoothstep(.5,.62,cir)-smoothstep(.62,.8,cir);
-          c=mix(c,c*vec3(.87,.86,.9),cirBody*.42);
-          c+=cirCol*cirEdge*.3;
-          float altN=fbm(vec2(az*1.55+3.7,d.y*13.-clock*.0012));
-          float altMask=smoothstep(.16,.26,d.y)*(1.-smoothstep(.42,.6,d.y));
-          float altBody=smoothstep(.52,.72,altN)*altMask;
-          float altEdge=(smoothstep(.48,.62,altN)-smoothstep(.62,.8,altN))*altMask;
-          c=mix(c,c*vec3(.82,.81,.86),altBody*.5);
-          c+=mix(cirCol,vec3(.9,.87,.82),.45)*altEdge*.38;
-          float strN=fbm(vec2(az*1.15-clock*.0018,d.y*22.));
-          float strMask=smoothstep(.005,.05,d.y)*(1.-smoothstep(.09,.2,d.y));
-          float strBody=smoothstep(.55,.8,strN)*strMask;
-          float strEdge=(smoothstep(.5,.66,strN)-smoothstep(.66,.85,strN))*strMask;
-          c=mix(c,c*vec3(.8,.79,.82),strBody*.55);
-          c+=mix(haze,cirCol,.6)*strEdge*.4;
-          c+=sunlight*(pow(sunAmt,80.)*.18+pow(sunAmt,14.)*.07)*warmth;   // halo dourado
         } else {
           float h=max(d.y,0.);c=mix(horizon,top,pow(h,.32));
           vec2 p=d.xz/max(.12,d.y+.18)*3.0+vec2(clock*.0015,0);
@@ -134,11 +104,11 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
         float nearTop=(.018+ridge2(az+2.7)*.068)*(1.-.62*sunGap);
         vec3 farCol=mix(hazeCol,ridgeFar,.74);
         vec3 nearCol=mix(hazeCol,ridgeNear,.82);
-        if(d.y<farTop){
+        if(useHdri<.5 && d.y<farTop){
           float soft=1.-smoothstep(farTop-.012,farTop,d.y);
           c=mix(c,farCol,soft*.9);
         }
-        if(d.y<nearTop){
+        if(useHdri<.5 && d.y<nearTop){
           float soft=1.-smoothstep(nearTop-.014,nearTop,d.y);
           c=mix(c,nearCol,soft*.92);
         }
@@ -147,7 +117,7 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
         // y=0 made an abrupt cream band whenever the terrain exposed the horizon.
         c=mix(c,groundNear,1.-smoothstep(-.3,-.02,d.y));
         // ── Sol: disco HDR + glow para o bloom segurar ──────────────────
-        if(night<.5) c+=sunlight*(smoothstep(.99988,.99996,sunAmt)*6.+pow(sunAmt,900.)*1.4+pow(sunAmt,34.)*.12*warmth);
+        if(night<.5 && useHdri<.5) c+=sunlight*(smoothstep(.99988,.99996,sunAmt)*6.+pow(sunAmt,900.)*1.4+pow(sunAmt,34.)*.12*warmth);
         gl_FragColor=vec4(c,1.);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -174,7 +144,7 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
       uniforms.wetSky.value = wet ? 1 : 0;
       uniforms.useHdri.value = textures.dry || textures.wet ? 1 : 0;
       sunOffset.set(...palette.direction as [number, number, number]).normalize();
-      sun.position.copy(anchor).addScaledVector(sunOffset, 46);
+      sun.position.copy(anchor).addScaledVector(sunOffset, 150);
       sun.target.position.copy(anchor); sun.target.updateMatrixWorld();
       const sunAzimuth = Math.atan2(sunOffset.z, sunOffset.x);
       uniforms.sunAzimuth.value = sunAzimuth;
@@ -191,12 +161,12 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
       uniforms.ridgeNear.value.set(night ? '#14211f' : mode === 'overcast' ? '#3d4c40' : '#4c5e3e');
       sun.color.set(night ? '#9bbaca' : palette.sun); sun.intensity = night ? 0.45 : palette.strength;
       renderer.toneMappingExposure = config.exposure * (night ? 0.92 : mode === 'golden' ? 1.00 : 1.06);
-      scene.environmentIntensity = night ? 0.28 : mode === 'overcast' ? 0.72 : mode === 'golden' ? 0.62 : 0.95;
+      scene.environmentIntensity = night ? 0.28 : mode === 'overcast' ? 0.72 : 0.48;
       if (scene.fog instanceof THREE.Fog) {
         // Névoa de distância esfria e perde saturação: serras ficam azuladas
         // em camadas como na referência em vez de virarem uma parede âmbar.
-        scene.fog.color.set(night ? '#172733' : mode === 'overcast' ? '#a9b2ae' : mode === 'golden' ? '#dad1b6' : '#d6dcc8');
-        scene.fog.near = wet ? 70 : 45; scene.fog.far = wet ? 260 : 230;
+        scene.fog.color.set(night ? '#172733' : mode === 'overcast' ? '#a9b2ae' : '#a8bfd0');
+        scene.fog.near = wet ? 70 : 100; scene.fog.far = wet ? 260 : 430;
       }
     },
     dispose() {

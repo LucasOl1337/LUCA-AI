@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { createSompoPastureSurface } from './createSompoPastureSurface';
 import { createSompoAnimal } from './createSompoAnimal';
-import { createSompoVegetation } from './createSompoVegetation';
+import { createSompoLicensedFoliage } from './createSompoLicensedFoliage';
 import { createSompoRoadDetails, varySompoSurface, wornRoadPaint, wrapSompoX } from './createSompoRoadDetails';
 import { createSompoTerrainMesh, sompoTerrainHeight, SOMPO_TERRAIN_PERIOD_X, SOMPO_LAKE } from './createSompoTerrain';
 import type { SompoEffectFrame } from '../../../shared/sompo-scenario-effects.js';
@@ -78,7 +78,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const terrain = createSompoTerrainMesh(earth);
   terrain.position.y = -0.055;
   root.add(terrain);
-  assets.surface(earth, 'dirt', 45, 30);
+  assets.surface(earth, 'grass', 101.2, 55.2, { normalScale: .65 });
   varySompoSurface(earth, 0.24);
   const pasture = createSompoPastureSurface(earth);
   const details = createSompoRoadDetails(root);
@@ -158,7 +158,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
     strand.userData.rowZ = z; strand.userData.wireY = y;
     wires.push(strand);
   }
-  const vegetation = createSompoVegetation(root, camera, sompoTerrainHeight);
+  const vegetation = createSompoLicensedFoliage(root, camera);
 
   const puddles = new THREE.Group(); root.add(puddles);
   const water = new THREE.MeshPhysicalMaterial({ color: 0x192426, roughness: 0.1, metalness: 0, transparent: true, opacity: 0.44, clearcoat: 0.55, clearcoatRoughness: 0.12, envMapIntensity: 0.35, depthWrite: false });

@@ -7,6 +7,8 @@ Kloppenheim 06 — Greg Zaal
 https://polyhaven.com/a/kloppenheim_06
 Farmland Overcast
 https://polyhaven.com/a/farmland_overcast
+Kloofendal 48d Partly Cloudy (Pure Sky) — Greg Zaal / Jarod Guest
+https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky
 
 PBR textures (original albedo, OpenGL normal, packed AO/roughness/metalness):
 Asphalt 02 — https://polyhaven.com/a/asphalt_02

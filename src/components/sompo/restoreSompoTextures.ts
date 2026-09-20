@@ -6,7 +6,7 @@ type MaterialDefinition = {
   pbrMetallicRoughness?: { baseColorTexture?: TextureInfo; metallicRoughnessTexture?: TextureInfo };
   normalTexture?: TextureInfo; occlusionTexture?: TextureInfo; emissiveTexture?: TextureInfo;
 };
-type Slot = 'map' | 'metalnessMap' | 'roughnessMap' | 'normalMap' | 'aoMap' | 'emissiveMap';
+type Slot = 'map' | 'metalnessMap' | 'roughnessMap' | 'normalMap' | 'aoMap' | 'emissiveMap' | 'alphaMap';
 
 /** Production CSP allows images but excludes fetch(blob:) from connect-src.
  * Preserve glTF material construction with temporary texture slots; the external
@@ -28,7 +28,7 @@ export function useSompoExternalTextures(loader: GLTFLoader) {
 export async function restoreSompoTextures(gltf: GLTF, assetUrl: string, signal: AbortSignal) {
   const response = await fetch(assetUrl.replace(/\.glb(?:\?.*)?$/, '.textures.json'), { signal });
   if (!response.ok) throw new Error(`Sompo texture manifest: HTTP ${response.status}`);
-  const manifest: { images: string[] } = await response.json();
+  const manifest: { images: string[]; alphaMaps?: Record<string, string> } = await response.json();
   const base = assetUrl.slice(0, assetUrl.lastIndexOf('/') + 1);
   const loader = new THREE.TextureLoader();
   const pending = new Map<string, Promise<THREE.Texture>>();
@@ -86,6 +86,20 @@ export async function restoreSompoTextures(gltf: GLTF, assetUrl: string, signal:
       for (const [slot, info, color] of slots) if (info) jobs.push(load(info, color).then((texture) => {
         bindings.push({ material, slot, texture });
       }));
+      const alphaFile = manifest.alphaMaps?.[String(index)];
+      if (alphaFile) {
+        if (!/^[\w.-]+\.(png|jpe?g)$/.test(alphaFile)) throw new Error('Invalid Sompo alpha image');
+        jobs.push(loader.loadAsync(base + alphaFile).then(texture => {
+          owned.add(texture);
+          if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+          const image = texture.image as HTMLImageElement;
+          if (!image?.complete || !(image.naturalWidth > 0 && image.naturalHeight > 0)) throw new Error(`Invalid Sompo alpha image: ${alphaFile}`);
+          texture.flipY = false; texture.colorSpace = THREE.NoColorSpace;
+          texture.anisotropy = 8; texture.name = alphaFile;
+          texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+          bindings.push({ material, slot: 'alphaMap', texture });
+        }));
+      }
     }
     // Settle every image before cleanup: late downloads must not leak on abort/failure.
     const results = await Promise.allSettled(jobs);

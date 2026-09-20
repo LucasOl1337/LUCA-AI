@@ -3,7 +3,7 @@ import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 
 // Poly Haven CC0 assets, downloaded locally. Exact sources/credits: public/environments/sompo/LICENSE.txt.
 const ASSET_ROOT = '/environments/sompo/';
-type Surface = 'asphalt' | 'dirt' | 'wood';
+type Surface = 'asphalt' | 'dirt' | 'wood' | 'grass';
 
 /** Async upgrades keep the scene usable if an HDRI or texture is unavailable. */
 export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE.WebGLRenderer, options: { background?: boolean; intensity?: number; initialWet?: boolean; onHdri?: (kind: 'dry' | 'wet', texture: THREE.Texture) => void } = {}) {
@@ -35,7 +35,7 @@ export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE
   }
   function loadHdri(kind: 'dry' | 'wet') {
     if (hdriJobs[kind]) return;
-    const filename = kind === 'dry' ? 'kloppenheim_06_2k.hdr' : 'farmland_overcast_2k.hdr';
+    const filename = kind === 'dry' ? 'kloofendal_48d_partly_cloudy_puresky_2k.hdr' : 'farmland_overcast_2k.hdr';
     hdriJobs[kind] = new HDRLoader().loadAsync(ASSET_ROOT + filename).then((texture) => {
       retain(texture);
       if (disposed) return;
@@ -52,7 +52,7 @@ export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE
     surface(material: THREE.MeshStandardMaterial, surface: Surface, repeatX: number, repeatY: number, options: { keepMap?: boolean; normalScale?: number } = {}) {
       let pending = surfaces.get(surface);
       if (!pending) {
-        const size = surface === 'wood' ? '' : '-2k';
+        const size = surface === 'wood' || surface === 'grass' ? '' : '-2k';
         pending = Promise.all(['color', 'normal', 'arm'].map((channel) => loader.loadAsync(`${ASSET_ROOT}${surface}-${channel}${size}.jpg`).then(retain)));
         surfaces.set(surface, pending);
       }

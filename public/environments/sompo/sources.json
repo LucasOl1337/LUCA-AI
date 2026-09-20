@@ -2,6 +2,11 @@
   "license": "CC0-1.0",
   "assets": [
     {
+      "file": "kloofendal_48d_partly_cloudy_puresky_2k.hdr",
+      "source": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/kloofendal_48d_partly_cloudy_puresky_2k.hdr",
+      "md5": "2eba3a4d7eeb23cbfbeca364c97e7980"
+    },
+    {
       "file": "kloppenheim_06_2k.hdr",
       "source": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/kloppenheim_06_2k.hdr",
       "md5": "86deab62942f3ba6004fda4377769bf7"
