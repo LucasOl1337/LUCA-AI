@@ -64,9 +64,9 @@ try {
   await page.locator('[data-eyes="open"]').waitFor();
   await page.evaluate(() => { window.__eyeSample = { left: 0.9, right: 0.9 }; });
   await page.locator('[data-eyes="closed"]').waitFor();
-  await page.waitForTimeout(2300);
+  await page.waitForTimeout(600);
   assert.equal(await page.evaluate(() => window.__audioPulses), 0);
-  await page.locator('[data-eyes="alarm"]').waitFor({ timeout: 3000 });
+  await page.locator('[data-eyes="alarm"]').waitFor({ timeout: 1500 });
   assert.ok(await page.evaluate(() => window.__audioPulses > 0));
   await page.screenshot({ path: `${out}/alerta.png`, fullPage: true });
   await page.evaluate(() => { window.__eyeSample = { left: 0.1, right: 0.1 }; });
@@ -74,7 +74,7 @@ try {
   const pulses = await page.evaluate(() => window.__audioPulses);
   await page.waitForTimeout(800);
   assert.equal(await page.evaluate(() => window.__audioPulses), pulses);
-  console.log('PASS: olhos fechados por 3 s iniciam som; reabrir interrompe o som');
+  console.log('PASS: olhos fechados por 1 s iniciam som; reabrir interrompe o som');
   await page.evaluate(() => { window.__eyeSample = { left: 0.9, right: 0.9 }; });
   await page.locator('[data-eyes="closed"]').waitFor();
   await page.waitForTimeout(500);
