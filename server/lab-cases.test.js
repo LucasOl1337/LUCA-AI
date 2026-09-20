@@ -231,6 +231,21 @@ test('lab AI uses four real call boundaries, validates temporal references and p
   assert.equal(failed.body.case.conclusions.length, 1);
 });
 
+test('lab AI aceita JSON cercado ou com prosa e completa a investigação', async (t) => {
+  const chat = async () => ({
+    content: 'Segue a análise.\n```json\n' + JSON.stringify(validResponse) + '\n```\n',
+    toolCalls: [],
+    finishReason: 'stop',
+  });
+  const { request, register } = await fixture(t, { chat });
+  const cookie = await register('fenced');
+  const saved = await request('/api/lab/cases', { cookie, body: source() });
+  const result = await request(`/api/lab/cases/${saved.body.case.id}/analyses`, { cookie, body: {} });
+  assert.equal(result.status, 201);
+  assert.equal(result.body.analysis.status, 'completed');
+  assert.equal(result.body.analysis.hypotheses.length, 4);
+});
+
 test('router network outage is persisted as unavailable and retry creates a new version, never a fake analysis', async (t) => {
   const originalFetch = globalThis.fetch;
   let attempts = 0;

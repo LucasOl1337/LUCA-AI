@@ -176,7 +176,49 @@ test('store legado migra o modelo visual de todos os templates para a rota defau
   });
 
   const persisted = JSON.parse(fs.readFileSync(storePath, 'utf8'));
-  assert.equal(persisted.version, 4);
+  assert.equal(persisted.version, 5);
+});
+
+test('versão 5 substitui presets da plataforma com slugs inexistentes e preserva templates custom', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-templates-platform-refresh-'));
+  const { workspace, templates } = await loadModule(dataDir);
+  const storePath = path.join(dataDir, 'team-templates.json');
+  fs.mkdirSync(path.dirname(storePath), { recursive: true });
+  fs.writeFileSync(storePath, JSON.stringify({
+    version: 4,
+    team: [{
+      id: 'risco-agro',
+      label: 'Equipe Risco Agro',
+      assignments: {
+        supervisor: ['supervisor-agentes-ia'], mission: ['planejador-missao'],
+        execution: ['estrategista-risco-agro'], approval: ['curador-personas'],
+        display: ['relator-executivo-risco'], visual: ['especialista-visual'],
+      },
+    }, {
+      id: 'equipe-cliente',
+      label: 'Equipe do cliente',
+      assignments: {
+        supervisor: ['aurora'], mission: ['lucas'], execution: ['tars'],
+        approval: ['maestro-2'], display: ['pure-gpt-5-6-sol'], visual: ['especialista-visual'],
+      },
+    }],
+    individual: [{
+      id: 'comite-risco-agro',
+      label: 'Comitê Risco Agro',
+      participants: ['estrategista-risco-agro'],
+      judge: 'relator-executivo-risco',
+    }],
+  }));
+
+  workspace.runWithWorkspaceUser('refresh', () => {
+    const snapshot = templates.getTeamTemplatesSnapshot();
+    assert.equal(snapshot.team.some((item) => item.id === 'risco-agro'), false);
+    assert.equal(snapshot.individual.some((item) => item.id === 'comite-risco-agro'), false);
+    assert.equal(snapshot.team.some((item) => item.id === 'conselho-estrategia'), true);
+    assert.equal(snapshot.individual.some((item) => item.id === 'conselho-de-ceos'), true);
+    assert.equal(snapshot.team.some((item) => item.id === 'equipe-cliente'), true);
+    assert.deepEqual(snapshot.team.find((item) => item.id === 'conselho-estrategia')?.assignments.supervisor, ['lucas']);
+  });
 });
 
 test('create update delete reorder', async () => {

@@ -128,15 +128,15 @@ const CONTEXT_HIGHLIGHTS = SOMPO_INDUSTRY_CONTEXT.filter((fact) =>
 );
 
 function defaultTeamPresetId(list: LucaTeamPreset[]): string {
-  return list.find((item) => item.id === 'risco-agro')?.id
-    || list.find((item) => /agro|risco|sompo/i.test(`${item.id} ${item.label}`))?.id
+  return list.find((item) => item.id === 'conselho-estrategia')?.id
+    || list.find((item) => /agro|risco|sompo|conselho/i.test(`${item.id} ${item.label}`))?.id
     || list[0]?.id
     || '';
 }
 
 function defaultIndividualPresetId(list: LucaIndividualPreset[]): string {
-  return list.find((item) => item.id === 'comite-risco-agro')?.id
-    || list.find((item) => /agro|risco|sompo/i.test(`${item.id} ${item.label}`))?.id
+  return list.find((item) => item.id === 'conselho-de-ceos')?.id
+    || list.find((item) => /agro|risco|sompo|conselho/i.test(`${item.id} ${item.label}`))?.id
     || list[0]?.id
     || '';
 }

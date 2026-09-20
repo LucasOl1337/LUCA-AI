@@ -56,7 +56,7 @@ export interface SompoExampleCase {
   decisionGoal: string;
   patternNote: string;
   sources: string[];
-  suggestedPresetId: 'risco-agro' | 'comite-risco-agro';
+  suggestedPresetId: 'conselho-estrategia' | 'conselho-de-ceos';
   suggestedMode: 'team' | 'individual';
 }
 
@@ -151,7 +151,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
       'Globo Rural/Forbes: seca+granizo+geada ~87% dos sinistros',
       'Sompo Agrícola Produtividade (comunicação de produto)',
     ],
-    suggestedPresetId: 'risco-agro',
+    suggestedPresetId: 'conselho-estrategia',
     suggestedMode: 'team',
   },
   {
@@ -195,7 +195,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
       'Levantamentos setoriais seca/granizo/geada',
       'Sompo: vistoria de campo digital para agilizar indenização',
     ],
-    suggestedPresetId: 'risco-agro',
+    suggestedPresetId: 'conselho-estrategia',
     suggestedMode: 'team',
   },
   {
@@ -239,7 +239,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
       'Séries setoriais de sinistros (geada no top 3)',
       'ZARC e guias CNA sobre manejo de risco',
     ],
-    suggestedPresetId: 'risco-agro',
+    suggestedPresetId: 'conselho-estrategia',
     suggestedMode: 'team',
   },
   {
@@ -283,7 +283,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
       'Condições gerais de seguros agrícolas (riscos cobertos: chuva excessiva)',
       'Comunicações de mercado sobre cobertura de replantio',
     ],
-    suggestedPresetId: 'risco-agro',
+    suggestedPresetId: 'conselho-estrategia',
     suggestedMode: 'team',
   },
   {
@@ -327,7 +327,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
       'CNA: Guia dos Seguros Rurais (ZARC e indenização)',
       'MAPA/ZARC: janelas de plantio',
     ],
-    suggestedPresetId: 'risco-agro',
+    suggestedPresetId: 'conselho-estrategia',
     suggestedMode: 'team',
   },
   {
@@ -371,7 +371,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
       'Valor Econômico: prêmios penhor rural Sompo 2023',
       'Sompo Penhor Rural (comunicação de produto)',
     ],
-    suggestedPresetId: 'risco-agro',
+    suggestedPresetId: 'conselho-estrategia',
     suggestedMode: 'team',
   },
   {
@@ -414,7 +414,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
       'Briefing interno LUCA-AI (Santa Aurora)',
       'Padrões de sinistro agrícola com múltiplos perigos',
     ],
-    suggestedPresetId: 'risco-agro',
+    suggestedPresetId: 'conselho-estrategia',
     suggestedMode: 'team',
   },
   {
@@ -458,7 +458,7 @@ export const SOMPO_EXAMPLE_CASES: SompoExampleCase[] = [
       'Padrões de concentração de risco em safrinha',
       'Sompo: papel do seguro na mitigação de riscos no agro (eventos/setor)',
     ],
-    suggestedPresetId: 'risco-agro',
+    suggestedPresetId: 'conselho-estrategia',
     suggestedMode: 'team',
   },
 ];

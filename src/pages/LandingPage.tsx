@@ -155,7 +155,7 @@ export default function LandingPage(_props: LandingPageProps) {
                 <span className="home-story-eyebrow">Aprendizado para a próxima safra</span>
                 <h2>Aprender com o que já aconteceu.</h2>
                 <p className="home-story-lead">Como gestor da frota e seguradora, quero comparar a telemetria de várias máquinas e usar os episódios passados pra decidir a próxima safra.</p>
-                <p>Jornadas, alertas e episódios viram estatísticas por máquina. A Equipe Risco Agro usa essas evidências para recomendar treinamento, mudanças na operação e decisões para a próxima safra.</p>
+                <p>Jornadas, alertas e episódios viram estatísticas por máquina. O Conselho de Estratégia usa essas evidências para recomendar treinamento, mudanças na operação e decisões para a próxima safra.</p>
                 <div className="home-story-actions">
                   <button type="button" data-landing-cta="portfolio" onClick={() => navigate({ page: 'sompo', aba: 'safra' }, 'push')}>
                     Ver o desempenho da frota <ArrowRight aria-hidden="true" />

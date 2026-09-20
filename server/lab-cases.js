@@ -59,6 +59,26 @@ function strings(value, name, minimum = 0) {
   return value.map((item) => text(item, name, 1600));
 }
 
+function extractJsonObject(content) {
+  const source = String(content || '').trim();
+  if (!source) throw new Error('empty_response');
+  const fenced = source.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1];
+  const candidate = (fenced || source).trim();
+  const tryParse = (raw) => {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid_json_object');
+    return parsed;
+  };
+  try {
+    return tryParse(candidate);
+  } catch {
+    const start = candidate.indexOf('{');
+    const end = candidate.lastIndexOf('}');
+    if (start < 0 || end <= start) throw new Error('invalid_json_object');
+    return tryParse(candidate.slice(start, end + 1));
+  }
+}
+
 // The model receives measured samples, computed events and descriptive metadata only.
 // In particular, expected-event fixtures and arbitrary manifest properties never enter the prompt.
 function evidenceContext(parsed) {
@@ -132,7 +152,7 @@ function evidenceContext(parsed) {
 }
 
 function readAxis(content, axis, parsed, allowedIndices) {
-  const result = JSON.parse(String(content || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''));
+  const result = extractJsonObject(content);
   if (!Array.isArray(result.hypotheses) || result.hypotheses.length > 8) throw new Error('invalid_hypotheses');
   return {
     id: axis.id, title: axis.title, status: 'completed',
@@ -287,7 +307,8 @@ Retorne apenas JSON neste formato: {"summary":"...","limitations":["..."],"addit
           });
           if (result.toolCalls?.length || ['length', 'timeout'].includes(result.finishReason)) throw new Error('incomplete_response');
           return readAxis(result.content, axis, parsed, context.allowedIndices);
-        } catch {
+        } catch (error) {
+          console.error('[lab] axis failed', axis.id, error?.message || error);
           return { id: axis.id, title: axis.title, status: 'unavailable', summary: '', hypotheses: [], limitations: [], additionalInformation: [], error: 'O serviço de IA não concluiu uma resposta válida neste eixo. Tente investigar novamente.' };
         }
       };

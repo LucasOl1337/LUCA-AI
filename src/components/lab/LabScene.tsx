@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { getReplayFrame, toLocalCoordinate, type LabCase, type LabSite, type LabPolygon } from '../../../shared/lab-telemetry.js';
+import { labVehiclePose } from '../../../shared/lab-vehicle-pose.js';
 import { createLabTractor } from './createLabTractor';
 import { createSompoTruckModel, SOMPO_TRUCK_PIVOT_Y } from '../sompo/createSompoTruckModel';
 import { parseLabTerrain, createTerrainSampler, type LabTerrain } from '../../../shared/lab-terrain.js';
@@ -463,7 +464,8 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
     controls.zoomSpeed = 0.8;
     controls.panSpeed = 0.65;
     const firstPosition = labCase?.samples.find((sample) => sample.x !== null && sample.z !== null);
-    const lastKnownPosition = new THREE.Vector3(firstPosition?.x || 0, 0, firstPosition?.z || 0);
+    const studioOrigin = { x: firstPosition?.x || 0, y: 0, z: firstPosition?.z || 0 };
+    const lastKnownPosition = new THREE.Vector3(studioOrigin.x, 0, studioOrigin.z);
     const forward = new THREE.Vector3(1, 0, 0);
     let previousMode: LabCameraMode | null = null;
     let previousSampleIndex = -1;
@@ -519,23 +521,22 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
       if (disposed) return;
       const current = labCase ? getReplayFrame(labCase, elapsedRef.current) : null;
       const sample = current?.sample;
-      const hasAttitude = !!sample && sample.heading_deg !== null && sample.pitch_deg !== null && sample.roll_deg !== null;
-      // Recorded samples only: GPS outages hide the machine and never join route segments.
-      const elevation = current?.position ? groundHeight(current.position) : null;
-      vehicle.visible = elevation !== null && hasAttitude;
-      locator.visible = elevation !== null && (!hasAttitude || detailsRef.current);
-      headingArrow.visible = elevation !== null && sample?.heading_deg != null && detailsRef.current;
-      if (current?.position && elevation !== null) lastKnownPosition.set(current.position.x, elevation, current.position.z);
+      const pose = labVehiclePose(current, { studio: studioOrigin });
+      const elevation = pose.hasGps && current?.position ? groundHeight(current.position) : pose.visible ? 0 : null;
+      vehicle.visible = pose.visible && elevation !== null;
+      locator.visible = pose.visible && elevation !== null && (!pose.hasAttitude || detailsRef.current);
+      headingArrow.visible = pose.visible && elevation !== null && detailsRef.current;
+      if (pose.visible && elevation !== null) lastKnownPosition.set(pose.x, elevation, pose.z);
       vehicle.position.set(lastKnownPosition.x, lastKnownPosition.y + pivot, lastKnownPosition.z);
-      if (sample && hasAttitude) {
+      if (pose.visible) {
         vehicle.rotation.set(
-          THREE.MathUtils.degToRad(sample.roll_deg!),
-          THREE.MathUtils.degToRad(90 - sample.heading_deg!),
-          THREE.MathUtils.degToRad(sample.pitch_deg!),
+          THREE.MathUtils.degToRad(pose.rollDeg),
+          THREE.MathUtils.degToRad(90 - pose.headingDeg),
+          THREE.MathUtils.degToRad(pose.pitchDeg),
           'YZX',
         );
       }
-      const yaw = sample?.heading_deg != null ? THREE.MathUtils.degToRad(90 - sample.heading_deg) : vehicle.rotation.y;
+      const yaw = THREE.MathUtils.degToRad(90 - pose.headingDeg);
       forward.set(Math.cos(yaw), 0, -Math.sin(yaw));
       if (labCase?.manifest?.demo === 'farm-truck-v1' && sampleTerrain && terrain && current?.position) {
         const p = current.position;
@@ -673,10 +674,22 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
         {!!frame?.activeEvents.length && frame.position && (
           <div className="lab-scene-active-event" role="status">{frame.activeEvents.filter((event) => event.type !== 'gnss_unavailable').map((event) => event.title).join(' · ')}</div>
         )}
-        {(webglError || (labCase && (!frame?.position || frame.sample.heading_deg === null || frame.sample.roll_deg === null || frame.sample.pitch_deg === null)) || !geography) && (
+        {(webglError || (labCase && (frame?.recordingGap || !labVehiclePose(frame).visible))) && (
           <div className="lab-scene-status" role="status" data-lab-scene-status>
-            <strong>{webglError ? 'Visualização 3D indisponível' : !labCase ? 'Seu próximo caso começa aqui' : frame?.recordingGap ? 'Lacuna no registro' : !frame?.position ? 'Posição GPS indisponível' : 'Orientação incompleta'}</strong>
-            <span>{webglError ? 'A linha do tempo, os eventos e a análise continuam disponíveis.' : !labCase ? 'Abra um exemplo ou carregue os dados da máquina.' : frame?.recordingGap ? 'Não há amostra neste intervalo. A posição não foi reconstruída e o último registro não representa uma leitura atual.' : !frame?.position ? 'Movimento não reconstruído nesta lacuna. Os demais sinais continuam no relógio do caso.' : 'O marcador mantém a posição registrada; a atitude ausente não foi inventada.'}</span>
+            <strong>{webglError ? 'Visualização 3D indisponível' : frame?.recordingGap ? 'Lacuna no registro' : 'Equipamento sem sinais de pose'}</strong>
+            <span>{webglError ? 'A linha do tempo, os eventos e a análise continuam disponíveis.' : frame?.recordingGap ? 'Não há amostra neste intervalo. A posição não foi reconstruída e o último registro não representa uma leitura atual.' : 'Sem IMU nem GNSS neste instante. Os demais sinais continuam no relógio do caso.'}</span>
+          </div>
+        )}
+        {!labCase && !webglError && (
+          <div className="lab-scene-status" role="status" data-lab-scene-status>
+            <strong>Seu próximo caso começa aqui</strong>
+            <span>Abra um exemplo ou carregue os dados da máquina.</span>
+          </div>
+        )}
+        {labCase && !frame?.recordingGap && !frame?.position && labVehiclePose(frame).visible && (
+          <div className="lab-scene-status" role="status" data-lab-scene-status>
+            <strong>Caminhão no palco local</strong>
+            <span>Sem GPS neste episódio: o modelo 3D usa a IMU registrada. Não há trajetória geográfica.</span>
           </div>
         )}
         <div className="lab-scene-scale" aria-label="Escala do mapa"><span ref={scaleRef} /><span ref={scaleLabelRef} /></div>
