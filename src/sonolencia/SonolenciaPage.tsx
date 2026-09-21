@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Camera, CameraOff, Eye, ShieldCheck, Square, Volume2 } from 'lucide-react';
 import { DrowsinessAlarm } from './alarm';
+import { describeCameraStream, formatCameraQuality, openPreferredCamera } from './camera.js';
 import { CLOSED_DURATION_MS, SENSITIVITY_THRESHOLDS, createEyeMonitor, normalizeEyeClosure, type EyeReading, type EyeSample } from './eye-state.js';
 import './sonolencia.css';
 
@@ -110,9 +111,10 @@ export default function SonolenciaPage() {
       session.alarm = new DrowsinessAlarm();
       await session.alarm.unlock();
       if (session.disposed) return;
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user', frameRate: { ideal: 15, max: 30 } } });
+      const stream = await openPreferredCamera(navigator.mediaDevices);
       if (session.disposed) { stream.getTracks().forEach(track => track.stop()); return; }
       session.stream = stream;
+      const cameraQuality = describeCameraStream(stream);
       for (const track of stream.getVideoTracks()) {
         track.addEventListener('ended', () => { if (!session.disposed) stop('A webcam foi desconectada. Reconecte e ative o monitor novamente.', true); });
         track.addEventListener('mute', () => { if (!session.disposed) stop('A webcam deixou de enviar imagens. Ative o monitor novamente.', true); });
@@ -155,7 +157,7 @@ export default function SonolenciaPage() {
         setReading(next); setScores(sample);
         if (next.alarm) session.alarm!.start(); else session.alarm!.stop();
       };
-      setPhase('running'); setMessage('Mantenha seu rosto de frente para a câmera, com boa iluminação.');
+      setPhase('running'); setMessage(`${formatCameraQuality(cameraQuality)} Mantenha seu rosto de frente para a câmera, com boa iluminação.`);
       session.tick = window.setInterval(async () => {
         if (session.disposed) return;
         if (!session.alarm!.available) { stop('O áudio foi interrompido. Ative o monitor novamente para rearmar o alarme.', true); return; }
