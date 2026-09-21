@@ -25,6 +25,7 @@ try {
   await page.getByRole('button', { name: 'Testar som', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Ativar webcam' }).click();
   await page.locator('.drowsiness-page[data-state="running"]').waitFor({ timeout: 60000 });
+  await page.getByText(/^Qualidade ativa:/).waitFor();
   console.log('PASS: modelo real + WASM inicializam no worker sob a CSP de produção');
   await page.waitForTimeout(1200);
   assert.equal(await page.locator('.drowsiness-page').getAttribute('data-eyes'), 'unknown');
