@@ -6,6 +6,8 @@ import { createSompoRoadDetails, varySompoSurface, wearSompoRoad, wornRoadPaint,
 import { createSompoTerrainMesh, sompoTerrainHeight, SOMPO_TERRAIN_PERIOD_X, SOMPO_LAKE } from './createSompoTerrain';
 import type { SompoEffectFrame } from '../../../shared/sompo-scenario-effects.js';
 import { createSompoEnvironmentAssets } from './createSompoEnvironmentAssets';
+import { createSompoRoadsideLife } from './createSompoRoadsideLife';
+import { sompoRenderBudget } from './sompoStage';
 import type { SompoRuralFrame } from '../../../shared/sompo-telemetry-simulator.js';
 
 function texture(width: number, height: number, draw: (context: CanvasRenderingContext2D) => void, color = true) {
@@ -38,7 +40,7 @@ function groundTexture(kind: 'road' | 'earth') {
     }
   });
   map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  map.repeat.set(kind === 'road' ? 39 : 45, kind === 'road' ? 2 : 30);
+  map.repeat.set(kind === 'road' ? 39 : 98, kind === 'road' ? 2 : 30);
   return map;
 }
 
@@ -78,7 +80,8 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const terrain = createSompoTerrainMesh(earth);
   terrain.position.y = -0.055;
   root.add(terrain);
-  assets.surface(earth, 'grass', 101.2, 55.2, { normalScale: .65 });
+  // 220 ladrilhos em 960 m: 110 por período, o salto do relevo não desloca a textura.
+  assets.surface(earth, 'grass', 220, 55.2, { normalScale: .65 });
   varySompoSurface(earth, 0.24);
   const pasture = createSompoPastureSurface(earth);
   const details = createSompoRoadDetails(root, camera);
@@ -145,33 +148,9 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const wood = new THREE.MeshStandardMaterial({ color: 0x70614b, roughness: 1 });
   assets.surface(wood, 'wood', 0.18, 1.2);
   wood.color.set(0xb9b2a0);
-  // Cerca com mourões irregulares: altura, prumo e giro variam por instância.
-  const postSlots: { x: number; z: number; height: number; lean: number; spin: number; fallen?: number }[] = [];
-  const postRand = (i: number) => { const n = Math.sin(i * 127.1 + 311.7) * 43758.5453; return n - Math.floor(n); };
-  for (let i = 0; i < 108; i += 1) {
-    postSlots.push({
-      x: (i % 54) * 4.5 - 120 + (postRand(i + 7) - 0.5) * 0.7,
-      z: i < 54 ? 6 : -10,
-      height: 1.05 + postRand(i + 13) * 0.35,
-      lean: (postRand(i + 21) - 0.5) * 0.16,
-      spin: postRand(i + 34) * Math.PI,
-    });
-  }
-  // Mourão roliço de eucalipto, com a ponta um pouco mais fina.
-  const posts = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.055, 0.068, 1.2, 7), wood, postSlots.length);
-  const postPositions = new Float64Array(postSlots.length).fill(NaN);
-  const postFallen = new Float64Array(postSlots.length).fill(-1);
-  posts.castShadow = true; root.add(posts);
-  const wires: THREE.Mesh[] = [];
-  // Arame galvanizado em três fios. Com 4 mm ficava abaixo de um pixel e
-  // a cerca lia só como mourões soltos; 9 mm o MSAA ainda resolve a 10 m.
-  const wire = new THREE.MeshStandardMaterial({ color: 0x8b908a, roughness: 0.5, metalness: 0.6 });
-  for (const z of [6, -10]) for (const y of [0.38, 0.68, 0.98]) {
-    const strand = mesh(root, new THREE.CylinderGeometry(0.009, 0.009, 245, 4), wire, [0, y, z]);
-    strand.rotation.z = Math.PI / 2;
-    strand.userData.rowZ = z; strand.userData.wireY = y;
-    wires.push(strand);
-  }
+  // Cerca, posteação, placas, sítio, gado, eucalipto e serras: a composição
+  // de rodovia rural fica em createSompoRoadsideLife.
+  const life = createSompoRoadsideLife(root, wood, { compact: typeof window !== 'undefined' && sompoRenderBudget().compact });
   const vegetation = createSompoLicensedFoliage(root, camera);
 
   const puddles = new THREE.Group(); root.add(puddles);
@@ -298,37 +277,10 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       for (const shoulder of shoulders) shoulder.position.x = Math.round(truckX / 20) * 20;
       for (const line of edgeLines) line.position.x = Math.round(truckX / 20) * 20;
       dashes.position.x = Math.round(truckX / 5) * 5;
-      for (const strand of wires) {
-        strand.position.x = truckX;
-        // Cerca derrubada: quando o caminhão cruza a linha da cerca, os arames
-        // daquela fileira caem pro chão junto com os mourões da janela dele.
-        const rowCrossed = strand.userData.rowZ > 0 ? truck.z > 4.3 : truck.z < -8.6;
-        strand.position.y = rowCrossed ? 0.12 : strand.userData.wireY;
-      }
-      let postsChanged = false;
-      for (const [index, slot] of postSlots.entries()) {
-        const x = wrapSompoX(slot.x, truckX, 243);
-        const crossing = slot.z > 0 ? truck.z > 4.3 : truck.z < -8.6;
-        if (crossing && Math.abs(x - truckX) < 5.6) slot.fallen = 1;
-        const fallen = slot.fallen ?? 0;
-        if (postPositions[index] === x && postFallen[index] === fallen) continue;
-        postPositions[index] = x; postFallen[index] = fallen; postsChanged = true;
-        if (fallen) {
-          // Mourão derrubado: deita no sentido do deslocamento e é empurrado
-          // um pouco pra fora da linha da cerca.
-          const dir = frame?.direction ?? 1;
-          transform.position.set(x, 0.08, slot.z + Math.sign(slot.z) * 0.35);
-          transform.rotation.set(0, slot.spin, dir * -1.42 + slot.lean * 0.2);
-          transform.scale.set(1, slot.height / 1.2, 1);
-        } else {
-          transform.position.set(x, (slot.height / 2) - 0.04, slot.z);
-          transform.rotation.set(slot.lean, slot.spin, slot.lean * 0.7);
-          transform.scale.set(1, slot.height / 1.2, 1);
-        }
-        transform.updateMatrix();
-        posts.setMatrixAt(index, transform.matrix);
-      }
-      if (postsChanged) { posts.instanceMatrix.needsUpdate = true; posts.computeBoundingSphere(); }
+      // Placas e balizadores saem da frente do animal enquanto ele atravessa.
+      const animalClear: [number, number] | null = effects.has('animal') && extras?.animalAnchorX !== undefined
+        ? [extras.animalAnchorX - 5, extras.animalAnchorX + 26] : null;
+      life.update(truckX, truck, frame?.direction ?? 1, animalClear, (frame?.rain ?? 0) > 0);
       for (const slot of puddleSlots) slot.mesh.position.x = wrapSompoX(slot.x, truckX, 198);
       lakeWater.position.x = wrapSompoX(SOMPO_LAKE.x, truckX, SOMPO_TERRAIN_PERIOD_X);
       shed.position.x = wrapSompoX(-7, truckX, 240);
@@ -398,6 +350,6 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
     },
     get hasHdri() { return assets.hasHdri; },
     dispose() {
-      pasture.dispose(); vegetation.dispose(); animal.dispose(); details.dispose(); assets.dispose(); asphalt.dispose(); unpaved.dispose(); clearSky.dispose(); rainSky.dispose(); },
+      pasture.dispose(); life.dispose(); vegetation.dispose(); animal.dispose(); details.dispose(); assets.dispose(); asphalt.dispose(); unpaved.dispose(); clearSky.dispose(); rainSky.dispose(); },
   };
 }

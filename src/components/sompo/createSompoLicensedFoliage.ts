@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { restoreSompoTextures, useSompoExternalTextures } from './restoreSompoTextures';
-import { sompoTerrainHeight, sompoLakeDistance } from './createSompoTerrain';
+import { sompoTerrainHeight, sompoLakeDistance, SOMPO_WORLD_PERIOD } from './createSompoTerrain';
 import { sompoRenderBudget } from './sompoStage';
 
 const random = (i: number) => { const n = Math.sin(i * 127.1 + 311.7) * 43758.5453; return n - Math.floor(n); };
@@ -20,18 +20,46 @@ function plantTint(i: number, tree: boolean) {
   return color;
 }
 export interface FoliageSlot { x: number; z: number; scale: number; yaw: number }
+/**
+ * Árvores como na roça de verdade: capões de mata no alto e nas grotas, mata
+ * ciliar descendo até o lago, sombra isolada no pasto e perto da sede. Nada de
+ * copa espalhada por igual no morro. [x, z, raio, quantidade] no período de 480 m.
+ */
+const TREE_GROUPS: readonly (readonly [number, number, number, number])[] = [
+  [-68, -64, 13, 9], [-178, -96, 20, 10], [34, -58, 9, 5], [-122, -110, 15, 6], [62, -112, 18, 7], [226, -104, 12, 5],
+  [-104, 46, 12, 5], [122, 52, 10, 4], [-212, 64, 14, 5],
+  [100, -76, 9, 5], [-150, -72, 12, 6], [-222, -56, 10, 5], [2, -74, 10, 5], [-92, -96, 11, 5], [150, -118, 14, 6], [60, 88, 12, 5],
+  // Sombra do pasto e do terreiro: árvores soltas, grandes.
+  [-141, -24, 0, 1], [-124, -46, 0, 1], [55, -50, 0, 1], [86, -52, 0, 1], [97, -15, 0, 1], [18, 30, 0, 1], [-34, 38, 0, 1], [178, 34, 0, 1],
+];
+function treeSlots(): FoliageSlot[] {
+  const slots: FoliageSlot[] = [];
+  let i = 0;
+  for (const [cx, cz, radius, count] of TREE_GROUPS) {
+    for (let k = 0; k < count; k += 1, i += 1) {
+      const angle = random(i + 3) * Math.PI * 2, r = radius * Math.sqrt(random(i + 5));
+      const lone = radius === 0;
+      slots.push({ x: cx + Math.cos(angle) * r, z: cz + Math.sin(angle) * r * .7,
+        scale: lone ? .5 + random(i + 45) * .08 : .3 + random(i + 45) * .22, yaw: random(i + 11) * Math.PI * 2 });
+    }
+  }
+  // Mata ciliar: fileira irregular pela grota que desce ao lago.
+  for (let k = 0; k < 9; k += 1, i += 1) {
+    const t = k / 8;
+    slots.push({ x: -26 + t * 22 + (random(i + 7) - .5) * 6, z: -73 + t * 24 + (random(i + 9) - .5) * 5, scale: .32 + random(i + 45) * .16, yaw: random(i + 11) * Math.PI * 2 });
+  }
+  return slots;
+}
+
 export function highwayFoliageSlots(kind: 'trees' | 'grass' | 'shrubs' | 'pasture'): FoliageSlot[] {
-  const slots = Array.from({ length: kind === 'trees' ? 62 : kind === 'grass' ? 32000 : kind === 'pasture' ? 20000 : 650 }, (_, i) => {
-    const near = i % 3 !== 0;
-    const z = kind === 'trees' ? (i % 4 ? -1 : 1) * (near ? 35 + random(i + 8) * 45 : 75 + random(i + 8) * 38)
-      // Camera side: 15% of the tufts fray the band edge over 7 m instead of a ruled line.
-      : kind === 'grass' ? (i % 2 ? -7.9 - random(i + 9) * 6 : random(i + 9) < .85 ? 3.8 + random(i + 9) / .85 * 14 : 17.8 + (random(i + 9) - .85) / .15 * 7 * random(i + 17))
+  if (kind === 'trees') return treeSlots();
+  return Array.from({ length: kind === 'grass' ? 32000 : kind === 'pasture' ? 20000 : 650 }, (_, i) => {
+    // Camera side: 15% of the tufts fray the band edge over 7 m instead of a ruled line.
+    const z = kind === 'grass' ? (i % 2 ? -7.9 - random(i + 9) * 6 : random(i + 9) < .85 ? 3.8 + random(i + 9) / .85 * 14 : 17.8 + (random(i + 9) - .85) / .15 * 7 * random(i + 17))
       : kind === 'pasture' ? (i % 4 ? -1 : 1) * (36 + random(i + 9) * 78)
       : (i % 2 ? -1 : 1) * (14 + random(i + 9) * 70);
-    return { x: random(i + 81) * 212 - 106, z, scale: kind === 'trees' ? .30 + random(i + 45) * .23 : kind === 'grass' ? 3.2 + random(i + 45) * 1.4 : kind === 'pasture' ? 2.8 + random(i + 45) * 2 : .6 + random(i + 45) * 1.1, yaw: random(i + 11) * Math.PI * 2 };
+    return { x: random(i + 81) * 212 - 106, z, scale: kind === 'grass' ? 3.2 + random(i + 45) * 1.4 : kind === 'pasture' ? 2.8 + random(i + 45) * 2 : .6 + random(i + 45) * 1.1, yaw: random(i + 11) * Math.PI * 2 };
   });
-  if (kind === 'trees') slots.push({x:-94,z:-23,scale:.5,yaw:.7},{x:-65,z:-50,scale:.53,yaw:2.1});
-  return slots;
 }
 
 /** Authored CC0 mesh foliage, shared geometry and bounded instanced draw calls.
@@ -164,7 +192,8 @@ export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Ca
         let count = 0;
         for (let index = 0; index < batch.slots.length; index++) {
           const slot = batch.slots[index];
-          const x = slot.x + 212 * Math.round((truckX - slot.x) / 212);
+          const span = batch.slots === trees ? SOMPO_WORLD_PERIOD : 212;
+          const x = slot.x + span * Math.round((truckX - slot.x) / span);
           let ground = groundCache.get(slot);
           if (!ground || ground.x !== x) {
             ground = { x, y: sompoTerrainHeight(x, slot.z) - .025, lake: sompoLakeDistance(x, slot.z) < 27 };
