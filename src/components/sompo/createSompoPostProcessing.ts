@@ -5,6 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { sompoRenderBudget } from './sompoStage';
+import { SompoDepthAOPass } from './createSompoDepthAO';
 
 /**
  * Cadeia real de pós: render HDR (alvo HalfFloat com MSAA) → bloom só do que
@@ -20,9 +21,13 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
       dispose() {},
     };
   }
-  const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+  // Depth resolved from the MSAA buffer feeds the ambient-occlusion pass; the
+  // composer's second buffer clones it.
+  const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4, depthTexture: new THREE.DepthTexture(1, 1, THREE.UnsignedIntType) });
   const composer = new EffectComposer(renderer, target);
   composer.addPass(new RenderPass(scene, camera));
+  const ambientOcclusion = new SompoDepthAOPass(camera);
+  composer.addPass(ambientOcclusion);
   // Um texel NaN/Inf contaminaria todos os mips do bloom e apagaria o frame
   // inteiro. O passe zera qualquer valor inválido antes da extração de altas.
   const sanitize = new ShaderPass({
@@ -53,7 +58,9 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
         c=mix(vec3(lum),c,1.12);                                   // saturação
         c=mix(c,c*c*(3.-2.*c),.4);                                 // contraste (curva S)
         c*=mix(vec3(1.),vec3(1.1,1.,.86),smoothstep(.45,1.,lum)*.6);  // altas quentes
-        c*=mix(vec3(1.),vec3(.955,1.,1.06),smoothstep(.5,0.,lum)*.38); // sombras frias
+        c*=mix(vec3(1.),vec3(.9,.98,1.1),smoothstep(.5,0.,lum)*.5);    // sombras frias
+        c=max(c,vec3(.018,.02,.026));                               // preto sem esmagar
+        c=c-max(c-.82,0.)*.55;                                      // ombro: branco sem clipar
         vec2 p=(vUv-.5)*vec2(resolution.x/max(1.,resolution.y),1.);
         c*=1.-.30*smoothstep(.42,1.15,length(p));                  // vinheta
         gl_FragColor=vec4(c,1.);
@@ -66,6 +73,6 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
       grade.uniforms.resolution.value.set(Math.max(1, width), Math.max(1, height));
     },
     render(_delta: number) { composer.render(); },
-    dispose() { composer.dispose(); target.dispose(); },
+    dispose() { ambientOcclusion.dispose(); composer.dispose(); target.dispose(); },
   };
 }
