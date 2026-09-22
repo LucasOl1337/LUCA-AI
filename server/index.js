@@ -141,6 +141,7 @@ import { buildPublicStateSnapshot } from '../shared/state-payload.js';
 import { runOperationalPreflight } from '../shared/preflight.js';
 import { reviewResearcherContribution } from './agent-quality.js';
 import { buildEndpointCatalog } from './endpoint-catalog.js';
+import { precompressedModels } from './precompressed-models.js';
 import { buildToolCatalog } from './tool-catalog.js';
 import { buildCatalogAudit } from './catalog-audit.js';
 import { appendEvent, eventFlows, eventSummary, listEvents } from './event-log.js';
@@ -4366,6 +4367,7 @@ app.use('/icons', express.static(path.resolve(process.cwd(), 'public', 'icons'))
 app.use('/datasets', express.static(path.resolve(process.cwd(), 'datasets')));
 
 if (fs.existsSync(indexPath)) {
+  app.use(precompressedModels(distPath));
   app.use(express.static(distPath));
   app.get('*splat', (_req, res) => {
     res.sendFile(indexPath);

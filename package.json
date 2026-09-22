@@ -6,7 +6,7 @@
   "scripts": {
     "dev:full": "node server/index.js",
     "start": "vite build && node server/index.js",
-    "build": "vite build --configLoader native",
+    "build": "vite build --configLoader native && node scripts/precompress-models.mjs",
     "preview": "vite preview",
     "server": "node server/index.js",
     "typecheck": "tsc --noEmit",
