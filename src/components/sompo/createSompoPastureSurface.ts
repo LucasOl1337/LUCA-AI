@@ -118,7 +118,12 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       tilled *= .68 + macro * .5;
       diffuseColor.rgb = mix(diffuseColor.rgb, tilled, fieldZone);` : ''}
       #include <roughnessmap_fragment>`);
+    // Sombra de nuvem: manchas largas de luz direta a menos no morro e no pasto,
+    // o que dá escala e profundidade ao relevo. Só a luz do sol, o céu continua.
+    if (!field) shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+      float cloudShade = smoothstep(.42, .7, ruralNoise(ruralWorld.xz / 46.0 + vec2(3.7, 11.2)) * .7 + ruralNoise(ruralWorld.xz / 17.0 + 5.1) * .3);
+      reflectedLight.directDiffuse *= 1.0 - cloudShade * .55 * smoothstep(9.0, 30.0, abs(ruralWorld.z + 2.05));`);
   };
-  material.customProgramCacheKey = () => `sompo-pasture-albedo-v8-${field}`;
+  material.customProgramCacheKey = () => `sompo-pasture-albedo-v9-${field}`;
   return { dispose() { disposed = true; texture.dispose(); soilTexture.dispose(); bladeTexture.dispose(); if (field) tilledTexture.dispose(); else canopyTexture.dispose(); } };
 }

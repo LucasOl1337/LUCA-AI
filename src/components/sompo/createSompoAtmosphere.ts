@@ -3,7 +3,9 @@ import type { SompoStudioConfig } from './sompoStudioConfig';
 
 const palettes = {
   day: { top: '#5596b6', horizon: '#c6d7d2', sun: '#fff3d7', ground: '#45563b', direction: [26, 42, 18], strength: 2.2, warmth: 0.15 },
-  golden: { top: '#6ea4d3', horizon: '#c5d2da', sun: '#ffe3b6', ground: '#4d5a38', direction: [-26, 30, 18], strength: 3.6, warmth: 0.28 },
+  // Sol a ~24°, âmbar e rasante: sombra comprida sem perder o céu azul da foto
+  // (a câmera olha para o lado oposto ao sol, então o disco da foto não aparece).
+  golden: { top: '#6ea4d3', horizon: '#c9d0d0', sun: '#ffd49e', ground: '#4d5a38', direction: [-26, 14, 18], strength: 4.2, warmth: 0.42 },
   overcast: { top: '#758992', horizon: '#bec9c5', sun: '#d8e8ee', ground: '#424b3c', direction: [12, 40, 16], strength: 0.65, warmth: 0 },
 };
 
@@ -160,15 +162,17 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
       uniforms.ridgeFar.value.set(night ? '#101c26' : mode === 'overcast' ? '#4d5d63' : '#68798f');
       uniforms.ridgeNear.value.set(night ? '#14211f' : mode === 'overcast' ? '#3d4c40' : '#4c5e3e');
       sun.color.set(night ? '#9bbaca' : palette.sun); sun.intensity = night ? 0.45 : palette.strength;
-      renderer.toneMappingExposure = config.exposure * (night ? 0.92 : mode === 'golden' ? 1.00 : 1.06);
-      scene.environmentIntensity = night ? 0.28 : mode === 'overcast' ? 0.72 : 0.48;
+      renderer.toneMappingExposure = config.exposure * (night ? 0.92 : mode === 'golden' ? 1.05 : 1.06);
+      // Fim de tarde precisa de sol forte contra um céu que ilumina pouco; ambiente
+      // alto achatava a luz rasante num sépia sem sombra.
+      scene.environmentIntensity = night ? 0.28 : mode === 'overcast' ? 0.72 : mode === 'golden' ? 0.38 : 0.48;
       if (scene.fog instanceof THREE.Fog) {
         // Névoa de distância esfria e perde saturação: serras ficam azuladas
         // em camadas como na referência em vez de virarem uma parede âmbar.
         // Perspectiva aérea começa perto: com início em 100 m o morro a 60-120 m
         // tinha o mesmo contraste do capim a 5 m e a cena achatava.
-        scene.fog.color.set(night ? '#172733' : mode === 'overcast' ? '#a9b2ae' : '#b4c6d2');
-        scene.fog.near = night ? 40 : wet ? 12 : 15; scene.fog.far = night ? 380 : wet ? 300 : 520;
+        scene.fog.color.set(night ? '#172733' : mode === 'overcast' ? '#a9b2ae' : mode === 'golden' ? '#c8c9bd' : '#b4c6d2');
+        scene.fog.near = night ? 40 : wet ? 8 : 18; scene.fog.far = night ? 380 : wet ? 230 : mode === 'golden' ? 470 : 460;
       }
     },
     dispose() {

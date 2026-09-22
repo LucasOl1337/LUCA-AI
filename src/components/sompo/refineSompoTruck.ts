@@ -213,6 +213,8 @@ export function refineSompoTruck(model: SompoTruckModel) {
     const chrome = material.name === 'Astra polished chrome';
     const amount = { box: [.3, .18], paint: [.42, .3], metal: [chrome ? .3 : .55, chrome ? .2 : .38], rubber: [.2, 0] }[family];
     const compile = material.onBeforeCompile;
+    // Metal ganha piso de rugosidade: cromo polido com o sol baixo virava ponto
+    // branco de um pixel no tanque e nos aros.
     material.onBeforeCompile = (shader, renderer) => {
       compile?.call(material, shader, renderer);
       shader.vertexShader = 'attribute float sompoHeight; varying float truckH; varying vec3 truckW;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -234,9 +236,10 @@ export function refineSompoTruck(model: SompoTruckModel) {
           ${family === 'box' ? `float streak = truckNoise(vec2(truckW.z * 14.0 + truckW.x * 9.0, truckW.y * .6));
           diffuseColor.rgb *= 1.0 - smoothstep(.55, .95, streak) * .1 * (1.0 - smoothstep(2.4, 3.7, truckH));` : ''}`)
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-          roughnessFactor = mix(roughnessFactor, .92, clamp(truckDust * .6 + truckSpray * .4, 0., 1.) * ${family === 'rubber' ? '.3' : '.6'});`);
+          roughnessFactor = mix(roughnessFactor, .92, clamp(truckDust * .6 + truckSpray * .4, 0., 1.) * ${family === 'rubber' ? '.3' : '.6'});
+          ${family === 'metal' ? 'roughnessFactor = max(roughnessFactor, .34);' : ''}`);
     };
-    material.customProgramCacheKey = () => `sompo-truck-wear-v4-${family}-${panel}-${chrome}`;
+    material.customProgramCacheKey = () => `sompo-truck-wear-v5-${family}-${panel}-${chrome}`;
   };
   materials.forEach(wearTruck);
   const axisY = new THREE.Vector3(0, 1, 0), axle = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
