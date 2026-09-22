@@ -75,6 +75,37 @@ Passaram no Chromium real: abrir e fechar resposta, callback `onInspect`, tabela
 
 Artefatos no diretório scratch citado acima: `browser-interactions.mjs`, `browser-interactions.log`, `canvas-desktop.png`, `canvas-narrow.png`, `bench-validated.json` e `browser-validated.json`. A aba própria foi fechada, o servidor estático encerrado e a bancada liberada após os testes. O perfil preparado foi preservado.
 
-Limites: foi exercitado o componente real com props de fixture, não o fluxo autenticado integral da aplicação. Não foram exercitados rede, sessão, persistência, seleção real de personas ou execução de missão. SSR demonstra equivalência exata do HTML nos casos cobertos, não equivalência universal de pixels ou hidratação. A página ainda concentra estado e outras responsabilidades, fora desta rodada.
+A rodada inicial acima usou props de fixture. O follow-up abaixo fechou adicionalmente o fluxo autenticado local real de leitura e cópia de conversa persistida. SSR continua demonstrando equivalência exata do HTML nos casos cobertos, não equivalência universal de pixels ou hidratação. A página ainda concentra estado e outras responsabilidades, fora desta rodada.
+
+## Follow-up: workflow autenticado local real
+
+Em 22/09/2026, a coordenação autorizou iniciar o runtime oficial em ambiente descartável para fechar a validação integrada, sem missão, provider ou produção. Nenhum código de produto foi acrescentado ou modificado para fabricar o teste.
+
+Antes de iniciar, foram inspecionados `server/index.js`, configuração, auth, chat library, source de telemetria e cliente Kamui. O bootstrap sempre agenda o scheduler e a sincronização de personas. `LUCA_SOMPO_OFFLINE=true` desliga o heartbeat Python e o Firebase SSE, mas não basta sozinho para isolar os demais destinos.
+
+O isolamento efetivo foi:
+
+- Entry point real `/home/lol/Projects/LUCA-AI/server/index.js`, não uma cópia. Build real `dist/` do checkout, sem substituir componentes ou backend por mocks.
+- `env -i`, HOME e cwd descartáveis, `LUCA_DATA_DIR`/`LUCA_AUTH_DATA_PATH` no scratch. Nenhum `.env`, credencial ou dado privado foi lido.
+- Node `--permission` com leitura limitada a `server`, `shared`, `node_modules`, `dist`, `package.json` e scratch, escrita somente no diretório de dados do teste. Sem permissão para subprocessos.
+- Namespace `unshare -Urmn` apenas com loopback e nenhuma rota externa. Probe no endereço reservado para documentação `192.0.2.1:443` retornou `ENETUNREACH` antes do start. Kamui/9Router apontados a `127.0.0.1:1`, sem serviço no namespace.
+- Relay de transporte TCP loopback → Unix socket → loopback do namespace. HTTP e WebSocket continuam atendidos pelo runtime Express oficial, sem respostas simuladas.
+
+A primeira tentativa do harness encontrou HTTP 404 porque o cwd estava sob `.jcode`, e o `sendFile` do Express recusa caminhos ocultos. Isso foi corrigido somente no launcher de teste: bind-mount do cwd descartável em `/mnt` dentro do namespace. O runtime foi reiniciado, mantendo os dados sintéticos já persistidos. Não houve ajuste no produto.
+
+Pelas APIs reais foram criados conta sintética (`refactor-luca@example.test`), sessão e imagem PNG local. O transcript foi salvo com `PATCH`, ativado e recuperado com `GET`. A autenticação do Chromium usou exclusivamente o cookie emitido pelo registro real. O fluxo não testa digitação no formulário de login, mas autentica de verdade pela API oficial e valida `/api/auth/session` na interface.
+
+Na bancada `refactor-luca`, workspace 9, display `:83`, perfil exclusivo validado, a aplicação built completa em `/luca-ai?sessao=...` carregou a conversa pela API, abriu a resposta, exibiu tabela/código/imagem do anexo autenticado e copiou exatamente o texto persistido no clipboard isolado. Depois do reload completo, o conteúdo foi recuperado novamente. Como houve reinício do runtime antes do passe, a leitura também comprova persistência entre processos, não apenas estado em memória.
+
+Resultados: `passed=true`, `authenticated=true`, `copyExact=true`, `reloadRestored=true`. Todas as respostas observadas no browser foram HTTP 200, `errors=[]`, `blocked=[]`, `activeMission=null` e nenhuma missão agendada. A única mutação observada da UI foi o PATCH normal da própria sessão sintética. Nenhum endpoint de execução de missão/persona foi chamado. Foram capturadas telas desktop e estreita, com a desktop inspecionada visualmente.
+
+Evidências em `/home/lol/.jcode/scratch/refactor-luca-1139459/e2e/`:
+
+- `start-isolated.sh`, `runtime-process-proof.json`, `egress-proof.log`, `net-address.json`, `net-routes.json`: comando, permissões e contenção de rede.
+- `seed-proof.json`, `workflow-proof.json`, `workflow.log`: APIs reais, autenticação, requests/responses, cópia e reload.
+- `authenticated-desktop.png`, `authenticated-narrow.png`: interface built real com conversa persistida.
+- `seed.mjs`, `workflow.mjs`: harness usado, mantido fora do produto.
+
+Teardown: aba própria fechada, bancada encerrada, runtime namespace e ambos os relays terminados. O storage sintético permanece apenas no scratch como evidência, sem serviço ativo. Sem push/deploy. A limitação residual agora é execução real de providers/missões e produção, deliberadamente não exercitadas, não a leitura/renderização/cópia autenticada local.
 
 Ao alterar futuramente o comportamento, não atualize os hashes automaticamente para fazer testes passarem. Confira a diferença HTML e revise as asserções semânticas antes de aceitar uma nova baseline.
