@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { createSompoPastureSurface } from './createSompoPastureSurface';
 import { createSompoAnimal } from './createSompoAnimal';
 import { createSompoLicensedFoliage } from './createSompoLicensedFoliage';
-import { createSompoRoadDetails, varySompoSurface, wornRoadPaint, wrapSompoX } from './createSompoRoadDetails';
+import { createSompoRoadDetails, varySompoSurface, wearSompoRoad, wornRoadPaint, wrapSompoX } from './createSompoRoadDetails';
 import { createSompoTerrainMesh, sompoTerrainHeight, SOMPO_TERRAIN_PERIOD_X, SOMPO_LAKE } from './createSompoTerrain';
 import type { SompoEffectFrame } from '../../../shared/sompo-scenario-effects.js';
 import { createSompoEnvironmentAssets } from './createSompoEnvironmentAssets';
@@ -100,6 +100,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   road.rotation.x = -Math.PI / 2;
   assets.surface(asphalt, 'asphalt', 65, 2.05, { keepMap: true, normalScale: 1.0 });
   varySompoSurface(asphalt, 0.24);
+  const asphaltWear = wearSompoRoad(asphalt, 'asphalt');
   const unpaved = new THREE.MeshStandardMaterial({ map: earthMap, roughness: 1, color: 0xb09b7e });
   assets.surface(unpaved, 'dirt', 65, 2.05);
   varySompoSurface(unpaved, 0.38);
@@ -115,6 +116,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const shoulderMaterial = new THREE.MeshStandardMaterial({ map: earthMap, color: 0xe1c9aa, roughness: 1 });
   assets.surface(shoulderMaterial, 'dirt', 65, 0.375);
   varySompoSurface(shoulderMaterial, 0.3);
+  wearSompoRoad(shoulderMaterial, 'shoulder');
   const shoulders: THREE.Mesh[] = [];
   for (const z of [2.72, -6.82]) {
     const shoulder = mesh(root, new THREE.PlaneGeometry(260, 1.5), shoulderMaterial, [0, -0.015, z]);
@@ -179,17 +181,30 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   }
   // Spray das rodas: a névoa de água que o pneu levanta em pista molhada.
   // Pontos nascem nas caixas de roda e o movimento do caminhão joga pra trás.
-  const SPRAY_COUNT = 150;
+  const SPRAY_COUNT = 220;
   const sprayGeometry = new THREE.BufferGeometry();
   const sprayPositions = new Float32Array(SPRAY_COUNT * 3);
   sprayGeometry.setAttribute('position', new THREE.BufferAttribute(sprayPositions, 3));
+  // Cada gota nasce pequena, abre em névoa e some: tamanho e alfa por partícula.
+  const spraySizes = new Float32Array(SPRAY_COUNT), sprayColors = new Float32Array(SPRAY_COUNT * 4).fill(1);
+  sprayGeometry.setAttribute('spraySize', new THREE.BufferAttribute(spraySizes, 1));
+  sprayGeometry.setAttribute('color', new THREE.BufferAttribute(sprayColors, 4));
   const sprayCanvas = document.createElement('canvas'); sprayCanvas.width = sprayCanvas.height = 64;
   const sprayCtx = sprayCanvas.getContext('2d')!;
-  const sprayGrad = sprayCtx.createRadialGradient(32, 32, 2, 32, 32, 30);
-  sprayGrad.addColorStop(0, 'rgba(255,255,255,.85)'); sprayGrad.addColorStop(.55, 'rgba(255,255,255,.28)'); sprayGrad.addColorStop(1, 'rgba(255,255,255,0)');
-  sprayCtx.fillStyle = sprayGrad; sprayCtx.fillRect(0, 0, 64, 64);
+  // Névoa irregular: tufos macios sobrepostos e gotículas, não um disco.
+  for (let i = 0; i < 14; i += 1) {
+    const a = i * 2.4, r = 6 + (i % 5) * 3.2, x = 32 + Math.cos(a) * r * .9, y = 32 + Math.sin(a) * r * .7, radius = 9 + (i % 4) * 3;
+    const puff = sprayCtx.createRadialGradient(x, y, 0, x, y, radius);
+    puff.addColorStop(0, 'rgba(255,255,255,.3)'); puff.addColorStop(1, 'rgba(255,255,255,0)');
+    sprayCtx.fillStyle = puff; sprayCtx.fillRect(0, 0, 64, 64);
+  }
+  for (let i = 0; i < 26; i += 1) { sprayCtx.fillStyle = 'rgba(255,255,255,.55)'; sprayCtx.fillRect(10 + (i * 37 % 44), 12 + (i * 23 % 40), 1.3, 1.3); }
   const sprayTexture = new THREE.CanvasTexture(sprayCanvas);
-  const sprayMaterial = new THREE.PointsMaterial({ map: sprayTexture, size: 0.85, transparent: true, opacity: 0, depthWrite: false, color: 0xcfd9de });
+  const sprayMaterial = new THREE.PointsMaterial({ map: sprayTexture, size: 1.0, transparent: true, opacity: 0, depthWrite: false, color: 0xcfd9de, vertexColors: true });
+  sprayMaterial.onBeforeCompile = shader => {
+    shader.vertexShader = 'attribute float spraySize;\n' + shader.vertexShader.replace('gl_PointSize = size;', 'gl_PointSize = size * spraySize;');
+  };
+  sprayMaterial.customProgramCacheKey = () => 'sompo-wheel-spray-v2';
   const spray = new THREE.Points(sprayGeometry, sprayMaterial);
   spray.frustumCulled = false; spray.name = 'sompo-road-wheel-spray'; spray.visible = false; root.add(spray);
   let spraySeed = 4242;
@@ -322,8 +337,10 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       fog.color.set(wet ? 0x919b9c : 0xbebca9); fog.near = wet ? 55 : 100; fog.far = wet ? 220 : 260;
       earth.color.setScalar(wet ? 0.58 : 1);
       shoulderMaterial.color.set(wet ? 0x96856c : 0xe1c9aa);
-      asphalt.color.set(mud ? 0x604331 : gravel ? 0x998467 : wet ? 0x45545f : 0xffffff);
-      asphalt.roughness = wet && !mud ? 0.2 : 0.95;
+      // Molhado é escuro e brilha em manchas: poças espelham o céu, o resto fica fosco.
+      asphalt.color.set(mud ? 0x604331 : gravel ? 0x998467 : wet ? 0x303a40 : 0xffffff);
+      asphalt.roughness = wet && !mud ? 0.38 : 0.95;
+      asphaltWear.wetness.value = wet && !mud && !gravel ? 1 : 0;
       asphalt.normalScale.setScalar(wet ? 0.20 : 1.0);
       markings.visible = !mud && !gravel;
       puddles.visible = wet;
@@ -344,7 +361,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       rainMaterial.opacity = (effects.get('rain') ?? 0) * 0.4;
       const sprayAmt = wet ? THREE.MathUtils.clamp(((frame?.speedKph ?? 0) - 18) / 45, 0, 1) : 0;
       spray.visible = sprayAmt > 0.02;
-      sprayMaterial.opacity = sprayAmt * 0.36;
+      sprayMaterial.opacity = sprayAmt * 0.5;
       if (spray.visible) {
         const drift = 1 + (frame?.speedKph ?? 0) / 60;
         const sprayT = reduceMotion ? 0 : t;
@@ -354,8 +371,12 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
           sprayPositions[i * 3] = truckX + origin.axle - age * 2.6 * drift;
           sprayPositions[i * 3 + 1] = 0.18 + age * 0.85 - age * age * 0.55;
           sprayPositions[i * 3 + 2] = truck.z + origin.side * (0.72 + origin.jitter * 0.35 + age * 0.5);
+          spraySizes[i] = .35 + age * (1.6 + origin.jitter);
+          sprayColors[i * 4 + 3] = Math.pow(1 - age, 1.4) * (.55 + .45 * origin.jitter);
         }
         sprayGeometry.attributes.position.needsUpdate = true;
+        sprayGeometry.attributes.spraySize.needsUpdate = true;
+        sprayGeometry.attributes.color.needsUpdate = true;
       }
       const clock = reduceMotion ? 0 : t;
       const rainPositions = rainGeometry.attributes.position as THREE.BufferAttribute;

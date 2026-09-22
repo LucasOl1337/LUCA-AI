@@ -28,6 +28,51 @@ export function varySompoSurface(material: THREE.MeshStandardMaterial, amount = 
   material.customProgramCacheKey = () => `sompo-macro-${amount}`;
 }
 
+/**
+ * Uso de pista por cima da variação macro (precisa de varySompoSurface antes).
+ * Asfalto: trilhas de roda polidas nas duas faixas e remendos de recapeamento.
+ * Acostamento: faixa compactada, cascalho solto e borda externa esfarelada
+ * entrando no capim em vez de uma régua.
+ */
+export function wearSompoRoad(material: THREE.MeshStandardMaterial, kind: 'asphalt' | 'shoulder') {
+  // 0 seco, 1 chuva: a água para nas trilhas de roda, nos remendos e em poças.
+  const wetness = { value: 0 };
+  const compile = material.onBeforeCompile;
+  const baseKey = material.customProgramCacheKey();
+  material.onBeforeCompile = (shader, renderer) => {
+    compile.call(material, shader, renderer);
+    shader.uniforms.roadWetness = wetness;
+    shader.fragmentShader = 'uniform float roadWetness;\n' + shader.fragmentShader;
+    shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', kind === 'asphalt' ? `#include <color_fragment>
+      float laneOffset = ruralWorld.z - (ruralWorld.z > -2.05 ? 0.0 : -4.1);
+      float wheelTrack = exp(-pow((abs(laneOffset) - .98) / .3, 2.0)) * (.6 + .4 * ruralNoise(vec2(ruralWorld.x * .35, ruralWorld.z * 3.0)));
+      diffuseColor.rgb *= 1.0 - wheelTrack * .14;
+      vec2 patchSpace = vec2(ruralWorld.x / 17.0, (ruralWorld.z + 6.15) / 4.1);
+      vec2 patchCell = floor(patchSpace), patchUv = fract(patchSpace);
+      vec2 patchLo = vec2(.12 + .3 * ruralHash(patchCell + 1.1), .1 + .25 * ruralHash(patchCell + 2.3));
+      vec2 patchHi = patchLo + vec2(.18 + .3 * ruralHash(patchCell + 4.1), .3 + .3 * ruralHash(patchCell + 5.9));
+      vec2 patchEdge = smoothstep(patchLo, patchLo + .006, patchUv) * (1.0 - smoothstep(patchHi, patchHi + .006, patchUv));
+      float roadPatch = step(.7, ruralHash(patchCell + 3.7)) * patchEdge.x * patchEdge.y;
+      diffuseColor.rgb *= mix(1.0, .7, roadPatch);
+      float roadPuddle = clamp(wheelTrack * 1.2 + roadPatch * .8 + smoothstep(.62, .8, ruralNoise(ruralWorld.xz * vec2(.35, 1.4) + 19.0)), 0.0, 1.0) * roadWetness;
+      diffuseColor.rgb *= 1.0 - roadPuddle * .35;` : `#include <color_fragment>
+      float shoulderT = clamp((abs(ruralWorld.z + 2.05) - 4.02) / 1.5, 0.0, 1.0);
+      float shoulderRag = .66 + ruralNoise(vec2(ruralWorld.x * 1.4, 1.7)) * .24 + ruralNoise(vec2(ruralWorld.x * 5.3, 3.1)) * .12;
+      if (shoulderT > shoulderRag) discard;
+      float packedTrack = exp(-pow((shoulderT - .3) / .16, 2.0)) * (.6 + .4 * ruralNoise(vec2(ruralWorld.x * .5, 9.0)));
+      diffuseColor.rgb *= 1.0 - packedTrack * .18;
+      float gravel = smoothstep(.8, .96, ruralNoise(ruralWorld.xz * 14.0));
+      diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.3 + .035, gravel * .5);
+      diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(.7, .77, .58), smoothstep(.45, .95, shoulderT) * .55);`);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', kind === 'asphalt' ? `#include <roughnessmap_fragment>
+      roughnessFactor *= mix(1.0, .82, wheelTrack);
+      roughnessFactor = mix(roughnessFactor, .05, roadPuddle);` : `#include <roughnessmap_fragment>
+      roughnessFactor = mix(roughnessFactor, .72, packedTrack * .4);`);
+  };
+  material.customProgramCacheKey = () => `${baseKey}-road-wear-v2-${kind}`;
+  return { wetness };
+}
+
 export function wornRoadPaint() {
   const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 128;
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
