@@ -42,6 +42,16 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
   bladeTexture.colorSpace = THREE.SRGBColorSpace;
   bladeTexture.wrapS = bladeTexture.wrapT = THREE.MirroredRepeatWrapping;
   bladeTexture.anisotropy = 8;
+  // Pasto de braquiária visto de cima (Grok Imagine, r30): manchas reais de verde,
+  // palha e solo exposto em escala de dezenas de metros no morro e no gramado.
+  const aerialReady = { value: 0 };
+  const aerialTexture = field ? new THREE.Texture() : load('/sompo/gen/r30-pasture-aerial.webp', map => {
+    if (disposed) { map.dispose(); return; }
+    aerialReady.value = 1;
+  });
+  aerialTexture.colorSpace = THREE.SRGBColorSpace;
+  aerialTexture.wrapS = aerialTexture.wrapT = THREE.RepeatWrapping;
+  aerialTexture.anisotropy = 8;
   const canopyReady = { value: 0 };
   const canopyTexture = field ? soilTexture : load('/sompo/gen/lavoura-densa.webp', map => {
     if (disposed) { map.dispose(); return; }
@@ -60,7 +70,8 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
     shader.uniforms.tilledMap = { value: tilledTexture }; shader.uniforms.tilledReady = tilledReady;
     shader.uniforms.bladeMap = { value: bladeTexture }; shader.uniforms.bladeReady = bladeReady;
     shader.uniforms.canopyMap = { value: canopyTexture }; shader.uniforms.canopyReady = canopyReady;
-    shader.fragmentShader = 'uniform sampler2D pastureMap; uniform float pastureReady;\nuniform sampler2D soilMap; uniform float soilReady;\nuniform sampler2D tilledMap; uniform float tilledReady;\nuniform sampler2D bladeMap; uniform float bladeReady;\nuniform sampler2D canopyMap; uniform float canopyReady;\n' + shader.fragmentShader;
+    shader.uniforms.aerialMap = { value: aerialTexture }; shader.uniforms.aerialReady = aerialReady;
+    shader.fragmentShader = 'uniform sampler2D pastureMap; uniform float pastureReady;\nuniform sampler2D soilMap; uniform float soilReady;\nuniform sampler2D tilledMap; uniform float tilledReady;\nuniform sampler2D bladeMap; uniform float bladeReady;\nuniform sampler2D canopyMap; uniform float canopyReady;\nuniform sampler2D aerialMap; uniform float aerialReady;\n' + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', `
       float pasture = ${field ? 'smoothstep(11.0,18.0,abs(ruralWorld.z))' : 'smoothstep(4.1,7.2,abs(ruralWorld.z+2.05))'};
       vec3 grassland = mix(vec3(.10,.135,.04), texture2D(pastureMap,ruralWorld.xz*.23).rgb, pastureReady);
@@ -107,7 +118,14 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
         grassland = mix(grassland, grassland * vec3(1.32, 1.16, .74), straw * hills * .55);
       }
       // Keep foreground grass in shade and distant hills muted in the cream haze.
-      ${field ? '' : 'grassland *= vec3(.45,.58,.29);'}
+      ${field ? '' : `grassland *= vec3(.45,.58,.29);
+      // Foto aérea domina a partir de ~9 m da pista; a foto de folhas de perto
+      // continua como micro detalhe (luminância) sobre ela.
+      const float aerialGain = .62;
+      float aerialW = aerialReady * smoothstep(8.0, 22.0, corridorZ) * (1.0 - fieldSoil * .9);
+      vec3 aerial = mix(texture2D(aerialMap, ruralWorld.xz / 36.0).rgb, texture2D(aerialMap, ruralWorld.xz / 83.0 + vec2(.37, .61)).rgb, .42);
+      float leafLum = dot(grassland, vec3(.3, .6, .1)) / .09;
+      grassland = mix(grassland, aerial * aerialGain * mix(1.0, clamp(leafLum, .6, 1.5), .35), aerialW);`}
       diffuseColor.rgb = mix(diffuseColor.rgb, grassland, pasture);
       // Talhão do agri: sulcos na direção das fileiras (o v da textura segue
       // o x do mundo) com resteva nas valetas, escurecido sob a copa. A faixa
@@ -124,6 +142,6 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       float cloudShade = smoothstep(.42, .7, ruralNoise(ruralWorld.xz / 46.0 + vec2(3.7, 11.2)) * .7 + ruralNoise(ruralWorld.xz / 17.0 + 5.1) * .3);
       reflectedLight.directDiffuse *= 1.0 - cloudShade * .55 * smoothstep(9.0, 30.0, abs(ruralWorld.z + 2.05));`);
   };
-  material.customProgramCacheKey = () => `sompo-pasture-albedo-v9-${field}`;
-  return { dispose() { disposed = true; texture.dispose(); soilTexture.dispose(); bladeTexture.dispose(); if (field) tilledTexture.dispose(); else canopyTexture.dispose(); } };
+  material.customProgramCacheKey = () => `sompo-pasture-albedo-v10-${field}`;
+  return { dispose() { disposed = true; texture.dispose(); soilTexture.dispose(); bladeTexture.dispose(); aerialTexture.dispose(); if (field) tilledTexture.dispose(); else canopyTexture.dispose(); } };
 }

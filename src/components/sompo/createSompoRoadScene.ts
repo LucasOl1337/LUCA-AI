@@ -114,7 +114,16 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const contact = new THREE.Mesh(new THREE.PlaneGeometry(10.4, 3.4), new THREE.MeshBasicMaterial({ map: contactMap, transparent: true, depthWrite: false, opacity: 0.82 }));
   contact.name = 'truck-ambient-contact'; contact.rotation.x = -Math.PI / 2; root.add(contact);
   const shoulderMaterial = new THREE.MeshStandardMaterial({ map: earthMap, color: 0xe1c9aa, roughness: 1 });
-  assets.surface(shoulderMaterial, 'dirt', 65, 0.375);
+  // Faixa de laterita vista de cima (Grok Imagine, r31): trilhas de pneu no
+  // comprimento, cascalho e touceiras na borda de fora; repete a cada 3 m e
+  // cobre a largura inteira uma vez. Normal/ARM da terra Poly Haven dão o relevo.
+  assets.surface(shoulderMaterial, 'dirt', 65, 0.375, { keepMap: true });
+  if (typeof document !== 'undefined') {
+    const laterite = new THREE.TextureLoader().load('/sompo/gen/r31-laterite-strip.webp');
+    laterite.colorSpace = THREE.SRGBColorSpace; laterite.wrapS = THREE.RepeatWrapping; laterite.wrapT = THREE.ClampToEdgeWrapping;
+    laterite.repeat.set(260 / 3, 1); laterite.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    shoulderMaterial.map = laterite;
+  }
   varySompoSurface(shoulderMaterial, 0.3);
   wearSompoRoad(shoulderMaterial, 'shoulder');
   const shoulders: THREE.Mesh[] = [];
@@ -336,7 +345,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       const fog = scene.fog as THREE.Fog;
       fog.color.set(wet ? 0x919b9c : 0xbebca9); fog.near = wet ? 55 : 100; fog.far = wet ? 220 : 260;
       earth.color.setScalar(wet ? 0.58 : 1);
-      shoulderMaterial.color.set(wet ? 0x96856c : 0xe1c9aa);
+      shoulderMaterial.color.set(wet ? 0x9a8e84 : 0xffffff);
       // Molhado é escuro e brilha em manchas: poças espelham o céu, o resto fica fosco.
       asphalt.color.set(mud ? 0x604331 : gravel ? 0x998467 : wet ? 0x303a40 : 0xffffff);
       asphalt.roughness = wet && !mud ? 0.38 : 0.95;

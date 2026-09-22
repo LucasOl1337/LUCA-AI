@@ -1,0 +1,7 @@
+{
+  "generator": "Grok Imagine (grok-imagine-image-2.0) via Grok CLI login, 2026-09-22",
+  "sourceFile": "strip-2.jpg",
+  "processing": "scripts/sompo/make-seamless.py (half-shift cross blend); horizontal-only seam, 2048x1024, saturation x0.72",
+  "sha256": "94cbb713bb6d987bc813bb2d794b80b2ada5311be480e9413350f13b95d8f552",
+  "usage": "Road shoulder albedo, 3 m repeat along the road (createSompoRoadScene)"
+}

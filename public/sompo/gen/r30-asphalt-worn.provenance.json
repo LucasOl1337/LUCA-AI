@@ -1,0 +1,7 @@
+{
+  "generator": "Grok Imagine (grok-imagine-image-2.0) via Grok CLI login, 2026-09-22",
+  "sourceFile": "asphalt-2.jpg",
+  "processing": "scripts/sompo/make-seamless.py (half-shift cross blend)",
+  "sha256": "cc0de11f310e04c1398db26f2d92b903ba462b23af0cd0445e35a33dd2242ada",
+  "usage": "Large-scale asphalt wear modulation, 11x6 m (wearSompoRoad)"
+}

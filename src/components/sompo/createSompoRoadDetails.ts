@@ -37,16 +37,22 @@ export function varySompoSurface(material: THREE.MeshStandardMaterial, amount = 
 export function wearSompoRoad(material: THREE.MeshStandardMaterial, kind: 'asphalt' | 'shoulder') {
   // 0 seco, 1 chuva: a água para nas trilhas de roda, nos remendos e em poças.
   const wetness = { value: 0 };
+  // Asfalto gasto gerado (r30) em escala larga: manchas e desbote que mudam ao
+  // longo da pista, quebrando a repetição de 8 m do mapa de detalhe.
+  const wornMap = kind === 'asphalt' && typeof document !== 'undefined' ? new THREE.TextureLoader().load('/sompo/gen/r30-asphalt-worn.webp') : null;
+  if (wornMap) { wornMap.colorSpace = THREE.SRGBColorSpace; wornMap.wrapS = wornMap.wrapT = THREE.RepeatWrapping; }
   const compile = material.onBeforeCompile;
   const baseKey = material.customProgramCacheKey();
   material.onBeforeCompile = (shader, renderer) => {
     compile.call(material, shader, renderer);
     shader.uniforms.roadWetness = wetness;
-    shader.fragmentShader = 'uniform float roadWetness;\n' + shader.fragmentShader;
+    shader.uniforms.roadWorn = { value: wornMap };
+    shader.fragmentShader = 'uniform float roadWetness;\nuniform sampler2D roadWorn;\n' + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', kind === 'asphalt' ? `#include <color_fragment>
       float laneOffset = ruralWorld.z - (ruralWorld.z > -2.05 ? 0.0 : -4.1);
       float wheelTrack = exp(-pow((abs(laneOffset) - .98) / .3, 2.0)) * (.6 + .4 * ruralNoise(vec2(ruralWorld.x * .35, ruralWorld.z * 3.0)));
       diffuseColor.rgb *= 1.0 - wheelTrack * .14;
+      ${wornMap ? 'vec3 worn = texture2D(roadWorn, ruralWorld.xz / vec2(11.0, 6.0)).rgb; diffuseColor.rgb *= mix(1.0, dot(worn, vec3(.33)) / .135, .85);' : ''}
       vec2 patchSpace = vec2(ruralWorld.x / 17.0, (ruralWorld.z + 6.15) / 4.1);
       vec2 patchCell = floor(patchSpace), patchUv = fract(patchSpace);
       vec2 patchLo = vec2(.12 + .3 * ruralHash(patchCell + 1.1), .1 + .25 * ruralHash(patchCell + 2.3));
@@ -69,7 +75,7 @@ export function wearSompoRoad(material: THREE.MeshStandardMaterial, kind: 'aspha
       roughnessFactor = mix(roughnessFactor, .05, roadPuddle);` : `#include <roughnessmap_fragment>
       roughnessFactor = mix(roughnessFactor, .72, packedTrack * .4);`);
   };
-  material.customProgramCacheKey = () => `${baseKey}-road-wear-v2-${kind}`;
+  material.customProgramCacheKey = () => `${baseKey}-road-wear-v3-${kind}-${!!wornMap}`;
   return { wetness };
 }
 

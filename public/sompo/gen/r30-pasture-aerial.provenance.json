@@ -1,0 +1,7 @@
+{
+  "generator": "Grok Imagine (grok-imagine-image-2.0) via Grok CLI login, 2026-09-22",
+  "sourceFile": "pasture-2.jpg",
+  "processing": "scripts/sompo/make-seamless.py (half-shift cross blend)",
+  "sha256": "233b0b747cb3459b888d33454aaece82b9ee417b015e26789b9e3feb8be9a54c",
+  "usage": "Pasture terrain albedo at 36 m and 83 m scale (createSompoPastureSurface)"
+}
