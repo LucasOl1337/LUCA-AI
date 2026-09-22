@@ -127,7 +127,7 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
   let intact: Float32Array | undefined; let originalChildren: boolean[] = []; let lastDamage = -1;
   let anchors: THREE.Vector3[] = []; let front = new THREE.Vector3(3.28, 0.46, 1.02);
   const origins = new Map<string, THREE.Vector3>();
-  let previousTime = -1; let previousScenario = ''; let lampSkin: unknown = null;
+  let previousTime = -1; let previousScenario = ''; let lampSkin: unknown = null; let skinActive = false;
   function refreshModel() {
     if (asset === model.root.userData.asset && anchors.length) return;
     asset = model.root.userData.asset;
@@ -151,7 +151,9 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
   function worldOrigin(style: ParticleStyle, i: number) {
     if (style.origin === 'wheels') point.copy(anchors[i % anchors.length]);
     else if (style.origin === 'front-wheel') point.copy(front);
-    else if (style.origin === 'engine') point.set(3.65, 1.05, 0.72);
+    // Cara-chata: motor sob a cabine; fumaça sai pelo vão entre a roda dianteira
+    // e o tanque, por fora da carroceria (no bicudo sai pelo capô).
+    else if (style.origin === 'engine') { if (skinActive) point.set(2.7 + (i % 3) * .12, 0.7, 1.22); else point.set(3.65, 1.05, 0.72); }
     else if (style.origin === 'exhaust') point.set(1.5, 0.68, -0.85);
     else if (style.origin === 'impact-rear') point.set(-4.4, 0.6, (i % 2 ? 1 : -1) * 0.6);
     else point.set(3.6, 0.6, 0.6);
@@ -186,7 +188,10 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
       refreshModel(); root.visible = attachments.visible = true;
       if (lampSkin !== model.root.userData.visualAsset) {
         lampSkin = model.root.userData.visualAsset;
-        for (const lamp of lamps) lamp.mesh.position.copy(lampSkin === 'AstraSompoTruck' ? lamp.skin : lamp.rig);
+        skinActive = lampSkin === 'AstraSompoTruck';
+        for (const lamp of lamps) lamp.mesh.position.copy(skinActive ? lamp.skin : lamp.rig);
+        if (skinActive) { fireLight.position.set(2.75, 0.8, 1.35); engineGlow.position.set(2.75, 0.72, 0); engineGlow.scale.set(1.3, 1.1, 1.55); }
+        else { fireLight.position.set(3.7, 1.15, 0.8); engineGlow.position.set(3.8, 0.9, 0); engineGlow.scale.set(1, 1, 1); }
       }
       const runKey = `${scenarioId} ${outcomeKey}`;
       if (runKey !== previousScenario || elapsed < previousTime) origins.clear();
@@ -248,7 +253,9 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
       const fire = intensity('engine-fire');
       flames.mesh.visible = fire > 0;
       for (let i = 0; i < 9 && fire > 0; i += 1) {
-        point.set(3.55 + rand(i) * 0.55, 1.0 + rand(i + 10) * 0.22, 0.60 + rand(i + 20) * 0.45); model.root.localToWorld(point);
+        if (skinActive) point.set(2.5 + rand(i) * 0.6, 0.55 + rand(i + 10) * 0.3, 1.1 + rand(i + 20) * 0.22);
+        else point.set(3.55 + rand(i) * 0.55, 1.0 + rand(i + 10) * 0.22, 0.60 + rand(i + 20) * 0.45);
+        model.root.localToWorld(point);
         const pulse = 0.8 + Math.sin(clock * (8 + rand(i) * 7) + i) * 0.15;
         transform.position.copy(point); transform.position.y += fire * pulse * 0.42; transform.quaternion.copy(cameraRotation);
         transform.scale.set(0.34 * pulse * fire, (0.7 + rand(i + 3) * 0.9) * fire * pulse, 1); transform.updateMatrix(); flames.mesh.setMatrixAt(i, transform.matrix);
