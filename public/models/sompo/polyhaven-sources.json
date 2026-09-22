@@ -134,25 +134,25 @@
   "runtime": [
     {
       "file": "ph-jacaranda-near.glb",
-      "sha256": "396c0e460447ad6ac55ae05cbb0348ef45a0b66fba989384033f33713bba7468",
+      "sha256": "e573c06d953063f82c77d6b910989fffba009dbac562177c89f03e286d3c4151",
       "bytes": 12380412,
       "triangles": 200450
     },
     {
       "file": "ph-jacaranda-far.glb",
-      "sha256": "7e628e4e2257911419cc55db16fd178895fd509f16c34c634d3c0bea1991c4f0",
+      "sha256": "c79c069326afb40f698a79fef5b0d52c7f04bc1dd32e4e95dd80b5e0b00437d2",
       "bytes": 3701968,
       "triangles": 59896
     },
     {
       "file": "ph-grass_bermuda_01-0.glb",
-      "sha256": "be61f1375fa4725842d1d830cd390e728cb2e26bfec0aec6b834cbd53ec57051",
+      "sha256": "61fb3ad98fd208c02730c675d95ee5c50028214be25c36efab35334201afe92e",
       "bytes": 14804,
       "triangles": 356
     },
     {
       "file": "ph-shrub_02-0.glb",
-      "sha256": "012b8d4b57513dcceca4d11fb4c053bdd82da06070b11652d1018482e80eada1",
+      "sha256": "64a5dc7f4f7d9fd6185288c5b4f3756eac93483cde97ac6ba31f5726205a3d52",
       "bytes": 132616,
       "triangles": 4670
     }

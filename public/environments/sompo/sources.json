@@ -159,6 +159,36 @@
         2048,
         2048
       ]
+    },
+    {
+      "file": "grass-color-2k.jpg",
+      "derivedFrom": "grass-color.jpg",
+      "encoding": "Lanczos 4096->2048, JPEG q90 for delivery; repeated ~100x on the road terrain",
+      "sha256": "6eee31ccd846ff8b73b8242c1d689ebfb977d783b98f1f6aaab266da44b2a8d6",
+      "dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "file": "grass-normal-2k.jpg",
+      "derivedFrom": "grass-normal.jpg",
+      "encoding": "Lanczos 4096->2048, JPEG q85 for delivery; repeated ~100x on the road terrain",
+      "sha256": "461b8b9beb4bfde5b4a8265f977a049a55b1a256f138b1a7d26ecf096d05d9ac",
+      "dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "file": "grass-arm-2k.jpg",
+      "derivedFrom": "grass-arm.jpg",
+      "encoding": "Lanczos 4096->2048, JPEG q90 for delivery; repeated ~100x on the road terrain",
+      "sha256": "8fc442e3eaa3feb9f8f143583c0c278ed1ad6ea6324bcf4b3ddfeba1fdfecd5b",
+      "dimensions": [
+        2048,
+        2048
+      ]
     }
   ],
   "vegetationSource": {

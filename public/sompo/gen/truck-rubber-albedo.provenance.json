@@ -2,5 +2,6 @@
   "generator": "built-in image_gen",
   "source": "/home/lol/.codex/generated_images/01a0aa39-b468-7061-a25b-f9e14ee51983/exec-1c76ce9f-28cb-4b28-b23d-043df7fb2d53.png",
   "prompt": "Use case: photorealistic-natural. Asset type: seamless albedo texture for the black rubber surfaces of truck tires in a real-time 3D rural simulator. Generate a square, orthographic flat material scan, filling the entire image with moderately used dark charcoal vulcanized tire rubber. Very fine pebbled grain, slight rubbed patches, faint hairline scratches and restrained dusty grey-brown residue in microscopic pores. Even neutral diffuse lighting without baked highlights, shadows, gradients or perspective. This is only the base material microtexture, not a tire photograph or a tread-pattern diagram: no wheel, no circular forms, no deep grooves, no letters, no branding, no border. Seamlessly tileable on both axes. Keep average color dark charcoal but retain realistic visible subtle variation; never pure black. Matte physical rubber suitable for close camera views.",
-  "usage": "Diffuse tire material microtexture; generated bitmap copied unchanged. Geometry and lighting are rendered by the simulator."
+  "usage": "Diffuse tire material microtexture; generated bitmap copied unchanged. Geometry and lighting are rendered by the simulator.",
+  "delivery": "truck-rubber-albedo.jpg: JPEG q90 of the unchanged PNG, same 1254x1254 pixels; the PNG stays as the source."
 }

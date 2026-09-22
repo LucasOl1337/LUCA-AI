@@ -52,7 +52,7 @@ export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE
     surface(material: THREE.MeshStandardMaterial, surface: Surface, repeatX: number, repeatY: number, options: { keepMap?: boolean; normalScale?: number } = {}) {
       let pending = surfaces.get(surface);
       if (!pending) {
-        const size = surface === 'wood' || surface === 'grass' ? '' : '-2k';
+        const size = surface === 'wood' ? '' : '-2k';
         pending = Promise.all(['color', 'normal', 'arm'].map((channel) => loader.loadAsync(`${ASSET_ROOT}${surface}-${channel}${size}.jpg`).then(retain)));
         surfaces.set(surface, pending);
       }

@@ -100,8 +100,8 @@ function assignVisualMaps(root: THREE.Object3D, isDisposed: () => boolean) {
       });
     });
   };
-  paint('/sompo/gen/reefer-painted-albedo.png', ['Painéis do baú']);
-  loader.load('/sompo/gen/truck-rubber-albedo.png', map => {
+  paint('/sompo/gen/reefer-painted-albedo.jpg', ['Painéis do baú']);
+  loader.load('/sompo/gen/truck-rubber-albedo.jpg', map => {
     if (isDisposed()) { map.dispose(); return; }
     map.colorSpace = THREE.SRGBColorSpace;
     map.wrapS = map.wrapT = THREE.RepeatWrapping;
