@@ -4366,14 +4366,17 @@ app.use('/icons', express.static(path.resolve(process.cwd(), 'public', 'icons'))
 app.use('/datasets', express.static(path.resolve(process.cwd(), 'datasets')));
 
 if (fs.existsSync(indexPath)) {
-  app.use(express.static(distPath));
+  // redirect:false evita que /sompo (pasta de imagens em dist/) vire 301 para /sompo/
+  // e coma a rota da SPA. sendFile com { root } é obrigatório no Express 5: o *splat
+  // faz o send absoluto resolver o path da URL e devolver 404 em /luca-ai etc.
+  app.use(express.static(distPath, { redirect: false }));
   app.get('*splat', (_req, res) => {
-    res.sendFile(indexPath);
+    res.sendFile('index.html', { root: distPath });
   });
 } else if (fs.existsSync(v2IndexPath)) {
-  app.use(express.static(v2DesignPath));
+  app.use(express.static(v2DesignPath, { redirect: false }));
   app.get('*splat', (_req, res) => {
-    res.sendFile(v2IndexPath);
+    res.sendFile('index.html', { root: v2DesignPath });
   });
 }
 
