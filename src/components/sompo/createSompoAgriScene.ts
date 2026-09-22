@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createSompoCropRows } from './createSompoCropRows';
 import { geofenceFieldRelief, geofenceOperacaoRelief } from '../../../shared/geofencing/index.js'; // geofencing: relevo dos talhões sintéticos
 import { grassTuftGeometry, varySompoSurface } from './createSompoRoadDetails';
@@ -177,62 +178,143 @@ function createGroundFog() {
   return { root, layers };
 }
 
-/** Galpão de máquinas com o lado da câmera aberto: pilares e telhado sem
- * parede, para a manobra continuar visível quando o trator entra de ré.
+/** UV em metros para BoxGeometry: uma textura com repeat 1 cobre `tile` metros
+ * em qualquer face, e as nervuras ficam na mesma escala em todas as chapas. */
+function tileBoxUv(geometry: THREE.BoxGeometry, tile: number) {
+  const { width: w, height: h, depth: d } = geometry.parameters;
+  const spans: [number, number][] = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
+  const uv = geometry.attributes.uv;
+  for (let face = 0; face < 6; face++) for (let i = face * 4; i < face * 4 + 4; i++) {
+    uv.setXY(i, uv.getX(i) * spans[face][0] / tile, uv.getY(i) * spans[face][1] / tile);
+  }
+  uv.needsUpdate = true;
+  return geometry;
+}
+
+/** Galpão de máquinas com o lado da câmera aberto: pilares, tesouras e
+ * telhado de duas águas em zinco, sem parede, para a manobra continuar
+ * visível quando o trator entra de ré. Tapume de chapa nervurada pintada,
+ * acabamento branco e porta de correr aberta ao lado do vão.
  * Eixo local: -x é a fachada da porta (virada para +x mundo após o giro do
- * palco), +z é a parede do fundo (longe da câmera). */
+ * palco), +z é a parede do fundo (longe da câmera). A planta (paredes,
+ * vão de 5 m e pilar de balanço) é a mesma usada pela física da manobra. */
 function createBarn() {
   const root = new THREE.Group();
   root.name = 'sompo-agri-barn';
   root.position.set(4, 0, 0);
   const steel = new THREE.MeshStandardMaterial({ color: 0x4d5556, metalness: 0.62, roughness: 0.52 });
-  const siding = new THREE.MeshStandardMaterial({ color: 0x8c3d2d, metalness: 0.28, roughness: 0.72 });
-  const roof = new THREE.MeshStandardMaterial({ color: 0x8d9895, metalness: 0.72, roughness: 0.42 });
+  const siding = new THREE.MeshStandardMaterial({ color: 0xa8402c, metalness: 0.18, roughness: 0.6, side: THREE.DoubleSide });
+  const roof = new THREE.MeshStandardMaterial({ color: 0xa3aba8, metalness: 0.7, roughness: 0.4 });
+  const trim = new THREE.MeshStandardMaterial({ color: 0xe6e1d3, metalness: 0.08, roughness: 0.62 });
   const timber = new THREE.MeshStandardMaterial({ color: 0x6b5138, metalness: 0.05, roughness: 0.85 });
   const straw = new THREE.MeshStandardMaterial({ color: 0xa98f4e, roughness: 0.95 });
   const floorMat = new THREE.MeshStandardMaterial({ color: 0x5c4a33, roughness: 1 });
-  const D = 6, W = 5.5, H = 5.1;
+  const concrete = new THREE.MeshStandardMaterial({ color: 0x9a968c, roughness: 0.92 });
+  if (typeof document !== 'undefined' && typeof document.createElementNS === 'function') {
+    const loader = new THREE.TextureLoader();
+    // Chapa branca nervurada do baú girada 90°: nervura vertical tingida pelo vermelho do tapume.
+    loader.load('/sompo/gen/r10-corrugation.webp', map => {
+      map.colorSpace = THREE.SRGBColorSpace; map.wrapS = map.wrapT = THREE.RepeatWrapping;
+      map.center.set(0.5, 0.5); map.rotation = Math.PI / 2; map.anisotropy = 8;
+      siding.map = map; siding.bumpMap = map; siding.bumpScale = 2.2; siding.needsUpdate = true;
+    });
+    // Zinco galvanizado do silo: nervuras descendo a água do telhado.
+    loader.load('/sompo/gen/metal-silo.webp', map => {
+      map.colorSpace = THREE.SRGBColorSpace; map.wrapS = map.wrapT = THREE.RepeatWrapping; map.anisotropy = 8;
+      roof.map = map; roof.bumpMap = map; roof.bumpScale = 1.6; roof.color.set(0xe2e6e4); roof.needsUpdate = true;
+    });
+  }
+  const TILE = 3;
+  const box = (w: number, h: number, d: number, material: THREE.Material, x: number, y: number, z: number, shadow = true) => {
+    const mesh = new THREE.Mesh(tileBoxUv(new THREE.BoxGeometry(w, h, d), TILE), material);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = shadow; mesh.receiveShadow = true;
+    root.add(mesh);
+    return mesh;
+  };
+  const D = 6, W = 5.5, H = 5.1, RISE = 1.7, EAVE = 0.55;
   // Lado -z (câmera): vão livre com pilares a cada 3 m e longarina no topo.
-  for (const x of [-6, -3, 0, 3, 6]) {
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.26, H, 0.26), steel);
-    post.position.set(x, H / 2, -W);
-    post.castShadow = true;
-    root.add(post);
-  }
-  const rail = new THREE.Mesh(new THREE.BoxGeometry(12.4, 0.22, 0.22), steel);
-  rail.position.set(0, H - 0.25, -W);
-  root.add(rail);
+  for (const x of [-6, -3, 0, 3, 6]) box(0.26, H, 0.26, steel, x, H / 2, -W);
+  box(12.4, 0.22, 0.22, steel, 0, H - 0.25, -W, false);
   // Lado +z: parede inteiriça, fundo da cena para a silhueta da máquina.
-  const farWall = new THREE.Mesh(new THREE.BoxGeometry(12.4, H, 0.18), siding);
-  farWall.position.set(0, H / 2, W);
-  farWall.castShadow = farWall.receiveShadow = true;
-  root.add(farWall);
+  box(12.4, H, 0.18, siding, 0, H / 2, W);
   // Fundo +x: parede inteiriça.
-  const back = new THREE.Mesh(new THREE.BoxGeometry(0.18, H, 11.2), siding);
-  back.position.set(D, H / 2, 0);
-  back.castShadow = back.receiveShadow = true;
-  root.add(back);
+  box(0.18, H, 11.2, siding, D, H / 2, 0);
   // Fachada -x: vão de 5 m entre as ombreiras; folga lateral mínima na entrada.
-  const entryA = new THREE.Mesh(new THREE.BoxGeometry(0.18, H, 4.0), siding);
-  entryA.position.set(-D, H / 2, -3.5);
-  entryA.castShadow = entryA.receiveShadow = true;
-  root.add(entryA);
-  const entryB = new THREE.Mesh(new THREE.BoxGeometry(0.18, H, 2.0), siding);
-  entryB.position.set(-D, H / 2, 4.5);
-  entryB.castShadow = entryB.receiveShadow = true;
-  root.add(entryB);
-  for (const z of [-1.5, 3.5]) {
-    const jamb = new THREE.Mesh(new THREE.BoxGeometry(0.3, H, 0.3), timber);
-    jamb.position.set(-D, H / 2, z);
-    jamb.castShadow = true;
-    root.add(jamb);
+  box(0.18, H, 4.0, siding, -D, H / 2, -3.5);
+  box(0.18, H, 2.0, siding, -D, H / 2, 4.5);
+  // Verga do vão: 4,3 m livres, acima da cabine com giroflex.
+  const DOOR_TOP = 4.3;
+  box(0.18, H - DOOR_TOP, 5.0, siding, -D, (H + DOOR_TOP) / 2, 1.0);
+  for (const z of [-1.5, 3.5]) box(0.3, DOOR_TOP, 0.3, timber, -D, DOOR_TOP / 2, z);
+  // Oitões: triângulo de tapume sob as duas águas nas fachadas ±x.
+  const gableShape = new THREE.Shape([new THREE.Vector2(-W, 0), new THREE.Vector2(W, 0), new THREE.Vector2(0, RISE)]);
+  const gableGeometry = new THREE.ShapeGeometry(gableShape);
+  const gableUv = gableGeometry.attributes.uv;
+  for (let i = 0; i < gableUv.count; i++) gableUv.setXY(i, gableUv.getX(i) / TILE, gableUv.getY(i) / TILE);
+  for (const x of [-D, D]) {
+    const gable = new THREE.Mesh(gableGeometry, siding);
+    gable.position.set(x, H, 0); gable.rotation.y = Math.PI / 2;
+    gable.castShadow = gable.receiveShadow = true;
+    root.add(gable);
   }
-  const roofMesh = new THREE.Mesh(new THREE.BoxGeometry(12.9, 0.18, 11.9), roof);
-  roofMesh.position.set(0, H + 0.02, 0);
-  roofMesh.rotation.z = -0.05;
-  roofMesh.castShadow = true;
-  root.add(roofMesh);
-  // Piso socado do galpão: mais escuro que o talhão ao redor.
+  // Duas águas com beiral: cumeeira em x, a água -z desce até a longarina do vão.
+  const pitch = Math.atan2(RISE, W);
+  const run = W + EAVE, slope = run / Math.cos(pitch);
+  for (const side of [-1, 1]) {
+    const panel = box(13.4, 0.07, slope, roof, 0, H + RISE - (run / 2) * Math.tan(pitch) + 0.06, side * run / 2);
+    panel.rotation.x = side * pitch;
+    // Rufo do beiral e calha no lado da câmera.
+    const fascia = box(13.4, 0.2, 0.06, trim, 0, H - EAVE * Math.tan(pitch) - 0.02, side * (run + 0.02), false);
+    if (side < 0) {
+      const gutter = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 13.4, 10, 1, true, 0, Math.PI), steel);
+      gutter.rotation.set(0, 0, Math.PI / 2); gutter.rotation.order = 'ZXY';
+      gutter.position.set(0, fascia.position.y - 0.1, fascia.position.z - 0.08);
+      root.add(gutter);
+      box(0.1, H - 0.2, 0.1, steel, D + 0.3, (H - 0.2) / 2, -run, false);
+    }
+  }
+  box(13.5, 0.14, 0.34, roof, 0, H + RISE + 0.1, 0);
+  // Tesouras sobre cada pilar: pernas na água e tirante na altura do beiral.
+  for (const x of [-4.5, -1.5, 1.5, 4.5]) {
+    for (const side of [-1, 1]) {
+      const leg = box(0.12, 0.2, W / Math.cos(pitch), steel, x, H + RISE / 2 - 0.08, side * W / 2, false);
+      leg.rotation.x = side * pitch;
+    }
+    box(0.1, 0.12, W * 2, steel, x, H - 0.06, 0, false);
+    box(0.09, RISE - 0.1, 0.09, steel, x, H + (RISE - 0.1) / 2, 0, false);
+  }
+  // Acabamento branco: cantoneiras, testeiras dos oitões e moldura do vão.
+  for (const [x, z] of [[-D, W], [D, W], [D, -W + 0.2], [-D, -W + 0.2]]) box(0.24, H, 0.24, trim, x, H / 2, z, false);
+  for (const x of [-D - 0.1, D + 0.1]) for (const side of [-1, 1]) {
+    const rake = box(0.1, 0.22, run / Math.cos(pitch), trim, x, H + RISE - (run / 2) * Math.tan(pitch) - 0.02, side * run / 2, false);
+    rake.rotation.x = side * pitch;
+  }
+  box(0.08, 0.22, 5.6, trim, -D - 0.12, DOOR_TOP + 0.11, 1.0, false);
+  // Porta de correr aberta sobre a ombreira -z, no trilho acima do vão.
+  box(0.08, 0.14, 9.4, steel, -D - 0.2, DOOR_TOP + 0.34, -0.8, false);
+  const door = new THREE.Group();
+  door.position.set(-D - 0.26, 0, -3.35);
+  root.add(door);
+  const doorPanel = new THREE.Mesh(tileBoxUv(new THREE.BoxGeometry(0.08, DOOR_TOP - 0.1, 3.3), TILE), siding);
+  doorPanel.position.y = (DOOR_TOP - 0.1) / 2 + 0.06;
+  doorPanel.castShadow = doorPanel.receiveShadow = true;
+  door.add(doorPanel);
+  const doorSpan = Math.hypot(DOOR_TOP - 0.5, 3.0);
+  for (const [y, z, w, h, angle] of [
+    [0.2, 0, 0.16, 3.3, 0], [DOOR_TOP - 0.24, 0, 0.16, 3.3, 0], [DOOR_TOP / 2, 1.57, DOOR_TOP - 0.2, 0.16, 0], [DOOR_TOP / 2, -1.57, DOOR_TOP - 0.2, 0.16, 0],
+    [DOOR_TOP / 2, 0, 0.14, doorSpan, Math.atan2(DOOR_TOP - 0.5, 3.0)], [DOOR_TOP / 2, 0, 0.14, doorSpan, -Math.atan2(DOOR_TOP - 0.5, 3.0)],
+  ] as [number, number, number, number, number][]) {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.05, w, h), trim);
+    bar.position.set(-0.06, y, z); bar.rotation.x = angle;
+    door.add(bar);
+  }
+  // Calçada de concreto na boca do vão e piso socado do galpão.
+  const apron = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 6.2), concrete);
+  apron.rotation.x = -Math.PI / 2;
+  apron.position.set(-D - 1.6, 0.05, 1.0);
+  apron.receiveShadow = true;
+  root.add(apron);
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(12.2, 11.2), floorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = 0.04;
@@ -251,6 +333,31 @@ function createBarn() {
     drum.position.set(bx, 0.46, bz);
     drum.castShadow = true;
     root.add(drum);
+  }
+  // Chapas, perfis e acabamento estáticos viram uma malha por material e
+  // sombra; a porta e o pilar de balanço continuam objetos próprios.
+  root.updateMatrixWorld(true);
+  const inverse = root.matrixWorld.clone().invert();
+  const buckets = new Map<string, { material: THREE.Material; shadow: boolean; parts: THREE.BufferGeometry[] }>();
+  const sources = new Set<THREE.BufferGeometry>();
+  for (const mesh of root.children.filter((node): node is THREE.Mesh => node instanceof THREE.Mesh && node.geometry.attributes.uv !== undefined)) {
+    const key = `${mesh.material instanceof THREE.Material ? mesh.material.uuid : ''}:${mesh.castShadow}`;
+    const bucket = buckets.get(key) ?? { material: mesh.material as THREE.Material, shadow: mesh.castShadow, parts: [] };
+    const part = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
+    part.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inverse, mesh.matrixWorld));
+    for (const name of Object.keys(part.attributes)) if (!['position', 'normal', 'uv'].includes(name)) part.deleteAttribute(name);
+    bucket.parts.push(part); buckets.set(key, bucket);
+    sources.add(mesh.geometry);
+    mesh.removeFromParent();
+  }
+  for (const geometry of sources) geometry.dispose();
+  for (const { material, shadow, parts } of buckets.values()) {
+    const merged = mergeGeometries(parts);
+    for (const part of parts) part.dispose();
+    if (!merged) continue;
+    const mesh = new THREE.Mesh(merged, material);
+    mesh.castShadow = shadow; mesh.receiveShadow = true;
+    root.add(mesh);
   }
   // Pilar de balanço interno: o palco posiciona no ponto onde a ponta do
   // implemento varre; no desfecho de contato é nele que a máquina engancha.
