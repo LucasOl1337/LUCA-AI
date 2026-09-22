@@ -1,0 +1,9 @@
+{
+  "asset": "reefer-side-grime.jpg",
+  "generatedAt": "2026-09-22",
+  "generator": "Grok Imagine (grok-imagine image, via LUCA-AI-vigilia-3d/.scratch/vigilia-3d/grokimg.py, AR 16:9)",
+  "prompt": "Orthographic flat texture scan, edge to edge, of the entire side wall of a white refrigerated truck box body (fiberglass sandwich panel), perfectly flat and evenly lit, no perspective, no shadows, no highlights. Off-white paint with very subtle grain. Faint thin vertical grey rain streaks running down from the top edge, light reddish-brown road dust and grime gradient concentrated in the bottom quarter, tiny mud specks near the bottom, a working truck on Brazilian rural roads but maintained. Absolutely no seams, no rivets, no rails, no logos, no letters, no objects, no background.",
+  "role": "Diffuse albedo of the whole box side, mapped once (unrepeated, clamp) across each side skin; the rear doors sample a central strip. Panel seams, rails and tape are geometry.",
+  "processing": "1280x720 source. White point rebalanced from the warm generated off-white (median 242,238,227) to a cool white (228,236,244); deviations from white (streaks, dust) scaled by 0.55 and 40% desaturated toward luminance. JPEG q88.",
+  "limitations": "Generated image, 1280x720; not a measured material. Dust gradient is fixed in the texture and combines with the runtime height-based film in refineSompoTruck."
+}

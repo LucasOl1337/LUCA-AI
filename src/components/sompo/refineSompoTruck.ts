@@ -272,6 +272,9 @@ export function refineSompoTruck(model: SompoTruckModel) {
         for (const wheel of model.wheels) wheel.traverse(node => { const mesh = node as THREE.Mesh; if (mesh.isMesh && !Array.isArray(mesh.material) && polished(mesh.material)) mesh.material = wheelSteel; });
         for (const node of chassis.children) { const mesh = node as THREE.Mesh; if (mesh.isMesh && !Array.isArray(mesh.material) && polished(mesh.material)) mesh.material = darkSteel; }
         for (const material of [wheelSteel, darkSteel]) { materials.add(material); wearTruck(material); }
+        // O defletor de teto da cara-chata sobe até 3,7 m: a etiqueta do sensor
+        // passa para cima dele em vez de ser cortada pela carenagem.
+        sensorLabel?.position.set(-2.2, 6.5, 0);
       }
       for (const [name, assembly] of replacements) {
         for (const child of assembly.children) child.visible = false;

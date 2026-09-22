@@ -55,37 +55,37 @@ def glass_mat(name):
 
 # Nomes são contrato com refineSompoTruck (cor da pintura, textura do baú, película).
 paint = mat('Pintura da cabine', (.008, .017, .05), .42, .22, coat=.82)
-trim = mat('Astra cab trim', (.035, .037, .04), .1, .55)            # faixa do para-brisa, para-sol
+trim = mat('Astra cab trim', (.07, .075, .08), .15, .5)            # faixa do para-brisa, para-sol
 bumper_grey = mat('Astra bumper plastic', (.20, .205, .21), .05, .62)
 black = mat('Astra black plastic', (.018, .019, .021), .04, .7)
 rubber = mat('Astra rubber seals', (.009, .012, .016), .05, .78)
 glass = glass_mat('Astra cabin glass')
 mirror = mat('Astra mirror glass', (.18, .22, .24), .88, .05)
-grille_face = mat('Astra grille face', (.16, .17, .18), .6, .34)
+grille_face = mat('Astra grille face', (.30, .31, .32), .65, .3)
 recess = mat('Astra grille recess', (.008, .009, .01), .1, .8)
 chrome = mat('Astra polished chrome', (.60, .62, .64), .9, .3)      # inox fosco: travas, dobradiças
 lamp = mat('Astra headlight', (.92, .92, .88), .1, .12, .35)
-reflector = mat('Astra lamp reflector', (.75, .77, .8), .95, .12)
+reflector = chrome
 amber = mat('Astra amber marker', (.85, .32, .02), .1, .25, .35)
-tail = mat('Astra tail lamp', (.55, .02, .02), .1, .22, .25)
-reverse = mat('Astra reverse lens', (.82, .82, .8), .05, .2)
-red = mat('Astra red reflector', (.62, .03, .03), .15, .32)
+red = mat('Astra red reflector', (.62, .03, .03), .15, .3)
+tail = red
 white_tape = mat('Astra white reflector', (.86, .87, .86), .2, .3)
+reverse = white_tape
 interior = mat('Astra cabin interior', (.04, .042, .045), 0, .9)
 seat = mat('Astra cabin seats', (.05, .052, .055), .02, .85)
 letter = mat('SOMPO painted metal', (.008, .017, .05), .3, .35)
 shell = mat('Astra box shell', (.84, .84, .80), .1, .5)
 panel = mat('Painéis do baú', (.9, .9, .87), .02, .48)
 alloy = mat('Alumínio do baú', (.62, .64, .66), .8, .32)
-seam = mat('Astra box seam', (.55, .56, .57), .3, .5)
-reefer_dark = mat('Astra reefer grille', (.03, .033, .036), .2, .6)
+seam = alloy
+reefer_dark = recess
 chassis_black = mat('Astra chassis black', (.022, .024, .026), .45, .55)
 tank_alu = mat('Astra tank aluminium', (.66, .68, .7), .85, .28)
 flap = mat('Astra mudflap rubber', (.012, .012, .013), 0, .9)
-plate_mat = mat('Astra plate', (.86, .87, .88), .1, .4)
-plate_blue = mat('Astra plate band', (.02, .08, .38), .1, .4)
-plate_ink = mat('Astra plate ink', (.02, .02, .025), .1, .5)
-steel = mat('Astra wheel steel', (.55, .56, .57), .55, .42)
+plate_mat = white_tape
+plate_blue = letter
+plate_ink = recess
+steel = tank_alu
 tire_mat = mat('Sompo tire rubber', (.03, .033, .036), 0, .92)
 
 parts = {}
@@ -366,7 +366,7 @@ def front_plate(n, y0, y1, half, m, proud=.004, thick=.012, b=.004):
     profile(n, poly, -half, half, m, b, 2)
 
 front_plate('astra-windscreen-band', 1.92, WIN_Y[0] + .01, W - .12, trim, .006)
-front_plate('astra-grille-frame', 1.36, 1.84, W - .12, black, .012)
+front_plate('astra-grille-frame', 1.38, 1.82, .86, black, .012)
 front_plate('astra-grille-back', 1.40, 1.80, .78, recess, .016)
 for i in range(4):
     y = 1.44 + i * .095

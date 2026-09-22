@@ -1,11 +1,21 @@
 {
   "asset": "astra-sompo-truck.glb",
-  "createdAt": "2026-09-18",
+  "createdAt": "2026-09-22",
   "generator": "Blender 5.2; scripts/sompo/build-astra-truck.py",
-  "sha256": "863e4b7115f800750197d9bfbaf56aa7baf7adf8a34f61b387beb9d22da301eb",
-  "geometry": "Original scripted truck skin, swept hollow greenhouse with optical panes, compound-curved hood, curved steer-axle fenders, horizontal grille, shallow reefer corrugation and cabin interior.",
+  "sha256": "411aa6ebf0a127e8777d40cd522d86821fb42899d13ae634a707257497351949",
+  "geometry": "Original scripted skin of a generic Brazilian cab-over 6x2 rigid truck (Constellation/Atego class) with refrigerated box. Groups astra-cab, astra-cargo and optional astra-chassis. No manufacturer logos; the only brand is the SOMPO wordmark. Metres, +X forward, +Y up.",
+  "references": {
+    "tool": "Grok Imagine (grok-imagine image, via .scratch/vigilia-3d/grokimg.py), used only as proportion/detail references, not shipped",
+    "generatedAt": "2026-09-22",
+    "prompts": [
+      "Rear three-quarter photo of a Brazilian cab-over 6x2 rigid truck (VW Constellation 24.280 class) with white refrigerated box, rear double doors with four stainless lock bars, tail lights, striped underrun bumper, mudflaps, side guards, Mercosul plate, rural road, no logos",
+      "Front three-quarter photo of a generic Brazilian cab-over truck (Constellation/Atego), black horizontal grille, recessed headlights, sun visor, roof deflector, arm mirrors, steps, bumper with fog lights, reefer unit on the box front, red-soil rural road, no logos",
+      "Exact side view of a Brazilian 6x2 cab-over with refrigerated box, visible chassis with diesel tank, battery box, air tanks, spare wheel, side protection guards, tandem mudguards, red/white reflective tape, no logos",
+      "Close rear view of a white refrigerated box: two doors, four lock bars with cam handles, hinges, rubber seals, aluminium frame, striped rear bumper, tail light clusters, plate light, mudflaps"
+    ]
+  },
   "lightingData": "24-ray short-range hemispherical visibility baked to active vertex colour CavityAO. Runtime consumes the channel only for indirect illumination.",
-  "runtime": "Replaces cab/cargo skin only. Existing wheel pivots, travel, road contact and sensor aperture remain owned by the simulator rig.",
-  "textures": ["/sompo/gen/reefer-painted-albedo.png", "/sompo/gen/truck-rubber-albedo.png"],
-  "evaluation": "Experimental. Independent screenshot evaluation 6.0/10 against the current target. Not a claim of RDR2 fidelity."
+  "runtime": "Replaces cab/cargo skin and, when astra-chassis is present, the procedural chassis dress and toroidal fenders. Wheel pivots, suspension, road contact, ground support hull and the ESP32 sensor aperture (X=4.62) remain owned by the simulator rig.",
+  "textures": ["/sompo/gen/reefer-side-grime.jpg", "/sompo/gen/truck-rubber-albedo.jpg"],
+  "evaluation": "Experimental. Inspected in the /sompo preview (SwiftShader) at the default camera, rear 3/4, close rear, close front, failure scenarios and 390x844 mobile; screenshots in the vigil report, not a claim of photographic fidelity."
 }
