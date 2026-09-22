@@ -29,7 +29,10 @@ const inspect = process.env.SOMPO_PREVIEW_INSPECT === '1' ? [{ name: 'fixture-sc
 if (process.env.SOMPO_PREVIEW_SKIP_BUILD !== '1') await build({ absWorkingDir: repo, entryPoints: [`${repo}/scripts/sompo-preview/preview.tsx`], outfile: `${output}/preview.js`, bundle: true, format: 'esm', minify: true, plugins: inspect, define: { 'process.env.NODE_ENV': '"production"' }, alias: { '@': `${repo}/src` } });
 writeFileSync(`${output}/instrument.js`, readFileSync(`${repo}/scripts/sompo-preview/instrument.js`));
 writeFileSync(`${output}/index.html`, '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SOMPO · prévia isolada</title><link rel="stylesheet" href="/preview.css"><div id="root"></div><script src="/instrument.js"></script><script type="module" src="/preview.js"></script></html>');
-const csp = readFileSync(`${repo}/server/index.js`, 'utf8').match(/res\.setHeader\('Content-Security-Policy', "([^"]+)"\)/)?.[1];
+// First app-wide policy; it is a template literal parameterised by the vision worker exception.
+const csp = readFileSync(`${repo}/server/index.js`, 'utf8').match(/res\.setHeader\('Content-Security-Policy', [`"]([^`"]+)[`"]\)/)?.[1]
+  ?.replace('${scriptPolicy}', "'self'");
+if (csp?.includes('sandbox')) throw new Error('CSP match hit a sandbox policy');
 if (!csp) throw new Error('CSP missing');
 const types = { '.js':'text/javascript','.css':'text/css','.html':'text/html','.json':'application/json','.glb':'model/gltf-binary','.png':'image/png','.jpg':'image/jpeg','.webp':'image/webp' };
 createServer((req,res) => {
