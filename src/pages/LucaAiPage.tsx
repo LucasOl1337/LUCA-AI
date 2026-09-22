@@ -56,6 +56,7 @@ import {
   transcriptEntriesFromPersonaRun,
 } from '../../shared/persona-run-transcript.js';
 import CopyLogButton from '@/components/CopyLogButton';
+import { RichMessageBody } from '@/components/rich-message/RichMessageBody';
 import DashboardBlock from '@/components/DashboardBlock';
 import { useLuca } from '@/hooks/useLucaState';
 import {
@@ -174,19 +175,6 @@ export interface TeamTranscriptEntry {
   completedAt?: string;
   durationMs?: number;
   attachments?: LucaAiChatAttachment[];
-}
-
-type MessageBlock =
-  | { kind: 'heading'; label: string; level: number }
-  | { kind: 'bullet'; label?: string; body: string }
-  | { kind: 'paragraph'; label?: string; body: string }
-  | { kind: 'table'; headers: string[]; rows: string[][] }
-  | { kind: 'code'; language?: string; body: string }
-  | { kind: 'image'; alt: string; src: string };
-
-interface InlineTextPart {
-  text: string;
-  strong: boolean;
 }
 
 const WORKFLOW_ROLE_ICONS: Record<WorkflowRoleId, LucideIcon> = {
@@ -354,119 +342,6 @@ function mergeTranscriptEntries(
   return merged.slice(-140);
 }
 
-function stripOuterMarkdown(value: string): string {
-  return value
-    .replace(/^\s*\*\*(.+?)\*\*\s*$/g, '$1')
-    .replace(/^\s*__(.+?)__\s*$/g, '$1')
-    .trim();
-}
-
-function parseLabelledText(value: string): { label?: string; body: string } {
-  const text = value.trim();
-  const boldMatch = text.match(/^\*\*(.+?)\*\*:?\s*(.*)$/);
-  if (boldMatch) {
-    return {
-      label: stripOuterMarkdown(boldMatch[1]),
-      body: boldMatch[2].trim(),
-    };
-  }
-
-  const labelMatch = text.match(/^([^:]{2,48}):\s+(.+)$/);
-  if (labelMatch) {
-    return {
-      label: stripOuterMarkdown(labelMatch[1]),
-      body: labelMatch[2].trim(),
-    };
-  }
-
-  return { body: text };
-}
-
-function parseMessageBlocks(value: string): MessageBlock[] {
-  const lines = String(value || '').replace(/\r/g, '').split('\n');
-  const blocks: MessageBlock[] = [];
-  const markdownCells = (line: string) => line
-    .replace(/^\s*\|/, '')
-    .replace(/\|\s*$/, '')
-    .split('|')
-    .map((cell) => stripOuterMarkdown(cell.trim()));
-  const isTableDivider = (line: string) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line);
-
-  for (let index = 0; index < lines.length;) {
-    const line = lines[index].trim();
-    if (!line || /^[-*_]{3,}$/.test(line)) {
-      index += 1;
-      continue;
-    }
-
-    const codeStart = line.match(/^```([\w-]+)?\s*$/);
-    if (codeStart) {
-      const code: string[] = [];
-      index += 1;
-      while (index < lines.length && !/^```\s*$/.test(lines[index].trim())) {
-        code.push(lines[index]);
-        index += 1;
-      }
-      blocks.push({ kind: 'code', language: codeStart[1], body: code.join('\n') });
-      index += 1;
-      continue;
-    }
-
-    if (line.includes('|') && index + 1 < lines.length && isTableDivider(lines[index + 1])) {
-      const headers = markdownCells(line);
-      const rows: string[][] = [];
-      index += 2;
-      while (index < lines.length) {
-        const row = lines[index].trim();
-        if (!row || !row.includes('|')) break;
-        rows.push(markdownCells(row));
-        index += 1;
-      }
-      blocks.push({ kind: 'table', headers, rows });
-      continue;
-    }
-
-    const image = line.match(/^!\[([^\]]*)\]\((https?:\/\/[^\s)]+|\/[^\s)]+)\)$/i);
-    if (image) {
-      blocks.push({ kind: 'image', alt: image[1] || 'Imagem da entrega', src: image[2] });
-      index += 1;
-      continue;
-    }
-
-    const heading = line.match(/^(#{1,4})\s+(.+)$/);
-    if (heading) {
-      blocks.push({ kind: 'heading', label: stripOuterMarkdown(heading[2]), level: heading[1].length });
-      index += 1;
-      continue;
-    }
-
-    const bullet = line.match(/^(?:[-*]|•)\s+(.+)$/);
-    const ordered = line.match(/^(\d+)[.)]\s+(.+)$/);
-    const source = bullet ? bullet[1].trim() : ordered ? ordered[2].trim() : line;
-    const labelled = parseLabelledText(source);
-    const body = stripOuterMarkdown(labelled.body);
-
-    if (bullet || ordered) {
-      blocks.push({
-        kind: 'bullet',
-        label: ordered ? String(ordered[1]).padStart(2, '0') : labelled.label,
-        body: body || labelled.label || source,
-      });
-      index += 1;
-      continue;
-    }
-
-    if (labelled.label && !body) {
-      blocks.push({ kind: 'heading', label: labelled.label, level: 3 });
-    } else {
-      blocks.push({ kind: 'paragraph', label: labelled.label, body: body || source });
-    }
-    index += 1;
-  }
-
-  return blocks.length ? blocks : [{ kind: 'paragraph', body: 'Sem conteúdo textual.' }];
-}
-
 function createEmptyIndividualAssignments(): IndividualAssignments {
   return { participants: [], judge: null, visual: null, visualEnabled: false };
 }
@@ -485,27 +360,6 @@ function isTeamTranscriptEntry(value: unknown): value is TeamTranscriptEntry {
   if (!value || typeof value !== 'object') return false;
   const entry = value as TeamTranscriptEntry;
   return typeof entry.id === 'string' && typeof entry.content === 'string' && typeof entry.role === 'string';
-}
-
-function inlineTextParts(value: string): InlineTextPart[] {
-  const parts: InlineTextPart[] = [];
-  const pattern = /\*\*(.+?)\*\*/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(value)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push({ text: value.slice(lastIndex, match.index), strong: false });
-    }
-    parts.push({ text: match[1], strong: true });
-    lastIndex = match.index + match[0].length;
-  }
-
-  if (lastIndex < value.length) {
-    parts.push({ text: value.slice(lastIndex), strong: false });
-  }
-
-  return parts.length ? parts : [{ text: value, strong: false }];
 }
 
 function compactText(value: unknown, maxLength = 220): string {
@@ -4364,119 +4218,5 @@ function SpeakerAvatar({ entry, persona, compact = false }: { entry: TeamTranscr
     <div className={`${sizeClass} flex shrink-0 items-center justify-center rounded-full border`} style={{ background, borderColor: 'rgba(255,255,255,0.08)', color }}>
       <Icon className="h-3.5 w-3.5" />
     </div>
-  );
-}
-
-function RichMessageBody({ content, compact = false }: { content: string; compact?: boolean }) {
-  const theme = useTheme();
-  const blocks = parseMessageBlocks(content);
-
-  return (
-    <div
-      className={`luca-ai-prose luca-wrap ${compact ? 'text-[13px]' : ''}`}
-      style={{ color: theme.textSoft }}
-    >
-      {blocks.map((block, index) => {
-        if (block.kind === 'heading') {
-          const headingClass = block.level <= 1
-            ? 'text-[15px] font-semibold tracking-[-0.02em]'
-            : block.level === 2
-              ? 'text-[14.5px] font-semibold tracking-[-0.015em]'
-              : 'text-[13.5px] font-semibold';
-          return (
-            <h4 key={`${block.kind}-${index}`} className={`${headingClass} leading-snug luca-wrap`} style={{ color: theme.text }}>
-              <InlineText value={block.label} />
-            </h4>
-          );
-        }
-
-        if (block.kind === 'table') {
-          return (
-            <div key={`${block.kind}-${index}`} className="max-w-full overflow-x-auto rounded-xl border" style={{ borderColor: theme.border }}>
-              <table className="w-full min-w-[min(100%,480px)] border-collapse text-left text-xs sm:text-sm">
-                <thead style={{ background: theme.surfaceHi }}>
-                  <tr>{block.headers.map((header, cellIndex) => <th key={`${header}-${cellIndex}`} className="border-b px-3 py-2.5 font-semibold luca-wrap sm:px-4 sm:py-3" style={{ borderColor: theme.border, color: theme.text }}><InlineText value={header} /></th>)}</tr>
-                </thead>
-                <tbody>
-                  {block.rows.map((row, rowIndex) => (
-                    <tr key={`row-${rowIndex}`} className="border-b last:border-b-0" style={{ borderColor: theme.border }}>
-                      {block.headers.map((_, cellIndex) => <td key={`cell-${cellIndex}`} className="px-3 py-2.5 align-top luca-wrap sm:px-4 sm:py-3"><InlineText value={row[cellIndex] || '-'} /></td>)}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          );
-        }
-
-        if (block.kind === 'code') {
-          return (
-            <div key={`${block.kind}-${index}`} className="max-w-full overflow-hidden rounded-xl border" style={{ borderColor: theme.border, background: theme.console }}>
-              {block.language && <div className="border-b px-4 py-2 font-mono text-[10px] uppercase tracking-wider" style={{ borderColor: theme.border, color: theme.textGhost }}>{block.language}</div>}
-              <pre className="luca-pre overflow-x-auto p-4 font-mono text-xs leading-relaxed" style={{ color: theme.consoleText }}><code>{block.body}</code></pre>
-            </div>
-          );
-        }
-
-        if (block.kind === 'image') {
-          return (
-            <figure key={`${block.kind}-${index}`} className="max-w-full overflow-hidden rounded-xl border" style={{ borderColor: theme.border, background: theme.input }}>
-              <img src={block.src} alt={block.alt} className="max-h-[680px] w-full object-contain" />
-              {block.alt && <figcaption className="border-t px-4 py-2 text-xs luca-wrap" style={{ borderColor: theme.border, color: theme.textMute }}>{block.alt}</figcaption>}
-            </figure>
-          );
-        }
-
-        if (block.kind === 'bullet') {
-          return (
-            <div key={`${block.kind}-${index}`} className="luca-ai-bullet">
-              <span className="luca-ai-bullet-dot" style={{ background: theme.textMute }} />
-              <div className="min-w-0 flex-1">
-                {block.label && (
-                  <span className="font-semibold luca-wrap" style={{ color: theme.text }}>
-                    <InlineText value={block.label} />
-                    {block.body ? ': ' : ''}
-                  </span>
-                )}
-                {block.body ? (
-                  <span className="luca-wrap">
-                    <InlineText value={block.body} />
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          );
-        }
-
-        return (
-          <p key={`${block.kind}-${index}`} className="luca-wrap">
-            {block.label && (
-              <span className="font-semibold" style={{ color: theme.text }}>
-                <InlineText value={block.label} />
-                {' '}
-              </span>
-            )}
-            <InlineText value={block.body} />
-          </p>
-        );
-      })}
-    </div>
-  );
-}
-
-function InlineText({ value }: { value: string }) {
-  const theme = useTheme();
-  return (
-    <>
-      {inlineTextParts(value).map((part, index) => (
-        part.strong ? (
-          <strong key={`${part.text}-${index}`} style={{ color: theme.text }}>
-            {part.text}
-          </strong>
-        ) : (
-          <span key={`${part.text}-${index}`}>{part.text}</span>
-        )
-      ))}
-    </>
   );
 }
