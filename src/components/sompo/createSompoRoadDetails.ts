@@ -3,7 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { restoreSompoTextures, useSompoExternalTextures } from './restoreSompoTextures';
 import { disposeSompoObject } from './sompoStage';
-import { sompoTerrainHeight, sompoVegetationDensity } from './createSompoTerrain';
+import { sompoTerrainHeight, sompoVegetationDensity, sompoIsCornX, SOMPO_WORLD_PERIOD } from './createSompoTerrain';
 
 const rand = (i: number) => { const n = Math.sin(i * 127.1 + 21.7) * 43758.5453; return n - Math.floor(n); };
 
@@ -372,12 +372,28 @@ export function createSompoRoadDetails(parent: THREE.Group, camera?: THREE.Camer
       : new THREE.Color().setHSL(0.19 + rand(i + 305) * 0.055, 0.22 + rand(i + 308) * 0.1, 0.27 + rand(i + 306) * 0.13));
   }
   const clumpTrail = makeTrail(clumps, clumpSlots, 220, true, 0.05);
+  // Pasto do lado de lá nos vãos entre os talhões: touceiras onde não há milho.
+  const gapSlots: InstanceSlot[] = [];
+  for (let i = 0; gapSlots.length < 260 && i < 4000; i += 1) {
+    const x = rand(i + 1301) * SOMPO_WORLD_PERIOD - SOMPO_WORLD_PERIOD / 2;
+    if (sompoIsCornX(x, -2)) continue;
+    const z = -10.6 - rand(i + 1302) * 28;
+    const size = (0.8 + rand(i + 1303) * 1.2) * (0.55 + sompoVegetationDensity(x, z) * 0.8);
+    gapSlots.push({ x, z, rotation: rand(i + 1304) * Math.PI, scale: new THREE.Vector3(size, size * 1.05, size) });
+  }
+  const gapClumps = new THREE.InstancedMesh(clumps.geometry, clumpMaterial, gapSlots.length);
+  gapClumps.name = 'gap-pasture-clumps'; gapClumps.receiveShadow = true; root.add(gapClumps);
+  gapSlots.forEach((_, i) => gapClumps.setColorAt(i, rand(i + 1350) < 0.3
+    ? new THREE.Color().setHSL(0.115 + rand(i + 1305) * 0.02, 0.3 + rand(i + 1308) * 0.12, 0.3 + rand(i + 1306) * 0.1)
+    : new THREE.Color().setHSL(0.19 + rand(i + 1305) * 0.055, 0.22 + rand(i + 1308) * 0.1, 0.27 + rand(i + 1306) * 0.13)));
+  const gapTrail = makeTrail(gapClumps, gapSlots, SOMPO_WORLD_PERIOD, true, 0.05);
 
   // Arbustos: só o CC0 ph-shrub_02 da folhagem licenciada. Os icosaedros
   // amassados de cor sólida que ficavam aqui liam como pedra verde.
 
-  // Continuous cultivated rows across the full wrapping span. The former
-  // cols*spacing covered only ~150 of 240 metres, leaving a moving bare gap.
+  // Talhões de milho ancorados no mundo, no período da composição (480 m):
+  // entre eles o pasto com gado e a entrada do sítio. Cada fileira termina
+  // num ponto um pouco diferente (cabeceira serrilhada, não régua).
   const cropLeafMaterial = new THREE.MeshStandardMaterial({
     color: 0xf2f4e8, roughness: 0.78, side: THREE.DoubleSide, alphaTest: 0.38, alphaToCoverage: true,
   });
@@ -396,20 +412,26 @@ export function createSompoRoadDetails(parent: THREE.Group, camera?: THREE.Camer
     const dist = 8.4 + row * (row < 8 ? 1.12 : 1.02);
     const near = dist < 16.5;
     const farField = dist >= 26.4;
-    const cols = near ? 192 : farField ? 128 : 160;
-    const spacing = 240 / cols;
+    const cols = (near ? 192 : farField ? 128 : 160) * 2;
+    const spacing = SOMPO_WORLD_PERIOD / cols;
+    const ragged = (rand(row + 4071) - 0.5) * 5;
     for (let column = 0; column < cols; column += 1) {
-      const i = row * 320 + column;
+      const i = row * 640 + column;
+      if (!sompoIsCornX(column * spacing - SOMPO_WORLD_PERIOD / 2 + ragged)) continue;
       const z = -8.4 - row * (near ? 1.12 : 1.02) + (rand(i + 401) - 0.5) * (near ? 0.48 : 0.22);
       const nearFence = row < 4;
       if (nearFence && rand(i + 419) < 0.03) continue;
       if (near && !nearFence && rand(i + 419) < 0.05) continue;
       if (!near && !farField && rand(i + 419) < 0.04) continue;
       if (farField && rand(i + 419) < 0.08) continue;
-      const height = (near ? 2.12 : 1.92) + rand(i + 403) * (near ? 0.22 : 0.16);
+      // Manchas de lavoura mais alta e mais baixa (fertilidade, falha de plantio):
+      // a copa do talhão ondula em vez de ser uma régua de 2 m.
+      const px = column * spacing - SOMPO_WORLD_PERIOD / 2;
+      const vigour = 0.84 + 0.24 * (0.5 + 0.5 * Math.sin(px * 0.047 + 1.3) * Math.sin(px * 0.019 + row * 0.21));
+      const height = ((near ? 2.12 : 1.92) + rand(i + 403) * (near ? 0.22 : 0.16)) * vigour;
       const width = 0.86 + rand(i + 412) * 0.20;
       (near ? nearSlots : farSlots).push({
-        x: column * spacing - 120 + (rand(i + 402) - 0.5) * .35,
+        x: column * spacing - SOMPO_WORLD_PERIOD / 2 + (rand(i + 402) - 0.5) * .35,
         z,
         rotation: rand(i + 404) * Math.PI * 2,
         tilt: (rand(i + 407) - 0.5) * (near ? 0.08 : 0.06),
@@ -428,8 +450,8 @@ export function createSompoRoadDetails(parent: THREE.Group, camera?: THREE.Camer
   root.add(cropsNear, cropsFar);
   nearColors.forEach((color, index) => cropsNear.setColorAt(index, color));
   farColors.forEach((color, index) => cropsFar.setColorAt(index, color));
-  const cropNearTrail = makeTrail(cropsNear, nearSlots, 240, true, 0.04);
-  const cropFarTrail = makeTrail(cropsFar, farSlots, 240, true, 0.04);
+  const cropNearTrail = makeTrail(cropsNear, nearSlots, SOMPO_WORLD_PERIOD, true, 0.04);
+  const cropFarTrail = makeTrail(cropsFar, farSlots, SOMPO_WORLD_PERIOD, true, 0.04);
 
   // Near plants have independently curved leaves in 3D. Reuse each geometry
   // across the field; distant plants retain the lightweight photographic cutout.
@@ -484,7 +506,7 @@ export function createSompoRoadDetails(parent: THREE.Group, camera?: THREE.Camer
           root.add(plants);
           // The authored atlas already contains the leaf albedo; multiplying it
           // by a second dark green tint made the complete field nearly black.
-          const trail = camera ? makeCulledTrail(plants, nearSlots, 240, .025, camera, 4.5) : makeTrail(plants, nearSlots, 240, true, .025);
+          const trail = camera ? makeCulledTrail(plants, nearSlots, SOMPO_WORLD_PERIOD, .025, camera, 4.5) : makeTrail(plants, nearSlots, SOMPO_WORLD_PERIOD, true, .025);
           trail.update(latestTruckX);
           maizeTrails.push(trail);
         });
@@ -504,15 +526,19 @@ export function createSompoRoadDetails(parent: THREE.Group, camera?: THREE.Camer
       canopyMaterial.map = map; canopyMaterial.needsUpdate = true;
     });
   }
-  const canopy = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), canopyMaterial, 12);
-  canopy.name = 'astra-corn-canopy-cards'; canopy.receiveShadow = true; root.add(canopy);
   const canopySlots: InstanceSlot[] = [];
-  for (let i = 0; i < 12; i++) canopySlots.push({
-    x: (i % 4) * 22 - 88, z: -42 - Math.floor(i / 4) * 8.5,
-    y: 2.15, rotation: (rand(i + 901) - .5) * .4,
-    scale: new THREE.Vector3(1.7 + rand(i + 903) * .35, 3.4 + rand(i + 902) * .25, 1),
-  });
-  const canopyTrail = makeTrail(canopy, canopySlots, 240, false);
+  for (let i = 0; i < 66; i++) {
+    const x = (i % 22) * 22 - 236 + rand(i + 905) * 6;
+    if (!sompoIsCornX(x, 6)) continue;
+    canopySlots.push({
+      x, z: -42 - Math.floor(i / 22) * 8.5,
+      rotation: (rand(i + 901) - .5) * .4,
+      scale: new THREE.Vector3(1.7 + rand(i + 903) * .35, 3.4 + rand(i + 902) * .25, 1),
+    });
+  }
+  const canopy = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), canopyMaterial, canopySlots.length);
+  canopy.name = 'astra-corn-canopy-cards'; canopy.receiveShadow = true; root.add(canopy);
+  const canopyTrail = makeTrail(canopy, canopySlots, SOMPO_WORLD_PERIOD, true, -2.15);
 
   // Pedras e cupinzeiros de cerrado espalhados no pasto.
   const rocks = new THREE.InstancedMesh(
@@ -555,6 +581,7 @@ export function createSompoRoadDetails(parent: THREE.Group, camera?: THREE.Camer
       grassTrail.update(truckX);
       weedTrail.update(truckX);
       clumpTrail.update(truckX);
+      gapTrail.update(truckX);
       canopyTrail.update(truckX);
       cropNearTrail.update(truckX);
       cropFarTrail.update(truckX);

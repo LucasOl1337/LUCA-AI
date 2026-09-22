@@ -83,6 +83,10 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       // faz o verde das fileiras saltar, como na referência.
       ${field ? '' : `
       float fieldSoil = smoothstep(11.4, 14.5, -ruralWorld.z) * (1.0 - smoothstep(31.0, 36.0, -ruralWorld.z));
+      // Só onde há talhão (SOMPO_CORN_ZONES, período 480 m); no vão é pasto.
+      float cornPx = mod(ruralWorld.x + 240.0, 480.0) - 240.0;
+      fieldSoil *= smoothstep(-114.0, -106.0, cornPx) * (1.0 - smoothstep(16.0, 24.0, cornPx))
+        + smoothstep(106.0, 114.0, cornPx) + (1.0 - smoothstep(-174.0, -166.0, cornPx));
       vec3 tilled = mix(vec3(.28, .21, .125), texture2D(soilMap, ruralWorld.xz * .38).rgb * vec3(.82, .72, .62), soilReady);
       // Sombra de copa: sob milho denso o chão lê verde-escuro, não barro claro.
       vec3 canopyFloor = mix(tilled, texture2D(canopyMap, ruralWorld.xz * .14).rgb * vec3(.42, .5, .38), .55 * canopyReady);
@@ -142,6 +146,6 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       float cloudShade = smoothstep(.42, .7, ruralNoise(ruralWorld.xz / 46.0 + vec2(3.7, 11.2)) * .7 + ruralNoise(ruralWorld.xz / 17.0 + 5.1) * .3);
       reflectedLight.directDiffuse *= 1.0 - cloudShade * .55 * smoothstep(9.0, 30.0, abs(ruralWorld.z + 2.05));`);
   };
-  material.customProgramCacheKey = () => `sompo-pasture-albedo-v10-${field}`;
+  material.customProgramCacheKey = () => `sompo-pasture-albedo-v11-${field}`;
   return { dispose() { disposed = true; texture.dispose(); soilTexture.dispose(); bladeTexture.dispose(); aerialTexture.dispose(); if (field) tilledTexture.dispose(); else canopyTexture.dispose(); } };
 }
