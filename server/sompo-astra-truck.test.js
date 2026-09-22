@@ -35,12 +35,12 @@ test('Blender skin fits the existing rig and preserves spinning wheels and senso
   });
   assert.ok(bakedMeshes > 10 && aoMinimum < .4 && aoMaximum > .9, `AO range ${aoMinimum}..${aoMaximum}`);
   scene.updateMatrixWorld(true);
-  // Ray crosses each window opening without an opaque gasket sheet or photo card.
-  // The Blender cab now compresses its greenhouse above 2.1 m by 0.70;
-  // keep the probe inside the window, not at the lowered headliner height.
+  // Ray crosses both door windows of the cab-over (2.10–2.84 m, between the
+  // B-pillar and the raked A-pillar) above the seats and in front of the wheel,
+  // without meeting an opaque gasket sheet or photo card.
   for (const side of [-1,1]) {
-    const windowY = 2.1 + (2.72 - 2.1) * .70;
-    const raycast = new THREE.Raycaster(new THREE.Vector3(2.2,windowY,side*1.4),new THREE.Vector3(0,0,-side),0,2.8);
+    const windowY = 2.5;
+    const raycast = new THREE.Raycaster(new THREE.Vector3(3.3,windowY,side*1.4),new THREE.Vector3(0,0,-side),0,2.8);
     const hits=raycast.intersectObject(scene,true);
     assert.ok(hits.length>0, 'ray must meet actual window panes');
     const opaque=hits.filter(hit=>![].concat(hit.object.material).every(m=>m.name==='Astra cabin glass'));
@@ -67,6 +67,15 @@ test('Blender skin fits the existing rig and preserves spinning wheels and senso
   assert.ok(Math.abs(sensorBefore.x - 4.62) < 1e-9);
   assert.ok(wheelBefore.angleTo(wheels[0].quaternion) > .01);
   assert.ok(oldCab.every(node => !node.visible));
+  // Dressed chassis: the procedural tank/steps/guards/lamps retire together with
+  // the toroidal fenders; rails, axles and springs stay on the rig.
+  const dress = model.root.getObjectByName('chassis-dress');
+  const chassisSkin = model.root.getObjectByName('astra-chassis');
+  assert.equal(chassisSkin?.parent, dress);
+  assert.ok(dress.children.filter(node => node !== chassisSkin).every(node => !node.visible));
+  assert.ok(dress.children.length > 1, 'procedural dress was batched into the retired group');
+  assert.ok(model.root.getObjectByName('chassis-assembly').children.some(node => node.visible && node !== dress));
+  model.root.getObjectByName('wheel-system').children.filter(node => node.name.startsWith('fender-')).forEach(node => assert.equal(node.visible, false));
   assert.equal(model.root.userData.visualAsset, 'AstraSompoTruck');
   scene.traverse(node => {
     if (!node.isMesh || node.material.name === 'Astra cabin glass') return;

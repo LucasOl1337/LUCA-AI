@@ -91,15 +91,24 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
       const ridge = new THREE.Mesh(mudRidgeGeometry(), rutMaterial); ridge.position.set(-1.4, 0.03, z + side * 0.27); mudRuts.add(ridge);
     }
   }
-  const lamps: { mesh: THREE.Mesh; kind: SompoVisualEffect }[] = [];
+  // Duas montagens: a do rig procedural e a da pele Blender (cara-chata), com
+  // lanternas no para-choque dianteiro e no suporte sob o baú.
+  const lamps: { mesh: THREE.Mesh; kind: SompoVisualEffect; rig: THREE.Vector3; skin: THREE.Vector3 }[] = [];
+  const skinLamp: Record<string, [number, number, number]> = {
+    'brake-lights': [-4.435, 0.97, 0.89], 'reverse-lights': [-4.435, 0.97, 0.7625], 'running-lights': [4.452, 0.945, 0.865],
+    'hazard-lights': [4.462, 0.945, 1.0], 'hazard-lights-rear': [-4.435, 0.97, 1.0175],
+  };
   const lampGeometry = new THREE.BoxGeometry(0.035, 0.065, 0.17);
   for (const [kind, color, x] of [['brake-lights', 0xff1808, -4.39], ['reverse-lights', 0xfff4db, -4.40], ['running-lights', 0xffedd0, 4.39], ['hazard-lights', 0xff9208, 4.40]] as const) {
     for (const side of [-1, 1]) {
       const lamp = new THREE.Mesh(lampGeometry, new THREE.MeshBasicMaterial({ color, toneMapped: false }));
       lamp.position.set(x, kind === 'hazard-lights' ? 0.88 : 0.62, side * (kind === 'reverse-lights' ? 0.73 : 0.95));
-      attachments.add(lamp); lamps.push({ mesh: lamp, kind });
+      const [sx, sy, sz] = skinLamp[kind];
+      attachments.add(lamp); lamps.push({ mesh: lamp, kind, rig: lamp.position.clone(), skin: new THREE.Vector3(sx, sy, side * sz) });
       if (kind === 'hazard-lights') {
-        const rear = lamp.clone(); rear.position.x = -4.40; attachments.add(rear); lamps.push({ mesh: rear, kind });
+        const rear = lamp.clone(); rear.position.x = -4.40; attachments.add(rear);
+        const [rx, ry, rz] = skinLamp['hazard-lights-rear'];
+        lamps.push({ mesh: rear, kind, rig: rear.position.clone(), skin: new THREE.Vector3(rx, ry, side * rz) });
       }
     }
   }
@@ -118,7 +127,7 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
   let intact: Float32Array | undefined; let originalChildren: boolean[] = []; let lastDamage = -1;
   let anchors: THREE.Vector3[] = []; let front = new THREE.Vector3(3.28, 0.46, 1.02);
   const origins = new Map<string, THREE.Vector3>();
-  let previousTime = -1; let previousScenario = '';
+  let previousTime = -1; let previousScenario = ''; let lampSkin: unknown = null;
   function refreshModel() {
     if (asset === model.root.userData.asset && anchors.length) return;
     asset = model.root.userData.asset;
@@ -175,6 +184,10 @@ export function createSompoScenarioEffects(scene: THREE.Scene, model: SompoTruck
     },
     update(frame: SompoEffectFrame, elapsed: number, scenarioId: string, speed: number, reducedMotion: boolean, slope: number, outcomeKey = '', slopePivotX = 0, direction = 1, worldXAt?: (atMs: number) => number) {
       refreshModel(); root.visible = attachments.visible = true;
+      if (lampSkin !== model.root.userData.visualAsset) {
+        lampSkin = model.root.userData.visualAsset;
+        for (const lamp of lamps) lamp.mesh.position.copy(lampSkin === 'AstraSompoTruck' ? lamp.skin : lamp.rig);
+      }
       const runKey = `${scenarioId} ${outcomeKey}`;
       if (runKey !== previousScenario || elapsed < previousTime) origins.clear();
       previousScenario = runKey; previousTime = elapsed;

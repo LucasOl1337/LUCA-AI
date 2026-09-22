@@ -15,7 +15,7 @@ function batchAssembly(parent: THREE.Object3D) {
     const mesh = node as THREE.Mesh;
     if (node === parent || !mesh.isMesh || Array.isArray(mesh.material)) return;
     let ancestor: THREE.Object3D | null = mesh;
-    while (ancestor && ancestor !== parent) { if (ancestor.userData.articulated) return; ancestor = ancestor.parent; }
+    while (ancestor && ancestor !== parent) { if (ancestor.userData.articulated || ancestor.userData.batchSeparately) return; ancestor = ancestor.parent; }
     const geometries = batches.get(mesh.material) || [];
     const instance = mesh as THREE.InstancedMesh;
     const count = instance.isInstancedMesh ? instance.count : 1;
@@ -83,7 +83,7 @@ function assignVisualMaps(root: THREE.Object3D, isDisposed: () => boolean) {
       if (isDisposed()) { map.dispose(); return; }
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;
-      map.wrapS = map.wrapT = THREE.RepeatWrapping;
+      map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
       root.traverse(node => {
         const mesh = node as THREE.Mesh;
         if (!mesh.isMesh) return;
@@ -100,7 +100,9 @@ function assignVisualMaps(root: THREE.Object3D, isDisposed: () => boolean) {
       });
     });
   };
-  paint('/sompo/gen/reefer-painted-albedo.jpg', ['Painéis do baú']);
+  // Lateral inteira do baú num único mapa: escorrido da chuva sob o perfil de
+  // cima e poeira de estrada de terra concentrada no quarto de baixo.
+  paint('/sompo/gen/reefer-side-grime.jpg', ['Painéis do baú']);
   loader.load('/sompo/gen/truck-rubber-albedo.jpg', map => {
     if (isDisposed()) { map.dispose(); return; }
     map.colorSpace = THREE.SRGBColorSpace;
@@ -135,6 +137,13 @@ export function refineSompoTruck(model: SompoTruckModel) {
   (cap.material as THREE.Material).name = 'Acabamentos da cabine';
   const rib = root.getObjectByName('cargo-horizontal-corrugation') as THREE.Mesh;
   (rib.material as THREE.Material).name = 'Alumínio do baú';
+  // Vestimenta do chassi que a pele Blender substitui (tanque, degraus, protetor,
+  // lanternas, para-choque traseiro, escape). Assada à parte para poder sumir
+  // inteira sem mexer em longarinas, eixos, feixes de mola e cardã.
+  const dress = new THREE.Group(); dress.name = 'chassis-dress'; dress.userData.batchSeparately = true;
+  const dressParts = /^(fuel-tank|tank-strap|side-guard|guard-bracket|cab-step|step-grip|rear-mudflap|rear-underrun|rear-light|rear-brake|rear-indicator|exhaust)/;
+  for (const child of [...chassis.children]) if (dressParts.test(child.name)) dress.add(child);
+  chassis.add(dress);
   const wipers: THREE.Group[] = [];
   for (const side of [-1, 1]) {
     const blade = root.getObjectByName(`wiper-${side}`)!;
@@ -153,7 +162,7 @@ export function refineSompoTruck(model: SompoTruckModel) {
   root.userData.cargoBody = cargo; root.userData.asset = 'SompoModularTruck';
   const wheels = model.wheels.map(wheel => ({ wheel, position: wheel.position.clone(), spin: 0 }));
   for (const { wheel } of wheels) batchAssembly(wheel);
-  for (const assembly of [cab, cargo, chassis]) batchAssembly(assembly);
+  for (const assembly of [cab, cargo, chassis, dress]) batchAssembly(assembly);
   root.updateMatrixWorld(true);
   const inverseRoot = root.matrixWorld.clone().invert();
   const supportPoints: THREE.Vector3[] = [];
@@ -202,10 +211,10 @@ export function refineSompoTruck(model: SompoTruckModel) {
   // rodas e filetes no baú. Intensidade por família de material; interior,
   // vidro, faróis e refletores ficam limpos.
   const wearFamily = (name: string) =>
-    ['Painéis do baú', 'Alumínio do baú', 'Astra box shell'].includes(name) ? 'box'
-      : ['Pintura da cabine', 'Acabamentos da cabine', 'SOMPO painted metal'].includes(name) ? 'paint'
-        : ['', 'Astra polished chrome', 'Astra grille face', 'Astra grille recess'].includes(name) ? 'metal'
-          : name === 'Sompo tire rubber' ? 'rubber' : null;
+    ['Painéis do baú', 'Alumínio do baú', 'Astra box shell', 'Astra box seam'].includes(name) ? 'box'
+      : ['Pintura da cabine', 'Acabamentos da cabine', 'SOMPO painted metal', 'Astra cab trim', 'Astra bumper plastic', 'Astra black plastic'].includes(name) ? 'paint'
+        : ['', 'Astra polished chrome', 'Astra grille face', 'Astra grille recess', 'Astra chassis black', 'Astra tank aluminium', 'Sompo wheel steel'].includes(name) ? 'metal'
+          : ['Sompo tire rubber', 'Astra mudflap rubber'].includes(name) ? 'rubber' : null;
   const wearTruck = (material: THREE.MeshStandardMaterial) => {
     const family = wearFamily(material.name);
     if (!family) return;
@@ -248,8 +257,22 @@ export function refineSompoTruck(model: SompoTruckModel) {
   return {
     /** Replace only the skin; wheel pivots, ground support and sensor stay on the rig. */
     replaceVisual(visual: THREE.Group) {
-      const replacements = [['astra-cab', cab], ['astra-cargo', cargo]] as const;
-      if (replacements.some(([name]) => !visual.getObjectByName(name))) throw new Error('Incomplete Astra truck');
+      if (!visual.getObjectByName('astra-cab') || !visual.getObjectByName('astra-cargo')) throw new Error('Incomplete Astra truck');
+      // O chassi vestido é opcional: sem ele a vestimenta procedural continua.
+      const dressed = !!visual.getObjectByName('astra-chassis');
+      const replacements: [string, THREE.Object3D][] = [['astra-cab', cab], ['astra-cargo', cargo]];
+      if (dressed) {
+        replacements.push(['astra-chassis', dress]);
+        // Para-lamas toroidais e cromo de brinquedo saem junto: rodas de aço
+        // pintado e amortecedores escuros, como num caminhão de frota.
+        const wheelSteel = new THREE.MeshStandardMaterial({ name: 'Sompo wheel steel', color: 0xb3b7b9, metalness: .55, roughness: .42 });
+        const darkSteel = new THREE.MeshStandardMaterial({ name: 'Astra chassis black', color: 0x1b1f22, metalness: .45, roughness: .55 });
+        const polished = (item: THREE.Material) => item instanceof THREE.MeshStandardMaterial && !item.name && item.metalness > .8;
+        root.getObjectByName('wheel-system')?.children.forEach(node => { if (node.name.startsWith('fender-')) node.visible = false; });
+        for (const wheel of model.wheels) wheel.traverse(node => { const mesh = node as THREE.Mesh; if (mesh.isMesh && !Array.isArray(mesh.material) && polished(mesh.material)) mesh.material = wheelSteel; });
+        for (const node of chassis.children) { const mesh = node as THREE.Mesh; if (mesh.isMesh && !Array.isArray(mesh.material) && polished(mesh.material)) mesh.material = darkSteel; }
+        for (const material of [wheelSteel, darkSteel]) { materials.add(material); wearTruck(material); }
+      }
       for (const [name, assembly] of replacements) {
         for (const child of assembly.children) child.visible = false;
         const skin = visual.getObjectByName(name)!;
