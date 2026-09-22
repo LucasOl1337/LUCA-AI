@@ -131,6 +131,24 @@ export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Ca
       if (!abort.signal.aborted) console.warn('SOMPO foliage unavailable', spec.asset, error);
     }
   });
+  // Oclusão sob a copa: um disco escuro e macio por árvore visível, deitado
+  // na encosta. Sem ele a árvore pousava no pasto sem escurecer o chão.
+  const aoMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .26, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 64;
+    const context = canvas.getContext('2d');
+    if (context) {
+      const fade = context.createRadialGradient(32, 32, 0, 32, 32, 32);
+      fade.addColorStop(0, 'rgba(255,255,255,.85)'); fade.addColorStop(.5, 'rgba(255,255,255,.4)'); fade.addColorStop(1, 'rgba(255,255,255,0)');
+      context.fillStyle = fade; context.fillRect(0, 0, 64, 64);
+      aoMaterial.alphaMap = new THREE.CanvasTexture(canvas);
+    }
+  }
+  const aoGeometry = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+  const treeAo = new THREE.InstancedMesh(aoGeometry, aoMaterial, trees.length);
+  treeAo.name = 'licensed-tree-ground-occlusion'; treeAo.count = 0; treeAo.renderOrder = 1; treeAo.frustumCulled = false;
+  root.add(treeAo);
+  const aoTransform = new THREE.Object3D(), up = new THREE.Vector3(0, 1, 0), slopeNormal = new THREE.Vector3();
   const cameraPosition = new THREE.Vector3(), transform = new THREE.Object3D(), matrix = new THREE.Matrix4();
   const frustum = new THREE.Frustum(), clip = new THREE.Matrix4(), sphere = new THREE.Sphere();
   const groundCache = new WeakMap<FoliageSlot, { x: number; y: number; lake: boolean }>();
@@ -141,6 +159,7 @@ export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Ca
       clip.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).multiply(parent.matrixWorld);
       frustum.setFromProjectionMatrix(clip);
       const sight = parent.worldToLocal(focus.clone()).sub(cameraPosition), projected = new THREE.Vector3();
+      let aoCount = 0;
       for (const batch of batches) {
         let count = 0;
         for (let index = 0; index < batch.slots.length; index++) {
@@ -172,12 +191,25 @@ export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Ca
             const t = projected.copy(center).sub(cameraPosition).dot(sight) / Math.max(1, sight.lengthSq());
             if (t > 0 && t < 1 && center.distanceTo(projected.copy(cameraPosition).addScaledVector(sight, t)) < 5) continue;
           }
-          transform.rotation.set(0, slot.yaw, 0); transform.scale.setScalar(scale); transform.updateMatrix();
+          transform.rotation.set(0, slot.yaw, 0);
+          // Trees stretch independently in height and spread: no two crowns share a silhouette.
+          if (batch.slots === trees) transform.scale.set(scale * (1 + (random(index + 1201) - .5) * .3), scale * (1 + (random(index + 1301) - .5) * .36), scale * (1 + (random(index + 1401) - .5) * .3));
+          else transform.scale.setScalar(scale);
+          transform.updateMatrix();
           batch.meshes.forEach((mesh, i) => {
             matrix.multiplyMatrices(transform.matrix, batch.base[i]); mesh.setMatrixAt(count, matrix);
             if (batch.varied[i]) mesh.setColorAt(count, batch.tints[index]);
           });
           count++;
+          // Past 90 m the occlusion is invisible and a disc on the crest shows against the sky.
+          if (batch.slots === trees && aoCount < trees.length && distance < 90) {
+            slopeNormal.set(sompoTerrainHeight(x - 1, slot.z) - sompoTerrainHeight(x + 1, slot.z), 2, sompoTerrainHeight(x, slot.z - 1) - sompoTerrainHeight(x, slot.z + 1)).normalize();
+            aoTransform.position.set(x, ground.y + .06, slot.z);
+            aoTransform.quaternion.setFromUnitVectors(up, slopeNormal);
+            aoTransform.scale.setScalar(16 * slot.scale);
+            aoTransform.updateMatrix();
+            treeAo.setMatrixAt(aoCount++, aoTransform.matrix);
+          }
         }
         for (const mesh of batch.meshes) {
           mesh.count = count; mesh.instanceMatrix.needsUpdate = true;
@@ -186,9 +218,11 @@ export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Ca
           mesh.boundingSphere.center.copy(cameraPosition); mesh.boundingSphere.radius = batch.max + 20;
         }
       }
+      treeAo.count = aoCount; treeAo.instanceMatrix.needsUpdate = true;
     },
     dispose() {
       abort.abort(); root.removeFromParent();
+      treeAo.dispose(); aoGeometry.dispose(); aoMaterial.alphaMap?.dispose(); aoMaterial.dispose();
       for (const batch of batches) for (const mesh of batch.meshes) mesh.dispose();
       for (const g of geometries) g.dispose(); for (const m of materials) m.dispose(); for (const t of textures) t.dispose();
     },

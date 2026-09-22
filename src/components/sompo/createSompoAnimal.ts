@@ -12,6 +12,22 @@ export function createSompoAnimal(parent: THREE.Group) {
   const sizeLimit = getSompoAnimalPose(-6);
   const fallback = new THREE.Mesh(new THREE.PlaneGeometry(sizeLimit.length, sizeLimit.height), new THREE.MeshStandardMaterial({ map: fallbackMap, alphaTest: 0.4, side: THREE.DoubleSide, roughness: 1 }));
   fallback.position.y = sizeLimit.height / 2; root.add(fallback); fallback.visible = false;
+  // Sombra de contato: o mapa de sombra do sol sozinho deixa o bovino
+  // flutuando na pista. Fica fora do grupo que tomba, rente ao chão.
+  const contact = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, opacity: .8, color: 0x000000 }));
+  contact.name = 'generated-nelore-contact'; contact.rotation.x = -Math.PI / 2; contact.renderOrder = 1; contact.visible = false;
+  if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 64;
+    const context = canvas.getContext('2d');
+    if (context) {
+      const fade = context.createRadialGradient(32, 32, 2, 32, 32, 32);
+      fade.addColorStop(0, 'rgba(255,255,255,.85)'); fade.addColorStop(.35, 'rgba(255,255,255,.5)'); fade.addColorStop(1, 'rgba(255,255,255,0)');
+      context.fillStyle = fade; context.fillRect(0, 0, 64, 64);
+      const map = new THREE.CanvasTexture(canvas);
+      (contact.material as THREE.MeshBasicMaterial).alphaMap = map;
+    }
+  }
+  parent.add(contact);
   let model: THREE.Group | null = null;
   let body: THREE.Mesh | undefined; let rest: Float32Array | undefined;
   const animated: number[] = [];
@@ -41,7 +57,11 @@ export function createSompoAnimal(parent: THREE.Group) {
       model.traverse((node) => { if ((node as THREE.Mesh).isMesh) meshes.push(node as THREE.Mesh); });
       for (const mesh of meshes) {
         mesh.castShadow = mesh.receiveShadow = true;
-        for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) if (material instanceof THREE.MeshStandardMaterial) { material.metalness = 0; material.roughness = 0.9; material.envMapIntensity = 0.7; }
+        for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) if (material instanceof THREE.MeshStandardMaterial) {
+          // The reconstruction baked studio light into the albedo; pull it under
+          // the scene exposure so the shaded flank does not glow.
+          material.metalness = 0; material.roughness = 0.9; material.envMapIntensity = 0.5; material.color.setScalar(.8);
+        }
       }
       if (meshes.length === 1) {
         body = meshes[0];
@@ -68,7 +88,7 @@ export function createSompoAnimal(parent: THREE.Group) {
       // A trilha "animal" da cena decide quando o bovino sai de quadro; o corte
       // fixo de 13 s vale só para quem chama sem âncora (compatibilidade).
       const pose = getSompoAnimalPose(z, elapsedMs, anchorX === undefined ? 13000 : null);
-      root.visible = visible && pose.visible; if (!root.visible) return;
+      root.visible = visible && pose.visible; contact.visible = root.visible; if (!root.visible) return;
       void ensureLoaded();
       const impact = impactAgeMs === null ? 0 : clamp01(impactAgeMs / 1400);
       const fall = impact * impact * (3 - 2 * impact);
@@ -92,6 +112,11 @@ export function createSompoAnimal(parent: THREE.Group) {
         for (let i = 0; i < rest.length; i += 3) bottom = Math.min(bottom, c * rest[i + 1] - s * rest[i + 2]);
         root.position.y = .015 - bottom;
       }
+      // Deitado ocupa mais chão e cola mais; em pé é uma elipse sob o corpo.
+      contact.position.set(root.position.x, .012, root.position.z);
+      contact.rotation.z = pose.yaw;
+      contact.scale.set(sizeLimit.length * (1.25 + fall * .2), sizeLimit.width * (1.5 + fall * 1.4), 1);
+      (contact.material as THREE.MeshBasicMaterial).opacity = .62 + fall * .2;
       fallback.visible = !model && !!fallbackMap.image;
       if (body && rest) {
         const p = body.geometry.attributes.position as THREE.BufferAttribute;
@@ -106,7 +131,7 @@ export function createSompoAnimal(parent: THREE.Group) {
       }
     },
     get asset() { return root.userData.asset ?? 'photograph-fallback'; },
-    dispose() { disposed = true; abort.abort(); release(root); root.removeFromParent(); },
+    dispose() { disposed = true; abort.abort(); release(root); root.removeFromParent(); release(contact); contact.removeFromParent(); },
   };
 }
 function clamp01(value: number) { return Math.max(0, Math.min(1, value)); }
