@@ -353,6 +353,10 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     let runStamp = -1;
     let runOriginX = 0;
     let animalAnchorX = 9;
+    // Roteiro que ancorou o bovino. selectScenario troca startedAtRef na hora,
+    // mas controlsRef só chega no useEffect seguinte: um frame no meio via o
+    // cenário anterior e deixava o animal para trás do caminhão.
+    let anchoredScript = '';
     let lastCruiseKph: number | null = null;
     const cameraShift = new THREE.Vector3();
     const wheelAxis = new THREE.Vector3(0, 1, 0);
@@ -461,6 +465,10 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
         // adiante a partir de onde está, sem teleporte para a origem.
         runStamp = startedAtRef.current;
         runOriginX = lastTruckWorldX;
+        anchoredScript = '';
+      }
+      if (anchoredScript !== `${settings.scenarioId}:${settings.outcomeId ?? ''}`) {
+        anchoredScript = `${settings.scenarioId}:${settings.outcomeId ?? ''}`;
         animalAnchorX = animalAnchorFor(settings, runOriginX);
       }
       let truckWorldX = lastTruckWorldX;
