@@ -38,7 +38,9 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
       }`,
   });
   composer.addPass(sanitize);
-  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.22, 0.35, 1.1);
+  // Limiar acima do teto branco do baú ao sol: em 1.1 ele florescia num halo
+  // leitoso sobre a carroceria e os aros; farol, sol e reflexo seguem acima.
+  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.2, 0.35, 1.6);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
   const grade = new ShaderPass({
@@ -48,9 +50,9 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
       void main(){
         vec3 c=texture2D(tDiffuse,vUv).rgb;
         float lum=dot(c,vec3(.2126,.7152,.0722));
-        c=mix(vec3(lum),c,1.03);                                   // saturação
-        c=mix(c,c*c*(3.-2.*c),.28);                                // contraste suave
-        c*=mix(vec3(1.),vec3(1.085,1.,.90),smoothstep(.55,1.,lum)*.55); // altas quentes
+        c=mix(vec3(lum),c,1.12);                                   // saturação
+        c=mix(c,c*c*(3.-2.*c),.4);                                 // contraste (curva S)
+        c*=mix(vec3(1.),vec3(1.1,1.,.86),smoothstep(.45,1.,lum)*.6);  // altas quentes
         c*=mix(vec3(1.),vec3(.955,1.,1.06),smoothstep(.5,0.,lum)*.38); // sombras frias
         vec2 p=(vUv-.5)*vec2(resolution.x/max(1.,resolution.y),1.);
         c*=1.-.30*smoothstep(.42,1.15,length(p));                  // vinheta

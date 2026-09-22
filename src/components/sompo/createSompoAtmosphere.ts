@@ -165,8 +165,10 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
       if (scene.fog instanceof THREE.Fog) {
         // Névoa de distância esfria e perde saturação: serras ficam azuladas
         // em camadas como na referência em vez de virarem uma parede âmbar.
-        scene.fog.color.set(night ? '#172733' : mode === 'overcast' ? '#a9b2ae' : '#a8bfd0');
-        scene.fog.near = wet ? 70 : 100; scene.fog.far = wet ? 260 : 430;
+        // Perspectiva aérea começa perto: com início em 100 m o morro a 60-120 m
+        // tinha o mesmo contraste do capim a 5 m e a cena achatava.
+        scene.fog.color.set(night ? '#172733' : mode === 'overcast' ? '#a9b2ae' : '#b4c6d2');
+        scene.fog.near = night ? 40 : wet ? 12 : 15; scene.fog.far = night ? 380 : wet ? 300 : 520;
       }
     },
     dispose() {

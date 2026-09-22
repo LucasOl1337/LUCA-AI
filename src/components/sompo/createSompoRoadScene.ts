@@ -81,7 +81,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   assets.surface(earth, 'grass', 101.2, 55.2, { normalScale: .65 });
   varySompoSurface(earth, 0.24);
   const pasture = createSompoPastureSurface(earth);
-  const details = createSompoRoadDetails(root);
+  const details = createSompoRoadDetails(root, camera);
   const roadMap = groundTexture('road');
   const asphalt = new THREE.MeshStandardMaterial({ map: roadMap, roughness: 0.90, metalness: 0.03 });
   // Asfalto fotográfico com agregado/trincas: a faixa de brita das bordas corre
@@ -146,14 +146,17 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       spin: postRand(i + 34) * Math.PI,
     });
   }
-  const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.11, 1.2, 0.12), wood, postSlots.length);
+  // Mourão roliço de eucalipto, com a ponta um pouco mais fina.
+  const posts = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.055, 0.068, 1.2, 7), wood, postSlots.length);
   const postPositions = new Float64Array(postSlots.length).fill(NaN);
   const postFallen = new Float64Array(postSlots.length).fill(-1);
   posts.castShadow = true; root.add(posts);
   const wires: THREE.Mesh[] = [];
-  const wire = new THREE.MeshStandardMaterial({ color: 0x5f6460, roughness: 0.7, metalness: 0.65 });
-  for (const z of [6, -10]) for (const y of [0.45, 0.9]) {
-    const strand = mesh(root, new THREE.CylinderGeometry(0.004, 0.004, 245, 4), wire, [0, y, z]);
+  // Arame galvanizado em três fios. Com 4 mm ficava abaixo de um pixel e
+  // a cerca lia só como mourões soltos; 9 mm o MSAA ainda resolve a 10 m.
+  const wire = new THREE.MeshStandardMaterial({ color: 0x8b908a, roughness: 0.5, metalness: 0.6 });
+  for (const z of [6, -10]) for (const y of [0.38, 0.68, 0.98]) {
+    const strand = mesh(root, new THREE.CylinderGeometry(0.009, 0.009, 245, 4), wire, [0, y, z]);
     strand.rotation.z = Math.PI / 2;
     strand.userData.rowZ = z; strand.userData.wireY = y;
     wires.push(strand);

@@ -28,7 +28,7 @@ export function createSompoCropRows(groundHeight: (x: number, z: number) => numb
     map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8;
     map.repeat.set(0.98, 1);
     leafTexture.value = map;
-    material.map = map; material.alphaTest = 0.5; material.needsUpdate = true;
+    material.map = map; material.alphaTest = 0.5; material.alphaToCoverage = true; material.needsUpdate = true;
   });
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, { cropTime: time, cropWind: wind, cropCut: cut, cropPath: path, harvestTime });

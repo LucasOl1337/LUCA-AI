@@ -140,10 +140,45 @@ function makeTrail(mesh: THREE.InstancedMesh, slots: InstanceSlot[], span: numbe
   };
 }
 
-export function createSompoRoadDetails(parent: THREE.Group) {
+/**
+ * Trail that only submits plants inside the camera frustum. The wrapped span
+ * keeps 240 m of rows around the truck, but the side camera sees ~70 m of it;
+ * every hidden plant still cost its vertices twice (colour and shadow pass).
+ * The margin keeps shadows that fall into frame from plants just outside it.
+ */
+function makeCulledTrail(mesh: THREE.InstancedMesh, slots: InstanceSlot[], span: number, sink: number, camera: THREE.Camera, radius: number) {
+  const transform = new THREE.Object3D();
+  const frustum = new THREE.Frustum(), clip = new THREE.Matrix4(), sphere = new THREE.Sphere();
+  mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), Math.hypot(span / 2 + 12, 80));
+  return {
+    mesh,
+    update(truckX: number) {
+      mesh.updateWorldMatrix(true, false);
+      clip.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).multiply(mesh.matrixWorld);
+      frustum.setFromProjectionMatrix(clip);
+      mesh.boundingSphere!.center.x = truckX;
+      let count = 0;
+      for (const slot of slots) {
+        const x = wrapSompoX(slot.x, truckX, span);
+        const y = slot.y ?? sompoTerrainHeight(x, slot.z) - sink;
+        sphere.center.set(x, y + slot.scale.y * .5, slot.z); sphere.radius = radius;
+        if (!frustum.intersectsSphere(sphere)) continue;
+        transform.position.set(x, y, slot.z);
+        transform.rotation.set(slot.tilt ?? 0, slot.rotation, (slot.tilt ?? 0) * 0.6);
+        transform.scale.copy(slot.scale);
+        transform.updateMatrix();
+        mesh.setMatrixAt(count++, transform.matrix);
+      }
+      mesh.count = count;
+      mesh.instanceMatrix.needsUpdate = true;
+    },
+  };
+}
+
+export function createSompoRoadDetails(parent: THREE.Group, camera?: THREE.Camera) {
   let disposed = false;
   const assetAbort = new AbortController();
-  const maizeTrails: ReturnType<typeof makeTrail>[] = [];
+  const maizeTrails: { update(truckX: number): void }[] = [];
   let latestTruckX = 0;
   const root = new THREE.Group(); root.name = 'rural-surface-details'; parent.add(root);
   const transform = new THREE.Object3D();
@@ -287,32 +322,13 @@ export function createSompoRoadDetails(parent: THREE.Group) {
   }
   const clumpTrail = makeTrail(clumps, clumpSlots, 220, true, 0.05);
 
-  // Arbustos de cerrado na borda da lavoura e do pasto.
-  const bushMaterial = new THREE.MeshStandardMaterial({ color: 0x51683a, roughness: 1 });
-  windify(bushMaterial, 0.02);
-  const bushes = new THREE.InstancedMesh(
-    lumpyGeometry(new THREE.IcosahedronGeometry(1, 2), 0.42, 31),
-    bushMaterial,
-    46,
-  );
-  bushes.name = 'cerrado-shrubs'; bushes.castShadow = bushes.receiveShadow = true; root.add(bushes);
-  const bushSlots: InstanceSlot[] = [];
-  for (let i = 0; i < 46; i += 1) {
-    const size = 0.5 + rand(i + 701) * 0.9;
-    bushSlots.push({
-      x: rand(i + 702) * 230 - 115,
-      z: i % 3 === 0 ? -(11 + rand(i + 703) * 9) : 8 + rand(i + 703) * 30,
-      rotation: rand(i + 704) * Math.PI,
-      scale: new THREE.Vector3(size * (1.1 + rand(i + 705) * 0.5), size * (0.55 + rand(i + 706) * 0.4), size),
-    });
-    bushes.setColorAt(i, new THREE.Color().setHSL(0.22 + rand(i + 707) * 0.05, 0.3 + rand(i + 708) * 0.12, 0.26 + rand(i + 709) * 0.12));
-  }
-  const bushTrail = makeTrail(bushes, bushSlots, 230, true, 0.04);
+  // Arbustos: só o CC0 ph-shrub_02 da folhagem licenciada. Os icosaedros
+  // amassados de cor sólida que ficavam aqui liam como pedra verde.
 
   // Continuous cultivated rows across the full wrapping span. The former
   // cols*spacing covered only ~150 of 240 metres, leaving a moving bare gap.
   const cropLeafMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf2f4e8, roughness: 0.78, side: THREE.DoubleSide, alphaTest: 0.38,
+    color: 0xf2f4e8, roughness: 0.78, side: THREE.DoubleSide, alphaTest: 0.38, alphaToCoverage: true,
   });
   windify(cropLeafMaterial, 0.04);
   if (typeof document !== 'undefined' && typeof document.createElementNS === 'function') {
@@ -394,6 +410,7 @@ export function createSompoRoadDetails(parent: THREE.Group) {
           const material = source.material as THREE.MeshStandardMaterial;
           material.transparent = false;
           material.alphaTest = material.map ? 0.18 : 0;
+          material.alphaToCoverage = !!material.map;
           material.side = THREE.DoubleSide;
           material.roughness = .86;
           material.metalness = 0;
@@ -416,7 +433,7 @@ export function createSompoRoadDetails(parent: THREE.Group) {
           root.add(plants);
           // The authored atlas already contains the leaf albedo; multiplying it
           // by a second dark green tint made the complete field nearly black.
-          const trail = makeTrail(plants, nearSlots, 240, true, .025);
+          const trail = camera ? makeCulledTrail(plants, nearSlots, 240, .025, camera, 4.5) : makeTrail(plants, nearSlots, 240, true, .025);
           trail.update(latestTruckX);
           maizeTrails.push(trail);
         });
@@ -426,7 +443,7 @@ export function createSompoRoadDetails(parent: THREE.Group) {
 
   // Distant mass only, well behind the fence so it is not a green wall.
   const canopyMaterial = new THREE.MeshStandardMaterial({
-    color: 0xffffff, roughness: 1, side: THREE.DoubleSide, alphaTest: 0.42,
+    color: 0xffffff, roughness: 1, side: THREE.DoubleSide, alphaTest: 0.42, alphaToCoverage: true,
   });
   windify(canopyMaterial, 0.025);
   if (typeof document !== 'undefined' && typeof document.createElementNS === 'function') {
@@ -473,7 +490,6 @@ export function createSompoRoadDetails(parent: THREE.Group) {
       time.value = reducedMotion ? 0 : elapsed / 1000;
       grassMaterial.color.set(wet ? 0x9aa383 : 0xffffff);
       clumpMaterial.color.set(wet ? 0x93a07f : 0xf5f2e2);
-      bushMaterial.color.set(wet ? 0x43543a : 0x51683a);
       cropLeafMaterial.color.set(wet ? 0xc4c8b0 : 0xe4dfc4);
       (patches.material as THREE.MeshBasicMaterial).opacity = wet ? 0.4 : 0.28;
       for (const [index, slot] of patchSlots.entries()) {
@@ -488,7 +504,6 @@ export function createSompoRoadDetails(parent: THREE.Group) {
       grassTrail.update(truckX);
       weedTrail.update(truckX);
       clumpTrail.update(truckX);
-      bushTrail.update(truckX);
       canopyTrail.update(truckX);
       cropNearTrail.update(truckX);
       cropFarTrail.update(truckX);

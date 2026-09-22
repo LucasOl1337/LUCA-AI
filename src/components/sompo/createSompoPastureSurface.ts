@@ -9,7 +9,7 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
   const load = (url: string, onReady: (map: THREE.Texture) => void) =>
     canLoad ? new THREE.TextureLoader().load(url, onReady) : new THREE.Texture();
   const ready = { value: 0 };
-  const texture = load(field ? '/sompo/gen/pasto-albedo.webp' : '/environments/sompo/grass-color.jpg', map => {
+  const texture = load(field ? '/sompo/gen/pasto-albedo.webp' : '/environments/sompo/grass-color-2k.jpg', map => {
     if (disposed) { map.dispose(); return; }
     ready.value = 1;
   });
@@ -81,11 +81,30 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       // Broad continuous vegetation variation; no square colour tiles on hills.
       float corridorZ = ${field ? 'abs(ruralWorld.z)' : 'abs(ruralWorld.z+2.05)'};
       float hills = smoothstep(38.0, 72.0, corridorZ);
+      // Gramado do lado da câmera (z > 18): fora do alcance do capim 3D, era
+      // um tapete liso na visão aberta. Recebe as mesmas touceiras pintadas.
+      float lawn = ${field ? '0.0' : 'smoothstep(17.0, 24.0, ruralWorld.z) * (1.0 - hills)'};
+      if (lawn > 0.001) {
+        float lawnFade = 1.0 - smoothstep(20.0, 110.0, distance(cameraPosition, ruralWorld));
+        float lawnTuft = ruralNoise(ruralWorld.xz * 1.9 + 3.1) * .6 + ruralNoise(ruralWorld.xz * 4.7 + 8.7) * .4;
+        grassland *= mix(1.0, .78 + lawnTuft * .46, lawn * lawnFade);
+        float lawnStraw = smoothstep(.5, .82, ruralNoise(ruralWorld.xz / 13.0 + 41.0));
+        grassland = mix(grassland, grassland * vec3(1.3, 1.15, .76), lawnStraw * lawn * .5);
+      }
       if (hills > 0.001) {
         float moisture = ruralNoise(ruralWorld.xz / 26.0 + .5);
         float cover = ruralNoise(ruralWorld.xz / 7.0 + 19.31);
         vec3 vegetationTint = mix(vec3(.70,.64,.47), vec3(.60,.76,.52), smoothstep(.22,.78,moisture));
         grassland *= mix(vec3(1.), vegetationTint * (1.0 + cover * .18), hills * .55);
+        // Touceiras pintadas no chão: duas oitavas de claro/escuro que somem
+        // com a distância antes de cintilar. Substituem a malha de capim que
+        // virava pontilhado preto no morro.
+        float tuftFade = 1.0 - smoothstep(28.0, 150.0, distance(cameraPosition, ruralWorld));
+        float tuft = ruralNoise(ruralWorld.xz * 1.9 + 3.1) * .6 + ruralNoise(ruralWorld.xz * 4.7 + 8.7) * .4;
+        grassland *= mix(1.0, .8 + tuft * .42, hills * tuftFade);
+        // Manchas de palha seca da braquiária, maiores que as de umidade.
+        float straw = smoothstep(.5, .82, ruralNoise(ruralWorld.xz / 13.0 + 41.0));
+        grassland = mix(grassland, grassland * vec3(1.32, 1.16, .74), straw * hills * .55);
       }
       // Keep foreground grass in shade and distant hills muted in the cream haze.
       ${field ? '' : 'grassland *= vec3(.45,.58,.29);'}
@@ -100,6 +119,6 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       diffuseColor.rgb = mix(diffuseColor.rgb, tilled, fieldZone);` : ''}
       #include <roughnessmap_fragment>`);
   };
-  material.customProgramCacheKey = () => `sompo-pasture-albedo-v6-${field}`;
+  material.customProgramCacheKey = () => `sompo-pasture-albedo-v8-${field}`;
   return { dispose() { disposed = true; texture.dispose(); soilTexture.dispose(); bladeTexture.dispose(); if (field) tilledTexture.dispose(); else canopyTexture.dispose(); } };
 }
