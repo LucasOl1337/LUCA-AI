@@ -501,7 +501,7 @@ function boxUV(w: number, h: number, d: number, tile: number) {
   return g;
 }
 
-function createFarm(batch: Batcher, mats: Record<'plaster' | 'tile' | 'trim' | 'dark' | 'wood' | 'weathered' | 'tank' | 'steel' | 'concrete' | 'fibro' | 'pit', THREE.Material>) {
+function createFarm(batch: Batcher, mats: Record<'plaster' | 'tile' | 'trim' | 'dark' | 'wood' | 'weathered' | 'tank' | 'steel' | 'concrete' | 'fibro', THREE.Material>) {
   const ground = (x: number, z: number) => sompoTerrainHeight(x, z);
   // Casa: 9 × 7 m, telhado de duas águas de barro, varanda na frente.
   const hx = SOMPO_FARM.x + 2, hz = SOMPO_FARM.z - 3, hy = ground(hx, hz) - 0.1, wallH = 2.9;
@@ -567,7 +567,7 @@ function createFarm(batch: Batcher, mats: Record<'plaster' | 'tile' | 'trim' | '
 
   // Mata-burro: vala escura com trilhos de ferro, muretas de concreto.
   const gx = SOMPO_FARM.gateX;
-  batch.addPeriodic(mats.pit, new THREE.BoxGeometry(3.4, 0.02, 2.6), m4(gx, 0.012, -10));
+  batch.addPeriodic(mats.dark, new THREE.BoxGeometry(3.4, 0.02, 2.6), m4(gx, 0.012, -10));
   for (let k = 0; k < 10; k += 1) batch.addPeriodic(mats.steel, new THREE.CylinderGeometry(0.035, 0.035, 3.5, 6), m4(gx, 0.07, -8.85 - k * 0.255, 0, 0, Math.PI / 2));
   for (const side of [-1, 1]) batch.addPeriodic(mats.concrete, new THREE.BoxGeometry(0.28, 0.42, 2.9), m4(gx + side * 1.88, 0.2, -10));
   // Mourões grossos do vão e a porteira fechada ao lado do mata-burro.
@@ -704,13 +704,13 @@ function createDistantRidges(root: THREE.Group) {
     root.add(mesh);
     return mesh;
   });
-  const wetHaze = new THREE.Color(0x8f9a9c);
+  const wetHaze = new THREE.Color(0xa3aca9);
   return {
     update(truckX: number, wet: boolean) {
       for (const mesh of meshes) mesh.position.x = Math.round(truckX / RP) * RP;
       // Na chuva a serra quase some na cortina d'água: cor puxada para a névoa.
-      material.color.setScalar(wet ? 0.35 : 1);
-      material.emissive.copy(wetHaze).multiplyScalar(wet ? 0.6 : 0);
+      material.color.setScalar(wet ? 0.18 : 1);
+      material.emissive.copy(wetHaze).multiplyScalar(wet ? 0.92 : 0);
       meshes[1].visible = !wet;
     },
     dispose() { meshes.forEach(m => m.geometry.dispose()); material.dispose(); },
@@ -738,7 +738,6 @@ export function createSompoRoadsideLife(parent: THREE.Group, postWood: THREE.Mat
     steel: std({ color: 0x8d9394, roughness: 0.45, metalness: 0.7 }),
     concrete: std({ color: 0x8e8c85, roughness: 0.92 }),
     fibro: std({ color: 0x9fa19b, roughness: 0.85 }),
-    pit: std({ color: 0x1a1612, roughness: 1 }),
     porcelain: std({ color: 0x7c5a3c, roughness: 0.35 }),
     cable: std({ color: 0x2a2c2c, roughness: 0.6, metalness: 0.3 }),
     atlas: std({ map: atlas, roughness: 0.5, color: atlas ? 0xffffff : 0xcccccc }),
@@ -823,17 +822,11 @@ export function createSompoRoadsideLife(parent: THREE.Group, postWood: THREE.Mat
       if (z > -63 - Math.sin(jx * 0.09) * 3) continue;
       if (rnd(seed + 7001) < 0.06) continue;
       const h = 17 + rnd(seed + 7002) * 6;
-      euca.add(eucaMaterial, cross, m4(jx, sompoTerrainHeight(jx, z) - 0.2, z + (rnd(seed + 7003) - 0.5) * 0.6, 0, rnd(seed + 7004) * 3, 0, h * 0.36, h, h * 0.36));
+      euca.addPeriodic(eucaMaterial, cross, m4(jx, sompoTerrainHeight(jx, z) - 0.2, z + (rnd(seed + 7003) - 0.5) * 0.6, 0, rnd(seed + 7004) * 3, 0, h * 0.36, h, h * 0.36));
     }
   }
   const eucaGroup = new THREE.Group(); eucaGroup.name = 'eucalyptus-stand'; root.add(eucaGroup);
-  const eucaMeshes: THREE.Mesh[] = [];
-  for (const offset of COPIES) {
-    const copy = new Batcher();
-    for (const [material, list] of euca.parts) for (const g of list) copy.add(material, g, new THREE.Matrix4().makeTranslation(offset, 0, 0));
-    eucaMeshes.push(...copy.build(eucaGroup, 'eucalyptus-stand-rows', false));
-  }
-  for (const list of euca.parts.values()) list.forEach(g => g.dispose());
+  const eucaMeshes = euca.build(eucaGroup, 'eucalyptus-stand-rows', false);
   card.dispose(); cross.dispose();
 
   const transform = new THREE.Object3D();
