@@ -25,7 +25,7 @@ for(const name of assets)test(`${name}: bounded UV mesh and content-addressed ex
     assert.notEqual(p.attributes.TEXCOORD_0,undefined);
     assert.equal(p.attributes.COLOR_0,undefined,'no unintended double tint');
   }
-  assert.ok(triangles>0 && triangles<(name.includes('near')?210000:name.includes('far')?115000:10000),`${triangles} triangles`);
+  assert.ok(triangles>0 && triangles<(name.includes('near')?210000:name.includes('far')?70000:10000),`${triangles} triangles`);
   assert.ok(bytes.length<14000000,'images are not duplicated inside geometry payload');
   for(const filename of [...manifest.images,...Object.values(manifest.alphaMaps??{})]){
     assert.match(filename,/^ph-[a-f0-9]{16}\.(png|jpg)$/);

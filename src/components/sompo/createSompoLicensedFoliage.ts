@@ -23,14 +23,16 @@ export function highwayFoliageSlots(kind: 'trees' | 'grass' | 'shrubs' | 'pastur
 export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Camera) {
   const root = new THREE.Group(); root.name = 'licensed-highway-foliage'; parent.add(root);
   const abort = new AbortController();
-  const batches: { meshes: THREE.InstancedMesh[]; slots: FoliageSlot[]; min: number; max: number; base: THREE.Matrix4[] }[] = [];
+  const batches: { meshes: THREE.InstancedMesh[]; slots: FoliageSlot[]; min: number; max: number; thinFrom?: number; base: THREE.Matrix4[] }[] = [];
   const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>(), textures = new Set<THREE.Texture>();
   const trees = highwayFoliageSlots('trees');
   const specs = [
     { asset: 'ph-jacaranda-near', slots: trees, min: 0, max: 54, shadow: true },
     { asset: 'ph-jacaranda-far', slots: trees, min: 54, max: 210, shadow: true },
     { asset: 'ph-grass_bermuda_01-0', slots: highwayFoliageSlots('grass'), min: 0, max: 55, shadow: false },
-    { asset: 'ph-grass_bermuda_01-0', slots: highwayFoliageSlots('pasture'), min: 0, max: 160, shadow: false },
+    // Pasture clumps past 60 m cover 2-3 px each: density falls with distance
+    // and the survivors grow to keep the same covered area.
+    { asset: 'ph-grass_bermuda_01-0', slots: highwayFoliageSlots('pasture'), min: 0, max: 160, thinFrom: 60, shadow: false },
     { asset: 'ph-shrub_02-0', slots: highwayFoliageSlots('shrubs'), min: 0, max: 140, shadow: true },
   ];
   const pending = specs.map(async spec => {
@@ -86,7 +88,7 @@ export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Ca
         instances.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
         root.add(instances); meshes.push(instances); base.push(mesh.matrixWorld.clone());
       });
-      batches.push({ meshes, base, slots: spec.slots, min: spec.min, max: spec.max });
+      batches.push({ meshes, base, slots: spec.slots, min: spec.min, max: spec.max, thinFrom: spec.thinFrom });
       root.userData.loadedAssets = (root.userData.loadedAssets ?? 0) + 1;
     } catch (error) {
       if (model) model.traverse(node => {
@@ -112,7 +114,8 @@ export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Ca
       const sight = parent.worldToLocal(focus.clone()).sub(cameraPosition), projected = new THREE.Vector3();
       for (const batch of batches) {
         let count = 0;
-        for (const slot of batch.slots) {
+        for (let index = 0; index < batch.slots.length; index++) {
+          const slot = batch.slots[index];
           const x = slot.x + 212 * Math.round((truckX - slot.x) / 212);
           let ground = groundCache.get(slot);
           if (!ground || ground.x !== x) {
@@ -122,6 +125,12 @@ export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Ca
           transform.position.set(x, ground.y, slot.z);
           const distance = transform.position.distanceTo(cameraPosition);
           if (distance < batch.min || distance >= batch.max || ground.lake) continue;
+          let scale = slot.scale;
+          if (batch.thinFrom && distance > batch.thinFrom) {
+            const keep = (batch.thinFrom / distance) ** 2;
+            if (random(index + 523) > keep) continue;
+            scale *= Math.min(1.5, Math.sqrt(1 / keep));
+          }
           sphere.center.copy(transform.position); sphere.radius = batch.slots === trees ? 15 * slot.scale : 2 * slot.scale;
           sphere.center.y += batch.slots === trees ? 9 * slot.scale : .5 * slot.scale;
           if (!frustum.intersectsSphere(sphere)) continue;
@@ -130,7 +139,7 @@ export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Ca
             const t = projected.copy(center).sub(cameraPosition).dot(sight) / Math.max(1, sight.lengthSq());
             if (t > 0 && t < 1 && center.distanceTo(projected.copy(cameraPosition).addScaledVector(sight, t)) < 5) continue;
           }
-          transform.rotation.set(0, slot.yaw, 0); transform.scale.setScalar(slot.scale); transform.updateMatrix();
+          transform.rotation.set(0, slot.yaw, 0); transform.scale.setScalar(scale); transform.updateMatrix();
           batch.meshes.forEach((mesh, i) => { matrix.multiplyMatrices(transform.matrix, batch.base[i]); mesh.setMatrixAt(count, matrix); });
           count++;
         }

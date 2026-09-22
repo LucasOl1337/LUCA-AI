@@ -3,6 +3,8 @@
 Sources: jacaranda_tree, shrub_02 and grass_medium_02 (CC0).
 blender -b --factory-startup --disable-autoexec --python scripts/sompo/prepare-polyhaven.py -- ASSET
 Source directory is .dream-loop/roadway-rebuild/sources/ASSET.
+After jacaranda_tree, run scripts/sompo/prune-jacaranda-far.py: decimate cannot
+reach the far branch budget while ~1300 loose twig islands remain.
 """
 import bpy, bmesh, sys, os, json, struct, math, hashlib
 import numpy as np
