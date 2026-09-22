@@ -174,35 +174,69 @@ export function refineSompoTruck(model: SompoTruckModel) {
   delete root.userData.sculptRuntime;
   const materials = new Set<THREE.MeshStandardMaterial>();
   root.traverse(node => { const mesh = node as THREE.Mesh; if (mesh.isMesh && mesh.material instanceof THREE.MeshStandardMaterial) materials.add(mesh.material); });
-  // Película de estrada: poeira acumulada nas partes baixas e filetes finos de
-  // água/sujeira escorrendo no baú. É o que separa pintura real de plástico.
+  // Altura sobre o chão por vértice, na pose de repouso e a partir do contato
+  // dos pneus. A sujeira fica presa à peça em rampa, rolagem ou giro; peças
+  // articuladas (rodas, limpadores) recebem um valor único, sem gradiente girando.
+  const groundY = supportPoints.reduce((low, point) => Math.min(low, point.y), Infinity);
+  const articulated = new Set<THREE.Object3D>();
+  for (const wheel of model.wheels) wheel.traverse(node => articulated.add(node));
+  for (const wiper of wipers) wiper.traverse(node => articulated.add(node));
+  const bakeHeights = () => {
+    root.updateMatrixWorld(true);
+    const inverse = root.matrixWorld.clone().invert(), matrix = new THREE.Matrix4(), point = new THREE.Vector3();
+    root.traverse(node => {
+      const mesh = node as THREE.Mesh;
+      if (!mesh.isMesh || mesh.geometry.getAttribute('sompoHeight')) return;
+      const positions = mesh.geometry.attributes.position;
+      const heights = new Float32Array(positions.count);
+      if (articulated.has(mesh)) heights.fill(.45);
+      else {
+        matrix.multiplyMatrices(inverse, mesh.matrixWorld);
+        for (let i = 0; i < positions.count; i++) heights[i] = point.fromBufferAttribute(positions, i).applyMatrix4(matrix).y - groundY;
+      }
+      mesh.geometry.setAttribute('sompoHeight', new THREE.BufferAttribute(heights, 1));
+    });
+  };
+  bakeHeights();
+  // Película de estrada: poeira que sobe do chão, respingo de pista perto das
+  // rodas e filetes no baú. Intensidade por família de material; interior,
+  // vidro, faróis e refletores ficam limpos.
+  const wearFamily = (name: string) =>
+    ['Painéis do baú', 'Alumínio do baú', 'Astra box shell'].includes(name) ? 'box'
+      : ['Pintura da cabine', 'Acabamentos da cabine', 'SOMPO painted metal'].includes(name) ? 'paint'
+        : ['', 'Astra polished chrome', 'Astra grille face', 'Astra grille recess'].includes(name) ? 'metal'
+          : name === 'Sompo tire rubber' ? 'rubber' : null;
   const wearTruck = (material: THREE.MeshStandardMaterial) => {
+    const family = wearFamily(material.name);
+    if (!family) return;
     const panel = material.name === 'Painéis do baú';
-    const box = panel || material.name === 'Alumínio do baú' || material.name === 'Astra box shell';
-    const paint = material.name === 'Pintura da cabine' || material.name === 'Acabamentos da cabine';
-    if (!box && !paint) return;
+    const chrome = material.name === 'Astra polished chrome';
+    const amount = { box: [.3, .18], paint: [.42, .3], metal: [chrome ? .3 : .55, chrome ? .2 : .38], rubber: [.2, 0] }[family];
     const compile = material.onBeforeCompile;
     material.onBeforeCompile = (shader, renderer) => {
       compile?.call(material, shader, renderer);
-      shader.vertexShader = 'varying vec3 truckW;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
-        truckW = transformed;`);
+      shader.vertexShader = 'attribute float sompoHeight; varying float truckH; varying vec3 truckW;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+        truckW = transformed; truckH = sompoHeight;`);
       if (panel) shader.vertexShader = shader.vertexShader.replace('#include <shadowmap_vertex>', `#include <shadowmap_vertex>
         #if NUM_DIR_LIGHT_SHADOWS > 0
           vDirectionalShadowCoord[0].z -= .0006 * vDirectionalShadowCoord[0].w;
         #endif`);
-      shader.fragmentShader = `varying vec3 truckW;
+      shader.fragmentShader = `varying float truckH; varying vec3 truckW;
         float truckHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
         float truckNoise(vec2 p){vec2 i=floor(p),f=fract(p);f*=f*(3.-2.*f);
           return mix(mix(truckHash(i),truckHash(i+vec2(1,0)),f.x),mix(truckHash(i+vec2(0,1)),truckHash(i+vec2(1,1)),f.x),f.y);}\n` + shader.fragmentShader
         .replace('#include <color_fragment>', `#include <color_fragment>
-          float truckDust = (1.0 - smoothstep(.35, 1.9, truckW.y)) * (.4 + .6 * truckNoise(truckW.xz * 1.9));
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.42, .35, .24), clamp(truckDust, 0., 1.) * ${paint ? '.22' : '.16'});
-          ${box ? `float streak = truckNoise(vec2(truckW.z * 14.0 + truckW.x * 9.0, truckW.y * .6));
-          diffuseColor.rgb *= 1.0 - smoothstep(.55, .95, streak) * .09 * (1.0 - smoothstep(2.4, 3.7, truckW.y));` : ''}`)
+          ${family === 'rubber' ? `float truckDust = .6 + .4 * truckNoise(truckW.xy * 7.0 + truckW.z * 3.0);
+          float truckSpray = 0.0;` : `float truckDust = (1.0 - smoothstep(.2, 1.7, truckH)) * (.45 + .55 * truckNoise(truckW.xz * 1.9 + truckW.y * .7));
+          // Respingo de pista: pintas finas concentradas no primeiro metro.
+          float truckSpray = smoothstep(.7, .9, truckNoise(truckW.xz * 9.0 + truckW.y * 7.0)) * (1.0 - smoothstep(.05, 1.0, truckH));`}
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.46, .38, .27), clamp(truckDust * ${amount[0].toFixed(2)} + truckSpray * ${amount[1].toFixed(2)}, 0., .8));
+          ${family === 'box' ? `float streak = truckNoise(vec2(truckW.z * 14.0 + truckW.x * 9.0, truckW.y * .6));
+          diffuseColor.rgb *= 1.0 - smoothstep(.55, .95, streak) * .1 * (1.0 - smoothstep(2.4, 3.7, truckH));` : ''}`)
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-          roughnessFactor = mix(roughnessFactor, .92, clamp(truckDust, 0., 1.) * .5);`);
+          roughnessFactor = mix(roughnessFactor, .92, clamp(truckDust * .6 + truckSpray * .4, 0., 1.) * ${family === 'rubber' ? '.3' : '.6'});`);
     };
-    material.customProgramCacheKey = () => `sompo-truck-wear-local-v3-${box}-${panel}`;
+    material.customProgramCacheKey = () => `sompo-truck-wear-v4-${family}-${panel}-${chrome}`;
   };
   materials.forEach(wearTruck);
   const axisY = new THREE.Vector3(0, 1, 0), axle = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
@@ -266,6 +300,7 @@ export function refineSompoTruck(model: SompoTruckModel) {
           mesh.material = Array.isArray(mesh.material) ? mesh.material.map(apply) : apply(mesh.material);
         });
       }
+      bakeHeights();
       finishKey = '';
       assignVisualMaps(root, () => disposed);
       root.userData.visualAsset = 'AstraSompoTruck';
