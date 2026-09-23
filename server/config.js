@@ -51,8 +51,16 @@ const NINE_ROUTER_PROFILE_DEFINITIONS = [
   ['gpt-5-6-luna-xhigh', 'GPT 5.6 Luna xhigh', 'cx/gpt-5.6-luna(xhigh)'],
   ['gpt-5-6-luna-max', 'GPT 5.6 Luna Max', 'cx/gpt-5.6-luna(max)'],
   ['gpt-5-6-luna-ultra', 'GPT 5.6 Luna Ultra', 'cx/gpt-5.6-luna(max)'],
+  ['gpt-6-luna-medium', 'GPT 6 Luna Medium', 'cx/gpt-6-luna(medium)'],
+  ['gpt-6-sol-medium', 'GPT 6 Sol Medium', 'cx/gpt-6-sol(medium)'],
+  ['gpt-6-sol-high', 'GPT 6 Sol High', 'cx/gpt-6-sol(high)'],
+  ['gpt-6-sol-xhigh', 'GPT 6 Sol xhigh', 'cx/gpt-6-sol(xhigh)'],
+  ['gpt-6-astra-medium', 'GPT 6 Astra Medium', 'cx/gpt-6-astra(medium)'],
+  ['gpt-6-astra-high', 'GPT 6 Astra High', 'cx/gpt-6-astra(high)'],
+  ['gpt-6-astra-xhigh', 'GPT 6 Astra xhigh', 'cx/gpt-6-astra(xhigh)'],
   ['grok-4-6', 'Grok 4.6', 'gcli/grok-4.6'],
   ['grok-4-6-high', 'Grok 4.6 High', 'gcli/grok-4.6(high)'],
+  ['grok-4-7', 'Grok 4.7', 'gcli/grok-4.7'],
   ['grok-4-5-high', 'Grok 4.5 High', 'gcli/grok-4.5(high)'],
 ];
 
