@@ -14,6 +14,7 @@ import { isAppPage } from '../shared/app-location.js';
 
 const ADMIN_PAGES: PageId[] = ['personas', 'configuracao', 'admin'];
 const SonolenciaPage = lazy(() => import('@/sonolencia/SonolenciaPage'));
+const SensorLabPage = lazy(() => import('@/sensor-lab/SensorLabPage'));
 
 export default function App() {
   const { user } = useAuth();
@@ -44,6 +45,7 @@ export default function App() {
       case 'configuracao': return <ConfiguracaoPage />;
       case 'sompo':       return <SompoPage />;
       case 'laboratorio': return <LaboratorioPage />;
+      case 'sensor':      return <Suspense fallback={<p role="status" className="p-8">Abrindo o laboratório do sensor…</p>}><SensorLabPage /></Suspense>;
       case 'sonolencia': return <Suspense fallback={<p role="status" className="p-8">Carregando monitor de sonolência…</p>}><SonolenciaPage /></Suspense>;
       case 'admin':       return <AdminPage />;
     }

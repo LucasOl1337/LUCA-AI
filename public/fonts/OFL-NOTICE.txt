@@ -1,0 +1,4 @@
+Outfit (c) The Outfit Project Authors — SIL Open Font License 1.1
+JetBrains Mono (c) The JetBrains Mono Project Authors — SIL Open Font License 1.1
+Subconjunto latino baixado do Google Fonts para servir localmente (a CSP do app só aceita 'self').
+Licença: https://openfontlicense.org

@@ -42,6 +42,7 @@ tmp-live-ui/
 
 # Local SOMPO workshop builds and review evidence
 .sompo-preview*/
+.sensor-preview*/
 .sompo-agri-preview/
 delivery/
 

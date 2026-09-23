@@ -4,6 +4,7 @@ import {
   BrainCircuit,
   ChevronLeft,
   ChevronRight,
+  Cpu,
   FlaskConical,
   Eye,
   Home,
@@ -19,7 +20,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useDeferredFlag } from '@/hooks/useDeferredFlag';
 import SidebarSessionsRail from '@/components/SidebarSessionsRail';
 
-export type PageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'laboratorio' | 'sonolencia' | 'admin';
+export type PageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'laboratorio' | 'sensor' | 'sonolencia' | 'admin';
 
 interface LayoutProps {
   activePage: PageId;
@@ -39,6 +40,7 @@ const navItems: NavItem[] = [
   { id: 'luca-ai', label: 'LUCA-AI', icon: BrainCircuit, hint: 'bancada isolada com equipe de personas' },
   { id: 'sompo', label: 'SOMPO', icon: Wheat, hint: 'casos de exemplo agrícolas e rurais' },
   { id: 'laboratorio', label: 'Laboratório', icon: FlaskConical, hint: 'replay de incidentes a partir de arquivos' },
+  { id: 'sensor', label: 'Sensor', icon: Cpu, hint: 'o chip do ESP32 por dentro, em 3D' },
   { id: 'sonolencia', label: 'Sonolência', icon: Eye, hint: 'alerta de olhos fechados pela webcam' },
   { id: 'admin', label: 'Admin', icon: ShieldCheck, hint: 'usuários, personas e configuração' },
 ];

@@ -1,4 +1,4 @@
-export type AppPageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'laboratorio' | 'sonolencia' | 'admin';
+export type AppPageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'laboratorio' | 'sensor' | 'sonolencia' | 'admin';
 export type AppLocationKind = 'app' | 'auth' | 'leitura';
 
 export interface AppLocation {
