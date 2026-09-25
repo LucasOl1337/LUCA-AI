@@ -103,7 +103,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   const budget = sompoRenderBudget();
   const field = createSompoAgriScene(worldRoot, scenario.environmentId, budget.compact, scenario.equipmentId);
   const atmosphere = createSompoAtmosphere(scene, renderer, field.sun);
-  const post = createSompoPostProcessing(renderer, scene, camera, .85);
+  const post = createSompoPostProcessing(renderer, scene, camera);
   const meter = createSompoRenderMeter(renderer, onStats);
   const assets = createSompoEnvironmentAssets(scene, renderer, { background: false, intensity: night ? 0.30 : 0.68, initialWet: scenario.environmentId === 'muddy-field', onHdri: (kind, tex) => atmosphere.setSkyTexture(kind, tex) });
   assets.surface(field.terrain.material, 'dirt', 45, 30);
@@ -117,7 +117,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   field.terrain.material.color.set(night ? 0x8b8b81 : scenario.environmentId === 'muddy-field' ? 0x736b60 : 0xd7c6a5);
   // A cena agrícola traz o próprio sol; só o abrimos para cobrir a máquina inteira.
   field.root.traverse((node) => {
-    if (node instanceof THREE.HemisphereLight) node.intensity = night ? .18 : .52;
+    if (node instanceof THREE.HemisphereLight) node.intensity = night ? .18 : .40;
     const light = node as THREE.DirectionalLight;
     if (light.isDirectionalLight) {
       light.castShadow = true;

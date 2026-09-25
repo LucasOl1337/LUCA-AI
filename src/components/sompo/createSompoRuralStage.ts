@@ -132,7 +132,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     orbit.maxPolarAngle = Math.PI * 0.49;
     orbit.target.set(0.35, 1.28, 0);
 
-    scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x776346, 0.50));
+    scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x776346, 0.40));
     const keyLight = new THREE.DirectionalLight(0xffefcd, 2.7);
     keyLight.position.set(-10, 12, 9);
     // One physical sun plus environment illumination. Unshadowed studio fill
@@ -157,7 +157,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     // A rodovia já tem contato projetado sob o caminhão e oclusão assada na
     // vegetação. Desligar o AO de tela evita oito leituras de profundidade por
     // pixel sem perder a ancoragem que realmente aparece neste enquadramento.
-    const postProcessing = createSompoPostProcessing(renderer, scene, camera, .68, false);
+    const postProcessing = createSompoPostProcessing(renderer, scene, camera, false);
     if (location.hostname === '127.0.0.1') Object.assign(window, { __sompoDebug: { scene, camera, renderer, postProcessing } });
     const frontArrow = new THREE.ArrowHelper(
       new THREE.Vector3(1, 0, 0),

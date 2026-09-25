@@ -19,7 +19,7 @@ await p.goto(`${process.env.SOMPO_PREVIEW_URL || 'http://127.0.0.1:5261'}/?bench
 if (exactStage) await p.addStyleTag({ content: `
   html,body,#root{margin:0!important;padding:0!important;width:${viewportWidth}px!important;max-width:none!important;overflow:hidden!important}
   .sompo-simulator-workspace{display:block!important;width:${viewportWidth}px!important}
-  .sompo-simulator-stage{width:${viewportWidth}px!important;height:${viewportHeight}px!important;min-height:0!important;aspect-ratio:auto!important;border-radius:0!important}
+  .sompo-simulator-stage{box-sizing:border-box!important;width:${viewportWidth}px!important;height:${viewportHeight}px!important;min-height:0!important;aspect-ratio:auto!important;border:0!important;border-radius:0!important}
   .sompo-simulator-panel{display:none!important}
 ` });
 await p.locator('[data-sompo-model]:not([data-sompo-model="loading"])').waitFor({ timeout: 60000 });
@@ -35,6 +35,13 @@ for (const id of list) {
   await p.evaluate(() => { if (window.__sompoPreview?.metrics) window.__sompoPreview.metrics.length = 0; });
   await p.waitForTimeout(at);
   const stage = p.locator('.sompo-simulator-stage');
+  await stage.evaluate(element => { element.style.transform = ''; });
+  const box = await stage.boundingBox();
+  if (!box) throw new Error(`Palco sem caixa no cenário ${id}`);
+  await stage.evaluate((element, shift) => {
+    element.style.transform = `translate(${shift.x}px,${shift.y}px)`;
+  }, { x: Math.round(box.x) - box.x, y: Math.round(box.y) - box.y });
+  await p.evaluate(() => new Promise(resolve => requestAnimationFrame(() => resolve())));
   await stage.screenshot({ path: `${out}/${id}.png` });
   report[id] = await p.evaluate(() => window.__sompoPreview?.measure?.() ?? null).catch(() => null);
   console.log('ok', id, JSON.stringify(report[id] && { interval: report[id].intervalMs, gpu: report[id].gpuMs, cpu: report[id].cpuMs, calls: report[id].calls, tris: report[id].triangles }));

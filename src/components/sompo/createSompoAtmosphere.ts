@@ -3,9 +3,9 @@ import type { SompoStudioConfig } from './sompoStudioConfig';
 
 const palettes = {
   day: { top: '#5596b6', horizon: '#c6d7d2', sun: '#fff3d7', ground: '#45563b', direction: [26, 42, 18], strength: 2.2, warmth: 0.15 },
-  // Sol a ~24°, âmbar e rasante: sombra comprida sem perder o céu azul da foto
-  // (a câmera olha para o lado oposto ao sol, então o disco da foto não aparece).
-  golden: { top: '#6ea4d3', horizon: '#c9d0d0', sun: '#ffd09a', ground: '#4d5a38', direction: [-26, 11, 18], strength: 3.2, warmth: 0.52 },
+  // Sol a ~20°, âmbar e rasante: a componente lateral domina e recorta
+  // vegetação/máquina em vez de iluminar a cena de frente.
+  golden: { top: '#6797c7', horizon: '#d7b892', sun: '#ffd092', ground: '#4d5a38', direction: [-28, 10, 19], strength: 5.2, warmth: 0.76 },
   overcast: { top: '#758992', horizon: '#bec9c5', sun: '#d8e8ee', ground: '#424b3c', direction: [12, 40, 16], strength: 0.65, warmth: 0 },
 };
 
@@ -84,13 +84,16 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
           c+=sunlight*pow(sunAmt,40.)*.05;
         } else if(useHdri>.5){
           vec3 sky=mix(equirect(d,skyDry),equirect(d,skyWet),wetSky);
+          float skyLum=dot(sky,vec3(.2126,.7152,.0722));
+          sky=mix(vec3(skyLum),sky,1.20);
+          sky=(sky-.18)*1.10+.18;
           // The authored HDR sky supplies cloud structure and dynamic range.
           c=sky;
           // Espalhamento de fim de tarde: aquece a base das nuvens e cria um
           // halo largo no mesmo azimute do sol real, sem apagar o HDR.
           float lowSun=(1.-smoothstep(.05,.48,max(d.y,0.)))*warmth*(1.-wetSky);
-          c*=mix(vec3(1.),vec3(1.12,.91,.72),lowSun*.42);
-          c+=sunlight*(pow(sunAmt,18.)*.22+pow(sunAmt,180.)*.35)*warmth*(1.-wetSky);
+          c*=mix(vec3(1.),vec3(1.16,.92,.72),lowSun*.48);
+          c+=sunlight*(pow(sunAmt,14.)*.28+pow(sunAmt,160.)*.48)*warmth*(1.-wetSky);
         } else {
           float h=max(d.y,0.);c=mix(horizon,top,pow(h,.32));
           vec2 p=d.xz/max(.12,d.y+.18)*3.0+vec2(clock*.0015,0);
@@ -169,19 +172,19 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
       uniforms.ridgeFar.value.set(night ? '#101c26' : mode === 'overcast' ? '#4d5d63' : '#68798f');
       uniforms.ridgeNear.value.set(night ? '#14211f' : mode === 'overcast' ? '#3d4c40' : '#4c5e3e');
       sun.color.set(night ? '#9bbaca' : palette.sun); sun.intensity = night ? 0.45 : palette.strength;
-      renderer.toneMappingExposure = config.exposure * (night ? 1.04 : mode === 'golden' ? 0.94 : 1.02);
+      renderer.toneMappingExposure = config.exposure * (night ? 1.04 : mode === 'golden' ? 1.05 : 1.02);
       // Fim de tarde precisa de sol forte contra um céu que ilumina pouco; ambiente
       // alto achatava a luz rasante num sépia sem sombra.
-      scene.environmentIntensity = night ? 0.32 : mode === 'overcast' ? 0.68 : mode === 'golden' ? 0.50 : 0.46;
+      scene.environmentIntensity = night ? 0.32 : mode === 'overcast' ? 0.68 : mode === 'golden' ? 0.42 : 0.46;
       if (scene.fog instanceof THREE.FogExp2) {
         // Névoa de distância esfria e perde saturação: serras ficam azuladas
         // em camadas como na referência em vez de virarem uma parede âmbar.
         // Perspectiva aérea começa perto: com início em 100 m o morro a 60-120 m
         // tinha o mesmo contraste do capim a 5 m e a cena achatava.
-        scene.fog.color.set(night ? '#172733' : mode === 'overcast' ? '#a9b2ae' : mode === 'golden' ? '#c8c9bd' : '#b4c6d2');
+        scene.fog.color.set(night ? '#172733' : mode === 'overcast' ? '#a9b2ae' : mode === 'golden' ? '#c9b99f' : '#b4c6d2');
         // Na chuva a cortina fecha antes do capão de mata a ~180 m: com far 230
         // ele ficava escuro e recortado, flutuando sobre a faixa baixa de névoa.
-        scene.fog.density = night ? .0038 : wet ? .007 : mode === 'golden' ? .0022 : .0028;
+        scene.fog.density = night ? .0038 : wet ? .007 : mode === 'golden' ? .0011 : .0028;
       }
     },
     dispose() {
