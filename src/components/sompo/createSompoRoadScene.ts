@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createSompoPastureSurface } from './createSompoPastureSurface';
+import { applySompoScannedGround, createSompoPastureSurface } from './createSompoPastureSurface';
 import { createSompoAnimal } from './createSompoAnimal';
 import { createSompoLicensedFoliage } from './createSompoLicensedFoliage';
 import { createSompoRoadDetails, varySompoSurface, wearSompoRoad, wornRoadPaint, wrapSompoX } from './createSompoRoadDetails';
@@ -87,26 +87,18 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   const details = createSompoRoadDetails(root, camera);
   const roadMap = groundTexture('road');
   const asphalt = new THREE.MeshStandardMaterial({ map: roadMap, roughness: 0.90, metalness: 0.03 });
-  // Asfalto fotográfico com agregado/trincas: a faixa de brita das bordas corre
-  // no sentido longitudinal (u da textura atravessa a pista, v repete a cada 4m).
-  if (typeof document !== 'undefined') {
-    const detail = new THREE.TextureLoader().load('/sompo/gen/astra-asphalt.webp');
-    detail.colorSpace = THREE.SRGBColorSpace;
-    detail.wrapS = detail.wrapT = THREE.RepeatWrapping;
-    detail.center.set(0.5, 0.5);
-    detail.rotation = 0;
-    detail.repeat.set(32.5, 2.05);
-    detail.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    asphalt.map = detail;
-  }
   const road = mesh(root, new THREE.PlaneGeometry(260, 8.2), asphalt, [0, 0, -2.05]);
   road.rotation.x = -Math.PI / 2;
-  assets.surface(asphalt, 'asphalt', 65, 2.05, { keepMap: true, normalScale: 1.0 });
   varySompoSurface(asphalt, 0.24);
+  const scannedGround = [applySompoScannedGround(asphalt, 'asphalt', {
+    anisotropy: renderer.capabilities.getMaxAnisotropy(), scale: 2.2,
+  })];
   const asphaltWear = wearSompoRoad(asphalt, 'asphalt');
   const unpaved = new THREE.MeshStandardMaterial({ map: earthMap, roughness: 1, color: 0xb09b7e });
-  assets.surface(unpaved, 'dirt', 65, 2.05);
   varySompoSurface(unpaved, 0.38);
+  scannedGround.push(applySompoScannedGround(unpaved, 'latosol', {
+    anisotropy: renderer.capabilities.getMaxAnisotropy(), scale: 1.5,
+  }));
   // Broad, soft ambient contact below the chassis complements the tyre-level GTAO.
   const contactMap = texture(256, 64, (context) => {
     context.scale(4, 1);
@@ -116,18 +108,11 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   });
   const contact = new THREE.Mesh(new THREE.PlaneGeometry(10.4, 3.4), new THREE.MeshBasicMaterial({ map: contactMap, transparent: true, depthWrite: false, opacity: 0.82 }));
   contact.name = 'truck-ambient-contact'; contact.rotation.x = -Math.PI / 2; root.add(contact);
-  const shoulderMaterial = new THREE.MeshStandardMaterial({ map: earthMap, color: 0xe1c9aa, roughness: 1 });
-  // Faixa de laterita vista de cima (Grok Imagine, r31): trilhas de pneu no
-  // comprimento, cascalho e touceiras na borda de fora; repete a cada 3 m e
-  // cobre a largura inteira uma vez. Normal/ARM da terra Poly Haven dão o relevo.
-  assets.surface(shoulderMaterial, 'dirt', 65, 0.375, { keepMap: true });
-  if (typeof document !== 'undefined') {
-    const laterite = new THREE.TextureLoader().load('/sompo/gen/r31-laterite-strip.webp');
-    laterite.colorSpace = THREE.SRGBColorSpace; laterite.wrapS = THREE.RepeatWrapping; laterite.wrapT = THREE.ClampToEdgeWrapping;
-    laterite.repeat.set(260 / 3, 1); laterite.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    shoulderMaterial.map = laterite;
-  }
+  const shoulderMaterial = new THREE.MeshStandardMaterial({ map: earthMap, color: 0xb6a69a, roughness: 1 });
   varySompoSurface(shoulderMaterial, 0.3);
+  scannedGround.push(applySompoScannedGround(shoulderMaterial, 'latosol', {
+    anisotropy: renderer.capabilities.getMaxAnisotropy(), scale: 1.5,
+  }));
   wearSompoRoad(shoulderMaterial, 'shoulder');
   const shoulders: THREE.Mesh[] = [];
   for (const z of [2.72, -6.82]) {
@@ -350,6 +335,8 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
     },
     get hasHdri() { return assets.hasHdri; },
     dispose() {
-      pasture.dispose(); life.dispose(); vegetation.dispose(); animal.dispose(); details.dispose(); assets.dispose(); asphalt.dispose(); unpaved.dispose(); clearSky.dispose(); rainSky.dispose(); },
+      pasture.dispose(); life.dispose(); vegetation.dispose(); animal.dispose(); details.dispose(); assets.dispose();
+      scannedGround.forEach(value => value.dispose());
+      asphalt.dispose(); unpaved.dispose(); clearSky.dispose(); rainSky.dispose(); },
   };
 }

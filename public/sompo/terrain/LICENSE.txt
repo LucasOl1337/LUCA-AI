@@ -1,0 +1,13 @@
+Ground texture assets from Poly Haven, licensed CC0 1.0 Universal.
+https://polyhaven.com/license
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Red Mud Stones, by Rob Tuytel:
+https://polyhaven.com/a/red_mud_stones
+
+Tarred Gravel, by Dimitrios Savva:
+https://polyhaven.com/a/tarred_gravel
+
+The runtime WebP files are local 2048 px derivatives made on 2026-09-25.
+The latosol albedo has a baked luminance/saturation adjustment; this is an
+adaptation of the CC0 source, not a claim of authorship over the scan.

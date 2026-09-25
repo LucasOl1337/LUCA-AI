@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createSompoCropRows } from './createSompoCropRows';
 import { geofenceFieldRelief, geofenceOperacaoRelief } from '../../../shared/geofencing/index.js'; // geofencing: relevo dos talhões sintéticos
 import { grassTuftGeometry, varySompoSurface } from './createSompoRoadDetails';
+import { applySompoScannedGround } from './createSompoPastureSurface';
 import { disposeSompoObject } from './sompoStage';
 import type { SompoAgriVisualFrame } from '../../../shared/sompo-agri-scenarios.js';
 
@@ -31,24 +32,71 @@ function terrainHeight(x: number, z: number, slope: number, relief?: (x: number,
   return base + rise * (0.72 + roll * 0.28);
 }
 
-function createTerrain(environment: (typeof SOMPO_AGRI_ENVIRONMENTS)[SompoAgriEnvironmentId]) {
+function createTerrain(environment: (typeof SOMPO_AGRI_ENVIRONMENTS)[SompoAgriEnvironmentId], compact: boolean) {
   const geometry = new THREE.PlaneGeometry(300, 220, 150, 110);
   geometry.rotateX(-Math.PI / 2);
   const positions = geometry.attributes.position;
+  const relief = (environment as { relief?: (x: number, z: number) => number }).relief;
+  const groundAt = (x: number, z: number) => terrainHeight(x, z, environment.slope, relief);
   for (let index = 0; index < positions.count; index += 1) {
-    positions.setY(index, terrainHeight(positions.getX(index), positions.getZ(index), environment.slope, (environment as { relief?: (x: number, z: number) => number }).relief));
+    positions.setY(index, groundAt(positions.getX(index), positions.getZ(index)));
   }
   positions.needsUpdate = true;
   geometry.computeVertexNormals();
   const material = new THREE.MeshStandardMaterial({
-    color: environment.ground,
+    color: environment.mud ? 0x817870 : 0xc9b8aa,
     roughness: environment.mud ? 0.72 : 0.96,
     metalness: 0,
   });
   varySompoSurface(material, 0.26);
+  applySompoScannedGround(material, 'latosol', { furrows: true, scale: 1.5 });
   const terrain = new THREE.Mesh(geometry, material);
   terrain.name = 'sompo-agri-terrain';
   terrain.receiveShadow = true;
+
+  if (!compact) {
+    let seed = 0x51f15e;
+    const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+    const transform = new THREE.Object3D();
+    // Torrões de 4–16 cm: silhueta e sombra real no primeiro plano, onde o
+    // normal map sozinho ficaria plano no ângulo rasante.
+    const clodGeometry = new THREE.DodecahedronGeometry(1, 0);
+    const clodMaterial = new THREE.MeshStandardMaterial({ color: 0x713820, roughness: .98, metalness: 0 });
+    const clods = new THREE.InstancedMesh(clodGeometry, clodMaterial, 280);
+    clods.name = 'sompo-agri-soil-clods';
+    clods.castShadow = clods.receiveShadow = true;
+    for (let i = 0; i < clods.count; i += 1) {
+      const x = random() * 156 - 78;
+      const z = random() * 30 - 15;
+      const size = .028 + random() ** 2 * .078;
+      transform.position.set(x, groundAt(x, z) + size * .27, z);
+      transform.rotation.set(random() * .8, random() * Math.PI, random() * .5);
+      transform.scale.set(size * (.8 + random() * .7), size * (.55 + random() * .45), size * (.75 + random() * .7));
+      transform.updateMatrix(); clods.setMatrixAt(i, transform.matrix);
+      clods.setColorAt(i, new THREE.Color().setHSL(.045 + random() * .025, .48 + random() * .14, .19 + random() * .1));
+    }
+    clods.computeBoundingSphere();
+    // Resteva seca horizontal, separada da frente de plantas: duas faces por
+    // haste, um draw call, e só no perfil desktop.
+    const strawGeometry = new THREE.PlaneGeometry(.32, .018);
+    strawGeometry.rotateX(-Math.PI / 2);
+    const strawMaterial = new THREE.MeshStandardMaterial({ color: 0xa67b3e, roughness: 1, side: THREE.DoubleSide });
+    const straw = new THREE.InstancedMesh(strawGeometry, strawMaterial, 980);
+    straw.name = 'sompo-agri-ground-straw';
+    straw.receiveShadow = true;
+    for (let i = 0; i < straw.count; i += 1) {
+      const x = random() * 156 - 78;
+      const z = random() * 30 - 15;
+      const length = .45 + random() * 1.15;
+      transform.position.set(x, groundAt(x, z) + .018, z);
+      transform.rotation.set(0, random() * Math.PI, 0);
+      transform.scale.set(length, .7 + random() * .7, 1);
+      transform.updateMatrix(); straw.setMatrixAt(i, transform.matrix);
+      straw.setColorAt(i, new THREE.Color().setHSL(.09 + random() * .035, .34 + random() * .18, .32 + random() * .16));
+    }
+    straw.computeBoundingSphere();
+    terrain.add(clods, straw);
+  }
   return terrain;
 }
 
@@ -656,7 +704,7 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
   const definition = SOMPO_AGRI_ENVIRONMENTS[environmentId] || SOMPO_AGRI_ENVIRONMENTS['row-crop-field'];
   const root = new THREE.Group();
   root.name = `sompo-agri-environment-${environmentId}`;
-  const terrain = createTerrain(definition);
+  const terrain = createTerrain(definition, compact);
   root.add(terrain);
   const operation = environmentId === 'geofence-operacao';
   const crops = definition.barn ? null : createSompoCropRows((x,z)=>terrainHeight(x,z,definition.slope,(definition as { relief?: (x: number, z: number) => number }).relief), compact, equipmentId === 'tractor' ? .32 : 1, operation, equipmentId === 'harvester');

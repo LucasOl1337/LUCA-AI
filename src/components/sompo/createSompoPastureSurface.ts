@@ -1,5 +1,102 @@
 import * as THREE from 'three';
 
+type ScannedGroundKind = 'latosol' | 'asphalt';
+
+/**
+ * PBR fotoescaneado em coordenadas de mundo. A macrovariação de duas escalas
+ * de `varySompoSurface` quebra o ladrilho sem duplicar as leituras PBR; no
+ * latossolo, o sulco acompanha as fileiras de milho (eixo X). Aplicar depois de
+ * `varySompoSurface`, que fornece `ruralWorld`, `ruralNoise` e `ruralHash`.
+ */
+export function applySompoScannedGround(
+  material: THREE.MeshStandardMaterial,
+  kind: ScannedGroundKind,
+  options: { anisotropy?: number; furrows?: boolean; scale?: number } = {},
+) {
+  const root = '/sompo/terrain/';
+  const stem = kind === 'latosol' ? 'latosol-red' : 'tarred-gravel';
+  const loader = new THREE.TextureLoader();
+  const canLoad = typeof document !== 'undefined' && typeof document.createElementNS === 'function';
+  const load = (channel: 'albedo' | 'normal' | 'arm', color = false) => {
+    const map = canLoad ? loader.load(`${root}${stem}-${channel}.webp`) : new THREE.Texture();
+    map.colorSpace = color ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    map.wrapS = map.wrapT = THREE.RepeatWrapping;
+    map.anisotropy = Math.min(16, options.anisotropy ?? 16);
+    return map;
+  };
+  const albedo = load('albedo', true);
+  const normal = load('normal');
+  const arm = load('arm');
+  // Ativa os caminhos físicos do MeshStandardMaterial; o shader abaixo troca
+  // os UVs da malha por coordenadas de mundo e reutiliza os mesmos samplers.
+  material.map = albedo;
+  material.normalMap = normal;
+  material.roughnessMap = arm;
+  material.aoMap = arm;
+  material.aoMapIntensity = kind === 'latosol' ? 1.05 : 0.72;
+  material.normalScale.setScalar(kind === 'latosol' ? 0.92 : 0.72);
+  material.needsUpdate = true;
+
+  const compile = material.onBeforeCompile;
+  const baseKey = material.customProgramCacheKey();
+  const scale = options.scale ?? (kind === 'latosol' ? 1.5 : 2.2);
+  const furrows = kind === 'latosol' && options.furrows;
+  material.onBeforeCompile = (shader, renderer) => {
+    compile.call(material, shader, renderer);
+    shader.uniforms.scannedAlbedo = { value: albedo };
+    shader.uniforms.scannedNormal = { value: normal };
+    shader.uniforms.scannedArm = { value: arm };
+    shader.fragmentShader = `uniform sampler2D scannedAlbedo;
+uniform sampler2D scannedNormal;
+uniform sampler2D scannedArm;
+` + shader.fragmentShader;
+    shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `
+      vec2 scannedUvA = ruralWorld.xz / ${scale.toFixed(3)};
+      vec3 scannedColor = texture2D(scannedAlbedo, scannedUvA).rgb;
+      ${kind === 'asphalt' ? 'scannedColor *= 1.16;' : ''}
+      ${furrows ? `
+      // 24 m / 54 linhas = 44,4 cm. A crista clara e a valeta escura
+      // continuam legíveis no contraluz sem virar uma grade desenhada.
+      float scannedFurrowPhase = ruralWorld.z * 14.137;
+      float scannedFurrow = .5 + .5 * cos(scannedFurrowPhase);
+      float scannedValley = 1.0 - smoothstep(.18, .72, scannedFurrow);
+      float scannedFurrowMask = (1.0 - smoothstep(14.0, 22.0, abs(ruralWorld.z)))
+        * (1.0 - smoothstep(28.0, 72.0, distance(cameraPosition, ruralWorld)));
+      scannedColor *= mix(1.0, mix(.82, 1.06, smoothstep(.08, .92, scannedFurrow)), scannedFurrowMask);
+      // Palhada fina assada no material; as hastes geométricas ficam só perto.
+      float scannedStraw = smoothstep(.84, .975, ruralNoise(ruralWorld.xz * 5.8 + 71.0));
+      scannedColor = mix(scannedColor, vec3(.58, .43, .22), scannedStraw * .42 * scannedFurrowMask);
+      ` : ''}
+      diffuseColor.rgb *= scannedColor;`);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      vec3 scannedN = texture2D(scannedNormal, scannedUvA).xyz * 2.0 - 1.0;
+      ${furrows ? 'scannedN.y += sin(scannedFurrowPhase) * .2 * scannedFurrowMask; scannedN = normalize(scannedN);' : ''}
+      scannedN.xy *= normalScale;
+      normal = normalize(tbn * scannedN);`);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', `
+      vec3 scannedArmValue = texture2D(scannedArm, scannedUvA).rgb;
+      float roughnessFactor = roughness * scannedArmValue.g;
+      ${furrows ? 'roughnessFactor *= mix(1.0, mix(.92, 1.06, scannedValley), scannedFurrowMask);' : ''}`);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <aomap_fragment>', `
+      float ambientOcclusion = (scannedArmValue.r - 1.0) * aoMapIntensity + 1.0;
+      reflectedLight.indirectDiffuse *= ambientOcclusion;
+      #if defined( USE_CLEARCOAT )
+        clearcoatSpecularIndirect *= ambientOcclusion;
+      #endif
+      #if defined( USE_SHEEN )
+        sheenSpecularIndirect *= ambientOcclusion;
+      #endif
+      #if defined( USE_ENVMAP ) && defined( STANDARD )
+        float scannedDotNV = saturate(dot(geometryNormal, geometryViewDir));
+        reflectedLight.indirectSpecular *= computeSpecularOcclusion(scannedDotNV, ambientOcclusion, material.roughness);
+      #endif`);
+  };
+  material.customProgramCacheKey = () => `${baseKey}-scanned-ground-v1-${kind}-${furrows}-${scale}`;
+  return {
+    dispose() { albedo.dispose(); normal.dispose(); arm.dispose(); },
+  };
+}
+
 /** Generated albedo is a surface input; geometry, light and shadows remain live. */
 export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, field = false, farmland = field) {
   let disposed = false;
@@ -17,7 +114,7 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
   texture.wrapS = texture.wrapT = THREE.MirroredRepeatWrapping;
   texture.anisotropy = 8;
   const soilReady = { value: 0 };
-  const soilTexture = load('/sompo/gen/solo-barro.webp', map => {
+  const soilTexture = load('/sompo/terrain/latosol-red-albedo.webp', map => {
     if (disposed) { map.dispose(); return; }
     soilReady.value = 1;
   });

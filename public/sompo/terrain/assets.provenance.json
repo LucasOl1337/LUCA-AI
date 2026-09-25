@@ -1,0 +1,41 @@
+{
+  "license": "CC0-1.0",
+  "licenseUrl": "https://polyhaven.com/license",
+  "downloadedAt": "2026-09-25",
+  "assets": [
+    {
+      "id": "red_mud_stones",
+      "page": "https://polyhaven.com/a/red_mud_stones",
+      "author": "Rob Tuytel",
+      "physicalWidthMeters": 1.5,
+      "sourceResolution": "2k",
+      "sourceUrls": {
+        "albedo": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_mud_stones/red_mud_stones_diff_2k.jpg",
+        "normal": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_mud_stones/red_mud_stones_nor_gl_2k.jpg",
+        "arm": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_mud_stones/red_mud_stones_arm_2k.jpg"
+      },
+      "derivatives": {
+        "latosol-red-albedo.webp": { "bytes": 1742496, "sha256": "e2fb43490669b91889abfe0bede53f6f6b941b4e5161f199a6b342221b6bd8c8", "process": "ImageMagick: modulate 92,112,100; WebP q92" },
+        "latosol-red-normal.webp": { "bytes": 2900452, "sha256": "104434552422599c5346c7a8ff4f687340a4ca5242e38683621b1e0ae91dca16", "process": "ImageMagick: WebP q95" },
+        "latosol-red-arm.webp": { "bytes": 1246642, "sha256": "42cc388cf71bf51ff83464b0b7524d47ee54b3582c1f18f0fa5897eab5dce7a2", "process": "ImageMagick: WebP q95" }
+      }
+    },
+    {
+      "id": "tarred_gravel",
+      "page": "https://polyhaven.com/a/tarred_gravel",
+      "author": "Dimitrios Savva",
+      "physicalWidthMeters": 2.2,
+      "sourceResolution": "2k",
+      "sourceUrls": {
+        "albedo": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/tarred_gravel/tarred_gravel_diff_2k.jpg",
+        "normal": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/tarred_gravel/tarred_gravel_nor_gl_2k.jpg",
+        "arm": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/tarred_gravel/tarred_gravel_arm_2k.jpg"
+      },
+      "derivatives": {
+        "tarred-gravel-albedo.webp": { "bytes": 1050080, "sha256": "08e2320238eebdc986d7ff64f682d6af86f584fe96be145dac9e78cc326d5a14", "process": "ImageMagick: modulate 95,92,100; WebP q92" },
+        "tarred-gravel-normal.webp": { "bytes": 1938724, "sha256": "ee1228fb79499b46643b5326c618006bf2191f5c93cf71724d76ddedaf157194", "process": "ImageMagick: WebP q95" },
+        "tarred-gravel-arm.webp": { "bytes": 2024196, "sha256": "3c26a4820f9d360aa59253bf770fcb7b8be938f4ce096c2e361eec8675158c7d", "process": "ImageMagick: WebP q95" }
+      }
+    }
+  ]
+}
