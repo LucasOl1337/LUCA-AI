@@ -2,9 +2,9 @@
   "asset": "maize-leaf-normal.webp",
   "createdAt": "2026-09-25",
   "generator": "scripts/sompo/build-lavoura-materials.py (Pillow + NumPy)",
-  "sha256": "16162183e1584fb1893be044f86915d729ba7208508c6c635f204a4d84b87b0b",
-  "source": "/sompo/gen/maize-leaf-albedo.png",
-  "sourceProvenance": "/models/sompo/maize-curved.provenance.json",
+  "sha256": "e84bd1bfaf92c907184fa7803dba38122caf8dfc3d5757175e8828ed2ad4ed9f",
+  "source": "/sompo/gen/maize-leaf-surface.webp",
+  "sourceProvenance": "/sompo/gen/maize-leaf-surface.provenance.json",
   "license": "Project-owned derived asset; source generated for LUCA-AI",
-  "purpose": "Normal map com nervuras longitudinais e nervura central para folhas curvas de milho"
+  "purpose": "Normal map opaco com nervuras longitudinais e nervura central contínua para folhas curvas de milho"
 }

@@ -26,39 +26,47 @@ function maizeLeafGeometry(mature: boolean, detailed: boolean) {
   const positions: number[] = [];
   const uvs: number[] = [];
   const flex: number[] = [];
+  const layers: number[] = [];
   const indices: number[] = [];
-  const leafCount = detailed ? (mature ? 7 : 6) : 3;
-  const segments = detailed ? 6 : 2;
+  const leafCount = detailed ? (mature ? 7 : 4) : 3;
+  const segments = detailed ? 8 : 3;
 
   for (let leaf = 0; leaf < leafCount; leaf += 1) {
-    const base = mature ? .19 + leaf * .082 : .12 + leaf * .105;
-    const reach = (mature ? .31 : .36) + seeded(leaf * 13 + (mature ? 4 : 9)) * .13;
-    const lift = (mature ? .42 : .58) + seeded(leaf * 17 + 3) * .12;
-    const azimuth = leaf * 2.399963 + seeded(leaf * 29 + 8) * .32;
-    const baseWidth = (mature ? .072 : .082) + seeded(leaf * 31 + 11) * .024;
+    const layer = leaf / Math.max(1, leafCount - 1);
+    const base = mature ? .15 + leaf * .105 : .1 + leaf * .135;
+    const reach = (mature ? .48 : .43) + seeded(leaf * 13 + (mature ? 4 : 9)) * (mature ? .17 : .14);
+    const lift = (mature ? .5 : .62) + seeded(leaf * 17 + 3) * .11;
+    // Milho lança folhas alternadas em lados opostos do colmo; a pequena
+    // divergência impede uma silhueta perfeitamente plana sem virar roseta.
+    const azimuth = leaf * Math.PI + (leaf % 2 ? .12 : -.1) + seeded(leaf * 29 + 8) * .14;
+    // Lâmina de milho real: comprimento entre 8 e 12 vezes a largura total.
+    const halfWidth = (mature ? .056 : .063) + seeded(leaf * 31 + 11) * (mature ? .012 : .014);
     const vertexBase = positions.length / 3;
 
     for (let segment = 0; segment <= segments; segment += 1) {
       const t = segment / segments;
-      const twist = Math.sin(t * Math.PI) * (.12 + seeded(leaf * 43 + 5) * .12) * (leaf % 2 ? -1 : 1);
+      const twist = Math.sin(t * Math.PI) * (.1 + seeded(leaf * 43 + 5) * .15) * (leaf % 2 ? -1 : 1);
       const angle = azimuth + twist;
-      const radius = reach * (t + Math.sin(t * Math.PI) * .11);
-      const droop = mature ? 1.08 : .72;
-      const centerY = base + lift * (t - droop * t * t * .63);
-      const taper = Math.max(.025, Math.sin(Math.PI * Math.pow(t, .82)));
-      const width = baseWidth * taper;
+      const radius = reach * (t + Math.sin(t * Math.PI) * .13);
+      const fall = Math.max(0, t - .52);
+      const arch = Math.sin(Math.PI * Math.min(1, t * .86)) * .72 + t * .2;
+      const centerY = base + lift * (arch - fall * fall * (mature ? 1.75 : 1.4));
+      const taper = Math.max(.035, Math.sin(Math.PI * Math.pow(t, .78)));
+      const width = halfWidth * taper;
       for (let column = 0; column < 3; column += 1) {
         const across = column - 1;
-        const ridge = column === 1 ? .012 * Math.sin(t * Math.PI) : 0;
+        const ridge = column === 1 ? .009 * Math.sin(t * Math.PI) : 0;
+        const edgeWave = across * Math.sin(t * Math.PI * 5 + leaf * 1.7) * width * .1;
         positions.push(
           Math.cos(angle) * radius - Math.sin(angle) * across * width,
-          centerY + ridge,
+          centerY + ridge + edgeWave,
           Math.sin(angle) * radius + Math.cos(angle) * across * width,
         );
-        // O recorte ocupa o terço central do atlas-fonte; amostrar só essa
-        // faixa evita transformar a folha modelada numa lâmina de 2 cm.
-        uvs.push(.35 + column * .16, t);
+        // A textura é uma superfície opaca normalizada; a malha, não o alfa,
+        // define a silhueta e elimina a costura tracejada na nervura.
+        uvs.push(column * .5, t);
         flex.push(t);
+        layers.push(layer);
       }
     }
 
@@ -74,6 +82,7 @@ function maizeLeafGeometry(mature: boolean, detailed: boolean) {
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setAttribute('cropFlex', new THREE.Float32BufferAttribute(flex, 1));
+  geometry.setAttribute('cropLayer', new THREE.Float32BufferAttribute(layers, 1));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
@@ -137,9 +146,10 @@ function configureCropShader(
       harvestTime: options.harvestTime,
     });
     shader.vertexShader = `${options.operation ? 'attribute float harvestAt; uniform float harvestTime;' : ''}
-      ${options.leaves ? 'attribute float cropFlex;' : ''}
+      ${options.leaves ? 'attribute float cropFlex; attribute float cropLayer;' : ''}
       uniform float cropTime,cropWind; uniform vec3 cropCut; uniform vec2 cropPath[8];
       varying float cropHeight; varying float cropTint; varying float cropStubble; varying float cropFacing;
+      varying float cropTip; varying float cropLeafAge; varying float cropVariantId;
     ` + shader.vertexShader
       .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
         vec3 field=instanceMatrix[3].xyz; float phase=field.x*1.73+field.z*2.41;
@@ -149,6 +159,8 @@ function configureCropShader(
       .replace('#include <begin_vertex>', `
         float h=position.y;
         float plantFlex=${options.leaves ? 'cropFlex' : 'clamp(h,0.,1.)'};
+        float variantHash=fract(sin(field.x*15.73+field.z*8.91)*43758.5453);
+        float plantVariant=floor(variantHash*4.0);
         float w1=sin(cropTime*1.7+phase+field.x*.14+field.z*.11);
         float w2=sin(cropTime*.4+field.x*.02+field.z*.017);
         float bend=cropWind*(.025+.055*(.55+.45*w2)*(.55+.45*w1))*plantFlex*plantFlex;
@@ -159,17 +171,24 @@ function configureCropShader(
         float harvested=(1.-smoothstep(cropCut.x-.18,cropCut.x+.18,field.x))*step(abs(field.z-centerZ),2.72)*step(.001,cropCut.z);
         ${options.operation ? 'harvested=step(harvestAt,harvestTime);' : ''}
         cropHeight=h; cropTint=fract(sin(phase)*43758.5453); cropStubble=harvested;
+        cropTip=${options.leaves ? 'cropFlex' : 'clamp(h,0.,1.)'};
+        cropLeafAge=${options.leaves ? 'cropLayer' : 'clamp(h,0.,1.)'};
+        cropVariantId=plantVariant;
         vec3 shaped=position;
         float spunX=shaped.x*ca-shaped.z*sa;
         shaped.z=shaped.x*sa+shaped.z*ca; shaped.x=spunX;
-        shaped.x+=bend; shaped.z+=bend*.38;
+        // Quatro perfis discretos por pé: ereto, inclinado, arqueado à
+        // esquerda e arqueado à direita. A cor continua variando por instância.
+        float variantLean=(plantVariant-1.5)*.024*plantFlex*plantFlex;
+        float variantSide=(mod(plantVariant,2.0)-.5)*.052*plantFlex*plantFlex;
+        shaped.y*=1.0+(plantVariant-1.5)*.018;
+        shaped.x+=bend+variantLean; shaped.z+=bend*.38+variantSide;
         shaped.y*=1.-harvested*.78; shaped.xz*=1.-harvested*.36;
         vec3 transformed=shaped;`)
       .replace('#include <defaultnormal_vertex>', `#include <defaultnormal_vertex>
         cropFacing=clamp(-transformedNormal.z*.5+.5,0.,1.);`);
-    shader.fragmentShader = 'varying float cropHeight; varying float cropTint; varying float cropStubble; varying float cropFacing;\n' + shader.fragmentShader
-      .replace('#include <alphatest_fragment>', `${options.leaves ? 'diffuseColor.rgb/=max(.34,sqrt(max(diffuseColor.a,.001)));' : ''}
-        #include <alphatest_fragment>`)
+    shader.fragmentShader = `varying float cropHeight; varying float cropTint; varying float cropStubble; varying float cropFacing;
+      varying float cropTip; varying float cropLeafAge; varying float cropVariantId;\n` + shader.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
         ${options.mature ? `
           float leafLum=dot(diffuseColor.rgb,vec3(.3,.59,.11));
@@ -178,8 +197,19 @@ function configureCropShader(
           diffuseColor.rgb=${options.leaves ? 'straw*(.62+leafLum*1.32)' : 'mix(vec3(.28,.19,.07),vec3(.58,.39,.12),cropHeight)'};` : `
           diffuseColor.rgb*=${options.leaves ? 'mix(vec3(.30,.48,.095),vec3(.78,.90,.31),pow(max(cropHeight,.001),.82))' : 'mix(vec3(.20,.31,.065),vec3(.48,.58,.12),cropHeight)'};`}
         diffuseColor.rgb*=.76+cropTint*.38;
+        ${options.leaves && !options.mature ? `
+          float lowerDry=(1.0-cropLeafAge)*(.28+.3*step(.58,cropTint));
+          diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.42,.42,.075)*(.85+cropTint*.22),lowerDry);
+          float burnedTip=smoothstep(.78,.98,cropTip)*step(2.5,cropVariantId)*step(.68,cropTint)*.72;
+          diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.19,.105,.025),burnedTip);` : ''}
         ${options.leaves ? 'diffuseColor.rgb+=mix(vec3(.012,.028,.002),vec3(.075,.125,.018),cropFacing)*pow(1.-cropFacing,1.4);' : ''}
-        diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.46,.30,.105)*(.72+cropTint*.45),cropStubble*.9);`);
+        diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.46,.30,.105)*(.72+cropTint*.45),cropStubble*.9);`)
+      .replace('#include <opaque_fragment>', `${options.leaves ? `
+        // Luz transmitida barata: evita que a face inferior da ponta caída
+        // vire um ponto preto quando a normal deixa de receber sol direto.
+        vec3 leafLightFloor=diffuseColor.rgb*(gl_FrontFacing?.08:.55);
+        outgoingLight=max(outgoingLight,leafLightFloor);` : ''}
+        #include <opaque_fragment>`);
   };
   material.customProgramCacheKey = () => options.cacheKey;
 }
@@ -201,7 +231,7 @@ export function createSompoCropRows(groundHeight: (x: number, z: number) => numb
   const structureGeometry = maizeStructureGeometry(mature);
   const leafMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff, roughness: mature ? .92 : .78, metalness: 0,
-    side: THREE.DoubleSide, alphaTest: .38, alphaToCoverage: true,
+    side: THREE.DoubleSide,
   });
   const farLeafMaterial = leafMaterial.clone();
   const structureMaterial = new THREE.MeshStandardMaterial({
@@ -213,13 +243,13 @@ export function createSompoCropRows(groundHeight: (x: number, z: number) => numb
 
   if (typeof document !== 'undefined' && typeof document.createElementNS === 'function') {
     const loader = new THREE.TextureLoader();
-    loader.load('/sompo/gen/maize-leaf-albedo.png', map => {
+    loader.load('/sompo/gen/maize-leaf-surface.webp?v=2', map => {
       map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 16;
       leafTextures.push(map);
       leafMaterial.map = farLeafMaterial.map = map;
       leafMaterial.needsUpdate = farLeafMaterial.needsUpdate = true;
     });
-    loader.load('/sompo/gen/maize-leaf-normal.webp', normal => {
+    loader.load('/sompo/gen/maize-leaf-normal.webp?v=2', normal => {
       normal.colorSpace = THREE.NoColorSpace; normal.anisotropy = 16;
       leafTextures.push(normal);
       leafMaterial.normalMap = farLeafMaterial.normalMap = normal;
@@ -231,8 +261,8 @@ export function createSompoCropRows(groundHeight: (x: number, z: number) => numb
   const tiles: CropTile[] = [];
   const geometries = new Set<THREE.BufferGeometry>([nearLeafGeometry, farLeafGeometry, structureGeometry]);
   const dummy = new THREE.Object3D();
-  const columns = compact ? 34 : (operation ? 62 : 58);
-  const rows = compact ? (operation ? 58 : 30) : (operation ? 108 : 44);
+  const columns = compact ? 40 : (operation ? 62 : 27);
+  const rows = compact ? (operation ? 58 : 32) : 120;
   for (let tileIndex = 0; tileIndex < 8; tileIndex += 1) {
     const count = columns * rows;
     const detailGeometry = operation ? nearLeafGeometry.clone() : nearLeafGeometry;
@@ -263,14 +293,16 @@ export function createSompoCropRows(groundHeight: (x: number, z: number) => numb
 
     for (let row = 0; row < rows; row += 1) for (let column = 0; column < columns; column += 1) {
       const seed = tileIndex * 719 + row * 31 + column * 17;
-      const x = startX + tileIndex * tileSpan + (column + .5) * tileSpan / columns + (seeded(seed + 7) - .5) * .11;
-      const z = startZ + (row + .5) * zSpan / rows + (seeded(seed + 13) - .5) * .12;
+      const xJitter = operation ? .11 : .035;
+      const x = startX + tileIndex * tileSpan + (column + .5) * tileSpan / columns + (seeded(seed + 7) - .5) * xJitter;
+      const zJitter = operation ? .12 : .08;
+      const z = startZ + (row + .5) * zSpan / rows + (seeded(seed + 13) - .5) * zJitter;
       const plantHeight = mature
         ? (1.78 + seeded(seed + 19) * .38) * height
-        : (2.12 + seeded(seed + 19) * .72) * height;
+        : (1.6 + seeded(seed + 19) * .5) * height;
       const girth = mature
         ? .86 + seeded(seed + 23) * .28
-        : .57 + seeded(seed + 23) * .19;
+        : .34 + seeded(seed + 23) * .14;
       slots.push({ x, z });
       dummy.position.set(x, groundHeight(x, z), z);
       dummy.rotation.set(0, 0, 0);
@@ -315,7 +347,7 @@ export function createSompoCropRows(groundHeight: (x: number, z: number) => numb
       cut.value.set(machine ? machine.x + 4.28 : -1000, machine?.z ?? 0, cropCut);
       for (const tile of tiles) {
         const visible = operation || Math.abs(tile.centerX - camera.x) < 88;
-        const detailed = !compact && Math.abs(tile.centerX - camera.x) < 27;
+        const detailed = !compact && Math.abs(tile.centerX - camera.x) < (operation ? 27 : 20);
         tile.nearLeaves.visible = visible && detailed;
         tile.nearStructure.visible = visible && detailed;
         tile.farLeaves.visible = visible && !detailed;

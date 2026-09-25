@@ -24,6 +24,30 @@ test('crop layout stays deterministic, grounded and within both geometry budgets
   // O teto agora mede o pior LOD visível: malha curva perto + impostor longe.
   assert.ok(total<=2300000);assert.ok(reduced<total*.65);
   const shader={uniforms:{},vertexShader:'#include <begin_vertex>',fragmentShader:'#include <color_fragment>'};full.root.children[0].material.onBeforeCompile(shader);
+  assert.equal(full.root.children[0].material.alphaTest,0,'a silhueta vem da malha, sem costura de alpha-test');
+  assert.ok(full.root.children[0].geometry.getAttribute('cropLayer'),'idade da folha alimenta a variação de cor');
+  const leafPosition=full.root.children[0].geometry.getAttribute('position');let leafLength=0,leafWidth=0;
+  let previousCenter=new THREE.Vector3().fromBufferAttribute(leafPosition,1);
+  for(let segment=0;segment<=8;segment++) {
+    const left=new THREE.Vector3().fromBufferAttribute(leafPosition,segment*3);
+    const center=new THREE.Vector3().fromBufferAttribute(leafPosition,segment*3+1);
+    const right=new THREE.Vector3().fromBufferAttribute(leafPosition,segment*3+2);
+    if(segment) leafLength+=center.distanceTo(previousCenter);previousCenter=center;leafWidth=Math.max(leafWidth,left.distanceTo(right));
+  }
+  assert.ok(leafLength/leafWidth>=8&&leafLength/leafWidth<=12,'folha em fita fica entre 8 e 12 vezes mais longa que larga');
+  assert.match(shader.vertexShader,/floor\(variantHash\*4\.0\)/,'quatro perfis paramétricos por pé');
+  assert.match(shader.fragmentShader,/lowerDry/,'folhas inferiores amarelam');
+  assert.match(shader.fragmentShader,/burnedTip/,'uma variante recebe ponta queimada');
+  full.root.children[0].getMatrixAt(0,pose);const first=p.setFromMatrixPosition(pose).clone();
+  full.root.children[0].getMatrixAt(1,pose);const next=p.setFromMatrixPosition(pose).clone();
+  full.root.children[0].getMatrixAt(27,pose);const nextPlant=p.setFromMatrixPosition(pose).clone();
+  assert.ok(Math.abs(next.x-first.x)>.5&&Math.abs(next.x-first.x)<.65,'fileiras ficam perto de 60 cm');
+  assert.ok(Math.abs(nextPlant.z-first.z)>.11&&Math.abs(nextPlant.z-first.z)<.29,'pés ficam perto de 20 cm na linha');
+  const tractorCrop=createSompoCropRows(()=>0,false,.32);const tractorPose=new THREE.Matrix4();let tractorTop=0;
+  const plantTop=Math.max(...Array.from(tractorCrop.root.children[0].geometry.getAttribute('position').array).filter((_,index)=>index%3===1));
+  for(let index=0;index<tractorCrop.root.children[0].count;index++){tractorCrop.root.children[0].getMatrixAt(index,tractorPose);tractorTop=Math.max(tractorTop,plantTop*new THREE.Vector3().setFromMatrixScale(tractorPose).y);}
+  assert.ok(tractorTop>=.6&&tractorTop<=1,'milho jovem permanece no estágio V6–V8 de 0,6–1,0 m');
+  tractorCrop.dispose();
   full.update(3000,new THREE.Vector3(),false,.4,new THREE.Vector3(6,0,1),1);
   assert.ok(Math.abs(shader.uniforms.cropCut.value.x - 10.28) < 1e-8, 'cut begins at the measured cutter bar, ahead of the wheels');
   assert.deepEqual(shader.uniforms.cropCut.value.toArray().slice(1),[1,1]);

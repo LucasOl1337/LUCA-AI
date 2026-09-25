@@ -1,0 +1,10 @@
+{
+  "asset": "maize-leaf-surface.webp",
+  "createdAt": "2026-09-25",
+  "generator": "scripts/sompo/build-lavoura-materials.py (Pillow + NumPy)",
+  "sha256": "366c292d28e73a5fe069c8e067df6cd965fe724852beac3d1238a4e742f9ba8e",
+  "source": "/sompo/gen/maize-leaf-albedo.png",
+  "sourceProvenance": "/models/sompo/maize-curved.provenance.json",
+  "license": "Project-owned derived asset; source generated for LUCA-AI",
+  "purpose": "Superfície opaca reamostrada da folha; a malha curva define a silhueta sem alpha-test"
+}
