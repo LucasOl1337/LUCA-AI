@@ -17,10 +17,12 @@ export function sompoRenderBudget() {
 
 export function createSompoRenderer(mount: HTMLElement) {
   const budget = sompoRenderBudget();
-  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' });
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: budget.compact, powerPreference: 'high-performance' });
   renderer.setPixelRatio(budget.pixelRatio);
   renderer.setClearColor(0x07100c, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  // A comparação A/B deixou o AgX excessivamente dessaturado nesta paleta.
+  // ACES sem a antiga curva S preserva o contraste físico e segura o céu HDR.
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;

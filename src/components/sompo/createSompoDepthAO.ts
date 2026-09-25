@@ -37,21 +37,21 @@ export class SompoDepthAOPass extends Pass {
         if (rUv < texel.y * 1.5) { gl_FragColor = vec4(1.0); return; }
         rUv = min(rUv, .1);
         float spin = ign(gl_FragCoord.xy) * 6.2831853, occlusion = 0.0;
-        for (int i = 0; i < 12; i++) {
-          float f = (float(i) + .5) / 12.0, a = spin + float(i) * 2.3999632;
+        for (int i = 0; i < 8; i++) {
+          float f = (float(i) + .5) / 8.0, a = spin + float(i) * 2.3999632;
           vec2 offset = vec2(cos(a) / aspect, sin(a)) * rUv * sqrt(f);
           vec3 v = viewPos(vUv + offset) - P;
           float vv = dot(v, v);
           occlusion += max(0.0, dot(v, N) - .004 * -P.z) / (vv + .02) * (1.0 - smoothstep(radius * radius, 4.0 * radius * radius, vv));
         }
-        float ao = clamp(1.0 - occlusion * radius * 2.2 / 12.0, 0.0, 1.0);
+        float ao = clamp(1.0 - occlusion * radius * 2.0 / 8.0, 0.0, 1.0);
         gl_FragColor = vec4(vec3(mix(ao, 1.0, smoothstep(60.0, 140.0, -P.z))), 1.0);
       }`,
   });
   private readonly compositeMaterial = new THREE.ShaderMaterial({
     uniforms: {
       tDiffuse: { value: null }, tAO: { value: null }, tDepth: { value: null }, projInv: { value: new THREE.Matrix4() },
-      aoTexel: { value: new THREE.Vector2() }, strength: { value: 0.75 },
+      aoTexel: { value: new THREE.Vector2() }, strength: { value: 0.62 },
     },
     vertexShader,
     fragmentShader: `varying vec2 vUv; uniform sampler2D tDiffuse, tAO; uniform vec2 aoTexel; uniform float strength;
@@ -77,7 +77,7 @@ export class SompoDepthAOPass extends Pass {
   }
 
   setSize(width: number, height: number) {
-    const w = Math.max(1, Math.floor(width / 2)), h = Math.max(1, Math.floor(height / 2));
+    const w = Math.max(1, Math.floor(width / 3)), h = Math.max(1, Math.floor(height / 3));
     this.aoTarget.setSize(w, h);
     this.aoMaterial.uniforms.texel.value.set(1 / w, 1 / h);
     this.aoMaterial.uniforms.aspect.value = width / Math.max(1, height);
@@ -86,7 +86,7 @@ export class SompoDepthAOPass extends Pass {
 
   render(renderer: THREE.WebGLRenderer, writeBuffer: THREE.WebGLRenderTarget, readBuffer: THREE.WebGLRenderTarget) {
     const depth = readBuffer.depthTexture;
-    this.compositeMaterial.uniforms.strength.value = depth ? .75 : 0;
+    this.compositeMaterial.uniforms.strength.value = depth ? .62 : 0;
     for (const material of [this.aoMaterial, this.compositeMaterial]) {
       material.uniforms.tDepth.value = depth;
       material.uniforms.projInv.value.copy(this.camera.projectionMatrixInverse);

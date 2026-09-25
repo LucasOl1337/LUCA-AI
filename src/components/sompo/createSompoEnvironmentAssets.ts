@@ -35,7 +35,9 @@ export function createSompoEnvironmentAssets(scene: THREE.Scene, renderer: THREE
   }
   function loadHdri(kind: 'dry' | 'wet') {
     if (hdriJobs[kind]) return;
-    const filename = kind === 'dry' ? 'kloofendal_48d_partly_cloudy_puresky_2k.hdr' : 'farmland_overcast_2k.hdr';
+    // Kloppenheim traz sol baixo e nuvens recortadas, coerentes com o fim de
+    // tarde da cena; Kloofendal é um céu de meio-dia e achatava o contraluz.
+    const filename = kind === 'dry' ? 'kloppenheim_06_2k.hdr' : 'farmland_overcast_2k.hdr';
     hdriJobs[kind] = new HDRLoader().loadAsync(ASSET_ROOT + filename).then((texture) => {
       retain(texture);
       if (disposed) return;

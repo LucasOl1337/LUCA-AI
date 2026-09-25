@@ -95,7 +95,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   }
   const skyMap = new THREE.CanvasTexture(skyCanvas); skyMap.colorSpace = THREE.SRGBColorSpace;
   scene.background = skyMap;
-  scene.fog = new THREE.Fog(scenario.environmentId === 'row-crop-field-night' ? 0x081019 : 0xb9c8c2, 60, 170);
+  scene.fog = new THREE.FogExp2(scenario.environmentId === 'row-crop-field-night' ? 0x081019 : 0xb9c8c2, nightSky ? .006 : .0035);
 
   const worldRoot = new THREE.Group();
   scene.add(worldRoot);
@@ -103,7 +103,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   const budget = sompoRenderBudget();
   const field = createSompoAgriScene(worldRoot, scenario.environmentId, budget.compact, scenario.equipmentId);
   const atmosphere = createSompoAtmosphere(scene, renderer, field.sun);
-  const post = createSompoPostProcessing(renderer, scene, camera);
+  const post = createSompoPostProcessing(renderer, scene, camera, .85);
   const meter = createSompoRenderMeter(renderer, onStats);
   const assets = createSompoEnvironmentAssets(scene, renderer, { background: false, intensity: night ? 0.30 : 0.68, initialWet: scenario.environmentId === 'muddy-field', onHdri: (kind, tex) => atmosphere.setSkyTexture(kind, tex) });
   assets.surface(field.terrain.material, 'dirt', 45, 30);
@@ -117,14 +117,17 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   field.terrain.material.color.set(night ? 0x8b8b81 : scenario.environmentId === 'muddy-field' ? 0x736b60 : 0xd7c6a5);
   // A cena agrícola traz o próprio sol; só o abrimos para cobrir a máquina inteira.
   field.root.traverse((node) => {
+    if (node instanceof THREE.HemisphereLight) node.intensity = night ? .18 : .52;
     const light = node as THREE.DirectionalLight;
     if (light.isDirectionalLight) {
       light.castShadow = true;
       light.shadow.mapSize.set(budget.shadowSize, budget.shadowSize);
-      light.shadow.camera.left = -22; light.shadow.camera.right = 22;
-      light.shadow.camera.top = 22; light.shadow.camera.bottom = -22;
-      light.shadow.camera.near = 0.5; light.shadow.camera.far = 120;
-      light.shadow.normalBias = 0.02;
+      light.shadow.camera.left = -18; light.shadow.camera.right = 18;
+      light.shadow.camera.top = 18; light.shadow.camera.bottom = -18;
+      light.shadow.camera.near = 0.5; light.shadow.camera.far = 80;
+      light.shadow.normalBias = 0.015;
+      light.shadow.bias = -0.00015;
+      light.shadow.radius = 2;
     }
   });
 
@@ -305,14 +308,14 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     orbit.target.copy(focusPoint);
     orbit.update();
     atmosphere.update(studio, camera, machine.position, elapsed, scenario.environmentId === 'muddy-field', night);
-    if (operation && focusTarget === 'truck' && scene.fog instanceof THREE.Fog) { scene.fog.near = 500; scene.fog.far = 800; }
-    if (night && scene.fog instanceof THREE.Fog) {
+    if (operation && focusTarget === 'truck' && scene.fog instanceof THREE.FogExp2) scene.fog.density = .0011;
+    if (night && scene.fog instanceof THREE.FogExp2) {
       // Noite de lavoura: a partir de ~25 m o campo afunda num azul de luar e
       // só a silhueta do quebra-vento e dos silos recorta o céu. Quem ilumina
       // a imagem são os faróis, o giroflex e os projetores de trabalho.
-      scene.fog.color.set('#0b1622'); scene.fog.near = 24; scene.fog.far = 170;
-      scene.environmentIntensity = 0.1;
-      field.sun.intensity = 0.32;
+      scene.fog.color.set('#0b1622'); scene.fog.density = .006;
+      scene.environmentIntensity = 0.18;
+      field.sun.intensity = 0.38;
     }
     post.render(elapsed);
     meter.end();

@@ -73,7 +73,7 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
   });
   const clearSky = sky(false); const rainSky = sky(true);
   scene.background = clearSky;
-  scene.fog = new THREE.Fog(0xbebca9, 75, 220);
+  scene.fog = new THREE.FogExp2(0xbebca9, .0038);
   const assets = createSompoEnvironmentAssets(scene, renderer, { background: false, onHdri: hooks?.onHdri });
   const earthMap = groundTexture('earth');
   const earth = new THREE.MeshStandardMaterial({ map: earthMap, roughness: 1, color: 0xffffff });
@@ -294,8 +294,8 @@ export function createSompoRoadScene(scene: THREE.Scene, renderer: THREE.WebGLRe
       unpaved.color.set(mud ? 0x77604b : 0xb09b7e);
       unpaved.roughness = mud ? 0.82 : 1;
       assets.update(wet);
-      const fog = scene.fog as THREE.Fog;
-      fog.color.set(wet ? 0x919b9c : 0xbebca9); fog.near = wet ? 55 : 100; fog.far = wet ? 220 : 260;
+      const fog = scene.fog as THREE.FogExp2;
+      fog.color.set(wet ? 0x919b9c : 0xbebca9); fog.density = wet ? .007 : .0038;
       earth.color.setScalar(wet ? 0.58 : 1);
       shoulderMaterial.color.set(wet ? 0x9a8e84 : 0xffffff);
       // Molhado é escuro e brilha em manchas: poças espelham o céu, o resto fica fosco.

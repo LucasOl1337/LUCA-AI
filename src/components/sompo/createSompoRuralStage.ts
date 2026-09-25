@@ -132,26 +132,32 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     orbit.maxPolarAngle = Math.PI * 0.49;
     orbit.target.set(0.35, 1.28, 0);
 
-    scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x776346, 0.48));
+    scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x776346, 0.50));
     const keyLight = new THREE.DirectionalLight(0xffefcd, 2.7);
     keyLight.position.set(-10, 12, 9);
     // One physical sun plus environment illumination. Unshadowed studio fill
     // lights used to shine straight through the roof and flatten cabin depth.
     keyLight.castShadow = true;
-    keyLight.shadow.mapSize.set(sompoRenderBudget().shadowSize, sompoRenderBudget().shadowSize);
-    keyLight.shadow.camera.left = -90; keyLight.shadow.camera.right = 90;
-    keyLight.shadow.camera.top = 90; keyLight.shadow.camera.bottom = -90;
-    keyLight.shadow.camera.near = 0.5; keyLight.shadow.camera.far = 320;
-    keyLight.shadow.normalBias = 0.05;
-    keyLight.shadow.bias = -0.0003;
-    keyLight.shadow.radius = 2;
+    const ruralShadowSize = sompoRenderBudget().shadowSize;
+    keyLight.shadow.mapSize.set(ruralShadowSize, ruralShadowSize);
+    // Frustum próximo de alta resolução: concentra 2048 px nos pneus, cabine
+    // e vegetação dos primeiros planos. O longe fica por contato assado/IBL.
+    keyLight.shadow.camera.left = -24; keyLight.shadow.camera.right = 24;
+    keyLight.shadow.camera.top = 24; keyLight.shadow.camera.bottom = -24;
+    keyLight.shadow.camera.near = 0.5; keyLight.shadow.camera.far = 90;
+    keyLight.shadow.normalBias = 0.018;
+    keyLight.shadow.bias = -0.00018;
+    keyLight.shadow.radius = 2.5;
     scene.add(keyLight);
     // A sombra acompanha o caminhão pelo mundo: luz e alvo transladam juntos.
     scene.add(keyLight.target);
     const atmosphere = createSompoAtmosphere(scene, renderer, keyLight);
     const roadScene = createSompoRoadScene(scene, renderer, camera, { onHdri: (kind, tex) => atmosphere.setSkyTexture(kind, tex) });
     const meter = createSompoRenderMeter(renderer, onStats);
-    const postProcessing = createSompoPostProcessing(renderer, scene, camera);
+    // A rodovia já tem contato projetado sob o caminhão e oclusão assada na
+    // vegetação. Desligar o AO de tela evita oito leituras de profundidade por
+    // pixel sem perder a ancoragem que realmente aparece neste enquadramento.
+    const postProcessing = createSompoPostProcessing(renderer, scene, camera, .68, false);
     if (location.hostname === '127.0.0.1') Object.assign(window, { __sompoDebug: { scene, camera, renderer, postProcessing } });
     const frontArrow = new THREE.ArrowHelper(
       new THREE.Vector3(1, 0, 0),
