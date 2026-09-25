@@ -2,25 +2,24 @@ Sompo agricultural machine assets
 =================================
 
 Files covered:
-- generated-agri-tractor-source.png and generated-agri-tractor.glb, including
-  the external texture images named in generated-agri-tractor.textures.json
-- generated-agri-harvester-source.png and generated-agri-harvester.glb
+- generated-agri-tractor-source.png (visual reference)
+- generated-agri-tractor.glb (original procedural geometry and PBR materials,
+  authored for LUCA-AI by scripts/sompo/build-agri-tractor.py)
+- generated-agri-harvester-source.png (visual reference)
+- generated-agri-harvester.glb (original procedural geometry and PBR materials,
+  authored for LUCA-AI by scripts/sompo/build-agri-harvester.py)
 
 The source images were generated for LUCA-AI through the locally authorized
 9Router route cx/gpt-image-2 on 2026-09-11. Their prompts intentionally request
-unbranded equipment and remain recorded in the reconstruction pipeline history.
-Use of those generated images remains subject to the applicable image-provider
-terms.
+unbranded equipment. Use of those generated images remains subject to the
+applicable image-provider terms. They are used only as visual references.
 
-The tractor geometry and PBR atlases were reconstructed locally with Tencent
-Hunyuan3D-2.1. Redistribution and use of that reconstructed output remains
-subject to the Tencent Hunyuan 3D 2.1 Community License preserved in this
-directory as HUNYUAN-COMMUNITY-LICENSE.txt.
+Both machines are original, unbranded procedural hard-surface models created
+for LUCA-AI in Blender. Their meshes and PBR materials contain no Hunyuan3D
+reconstruction output, no image textures and no downloaded geometry. Earlier
+releases shipped Hunyuan3D-2.1 reconstructions of these machines; that output
+is no longer distributed here. HUNYUAN-COMMUNITY-LICENSE.txt stays in this
+directory for the other reconstructed assets that still use it.
 
-The harvester geometry is an original, unbranded procedural hard-surface model
-created for LUCA-AI in Blender by scripts/sompo/build-agri-harvester.py. Its
-generated source image was used only as a visual reference; the mesh and PBR
-materials contain no Hunyuan reconstruction output and no downloaded geometry.
-
-Each .provenance.json records the applicable source or reference, construction
-method, measured triangle count, output hash and known limits.
+Each .provenance.json records the applicable reference, construction method,
+measured triangle count, output hash and known limits.

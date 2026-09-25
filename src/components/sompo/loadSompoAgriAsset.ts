@@ -53,9 +53,9 @@ export async function loadSompoAgriAsset(equipmentId: SompoAgriEquipmentId, sign
 
   const model = gltf.scene;
   model.name = `sompo-agri-${equipmentId}-asset`;
-  // O trator reconstruído mantém o eixo autoral antigo. A colheitadeira procedural
-  // já sai do Blender no contrato do rig: +X para a plataforma e +Y para cima.
-  model.rotation.y = equipmentId === 'tractor' ? Math.PI / 2 : 0;
+  // Trator e colheitadeira procedurais já saem do Blender no contrato do rig:
+  // +X para a frente e +Y para cima, sem o giro herdado da reconstrução.
+  model.rotation.y = 0;
   model.updateMatrixWorld(true);
   const bounds = new THREE.Box3().setFromObject(model);
   const size = bounds.getSize(new THREE.Vector3());

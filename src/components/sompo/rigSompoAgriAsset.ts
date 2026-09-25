@@ -9,7 +9,7 @@ import { sompoSteeringAngle } from '../../../shared/sompo-motion.js';
  * These are visual articulation zones, not a CAD or collision rig.
  */
 export const SOMPO_AGRI_RIG_LAYOUT = {
-  tractor: { axles: [{ x: 1.82, y: .57, z: .76, radius: .57, inner: .50, steer: true }, { x: -.16, y: .78, z: .84, radius: .77, inner: .59, steer: false }], hitch: [-.85, 1.15, 0] },
+  tractor: { axles: [{ x: 1.57, y: .575, z: .99, radius: .575, inner: .74, steer: true }, { x: -.78, y: .89, z: 1, radius: .89, inner: .70, steer: false }], hitch: [-1.70, .82, 0] },
   harvester: { axles: [{ x: 1.30, y: .95, z: 1.24, radius: .95, inner: .86, steer: false }, { x: -1.48, y: .62, z: 1.10, radius: .62, inner: .85, steer: true }], hitch: [2.32, 1.1, 0] },
 } as const;
 
@@ -31,6 +31,7 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
   const pivots = [new THREE.Vector3(), ...wheels.map(wheel => wheel.steering.position), implement.position];
   const rotor = new THREE.Group(); rotor.name = 'agri-header-reel'; rotor.position.set(1.08, -.04, 0); implement.add(rotor);
   const removed: THREE.Mesh[] = [];
+  const authoredMaterials = new Map<string, THREE.Material>();
   let triangles = 0;
   source.updateMatrixWorld(true);
   root.updateMatrixWorld(true);
@@ -65,11 +66,20 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
     const mesh = node as THREE.Mesh;
     if (!mesh.isMesh || Array.isArray(mesh.material)) return;
     const geometry = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
+    authoredMaterials.set(mesh.material.name, mesh.material);
     const p = geometry.attributes.position;
     const indices = geometry.index?.array ?? Uint32Array.from({ length: p.count }, (_, i) => i);
     const buckets: number[][] = parts.map(() => []);
+    const authored = equipmentId === 'tractor'
+      ? /^rig-(body|hitch|wheel-(\d)-(-?1))--/.exec(mesh.name)
+      : null;
+    const directPart = authored?.[1] === 'body' ? 0
+      : authored?.[1] === 'hitch' ? parts.length - 1
+        : authored?.[2] ? Number(authored[2]) * 2 + (Number(authored[3]) > 0 ? 2 : 1)
+          : null;
     for (let i = 0; i < indices.length; i += 3) {
       const ids = [indices[i], indices[i + 1], indices[i + 2]];
+      if (directPart !== null) { buckets[directPart].push(...ids); triangles++; continue; }
       const x = ids.reduce((sum, id) => sum + p.getX(id), 0) / 3;
       const y = ids.reduce((sum, id) => sum + p.getY(id), 0) / 3;
       const z = ids.reduce((sum, id) => sum + p.getZ(id), 0) / 3;
@@ -94,7 +104,10 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
       piece.setIndex(compact); piece.translate(-pivots[part].x, -pivots[part].y, -pivots[part].z);
       piece.computeBoundingSphere();
       const surface = new THREE.Mesh(piece, mesh.material); surface.name = `${parts[part].name}-surface`;
-      surface.castShadow = surface.receiveShadow = true; parts[part].add(surface);
+      // Só o corpo consolidado entra no shadow map: uma chamada preserva a
+      // massa projetada no chão, enquanto rodas e engate usam o CavityAO.
+      surface.castShadow = equipmentId !== 'tractor' || part === 0;
+      surface.receiveShadow = true; parts[part].add(surface);
     });
     geometry.dispose(); removed.push(mesh);
   });
@@ -163,6 +176,7 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
     const compile = material.onBeforeCompile;
     material.onBeforeCompile = (shader, renderer) => {
       compile?.call(material, shader, renderer);
+      if (equipmentId === 'harvester') shader.defines = { ...shader.defines, AGRI_ROUGHNESS_ALPHA: '' };
       shader.vertexShader = 'varying vec3 agriW;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
         vec4 agriP = vec4(transformed, 1.0);
         #ifdef USE_INSTANCING
@@ -177,47 +191,62 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
           float agriDust = smoothstep(2.4, .1, agriW.y) * (.35 + .65 * agriNoise(agriW.xz * 2.4));
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.48, .4, .26), clamp(agriDust, 0., 1.) * .55);`)
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-          #ifdef USE_COLOR_ALPHA
-            roughnessFactor = mix(.24, .96, clamp(vColor.a, 0., 1.));
+          // Colheitadeira: roughness assada no alpha do vértice (CavityAO).
+          // Trator: alpha é 1 fixo; o vidro vem da cor azulada do vértice.
+          #if defined(AGRI_ROUGHNESS_ALPHA)
+            #ifdef USE_COLOR_ALPHA
+              roughnessFactor = mix(.24, .96, clamp(vColor.a, 0., 1.));
+            #endif
+          #elif defined(USE_COLOR)
+            float agriGlass = step(.72, vColor.b / max(vColor.g, .001)) * step(.32, vColor.r / max(vColor.g, .001));
+            roughnessFactor = mix(roughnessFactor, .14, agriGlass);
           #endif
           roughnessFactor = mix(roughnessFactor, .95, clamp(agriDust, 0., 1.) * .55);`);
     };
-    material.customProgramCacheKey = () => 'sompo-agri-wear-v1';
+    material.customProgramCacheKey = () => `sompo-agri-wear-v2-${equipmentId}`;
   };
-  const lampMaterial = new THREE.MeshStandardMaterial({ color: 0x721710, emissive: 0xff2714, emissiveIntensity: 0, roughness: .4 });
-  for (const side of [-1, 1]) {
+  const tractorControlMaterial = [...authoredMaterials.values()].find(
+    (material): material is THREE.MeshStandardMaterial => material instanceof THREE.MeshStandardMaterial,
+  );
+  const lampMaterial = equipmentId === 'tractor'
+    ? tractorControlMaterial!
+    : new THREE.MeshStandardMaterial({ color: 0x721710, emissive: 0xff2714, emissiveIntensity: 0, roughness: .4 });
+  if (equipmentId === 'harvester') for (const side of [-1, 1]) {
     const lamp = new THREE.Mesh(new THREE.BoxGeometry(.05, .09, .16), lampMaterial);
-    lamp.position.set(equipmentId === 'tractor' ? -.86 : -2.7, 1.35, side * .73); body.add(lamp);
+    lamp.position.set(-2.7, 1.35, side * .73); body.add(lamp);
   }
   // Fontes visíveis das luzes: sem o emissivo o feixe aparece no chão mas a
   // lâmpada fica apagada: à noite é isso que lê "farol aceso" com o bloom.
-  const headlampMaterial = new THREE.MeshStandardMaterial({ color: 0x3a3a34, emissive: 0xfff0cd, emissiveIntensity: 0, roughness: .3 });
-  const worklampMaterial = new THREE.MeshStandardMaterial({ color: 0x33383c, emissive: 0xe4efff, emissiveIntensity: 0, roughness: .3 });
-  const beaconDomeMaterial = new THREE.MeshStandardMaterial({ color: 0x53300a, emissive: 0xff9a1f, emissiveIntensity: 0, roughness: .35 });
+  const headlampMaterial = equipmentId === 'tractor'
+    ? tractorControlMaterial!
+    : new THREE.MeshStandardMaterial({ color: 0x3a3a34, emissive: 0xfff0cd, emissiveIntensity: 0, roughness: .3 });
+  const worklampMaterial = equipmentId === 'tractor'
+    ? headlampMaterial
+    : new THREE.MeshStandardMaterial({ color: 0x33383c, emissive: 0xe4efff, emissiveIntensity: 0, roughness: .3 });
+  const beaconDomeMaterial = equipmentId === 'tractor'
+    ? tractorControlMaterial!
+    : new THREE.MeshStandardMaterial({ color: 0x53300a, emissive: 0xff9a1f, emissiveIntensity: 0, roughness: .35 });
   const headY = equipmentId === 'tractor' ? 2.28 : 2.95, headX = equipmentId === 'tractor' ? 1.15 : 2.15, headZ = equipmentId === 'tractor' ? .55 : .72;
-  for (const side of [-1, 1]) {
+  if (equipmentId === 'harvester') for (const side of [-1, 1]) {
     const lamp = new THREE.Mesh(new THREE.BoxGeometry(.07, .13, .2), headlampMaterial);
     lamp.position.set(headX, headY, side * headZ); body.add(lamp);
   }
   // Projetores de serviço: na traseira do teto do trator (miram o implemento),
   // na testa do teto da colheitadeira (miram a plataforma).
-  for (const side of [-1, 1]) {
+  if (equipmentId === 'harvester') for (const side of [-1, 1]) {
     const lamp = new THREE.Mesh(new THREE.BoxGeometry(.06, .11, .17), worklampMaterial);
-    lamp.position.set(equipmentId === 'tractor' ? -0.55 : 1.9, equipmentId === 'tractor' ? 2.42 : 3.5, side * (equipmentId === 'tractor' ? .45 : .5)); body.add(lamp);
+    lamp.position.set(1.9, 3.5, side * .5); body.add(lamp);
   }
-  const beaconDome = new THREE.Mesh(new THREE.CylinderGeometry(.075, .095, .16, 12), beaconDomeMaterial);
-  beaconDome.position.set(equipmentId === 'tractor' ? -0.1 : 0.6, equipmentId === 'tractor' ? 2.52 : 3.74, equipmentId === 'tractor' ? .25 : .2); body.add(beaconDome);
+  if (equipmentId === 'harvester') {
+    const beaconDome = new THREE.Mesh(new THREE.CylinderGeometry(.075, .095, .16, 12), beaconDomeMaterial);
+    beaconDome.position.set(.6, 3.74, .2); body.add(beaconDome);
+  }
   root.traverse(node => {
     const material = (node as THREE.Mesh).material as THREE.Material | undefined;
     if (material && !Array.isArray(material)) wear(material);
   });
   const initialHitch = implement.position.clone();
-  const hydraulics = equipmentId === 'tractor' ? [-1, 1].map(side => {
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(.052, .052, 1, 12), new THREE.MeshStandardMaterial({ color: 0x26372b, roughness: .55, metalness: .4 }));
-    const rod = new THREE.Mesh(new THREE.CylinderGeometry(.025, .025, 1, 10), new THREE.MeshStandardMaterial({ color: 0x899291, roughness: .26, metalness: .8 }));
-    barrel.name = `agri-hydraulic-barrel-${side}`; rod.name = `agri-hydraulic-rod-${side}`; root.add(barrel, rod);
-    return { barrel, rod, base: new THREE.Vector3(-.60, 1.56, side * .43), end: new THREE.Vector3(-.72, -.25, side * .43) };
-  }) : [];
+  const hydraulics: { barrel: THREE.Mesh; rod: THREE.Mesh; base: THREE.Vector3; end: THREE.Vector3 }[] = [];
   const end = new THREE.Vector3(), direction = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   const inverse = new THREE.Matrix4(), rotationMatrix = new THREE.Matrix4(), matrix = new THREE.Matrix4(), contact = new THREE.Vector3();
   return {
@@ -270,8 +299,9 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
       }
       // Freio vence o marcador noturno; com farol aceso a lanterna fica acesa fraca.
       lampMaterial.emissiveIntensity = Math.max(frame.brakeLights * 3, frame.headlights > .3 ? .55 : 0);
-      headlampMaterial.emissiveIntensity = frame.headlights * 4.2;
-      worklampMaterial.emissiveIntensity = frame.workLights * 4.2;
+      const authoredLight = Math.max(frame.headlights, frame.workLights) * 4.2;
+      headlampMaterial.emissiveIntensity = equipmentId === 'tractor' ? authoredLight : frame.headlights * 4.2;
+      worklampMaterial.emissiveIntensity = equipmentId === 'tractor' ? authoredLight : frame.workLights * 4.2;
       const beaconPulse = Math.pow(Math.max(0, Math.sin(frame.atMs / 1000 * 7)), 2);
       beaconDomeMaterial.emissiveIntensity = frame.beacon * (1.1 + beaconPulse * 5);
     },
