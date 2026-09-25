@@ -52,6 +52,8 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
     uniforms: { tDiffuse: { value: null }, resolution: { value: new THREE.Vector2(1, 1) } },
     vertexShader: 'varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
     fragmentShader: `varying vec2 vUv; uniform sampler2D tDiffuse; uniform vec2 resolution;
+      // Ruído azul barato (interleaved gradient noise).
+      float ign(vec2 p){return fract(52.9829189*fract(dot(p,vec2(.06711056,.00583715))));}
       void main(){
         vec3 c=texture2D(tDiffuse,vUv).rgb;
         float lum=dot(c,vec3(.2126,.7152,.0722));
@@ -63,6 +65,14 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
         c=c-max(c-.82,0.)*.55;                                      // ombro: branco sem clipar
         vec2 p=(vUv-.5)*vec2(resolution.x/max(1.,resolution.y),1.);
         c*=1.-.30*smoothstep(.42,1.15,length(p));                  // vinheta
+        // Grão fixo na tela: forte nos meios-tons, some nas altas e nos pretos.
+        // Em 8 bits faz o papel de dither e quebra o degrau do céu e da névoa.
+        // Não anima por quadro: em A/B intercalado contra a main, o grão vivo
+        // custou +2,7 a +3,6 ms por quadro e o fixo +0,1 a +0,3 ms.
+        vec2 px=gl_FragCoord.xy;
+        float n=ign(px)+ign(px+vec2(17.,43.))-1.;
+        float mid=4.*lum*(1.-lum);
+        c+=n*(.004+.012*mid);
         gl_FragColor=vec4(c,1.);
       }`,
   });

@@ -53,7 +53,7 @@ function createTerrain(environment: (typeof SOMPO_AGRI_ENVIRONMENTS)[SompoAgriEn
 }
 
 /** Silos galvanizados no fundo do talhão. A assinatura do bg-agro. */
-function createSilos(slope: number) {
+function createSilos(ground: (x: number, z: number) => number, shiftZ = 0) {
   const root = new THREE.Group(); root.name = 'sompo-agri-silos';
   const metal = new THREE.MeshStandardMaterial({ color: 0xdadcda, metalness: .55, roughness: .5 });
   const roof = new THREE.MeshStandardMaterial({ color: 0xb4b8b2, metalness: .6, roughness: .46 });
@@ -65,28 +65,106 @@ function createSilos(slope: number) {
     const roofMap = map.clone(); roofMap.repeat.set(2, .8);
     roof.map = roofMap; roof.color.set(0xd8dcda); roof.needsUpdate = true;
   });
+  const concrete = new THREE.MeshStandardMaterial({ color: 0x9d988c, roughness: .95 });
+  const rail = new THREE.MeshStandardMaterial({ color: 0x5c615d, metalness: .6, roughness: .45, side: THREE.DoubleSide });
+  // Anéis de chapa: um cilindro fino por anel lê como a costura parafusada
+  // entre as chapas curvas, que é o que dá escala de 12 m ao silo.
   const cluster = (bx: number, bz: number, scale: number) => {
     const group = new THREE.Group();
     const specs: [number, number, number, number][] = [[0, 0, 2.9, 12.5], [6.4, .8, 2.9, 12.5], [3.2, 5.6, 2.5, 10.2]];
+    const ring = new THREE.CylinderGeometry(1, 1, .09, 24, 1, true);
     for (const [x, z, r, h] of specs) {
-      const silo = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 20), metal);
-      silo.position.set(x, h / 2, z); silo.castShadow = silo.receiveShadow = true; group.add(silo);
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(r * 1.08, r * .78, 20), roof);
-      cone.position.set(x, h + r * .36, z); cone.castShadow = true; group.add(cone);
-      const collar = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.04, r * 1.1, .6, 20), dark);
-      collar.position.set(x, .3, z); group.add(collar);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.12, r * 1.16, .7, 24), concrete);
+      base.position.set(x, .2, z); base.receiveShadow = true; group.add(base);
+      const silo = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 24), metal);
+      silo.position.set(x, .55 + h / 2, z); silo.castShadow = silo.receiveShadow = true; group.add(silo);
+      for (let y = 1.6; y < h; y += 1.12) {
+        const seam = new THREE.Mesh(ring, dark);
+        seam.scale.set(r * 1.006, 1, r * 1.006); seam.position.set(x, .55 + y, z); group.add(seam);
+      }
+      // Telhado baixo de silo de grão (~30°), com respiro no topo.
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(r * 1.07, r * .6, 24), roof);
+      cone.position.set(x, .55 + h + r * .3, z); cone.castShadow = true; group.add(cone);
+      const vent = new THREE.Mesh(new THREE.CylinderGeometry(.32, .42, .5, 10), dark);
+      vent.position.set(x, .55 + h + r * .6 + .2, z); group.add(vent);
+      // Escada marinheiro com guarda-corpo na face voltada para a câmera.
+      const ladder = new THREE.Mesh(new THREE.BoxGeometry(.5, h, .08), rail);
+      ladder.position.set(x - r * .7, .55 + h / 2, z + r * .72); ladder.rotation.y = -Math.PI / 4; group.add(ladder);
+      const cage = new THREE.Mesh(new THREE.CylinderGeometry(.42, .42, h * .8, 8, 1, true), rail);
+      cage.position.set(x - r * .78, .55 + h * .58, z + r * .8); group.add(cage);
     }
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(1.15, 13.5, 1.15), dark);
-    leg.position.set(9.6, 6.75, 2.4); leg.castShadow = true; group.add(leg);
-    const head = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.6, 2.2), roof);
-    head.position.set(9.6, 14.1, 2.4); head.castShadow = true; group.add(head);
+    // Passarela no topo ligando os silos ao elevador.
+    const walk = new THREE.Mesh(new THREE.BoxGeometry(11.5, .18, .9), rail);
+    walk.position.set(4.8, 14.2, 1.6); walk.rotation.y = .08; walk.castShadow = true; group.add(walk);
+    // Elevador de canecas: torre em treliça (quatro montantes + travamentos) com
+    // a cabeça do elevador e a bica descendo para cada silo.
+    const tower = new THREE.Group();
+    for (const [ox, oz] of [[-.55, -.55], [.55, -.55], [-.55, .55], [.55, .55]]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(.14, 16, .14), dark);
+      post.position.set(ox, 8, oz); post.castShadow = true; tower.add(post);
+    }
+    for (let y = 1; y < 16; y += 1.6) for (const [w, d, ox, oz] of [[1.2, .08, 0, -.55], [1.2, .08, 0, .55], [.08, 1.2, -.55, 0], [.08, 1.2, .55, 0]]) {
+      const brace = new THREE.Mesh(new THREE.BoxGeometry(w, .08, d), dark);
+      brace.position.set(ox, y, oz); tower.add(brace);
+    }
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(.6, 17, .6), metal);
+    leg.position.y = 8.5; leg.castShadow = true; tower.add(leg);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.6, 1.6), roof);
+    head.position.y = 17.4; head.castShadow = true; tower.add(head);
+    tower.position.set(9.8, 0, 2.6); group.add(tower);
+    for (const [x, z, r, h] of specs) {
+      const from = new THREE.Vector3(9.8, 17, 2.6), to = new THREE.Vector3(x, .55 + h + r * .55, z);
+      const spout = new THREE.Mesh(new THREE.CylinderGeometry(.13, .13, from.distanceTo(to), 8), metal);
+      spout.position.copy(from).add(to).multiplyScalar(.5);
+      spout.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize());
+      group.add(spout);
+    }
+    // Moega e secador baixo ao pé do elevador: o complexo de armazenagem.
+    const dryer = new THREE.Mesh(new THREE.BoxGeometry(2.4, 6.5, 2.4), roof);
+    dryer.position.set(12.6, 3.25, 5.2); dryer.castShadow = dryer.receiveShadow = true; group.add(dryer);
+    const pad = new THREE.Mesh(new THREE.BoxGeometry(18, .25, 12), concrete);
+    pad.position.set(5.5, 0, 2.6); pad.receiveShadow = true; group.add(pad);
+    ring.dispose();
     group.scale.setScalar(scale);
-    group.position.set(bx, terrainHeight(bx, bz, slope) - .15, bz);
+    group.position.set(bx, ground(bx, bz + shiftZ) - .15, bz + shiftZ);
     group.rotation.y = Math.sin(bx * .37) * .4;
     return group;
   };
   root.add(cluster(-46, -64, 1), cluster(58, -58, .82));
+  // ~150 peças viram uma malha por material: o detalhe não custa draw call.
+  mergeByMaterial(root);
   return root;
+}
+
+/** Funde todas as malhas estáticas de `root` numa malha por material+sombra. */
+function mergeByMaterial(root: THREE.Object3D) {
+  root.updateMatrixWorld(true);
+  const inverse = root.matrixWorld.clone().invert();
+  const buckets = new Map<string, { material: THREE.Material; shadow: boolean; parts: THREE.BufferGeometry[] }>();
+  const meshes: THREE.Mesh[] = [];
+  root.traverse(node => { if (node instanceof THREE.Mesh && !(node instanceof THREE.InstancedMesh)) meshes.push(node); });
+  const sources = new Set<THREE.BufferGeometry>();
+  for (const mesh of meshes) {
+    const material = mesh.material as THREE.Material;
+    const key = `${material.uuid}:${mesh.castShadow}`;
+    const bucket = buckets.get(key) ?? { material, shadow: mesh.castShadow, parts: [] };
+    const part = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
+    part.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inverse, mesh.matrixWorld));
+    for (const name of Object.keys(part.attributes)) if (!['position', 'normal', 'uv'].includes(name)) part.deleteAttribute(name);
+    bucket.parts.push(part); buckets.set(key, bucket);
+    sources.add(mesh.geometry);
+  }
+  for (const mesh of meshes) mesh.removeFromParent();
+  for (const child of [...root.children]) if (child.children.length === 0 && !(child instanceof THREE.Mesh)) child.removeFromParent();
+  sources.forEach(geometry => geometry.dispose());
+  for (const { material, shadow, parts } of buckets.values()) {
+    const merged = mergeGeometries(parts);
+    parts.forEach(part => part.dispose());
+    if (!merged) continue;
+    const mesh = new THREE.Mesh(merged, material);
+    mesh.castShadow = shadow; mesh.receiveShadow = true;
+    root.add(mesh);
+  }
 }
 
 /** Erva-daninha nas bordas do talhão: o mesmo tufo de lâmina fina do rural,
@@ -141,6 +219,84 @@ function createEdgeWeeds(ground: (x: number, z: number) => number) {
   return {
     root: mesh,
     update(elapsedMs: number, windStrength: number) { time.value = elapsedMs / 1000; wind.value = windStrength; },
+  };
+}
+
+/**
+ * Borda da fazenda: capões de cerrado nas grotas e no alto do anel de morro e
+ * um quebra-vento de eucalipto em fileira na divisa do talhão vizinho. Sem
+ * isso o horizonte era um morro verde liso sem escala. Cartões cruzados com o
+ * billboard gerado de cada espécie, um InstancedMesh por espécie (2 draw
+ * calls), pé escurecido no shader (contato com o chão sem sombra extra) e tom
+ * por árvore para o capão não ler como carimbo.
+ */
+function createTreeLine(ground: (x: number, z: number) => number, night: boolean, compact: boolean) {
+  const root = new THREE.Group(); root.name = 'sompo-agri-treeline';
+  if (typeof document === 'undefined' || typeof document.createElementNS !== 'function') return { root, dispose() {} };
+  let seed = 4099;
+  const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+  const card = new THREE.PlaneGeometry(1, 1); card.translate(0, .5, 0);
+  const cross = mergeGeometries([card.clone(), card.clone().rotateY(Math.PI / 2), card.clone().rotateY(Math.PI / 4)], false)!;
+  card.dispose();
+  const textures: THREE.Texture[] = [];
+  const materials: THREE.Material[] = [];
+  const species = (asset: string, slots: { x: number; z: number; h: number; w: number }[], tint: number) => {
+    const map = new THREE.TextureLoader().load(`/models/sompo/${asset}-billboard.webp`);
+    map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4; textures.push(map);
+    const material = new THREE.MeshLambertMaterial({ map, alphaTest: .42, alphaToCoverage: true, side: THREE.DoubleSide, color: tint });
+    material.onBeforeCompile = shader => {
+      shader.vertexShader = 'varying float treeFoot; varying float treeTone;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+        treeFoot = position.y;
+        treeTone = fract(sin(instanceMatrix[3].x * 12.9898 + instanceMatrix[3].z * 78.233) * 43758.5453);`);
+      shader.fragmentShader = 'varying float treeFoot; varying float treeTone;\n' + shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        // Copa pega luz por cima, pé fica na sombra da própria mata.
+        diffuseColor.rgb *= mix(.42, 1.0, smoothstep(.02, .45, treeFoot));
+        diffuseColor.rgb *= mix(vec3(.86, .92, .8), vec3(1.1, 1.04, .9), treeTone);`);
+    };
+    material.customProgramCacheKey = () => 'sompo-agri-treeline-v1';
+    materials.push(material);
+    const mesh = new THREE.InstancedMesh(cross, material, slots.length);
+    mesh.name = `sompo-agri-treeline-${asset}`;
+    const transform = new THREE.Object3D();
+    slots.forEach((slot, i) => {
+      transform.position.set(slot.x, ground(slot.x, slot.z) - .25, slot.z);
+      transform.rotation.set(0, random() * Math.PI, 0);
+      transform.scale.set(slot.w, slot.h, slot.w);
+      transform.updateMatrix(); mesh.setMatrixAt(i, transform.matrix);
+    });
+    mesh.computeBoundingSphere();
+    root.add(mesh);
+  };
+  // Capões: aglomerados irregulares no anel do relevo (onde o terreno sobe),
+  // nunca dentro do talhão da cena (|z|<24, |x|<90).
+  const cerrado: { x: number; z: number; h: number; w: number }[] = [];
+  const groves: [number, number, number, number][] = [
+    [-120, -78, 16, 14], [-38, -92, 22, 18], [70, -86, 18, 15], [132, -60, 12, 9], [-140, 40, 14, 10],
+    [118, 66, 16, 11], [-60, 88, 18, 12], [24, 96, 12, 8], [-128, -20, 10, 6], [138, 8, 10, 6],
+  ];
+  for (const [cx, cz, radius, count] of groves) {
+    const n = compact ? Math.ceil(count * .6) : count;
+    for (let i = 0; i < n; i++) {
+      const a = random() * Math.PI * 2, r = radius * Math.sqrt(random());
+      const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r * .7;
+      if (Math.abs(z) < 24 && Math.abs(x) < 90) continue;
+      const h = 7.5 + random() * 6.5;
+      cerrado.push({ x, z, h, w: h * (.72 + random() * .22) });
+    }
+  }
+  species('generated-cerrado', cerrado, night ? 0x5d6a6e : 0xb9b9a0);
+  // Quebra-vento: fileira reta de eucalipto na crista atrás dos silos, com
+  // falhas; fica atrás deles (z −64) para não esconder a assinatura do fundo.
+  const eucalyptus: { x: number; z: number; h: number; w: number }[] = [];
+  for (let x = -118; x < 124; x += compact ? 4.4 : 3.1) {
+    if (random() < .08) continue;
+    const h = 15 + random() * 6;
+    eucalyptus.push({ x: x + (random() - .5) * 1.2, z: -99 + Math.sin(x * .021) * 3 + (random() - .5) * 1.4, h, w: h * .42 });
+  }
+  species('generated-eucalyptus', eucalyptus, night ? 0x57625f : 0xaab0a0);
+  return {
+    root,
+    dispose() { cross.dispose(); textures.forEach(t => t.dispose()); materials.forEach(m => m.dispose()); },
   };
 }
 
@@ -203,11 +359,14 @@ function createBarn() {
   root.name = 'sompo-agri-barn';
   root.position.set(4, 0, 0);
   const steel = new THREE.MeshStandardMaterial({ color: 0x4d5556, metalness: 0.62, roughness: 0.52 });
-  const siding = new THREE.MeshStandardMaterial({ color: 0xa8402c, metalness: 0.18, roughness: 0.6, side: THREE.DoubleSide });
+  // Vermelho de galpão velho: desbotado pelo sol, não vermelho de brinquedo.
+  const siding = new THREE.MeshStandardMaterial({ color: 0x7c4538, metalness: 0.12, roughness: 0.74, side: THREE.DoubleSide });
   const roof = new THREE.MeshStandardMaterial({ color: 0xa3aba8, metalness: 0.7, roughness: 0.4 });
   const trim = new THREE.MeshStandardMaterial({ color: 0xe6e1d3, metalness: 0.08, roughness: 0.62 });
   const timber = new THREE.MeshStandardMaterial({ color: 0x6b5138, metalness: 0.05, roughness: 0.85 });
-  const straw = new THREE.MeshStandardMaterial({ color: 0xa98f4e, roughness: 0.95 });
+  const straw = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95 });
+  const strawMap = baleTexture();
+  if (strawMap) { straw.map = strawMap; straw.bumpMap = strawMap; straw.bumpScale = 3; } else straw.color.set(0x9a8454);
   const floorMat = new THREE.MeshStandardMaterial({ color: 0x5c4a33, roughness: 1 });
   const concrete = new THREE.MeshStandardMaterial({ color: 0x9a968c, roughness: 0.92 });
   if (typeof document !== 'undefined' && typeof document.createElementNS === 'function') {
@@ -326,6 +485,12 @@ function createBarn() {
     bale.position.set(bx, by, bz);
     bale.rotation.y = bx * 0.4;
     bale.castShadow = bale.receiveShadow = true;
+    // Fardo prensado não é cubo: arestas estufadas pela palha.
+    const bp = bale.geometry.attributes.position;
+    for (let i = 0; i < bp.count; i++) {
+      const x = bp.getX(i), y = bp.getY(i), z = bp.getZ(i);
+      bp.setXYZ(i, x * (0.96 + 0.04 * Math.abs(y) / 0.525), y * 0.97, z * (0.96 + 0.04 * Math.abs(y) / 0.525));
+    }
     root.add(bale);
   }
   for (const [bx, bz] of [[4.9, -3.9], [5.35, -3.35]]) {
@@ -370,6 +535,29 @@ function createBarn() {
   postShoe.position.y = 0.09;
   barnPost.add(postMesh, postShoe);
   return { root, barnPost };
+}
+
+/** Palha prensada: talos curtos em tons de feno seco e dois fios de barbante. */
+function baleTexture() {
+  if (typeof document === 'undefined' || typeof document.createElementNS !== 'function') return null;
+  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.fillStyle = '#8e7a4c'; ctx.fillRect(0, 0, 128, 128);
+  let s = 7;
+  const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 900; i++) {
+    const x = rnd() * 128, y = rnd() * 128, a = (rnd() - 0.5) * 0.9, l = 3 + rnd() * 7;
+    const v = 0.72 + rnd() * 0.5;
+    ctx.strokeStyle = `rgba(${Math.round(176 * v)},${Math.round(152 * v)},${Math.round(98 * v)},.8)`;
+    ctx.lineWidth = 0.6 + rnd() * 0.7;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(58,48,32,.85)'; ctx.lineWidth = 2;
+  for (const x of [40, 88]) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 1, 128); ctx.stroke(); }
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
+  return map;
 }
 
 function dustMap() {
@@ -428,6 +616,28 @@ function createExhaust() {
   return exhaust;
 }
 
+/**
+ * Borda orgânica para manchas planas (lama, lâmina d'água): o alfa cai numa
+ * faixa ruidosa perto da borda do disco em vez de cortar num polígono. O
+ * ruído é em espaço de objeto, então a mancha não "escorre" quando a câmera
+ * gira. `radius` é o raio do disco; `band` a fração que vira transição.
+ */
+function softEdgedPatch(material: THREE.MeshStandardMaterial, radius: number, band: number) {
+  material.onBeforeCompile = shader => {
+    shader.vertexShader = 'varying vec2 patchXZ;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\npatchXZ = position.xz;');
+    shader.fragmentShader = `varying vec2 patchXZ;
+      float patchHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+      float patchNoise(vec2 p){vec2 a=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+        return mix(mix(patchHash(a),patchHash(a+vec2(1,0)),f.x),mix(patchHash(a+vec2(0,1)),patchHash(a+vec2(1,1)),f.x),f.y);}
+    ` + shader.fragmentShader.replace('#include <alphatest_fragment>', `#include <alphatest_fragment>
+      float patchR = length(patchXZ / vec2(1.0, .65)) / ${radius.toFixed(2)};
+      float ragged = patchNoise(patchXZ * 1.3) * .6 + patchNoise(patchXZ * 3.7 + 9.1) * .4;
+      diffuseColor.a *= 1.0 - smoothstep(1.0 - ${band.toFixed(2)}, 1.0, patchR + (ragged - .5) * ${band.toFixed(2)});`);
+  };
+  material.customProgramCacheKey = () => `sompo-agri-soft-patch-${radius}-${band}`;
+  return material;
+}
+
 /** Sulcos encharcados deixados pelas rodas no trecho atolado. */
 function createRuts() {
   const material = new THREE.MeshStandardMaterial({ color: 0x2e241a, roughness: .38, metalness: 0, transparent: true, opacity: 0 });
@@ -449,7 +659,7 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
   const terrain = createTerrain(definition);
   root.add(terrain);
   const operation = environmentId === 'geofence-operacao';
-  const crops = definition.barn ? null : createSompoCropRows((x,z)=>terrainHeight(x,z,definition.slope,(definition as { relief?: (x: number, z: number) => number }).relief), compact, equipmentId === 'tractor' ? .32 : 1, operation);
+  const crops = definition.barn ? null : createSompoCropRows((x,z)=>terrainHeight(x,z,definition.slope,(definition as { relief?: (x: number, z: number) => number }).relief), compact, equipmentId === 'tractor' ? .32 : 1, operation, equipmentId === 'harvester');
   if (crops) root.add(crops.root);
   const weeds = definition.barn ? null : createEdgeWeeds((x, z) => terrainHeight(x, z, definition.slope, (definition as { relief?: (x: number, z: number) => number }).relief));
   if (weeds) root.add(weeds.root);
@@ -460,19 +670,19 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
     barn.root.position.set(60, terrainHeight(60, -55, 0, geofenceOperacaoRelief), -55);
     barn.barnPost.position.copy(barn.root.position);
   }
-  const silos = createSilos(definition.slope); root.add(silos);
-  if (operation) for (const cluster of silos.children) {
-    cluster.position.z -= 25; // libera o footprint do galpão mapeado
-    cluster.position.y = terrainHeight(cluster.position.x, cluster.position.z, 0, geofenceOperacaoRelief) - 0.15;
-  }
+  // Na operação o complexo recua 25 m e libera o footprint do galpão mapeado.
+  const silos = createSilos(operation ? (x, z) => terrainHeight(x, z, 0, geofenceOperacaoRelief) : (x, z) => terrainHeight(x, z, definition.slope), operation ? -25 : 0);
+  root.add(silos);
+  const treeLine = createTreeLine((x, z) => terrainHeight(x, z, definition.slope, (definition as { relief?: (x: number, z: number) => number }).relief), definition.night, compact);
+  if (treeLine) root.add(treeLine.root);
   // Névoa baixa é do talhão aberto: dentro do galpão as faixas horizontais
   // atravessavam as paredes (bug reportado pela frente agri-máquina).
   const groundFog = definition.barn ? null : createGroundFog();
   if (groundFog) { root.add(groundFog.root); groundFog.root.visible = !definition.night; }
 
   const mud = new THREE.Mesh(
-    new THREE.CircleGeometry(8, 40),
-    new THREE.MeshStandardMaterial({ color: 0x38291c, roughness: 0.55, metalness: 0 }),
+    new THREE.CircleGeometry(8, 64),
+    softEdgedPatch(new THREE.MeshStandardMaterial({ color: 0x38291c, roughness: 0.55, metalness: 0, transparent: true, depthWrite: false }), 8, .38),
   );
   mud.name = 'sompo-agri-mud';
   mud.geometry.rotateX(-Math.PI / 2);
@@ -481,8 +691,8 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
   // Lâmina d'água parada no centro do trecho saturado. O branco baixo é o que
   // diferencia solo úmido de solo encharcado.
   const puddle = new THREE.Mesh(
-    new THREE.CircleGeometry(3.4, 32),
-    new THREE.MeshStandardMaterial({ color: 0x1f1913, roughness: 0.18, metalness: 0, envMapIntensity: 0.45, transparent: true, opacity: 0.85 }),
+    new THREE.CircleGeometry(3.4, 48),
+    softEdgedPatch(new THREE.MeshStandardMaterial({ color: 0x1f1913, roughness: 0.12, metalness: 0, envMapIntensity: 0.6, transparent: true, opacity: 0.88, depthWrite: false }), 3.4, .55),
   );
   puddle.name = 'sompo-agri-puddle';
   puddle.geometry.rotateX(-Math.PI / 2);
@@ -522,7 +732,7 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
     const dc = dust.geometry.attributes.color;
     for (let i = 0; i < dc.count; i += 1) dc.setXYZ(i, dc.getX(i) * .3, dc.getY(i) * .28, dc.getZ(i) * .24);
   }
-  const ambient = new THREE.HemisphereLight(definition.sky, 0x30291d, definition.night ? 0.32 : 0.7);
+  const ambient = new THREE.HemisphereLight(definition.sky, 0x30291d, definition.night ? 0.16 : 0.7);
   const sun = new THREE.DirectionalLight(definition.night ? 0x91b4dd : 0xfff1cf, definition.night ? 0.6 : 2.1);
   sun.position.set(-24, 34, 18);
   sun.castShadow = true;
@@ -637,6 +847,7 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
     dispose() {
       root.removeFromParent();
       crops?.dispose();
+      treeLine?.dispose();
       disposeSompoObject(root);
     },
   };

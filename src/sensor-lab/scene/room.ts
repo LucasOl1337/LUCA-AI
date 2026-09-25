@@ -30,7 +30,7 @@ export interface Room {
   dispose(): void;
 }
 
-function lowPolyTree(random: () => number, material: THREE.Material, trunk: THREE.Material, scale: number) {
+function pottedPlant(random: () => number, material: THREE.Material, trunk: THREE.Material, scale: number) {
   const tree = new THREE.Group();
   const height = (2.2 + random() * 1.6) * scale;
   const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * scale, 0.18 * scale, height, 6), trunk);
@@ -39,9 +39,9 @@ function lowPolyTree(random: () => number, material: THREE.Material, trunk: THRE
   const blobs = 3 + Math.floor(random() * 3);
   for (let i = 0; i < blobs; i++) {
     const radius = (0.9 + random() * 0.8) * scale;
-    const blob = new THREE.Mesh(new THREE.IcosahedronGeometry(radius, 0), material);
+    const blob = new THREE.Mesh(new THREE.IcosahedronGeometry(radius, 1), material);
     blob.position.set((random() - 0.5) * 1.4 * scale, height + (random() - 0.2) * 1.2 * scale, (random() - 0.5) * 1.2 * scale);
-    blob.rotation.set(random() * 3, random() * 3, random() * 3);
+    blob.scale.y = 0.8;
     tree.add(blob);
   }
   return tree;
@@ -227,21 +227,41 @@ export function createRoom(materials: RoomMaterials): Room {
   pivot.add(truss);
   group.add(pivot);
 
-  const leafMaterial = track(new THREE.MeshStandardMaterial({ color: 0x4f7f3a, roughness: 0.85, flatShading: true }));
-  const leafDark = track(new THREE.MeshStandardMaterial({ color: 0x3b6a33, roughness: 0.85, flatShading: true }));
-  const trunkMaterial = track(new THREE.MeshStandardMaterial({ color: 0x6b5140, roughness: 0.9 }));
+  // Árvores da janela: os mesmos billboards botânicos do simulador SOMPO em
+  // cards cruzados. Os icosaedros facetados de antes liam como jogo low-poly
+  // contra a sala fotográfica. Um InstancedMesh por espécie, dois draw calls.
+  const cardGeometry = track(new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0));
+  const crossGeometry = track(merge([cardGeometry.clone(), cardGeometry.clone().rotateY(Math.PI / 2)]));
+  const treeRows: [string, [number, number, number][]][] = [
+    ['eucalyptus', []],
+    ['jacaranda', [[-9, -14, 1.3], [8.5, -15.5, 1.5], [15, -13, 1.1], [-15.5, -16, 1.4], [2.5, -19, 1.2]]],
+  ];
+  for (let i = 0; i < 26; i++) treeRows[0][1].push([-60 + i * 4.8 + random() * 2, -34 - random() * 6, 1.4 + random() * 0.8]);
   const trees = new THREE.Group();
-  for (let i = 0; i < 26; i++) {
-    const tree = lowPolyTree(random, i % 2 ? leafMaterial : leafDark, trunkMaterial, 1.4 + random() * 0.8);
-    tree.position.set(-60 + i * 4.8 + random() * 2, -0.4, -34 - random() * 6);
-    trees.add(tree);
+  const matrix = new THREE.Matrix4(), quaternion = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), tint = new THREE.Color();
+  for (const [species, slots] of treeRows) {
+    // Luz de céu na copa (emissivo baixo): contra o sol baixo a folhagem ficava
+    // um recorte preto; de fora, o céu ainda ilumina as folhas por baixo.
+    const material = track(new THREE.MeshStandardMaterial({ color: 0xa3ac7d, roughness: 0.95, alphaTest: 0.4, side: THREE.DoubleSide, emissive: 0x1f2718, emissiveIntensity: 1 }));
+    if (typeof document !== 'undefined') {
+      new THREE.TextureLoader().load(`/models/sompo/generated-${species}-billboard.webp`, (map) => {
+        map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
+        material.map = track(map); material.needsUpdate = true;
+      });
+    }
+    const mesh = new THREE.InstancedMesh(crossGeometry, material, slots.length);
+    mesh.name = `window-trees-${species}`;
+    slots.forEach(([x, z, s], i) => {
+      // Eucalipto é alto e esguio; jacarandá de sombra, mais largo.
+      const h = (species === 'eucalyptus' ? 7.5 : 3.6) * s * (0.85 + random() * 0.3);
+      const w = h * (species === 'eucalyptus' ? 0.42 : 0.9);
+      quaternion.setFromAxisAngle(up, random() * Math.PI);
+      matrix.compose(new THREE.Vector3(x, -0.5, z), quaternion, new THREE.Vector3(w, h, w));
+      mesh.setMatrixAt(i, matrix);
+      mesh.setColorAt(i, tint.setHSL(0.24 + random() * 0.04, 0.3, 0.55 + random() * 0.12));
+    });
+    trees.add(mesh);
   }
-  for (const [x, z, s] of [[-9, -14, 1.3], [8.5, -15.5, 1.5], [15, -13, 1.1], [-15.5, -16, 1.4], [2.5, -19, 1.2]] as const) {
-    const tree = lowPolyTree(random, leafMaterial, trunkMaterial, s);
-    tree.position.set(x, -0.4, z);
-    trees.add(tree);
-  }
-  trees.traverse((node) => { const mesh = node as THREE.Mesh; if (mesh.isMesh) track(mesh.geometry); });
   group.add(trees);
 
   // Feixes de luz com poeira: planos aditivos inclinados como o sol.
@@ -381,16 +401,18 @@ export function createRoom(materials: RoomMaterials): Room {
   boardFrame.position.set(ROOM.right - 0.33, 3.9, -2.2);
   group.add(boardFrame);
 
-  // Vasos com plantas low-poly.
+  // Vasos com plantas: copa subdividida e sombreada suave, sem faceta de jogo.
+  const leafMaterial = track(new THREE.MeshStandardMaterial({ color: 0x4a7436, roughness: 0.85 }));
+  const trunkMaterial = track(new THREE.MeshStandardMaterial({ color: 0x6b5140, roughness: 0.9 }));
   const potMaterial = track(new THREE.MeshStandardMaterial({ color: 0xd9d3c7, roughness: 0.7 }));
   for (const [x, z, s] of [[10.6, 3.2, 1], [-11.8, -4.8, 1.3], [12.8, -6.5, 1.1]] as const) {
     const pot = new THREE.Mesh(track(new THREE.CylinderGeometry(0.5 * s, 0.38 * s, 0.9 * s, 16)), potMaterial);
     pot.position.set(x, 0.45 * s, z);
     pot.castShadow = pot.receiveShadow = true;
     group.add(pot);
-    const plant = lowPolyTree(random, leafMaterial, trunkMaterial, 0.55 * s);
+    const plant = pottedPlant(random, leafMaterial, trunkMaterial, 0.55 * s);
     plant.position.set(x, 0.85 * s, z);
-    plant.traverse((node) => { const mesh = node as THREE.Mesh; if (mesh.isMesh) { track(mesh.geometry); mesh.castShadow = true; } });
+    plant.traverse((node: THREE.Object3D) => { const mesh = node as THREE.Mesh; if (mesh.isMesh) { track(mesh.geometry); mesh.castShadow = true; } });
     group.add(plant);
   }
 

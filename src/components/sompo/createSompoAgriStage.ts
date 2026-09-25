@@ -107,7 +107,8 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   const meter = createSompoRenderMeter(renderer, onStats);
   const assets = createSompoEnvironmentAssets(scene, renderer, { background: false, intensity: night ? 0.30 : 0.68, initialWet: scenario.environmentId === 'muddy-field', onHdri: (kind, tex) => atmosphere.setSkyTexture(kind, tex) });
   assets.surface(field.terrain.material, 'dirt', 45, 30);
-  const pasture = createSompoPastureSurface(field.terrain.material, true);
+  // Talhão da operação é visto de cima e ocupa o campo todo: sem colcha vizinha.
+  const pasture = createSompoPastureSurface(field.terrain.material, true, !operation);
   if (scenario.environmentId === 'muddy-field') {
     // Packed roughness and normals keep wet soil from becoming a flat gray mirror.
     assets.surface(field.mud.material, 'dirt', 4, 2.6);
@@ -286,6 +287,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     if (effort > 0.02) machine.position.y += effort * .014 * (0.5 + 0.5 * Math.sin(shakeT * 51));
     const studio = studioRef?.current ?? SOMPO_STUDIO_DEFAULT;
     field.update(frame, machine.position, camera.position, reduceMotion.matches, studio.wind, elapsed);
+    pasture.update(reduceMotion.matches ? 0 : elapsed / 1000);
     field.sun.position.set(x - 24, 34, z + 18);
     field.sun.target.position.set(x, 0, z);
     field.sun.target.updateMatrixWorld();
@@ -304,6 +306,14 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     orbit.update();
     atmosphere.update(studio, camera, machine.position, elapsed, scenario.environmentId === 'muddy-field', night);
     if (operation && focusTarget === 'truck' && scene.fog instanceof THREE.Fog) { scene.fog.near = 500; scene.fog.far = 800; }
+    if (night && scene.fog instanceof THREE.Fog) {
+      // Noite de lavoura: a partir de ~25 m o campo afunda num azul de luar e
+      // só a silhueta do quebra-vento e dos silos recorta o céu. Quem ilumina
+      // a imagem são os faróis, o giroflex e os projetores de trabalho.
+      scene.fog.color.set('#0b1622'); scene.fog.near = 24; scene.fog.far = 170;
+      scene.environmentIntensity = 0.1;
+      field.sun.intensity = 0.32;
+    }
     post.render(elapsed);
     meter.end();
     onAfterRender?.(renderer.domElement);

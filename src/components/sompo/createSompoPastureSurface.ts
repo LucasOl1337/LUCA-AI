@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 /** Generated albedo is a surface input; geometry, light and shadows remain live. */
-export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, field = false) {
+export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, field = false, farmland = field) {
   let disposed = false;
   // TextureLoader precisa de DOM (createElementNS); nos testes node fica a
   // textura vazia e o shader segue pelo caminho de fallback (ready = 0).
@@ -63,6 +63,7 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
     canopyTexture.anisotropy = 8;
   }
   const compile = material.onBeforeCompile;
+  const cloudDrift = { value: 0 };
   material.onBeforeCompile = (shader, renderer) => {
     compile(shader, renderer);
     shader.uniforms.pastureMap = { value: texture }; shader.uniforms.pastureReady = ready;
@@ -71,6 +72,8 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
     shader.uniforms.bladeMap = { value: bladeTexture }; shader.uniforms.bladeReady = bladeReady;
     shader.uniforms.canopyMap = { value: canopyTexture }; shader.uniforms.canopyReady = canopyReady;
     shader.uniforms.aerialMap = { value: aerialTexture }; shader.uniforms.aerialReady = aerialReady;
+    shader.uniforms.cloudDrift = cloudDrift;
+    shader.fragmentShader = 'uniform float cloudDrift;\n' + shader.fragmentShader;
     shader.fragmentShader = 'uniform sampler2D pastureMap; uniform float pastureReady;\nuniform sampler2D soilMap; uniform float soilReady;\nuniform sampler2D tilledMap; uniform float tilledReady;\nuniform sampler2D bladeMap; uniform float bladeReady;\nuniform sampler2D canopyMap; uniform float canopyReady;\nuniform sampler2D aerialMap; uniform float aerialReady;\n' + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', `
       float pasture = ${field ? 'smoothstep(11.0,18.0,abs(ruralWorld.z))' : 'smoothstep(4.1,7.2,abs(ruralWorld.z+2.05))'};
@@ -138,14 +141,58 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       float fieldZone = 1.0 - smoothstep(11.5, 15.5, abs(ruralWorld.z));
       vec3 tilled = mix(vec3(.24, .17, .1), texture2D(tilledMap, vec2(ruralWorld.z * .36, ruralWorld.x * .16)).rgb * vec3(.9, .8, .7), tilledReady);
       tilled *= .68 + macro * .5;
-      diffuseColor.rgb = mix(diffuseColor.rgb, tilled, fieldZone);` : ''}
+      diffuseColor.rgb = mix(diffuseColor.rgb, tilled, fieldZone);${farmland ? `
+      // Fazenda vizinha: fora do talhão da cena o chão vira uma colcha de
+      // talhões de ~60 m em estágios diferentes (soja verde, palha colhida,
+      // terra preparada), separados por carreadores de terra. As fileiras de
+      // cada talhão correm num rumo próprio e somem com a distância antes de
+      // cintilar. É o que dá escala: sem isso o morro liso lia como mapa vazio.
+      float beyond = smoothstep(15.0, 24.0, abs(ruralWorld.z)) + smoothstep(76.0, 88.0, abs(ruralWorld.x));
+      beyond = clamp(beyond, 0.0, 1.0);
+      if (beyond > 0.001) {
+        vec2 plotUv = ruralWorld.xz / vec2(46.0, 38.0) + vec2(.37, .61);
+        vec2 plotId = floor(plotUv), plotF = fract(plotUv);
+        float kind = ruralHash(plotId + 17.3);
+        float rowAngle = ruralHash(plotId + 3.1) * 3.14159;
+        vec2 rowDir = vec2(cos(rowAngle), sin(rowAngle));
+        float camDist = distance(cameraPosition, ruralWorld);
+        float rows = .5 + .5 * sin(dot(ruralWorld.xz, rowDir) * 8.4);
+        rows = mix(.5, rows, 1.0 - smoothstep(45.0, 120.0, camDist));
+        vec3 soy = mix(vec3(.13, .21, .06), vec3(.22, .31, .09), rows) * (.85 + macro * .3);
+        vec3 stubble = mix(vec3(.36, .27, .14), vec3(.47, .37, .2), rows) * (.85 + macro * .3);
+        vec3 bare = mix(vec3(.27, .15, .09), vec3(.34, .2, .12), rows) * (.8 + macro * .4);
+        vec3 pastureC = vec3(.26, .31, .13) * (.8 + macro * .45);
+        vec3 plot = kind < .42 ? soy : kind < .64 ? stubble : kind < .78 ? bare : pastureC;
+        // Terraço em curva de nível: camalhão a cada ~1,4 m de desnível, a
+        // marca do plantio brasileiro em encosta. Largura em pixels via fwidth,
+        // some antes de virar serrilhado no horizonte.
+        float contour = ruralWorld.y / 1.4 + ruralHash(plotId) * .5;
+        float lineW = fwidth(contour);
+        float terrace = (1.0 - smoothstep(.0, lineW * 1.5 + .04, abs(fract(contour) - .5) - .44)) * (1.0 - smoothstep(.12, .3, lineW));
+        plot = mix(plot, plot * vec3(.72, .8, .66), terrace * .6);
+        // Carreador: faixa de terra batida de ~4 m na divisa dos talhões.
+        vec2 edge = min(plotF, 1.0 - plotF) * vec2(46.0, 38.0);
+        float track = 1.0 - smoothstep(1.4, 2.4, min(edge.x, edge.y));
+        plot = mix(plot, vec3(.42, .27, .16) * (.9 + macro * .2), track * .85);
+        diffuseColor.rgb = mix(diffuseColor.rgb, plot, beyond);
+      }` : ''}` : ''}
       #include <roughnessmap_fragment>`);
     // Sombra de nuvem: manchas largas de luz direta a menos no morro e no pasto,
     // o que dá escala e profundidade ao relevo. Só a luz do sol, o céu continua.
     if (!field) shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
       float cloudShade = smoothstep(.42, .7, ruralNoise(ruralWorld.xz / 46.0 + vec2(3.7, 11.2)) * .7 + ruralNoise(ruralWorld.xz / 17.0 + 5.1) * .3);
       reflectedLight.directDiffuse *= 1.0 - cloudShade * .55 * smoothstep(9.0, 30.0, abs(ruralWorld.z + 2.05));`);
+    // No talhão a nuvem anda: a sombra corre devagar pelo campo vizinho e dá
+    // escala ao relevo sem escurecer a máquina (fora de |z|<16).
+    else shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+      vec2 cloudUv = (ruralWorld.xz + vec2(cloudDrift, cloudDrift * .35)) / 58.0;
+      float cloudShade = smoothstep(.45, .72, ruralNoise(cloudUv + vec2(3.7, 11.2)) * .72 + ruralNoise(cloudUv * 2.6 + 5.1) * .28);
+      reflectedLight.directDiffuse *= 1.0 - cloudShade * .6 * smoothstep(16.0, 34.0, max(abs(ruralWorld.x) * .55, abs(ruralWorld.z)));`);
   };
-  material.customProgramCacheKey = () => `sompo-pasture-albedo-v11-${field}`;
-  return { dispose() { disposed = true; texture.dispose(); soilTexture.dispose(); bladeTexture.dispose(); aerialTexture.dispose(); if (field) tilledTexture.dispose(); else canopyTexture.dispose(); } };
+  material.customProgramCacheKey = () => `sompo-pasture-albedo-v12-${field}-${farmland}`;
+  return {
+    /** Relógio da sombra de nuvem do talhão (segundos). */
+    update(seconds: number) { cloudDrift.value = seconds * 1.6; },
+    dispose() { disposed = true; texture.dispose(); soilTexture.dispose(); bladeTexture.dispose(); aerialTexture.dispose(); if (field) tilledTexture.dispose(); else canopyTexture.dispose(); },
+  };
 }

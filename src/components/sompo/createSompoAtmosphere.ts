@@ -99,6 +99,9 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
         vec3 hazeCol=mix(haze,sunlight,.5*sunSide*warmth);
         float horizonBand=1.-smoothstep(.004,.05,d.y);
         c=mix(c,hazeCol,horizonBand*smoothstep(-.35,0.,d.y)*.34);
+        // Chuva: o HDRI nublado traz uma mata escura na linha do horizonte que
+        // flutuava recortada sobre a névoa do terreno. A cortina d'água cobre.
+        c=mix(c,hazeCol,wetSky*(1.-smoothstep(.0,.11,d.y))*.78);
         // ── Serras: camada distante azulada, camada próxima verde ────────
         float sunDelta=wrapDelta(az-sunAzimuth)/.5;
         float sunGap=exp(-sunDelta*sunDelta); // pow(negative, 2) is undefined in GLSL.
@@ -172,7 +175,9 @@ export function createSompoAtmosphere(scene: THREE.Scene, renderer: THREE.WebGLR
         // Perspectiva aérea começa perto: com início em 100 m o morro a 60-120 m
         // tinha o mesmo contraste do capim a 5 m e a cena achatava.
         scene.fog.color.set(night ? '#172733' : mode === 'overcast' ? '#a9b2ae' : mode === 'golden' ? '#c8c9bd' : '#b4c6d2');
-        scene.fog.near = night ? 40 : wet ? 8 : 18; scene.fog.far = night ? 380 : wet ? 230 : mode === 'golden' ? 470 : 460;
+        // Na chuva a cortina fecha antes do capão de mata a ~180 m: com far 230
+        // ele ficava escuro e recortado, flutuando sobre a faixa baixa de névoa.
+        scene.fog.near = night ? 40 : wet ? 8 : 18; scene.fog.far = night ? 380 : wet ? 175 : mode === 'golden' ? 470 : 460;
       }
     },
     dispose() {

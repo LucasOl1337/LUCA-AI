@@ -9,7 +9,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
  * (alfa recorta a silhueta): 6 triângulos por planta mantém ~20 mil pés
  * dentro do orçamento do teste de recursos: densidade de lavoura de verdade.
  */
-export function createSompoCropRows(groundHeight: (x: number, z: number) => number, compact: boolean, height = 1, operation = false) {
+export function createSompoCropRows(groundHeight: (x: number, z: number) => number, compact: boolean, height = 1, operation = false, mature = false) {
   const root = new THREE.Group(); root.name = 'sompo-agri-crop-rows';
   const leaf = (lean: number, spread: number) => {
     const quad = new THREE.PlaneGeometry(0.78, 1, 1, 1);
@@ -59,7 +59,15 @@ export function createSompoCropRows(groundHeight: (x: number, z: number) => numb
         transformed.xz*=1.-harvested*.3;`);
     shader.fragmentShader = 'varying float cropHeight; varying float cropTint; varying float cropStubble;\n' + shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       #ifdef USE_MAP
-        diffuseColor.rgb*=mix(vec3(.5,.64,.38),vec3(.86,.8,.5),pow(max(cropHeight,.001),1.1));
+        ${mature ? `
+        // Grão se colhe seco: a folha verde da foto vira palha. A luminância da
+        // textura guarda a nervura; a rampa vai do pé queimado à ponta clara, e
+        // um em cada ~7 pés ainda segura um resto de verde (planta atrasada).
+        float leafLum=dot(diffuseColor.rgb,vec3(.3,.59,.11));
+        vec3 straw=mix(vec3(.30,.20,.10),vec3(.95,.74,.42),pow(max(cropHeight,.001),.8));
+        straw=mix(straw,straw*vec3(.78,.95,.62),step(.86,cropTint)*.7);
+        diffuseColor.rgb=straw*(.55+leafLum*1.6);` : `
+        diffuseColor.rgb*=mix(vec3(.5,.64,.38),vec3(.86,.8,.5),pow(max(cropHeight,.001),1.1));`}
       #else
         diffuseColor.rgb*=mix(vec3(.12,.2,.05),vec3(.55,.52,.2),pow(max(cropHeight,.001),1.2));
       #endif
@@ -67,7 +75,7 @@ export function createSompoCropRows(groundHeight: (x: number, z: number) => numb
       // Faixa colhida vira resteva seca e baixa, não terra nua.
       diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.56,.44,.24)*(.75+cropTint*.5),cropStubble*.9);`);
   };
-  material.customProgramCacheKey = () => `sompo-threeui-leafpair-v1-${height}-${operation}`;
+  material.customProgramCacheKey = () => `sompo-threeui-leafpair-v2-${height}-${operation}-${mature}`;
   const tiles: THREE.InstancedMesh[] = [];
   const dummy = new THREE.Object3D();
   const columns = compact ? 30 : 46, rows = compact ? 38 : 54;
