@@ -11,6 +11,7 @@ import json
 import math
 import os
 from mathutils import Vector
+from mathutils.bvhtree import BVHTree
 
 
 bpy.ops.object.select_all(action='SELECT')
@@ -43,7 +44,6 @@ def material(name, color, metal=0.0, rough=.5, coat=0.0, emission=0.0, alpha=1.0
         inp(shader, 'Emission Color', (*color, 1))
         inp(shader, 'Emission Strength', emission)
     if alpha < 1:
-        inp(shader, 'Transmission Weight', .18)
         for key, value in (('surface_render_method', 'DITHERED'), ('use_transparency_overlap', False)):
             try:
                 setattr(result, key, value)
@@ -52,7 +52,8 @@ def material(name, color, metal=0.0, rough=.5, coat=0.0, emission=0.0, alpha=1.0
     return result
 
 
-# Onze materiais PBR compartilhados. A união final deixa um draw por material.
+# Paleta de autoria. Na exportação, as cores e a rugosidade são consolidadas em
+# CavityAO e um único material opaco por parte rígida. O vidro fica separado.
 green = material('Harvester green satin', (.025, .22, .075), .28, .34, .52)
 green_dark = material('Harvester dark green', (.012, .075, .032), .32, .44, .3)
 yellow = material('Harvester warm yellow', (.96, .61, .015), .22, .32, .45)
@@ -69,6 +70,32 @@ red = material('Harvester rear lights', (.56, .012, .008), .12, .30, emission=.1
 root = bpy.data.objects.new('agri-harvester', None)
 bpy.context.collection.objects.link(root)
 
+parts = {}
+for part_name in (
+    'harvester-body',
+    'harvester-wheel-front-left',
+    'harvester-wheel-front-right',
+    'harvester-wheel-rear-left',
+    'harvester-wheel-rear-right',
+    'harvester-header',
+    'harvester-reel',
+):
+    part = bpy.data.objects.new(part_name, None)
+    bpy.context.collection.objects.link(part)
+    part.parent = root
+    parts[part_name] = part
+
+
+def parent_for(name):
+    for prefix in ('front-left', 'front-right', 'rear-left', 'rear-right'):
+        if name.startswith(prefix + '-'):
+            return parts['harvester-wheel-' + prefix]
+    if name.startswith('header-reel-'):
+        return parts['harvester-reel']
+    if name.startswith(('header-', 'corn-', 'divider-', 'cutter-')):
+        return parts['harvester-header']
+    return parts['harvester-body']
+
 
 def mesh_object(name, vertices, faces, mat, bevel=0.0, segments=2, smooth=True):
     mesh = bpy.data.meshes.new(name)
@@ -81,7 +108,7 @@ def mesh_object(name, vertices, faces, mat, bevel=0.0, segments=2, smooth=True):
     bm.free()
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.collection.objects.link(obj)
-    obj.parent = root
+    obj.parent = parent_for(name)
     obj.data.materials.append(mat)
     if bevel:
         modifier = obj.modifiers.new('Chanfrado', 'BEVEL')
@@ -99,7 +126,7 @@ def mesh_object(name, vertices, faces, mat, bevel=0.0, segments=2, smooth=True):
 
 def finish_primitive(obj, name, mat, bevel=0.0, segments=2, smooth=True):
     obj.name = name
-    obj.parent = root
+    obj.parent = parent_for(name)
     obj.data.materials.append(mat)
     if bevel:
         modifier = obj.modifiers.new('Chanfrado', 'BEVEL')
@@ -187,21 +214,29 @@ def torus(name, center, major_radius, minor_radius, mat, major_segments=32, mino
 
 
 def wheel(prefix, center, radius, width, rim_radius, lug_count):
-    """Pneu com banda toroidal, aro rebaixado, cubo e cravos em geometria."""
+    """Pneu agrícola com cravos altos em chevron, aro, cubo e porcas."""
     x, y, z = center
-    torus(prefix + '-tyre', center, radius * .72, radius * .28, rubber, 36, 12)
-    cylinder(prefix + '-rim', center, 'z', rim_radius, width * 1.035, yellow, 28, .018)
-    cylinder(prefix + '-hub', (x, y, z + math.copysign(width * .53, z)), 'z', rim_radius * .34, .055, steel, 20, .006)
+    torus(prefix + '-tyre', center, radius * .71, radius * .29, rubber, 44, 14)
+    cylinder(prefix + '-rim', center, 'z', rim_radius, width * 1.045, yellow, 32, .018)
+    outside = z + math.copysign(width * .55, z)
+    cylinder(prefix + '-hub', (x, y, outside), 'z', rim_radius * .34, .07, steel, 24, .006)
+    for index in range(8):
+        angle = index * math.tau / 8
+        cylinder(prefix + '-nut', (
+            x + math.cos(angle) * rim_radius * .23,
+            y + math.sin(angle) * rim_radius * .23,
+            outside + math.copysign(.042, z),
+        ), 'z', rim_radius * .035, .035, dark, 10, .002)
     for index in range(lug_count):
         angle = index * math.tau / lug_count
-        # Alternância lateral dá leitura de pneu agrícola em V sem textura.
-        lateral = (.16 if index % 2 else -.16) * width
+        # Duas metades inclinadas formam o V alto da banda agrícola.
+        lateral = (.19 if index % 2 else -.19) * width
         cx = x + math.cos(angle) * radius * .91
         cy = y + math.sin(angle) * radius * .91
         lug = box(prefix + '-lug', (cx, cy, z + lateral),
-                  (radius * .23, width * .42, radius * .105), rubber, .018, 1)
+                  (radius * .26, width * .48, radius * .14), rubber, .024, 1)
         lug.rotation_euler[1] = -angle
-        lug.rotation_euler[0] = math.radians(11 if index % 2 else -11)
+        lug.rotation_euler[0] = math.radians(24 if index % 2 else -24)
 
 
 # ---------------------------------------------------------------- chassi e rodas
@@ -211,13 +246,13 @@ for z in (-.92, .92):
 for x in (-3.25, -2.2, -1.0, .2, 1.25):
     box2('chassis-crossmember', (x - .055, .66, -.98), (x + .055, .80, .98), dark, .008)
 
-wheel('front-left', (1.30, .85, 1.20), .85, .50, .49, 18)
-wheel('front-right', (1.30, .85, -1.20), .85, .50, .49, 18)
-wheel('rear-left', (-1.48, .64, 1.09), .64, .40, .36, 16)
-wheel('rear-right', (-1.48, .64, -1.09), .64, .40, .36, 16)
+wheel('front-left', (1.30, .95, 1.24), .95, .58, .53, 22)
+wheel('front-right', (1.30, .95, -1.24), .95, .58, .53, 22)
+wheel('rear-left', (-1.48, .62, 1.10), .62, .44, .35, 18)
+wheel('rear-right', (-1.48, .62, -1.10), .62, .44, .35, 18)
 
 # Eixos, redutores e braços de direção visíveis sob a máquina.
-for x, y, half_width, radius in ((1.30, .85, 1.20, .14), (-1.48, .64, 1.09, .11)):
+for x, y, half_width, radius in ((1.30, .95, 1.24, .14), (-1.48, .62, 1.10, .11)):
     rod('axle', (x, y, -half_width), (x, y, half_width), radius, dark, 16)
     cylinder('final-drive', (x, y, half_width), 'z', radius * 1.65, .18, steel, 20)
     cylinder('final-drive', (x, y, -half_width), 'z', radius * 1.65, .18, steel, 20)
@@ -225,18 +260,39 @@ rod('rear-steering-link', (-1.48, .74, -1.02), (-1.48, .74, 1.02), .035, steel, 
 
 
 # ---------------------------------------------------------------- corpo, tanque graneleiro e painéis
-profile('main-body', [(-4.35, 1.12), (-4.28, 2.68), (-3.72, 3.18), (-1.35, 3.24),
-                      (.25, 2.90), (.92, 2.28), (.75, 1.22)], -1.28, 1.28, green, .07, 3)
-profile('rear-engine-cover', [(-4.52, 1.26), (-4.48, 2.70), (-3.98, 3.04), (-2.90, 3.06),
-                              (-2.68, 1.20)], -1.34, 1.34, green_dark, .055, 3)
-box2('yellow-side-band-left', (-3.92, 2.13, 1.337), (-.52, 2.36, 1.367), yellow, .018)
-box2('yellow-side-band-right', (-3.92, 2.13, -1.367), (-.52, 2.36, -1.337), yellow, .018)
+# Casco em degraus, com volumes de motor, graneleiro e transmissão legíveis.
+profile('main-body', [(-4.38, 1.08), (-4.35, 2.56), (-4.06, 2.90), (-3.48, 3.08),
+                      (-1.72, 3.10), (-1.56, 2.84), (-.30, 2.84), (.40, 2.47),
+                      (.82, 1.72), (.70, 1.17)], -1.28, 1.28, green, .055, 3)
+profile('rear-engine-cover', [(-4.54, 1.22), (-4.52, 2.62), (-4.22, 2.88), (-3.08, 2.90),
+                              (-2.76, 2.60), (-2.66, 1.16)], -1.35, 1.35, green_dark, .045, 3)
+profile('mid-service-panel', [(-3.00, 1.34), (-2.96, 2.72), (-1.70, 2.76),
+                              (-1.42, 2.45), (-1.46, 1.30)], 1.286, 1.335, green, .018, 2)
+profile('mid-service-panel-far', [(-3.00, 1.34), (-2.96, 2.72), (-1.70, 2.76),
+                                  (-1.42, 2.45), (-1.46, 1.30)], -1.335, -1.286, green, .018, 2)
+# A faixa é uma lâmina fina aplicada sobre painéis, não um volume estrutural.
+profile('yellow-side-band-left', [(-4.04, 2.05), (-3.90, 2.24), (-.76, 2.35),
+                                  (-.50, 2.20), (-.62, 2.08)], 1.348, 1.373, yellow, .008, 1)
+profile('yellow-side-band-right', [(-4.04, 2.05), (-3.90, 2.24), (-.76, 2.35),
+                                   (-.50, 2.20), (-.62, 2.08)], -1.373, -1.348, yellow, .008, 1)
 
-# Tampa superior facetada: volume largo e reconhecível, sem ultrapassar 4 m.
-profile('grain-tank', [(-3.55, 2.84), (-3.20, 3.67), (-2.68, 3.92), (-.28, 3.92),
-                       (.12, 3.62), (.05, 2.84)], -1.18, 1.18, green, .045, 3)
-box2('grain-tank-lip-left', (-3.26, 3.86, 1.14), (-.18, 3.98, 1.30), green_dark, .018)
-box2('grain-tank-lip-right', (-3.26, 3.86, -1.30), (-.18, 3.98, -1.14), green_dark, .018)
+# Funil central e quatro abas abertas: o topo fica mais largo que o casco.
+profile('grain-tank', [(-3.58, 2.82), (-3.25, 3.54), (-2.82, 3.70), (-.36, 3.70),
+                       (.04, 3.48), (.02, 2.82)], -1.03, 1.03, green, .04, 3)
+for side in (-1, 1):
+    inner = side * 1.00
+    outer = side * 1.56
+    vertices = [
+        (-3.42, 3.48, inner), (-.18, 3.48, inner),
+        (-.34, 3.88, outer), (-3.14, 3.88, outer),
+        (-3.42, 3.44, inner), (-.18, 3.44, inner),
+        (-.34, 3.84, outer), (-3.14, 3.84, outer),
+    ]
+    mesh_object('grain-tank-open-flap', vertices,
+                [(0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1),
+                 (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)], green, .018, 2)
+box2('grain-tank-front-lip', (-3.48, 3.78, -1.48), (-3.10, 3.94, 1.48), green_dark, .018)
+box2('grain-tank-rear-lip', (-.42, 3.78, -1.48), (-.10, 3.94, 1.48), green_dark, .018)
 for x in (-3.0, -2.25, -1.5, -.75):
     rod('grain-tank-brace-left', (x, 3.15, 1.23), (x + .18, 3.83, 1.23), .027, steel, 10)
     rod('grain-tank-brace-right', (x, 3.15, -1.23), (x + .18, 3.83, -1.23), .027, steel, 10)
@@ -247,6 +303,17 @@ for side in (-1, 1):
     box2('engine-vent-recess', (-4.10, 2.28, z_face - side * .012), (-3.10, 2.82, z_face), dark, .012)
     for y in (2.35, 2.46, 2.57, 2.68, 2.79):
         box('engine-vent-slat', (-3.60, y, z_face + side * .014), (.90, .035, .025), steel, .006, 1)
+
+# Tela rotativa do radiador e frisos de serviço na face próxima à câmera.
+cylinder('rotary-screen', (-3.46, 2.10, 1.395), 'z', .47, .045, dark, 48, .008)
+torus('rotary-screen-ring', (-3.46, 2.10, 1.426), .38, .022, steel, 36, 8)
+cylinder('rotary-screen-hub', (-3.46, 2.10, 1.445), 'z', .075, .04, steel, 18, .003)
+for angle in range(0, 360, 45):
+    a = math.radians(angle)
+    rod('rotary-screen-spoke', (-3.46, 2.10, 1.447),
+        (-3.46 + math.cos(a) * .36, 2.10 + math.sin(a) * .36, 1.447), .011, steel, 6)
+for x in (-4.10, -3.04, -1.66, -.48):
+    box('panel-seam', (x, 1.74, 1.383), (.018, 1.05, .018), dark, .003, 1)
 
 # Poeira física discreta nos protetores inferiores, usando a própria paleta PBR.
 for side in (-1, 1):
@@ -263,13 +330,18 @@ box2('cab-rear-bulkhead', (.96, 1.28, -.91), (1.10, 3.52, .91), green, .035, 3)
 box2('cab-front-sill', (2.28, 1.30, -.91), (2.43, 1.70, .91), green, .028, 3)
 for side in (-1, 1):
     box2('cab-side-sill', (1.06, 1.30, side * .84), (2.35, 1.70, side * .92), green, .025, 2)
-box2('cab-roof', (.90, 3.54, -1.00), (2.33, 3.72, 1.00), yellow, .04, 3)
+box2('cab-roof', (.88, 3.52, -1.03), (2.34, 3.69, 1.03), green, .04, 3)
+box2('cab-roof-yellow-pinstripe', (2.29, 3.50, -1.02), (2.365, 3.57, 1.02), yellow, .008, 1)
 
-# Vidros são lâminas separadas sobre uma cabine com interior verdadeiro.
-mesh_object('front-windscreen', [
-    (2.405, 1.70, -.78), (2.405, 1.70, .78),
-    (2.20, 3.46, .78), (2.20, 3.46, -.78),
-], [(0, 1, 2, 3)], glass, 0, 1, False)
+# Para-brisa em três lâminas: centro inclinado e cantos recuados simulam a
+# curvatura panorâmica sem uma bolha plástica lisa.
+for z0, z1, bottom_x, top_x in (
+    (-.82, -.36, 2.34, 2.12), (-.36, .36, 2.42, 2.18), (.36, .82, 2.34, 2.12),
+):
+    mesh_object('front-windscreen-curved', [
+        (bottom_x, 1.70, z0), (bottom_x, 1.70, z1),
+        (top_x, 3.45, z1), (top_x, 3.45, z0),
+    ], [(0, 1, 2, 3)], glass, 0, 1, False)
 for side in (-1, 1):
     z = side * .925
     # Janela lateral principal e vidro inferior de visão da plataforma.
@@ -278,8 +350,10 @@ for side in (-1, 1):
     vertices = [(1.84, 1.30, z + side * .002), (1.86, 1.66, z + side * .002),
                 (2.30, 1.66, z + side * .002), (2.34, 1.36, z + side * .002)]
     mesh_object('cab-lower-window', vertices, [(0, 1, 2, 3)], glass, 0, 1, False)
-    for x in (1.06, 2.29):
-        rod('cab-window-post', (x, 1.37, z + side * .025), (x, 3.46, z + side * .025), .035, green_dark, 10)
+    rod('cab-rear-window-post', (1.07, 1.38, z + side * .025),
+        (1.07, 3.46, z + side * .025), .034, green_dark, 10)
+    rod('cab-a-pillar', (2.37, 1.38, z + side * .025),
+        (2.12, 3.47, z + side * .025), .042, green_dark, 10)
 
 # Banco, console, painel e volante estão atrás do vidro, não pintados nele.
 box('seat-base', (1.50, 1.47, .18), (.54, .26, .54), interior, .08, 3)
@@ -287,9 +361,7 @@ box('seat-back', (1.35, 2.02, .18), (.22, .88, .55), interior, .10, 3)
 box('dashboard', (2.13, 1.88, 0), (.34, .36, 1.22), interior, .05, 2)
 rod('steering-column', (1.96, 1.83, .17), (2.14, 2.08, .17), .035, steel, 10)
 torus('steering-wheel', (2.15, 2.10, .17), .20, .025, dark, 20, 8)
-for x in (1.10, 2.28):
-    rod('cab-front-post', (x, 1.32, -.86), (x, 3.47, -.86), .04, green_dark, 10)
-    rod('cab-front-post', (x, 1.32, .86), (x, 3.47, .86), .04, green_dark, 10)
+rod('windscreen-center-post', (2.42, 1.67, 0), (2.18, 3.48, 0), .022, green_dark, 8)
 
 # Faróis e projetores em caixas individuais.
 for z in (-.67, -.22, .22, .67):
@@ -306,12 +378,20 @@ for side in (-1, 1):
 
 
 # ---------------------------------------------------------------- acesso, corrimãos e hidráulica
-for index, y in enumerate((.58, .86, 1.14, 1.42, 1.70)):
-    box('ladder-step', (.74, y, -1.52), (.42, .065, .52), steel, .012, 2)
-for z in (-1.78, -1.27):
-    rod('ladder-rail', (.74, .49, z), (.74, 2.02, z), .032, steel, 10)
-rod('handrail', (.74, 2.02, -1.78), (1.02, 2.70, -1.43), .032, steel, 10)
-rod('handrail', (1.02, 2.70, -1.43), (1.86, 2.78, -1.10), .032, steel, 10)
+# Passarela em L contorna a cabine, com escada inclinada no lado visível.
+box2('access-platform-side', (.72, 1.55, 1.00), (2.30, 1.68, 1.62), dark, .018, 2)
+box2('access-platform-front', (2.22, 1.55, -1.02), (2.47, 1.68, 1.58), dark, .018, 2)
+for index, y in enumerate((.42, .68, .94, 1.20, 1.46)):
+    x = .48 + index * .075
+    box('ladder-step', (x, y, 1.54), (.44, .065, .55), steel, .012, 2)
+for z in (1.28, 1.79):
+    rod('ladder-rail', (.43, .34, z), (.82, 1.77, z), .032, steel, 10)
+for x in (.82, 1.30, 1.78, 2.28):
+    rod('platform-handrail-upright', (x, 1.65, 1.58), (x, 2.38, 1.58), .028, steel, 10)
+rod('platform-handrail-top', (.82, 2.38, 1.58), (2.28, 2.38, 1.58), .030, steel, 10)
+for z in (1.58, .72, -.20, -1.02):
+    rod('front-handrail-upright', (2.43, 1.65, z), (2.43, 2.30, z), .027, steel, 10)
+rod('front-handrail-top', (2.43, 2.30, -1.02), (2.43, 2.30, 1.58), .030, steel, 10)
 rod('header-lift-left', (1.85, 1.08, .72), (2.48, .70, 1.06), .075, green_dark, 14)
 rod('header-lift-right', (1.85, 1.08, -.72), (2.48, .70, -1.06), .075, green_dark, 14)
 rod('header-cylinder-left', (1.62, 1.23, .62), (2.42, .82, .94), .038, steel, 10)
@@ -319,13 +399,16 @@ rod('header-cylinder-right', (1.62, 1.23, -.62), (2.42, .82, -.94), .038, steel,
 
 
 # ---------------------------------------------------------------- tubo descarregador dobrado
-# Tubo longitudinal na lateral direita, com joelhos e bocal escuro.
-rod('unloading-auger-main', (-3.25, 3.35, -1.48), (.78, 3.35, -1.48), .18, green, 24)
-rod('unloading-auger-elbow', (.72, 3.35, -1.48), (1.12, 3.52, -1.48), .20, green, 24)
-rod('unloading-auger-head', (1.10, 3.51, -1.48), (1.70, 3.51, -1.48), .17, green, 24)
-profile('unloading-spout', [(1.62, 3.66), (1.88, 3.55), (1.86, 3.20), (1.61, 3.29)], -1.61, -1.35, dark, .02, 2)
+# Tubo longitudinal alto no lado visível, com base, bandas, joelho e bocal
+# curvado sobre a cabine. Ele é a linha de silhueta típica da colheitadeira.
+rod('unloading-auger-base', (-3.50, 3.02, 1.34), (-3.18, 3.37, 1.52), .25, green_dark, 28)
+rod('unloading-auger-main', (-3.22, 3.38, 1.52), (.82, 3.38, 1.52), .205, green, 28)
+rod('unloading-auger-elbow', (.76, 3.38, 1.52), (1.18, 3.55, 1.52), .225, green, 28)
+rod('unloading-auger-head', (1.14, 3.54, 1.52), (1.83, 3.54, 1.52), .19, green, 28)
+profile('unloading-spout', [(1.72, 3.69), (2.02, 3.57), (2.00, 3.18), (1.74, 3.28)],
+        1.37, 1.67, dark, .025, 2)
 for x in (-2.7, -1.7, -.7, .3):
-    cylinder('auger-band', (x, 3.35, -1.48), 'x', .192, .055, steel, 18, .004)
+    cylinder('auger-band', (x, 3.38, 1.52), 'x', .218, .055, steel, 20, .004)
 
 
 # ---------------------------------------------------------------- plataforma de milho (toda acima de x=2,53 para o rig)
@@ -367,9 +450,9 @@ for side in (-1, 1):
     rod('rear-handrail', (-4.24, 2.76, side * 1.28), (-3.46, 3.30, side * 1.28), .028, steel, 10)
 
 
-# ---------------------------------------------------------------- consolidação e exportação
-# Aplica transformações/modificadores antes de unir por material. Isso preserva
-# os cravos inclinados e reduz o custo para no máximo onze draws no GLB isolado.
+# ---------------------------------------------------------------- consolidação, AO e exportação
+# Aplica transformações/modificadores antes do bake. Cada parte rígida vira um
+# draw opaco; a cor, a rugosidade e a poeira ficam no atributo CavityAO.
 for obj in list(bpy.context.scene.objects):
     if obj.type != 'MESH':
         continue
@@ -380,18 +463,76 @@ for obj in list(bpy.context.scene.objects):
     for modifier in list(obj.modifiers):
         bpy.ops.object.modifier_apply(modifier=modifier.name)
 
-for mat in list(bpy.data.materials):
-    objects = [obj for obj in bpy.context.scene.objects
-               if obj.type == 'MESH' and obj.data.materials and obj.data.materials[0] == mat]
-    if not objects:
-        continue
-    bpy.ops.object.select_all(action='DESELECT')
-    for obj in objects:
-        obj.select_set(True)
-    bpy.context.view_layer.objects.active = objects[0]
-    if len(objects) > 1:
-        bpy.ops.object.join()
-    objects[0].name = 'harvester-' + mat.name.lower().replace(' ', '-')
+
+opaque_objects = [obj for obj in bpy.context.scene.objects if obj.type == 'MESH'
+                  and obj.data.materials and obj.data.materials[0] != glass]
+vertices, polygons = [], []
+for obj in opaque_objects:
+    start = len(vertices)
+    vertices.extend([obj.matrix_world @ vertex.co for vertex in obj.data.vertices])
+    polygons.extend([tuple(start + index for index in polygon.vertices) for polygon in obj.data.polygons])
+bvh = BVHTree.FromPolygons(vertices, polygons)
+sample_directions = []
+for index in range(12):
+    radius = math.sqrt((index + .5) / 12)
+    angle = index * 2.399963229728653
+    sample_directions.append(Vector((radius * math.cos(angle), radius * math.sin(angle),
+                                     math.sqrt(1 - radius * radius))))
+
+for obj in opaque_objects:
+    source_material = obj.data.materials[0]
+    base = source_material.diffuse_color[:3]
+    shader = source_material.node_tree.nodes.get('Principled BSDF')
+    base_roughness = shader.inputs['Roughness'].default_value if shader else .5
+    colors = obj.data.color_attributes.new(name='CavityAO', type='FLOAT_COLOR', domain='POINT')
+    obj.data.color_attributes.active_color = colors
+    normal_matrix = obj.matrix_world.to_3x3().inverted().transposed()
+    for vertex in obj.data.vertices:
+        point = obj.matrix_world @ vertex.co
+        normal = (normal_matrix @ vertex.normal).normalized()
+        rotation = Vector((0, 0, 1)).rotation_difference(normal)
+        visibility = 0.0
+        for direction in sample_directions:
+            hit, _, _, distance = bvh.ray_cast(point + normal * .008, rotation @ direction, 1.8)
+            visibility += 1 if hit is None else min(1, (distance / 1.8) ** .58)
+        ao = .18 + .82 * visibility / len(sample_directions)
+        # Altura no Blender é Z. A poeira ganha força abaixo de 1,75 m e recebe
+        # ruído pequeno para não parecer uma faixa pintada a régua.
+        dust_height = max(0.0, min(1.0, (1.85 - point.z) / 1.55))
+        noise = .58 + .42 * (math.sin(point.x * 13.1 + point.y * 9.7) * .5 + .5)
+        dust = dust_height * noise * (.18 if source_material == rubber else .34)
+        dust_color = (.34, .25, .13)
+        color = tuple((channel * (1 - dust) + dust_color[i] * dust) * ao
+                      for i, channel in enumerate(base))
+        roughness = max(.24, min(.96, base_roughness * (1 - dust) + .94 * dust))
+        colors.data[vertex.index].color = (*color, roughness)
+
+opaque = material('Harvester vertex-painted PBR', (1, 1, 1), .18, .52, .25)
+opaque.diffuse_color = (1, 1, 1, 1)
+opaque_shader = opaque.node_tree.nodes.get('Principled BSDF')
+vertex_color = opaque.node_tree.nodes.new('ShaderNodeVertexColor')
+vertex_color.layer_name = 'CavityAO'
+opaque.node_tree.links.new(vertex_color.outputs['Color'], opaque_shader.inputs['Base Color'])
+opaque.node_tree.links.new(vertex_color.outputs['Alpha'], opaque_shader.inputs['Roughness'])
+
+for part in parts.values():
+    children = [obj for obj in part.children if obj.type == 'MESH']
+    for suffix, objects, target_material in (
+        ('surface', [obj for obj in children if obj.data.materials[0] != glass], opaque),
+        ('glass-surface', [obj for obj in children if obj.data.materials[0] == glass], glass),
+    ):
+        if not objects:
+            continue
+        for obj in objects:
+            obj.data.materials.clear()
+            obj.data.materials.append(target_material)
+        bpy.ops.object.select_all(action='DESELECT')
+        for obj in objects:
+            obj.select_set(True)
+        bpy.context.view_layer.objects.active = objects[0]
+        if len(objects) > 1:
+            bpy.ops.object.join()
+        objects[0].name = part.name + '-' + suffix
 
 triangles = sum(len(poly.vertices) - 2 for obj in bpy.context.scene.objects if obj.type == 'MESH'
                 for poly in obj.data.polygons)
@@ -405,6 +546,7 @@ bpy.ops.export_scene.gltf(
     export_yup=True,
     export_apply=True,
     export_materials='EXPORT',
+    export_vertex_color='ACTIVE',
 )
 
 digest = hashlib.sha256(open(output, 'rb').read()).hexdigest()
@@ -419,12 +561,13 @@ provenance = {
     'coordinateSystem': '+X forward, +Y up, +Z left; metres',
     'nominalSizeM': {'length': 9.2, 'width': 7.6, 'height': 4.0},
     'features': [
-        'Beveled modular body panels and grain tank',
+        'Stepped modular body panels and open grain-tank flaps',
         'Panoramic transparent cabin with seat, dashboard and steering wheel',
         'Four agricultural tyres with geometric lugs and yellow rims',
         'Corn header with twelve dividers, cutter bar, auger, reel and tines',
-        'Folded unloading auger, engine grilles, ladder, handrails, mirrors and lights',
-        'Existing agricultural rig applies light field dust to lower surfaces at runtime',
+        'Prominent folded unloading auger, rotary radiator screen and engine grilles',
+        'Inclined ladder, wraparound access platform, handrails, mirrors and lights',
+        'CavityAO vertex bake with height-based dust colour and roughness variation',
     ],
     'externalManifest': 'generated-agri-harvester.textures.json',
     'textures': [],
@@ -434,7 +577,7 @@ provenance = {
     'sha256': digest,
     'limits': [
         'Visual simulation asset, not manufacturing CAD',
-        'Runtime partitions rigid geometry into wheels, body and header by the existing pivot contract',
+        'Authored rigid nodes are consumed directly by the runtime rig',
     ],
 }
 with open(os.path.splitext(output)[0] + '.provenance.json', 'w', encoding='utf-8') as handle:

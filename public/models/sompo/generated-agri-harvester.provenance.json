@@ -13,21 +13,22 @@
     "height": 4.0
   },
   "features": [
-    "Beveled modular body panels and grain tank",
+    "Stepped modular body panels and open grain-tank flaps",
     "Panoramic transparent cabin with seat, dashboard and steering wheel",
     "Four agricultural tyres with geometric lugs and yellow rims",
     "Corn header with twelve dividers, cutter bar, auger, reel and tines",
-    "Folded unloading auger, engine grilles, ladder, handrails, mirrors and lights",
-    "Existing agricultural rig applies light field dust to lower surfaces at runtime"
+    "Prominent folded unloading auger, rotary radiator screen and engine grilles",
+    "Inclined ladder, wraparound access platform, handrails, mirrors and lights",
+    "CavityAO vertex bake with height-based dust colour and roughness variation"
   ],
   "externalManifest": "generated-agri-harvester.textures.json",
   "textures": [],
-  "triangles": 30514,
-  "materials": 11,
-  "bytes": 908764,
-  "sha256": "46b941f6ebcbc65c151873b178bcf15097f310f182b69e821a2522dcdd3a34d4",
+  "triangles": 44626,
+  "materials": 2,
+  "bytes": 1697480,
+  "sha256": "f236cc5d47b3daf4a89e91d0e421401068adb412ee538cddd9b20470942f488b",
   "limits": [
     "Visual simulation asset, not manufacturing CAD",
-    "Runtime partitions rigid geometry into wheels, body and header by the existing pivot contract"
+    "Authored rigid nodes are consumed directly by the runtime rig"
   ]
 }

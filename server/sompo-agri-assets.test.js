@@ -51,9 +51,16 @@ for (const name of ['generated-agri-tractor', 'generated-agri-harvester']) {
     const license = readFileSync(new URL(provenance.license, root), 'utf8');
     if (procedural) {
       assert.equal(document.images?.length ?? 0, 0);
+      assert.ok(!document.extensionsUsed?.includes('KHR_materials_transmission'), 'glass avoids scene refraction pass');
       assert.match(provenance.generatedBy, /Blender 5\.2/);
       assert.match(provenance.method, /no reconstruction/);
       assert.ok(provenance.materials <= 12);
+      assert.ok(document.meshes.flatMap(mesh => mesh.primitives).length <= 8, 'authored rig fits draw budget');
+      for (const part of ['harvester-body', 'harvester-header', 'harvester-reel',
+        'harvester-wheel-front-left', 'harvester-wheel-front-right',
+        'harvester-wheel-rear-left', 'harvester-wheel-rear-right']) {
+        assert.ok(document.nodes.some(node => node.name === part), `${part} authored in GLB`);
+      }
       assert.ok(readFileSync(new URL(provenance.referenceImage, root)).length > 100);
       assert.match(license, /original, unbranded procedural hard-surface model/);
     } else {
@@ -118,7 +125,7 @@ test('loader agrícola recupera PBR externo e ajusta os dois modelos ao chão', 
       assert.equal(model.userData.equipmentId, equipmentId);
       model.updateMatrixWorld(true);
       // O trator mantém o eixo reconstruído antigo; a colheitadeira já é +X.
-      const authored = model.getObjectByName(equipmentId === 'tractor' ? 'tractor-textured' : 'harvester-harvester-green-satin');
+      const authored = model.getObjectByName(equipmentId === 'tractor' ? 'tractor-textured' : 'harvester-body-surface');
       if (authored) {
         const front = equipmentId === 'tractor' ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
         const heading = authored.localToWorld(front).sub(authored.localToWorld(new THREE.Vector3())).normalize();
@@ -143,8 +150,11 @@ test('loader agrícola recupera PBR externo e ajusta os dois modelos ao chão', 
       } });
       assert.equal(partitionTriangles, sourceTriangles, 'every source triangle assigned exactly once');
       assert.equal(rig.wheels.length, 4);
-      assert.ok(rig.wheels.every(wheel => wheel.spin.children.reduce((count, child) =>
-        count + (child.geometry?.attributes.position.count ?? 0), 0) > 200));
+      assert.ok(rig.wheels.every(wheel => {
+        let vertices = 0;
+        wheel.spin.traverse(child => { vertices += child.geometry?.attributes.position.count ?? 0; });
+        return vertices > 200;
+      }));
       const scenarioId = equipmentId === 'tractor' ? 'agri-hydraulic-failure' : 'agri-harvest-dust';
       const frames = getSompoAgriKeyframes(scenarioId);
       const update = t => rig.update(getSompoAgriFrame(scenarioId, t), integrateSompoMotion(frames, t) / 3.6, integrateSompoMotion(frames, t, 'headerSpeed', false) * .8, false);

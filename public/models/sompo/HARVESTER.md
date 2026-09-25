@@ -17,11 +17,17 @@ altura). Os pivôs das rodas e da plataforma seguem `rigSompoAgriAsset.ts`, que
 continua responsável por esterçamento, giro das rodas, levante da plataforma,
 molinete e poeira de trabalho.
 
-A malha inclui corpo e tanque graneleiro chanfrados, cabine panorâmica vazada
-com interior, pneus com cravos geométricos, aros amarelos, tubo descarregador
-dobrado, grades, escada, corrimãos, espelhos, luzes e plataforma de milho com
-doze divisores, barra de corte, sem-fim e molinete. As onze superfícies PBR usam
-cores por material e dispensam imagens; por isso
+A malha inclui casco em degraus, tanque graneleiro com abas abertas, cabine
+panorâmica vazada, pneus com cravos em chevron, aros com cubo e porcas, tubo
+descarregador dobrado, tela rotativa do radiador, passarela, escada inclinada,
+corrimãos e plataforma de milho com doze divisores, barra, sem-fim e molinete.
+
+O GLB exporta sete partes rígidas nomeadas: corpo, quatro rodas, plataforma e
+molinete. Cada parte opaca é um único draw; o corpo acrescenta só a lâmina de
+vidro. Cor, AO de cavidade, poeira por altura e variação de roughness são
+gravados no atributo de vértice `CavityAO`, consolidando a paleta em dois
+materiais. O vidro usa alpha PBR sem transmissão física, porque a transmissão
+forçaria um passe completo de refração da cena. O asset dispensa imagens; por isso
 `generated-agri-harvester.textures.json` contém um manifesto vazio válido para
 o restaurador CSP.
 
