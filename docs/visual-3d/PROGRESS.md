@@ -68,7 +68,8 @@ Capturas em `.cinema/shots/baseline/` (fora do git). 28 cenários, zero erro de 
 - R1 → **fechado**. A faixa escura não era geometria: vinha do HDRI nublado. Duas tentativas pela
   névoa da cena não mudaram um pixel (medido), a causa era o céu. Véu de chuva na base do domo
   (`wetSky`) e névoa de chuva fechando em 175 m.
-- P1, P2 → **fechado** (ver passada 5). Grão IGN no grade, forte nos meios-tons, também como dither.
+- P2 → **fechado**. Grão IGN no grade, forte nos meios-tons (ver custo na passada 5).
+- P1 → **fechado na passada 6**, com prova de captura.
 
 ## Passada 4 · /sensor e regressão de custo
 
@@ -101,8 +102,21 @@ Capturas em `.cinema/shots/baseline/` (fora do git). 28 cenários, zero erro de 
 - Releitura completa (agro, rodovia seca e chuva, `/sensor`): nenhuma falha nova relevante.
   Critério de parada do método atingido.
 
+## Passada 6 · releitura das afirmações
+
+- P1 → **fechado com prova**. Recorte do céu da chuva com contraste realcado
+  ([`p1-ceu-dither.png`](./p1-ceu-dither.png), em cima a main, embaixo o branch): na main o
+  gradiente tem degraus em faixas; com o dither o degrau some no ruído fino. Mesma região: 26 → 29
+  níveis de cinza distintos.
+- Restolho atrás da colheitadeira: **não era falha**. A faixa colhida já existe no shader
+  (`cropStubble`, guiado por `cropCut` dos cenários); as capturas só enquadram a plataforma de
+  frente. Sai da lista.
+- Produção: `/sompo` e `/sensor` publicados exigem login, e a bancada de captura não tem sessão.
+  O que prova a release publicada é o hash dos chunks 3D (`SompoTruckSimulator-*`,
+  `SensorLabPage-*`), igual ao build capturado aqui. Nenhuma conta foi criada em produção para
+  olhar.
+
 ## Em aberto (próximas passadas)
 
 - Plantas dos vasos do `/sensor` ainda são volumes simples; baixa prioridade, estão fora de foco.
-- Colheita: a palha madura é uniforme; falta a faixa já colhida atrás da plataforma (restolho).
 - Laboratório de geofencing visto de cima segue o mapa de calor sintético, sem trabalho de luz.
