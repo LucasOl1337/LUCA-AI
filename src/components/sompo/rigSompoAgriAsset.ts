@@ -10,7 +10,7 @@ import { sompoSteeringAngle } from '../../../shared/sompo-motion.js';
  */
 export const SOMPO_AGRI_RIG_LAYOUT = {
   tractor: { axles: [{ x: 1.82, y: .57, z: .76, radius: .57, inner: .50, steer: true }, { x: -.16, y: .78, z: .84, radius: .77, inner: .59, steer: false }], hitch: [-.85, 1.15, 0] },
-  harvester: { axles: [{ x: 1.30, y: .85, z: 1.20, radius: .85, inner: .84, steer: false }, { x: -1.48, y: .64, z: 1.09, radius: .64, inner: .85, steer: true }], hitch: [2.32, 1.1, 0] },
+  harvester: { axles: [{ x: 1.30, y: .95, z: 1.24, radius: .95, inner: .86, steer: false }, { x: -1.48, y: .62, z: 1.10, radius: .62, inner: .85, steer: true }], hitch: [2.32, 1.1, 0] },
 } as const;
 
 export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgriEquipmentId) {
@@ -29,10 +29,39 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
   }));
   const parts = [body, ...wheels.map(wheel => wheel.spin), implement];
   const pivots = [new THREE.Vector3(), ...wheels.map(wheel => wheel.steering.position), implement.position];
+  const rotor = new THREE.Group(); rotor.name = 'agri-header-reel'; rotor.position.set(1.08, -.04, 0); implement.add(rotor);
   const removed: THREE.Mesh[] = [];
   let triangles = 0;
   source.updateMatrixWorld(true);
-  source.traverse(node => {
+  root.updateMatrixWorld(true);
+  const authoredNames = equipmentId === 'harvester' ? [
+    'harvester-body',
+    'harvester-wheel-front-right',
+    'harvester-wheel-front-left',
+    'harvester-wheel-rear-right',
+    'harvester-wheel-rear-left',
+    'harvester-header',
+  ] : [];
+  const authoredParts = authoredNames.map(name => source.getObjectByName(name));
+  const authoredReel = equipmentId === 'harvester' ? source.getObjectByName('harvester-reel') : null;
+  const usesAuthoredParts = authoredParts.length > 0
+    && authoredParts.every((part): part is THREE.Object3D => part !== undefined);
+  if (usesAuthoredParts) {
+    authoredParts.forEach((part, index) => {
+      parts[index].attach(part);
+      part.traverse(node => {
+        const mesh = node as THREE.Mesh;
+        if (mesh.isMesh) triangles += (mesh.geometry.index?.count ?? mesh.geometry.attributes.position.count) / 3;
+      });
+    });
+    if (authoredReel) {
+      rotor.attach(authoredReel);
+      authoredReel.traverse(node => {
+        const mesh = node as THREE.Mesh;
+        if (mesh.isMesh) triangles += (mesh.geometry.index?.count ?? mesh.geometry.attributes.position.count) / 3;
+      });
+    }
+  } else source.traverse(node => {
     const mesh = node as THREE.Mesh;
     if (!mesh.isMesh || Array.isArray(mesh.material)) return;
     const geometry = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
@@ -76,10 +105,14 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
   // triangles every frame. The articulated part matrices still move the support.
   const support = parts.map(part => {
     const points: THREE.Vector3[] = [];
-    for (const child of part.children) {
-      const position = (child as THREE.Mesh).geometry?.attributes.position;
-      if (position) for (let i = 0; i < position.count; i++) points.push(new THREE.Vector3().fromBufferAttribute(position, i));
-    }
+    part.traverse(child => {
+      const mesh = child as THREE.Mesh;
+      const position = mesh.geometry?.attributes.position;
+      if (!position) return;
+      child.updateMatrixWorld(true);
+      const local = new THREE.Matrix4().copy(part.matrixWorld).invert().multiply(child.matrixWorld);
+      for (let i = 0; i < position.count; i++) points.push(new THREE.Vector3().fromBufferAttribute(position, i).applyMatrix4(local));
+    });
     const vertices = new Set<THREE.Vector3>();
     if (points.length >= 4) for (const face of new ConvexHull().setFromPoints(points).faces) {
       let edge = face.edge;
@@ -87,12 +120,10 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
     }
     return { part, vertices: [...vertices] };
   });
-  const rotor = new THREE.Group(); rotor.name = 'agri-header-reel';
-  if (equipmentId === 'harvester') {
+  if (equipmentId === 'harvester' && !authoredReel) {
     // Open reel over the authored cutter bed; housing itself never spins.
     rotor.position.set(1.06, .16, 0); implement.add(rotor);
     const steel = new THREE.MeshStandardMaterial({ color: 0x26352c, roughness: .58, metalness: .48 });
-    const yellow = new THREE.MeshStandardMaterial({ color: 0xb69a48, roughness: .6, metalness: .28 });
     const shaft = new THREE.Mesh(new THREE.CylinderGeometry(.055, .055, 5.15, 12), steel); shaft.rotation.x = Math.PI / 2; rotor.add(shaft);
     const bar = new THREE.BoxGeometry(.055, .06, 5.04);
     const arm = new THREE.BoxGeometry(.035, .68, .035);
@@ -100,19 +131,25 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
     const tines = new THREE.InstancedMesh(tineGeometry, steel, 6 * 18); const matrix = new THREE.Matrix4();
     for (let i = 0; i < 6; i++) {
       const a = i * Math.PI / 3, x = Math.cos(a) * .34, y = Math.sin(a) * .34;
-      const bat = new THREE.Mesh(bar, yellow); bat.position.set(x, y, 0); rotor.add(bat);
+      const bat = new THREE.Mesh(bar, steel); bat.position.set(x, y, 0); rotor.add(bat);
       for (const z of [-2.45, 0, 2.45]) { const spoke = new THREE.Mesh(arm, steel); spoke.rotation.z = a - Math.PI / 2; spoke.position.z = z; rotor.add(spoke); }
       for (let k = 0; k < 18; k++) { matrix.makeTranslation(x, y - .08, -2.4 + k * 4.8 / 17); tines.setMatrixAt(i * 18 + k, matrix); }
     }
-    rotor.add(tines);
-    // One draw per material for the rigid reel; its whole group stays articulated.
-    for (const material of [steel, yellow]) {
-      const meshes = rotor.children.filter(node => (node as THREE.Mesh).isMesh && !(node as THREE.InstancedMesh).isInstancedMesh && (node as THREE.Mesh).material === material) as THREE.Mesh[];
-      const geometries = meshes.map(mesh => { mesh.updateMatrix(); return mesh.geometry.clone().applyMatrix4(mesh.matrix); });
-      const combined = new THREE.Mesh(mergeGeometries(geometries), material); rotor.add(combined);
-      geometries.forEach(geometry => geometry.dispose()); meshes.forEach(mesh => mesh.removeFromParent());
-      new Set(meshes.map(mesh => mesh.geometry)).forEach(geometry => geometry.dispose());
-    }
+    // Um draw para todo o molinete de fallback, inclusive os dentes repetidos.
+    const meshes = rotor.children.filter(node => (node as THREE.Mesh).isMesh) as THREE.Mesh[];
+    const geometries = meshes.flatMap(mesh => {
+      if ((mesh as THREE.InstancedMesh).isInstancedMesh) {
+        const instanced = mesh as THREE.InstancedMesh;
+        return Array.from({ length: instanced.count }, (_, index) => {
+          instanced.getMatrixAt(index, matrix);
+          return instanced.geometry.clone().applyMatrix4(matrix);
+        });
+      }
+      mesh.updateMatrix(); return [mesh.geometry.clone().applyMatrix4(mesh.matrix)];
+    });
+    const combined = new THREE.Mesh(mergeGeometries(geometries), steel); combined.name = 'agri-header-reel-surface'; rotor.add(combined);
+    geometries.forEach(geometry => geometry.dispose()); meshes.forEach(mesh => mesh.removeFromParent());
+    new Set(meshes.map(mesh => mesh.geometry)).forEach(geometry => geometry.dispose());
   }
   // Máquina de verdade acumula poeira nas partes baixas e palhada no corpo.
   // Só material: o GLB fica intacto, sem re-gerar rig nem texturas.
@@ -140,6 +177,9 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
           float agriDust = smoothstep(2.4, .1, agriW.y) * (.35 + .65 * agriNoise(agriW.xz * 2.4));
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.48, .4, .26), clamp(agriDust, 0., 1.) * .55);`)
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+          #ifdef USE_COLOR_ALPHA
+            roughnessFactor = mix(.24, .96, clamp(vColor.a, 0., 1.));
+          #endif
           roughnessFactor = mix(roughnessFactor, .95, clamp(agriDust, 0., 1.) * .55);`);
     };
     material.customProgramCacheKey = () => 'sompo-agri-wear-v1';

@@ -17,7 +17,8 @@ function moduleUrl(source) {
 }
 
 for (const name of ['generated-agri-tractor', 'generated-agri-harvester']) {
-  test(`${name}: GLB retopologizado, sem Draco e com texturas externas byte-idênticas`, () => {
+  test(`${name}: GLB sem Draco, dentro do orçamento e com proveniência verificável`, () => {
+    const procedural = name === 'generated-agri-harvester';
     const bytes = readFileSync(new URL(`${name}.glb`, root));
     assert.equal(bytes.readUInt32LE(0), 0x46546c67);
     const jsonLength = bytes.readUInt32LE(12);
@@ -27,8 +28,9 @@ for (const name of ['generated-agri-tractor', 'generated-agri-harvester']) {
     assert.ok(!document.extensionsRequired?.includes('KHR_draco_mesh_compression'));
 
     const manifest = JSON.parse(readFileSync(new URL(`${name}.textures.json`, root), 'utf8'));
-    assert.equal(manifest.images.length, document.images.length);
-    for (const [index, image] of document.images.entries()) {
+    const embeddedImages = document.images ?? [];
+    assert.equal(manifest.images.length, embeddedImages.length);
+    for (const [index, image] of embeddedImages.entries()) {
       const view = document.bufferViews[image.bufferView];
       const external = readFileSync(new URL(manifest.images[index], root));
       assert.deepEqual(external, binary.subarray(view.byteOffset ?? 0, (view.byteOffset ?? 0) + view.byteLength));
@@ -36,19 +38,37 @@ for (const name of ['generated-agri-tractor', 'generated-agri-harvester']) {
     }
 
     const triangles = document.meshes.flatMap((mesh) => mesh.primitives).reduce((sum, primitive) => {
-      assert.ok(primitive.attributes.TEXCOORD_0 !== undefined, 'PBR atlas has UV coordinates');
+      if (!procedural) assert.ok(primitive.attributes.TEXCOORD_0 !== undefined, 'PBR atlas has UV coordinates');
       return sum + (document.accessors[primitive.indices].count / 3);
     }, 0);
-    assert.ok(triangles >= 15_000 && triangles <= 30_000, `${triangles} triangles fit agricultural budget`);
+    const upperBudget = procedural ? 150_000 : 30_000;
+    assert.ok(triangles >= 15_000 && triangles <= upperBudget, `${triangles} triangles fit agricultural budget`);
 
     const provenance = JSON.parse(readFileSync(new URL(`${name}.provenance.json`, root), 'utf8'));
     assert.equal(provenance.triangles, triangles);
     assert.equal(provenance.sha256, createHash('sha256').update(bytes).digest('hex'));
-    const source = readFileSync(new URL(provenance.sourceImage, root));
-    assert.equal(provenance.sourceImageSha256, createHash('sha256').update(source).digest('hex'));
-    assert.equal(provenance.imageModel, 'cx/gpt-image-2 via local 9Router /v1/images/generations');
     assert.equal(provenance.license, 'SOMPO-AGRI-ASSET-LICENSE.txt');
-    assert.match(readFileSync(new URL(provenance.license, root), 'utf8'), /Hunyuan3D-2\.1/);
+    const license = readFileSync(new URL(provenance.license, root), 'utf8');
+    if (procedural) {
+      assert.equal(document.images?.length ?? 0, 0);
+      assert.ok(!document.extensionsUsed?.includes('KHR_materials_transmission'), 'glass avoids scene refraction pass');
+      assert.match(provenance.generatedBy, /Blender 5\.2/);
+      assert.match(provenance.method, /no reconstruction/);
+      assert.ok(provenance.materials <= 12);
+      assert.ok(document.meshes.flatMap(mesh => mesh.primitives).length <= 8, 'authored rig fits draw budget');
+      for (const part of ['harvester-body', 'harvester-header', 'harvester-reel',
+        'harvester-wheel-front-left', 'harvester-wheel-front-right',
+        'harvester-wheel-rear-left', 'harvester-wheel-rear-right']) {
+        assert.ok(document.nodes.some(node => node.name === part), `${part} authored in GLB`);
+      }
+      assert.ok(readFileSync(new URL(provenance.referenceImage, root)).length > 100);
+      assert.match(license, /original, unbranded procedural hard-surface model/);
+    } else {
+      const source = readFileSync(new URL(provenance.sourceImage, root));
+      assert.equal(provenance.sourceImageSha256, createHash('sha256').update(source).digest('hex'));
+      assert.equal(provenance.imageModel, 'cx/gpt-image-2 via local 9Router /v1/images/generations');
+      assert.match(license, /Hunyuan3D-2\.1/);
+    }
   });
 }
 
@@ -104,11 +124,10 @@ test('loader agrícola recupera PBR externo e ajusta os dois modelos ao chão', 
       assert.equal(model.name, `sompo-agri-${equipmentId}-asset`);
       assert.equal(model.userData.equipmentId, equipmentId);
       model.updateMatrixWorld(true);
-      // Landmarks inspected in the actual generated meshes: tractor hood +Y,
-      // harvester header -X, before the authored node's quarter turn around X.
-      const authored = model.getObjectByName(equipmentId === 'tractor' ? 'tractor-textured' : 'harvester-textured');
+      // O trator mantém o eixo reconstruído antigo; a colheitadeira já é +X.
+      const authored = model.getObjectByName(equipmentId === 'tractor' ? 'tractor-textured' : 'harvester-body-surface');
       if (authored) {
-        const front = equipmentId === 'tractor' ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(-1, 0, 0);
+        const front = equipmentId === 'tractor' ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
         const heading = authored.localToWorld(front).sub(authored.localToWorld(new THREE.Vector3())).normalize();
         assert.ok(heading.x > 0.999, `${equipmentId}: front must follow +X travel, got ${heading.toArray()}`);
       }
@@ -118,18 +137,24 @@ test('loader agrícola recupera PBR externo e ajusta os dois modelos ao chão', 
       const surfaces = [];
       model.traverse((node) => { if (node.isMesh) surfaces.push(node); });
       assert.ok(surfaces.length > 0);
-      assert.ok(surfaces.every((mesh) => mesh.material.map && mesh.material.metalnessMap === mesh.material.roughnessMap));
+      assert.ok(surfaces.every((mesh) => equipmentId === 'harvester'
+        ? !mesh.material.map && !mesh.material.metalnessMap && !mesh.material.roughnessMap
+        : mesh.material.map && mesh.material.metalnessMap === mesh.material.roughnessMap));
       const sourceTriangles = surfaces.reduce((sum, mesh) => sum + (mesh.geometry.index?.count ?? mesh.geometry.attributes.position.count) / 3, 0);
       const rig = rigSompoAgriAsset(model, equipmentId);
       assert.equal(rig.root.userData.sourceTriangles, sourceTriangles);
       let partitionTriangles = 0;
       rig.root.traverse(node => { if (node.isMesh && node.name.endsWith('-surface')) {
         partitionTriangles += node.geometry.index.count / 3;
-        assert.ok(node.material.map && node.geometry.attributes.uv, 'partition preserves authored atlas and UVs');
+        if (equipmentId === 'tractor') assert.ok(node.material.map && node.geometry.attributes.uv, 'partition preserves authored atlas and UVs');
       } });
       assert.equal(partitionTriangles, sourceTriangles, 'every source triangle assigned exactly once');
       assert.equal(rig.wheels.length, 4);
-      assert.ok(rig.wheels.every(wheel => wheel.spin.children[0]?.geometry.attributes.position.count > 200));
+      assert.ok(rig.wheels.every(wheel => {
+        let vertices = 0;
+        wheel.spin.traverse(child => { vertices += child.geometry?.attributes.position.count ?? 0; });
+        return vertices > 200;
+      }));
       const scenarioId = equipmentId === 'tractor' ? 'agri-hydraulic-failure' : 'agri-harvest-dust';
       const frames = getSompoAgriKeyframes(scenarioId);
       const update = t => rig.update(getSompoAgriFrame(scenarioId, t), integrateSompoMotion(frames, t) / 3.6, integrateSompoMotion(frames, t, 'headerSpeed', false) * .8, false);
@@ -154,7 +179,7 @@ test('loader agrícola recupera PBR externo e ajusta os dois modelos ao chão', 
       disposeSompoAgriAsset(rig.root);
     }
     assert.ok(imageRequests.some((url) => /generated-agri-tractor-basecolor\.jpg$/.test(url)));
-    assert.ok(imageRequests.some((url) => /generated-agri-harvester-metallicroughness\.png$/.test(url)));
+    assert.ok(!imageRequests.some((url) => /generated-agri-harvester-.*\.(png|jpe?g)$/.test(url)));
   } finally {
     globalThis.document = saved.document;
     globalThis.self = saved.self;

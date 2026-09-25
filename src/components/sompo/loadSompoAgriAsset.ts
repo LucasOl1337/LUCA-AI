@@ -28,9 +28,9 @@ function disposeObject(root: THREE.Object3D) {
 }
 
 /**
- * Loads a generated agricultural machine under the production CSP. The GLB
- * keeps its byte-identical embedded atlas for provenance, while rendering uses
- * the external image manifest through restoreSompoTextures.
+ * Carrega máquinas agrícolas sob a CSP de produção. Reconstruções restauram
+ * seus atlas externos; modelos procedurais usam o mesmo contrato com manifesto
+ * vazio e materiais PBR nativos do GLB.
  */
 export async function loadSompoAgriAsset(equipmentId: SompoAgriEquipmentId, signal: AbortSignal) {
   const equipment = SOMPO_AGRI_EQUIPMENT[equipmentId];
@@ -53,9 +53,9 @@ export async function loadSompoAgriAsset(equipmentId: SompoAgriEquipmentId, sign
 
   const model = gltf.scene;
   model.name = `sompo-agri-${equipmentId}-asset`;
-  // Authored axes differ: tractor hood +Y, harvester header -X (mesh space).
-  // Both GLBs already contain a quarter turn around X in their node transform.
-  model.rotation.y = equipmentId === 'tractor' ? Math.PI / 2 : Math.PI;
+  // O trator reconstruído mantém o eixo autoral antigo. A colheitadeira procedural
+  // já sai do Blender no contrato do rig: +X para a plataforma e +Y para cima.
+  model.rotation.y = equipmentId === 'tractor' ? Math.PI / 2 : 0;
   model.updateMatrixWorld(true);
   const bounds = new THREE.Box3().setFromObject(model);
   const size = bounds.getSize(new THREE.Vector3());
@@ -79,8 +79,8 @@ export async function loadSompoAgriAsset(equipmentId: SompoAgriEquipmentId, sign
     for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
       if (!(material instanceof THREE.MeshStandardMaterial)) continue;
       material.envMapIntensity = 0.7;
-      // Painted machinery keeps the generated atlas/UVs, with a satin floor to
-      // prevent reconstructed highlights from turning every painted panel into chrome.
+      // A pintura agrícola conserva seus mapas ou cores PBR, com piso acetinado
+      // para impedir que os painéis virem cromados sob o ambiente HDR.
       material.onBeforeCompile = (shader) => {
         shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>',
           '#include <roughnessmap_fragment>\nroughnessFactor = max(roughnessFactor, 0.46);');
