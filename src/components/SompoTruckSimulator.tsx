@@ -1121,7 +1121,7 @@ export default function SompoTruckSimulator({
           <p className="sompo-simulator-credit">
             {agriRun ? (
               modelStatus === 'gltf'
-                ? `${modelAsset ?? 'Equipamento agrícola'} · imagem → 3D por LUCA-AI`
+                ? `${modelAsset ?? 'Equipamento agrícola'} · ${getSompoAgriFrame(agriRun.scenarioId, 0).equipmentId === 'harvester' ? 'modelagem procedural Blender' : 'imagem → 3D'} por LUCA-AI`
                 : modelStatus === 'loading' ? 'Carregando equipamento agrícola…' : 'Silhueta nominal · GLB agrícola indisponível'
             ) : modelAsset === 'SompoModularTruck' ? 'Caminhão rural · imagem → 3D por LUCA-AI · adaptado com sensor' : modelAsset === 'GeneratedRuralTruck' ? 'Caminhão rural · imagem → 3D por LUCA-AI · adaptado com sensor' : modelStatus === 'gltf' ? <>
               <a href="https://sketchfab.com/3d-models/tesla-semi-39ffc7c746184e0c9ebd5bbcd0b405dd" target="_blank" rel="noreferrer">Tesla Semi © 2018 Oleksii Rozumnyi</a>
