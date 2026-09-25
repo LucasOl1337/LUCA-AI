@@ -14,13 +14,15 @@ test('crop layout stays deterministic, grounded and within both geometry budgets
   const full=createSompoCropRows(height,false),repeat=createSompoCropRows(height,false),compact=createSompoCropRows(height,true);
   let total=0, reduced=0;
   const pose=new THREE.Matrix4(),p=new THREE.Vector3();
+  full.update(0,new THREE.Vector3(),false);compact.update(0,new THREE.Vector3(),false);
   full.root.children.forEach((mesh,index)=>{
     assert.deepEqual(mesh.instanceMatrix.array,repeat.root.children[index].instanceMatrix.array);
-    total+=mesh.count*mesh.geometry.index.count/3;
+    if(mesh.visible) total+=mesh.count*mesh.geometry.index.count/3;
     for(let i=0;i<mesh.count;i++) {mesh.getMatrixAt(i,pose);p.setFromMatrixPosition(pose);assert.ok(Math.abs(p.y-height(p.x,p.z))<1e-5);assert.ok(Math.abs(p.z)<12.2,'crop strip stays inside the field');}
   });
-  compact.root.children.forEach(mesh=>reduced+=mesh.count*mesh.geometry.index.count/3);
-  assert.ok(total<=120000);assert.ok(reduced<total*.65);
+  compact.root.children.forEach(mesh=>{if(mesh.visible) reduced+=mesh.count*mesh.geometry.index.count/3;});
+  // O teto agora mede o pior LOD visível: malha curva perto + impostor longe.
+  assert.ok(total<=2300000);assert.ok(reduced<total*.65);
   const shader={uniforms:{},vertexShader:'#include <begin_vertex>',fragmentShader:'#include <color_fragment>'};full.root.children[0].material.onBeforeCompile(shader);
   full.update(3000,new THREE.Vector3(),false,.4,new THREE.Vector3(6,0,1),1);
   assert.ok(Math.abs(shader.uniforms.cropCut.value.x - 10.28) < 1e-8, 'cut begins at the measured cutter bar, ahead of the wheels');

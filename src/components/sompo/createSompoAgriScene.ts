@@ -172,7 +172,7 @@ function mergeByMaterial(root: THREE.Object3D) {
  * Tufos baixos dentro do campo leem como invasora entre as fileiras. */
 function createEdgeWeeds(ground: (x: number, z: number) => number) {
   const time = { value: 0 }, wind = { value: .65 };
-  const geometry = grassTuftGeometry(8, 91);
+  const geometry = grassTuftGeometry(10, 91);
   const material = new THREE.MeshStandardMaterial({ roughness: 1, side: THREE.DoubleSide });
   material.onBeforeCompile = shader => {
     shader.uniforms.weedTime = time;

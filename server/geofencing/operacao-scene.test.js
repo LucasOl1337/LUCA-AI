@@ -18,7 +18,11 @@ test('plantio da operação: corte cronológico nas duas direções e cobertura 
       assert.equal(crop.root.children.at(-1).geometry.getAttribute('harvestAt').getX(0), 1e9);
     }
     crop.update(2000, new Vector3(0, 400, 100), false);
-    assert.equal(crop.root.children.every(mesh => mesh.visible), true, 'visão geral mantém plantio visível');
+    for (let index = 0; index < crop.root.children.length; index += 3) {
+      const [leaves, structure, impostor] = crop.root.children.slice(index, index + 3);
+      assert.equal(leaves.visible || impostor.visible, true, 'cada faixa mantém uma representação visível');
+      assert.equal(leaves.visible, structure.visible, 'colmo acompanha as folhas no LOD próximo');
+    }
     const zs = crop.root.children.flatMap(mesh => Array.from({ length: mesh.count }, (_, i) => mesh.instanceMatrix.array[i * 16 + 14]));
     assert.ok(Math.min(...zs) < -45 && Math.max(...zs) > 40);
   } finally {

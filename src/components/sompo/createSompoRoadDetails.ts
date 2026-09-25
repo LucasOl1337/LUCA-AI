@@ -101,7 +101,8 @@ export function grassTuftGeometry(blades: number, seed: number, tall = false) {
   for (let i = 0; i < blades; i += 1) {
     const dry = i % 4 === 3;
     const height = (dry ? 0.15 + rand(seed + i * 5 + 2) * 0.1 : 0.26 + rand(seed + i * 7 + 5) * 0.16) * (tall ? 1.7 : 1);
-    const blade = new THREE.PlaneGeometry(0.015 + rand(seed + i * 3) * 0.008, height, 1, 2);
+    const width = (0.018 + rand(seed + i * 3) * 0.014) * (tall ? 1.18 : 1);
+    const blade = new THREE.PlaneGeometry(width, height, 1, tall ? 3 : 2);
     blade.translate(0, height / 2, 0);
     const positions = blade.attributes.position as THREE.BufferAttribute;
     const bend = dry ? 0.6 + rand(seed + i * 7 + 3) * 0.55 : 0.12 + rand(seed + i * 7 + 3) * 0.3;
@@ -110,7 +111,8 @@ export function grassTuftGeometry(blades: number, seed: number, tall = false) {
       const t = positions.getY(v) / height;
       bladeT[v] = t;
       positions.setX(v, positions.getX(v) * (1 - t * 0.78));
-      positions.setZ(v, positions.getZ(v) + t * t * bend * height * (dry ? 3 : 1.8));
+      positions.setX(v, positions.getX(v) + Math.sin(t * Math.PI) * (rand(seed + i * 19) - .5) * width * 2.4);
+      positions.setZ(v, positions.getZ(v) + t * t * bend * height * (dry ? 2.2 : 1.45));
     }
     blade.setAttribute('bladeT', new THREE.BufferAttribute(bladeT, 1));
     blade.rotateY((i / blades) * Math.PI * 2 + rand(seed + i) * 0.9);
@@ -118,6 +120,14 @@ export function grassTuftGeometry(blades: number, seed: number, tall = false) {
     const angle = rand(seed + i * 11) * Math.PI * 2;
     blade.translate(Math.cos(angle) * spread, 0, Math.sin(angle) * spread);
     parts.push(blade);
+    if (tall && i % 4 === 0) {
+      const head = new THREE.CylinderGeometry(.006, .017, .075 + rand(seed + i * 23) * .045, 5, 1, false);
+      head.translate(0, height + .025, 0);
+      head.rotateY((i / blades) * Math.PI * 2 + rand(seed + i) * .9);
+      head.translate(Math.cos(angle) * spread, 0, Math.sin(angle) * spread);
+      head.setAttribute('bladeT', new THREE.BufferAttribute(new Float32Array(head.attributes.position.count).fill(1), 1));
+      parts.push(head);
+    }
   }
   const geometry = mergeGeometries(parts);
   parts.forEach((part) => part.dispose());
@@ -335,7 +345,7 @@ export function createSompoRoadDetails(parent: THREE.Group, camera?: THREE.Camer
   const tallWeedMaterial = grassMaterial.clone();
   windify(tallWeedMaterial, 0.08);
   grassRamp(tallWeedMaterial);
-  const tallWeeds = new THREE.InstancedMesh(grassTuftGeometry(7, 137, true), tallWeedMaterial, 210);
+  const tallWeeds = new THREE.InstancedMesh(grassTuftGeometry(8, 137, true), tallWeedMaterial, 210);
   tallWeeds.name = 'roadside-tall-weeds'; tallWeeds.receiveShadow = true; root.add(tallWeeds);
   const weedSlots: InstanceSlot[] = [];
   for (let i = 0; i < 210; i += 1) {
@@ -358,7 +368,7 @@ export function createSompoRoadDetails(parent: THREE.Group, camera?: THREE.Camer
   const clumpMaterial = grassMaterial.clone();
   windify(clumpMaterial, 0.075);
   grassRamp(clumpMaterial);
-  const clumps = new THREE.InstancedMesh(grassTuftGeometry(11, 57, true), clumpMaterial, 300);
+  const clumps = new THREE.InstancedMesh(grassTuftGeometry(12, 57, true), clumpMaterial, 300);
   clumps.name = 'pasture-grass-clumps'; clumps.receiveShadow = true; root.add(clumps);
   const clumpSlots: InstanceSlot[] = [];
   for (let i = 0; i < 300; i += 1) {
