@@ -83,9 +83,9 @@ export async function loadSompoAgriAsset(equipmentId: SompoAgriEquipmentId, sign
       // para impedir que os painéis virem cromados sob o ambiente HDR.
       material.onBeforeCompile = (shader) => {
         shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>',
-          '#include <roughnessmap_fragment>\nroughnessFactor = max(roughnessFactor, 0.46);');
+          '#include <roughnessmap_fragment>\nroughnessFactor = max(roughnessFactor, 0.34);');
       };
-      material.customProgramCacheKey = () => 'sompo-agri-satin-v1';
+      material.customProgramCacheKey = () => 'sompo-agri-satin-v2';
       for (const value of Object.values(material)) {
         if (value instanceof THREE.Texture) value.anisotropy = 8;
       }

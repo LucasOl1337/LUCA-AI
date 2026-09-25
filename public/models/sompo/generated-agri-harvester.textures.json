@@ -1,3 +1,10 @@
 {
-  "images": []
+  "images": [
+    "agri-machine-body-normal.jpg",
+    "agri-machine-body-albedo.jpg",
+    "agri-machine-body-orm.jpg",
+    "agri-machine-wheel-normal.jpg",
+    "agri-machine-wheel-albedo.jpg",
+    "agri-machine-wheel-orm.jpg"
+  ]
 }

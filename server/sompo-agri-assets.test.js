@@ -42,9 +42,8 @@ for (const name of ['generated-agri-tractor', 'generated-agri-harvester']) {
     const upperBudget = harvester ? 150_000 : 120_000;
     assert.ok(triangles >= 15_000 && triangles <= upperBudget, `${triangles} triangles fit agricultural budget`);
     assert.ok((document.materials?.length ?? 0) <= 12, 'material budget');
-    // Nenhuma das duas máquinas carrega textura: a CSP não precisa liberar imagem.
-    assert.equal(document.images?.length ?? 0, 0);
-    assert.equal(manifest.images.length, 0);
+    assert.ok((document.images?.length ?? 0) >= 6, '2K body and wheel PBR maps are embedded');
+    assert.ok(manifest.images.every(filename => /^agri-machine-(body|wheel)-(albedo|normal|orm)\.jpg$/.test(filename)));
     assert.ok(!document.extensionsUsed?.includes('KHR_materials_transmission'), 'glass avoids scene refraction pass');
     assert.ok(document.meshes.flatMap(mesh => mesh.primitives).length <= 8, 'authored rig fits draw budget');
 
@@ -52,6 +51,9 @@ for (const name of ['generated-agri-tractor', 'generated-agri-harvester']) {
     assert.equal(provenance.triangles, triangles);
     assert.equal(provenance.sha256, createHash('sha256').update(bytes).digest('hex'));
     assert.equal(provenance.license, 'SOMPO-AGRI-ASSET-LICENSE.txt');
+    assert.equal(provenance.textureLicense, 'CC0 1.0');
+    assert.deepEqual(provenance.textureSources.map(source => source.id).sort(), ['Metal049A', 'Rubber004']);
+    assert.ok(provenance.textureSources.every(source => source.license === 'CC0 1.0' && source.accessedAt === '2026-09-25'));
     const license = readFileSync(new URL(provenance.license, root), 'utf8');
     assert.doesNotMatch(license, /reconstructed locally with Tencent/);
     if (harvester) {
@@ -144,8 +146,8 @@ test('loader agrícola recupera PBR externo e ajusta os dois modelos ao chão', 
       const surfaces = [];
       model.traverse((node) => { if (node.isMesh) surfaces.push(node); });
       assert.ok(surfaces.length > 0);
-      assert.ok(surfaces.every((mesh) => !mesh.material.map && !mesh.material.metalnessMap && !mesh.material.roughnessMap),
-        `${equipmentId}: procedural machine stays texture-free`);
+      assert.ok(surfaces.some((mesh) => mesh.material.map && mesh.material.normalMap && mesh.material.roughnessMap && mesh.material.metalnessMap),
+        `${equipmentId}: external PBR maps restored`);
       const sourceTriangles = surfaces.reduce((sum, mesh) => sum + (mesh.geometry.index?.count ?? mesh.geometry.attributes.position.count) / 3, 0);
       const rig = rigSompoAgriAsset(model, equipmentId);
       assert.equal(rig.root.userData.sourceTriangles, sourceTriangles);
@@ -183,7 +185,10 @@ test('loader agrícola recupera PBR externo e ajusta os dois modelos ao chão', 
       }
       disposeSompoAgriAsset(rig.root);
     }
-    assert.deepEqual(imageRequests, [], 'procedural machines make no image request');
+    assert.equal(imageRequests.length, 12, 'six PBR maps restored for each machine');
+    for (const filename of ['body-albedo', 'body-normal', 'body-orm', 'wheel-albedo', 'wheel-normal', 'wheel-orm']) {
+      assert.equal(imageRequests.filter(url => url.endsWith(`agri-machine-${filename}.jpg`)).length, 2, `${filename} loaded locally for both assets`);
+    }
   } finally {
     globalThis.document = saved.document;
     globalThis.self = saved.self;

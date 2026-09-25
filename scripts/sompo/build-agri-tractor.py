@@ -7,10 +7,16 @@ exportacao para preservar detalhe sem multiplicar draw calls no Three.js.
 """
 
 import bpy
+import hashlib
+import json
 import math
 import os
+import sys
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from agri_pbr import attach_tiled_pbr, extract_external_images, project_box_uv
 
 
 bpy.ops.object.select_all(action='SELECT')
@@ -64,6 +70,8 @@ red = material('Trator lanternas traseiras', (0.52, 0.018, 0.012), 0.12, 0.31, e
 amber = material('Trator giroflex', (0.9, 0.28, 0.015), 0.08, 0.24, emission=0.3, alpha=0.82)
 structural = material('Trator acabamentos unificados', (1, 1, 1), 0.25, 0.58)
 wheel_finish = material('Trator roda unificada', (1, 1, 1), 0.08, 0.78)
+attach_tiled_pbr(structural, 'body', .36)
+attach_tiled_pbr(wheel_finish, 'wheel', .62)
 
 
 parts = bpy.data.objects.new('trator-agricola-procedural', None)
@@ -385,8 +393,10 @@ for obj in list(bpy.context.scene.objects):
     if target != original:
         tint = tuple(original.diffuse_color[:3])
         colors = obj.data.color_attributes.new(name='CavityAO', type='FLOAT_COLOR', domain='POINT')
+        shader = original.node_tree.nodes.get('Principled BSDF')
+        authored_roughness = shader.inputs['Roughness'].default_value if shader else .5
         for vertex in obj.data.vertices:
-            colors.data[vertex.index].color = (*tint, 1)
+            colors.data[vertex.index].color = (*tint, authored_roughness)
         obj.data.color_attributes.active_color = colors
         obj.data.materials.clear()
         obj.data.materials.append(target)
@@ -396,6 +406,7 @@ for obj in list(bpy.context.scene.objects):
     for modifier in list(obj.modifiers):
         bpy.ops.object.modifier_apply(modifier=modifier.name)
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    project_box_uv(obj, .62 if rig_key.startswith('wheel-') else .78)
 
 # O nome é um contrato opcional com o rig do Three.js. Cada grupo já chega como
 # corpo, roda ou engate e não precisa ser recortado triângulo a triângulo.
@@ -451,7 +462,7 @@ for obj in opaque:
         colors.data[vertex.index].color = (
             base[0] * ao * (1 - dirt * .16),
             base[1] * ao * (1 - dirt * .27),
-            base[2] * ao * (1 - dirt * .46), 1)
+            base[2] * ao * (1 - dirt * .46), current[3])
 
 triangles = sum(len(poly.vertices) - 2 for obj in bpy.context.scene.objects if obj.type == 'MESH' for poly in obj.data.polygons)
 out = os.path.abspath(os.environ.get('AGRI_TRACTOR_OUT', 'public/models/sompo/generated-agri-tractor.glb'))
@@ -463,4 +474,51 @@ bpy.ops.export_scene.gltf(
     export_materials='EXPORT',
     export_vertex_color='ACTIVE',
 )
+manifest = os.path.splitext(out)[0] + '.textures.json'
+texture_names = extract_external_images(out, manifest)
+digest = hashlib.sha256(open(out, 'rb').read()).hexdigest()
+source_image = os.path.join(os.path.dirname(out), 'generated-agri-tractor-source.png')
+provenance = {
+    'asset': os.path.basename(out),
+    'generatedBy': 'LUCA-AI, Blender 5.2',
+    'createdAt': '2026-09-25',
+    'method': 'Procedural Blender modeling from dimensioned primitives and custom meshes',
+    'generator': 'scripts/sompo/build-agri-tractor.py',
+    'blenderVersion': '5.2.0 LTS',
+    'sourceImage': os.path.basename(source_image),
+    'sourceImageRole': 'Visual proportion and equipment-detail reference only; no geometry or texture was reconstructed from it',
+    'sourceImageSha256': hashlib.sha256(open(source_image, 'rb').read()).hexdigest(),
+    'authorship': 'Original unbranded procedural geometry authored for LUCA-AI',
+    'dimensionsM': {'length': 5.65, 'width': 2.7202, 'height': 3.0237},
+    'axes': {'forward': '+X', 'up': '+Y', 'lateral': '+Z'},
+    'license': 'SOMPO-AGRI-ASSET-LICENSE.txt',
+    'textureLicense': 'CC0 1.0',
+    'textureSources': [
+        {'id': 'Metal049A', 'url': 'https://ambientcg.com/a/Metal049A', 'license': 'CC0 1.0', 'accessedAt': '2026-09-25'},
+        {'id': 'Rubber004', 'url': 'https://ambientcg.com/a/Rubber004', 'license': 'CC0 1.0', 'accessedAt': '2026-09-25'},
+    ],
+    'texturePipeline': 'AmbientCG CC0 bases, neutralized for vertex tint; 2K albedo, tangent normal and ORM; box-projected UV at 0.62/0.78 m per tile',
+    'textures': texture_names,
+    'triangles': triangles,
+    'materials': len({obj.data.materials[0].name for obj in bpy.context.scene.objects if obj.type == 'MESH' and obj.data.materials}),
+    'geometry': {
+        'triangles': triangles,
+        'materials': len({obj.data.materials[0].name for obj in bpy.context.scene.objects if obj.type == 'MESH' and obj.data.materials}),
+        'parts': ['long hood and grille', 'enclosed glazed cab and interior', 'front and rear wheel assemblies',
+                  'mirrored chevron tire lugs', 'wheel arches', 'vertical exhaust', 'headlights, work lights and beacon',
+                  'front ballast plates', 'steps and handrails', 'rear three-point hitch, PTO and hydraulic cylinders',
+                  'engine block, sump, fuel tank and pivoting front axle', 'CavityAO tint plus 2K PBR microdetail'],
+    },
+    'externalManifest': os.path.basename(manifest),
+    'reproducibleCommand': 'blender -b --factory-startup --python scripts/sompo/build-agri-tractor.py',
+    'sha256': digest,
+    'bytes': os.path.getsize(out),
+    'limitations': ['The model is a visual simulator asset, not a manufacturer-accurate CAD assembly',
+                    'Hydraulic hoses are simplified to keep the runtime draw and triangle budget predictable',
+                    'Cab glazing remains simplified so body surfaces can share one runtime draw',
+                    'Vertex tint carries the authored paint family while 2K maps carry shared microdetail'],
+}
+with open(os.path.splitext(out)[0] + '.provenance.json', 'w', encoding='utf-8') as handle:
+    json.dump(provenance, handle, ensure_ascii=False, indent=2)
+    handle.write('\n')
 print('AGRI_TRACTOR_EXPORTED', out, os.path.getsize(out), 'triangles', triangles, 'materials', len(bpy.data.materials))

@@ -19,14 +19,37 @@
     "Corn header with twelve dividers, cutter bar, auger, reel and tines",
     "Prominent folded unloading auger, rotary radiator screen and engine grilles",
     "Inclined ladder, wraparound access platform, handrails, mirrors and lights",
-    "CavityAO vertex bake with height-based dust colour and roughness variation"
+    "CavityAO vertex bake with height-based dust colour and roughness variation",
+    "Two 2K tiled PBR families for painted body and wheel/rubber microdetail"
   ],
   "externalManifest": "generated-agri-harvester.textures.json",
-  "textures": [],
+  "textures": [
+    "agri-machine-body-normal.jpg",
+    "agri-machine-body-albedo.jpg",
+    "agri-machine-body-orm.jpg",
+    "agri-machine-wheel-normal.jpg",
+    "agri-machine-wheel-albedo.jpg",
+    "agri-machine-wheel-orm.jpg"
+  ],
+  "textureLicense": "CC0 1.0",
+  "textureSources": [
+    {
+      "id": "Metal049A",
+      "url": "https://ambientcg.com/a/Metal049A",
+      "license": "CC0 1.0",
+      "accessedAt": "2026-09-25"
+    },
+    {
+      "id": "Rubber004",
+      "url": "https://ambientcg.com/a/Rubber004",
+      "license": "CC0 1.0",
+      "accessedAt": "2026-09-25"
+    }
+  ],
   "triangles": 44626,
-  "materials": 2,
-  "bytes": 1697480,
-  "sha256": "f236cc5d47b3daf4a89e91d0e421401068adb412ee538cddd9b20470942f488b",
+  "materials": 3,
+  "bytes": 4777204,
+  "sha256": "7f88546a93d765ff0c654c0a0db9cc6ef866472638be1cd9bca7683fad7dc0fd",
   "limits": [
     "Visual simulation asset, not manufacturing CAD",
     "Authored rigid nodes are consumed directly by the runtime rig"

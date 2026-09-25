@@ -176,7 +176,7 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
     const compile = material.onBeforeCompile;
     material.onBeforeCompile = (shader, renderer) => {
       compile?.call(material, shader, renderer);
-      if (equipmentId === 'harvester') shader.defines = { ...shader.defines, AGRI_ROUGHNESS_ALPHA: '' };
+      shader.defines = { ...shader.defines, AGRI_ROUGHNESS_ALPHA: '' };
       shader.vertexShader = 'varying vec3 agriW;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
         vec4 agriP = vec4(transformed, 1.0);
         #ifdef USE_INSTANCING
@@ -191,19 +191,15 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
           float agriDust = smoothstep(2.4, .1, agriW.y) * (.35 + .65 * agriNoise(agriW.xz * 2.4));
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.48, .4, .26), clamp(agriDust, 0., 1.) * .55);`)
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-          // Colheitadeira: roughness assada no alpha do vértice (CavityAO).
-          // Trator: alpha é 1 fixo; o vidro vem da cor azulada do vértice.
+          // A família do acabamento vem no alpha e modula, sem apagar, o ORM 2K.
           #if defined(AGRI_ROUGHNESS_ALPHA)
             #ifdef USE_COLOR_ALPHA
-              roughnessFactor = mix(.24, .96, clamp(vColor.a, 0., 1.));
+              roughnessFactor = clamp(roughnessFactor * mix(.72, 1.18, clamp(vColor.a, 0., 1.)), .18, 1.);
             #endif
-          #elif defined(USE_COLOR)
-            float agriGlass = step(.72, vColor.b / max(vColor.g, .001)) * step(.32, vColor.r / max(vColor.g, .001));
-            roughnessFactor = mix(roughnessFactor, .14, agriGlass);
           #endif
           roughnessFactor = mix(roughnessFactor, .95, clamp(agriDust, 0., 1.) * .55);`);
     };
-    material.customProgramCacheKey = () => `sompo-agri-wear-v2-${equipmentId}`;
+    material.customProgramCacheKey = () => `sompo-agri-wear-v3-${equipmentId}`;
   };
   const tractorControlMaterial = [...authoredMaterials.values()].find(
     (material): material is THREE.MeshStandardMaterial => material instanceof THREE.MeshStandardMaterial,

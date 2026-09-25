@@ -10,8 +10,12 @@ import hashlib
 import json
 import math
 import os
+import sys
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from agri_pbr import attach_tiled_pbr, extract_external_images, project_box_uv
 
 
 bpy.ops.object.select_all(action='SELECT')
@@ -462,6 +466,7 @@ for obj in list(bpy.context.scene.objects):
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     for modifier in list(obj.modifiers):
         bpy.ops.object.modifier_apply(modifier=modifier.name)
+    project_box_uv(obj, .62 if 'wheel-' in obj.parent.name else .82)
 
 
 opaque_objects = [obj for obj in bpy.context.scene.objects if obj.type == 'MESH'
@@ -509,16 +514,18 @@ for obj in opaque_objects:
 
 opaque = material('Harvester vertex-painted PBR', (1, 1, 1), .18, .52, .25)
 opaque.diffuse_color = (1, 1, 1, 1)
-opaque_shader = opaque.node_tree.nodes.get('Principled BSDF')
-vertex_color = opaque.node_tree.nodes.new('ShaderNodeVertexColor')
-vertex_color.layer_name = 'CavityAO'
-opaque.node_tree.links.new(vertex_color.outputs['Color'], opaque_shader.inputs['Base Color'])
-opaque.node_tree.links.new(vertex_color.outputs['Alpha'], opaque_shader.inputs['Roughness'])
+wheel_opaque = material('Harvester wheel vertex-painted PBR', (1, 1, 1), .06, .82, .08)
+wheel_opaque.diffuse_color = (1, 1, 1, 1)
+attach_tiled_pbr(opaque, 'body', .36)
+attach_tiled_pbr(wheel_opaque, 'wheel', .62)
+# COLOR_0 continua ativo pelo exportador glTF e multiplica o albedo no runtime;
+# ligar o atributo ao Principled aqui substituiria o mapa base em vez de compor.
 
 for part in parts.values():
     children = [obj for obj in part.children if obj.type == 'MESH']
+    opaque_material = wheel_opaque if 'wheel-' in part.name else opaque
     for suffix, objects, target_material in (
-        ('surface', [obj for obj in children if obj.data.materials[0] != glass], opaque),
+        ('surface', [obj for obj in children if obj.data.materials[0] != glass], opaque_material),
         ('glass-surface', [obj for obj in children if obj.data.materials[0] == glass], glass),
     ):
         if not objects:
@@ -549,6 +556,9 @@ bpy.ops.export_scene.gltf(
     export_vertex_color='ACTIVE',
 )
 
+manifest_path = os.path.splitext(output)[0] + '.textures.json'
+texture_names = extract_external_images(output, manifest_path)
+
 digest = hashlib.sha256(open(output, 'rb').read()).hexdigest()
 provenance = {
     'asset': os.path.basename(output),
@@ -568,9 +578,15 @@ provenance = {
         'Prominent folded unloading auger, rotary radiator screen and engine grilles',
         'Inclined ladder, wraparound access platform, handrails, mirrors and lights',
         'CavityAO vertex bake with height-based dust colour and roughness variation',
+        'Two 2K tiled PBR families for painted body and wheel/rubber microdetail',
     ],
     'externalManifest': 'generated-agri-harvester.textures.json',
-    'textures': [],
+    'textures': texture_names,
+    'textureLicense': 'CC0 1.0',
+    'textureSources': [
+        {'id': 'Metal049A', 'url': 'https://ambientcg.com/a/Metal049A', 'license': 'CC0 1.0', 'accessedAt': '2026-09-25'},
+        {'id': 'Rubber004', 'url': 'https://ambientcg.com/a/Rubber004', 'license': 'CC0 1.0', 'accessedAt': '2026-09-25'},
+    ],
     'triangles': triangles,
     'materials': material_count,
     'bytes': os.path.getsize(output),
@@ -583,8 +599,4 @@ provenance = {
 with open(os.path.splitext(output)[0] + '.provenance.json', 'w', encoding='utf-8') as handle:
     json.dump(provenance, handle, ensure_ascii=False, indent=2)
     handle.write('\n')
-with open(os.path.splitext(output)[0] + '.textures.json', 'w', encoding='utf-8') as handle:
-    json.dump({'images': []}, handle, indent=2)
-    handle.write('\n')
-
 print('HARVESTER_EXPORTED', output, os.path.getsize(output), 'tris', triangles, 'materials', material_count)
