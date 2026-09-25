@@ -53,9 +53,9 @@ export async function loadSompoAgriAsset(equipmentId: SompoAgriEquipmentId, sign
 
   const model = gltf.scene;
   model.name = `sompo-agri-${equipmentId}-asset`;
-  // Authored axes differ: tractor hood +Y, harvester header -X (mesh space).
-  // Both GLBs already contain a quarter turn around X in their node transform.
-  model.rotation.y = equipmentId === 'tractor' ? Math.PI / 2 : Math.PI;
+  // O trator procedural ja e autorado no eixo do simulador (+X para a frente).
+  // A colheitadeira reconstruida preserva o eixo legado e ainda precisa do giro.
+  model.rotation.y = equipmentId === 'tractor' ? 0 : Math.PI;
   model.updateMatrixWorld(true);
   const bounds = new THREE.Box3().setFromObject(model);
   const size = bounds.getSize(new THREE.Vector3());

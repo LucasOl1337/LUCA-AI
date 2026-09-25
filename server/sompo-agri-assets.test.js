@@ -17,7 +17,8 @@ function moduleUrl(source) {
 }
 
 for (const name of ['generated-agri-tractor', 'generated-agri-harvester']) {
-  test(`${name}: GLB retopologizado, sem Draco e com texturas externas byte-idênticas`, () => {
+  test(`${name}: GLB dentro do orçamento, sem Draco e com manifesto CSP válido`, () => {
+    const procedural = name === 'generated-agri-tractor';
     const bytes = readFileSync(new URL(`${name}.glb`, root));
     assert.equal(bytes.readUInt32LE(0), 0x46546c67);
     const jsonLength = bytes.readUInt32LE(12);
@@ -27,8 +28,8 @@ for (const name of ['generated-agri-tractor', 'generated-agri-harvester']) {
     assert.ok(!document.extensionsRequired?.includes('KHR_draco_mesh_compression'));
 
     const manifest = JSON.parse(readFileSync(new URL(`${name}.textures.json`, root), 'utf8'));
-    assert.equal(manifest.images.length, document.images.length);
-    for (const [index, image] of document.images.entries()) {
+    assert.equal(manifest.images.length, document.images?.length ?? 0);
+    for (const [index, image] of (document.images ?? []).entries()) {
       const view = document.bufferViews[image.bufferView];
       const external = readFileSync(new URL(manifest.images[index], root));
       assert.deepEqual(external, binary.subarray(view.byteOffset ?? 0, (view.byteOffset ?? 0) + view.byteLength));
@@ -36,17 +37,24 @@ for (const name of ['generated-agri-tractor', 'generated-agri-harvester']) {
     }
 
     const triangles = document.meshes.flatMap((mesh) => mesh.primitives).reduce((sum, primitive) => {
-      assert.ok(primitive.attributes.TEXCOORD_0 !== undefined, 'PBR atlas has UV coordinates');
+      if (!procedural) assert.ok(primitive.attributes.TEXCOORD_0 !== undefined, 'PBR atlas has UV coordinates');
       return sum + (document.accessors[primitive.indices].count / 3);
     }, 0);
-    assert.ok(triangles >= 15_000 && triangles <= 30_000, `${triangles} triangles fit agricultural budget`);
+    assert.ok(triangles >= 15_000 && triangles <= (procedural ? 120_000 : 30_000), `${triangles} triangles fit agricultural budget`);
+    assert.ok((document.materials?.length ?? 0) <= 12, 'material budget');
 
     const provenance = JSON.parse(readFileSync(new URL(`${name}.provenance.json`, root), 'utf8'));
     assert.equal(provenance.triangles, triangles);
     assert.equal(provenance.sha256, createHash('sha256').update(bytes).digest('hex'));
     const source = readFileSync(new URL(provenance.sourceImage, root));
     assert.equal(provenance.sourceImageSha256, createHash('sha256').update(source).digest('hex'));
-    assert.equal(provenance.imageModel, 'cx/gpt-image-2 via local 9Router /v1/images/generations');
+    if (procedural) {
+      assert.equal(provenance.method, 'Procedural Blender modeling from dimensioned primitives and custom meshes');
+      assert.match(provenance.reproducibleCommand, /build-agri-tractor\.py/);
+      assert.equal(manifest.images.length, 0);
+    } else {
+      assert.equal(provenance.imageModel, 'cx/gpt-image-2 via local 9Router /v1/images/generations');
+    }
     assert.equal(provenance.license, 'SOMPO-AGRI-ASSET-LICENSE.txt');
     assert.match(readFileSync(new URL(provenance.license, root), 'utf8'), /Hunyuan3D-2\.1/);
   });
@@ -118,14 +126,15 @@ test('loader agrícola recupera PBR externo e ajusta os dois modelos ao chão', 
       const surfaces = [];
       model.traverse((node) => { if (node.isMesh) surfaces.push(node); });
       assert.ok(surfaces.length > 0);
-      assert.ok(surfaces.every((mesh) => mesh.material.map && mesh.material.metalnessMap === mesh.material.roughnessMap));
+      if (equipmentId === 'tractor') assert.ok(surfaces.every((mesh) => !mesh.material.map), 'procedural tractor stays texture-free');
+      else assert.ok(surfaces.every((mesh) => mesh.material.map && mesh.material.metalnessMap === mesh.material.roughnessMap));
       const sourceTriangles = surfaces.reduce((sum, mesh) => sum + (mesh.geometry.index?.count ?? mesh.geometry.attributes.position.count) / 3, 0);
       const rig = rigSompoAgriAsset(model, equipmentId);
       assert.equal(rig.root.userData.sourceTriangles, sourceTriangles);
       let partitionTriangles = 0;
       rig.root.traverse(node => { if (node.isMesh && node.name.endsWith('-surface')) {
         partitionTriangles += node.geometry.index.count / 3;
-        assert.ok(node.material.map && node.geometry.attributes.uv, 'partition preserves authored atlas and UVs');
+        if (equipmentId === 'harvester') assert.ok(node.material.map && node.geometry.attributes.uv, 'partition preserves authored atlas and UVs');
       } });
       assert.equal(partitionTriangles, sourceTriangles, 'every source triangle assigned exactly once');
       assert.equal(rig.wheels.length, 4);
@@ -153,7 +162,7 @@ test('loader agrícola recupera PBR externo e ajusta os dois modelos ao chão', 
       }
       disposeSompoAgriAsset(rig.root);
     }
-    assert.ok(imageRequests.some((url) => /generated-agri-tractor-basecolor\.jpg$/.test(url)));
+    assert.ok(!imageRequests.some((url) => /generated-agri-tractor-/.test(url)), 'procedural tractor makes no image request');
     assert.ok(imageRequests.some((url) => /generated-agri-harvester-metallicroughness\.png$/.test(url)));
   } finally {
     globalThis.document = saved.document;

@@ -9,7 +9,7 @@ import { sompoSteeringAngle } from '../../../shared/sompo-motion.js';
  * These are visual articulation zones, not a CAD or collision rig.
  */
 export const SOMPO_AGRI_RIG_LAYOUT = {
-  tractor: { axles: [{ x: 1.82, y: .57, z: .76, radius: .57, inner: .50, steer: true }, { x: -.16, y: .78, z: .84, radius: .77, inner: .59, steer: false }], hitch: [-.85, 1.15, 0] },
+  tractor: { axles: [{ x: 1.58, y: .61, z: 1, radius: .61, inner: .76, steer: true }, { x: -.75, y: .82, z: 1.02, radius: .82, inner: .76, steer: false }], hitch: [-1.73, .76, 0] },
   harvester: { axles: [{ x: 1.30, y: .85, z: 1.20, radius: .85, inner: .84, steer: false }, { x: -1.48, y: .64, z: 1.09, radius: .64, inner: .85, steer: true }], hitch: [2.32, 1.1, 0] },
 } as const;
 
