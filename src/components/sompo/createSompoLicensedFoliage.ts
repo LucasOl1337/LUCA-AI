@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { restoreSompoTextures, useSompoExternalTextures } from './restoreSompoTextures';
 import { sompoTerrainHeight, sompoLakeDistance, SOMPO_WORLD_PERIOD } from './createSompoTerrain';
@@ -53,7 +54,7 @@ function treeSlots(): FoliageSlot[] {
 
 export function highwayFoliageSlots(kind: 'trees' | 'grass' | 'shrubs' | 'pasture'): FoliageSlot[] {
   if (kind === 'trees') return treeSlots();
-  return Array.from({ length: kind === 'grass' ? 32000 : kind === 'pasture' ? 20000 : 650 }, (_, i) => {
+  return Array.from({ length: kind === 'grass' ? 16000 : kind === 'pasture' ? 12000 : 460 }, (_, i) => {
     // Camera side: 15% of the tufts fray the band edge over 7 m instead of a ruled line.
     const z = kind === 'grass' ? (i % 2 ? -7.9 - random(i + 9) * 6 : random(i + 9) < .85 ? 3.8 + random(i + 9) / .85 * 14 : 17.8 + (random(i + 9) - .85) / .15 * 7 * random(i + 17))
       : kind === 'pasture' ? (i % 4 ? -1 : 1) * (36 + random(i + 9) * 78)
@@ -62,8 +63,9 @@ export function highwayFoliageSlots(kind: 'trees' | 'grass' | 'shrubs' | 'pastur
   });
 }
 
-/** Authored CC0 mesh foliage, shared geometry and bounded instanced draw calls.
- * All LODs remain lit 3D geometry; distant trees are not unlit camera cards. */
+/** Folhagem CC0 com malha só nos elementos que ganham leitura no primeiro plano.
+ * Árvores usam impostores cruzados iluminados: copa distante deixa de pagar a
+ * malha inteira duas vezes (cena + shadow map), sem perder volume no contorno. */
 export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Camera) {
   const root = new THREE.Group(); root.name = 'licensed-highway-foliage'; parent.add(root);
   const abort = new AbortController();
@@ -74,14 +76,12 @@ export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Ca
   // clumps, grown to cover the same area, read the same and halve the vertices.
   const compact = typeof window !== 'undefined' && sompoRenderBudget().compact;
   const specs = [
-    { asset: 'ph-jacaranda-near', slots: trees, min: 0, max: 54, shadow: true },
-    { asset: 'ph-jacaranda-far', slots: trees, min: 54, max: 210, shadow: true },
-    { asset: 'ph-grass_bermuda_01-0', slots: highwayFoliageSlots('grass'), min: 0, max: 55, thinFrom: 30, shadow: false },
+    { asset: 'ph-grass_bermuda_01-0', slots: highwayFoliageSlots('grass'), min: 0, max: 38, thinFrom: 18, shadow: false },
     // Pasture clumps only where they still read as tufts: density falls from
-    // 35 m and the painted tufts of the terrain take over by 80 m. Lifted
+    // 30 m and the painted tufts of the terrain take over by 68 m. Lifted
     // towards the ground colour; at full albedo they read as black speckle.
-    { asset: 'ph-grass_bermuda_01-0', slots: highwayFoliageSlots('pasture'), min: 0, max: 80, thinFrom: 35, tint: [1.28, 1.24, 1.02] as const, shadow: false },
-    { asset: 'ph-shrub_02-0', slots: highwayFoliageSlots('shrubs'), min: 0, max: 140, shadow: true },
+    { asset: 'ph-grass_bermuda_01-0', slots: highwayFoliageSlots('pasture'), min: 0, max: 68, thinFrom: 30, tint: [1.28, 1.24, 1.02] as const, shadow: false },
+    { asset: 'ph-shrub_02-0', slots: highwayFoliageSlots('shrubs'), min: 0, max: 105, shadow: false },
   ];
   const pending = specs.map(async spec => {
     const url = `/models/sompo/${spec.asset}.glb`;
@@ -159,6 +159,45 @@ export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Ca
       if (!abort.signal.aborted) console.warn('SOMPO foliage unavailable', spec.asset, error);
     }
   });
+  // As árvores já ocupam de dezenas a centenas de metros na composição. Três
+  // cartões cruzados mantêm volume em qualquer rumo de câmera por 6 tri/árvore,
+  // usando os billboards e provenance já existentes das espécies brasileiras.
+  const treeCard = new THREE.PlaneGeometry(1, 1); treeCard.translate(0, .5, 0);
+  const treeCross = mergeGeometries([
+    treeCard.clone(), treeCard.clone().rotateY(Math.PI / 2), treeCard.clone().rotateY(Math.PI / 4),
+  ], false)!;
+  treeCard.dispose(); geometries.add(treeCross);
+  const treeBillboards: { mesh: THREE.InstancedMesh; slots: FoliageSlot[]; height: number }[] = [];
+  const treeSpecies = [
+    { asset: 'generated-jacaranda', height: 17, tint: 0x83905f },
+    { asset: 'generated-eucalyptus', height: 20, tint: 0x899478 },
+    { asset: 'generated-cerrado', height: 15, tint: 0x8b8a55 },
+  ] as const;
+  treeSpecies.forEach((species, speciesIndex) => {
+    const map = new THREE.TextureLoader().load(`/models/sompo/${species.asset}-billboard.webp`, loaded => {
+      if (abort.signal.aborted) loaded.dispose();
+    });
+    map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8; textures.add(map);
+    const material = new THREE.MeshLambertMaterial({
+      map, color: species.tint, alphaTest: .4, alphaToCoverage: true, side: THREE.DoubleSide,
+    });
+    material.onBeforeCompile = shader => {
+      shader.vertexShader = 'varying float treeFoot; varying float treeTone;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+        treeFoot = position.y;
+        treeTone = fract(sin(instanceMatrix[3].x * 12.9898 + instanceMatrix[3].z * 78.233) * 43758.5453);`);
+      shader.fragmentShader = 'varying float treeFoot; varying float treeTone;\n' + shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        diffuseColor.rgb *= mix(.44, 1.0, smoothstep(.02, .46, treeFoot));
+        diffuseColor.rgb *= mix(vec3(.88, .93, .82), vec3(1.08, 1.03, .9), treeTone);`);
+    };
+    material.customProgramCacheKey = () => 'sompo-highway-tree-billboard-v1';
+    materials.add(material);
+    const slots = trees.filter((_, index) => index % treeSpecies.length === speciesIndex);
+    const mesh = new THREE.InstancedMesh(treeCross, material, slots.length);
+    mesh.name = `highway-tree-billboard-${species.asset}`;
+    mesh.castShadow = false; mesh.receiveShadow = false; mesh.count = 0;
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    root.add(mesh); treeBillboards.push({ mesh, slots, height: species.height });
+  });
   // Oclusão sob a copa: um disco escuro e macio por árvore visível, deitado
   // na encosta. Sem ele a árvore pousava no pasto sem escurecer o chão.
   const aoMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .26, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
@@ -188,11 +227,51 @@ export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Ca
       frustum.setFromProjectionMatrix(clip);
       const sight = parent.worldToLocal(focus.clone()).sub(cameraPosition), projected = new THREE.Vector3();
       let aoCount = 0;
+      for (const [speciesIndex, batch] of treeBillboards.entries()) {
+        let count = 0;
+        for (let index = 0; index < batch.slots.length; index++) {
+          const slot = batch.slots[index];
+          const x = slot.x + SOMPO_WORLD_PERIOD * Math.round((truckX - slot.x) / SOMPO_WORLD_PERIOD);
+          let ground = groundCache.get(slot);
+          if (!ground || ground.x !== x) {
+            ground = { x, y: sompoTerrainHeight(x, slot.z) - .025, lake: sompoLakeDistance(x, slot.z) < 27 };
+            groundCache.set(slot, ground);
+          }
+          if (ground.lake) continue;
+          transform.position.set(x, ground.y, slot.z);
+          const distance = transform.position.distanceTo(cameraPosition);
+          if (distance >= 210) continue;
+          sphere.center.copy(transform.position); sphere.center.y += batch.height * slot.scale * .5;
+          sphere.radius = batch.height * slot.scale * .75;
+          if (!frustum.intersectsSphere(sphere)) continue;
+          const center = transform.position.clone().add(new THREE.Vector3(0, 4, 0));
+          const t = projected.copy(center).sub(cameraPosition).dot(sight) / Math.max(1, sight.lengthSq());
+          if (t > 0 && t < 1 && center.distanceTo(projected.copy(cameraPosition).addScaledVector(sight, t)) < 5) continue;
+          transform.rotation.set(0, slot.yaw, 0);
+          const width = batch.height * (.82 + (random(index + speciesIndex * 97) - .5) * .14);
+          transform.scale.set(width * slot.scale, batch.height * slot.scale, width * slot.scale);
+          transform.updateMatrix(); batch.mesh.setMatrixAt(count, transform.matrix);
+          batch.mesh.setColorAt(count, plantTint(index + speciesIndex * 401, true));
+          count++;
+          // O disco barato mantém contato com o chão sem renderizar a copa no shadow map.
+          if (aoCount < trees.length && distance < 90) {
+            slopeNormal.set(sompoTerrainHeight(x - 1, slot.z) - sompoTerrainHeight(x + 1, slot.z), 2, sompoTerrainHeight(x, slot.z - 1) - sompoTerrainHeight(x, slot.z + 1)).normalize();
+            aoTransform.position.set(x, ground.y + .06, slot.z);
+            aoTransform.quaternion.setFromUnitVectors(up, slopeNormal);
+            aoTransform.scale.setScalar(16 * slot.scale);
+            aoTransform.updateMatrix(); treeAo.setMatrixAt(aoCount++, aoTransform.matrix);
+          }
+        }
+        batch.mesh.count = count; batch.mesh.instanceMatrix.needsUpdate = true;
+        if (batch.mesh.instanceColor) batch.mesh.instanceColor.needsUpdate = true;
+        batch.mesh.boundingSphere ??= new THREE.Sphere();
+        batch.mesh.boundingSphere.center.copy(cameraPosition); batch.mesh.boundingSphere.radius = 230;
+      }
       for (const batch of batches) {
         let count = 0;
         for (let index = 0; index < batch.slots.length; index++) {
           const slot = batch.slots[index];
-          const span = batch.slots === trees ? SOMPO_WORLD_PERIOD : 212;
+          const span = 212;
           const x = slot.x + span * Math.round((truckX - slot.x) / span);
           let ground = groundCache.get(slot);
           if (!ground || ground.x !== x) {
@@ -212,33 +291,17 @@ export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Ca
             if (random(index + 523) > keep) continue;
             scale *= Math.min(1.5, Math.sqrt(1 / keep));
           }
-          sphere.center.copy(transform.position); sphere.radius = batch.slots === trees ? 15 * slot.scale : 2 * slot.scale;
-          sphere.center.y += batch.slots === trees ? 9 * slot.scale : .5 * slot.scale;
+          sphere.center.copy(transform.position); sphere.radius = 2 * slot.scale;
+          sphere.center.y += .5 * slot.scale;
           if (!frustum.intersectsSphere(sphere)) continue;
-          if (batch.slots === trees) {
-            const center = transform.position.clone().add(new THREE.Vector3(0, 4, 0));
-            const t = projected.copy(center).sub(cameraPosition).dot(sight) / Math.max(1, sight.lengthSq());
-            if (t > 0 && t < 1 && center.distanceTo(projected.copy(cameraPosition).addScaledVector(sight, t)) < 5) continue;
-          }
           transform.rotation.set(0, slot.yaw, 0);
-          // Trees stretch independently in height and spread: no two crowns share a silhouette.
-          if (batch.slots === trees) transform.scale.set(scale * (1 + (random(index + 1201) - .5) * .3), scale * (1 + (random(index + 1301) - .5) * .36), scale * (1 + (random(index + 1401) - .5) * .3));
-          else transform.scale.setScalar(scale);
+          transform.scale.setScalar(scale);
           transform.updateMatrix();
           batch.meshes.forEach((mesh, i) => {
             matrix.multiplyMatrices(transform.matrix, batch.base[i]); mesh.setMatrixAt(count, matrix);
             if (batch.varied[i]) mesh.setColorAt(count, batch.tints[index]);
           });
           count++;
-          // Past 90 m the occlusion is invisible and a disc on the crest shows against the sky.
-          if (batch.slots === trees && aoCount < trees.length && distance < 90) {
-            slopeNormal.set(sompoTerrainHeight(x - 1, slot.z) - sompoTerrainHeight(x + 1, slot.z), 2, sompoTerrainHeight(x, slot.z - 1) - sompoTerrainHeight(x, slot.z + 1)).normalize();
-            aoTransform.position.set(x, ground.y + .06, slot.z);
-            aoTransform.quaternion.setFromUnitVectors(up, slopeNormal);
-            aoTransform.scale.setScalar(16 * slot.scale);
-            aoTransform.updateMatrix();
-            treeAo.setMatrixAt(aoCount++, aoTransform.matrix);
-          }
         }
         for (const mesh of batch.meshes) {
           mesh.count = count; mesh.instanceMatrix.needsUpdate = true;
