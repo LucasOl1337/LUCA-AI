@@ -78,14 +78,16 @@ export async function loadSompoAgriAsset(equipmentId: SompoAgriEquipmentId, sign
     mesh.receiveShadow = true;
     for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
       if (!(material instanceof THREE.MeshStandardMaterial)) continue;
-      material.envMapIntensity = 0.7;
-      // A pintura agrícola conserva seus mapas ou cores PBR, com piso acetinado
-      // para impedir que os painéis virem cromados sob o ambiente HDR.
-      material.onBeforeCompile = (shader) => {
-        shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>',
-          '#include <roughnessmap_fragment>\nroughnessFactor = max(roughnessFactor, 0.34);');
-      };
-      material.customProgramCacheKey = () => 'sompo-agri-satin-v2';
+      const wheel = /wheel|roda/i.test(material.name);
+      const glass = /glass|vidro/i.test(material.name);
+      material.envMapIntensity = glass ? 1.7 : wheel ? 1.0 : 1.45;
+      material.aoMapIntensity = 1.0;
+      // O GLB traz clearcoat físico na família da carroceria. Não imponha piso
+      // de rugosidade aqui: isso apagava o reflexo do céu e fazia a tinta ler argila.
+      if (material instanceof THREE.MeshPhysicalMaterial && !wheel) {
+        material.clearcoat = glass ? .35 : .62;
+        material.clearcoatRoughness = glass ? .08 : .15;
+      }
       for (const value of Object.values(material)) {
         if (value instanceof THREE.Texture) value.anisotropy = 8;
       }

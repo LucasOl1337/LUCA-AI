@@ -19,17 +19,17 @@
     "Corn header with twelve dividers, cutter bar, auger, reel and tines",
     "Prominent folded unloading auger, rotary radiator screen and engine grilles",
     "Inclined ladder, wraparound access platform, handrails, mirrors and lights",
-    "CavityAO vertex bake with height-based dust colour and roughness variation",
-    "Two 2K tiled PBR families for painted body and wheel/rubber microdetail"
+    "Cycles AO baked at 2K on a unique UV1 atlas for contact between pieces",
+    "Two 2K tiled PBR families for painted body and wheel/rubber microdetail on UV0"
   ],
   "externalManifest": "generated-agri-harvester.textures.json",
   "textures": [
     "agri-machine-body-normal.jpg",
+    "generated-agri-harvester-body-orm.jpg",
     "agri-machine-body-albedo.jpg",
-    "agri-machine-body-orm.jpg",
     "agri-machine-wheel-normal.jpg",
-    "agri-machine-wheel-albedo.jpg",
-    "agri-machine-wheel-orm.jpg"
+    "generated-agri-harvester-wheel-orm.jpg",
+    "agri-machine-wheel-albedo.jpg"
   ],
   "textureLicense": "CC0 1.0",
   "textureSources": [
@@ -48,8 +48,8 @@
   ],
   "triangles": 44626,
   "materials": 3,
-  "bytes": 4777204,
-  "sha256": "7f88546a93d765ff0c654c0a0db9cc6ef866472638be1cd9bca7683fad7dc0fd",
+  "bytes": 6028840,
+  "sha256": "94a21f390a93d54af508ff7b619bd5855ddc77b006d4831d86f9734153640201",
   "limits": [
     "Visual simulation asset, not manufacturing CAD",
     "Authored rigid nodes are consumed directly by the runtime rig"

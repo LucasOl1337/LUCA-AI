@@ -13,10 +13,9 @@ import math
 import os
 import sys
 from mathutils import Vector
-from mathutils.bvhtree import BVHTree
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from agri_pbr import attach_tiled_pbr, extract_external_images, project_box_uv
+from agri_pbr import attach_tiled_pbr, bake_ao_atlas, compress_packed_orm, extract_external_images, project_box_uv
 
 
 bpy.ops.object.select_all(action='SELECT')
@@ -68,8 +67,8 @@ glass = material('Trator vidro da cabine', (0.075, 0.16, 0.15), 0.05, 0.12, alph
 lamp = material('Trator farois', (0.82, 0.88, 0.79), 0.25, 0.19, emission=0.35)
 red = material('Trator lanternas traseiras', (0.52, 0.018, 0.012), 0.12, 0.31, emission=0.15)
 amber = material('Trator giroflex', (0.9, 0.28, 0.015), 0.08, 0.24, emission=0.3, alpha=0.82)
-structural = material('Trator acabamentos unificados', (1, 1, 1), 0.25, 0.58)
-wheel_finish = material('Trator roda unificada', (1, 1, 1), 0.08, 0.78)
+structural = material('Trator acabamentos unificados', (1, 1, 1), 0.18, 0.42, coat=.62)
+wheel_finish = material('Trator roda unificada', (1, 1, 1), 0.04, 0.78)
 attach_tiled_pbr(structural, 'body', .36)
 attach_tiled_pbr(wheel_finish, 'wheel', .62)
 
@@ -423,46 +422,14 @@ for key, group in rig_parts.items():
             bpy.ops.object.join()
         objects[0].name = f'rig-{key}--{mat.name.lower().replace(" ", "-")}'
 
-# Visibilidade hemisférica de curto alcance em CavityAO, igual ao caminhão. O
-# gradiente inferior acrescenta terra seca sem abrir um material/draw extra.
-opaque = [obj for obj in bpy.context.scene.objects if obj.type == 'MESH'
-          and obj.data.materials and obj.data.materials[0] != glass]
-vertices, polygons = [], []
-for obj in opaque:
-    start = len(vertices)
-    vertices.extend([obj.matrix_world @ vertex.co for vertex in obj.data.vertices])
-    polygons.extend([tuple(start + index for index in polygon.vertices) for polygon in obj.data.polygons])
-bvh = BVHTree.FromPolygons(vertices, polygons)
-samples = 18
-directions = []
-for index in range(samples):
-    radius = math.sqrt((index + .5) / samples)
-    angle = index * 2.399963229728653
-    directions.append(Vector((radius * math.cos(angle), radius * math.sin(angle), math.sqrt(1 - radius * radius))))
-for obj in opaque:
-    colors = obj.data.color_attributes.get('CavityAO') or obj.data.color_attributes.new(
-        name='CavityAO', type='FLOAT_COLOR', domain='POINT')
-    obj.data.color_attributes.active_color = colors
-    normal_matrix = obj.matrix_world.to_3x3().inverted().transposed()
-    for vertex in obj.data.vertices:
-        normal = (normal_matrix @ vertex.normal).normalized()
-        rotation = Vector((0, 0, 1)).rotation_difference(normal)
-        world = obj.matrix_world @ vertex.co
-        origin = world + normal * .006
-        visibility = 0
-        for direction in directions:
-            hit, _, _, distance = bvh.ray_cast(origin, rotation @ direction, 2.0)
-            visibility += 1 if hit is None else min(1, (distance / 2.0) ** .60)
-        ao = .18 + .82 * visibility / samples
-        dirt = max(0, min(1, (1.48 - world.z) / 1.20))
-        noise = .72 + .28 * (math.sin(world.x * 11.7 + world.y * 7.3) * .5 + .5)
-        dirt *= noise
-        current = colors.data[vertex.index].color
-        base = tuple(current[:3]) if any(current[:3]) else (1, 1, 1)
-        colors.data[vertex.index].color = (
-            base[0] * ao * (1 - dirt * .16),
-            base[1] * ao * (1 - dirt * .27),
-            base[2] * ao * (1 - dirt * .46), current[3])
+# AO real em UV2: o Cycles enxerga todas as peças, mas cada família conserva
+# seu único material e os mesmos seis primitives/draws do rig.
+body_surfaces = [obj for obj in bpy.context.scene.objects if obj.type == 'MESH'
+                 and obj.data.materials and obj.data.materials[0] == structural]
+wheel_surfaces = [obj for obj in bpy.context.scene.objects if obj.type == 'MESH'
+                  and obj.data.materials and obj.data.materials[0] == wheel_finish]
+bake_ao_atlas(structural, body_surfaces, 'generated-agri-tractor-body-ao.jpg')
+bake_ao_atlas(wheel_finish, wheel_surfaces, 'generated-agri-tractor-wheel-ao.jpg')
 
 triangles = sum(len(poly.vertices) - 2 for obj in bpy.context.scene.objects if obj.type == 'MESH' for poly in obj.data.polygons)
 out = os.path.abspath(os.environ.get('AGRI_TRACTOR_OUT', 'public/models/sompo/generated-agri-tractor.glb'))
@@ -474,6 +441,7 @@ bpy.ops.export_scene.gltf(
     export_materials='EXPORT',
     export_vertex_color='ACTIVE',
 )
+compress_packed_orm(out)
 manifest = os.path.splitext(out)[0] + '.textures.json'
 texture_names = extract_external_images(out, manifest)
 digest = hashlib.sha256(open(out, 'rb').read()).hexdigest()
@@ -497,7 +465,7 @@ provenance = {
         {'id': 'Metal049A', 'url': 'https://ambientcg.com/a/Metal049A', 'license': 'CC0 1.0', 'accessedAt': '2026-09-25'},
         {'id': 'Rubber004', 'url': 'https://ambientcg.com/a/Rubber004', 'license': 'CC0 1.0', 'accessedAt': '2026-09-25'},
     ],
-    'texturePipeline': 'AmbientCG CC0 bases, neutralized for vertex tint; 2K albedo, tangent normal and ORM; box-projected UV at 0.62/0.78 m per tile',
+    'texturePipeline': 'AmbientCG CC0 microdetail on UV0 plus per-machine Cycles AO baked at 2K on unique UV1 atlas',
     'textures': texture_names,
     'triangles': triangles,
     'materials': len({obj.data.materials[0].name for obj in bpy.context.scene.objects if obj.type == 'MESH' and obj.data.materials}),
@@ -507,7 +475,7 @@ provenance = {
         'parts': ['long hood and grille', 'enclosed glazed cab and interior', 'front and rear wheel assemblies',
                   'mirrored chevron tire lugs', 'wheel arches', 'vertical exhaust', 'headlights, work lights and beacon',
                   'front ballast plates', 'steps and handrails', 'rear three-point hitch, PTO and hydraulic cylinders',
-                  'engine block, sump, fuel tank and pivoting front axle', 'CavityAO tint plus 2K PBR microdetail'],
+                  'engine block, sump, fuel tank and pivoting front axle', 'Cycles AO atlas plus 2K PBR microdetail'],
     },
     'externalManifest': os.path.basename(manifest),
     'reproducibleCommand': 'blender -b --factory-startup --python scripts/sompo/build-agri-tractor.py',
@@ -515,8 +483,8 @@ provenance = {
     'bytes': os.path.getsize(out),
     'limitations': ['The model is a visual simulator asset, not a manufacturer-accurate CAD assembly',
                     'Hydraulic hoses are simplified to keep the runtime draw and triangle budget predictable',
-                    'Cab glazing remains simplified so body surfaces can share one runtime draw',
-                    'Vertex tint carries the authored paint family while 2K maps carry shared microdetail'],
+                    'Cab glazing uses a glossy reflective approximation so body surfaces keep one runtime draw',
+                    'Vertex tint carries the authored finish while UV0 microdetail and UV1 AO carry surface response'],
 }
 with open(os.path.splitext(out)[0] + '.provenance.json', 'w', encoding='utf-8') as handle:
     json.dump(provenance, handle, ensure_ascii=False, indent=2)

@@ -35,14 +35,14 @@
       "accessedAt": "2026-09-25"
     }
   ],
-  "texturePipeline": "AmbientCG CC0 bases, neutralized for vertex tint; 2K albedo, tangent normal and ORM; box-projected UV at 0.62/0.78 m per tile",
+  "texturePipeline": "AmbientCG CC0 microdetail on UV0 plus per-machine Cycles AO baked at 2K on unique UV1 atlas",
   "textures": [
     "agri-machine-body-normal.jpg",
+    "generated-agri-tractor-body-orm.jpg",
     "agri-machine-body-albedo.jpg",
-    "agri-machine-body-orm.jpg",
     "agri-machine-wheel-normal.jpg",
-    "agri-machine-wheel-albedo.jpg",
-    "agri-machine-wheel-orm.jpg"
+    "generated-agri-tractor-wheel-orm.jpg",
+    "agri-machine-wheel-albedo.jpg"
   ],
   "triangles": 61852,
   "materials": 2,
@@ -61,17 +61,17 @@
       "steps and handrails",
       "rear three-point hitch, PTO and hydraulic cylinders",
       "engine block, sump, fuel tank and pivoting front axle",
-      "CavityAO tint plus 2K PBR microdetail"
+      "Cycles AO atlas plus 2K PBR microdetail"
     ]
   },
   "externalManifest": "generated-agri-tractor.textures.json",
   "reproducibleCommand": "blender -b --factory-startup --python scripts/sompo/build-agri-tractor.py",
-  "sha256": "d8682c8a6776d22687b9dc08fd45df98691d9d0049ce1e9637d9a8ca02bbd6a8",
-  "bytes": 6655496,
+  "sha256": "e1bf476cdf60723dca055de5bd769a5fb92a348df34e2f5cc4085b23de7d94d5",
+  "bytes": 7861736,
   "limitations": [
     "The model is a visual simulator asset, not a manufacturer-accurate CAD assembly",
     "Hydraulic hoses are simplified to keep the runtime draw and triangle budget predictable",
-    "Cab glazing remains simplified so body surfaces can share one runtime draw",
-    "Vertex tint carries the authored paint family while 2K maps carry shared microdetail"
+    "Cab glazing uses a glossy reflective approximation so body surfaces keep one runtime draw",
+    "Vertex tint carries the authored finish while UV0 microdetail and UV1 AO carry surface response"
   ]
 }

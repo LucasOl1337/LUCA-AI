@@ -171,35 +171,57 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
     if (!(material instanceof THREE.MeshStandardMaterial) || patched.has(material)) return;
     if (material.emissive.getHex() === 0xff2714) return; // luz de freio fica limpa
     patched.add(material);
-    material.roughness = Math.min(1, material.roughness * 1.25 + .08);
-    material.metalness = Math.min(material.metalness, .45);
+    const wheelFamily = /wheel|roda/i.test(material.name);
+    const glassFamily = /glass|vidro/i.test(material.name);
+    material.envMapIntensity = glassFamily ? 1.7 : wheelFamily ? 1.0 : 1.45;
+    material.aoMapIntensity = 1.0;
+    if (glassFamily) material.roughness = .08;
+    if (material instanceof THREE.MeshPhysicalMaterial && !wheelFamily) {
+      material.clearcoat = glassFamily ? .35 : .62;
+      material.clearcoatRoughness = glassFamily ? .08 : .15;
+    }
     const compile = material.onBeforeCompile;
     material.onBeforeCompile = (shader, renderer) => {
       compile?.call(material, shader, renderer);
-      shader.defines = { ...shader.defines, AGRI_ROUGHNESS_ALPHA: '' };
-      shader.vertexShader = 'varying vec3 agriW;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      shader.vertexShader = 'varying vec3 agriW; varying vec3 agriN;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
         vec4 agriP = vec4(transformed, 1.0);
         #ifdef USE_INSTANCING
           agriP = instanceMatrix * agriP;
         #endif
-        agriW = (modelMatrix * agriP).xyz;`);
-      shader.fragmentShader = `varying vec3 agriW;
+        agriW = (modelMatrix * agriP).xyz;
+        agriN = normalize(mat3(modelMatrix) * normal);`);
+      shader.fragmentShader = `varying vec3 agriW; varying vec3 agriN;
         float agriHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
         float agriNoise(vec2 p){vec2 i=floor(p),f=fract(p);f*=f*(3.-2.*f);
           return mix(mix(agriHash(i),agriHash(i+vec2(1,0)),f.x),mix(agriHash(i+vec2(0,1)),agriHash(i+vec2(1,1)),f.x),f.y);}\n` + shader.fragmentShader
         .replace('#include <color_fragment>', `#include <color_fragment>
-          float agriDust = smoothstep(2.4, .1, agriW.y) * (.35 + .65 * agriNoise(agriW.xz * 2.4));
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.48, .4, .26), clamp(agriDust, 0., 1.) * .55);`)
-        .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-          // A família do acabamento vem no alpha e modula, sem apagar, o ORM 2K.
-          #if defined(AGRI_ROUGHNESS_ALPHA)
-            #ifdef USE_COLOR_ALPHA
-              roughnessFactor = clamp(roughnessFactor * mix(.72, 1.18, clamp(vColor.a, 0., 1.)), .18, 1.);
-            #endif
+          vec4 agriTint = vec4(1.0);
+          #ifdef USE_COLOR_ALPHA
+            agriTint = vColor;
+          #elif defined(USE_COLOR)
+            agriTint = vec4(vColor, 1.0);
           #endif
-          roughnessFactor = mix(roughnessFactor, .95, clamp(agriDust, 0., 1.) * .55);`);
+          float agriRG = agriTint.r / max(agriTint.g, .001);
+          float agriBG = agriTint.b / max(agriTint.g, .001);
+          float agriGlass = max(${glassFamily ? '1.0' : '0.0'}, ${wheelFamily ? '0.0' : '1.0'} * smoothstep(.72, .90, agriBG) * (1.0 - smoothstep(.58, .78, agriRG)));
+          float agriTire = ${wheelFamily ? '1.0' : '0.0'} * (1.0 - smoothstep(.12, .44, max(max(agriTint.r, agriTint.g), agriTint.b)));
+          float agriLower = smoothstep(1.28, .12, agriW.y);
+          float agriGrain = .22 + .78 * agriNoise(agriW.xz * 5.6 + agriW.yy * 1.7);
+          float agriDust = agriLower * agriGrain * mix(${wheelFamily ? '.15' : '.08'}, .52, agriTire);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.34, .105, .032), clamp(agriDust, 0., .48));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.018, .050, .055), agriGlass * .38);`)
+        .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+          // Alpha conserva a rugosidade autoral de cada acabamento. O mapa traz
+          // microrrisco; esta multiplicação devolve tinta, vidro e borracha distintos.
+          #ifdef USE_COLOR_ALPHA
+            roughnessFactor = clamp(roughnessFactor * clamp(vColor.a, .07, .98), .055, .96);
+          #endif
+          float agriWornLug = agriTire * smoothstep(.50, .92, abs(normalize(agriN).y));
+          roughnessFactor = mix(roughnessFactor, max(.56, roughnessFactor - .14), agriWornLug);
+          roughnessFactor = mix(roughnessFactor, .90, clamp(agriDust, 0., .55));
+          roughnessFactor = mix(roughnessFactor, .075, agriGlass);`);
     };
-    material.customProgramCacheKey = () => `sompo-agri-wear-v3-${equipmentId}`;
+    material.customProgramCacheKey = () => `sompo-agri-realism-v4-${equipmentId}-${wheelFamily}-${glassFamily}`;
   };
   const tractorControlMaterial = [...authoredMaterials.values()].find(
     (material): material is THREE.MeshStandardMaterial => material instanceof THREE.MeshStandardMaterial,

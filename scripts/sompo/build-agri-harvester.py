@@ -12,10 +12,9 @@ import math
 import os
 import sys
 from mathutils import Vector
-from mathutils.bvhtree import BVHTree
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from agri_pbr import attach_tiled_pbr, extract_external_images, project_box_uv
+from agri_pbr import attach_tiled_pbr, bake_ao_atlas, compress_packed_orm, extract_external_images, project_box_uv
 
 
 bpy.ops.object.select_all(action='SELECT')
@@ -471,18 +470,6 @@ for obj in list(bpy.context.scene.objects):
 
 opaque_objects = [obj for obj in bpy.context.scene.objects if obj.type == 'MESH'
                   and obj.data.materials and obj.data.materials[0] != glass]
-vertices, polygons = [], []
-for obj in opaque_objects:
-    start = len(vertices)
-    vertices.extend([obj.matrix_world @ vertex.co for vertex in obj.data.vertices])
-    polygons.extend([tuple(start + index for index in polygon.vertices) for polygon in obj.data.polygons])
-bvh = BVHTree.FromPolygons(vertices, polygons)
-sample_directions = []
-for index in range(12):
-    radius = math.sqrt((index + .5) / 12)
-    angle = index * 2.399963229728653
-    sample_directions.append(Vector((radius * math.cos(angle), radius * math.sin(angle),
-                                     math.sqrt(1 - radius * radius))))
 
 for obj in opaque_objects:
     source_material = obj.data.materials[0]
@@ -493,28 +480,11 @@ for obj in opaque_objects:
     obj.data.color_attributes.active_color = colors
     normal_matrix = obj.matrix_world.to_3x3().inverted().transposed()
     for vertex in obj.data.vertices:
-        point = obj.matrix_world @ vertex.co
-        normal = (normal_matrix @ vertex.normal).normalized()
-        rotation = Vector((0, 0, 1)).rotation_difference(normal)
-        visibility = 0.0
-        for direction in sample_directions:
-            hit, _, _, distance = bvh.ray_cast(point + normal * .008, rotation @ direction, 1.8)
-            visibility += 1 if hit is None else min(1, (distance / 1.8) ** .58)
-        ao = .18 + .82 * visibility / len(sample_directions)
-        # Altura no Blender é Z. A poeira ganha força abaixo de 1,75 m e recebe
-        # ruído pequeno para não parecer uma faixa pintada a régua.
-        dust_height = max(0.0, min(1.0, (1.85 - point.z) / 1.55))
-        noise = .58 + .42 * (math.sin(point.x * 13.1 + point.y * 9.7) * .5 + .5)
-        dust = dust_height * noise * (.18 if source_material == rubber else .34)
-        dust_color = (.34, .25, .13)
-        color = tuple((channel * (1 - dust) + dust_color[i] * dust) * ao
-                      for i, channel in enumerate(base))
-        roughness = max(.24, min(.96, base_roughness * (1 - dust) + .94 * dust))
-        colors.data[vertex.index].color = (*color, roughness)
+        colors.data[vertex.index].color = (*base, base_roughness)
 
-opaque = material('Harvester vertex-painted PBR', (1, 1, 1), .18, .52, .25)
+opaque = material('Harvester vertex-painted PBR', (1, 1, 1), .14, .42, .62)
 opaque.diffuse_color = (1, 1, 1, 1)
-wheel_opaque = material('Harvester wheel vertex-painted PBR', (1, 1, 1), .06, .82, .08)
+wheel_opaque = material('Harvester wheel vertex-painted PBR', (1, 1, 1), .04, .82, 0)
 wheel_opaque.diffuse_color = (1, 1, 1, 1)
 attach_tiled_pbr(opaque, 'body', .36)
 attach_tiled_pbr(wheel_opaque, 'wheel', .62)
@@ -541,6 +511,13 @@ for part in parts.values():
             bpy.ops.object.join()
         objects[0].name = part.name + '-' + suffix
 
+body_surfaces = [obj for obj in bpy.context.scene.objects if obj.type == 'MESH'
+                 and obj.data.materials and obj.data.materials[0] == opaque]
+wheel_surfaces = [obj for obj in bpy.context.scene.objects if obj.type == 'MESH'
+                  and obj.data.materials and obj.data.materials[0] == wheel_opaque]
+bake_ao_atlas(opaque, body_surfaces, 'generated-agri-harvester-body-ao.jpg')
+bake_ao_atlas(wheel_opaque, wheel_surfaces, 'generated-agri-harvester-wheel-ao.jpg')
+
 triangles = sum(len(poly.vertices) - 2 for obj in bpy.context.scene.objects if obj.type == 'MESH'
                 for poly in obj.data.polygons)
 mesh_objects = [obj for obj in bpy.context.scene.objects if obj.type == 'MESH']
@@ -555,6 +532,7 @@ bpy.ops.export_scene.gltf(
     export_materials='EXPORT',
     export_vertex_color='ACTIVE',
 )
+compress_packed_orm(output)
 
 manifest_path = os.path.splitext(output)[0] + '.textures.json'
 texture_names = extract_external_images(output, manifest_path)
@@ -577,8 +555,8 @@ provenance = {
         'Corn header with twelve dividers, cutter bar, auger, reel and tines',
         'Prominent folded unloading auger, rotary radiator screen and engine grilles',
         'Inclined ladder, wraparound access platform, handrails, mirrors and lights',
-        'CavityAO vertex bake with height-based dust colour and roughness variation',
-        'Two 2K tiled PBR families for painted body and wheel/rubber microdetail',
+        'Cycles AO baked at 2K on a unique UV1 atlas for contact between pieces',
+        'Two 2K tiled PBR families for painted body and wheel/rubber microdetail on UV0',
     ],
     'externalManifest': 'generated-agri-harvester.textures.json',
     'textures': texture_names,

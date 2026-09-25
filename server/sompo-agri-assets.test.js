@@ -20,6 +20,7 @@ for (const name of ['generated-agri-tractor', 'generated-agri-harvester']) {
   test(`${name}: GLB procedural sem Draco, dentro do orçamento e com proveniência verificável`, () => {
     const harvester = name === 'generated-agri-harvester';
     const bytes = readFileSync(new URL(`${name}.glb`, root));
+    assert.ok(bytes.length <= 8_000_000, `${bytes.length} bytes fit the per-file budget`);
     assert.equal(bytes.readUInt32LE(0), 0x46546c67);
     const jsonLength = bytes.readUInt32LE(12);
     const document = JSON.parse(bytes.subarray(20, 20 + jsonLength).toString());
@@ -42,8 +43,19 @@ for (const name of ['generated-agri-tractor', 'generated-agri-harvester']) {
     const upperBudget = harvester ? 150_000 : 120_000;
     assert.ok(triangles >= 15_000 && triangles <= upperBudget, `${triangles} triangles fit agricultural budget`);
     assert.ok((document.materials?.length ?? 0) <= 12, 'material budget');
-    assert.ok((document.images?.length ?? 0) >= 6, '2K body and wheel PBR maps are embedded');
-    assert.ok(manifest.images.every(filename => /^agri-machine-(body|wheel)-(albedo|normal|orm)\.jpg$/.test(filename)));
+    assert.equal(document.images?.length, 6, '2K PBR maps with per-machine Cycles AO are embedded');
+    assert.ok(manifest.images.every(filename => /^(agri-machine-(body|wheel)-(albedo|normal)|generated-agri-(tractor|harvester)-(body|wheel)-orm)\.jpg$/.test(filename)));
+    const aoMaterials = document.materials.filter(material => material.occlusionTexture);
+    assert.equal(aoMaterials.length, 2, 'body and wheel consume baked AO');
+    assert.ok(aoMaterials.every(material => material.occlusionTexture.texCoord === 1), 'Cycles AO uses the unique UV1 atlas');
+    assert.ok(document.meshes.flatMap(mesh => mesh.primitives).every(primitive =>
+      !document.materials[primitive.material]?.occlusionTexture || primitive.attributes.TEXCOORD_1 !== undefined),
+    'every AO surface exports UV1');
+    const clearcoat = document.materials.find(material => material.extensions?.KHR_materials_clearcoat)
+      ?.extensions.KHR_materials_clearcoat;
+    assert.ok(clearcoat?.clearcoatFactor >= .55 && clearcoat.clearcoatFactor <= .7, 'factory paint exports clearcoat');
+    assert.ok(clearcoat?.clearcoatRoughnessFactor >= .12 && clearcoat.clearcoatRoughnessFactor <= .18,
+      'factory paint keeps a crisp clearcoat reflection');
     assert.ok(!document.extensionsUsed?.includes('KHR_materials_transmission'), 'glass avoids scene refraction pass');
     assert.ok(document.meshes.flatMap(mesh => mesh.primitives).length <= 8, 'authored rig fits draw budget');
 
@@ -185,9 +197,13 @@ test('loader agrícola recupera PBR externo e ajusta os dois modelos ao chão', 
       }
       disposeSompoAgriAsset(rig.root);
     }
-    assert.equal(imageRequests.length, 12, 'six PBR maps restored for each machine');
-    for (const filename of ['body-albedo', 'body-normal', 'body-orm', 'wheel-albedo', 'wheel-normal', 'wheel-orm']) {
+    assert.equal(imageRequests.length, 16, 'six PBR maps and two AO atlases restored for each machine');
+    for (const filename of ['body-albedo', 'body-normal', 'wheel-albedo', 'wheel-normal']) {
       assert.equal(imageRequests.filter(url => url.endsWith(`agri-machine-${filename}.jpg`)).length, 2, `${filename} loaded locally for both assets`);
+    }
+    for (const equipment of ['tractor', 'harvester']) for (const family of ['body', 'wheel']) {
+      assert.equal(imageRequests.filter(url => url.endsWith(`generated-agri-${equipment}-${family}-orm.jpg`)).length, 2,
+        `${equipment} ${family} packed AO/roughness/metal restored on UV0 and UV1`);
     }
   } finally {
     globalThis.document = saved.document;
