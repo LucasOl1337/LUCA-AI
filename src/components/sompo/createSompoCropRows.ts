@@ -189,6 +189,25 @@ function configureCropShader(
         cropFacing=clamp(-transformedNormal.z*.5+.5,0.,1.);`);
     shader.fragmentShader = `varying float cropHeight; varying float cropTint; varying float cropStubble; varying float cropFacing;
       varying float cropTip; varying float cropLeafAge; varying float cropVariantId;\n` + shader.fragmentShader
+      // O MeshStandardMaterial ja trata dupla face, mas fazemos a virada aqui
+      // explicitamente para a normal do mapa e a normal geometrica seguirem o
+      // mesmo caminho. Assim a face inferior recebe o mesmo BRDF, sem os
+      // pequenos pontos pretos que apareciam nas ondulacoes da borda.
+      .replace('#include <normal_fragment_begin>', `
+        #ifdef DOUBLE_SIDED
+          #define CROP_DOUBLE_SIDED
+          #undef DOUBLE_SIDED
+        #endif
+        #include <normal_fragment_begin>
+        #ifdef CROP_DOUBLE_SIDED
+          #define DOUBLE_SIDED
+        #endif`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        #ifdef CROP_DOUBLE_SIDED
+          float cropFaceDirection=gl_FrontFacing?1.0:-1.0;
+          normal*=cropFaceDirection;
+          nonPerturbedNormal*=cropFaceDirection;
+        #endif`)
       .replace('#include <color_fragment>', `#include <color_fragment>
         ${options.mature ? `
           float leafLum=dot(diffuseColor.rgb,vec3(.3,.59,.11));
@@ -204,12 +223,24 @@ function configureCropShader(
           diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.19,.105,.025),burnedTip);` : ''}
         ${options.leaves ? 'diffuseColor.rgb+=mix(vec3(.012,.028,.002),vec3(.075,.125,.018),cropFacing)*pow(1.-cropFacing,1.4);' : ''}
         diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.46,.30,.105)*(.72+cropTint*.45),cropStubble*.9);`)
-      .replace('#include <opaque_fragment>', `${options.leaves ? `
-        // Luz transmitida barata: evita que a face inferior da ponta caída
-        // vire um ponto preto quando a normal deixa de receber sol direto.
-        vec3 leafLightFloor=diffuseColor.rgb*(gl_FrontFacing?.08:.55);
-        outgoingLight=max(outgoingLight,leafLightFloor);` : ''}
-        #include <opaque_fragment>`);
+      .replace('#include <lights_fragment_begin>', `#include <lights_fragment_begin>
+        ${options.leaves ? `
+        // Contraluz barato, mas fisicamente ligado a sol/lua da cena. Entra
+        // como difuso direto: sem luz direcional nao ha brilho proprio e a lua
+        // fraca da noite produz so uma translucidez residual.
+        #if ( NUM_DIR_LIGHTS > 0 ) && defined( RE_Direct )
+          vec3 cropTransmittedIrradiance=vec3(0.0);
+          #pragma unroll_loop_start
+          for(int i=0;i<NUM_DIR_LIGHTS;i++) {
+            // Uma folha fina nunca bloqueia toda a irradiancia no rasante. O
+            // piso continua multiplicado pela intensidade real de sol/lua e
+            // impede que quinas subpixel virem tracos pretos.
+            float cropBackLight=max(.12,pow(saturate(dot(-geometryNormal,directionalLights[i].direction)),1.35));
+            cropTransmittedIrradiance+=directionalLights[i].color*cropBackLight*.18;
+          }
+          #pragma unroll_loop_end
+          reflectedLight.directDiffuse+=cropTransmittedIrradiance*BRDF_Lambert(material.diffuseColor);
+        #endif` : ''}`);
   };
   material.customProgramCacheKey = () => options.cacheKey;
 }
@@ -237,19 +268,19 @@ export function createSompoCropRows(groundHeight: (x: number, z: number) => numb
   const structureMaterial = new THREE.MeshStandardMaterial({
     color: mature ? 0x9b6b24 : 0x54771d, roughness: .9, metalness: 0,
   });
-  configureCropShader(leafMaterial, { leaves: true, mature, operation, time, wind, cut, path, harvestTime, cacheKey: `sompo-maize-leaf-r2-${mature}-${operation}` });
-  configureCropShader(farLeafMaterial, { leaves: true, mature, operation, time, wind, cut, path, harvestTime, cacheKey: `sompo-maize-far-r2-${mature}-${operation}` });
-  configureCropShader(structureMaterial, { leaves: false, mature, operation, time, wind, cut, path, harvestTime, cacheKey: `sompo-maize-stem-r2-${mature}-${operation}` });
+  configureCropShader(leafMaterial, { leaves: true, mature, operation, time, wind, cut, path, harvestTime, cacheKey: `sompo-maize-leaf-r3-${mature}-${operation}` });
+  configureCropShader(farLeafMaterial, { leaves: true, mature, operation, time, wind, cut, path, harvestTime, cacheKey: `sompo-maize-far-r3-${mature}-${operation}` });
+  configureCropShader(structureMaterial, { leaves: false, mature, operation, time, wind, cut, path, harvestTime, cacheKey: `sompo-maize-stem-r3-${mature}-${operation}` });
 
   if (typeof document !== 'undefined' && typeof document.createElementNS === 'function') {
     const loader = new THREE.TextureLoader();
-    loader.load('/sompo/gen/maize-leaf-surface.webp?v=2', map => {
+    loader.load('/sompo/gen/maize-leaf-surface.webp?v=3', map => {
       map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 16;
       leafTextures.push(map);
       leafMaterial.map = farLeafMaterial.map = map;
       leafMaterial.needsUpdate = farLeafMaterial.needsUpdate = true;
     });
-    loader.load('/sompo/gen/maize-leaf-normal.webp?v=2', normal => {
+    loader.load('/sompo/gen/maize-leaf-normal.webp?v=3', normal => {
       normal.colorSpace = THREE.NoColorSpace; normal.anisotropy = 16;
       leafTextures.push(normal);
       leafMaterial.normalMap = farLeafMaterial.normalMap = normal;

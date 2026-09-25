@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
 import * as THREE from 'three';
 
@@ -23,7 +24,7 @@ test('crop layout stays deterministic, grounded and within both geometry budgets
   compact.root.children.forEach(mesh=>{if(mesh.visible) reduced+=mesh.count*mesh.geometry.index.count/3;});
   // O teto agora mede o pior LOD visível: malha curva perto + impostor longe.
   assert.ok(total<=2300000);assert.ok(reduced<total*.65);
-  const shader={uniforms:{},vertexShader:'#include <begin_vertex>',fragmentShader:'#include <color_fragment>'};full.root.children[0].material.onBeforeCompile(shader);
+  const shader={uniforms:{},vertexShader:'#include <begin_vertex>',fragmentShader:'#include <normal_fragment_begin>\n#include <normal_fragment_maps>\n#include <color_fragment>\n#include <lights_fragment_begin>'};full.root.children[0].material.onBeforeCompile(shader);
   assert.equal(full.root.children[0].material.alphaTest,0,'a silhueta vem da malha, sem costura de alpha-test');
   assert.ok(full.root.children[0].geometry.getAttribute('cropLayer'),'idade da folha alimenta a variação de cor');
   const leafPosition=full.root.children[0].geometry.getAttribute('position');let leafLength=0,leafWidth=0;
@@ -38,6 +39,13 @@ test('crop layout stays deterministic, grounded and within both geometry budgets
   assert.match(shader.vertexShader,/floor\(variantHash\*4\.0\)/,'quatro perfis paramétricos por pé');
   assert.match(shader.fragmentShader,/lowerDry/,'folhas inferiores amarelam');
   assert.match(shader.fragmentShader,/burnedTip/,'uma variante recebe ponta queimada');
+  assert.match(shader.fragmentShader,/cropFaceDirection=gl_FrontFacing\?1\.0:-1\.0/,'a normal das duas faces vira explicitamente para o lado visivel');
+  assert.match(shader.fragmentShader,/directionalLights\[i\]\.color\*cropBackLight/,'a translucidez segue a luz direcional real da cena');
+  assert.match(shader.fragmentShader,/reflectedLight\.directDiffuse\+=cropTransmittedIrradiance/,'o contraluz percorre o BRDF difuso');
+  assert.doesNotMatch(shader.fragmentShader,/outgoingLight=max|leafLightFloor/,'folhas nao criam piso emissivo independente da luz');
+  const materialBuilder=readFileSync(new URL('../scripts/sompo/build-lavoura-materials.py',import.meta.url),'utf8');
+  assert.match(materialBuilder,/MedianFilter\(5\)/,'o albedo remove pontos escuros isolados sem borrar a folha inteira');
+  assert.match(materialBuilder,/lossless=True/,'a compressao nao recria blocos escuros na superficie limpa');
   full.root.children[0].getMatrixAt(0,pose);const first=p.setFromMatrixPosition(pose).clone();
   full.root.children[0].getMatrixAt(1,pose);const next=p.setFromMatrixPosition(pose).clone();
   full.root.children[0].getMatrixAt(27,pose);const nextPlant=p.setFromMatrixPosition(pose).clone();

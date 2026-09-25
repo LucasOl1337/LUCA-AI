@@ -2,7 +2,7 @@
   "asset": "maize-leaf-normal.webp",
   "createdAt": "2026-09-25",
   "generator": "scripts/sompo/build-lavoura-materials.py (Pillow + NumPy)",
-  "sha256": "e84bd1bfaf92c907184fa7803dba38122caf8dfc3d5757175e8828ed2ad4ed9f",
+  "sha256": "a769cc3f4f393c8e0dfd9e1baa2135f3978f09e72877d6720c51fbf80e3d1fe8",
   "source": "/sompo/gen/maize-leaf-surface.webp",
   "sourceProvenance": "/sompo/gen/maize-leaf-surface.provenance.json",
   "license": "Project-owned derived asset; source generated for LUCA-AI",

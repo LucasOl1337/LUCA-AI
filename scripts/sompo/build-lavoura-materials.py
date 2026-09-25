@@ -6,7 +6,7 @@ Uso: python scripts/sompo/build-lavoura-materials.py
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -51,7 +51,23 @@ def flattened_surface() -> np.ndarray:
     edge_guard = 32
     surface[:edge_guard] = surface[edge_guard]
     surface[-edge_guard:] = surface[-edge_guard - 1]
-    Image.fromarray(surface, "RGB").save(SURFACE, "WEBP", quality=94, method=6)
+    # A fotografia ainda traz poucos pixels escuros isolados no miolo. Quando
+    # o mesmo mapa cobre milhares de folhas, eles viram o pontilhado repetido
+    # que parece buraco ou verso sem luz. Troque apenas outliers locais fortes;
+    # a nervura e a variacao larga de albedo permanecem intactas.
+    luminance_weights = np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
+    for _ in range(3):
+        local_median = np.asarray(
+            Image.fromarray(surface, "RGB").filter(ImageFilter.MedianFilter(5)),
+            dtype=np.uint8,
+        )
+        luminance = surface.astype(np.float32) @ luminance_weights
+        median_luminance = local_median.astype(np.float32) @ luminance_weights
+        dark_outliers = (luminance < median_luminance * 0.75) & (median_luminance - luminance > 12)
+        surface[dark_outliers] = local_median[dark_outliers]
+    # Lossless evita que o encoder recrie blocos escuros ao redor dos poucos
+    # pixels corrigidos; ainda fica muito abaixo do PNG-fonte.
+    Image.fromarray(surface, "RGB").save(SURFACE, "WEBP", lossless=True, method=6)
     return surface.astype(np.float32) / 255.0
 
 
