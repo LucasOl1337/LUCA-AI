@@ -10,9 +10,9 @@
   "sourceImageSha256": "7f6033821b1dfdd696118da61798f8c5aff21845116897c8ea80c8a47baf96c5",
   "authorship": "Original unbranded procedural geometry authored for LUCA-AI",
   "dimensionsM": {
-    "length": 5.755,
-    "width": 2.704,
-    "height": 3.173
+    "length": 5.65,
+    "width": 2.7202,
+    "height": 3.0237
   },
   "axes": {
     "forward": "+X",
@@ -20,8 +20,8 @@
     "lateral": "+Z"
   },
   "geometry": {
-    "triangles": 57100,
-    "materials": 12,
+    "triangles": 61852,
+    "materials": 2,
     "parts": [
       "long hood and grille",
       "enclosed glazed cab and interior",
@@ -32,20 +32,22 @@
       "headlights, work lights and beacon",
       "front ballast plates",
       "steps and handrails",
-      "rear three-point hitch and hydraulic connectors",
-      "lower-body dry mud"
+      "rear three-point hitch, PTO and hydraulic cylinders",
+      "engine block, sump, fuel tank and pivoting front axle",
+      "CavityAO and height-based dry-earth vertex colour"
     ]
   },
-  "triangles": 57100,
-  "materials": "PBR values by part; no image textures and no manufacturer marks",
+  "triangles": 61852,
+  "materials": "Two consolidated PBR material families with CavityAO/colour per vertex; no image textures and no manufacturer marks",
   "externalManifest": "generated-agri-tractor.textures.json",
   "reproducibleCommand": "blender -b --factory-startup --python scripts/sompo/build-agri-tractor.py",
   "license": "SOMPO-AGRI-ASSET-LICENSE.txt",
   "limitations": [
     "The model is a visual simulator asset, not a manufacturer-accurate CAD assembly",
     "Hydraulic hoses are simplified to keep the runtime draw and triangle budget predictable",
-    "Dust is represented by lower-body PBR parts rather than a baked texture atlas"
+    "Cab glazing is opaque tinted glass so body surfaces can share one runtime draw",
+    "Dust and crevice occlusion are baked into the CavityAO vertex colour channel rather than an image atlas"
   ],
-  "sha256": "63910f9d7934ae430abbe91686f421b7ee17044f185ba26000a25f2efe6db2e2",
-  "bytes": 2762276
+  "sha256": "7a0316361b755e70bbb7b747d1ad95fd02bae76d4e727142a40cc8298ca6475e",
+  "bytes": 3631796
 }

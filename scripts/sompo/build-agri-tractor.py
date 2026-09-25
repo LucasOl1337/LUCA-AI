@@ -10,6 +10,7 @@ import bpy
 import math
 import os
 from mathutils import Vector
+from mathutils.bvhtree import BVHTree
 
 
 bpy.ops.object.select_all(action='SELECT')
@@ -50,28 +51,34 @@ def material(name, color, metallic=0.0, roughness=0.5, emission=0.0, alpha=1.0, 
     return mat
 
 
-# Doze materiais no maximo, todos PBR e sem atlas externo.
-paint = material('Trator pintura verde', (0.035, 0.19, 0.065), 0.38, 0.25, coat=0.72)
-accent = material('Trator faixa amarela', (0.94, 0.61, 0.035), 0.32, 0.29, coat=0.45)
-dark = material('Trator plastico e grade', (0.018, 0.022, 0.019), 0.12, 0.67)
-tire = material('Trator borracha com terra', (0.055, 0.046, 0.035), 0.0, 0.92)
-rim = material('Trator aro amarelo', (0.88, 0.56, 0.025), 0.52, 0.31)
-steel = material('Trator aco mecanico', (0.24, 0.27, 0.25), 0.76, 0.36)
+# Nove familias PBR. A mesma tinta amarela serve faixa e aros; o interior usa
+# o plastico escuro. Isso conserva contraste e reduz os passes de material.
+paint = material('Trator pintura verde', (0.025, 0.15, 0.048), 0.28, 0.34, coat=0.58)
+accent = material('Trator amarelo', (0.86, 0.52, 0.018), 0.34, 0.38, coat=0.34)
+dark = material('Trator plastico grade interior', (0.014, 0.017, 0.015), 0.10, 0.72)
+tire = material('Trator borracha agricola', (0.038, 0.032, 0.025), 0.0, 0.95)
+steel = material('Trator aco mecanico', (0.19, 0.22, 0.20), 0.68, 0.43)
 glass = material('Trator vidro da cabine', (0.075, 0.16, 0.15), 0.05, 0.12, alpha=0.28, coat=0.5)
-interior = material('Trator interior da cabine', (0.045, 0.05, 0.043), 0.02, 0.83)
 lamp = material('Trator farois', (0.82, 0.88, 0.79), 0.25, 0.19, emission=0.35)
 red = material('Trator lanternas traseiras', (0.52, 0.018, 0.012), 0.12, 0.31, emission=0.15)
 amber = material('Trator giroflex', (0.9, 0.28, 0.015), 0.08, 0.24, emission=0.3, alpha=0.82)
-dust = material('Trator poeira e lama seca', (0.25, 0.145, 0.065), 0.0, 0.96)
+structural = material('Trator acabamentos unificados', (1, 1, 1), 0.25, 0.58)
+wheel_finish = material('Trator roda unificada', (1, 1, 1), 0.08, 0.78)
 
 
 parts = bpy.data.objects.new('trator-agricola-procedural', None)
 bpy.context.collection.objects.link(parts)
+rig_parts = {}
+for key in ('body', 'wheel-0--1', 'wheel-0-1', 'wheel-1--1', 'wheel-1-1', 'hitch'):
+    group = bpy.data.objects.new(f'rig-{key}', None)
+    bpy.context.collection.objects.link(group)
+    group.parent = parts
+    rig_parts[key] = group
 
 
-def finish(obj, name, mat, bevel=0.0, segments=2, smooth=True):
+def finish(obj, name, mat, bevel=0.0, segments=2, smooth=True, rig='body'):
     obj.name = name
-    obj.parent = parts
+    obj.parent = rig_parts[rig]
     obj.data.materials.append(mat)
     if bevel:
         mod = obj.modifiers.new('chanfro de fabricacao', 'BEVEL')
@@ -84,47 +91,61 @@ def finish(obj, name, mat, bevel=0.0, segments=2, smooth=True):
     return obj
 
 
-def box(name, center, size, mat, bevel=0.015, segments=2):
+def box(name, center, size, mat, bevel=0.015, segments=2, rig='body'):
     bpy.ops.mesh.primitive_cube_add(size=1, location=xyz(center))
     obj = bpy.context.object
     obj.scale = (size[0], size[2], size[1])
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    return finish(obj, name, mat, bevel, segments, smooth=False)
+    return finish(obj, name, mat, bevel, segments, smooth=False, rig=rig)
 
 
-def mesh(name, vertices, faces, mat, bevel=0.0, segments=2, smooth=True):
+def mesh(name, vertices, faces, mat, bevel=0.0, segments=2, smooth=True, rig='body'):
     data = bpy.data.meshes.new(name)
     data.from_pydata([xyz(vertex) for vertex in vertices], [], faces)
     data.validate()
     data.update()
-    return finish(bpy.data.objects.new(name, data), name, mat, bevel, segments, smooth)
+    return finish(bpy.data.objects.new(name, data), name, mat, bevel, segments, smooth, rig)
 
 
-def linked_mesh(name, vertices, faces, mat, bevel=0.0, segments=2, smooth=True):
-    obj = mesh(name, vertices, faces, mat, bevel, segments, smooth)
+def linked_mesh(name, vertices, faces, mat, bevel=0.0, segments=2, smooth=True, rig='body'):
+    obj = mesh(name, vertices, faces, mat, bevel, segments, smooth, rig)
     bpy.context.collection.objects.link(obj)
     return obj
 
 
-def profile(name, polygon, z0, z1, mat, bevel=0.025, segments=3):
+def profile(name, polygon, z0, z1, mat, bevel=0.025, segments=3, rig='body'):
     """Perfil lateral XY extrudado na largura Z."""
     vertices = [(x, y, z) for z in (z0, z1) for x, y in polygon]
     count = len(polygon)
     faces = [tuple(range(count - 1, -1, -1)), tuple(range(count, count * 2))]
     faces += [(i, (i + 1) % count, (i + 1) % count + count, i + count) for i in range(count)]
-    return linked_mesh(name, vertices, faces, mat, bevel, segments, smooth=False)
+    return linked_mesh(name, vertices, faces, mat, bevel, segments, smooth=False, rig=rig)
 
 
-def rod(name, start, end, radius, mat, vertices=12, bevel=0.0):
+def tapered_shell(name, sections, mat, bevel=0.025, rig='body'):
+    """Casco por secoes (x, y_base, y_top, meia_largura), afunilado em planta."""
+    vertices = []
+    for x, bottom, top, half_width in sections:
+        vertices += [(x, bottom, -half_width), (x, bottom, half_width),
+                     (x, top, half_width), (x, top, -half_width)]
+    faces = [(0, 3, 2, 1), (len(vertices) - 4, len(vertices) - 3, len(vertices) - 2, len(vertices) - 1)]
+    for index in range(len(sections) - 1):
+        a, b = index * 4, (index + 1) * 4
+        faces += [(a, b, b + 3, a + 3), (a + 1, a + 2, b + 2, b + 1),
+                  (a + 3, b + 3, b + 2, a + 2), (a, a + 1, b + 1, b)]
+    return linked_mesh(name, vertices, faces, mat, bevel, 3, smooth=False, rig=rig)
+
+
+def rod(name, start, end, radius, mat, vertices=12, bevel=0.0, rig='body'):
     a, b = Vector(xyz(start)), Vector(xyz(end))
     bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=radius, depth=(b - a).length, location=(a + b) / 2)
     obj = bpy.context.object
     obj.rotation_euler = (b - a).to_track_quat('Z', 'Y').to_euler()
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-    return finish(obj, name, mat, bevel, 2)
+    return finish(obj, name, mat, bevel, 2, rig=rig)
 
 
-def cylinder(name, center, axis, radius, depth, mat, vertices=24, bevel=0.008):
+def cylinder(name, center, axis, radius, depth, mat, vertices=24, bevel=0.008, rig='body'):
     bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=radius, depth=depth, location=xyz(center))
     obj = bpy.context.object
     obj.rotation_euler = {
@@ -133,10 +154,10 @@ def cylinder(name, center, axis, radius, depth, mat, vertices=24, bevel=0.008):
         'z': (math.pi / 2, 0, 0),
     }[axis]
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-    return finish(obj, name, mat, bevel, 2)
+    return finish(obj, name, mat, bevel, 2, rig=rig)
 
 
-def torus(name, center, major, minor, mat, major_segments=40, minor_segments=12):
+def torus(name, center, major, minor, mat, major_segments=40, minor_segments=12, rig='body'):
     bpy.ops.mesh.primitive_torus_add(
         major_radius=major,
         minor_radius=minor,
@@ -145,14 +166,14 @@ def torus(name, center, major, minor, mat, major_segments=40, minor_segments=12)
         location=xyz(center),
         rotation=(math.pi / 2, 0, 0),
     )
-    return finish(bpy.context.object, name, mat, 0.0, smooth=True)
+    return finish(bpy.context.object, name, mat, 0.0, smooth=True, rig=rig)
 
 
-def quad(name, points, mat, bevel=0.0):
-    return linked_mesh(name, points, [tuple(range(len(points)))], mat, bevel, 2, smooth=False)
+def quad(name, points, mat, bevel=0.0, rig='body'):
+    return linked_mesh(name, points, [tuple(range(len(points)))], mat, bevel, 2, smooth=False, rig=rig)
 
 
-def arch_fender(name, center_x, center_y, radius_inner, radius_outer, z0, z1, mat, steps=22):
+def arch_fender(name, center_x, center_y, radius_inner, radius_outer, z0, z1, mat, steps=22, rig='body'):
     """Lamina curva sobre a roda, aberta embaixo e com espessura visivel."""
     angles = [math.radians(10 + i * 160 / steps) for i in range(steps + 1)]
     vertices = []
@@ -171,10 +192,10 @@ def arch_fender(name, center_x, center_y, radius_inner, radius_outer, z0, z1, ma
         for i in range(steps):
             faces.append((a + i, b + i, b + i + 1, a + i + 1))
     faces += [(0, n, n * 3, n * 2), (n - 1, n * 2 - 1, n * 4 - 1, n * 3 - 1)]
-    return linked_mesh(name, vertices, faces, mat, 0.012, 2, smooth=True)
+    return linked_mesh(name, vertices, faces, mat, 0.012, 2, smooth=True, rig=rig)
 
 
-def chevron_lug(name, center, radial, tangent, axial_half, tangent_half, radial_half, slope, mat):
+def chevron_lug(name, center, radial, tangent, axial_half, tangent_half, radial_half, slope, mat, rig):
     """Paralelepipedo orientado: garra diagonal que forma o V agricola."""
     c = Vector(center)
     r = Vector(radial) * radial_half
@@ -187,25 +208,25 @@ def chevron_lug(name, center, radial, tangent, axial_half, tangent_half, radial_
                        (1, -1, -1), (1, -1, 1), (1, 1, 1), (1, 1, -1)):
         vertices.append(tuple(c + r * sr + u * su + v * sv))
     faces = [(0, 1, 2, 3), (4, 7, 6, 5), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (4, 0, 3, 7)]
-    return linked_mesh(name, vertices, faces, mat, 0.008, 2, smooth=False)
+    return linked_mesh(name, vertices, faces, mat, 0.008, 2, smooth=False, rig=rig)
 
 
-def wheel(label, center_x, radius, width, center_z, front=False):
+def wheel(label, center_x, radius, width, center_z, rig, front=False):
     center_y = radius
     # Carcaca arredondada, aro rebaixado e cubo aparafusado.
     casing = radius * 0.93
     torus(f'{label}-pneu', (center_x, center_y, center_z), casing * 0.72, casing * 0.28, tire,
-          48 if not front else 40, 14)
+          48 if not front else 40, 14, rig=rig)
     for face in (-1, 1):
         z = center_z + face * width * 0.47
-        cylinder(f'{label}-aro', (center_x, center_y, z), 'z', radius * 0.55, 0.055, rim, 32, 0.012)
-        cylinder(f'{label}-cubo', (center_x, center_y, z + face * 0.035), 'z', radius * 0.18, 0.07, steel, 20, 0.006)
+        cylinder(f'{label}-aro', (center_x, center_y, z), 'z', radius * 0.55, 0.055, accent, 32, 0.012, rig=rig)
+        cylinder(f'{label}-cubo', (center_x, center_y, z + face * 0.035), 'z', radius * 0.18, 0.07, accent, 20, 0.006, rig=rig)
         for i in range(8):
             angle = i * math.pi / 4
             cylinder(
                 f'{label}-parafuso',
                 (center_x + math.cos(angle) * radius * 0.28, center_y + math.sin(angle) * radius * 0.28, z + face * 0.075),
-                'z', radius * 0.025, 0.025, steel, 8, 0.002,
+                'z', radius * 0.025, 0.025, accent, 8, 0.002, rig=rig,
             )
     # Duas metades espelhadas por passo formam garras em chevron de verdade.
     count = 24 if not front else 20
@@ -221,129 +242,154 @@ def wheel(label, center_x, radius, width, center_z, front=False):
                 (surface_x, surface_y, center_z + half * width * 0.24),
                 radial, tangent,
                 width * 0.24, radius * 0.055, radius * 0.035,
-                half * radius * 0.11, tire,
+                half * radius * 0.11, tire, rig,
             )
 
 
-# ---------------------------------------------------------------- chassis e capô
-box('chassi-esquerdo', (-0.05, 0.58, -0.48), (3.95, 0.18, 0.15), steel, 0.025)
-box('chassi-direito', (-0.05, 0.58, 0.48), (3.95, 0.18, 0.15), steel, 0.025)
-for x in (-1.25, -0.25, 0.75, 1.65):
-    box('travessa-do-chassi', (x, 0.58, 0), (0.13, 0.15, 1.05), steel, 0.018)
+# ---------------------------------------------------------------- chassi, motor e capô
+box('longarina-esquerda', (0.02, 0.62, -0.43), (4.00, 0.20, 0.14), steel, 0.022)
+box('longarina-direita', (0.02, 0.62, 0.43), (4.00, 0.20, 0.14), steel, 0.022)
+for x in (-1.05, -0.10, 0.86, 1.62):
+    box('travessa-chassi', (x, 0.62, 0), (0.14, 0.16, 0.94), steel, 0.015)
 
-# Capô facetado com frente alta e nariz levemente caido.
-hood_poly = [(-0.02, 0.91), (2.50, 0.91), (2.61, 1.12), (2.51, 1.78), (2.23, 1.92),
-             (0.34, 2.02), (-0.02, 1.84)]
-profile('capo-principal', hood_poly, -0.69, 0.69, paint, 0.045, 3)
-profile('faixa-lateral-esquerda', [(0.18, 1.65), (2.34, 1.72), (2.48, 1.60), (0.18, 1.52)], 0.695, 0.715, accent, 0.008, 2)
-profile('faixa-lateral-direita', [(0.18, 1.65), (2.34, 1.72), (2.48, 1.60), (0.18, 1.52)], -0.715, -0.695, accent, 0.008, 2)
-box('grade-frontal', (2.585, 1.37, 0), (0.055, 0.72, 1.08), dark, 0.025, 3)
-for z in (-0.42, -0.21, 0, 0.21, 0.42):
-    box('aleta-grade-frontal', (2.622, 1.36, z), (0.02, 0.55, 0.035), steel, 0.005)
+# Bloco, carter e tanque ficam expostos sob a cintura, entre os eixos.
+profile('bloco-motor', [(0.02, .67), (1.35, .67), (1.42, 1.23), (.22, 1.37)], -.43, .43, dark, .035, 3)
+profile('carter-motor', [(.25, .46), (1.15, .46), (1.29, .70), (.15, .70)], -.32, .32, steel, .025, 2)
+cylinder('filtro-oleo', (.64, .82, -.49), 'y', .08, .33, steel, 18, .01)
+box('tanque-combustivel', (-.08, .76, .58), (.82, .55, .34), steel, .045, 3)
+cylinder('bocal-tanque', (.15, 1.06, .62), 'y', .055, .08, dark, 14, .006)
+
+# Capô afina na frente em planta e desce no nariz, como a referência.
+tapered_shell('capo-principal', [(.05, .96, 1.83, .72), (1.18, .91, 1.78, .67),
+                                 (2.18, .88, 1.65, .59), (2.48, 1.00, 1.55, .53)], paint, .045)
 for side in (-1, 1):
-    # Painel de ventilacao com barras horizontais e moldura.
-    box('rebaixo-ventilacao', (1.18, 1.42, side * 0.704), (1.18, 0.48, 0.025), dark, 0.018)
-    for x in (0.78, 1.02, 1.26, 1.50):
-        box('aleta-ventilacao', (x, 1.42, side * 0.724), (0.06, 0.38, 0.018), steel, 0.004)
-    box('farol-frontal', (2.60, 1.64, side * 0.43), (0.06, 0.22, 0.28), lamp, 0.025, 3)
+    profile('faixa-amarela-fina', [(.18, 1.58), (2.32, 1.49), (2.40, 1.42), (.18, 1.49)],
+            side * .704, side * .721, accent, .005, 2)
+    box('painel-ventilacao', (1.18, 1.31, side * .694), (1.26, .41, .026), dark, .018)
+    for x in (.72, .94, 1.16, 1.38, 1.60):
+        box('veneziana-motor', (x, 1.31, side * .713), (.045, .31, .018), steel, .003)
 
-# Lastro dianteiro: laminas independentes legiveis na silhueta.
-box('suporte-lastro', (2.66, 0.73, 0), (0.52, 0.20, 0.52), steel, 0.025)
+# Grade inclinada e faróis embutidos, não cubos colados à frente.
+profile('grade-frontal', [(2.42, 1.02), (2.51, 1.10), (2.51, 1.50), (2.43, 1.55)], -.49, .49, dark, .018, 2)
+for z in (-.38, -.19, 0, .19, .38):
+    rod('barra-grade', (2.505, 1.13, z), (2.48, 1.47, z), .018, steel, 8)
+for side in (-1, 1):
+    profile('nicho-farol', [(2.425, 1.40), (2.505, 1.42), (2.50, 1.56), (2.43, 1.55)],
+            side * .27, side * .47, dark, .012, 2)
+    profile('farol-integrado', [(2.446, 1.43), (2.516, 1.445), (2.511, 1.53), (2.45, 1.52)],
+            side * .29, side * .45, lamp, .008, 2)
+
+# Lastro laminado e suporte, baixo o suficiente para não virar uma caixa na frente.
+box('suporte-lastro', (2.59, .65, 0), (.48, .18, .54), steel, .022)
 for i in range(9):
-    box('placa-lastro-dianteiro', (2.86, 0.72, (i - 4) * 0.115), (0.31, 0.54, 0.085), dark, 0.018, 2)
+    box('placa-lastro', (2.80, .63, (i - 4) * .105), (.28, .46, .075), dark, .018, 2)
 
 # ---------------------------------------------------------------- cabine fechada e interior
-box('piso-cabine', (-0.66, 0.94, 0), (1.72, 0.18, 1.48), dark, 0.035)
+box('piso-cabine', (-.66, 1.01, 0), (1.68, .18, 1.56), dark, .035)
 for side in (-1, 1):
-    # Colunas A/B/C visiveis separam os paineis de vidro.
-    for x, y, height in ((0.18, 2.02, 1.75), (-0.58, 2.05, 1.88), (-1.34, 1.98, 1.72)):
-        rod('coluna-cabine', (x, y - height / 2, side * 0.69), (x, y + height / 2, side * 0.69), 0.045, dark, 10)
-    quad('vidro-porta', [(0.13, 1.17, side * 0.701), (0.13, 2.78, side * 0.701),
-                         (-0.54, 2.92, side * 0.701), (-0.54, 1.17, side * 0.701)], glass)
-    quad('vidro-lateral-traseiro', [(-0.62, 1.20, side * 0.701), (-0.62, 2.91, side * 0.701),
-                                    (-1.28, 2.72, side * 0.701), (-1.28, 1.22, side * 0.701)], glass)
-    box('corrimao-cabine', (-0.15, 1.55, side * 0.80), (0.055, 1.25, 0.055), steel, 0.015)
-    # Tres degraus vazados sob cada porta.
-    for idx, y in enumerate((0.38, 0.62, 0.86)):
-        box('degrau-antiderrapante', (-0.13 - idx * 0.055, y, side * 0.84), (0.44, 0.055, 0.35), steel, 0.012)
-    # Retrovisor com braco duplo.
-    rod('braco-retrovisor', (0.05, 2.58, side * 0.66), (0.20, 2.60, side * 1.08), 0.025, dark, 10)
-    box('retrovisor', (0.20, 2.51, side * 1.13), (0.11, 0.31, 0.15), dark, 0.025, 3)
+    # Quatro colunas estruturais, uma em cada canto da cabine.
+    rod('coluna-a-cabine', (.17, 1.14, side * .70), (.10, 2.72, side * .70), .038, dark, 10)
+    rod('coluna-c-cabine', (-1.34, 1.15, side * .70), (-1.24, 2.70, side * .70), .038, dark, 10)
+    quad('vidro-porta', [(.12, 1.18, side * .706), (.10, 2.68, side * .706),
+                         (-.55, 2.72, side * .706), (-.55, 1.18, side * .706)], glass)
+    quad('vidro-lateral-traseiro', [(-.60, 1.19, side * .706), (-.60, 2.72, side * .706),
+                                    (-1.22, 2.67, side * .706), (-1.30, 1.19, side * .706)], glass)
+    # Moldura inferior da porta, duas dobradiças e maçaneta real.
+    box('soleira-porta', (-.22, 1.16, side * .722), (.75, .065, .045), dark, .008)
+    for y in (1.42, 2.35):
+        cylinder('dobradica-porta', (.13, y, side * .735), 'y', .025, .10, steel, 10, .003)
+    box('macaneta-porta', (-.46, 2.12, side * .742), (.18, .045, .035), steel, .008)
+    # Degraus perfurados e corrimão chegam até a maçaneta.
+    for index, y in enumerate((.34, .58, .82)):
+        box('degrau-cabine', (-.05 - index * .035, y, side * .88), (.48, .055, .38), steel, .010)
+        for x in (-.19, -.05, .09):
+            box('ranhura-degrau', (x - index * .035, y + .032, side * .88), (.055, .012, .28), dark, .002)
+    rod('corrimao-cabine', (.12, .80, side * .83), (.10, 2.05, side * .83), .024, steel, 10)
+    # Espelho preso por braço único robusto: nada fica flutuando.
+    rod('braco-retrovisor', (.08, 2.48, side * .69), (.20, 2.49, side * 1.00), .022, dark, 10)
+    box('retrovisor', (.20, 2.45, side * 1.06), (.10, .28, .15), dark, .020, 3)
 
-# Para-brisa e vidro traseiro em placas discretas para evitar dupla transparencia.
-quad('para-brisa', [(0.205, 1.25, -0.62), (0.205, 1.25, 0.62), (0.205, 2.78, 0.56), (0.205, 2.78, -0.56)], glass)
-quad('vidro-traseiro', [(-1.355, 1.25, 0.59), (-1.355, 1.25, -0.59), (-1.355, 2.69, -0.54), (-1.355, 2.69, 0.54)], glass)
-profile('teto-cabine', [(-1.43, 2.70), (-1.26, 3.02), (0.05, 3.08), (0.29, 2.79)], -0.79, 0.79, paint, 0.055, 3)
+quad('para-brisa', [(.16, 1.21, -.63), (.16, 1.21, .63), (.10, 2.67, .60), (.10, 2.67, -.60)], glass)
+quad('vidro-traseiro', [(-1.31, 1.21, .63), (-1.31, 1.21, -.63),
+                        (-1.23, 2.66, -.59), (-1.23, 2.66, .59)], glass)
+# Teto baixo, largo e com beiral/borda saliente.
+profile('teto-cabine', [(-1.38, 2.66), (-1.26, 2.84), (.08, 2.86), (.25, 2.70)], -.84, .84, paint, .045, 3)
+box('borda-teto-frontal', (.19, 2.72, 0), (.13, .10, 1.76), dark, .018)
+box('borda-teto-traseira', (-1.32, 2.70, 0), (.12, .10, 1.76), dark, .018)
 
-# Banco, console, volante e coluna aparecem atraves do vidro.
-box('assento-operador', (-0.79, 1.48, 0), (0.52, 0.18, 0.52), interior, 0.055, 3)
-box('encosto-operador', (-1.02, 1.90, 0), (0.16, 0.72, 0.53), interior, 0.055, 3)
-box('console-operador', (-0.05, 1.35, -0.18), (0.55, 0.42, 0.72), interior, 0.035)
-torus('volante', (0.05, 2.03, -0.03), 0.18, 0.018, interior, 24, 8)
-rod('coluna-volante', (0.03, 1.70, -0.03), (0.05, 2.03, -0.03), 0.025, interior, 10)
+# Banco, console e volante legíveis através do vidro.
+box('assento-operador', (-.79, 1.48, 0), (.52, .18, .52), dark, .055, 3)
+box('encosto-operador', (-1.02, 1.88, 0), (.16, .68, .53), dark, .055, 3)
+box('console-operador', (-.06, 1.36, -.18), (.52, .38, .68), dark, .030)
+torus('volante', (.02, 1.96, -.03), .18, .018, dark, 24, 8)
+rod('coluna-volante', (.00, 1.65, -.03), (.02, 1.96, -.03), .023, dark, 10)
 
-# Luzes de trabalho no teto e giroflex.
-for x in (-1.15, 0.05):
+# Projetores encostados na borda do teto e giroflex com base aparafusada.
+for x in (-1.16, .02):
     for side in (-1, 1):
-        box('projetor-cabine', (x, 2.89, side * 0.64), (0.12, 0.13, 0.17), lamp, 0.022, 3)
-cylinder('base-giroflex', (-0.62, 3.09, 0.28), 'y', 0.085, 0.045, dark, 16, 0.005)
-cylinder('domo-giroflex', (-0.62, 3.10, 0.28), 'y', 0.073, 0.14, amber, 20, 0.01)
+        box('projetor-teto', (x, 2.74, side * .68), (.13, .12, .17), lamp, .020, 3)
+cylinder('base-giroflex', (-.70, 2.88, .28), 'y', .085, .035, dark, 16, .005)
+cylinder('domo-giroflex', (-.70, 2.95, .28), 'y', .072, .14, amber, 20, .010)
 
-# Escapamento vertical com silencioso e ponteira inclinada.
-cylinder('silencioso-vertical', (0.12, 2.02, -0.78), 'y', 0.105, 1.05, dark, 20, 0.012)
-rod('escapamento-vertical', (0.12, 2.50, -0.78), (0.12, 3.04, -0.78), 0.060, dark, 14)
-rod('ponteira-escapamento', (0.12, 3.04, -0.78), (0.21, 3.12, -0.78), 0.060, dark, 14)
+# Escapamento completo: tubo, abafador e ponteira acima do teto.
+cylinder('abafador-vertical', (.16, 1.89, -.79), 'y', .105, .82, dark, 20, .012)
+rod('escapamento-vertical', (.16, 2.28, -.79), (.16, 2.90, -.79), .055, dark, 14)
+rod('ponteira-escapamento', (.16, 2.90, -.79), (.24, 2.98, -.79), .055, dark, 14)
 
-# ---------------------------------------------------------------- rodas e para-lamas
+# ---------------------------------------------------------------- rodas, para-lamas e eixos
 for side in (-1, 1):
-    wheel(f'roda-traseira-{side}', -0.75, 0.82, 0.52, side * 1.02, front=False)
-    wheel(f'roda-dianteira-{side}', 1.58, 0.61, 0.44, side * 1.00, front=True)
-    arch_fender('paralama-traseiro', -0.75, 0.82, 0.96, 1.03,
-                side * 0.74, side * 1.30, paint, 24)
-    arch_fender('paralama-dianteiro', 1.58, 0.61, 0.73, 0.79,
-                side * 0.75, side * 1.25, dark, 20)
+    suffix = '-1' if side < 0 else '1'
+    wheel(f'roda-traseira-{side}', -.78, .89, .58, side * 1.00, f'wheel-1-{suffix}', front=False)
+    wheel(f'roda-dianteira-{side}', 1.57, .575, .43, side * .99, f'wheel-0-{suffix}', front=True)
+    arch_fender('paralama-traseiro-envolvente', -.78, .89, .98, 1.06,
+                side * .70, side * 1.31, paint, 28)
+    arch_fender('paralama-dianteiro', 1.57, .575, .66, .72,
+                side * .75, side * 1.23, dark, 20)
 
-# Eixos e diferencial ficam legiveis entre as rodas.
-rod('eixo-traseiro', (-0.75, 0.82, -1.11), (-0.75, 0.82, 1.11), 0.105, steel, 18)
-cylinder('diferencial-traseiro', (-0.75, 0.82, 0), 'z', 0.25, 0.42, steel, 24, 0.018)
-rod('eixo-dianteiro', (1.58, 0.61, -1.04), (1.58, 0.61, 1.04), 0.08, steel, 16)
+rod('eixo-traseiro', (-.78, .89, -1.12), (-.78, .89, 1.12), .11, steel, 18)
+cylinder('diferencial-traseiro', (-.78, .89, 0), 'z', .27, .44, steel, 24, .018)
+# Eixo dianteiro pivotante com munhão e barra de direção.
+rod('berco-eixo-dianteiro', (1.12, .68, 0), (1.57, .575, 0), .095, steel, 16)
+rod('eixo-dianteiro-pivotante', (1.57, .575, -.98), (1.57, .575, .98), .082, steel, 16)
+cylinder('pivo-eixo-dianteiro', (1.32, .64, 0), 'x', .13, .18, steel, 20, .012)
+rod('barra-direcao', (1.48, .69, -.82), (1.48, .69, .82), .025, steel, 10)
 
-# ---------------------------------------------------------------- engate de tres pontos e hidraulica
-box('suporte-engate', (-1.73, 0.76, 0), (0.18, 0.82, 0.82), steel, 0.025)
+# ---------------------------------------------------------------- engate de três pontos, TDP e hidráulica
+box('suporte-engate', (-1.70, .82, 0), (.20, .78, .76), steel, .025, rig='hitch')
+cylinder('tdp-traseira', (-1.86, .70, 0), 'x', .105, .25, accent, 20, .008, rig='hitch')
+cylinder('capa-tdp', (-1.99, .70, 0), 'x', .145, .10, steel, 20, .008, rig='hitch')
 for side in (-1, 1):
-    rod('braco-inferior-engate', (-1.70, 0.58, side * 0.34), (-2.62, 0.31, side * 0.49), 0.055, steel, 14)
-    cylinder('olhal-engate', (-2.63, 0.31, side * 0.49), 'z', 0.11, 0.06, steel, 20, 0.006)
-    rod('tirante-vertical', (-1.92, 1.06, side * 0.34), (-2.22, 0.42, side * 0.44), 0.032, steel, 12)
-rod('terceiro-ponto', (-1.79, 1.19, 0), (-2.48, 0.75, 0), 0.047, steel, 14)
-cylinder('olhal-terceiro-ponto', (-2.49, 0.75, 0), 'z', 0.105, 0.07, steel, 20, 0.006)
+    rod('braco-inferior-engate', (-1.70, .58, side * .31), (-2.59, .30, side * .48), .055, steel, 14, rig='hitch')
+    cylinder('olhal-engate', (-2.60, .30, side * .48), 'z', .11, .06, steel, 20, .006, rig='hitch')
+    rod('tirante-vertical', (-1.87, 1.03, side * .31), (-2.18, .42, side * .43), .032, steel, 12, rig='hitch')
+    # Barril verde e haste cromada mostram o acionamento do levante.
+    rod('barril-cilindro-hidraulico', (-1.55, 1.14, side * .25), (-1.90, .72, side * .35), .060, paint, 14, rig='hitch')
+    rod('haste-cilindro-hidraulico', (-1.90, .72, side * .35), (-2.14, .43, side * .42), .030, steel, 12, rig='hitch')
+rod('terceiro-ponto', (-1.76, 1.18, 0), (-2.45, .75, 0), .047, steel, 14, rig='hitch')
+cylinder('olhal-terceiro-ponto', (-2.46, .75, 0), 'z', .105, .07, steel, 20, .006, rig='hitch')
+for z in (-.24, -.08, .08, .24):
+    cylinder('conector-hidraulico', (-1.79, 1.35, z), 'x', .043, .10, accent, 14, .004, rig='hitch')
+
 for side in (-1, 1):
-    rod('cilindro-hidraulico-engate', (-1.58, 1.12, side * 0.26), (-2.13, 0.46, side * 0.40), 0.055, paint, 14)
-for z in (-0.25, -0.08, 0.08, 0.25):
-    cylinder('conector-hidraulico', (-1.78, 1.35, z), 'x', 0.045, 0.10, accent, 14, 0.004)
-
-# Lanternas e refletores traseiros.
-for side in (-1, 1):
-    box('lanterna-traseira', (-1.48, 1.43, side * 0.58), (0.08, 0.18, 0.24), red, 0.02, 3)
-
-# Lama seca concentrada embaixo, sem encobrir a pintura nem os vidros.
-for x, z, sx in ((-1.18, -0.38, 0.38), (-1.18, 0.38, 0.38), (0.62, -0.53, 0.62), (0.62, 0.53, 0.62)):
-    box('crosta-lama-seca', (x, 0.69, z), (sx, 0.06, 0.18), dust, 0.015)
-for side in (-1, 1):
-    # Pequena faixa irregular na banda baixa dos pneus; a garra continua dominante.
-    for angle in (215, 245, 275, 305):
-        a = math.radians(angle)
-        quad('poeira-no-pneu', [
-            (-0.75 + math.cos(a - 0.09) * 0.80, 0.82 + math.sin(a - 0.09) * 0.80, side * 1.285),
-            (-0.75 + math.cos(a + 0.09) * 0.80, 0.82 + math.sin(a + 0.09) * 0.80, side * 1.285),
-            (-0.75 + math.cos(a + 0.09) * 0.70, 0.82 + math.sin(a + 0.09) * 0.70, side * 1.287),
-            (-0.75 + math.cos(a - 0.09) * 0.70, 0.82 + math.sin(a - 0.09) * 0.70, side * 1.287),
-        ], dust)
+    box('lanterna-traseira', (-1.42, 1.45, side * .61), (.08, .17, .20), red, .018, 3)
 
 
-# ---------------------------------------------------------------- consolidacao por material
+# ---------------------------------------------------------------- consolidação por parte rígida e material
 for obj in list(bpy.context.scene.objects):
     if obj.type != 'MESH':
         continue
+    original = obj.data.materials[0]
+    rig_key = next((key for key, group in rig_parts.items() if obj.parent == group), 'body')
+    target = wheel_finish if rig_key.startswith('wheel-') else (
+        structural if original in (paint, accent, dark, steel, glass, lamp, red, amber) else original)
+    if target != original:
+        tint = tuple(original.diffuse_color[:3])
+        colors = obj.data.color_attributes.new(name='CavityAO', type='FLOAT_COLOR', domain='POINT')
+        for vertex in obj.data.vertices:
+            colors.data[vertex.index].color = (*tint, 1)
+        obj.data.color_attributes.active_color = colors
+        obj.data.materials.clear()
+        obj.data.materials.append(target)
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.select_all(action='DESELECT')
     obj.select_set(True)
@@ -351,18 +397,61 @@ for obj in list(bpy.context.scene.objects):
         bpy.ops.object.modifier_apply(modifier=modifier.name)
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
-# Um mesh por material. As ilhas continuam separadas e o rig particiona rodas e engate.
-for mat in list(bpy.data.materials):
-    objects = [obj for obj in bpy.context.scene.objects if obj.type == 'MESH' and obj.data.materials and obj.data.materials[0] == mat]
-    if not objects:
-        continue
-    bpy.ops.object.select_all(action='DESELECT')
-    for obj in objects:
-        obj.select_set(True)
-    bpy.context.view_layer.objects.active = objects[0]
-    if len(objects) > 1:
-        bpy.ops.object.join()
-    objects[0].name = f'trator-{mat.name.lower().replace(" ", "-")}'
+# O nome é um contrato opcional com o rig do Three.js. Cada grupo já chega como
+# corpo, roda ou engate e não precisa ser recortado triângulo a triângulo.
+for key, group in rig_parts.items():
+    for mat in list(bpy.data.materials):
+        objects = [obj for obj in group.children if obj.type == 'MESH' and obj.data.materials and obj.data.materials[0] == mat]
+        if not objects:
+            continue
+        bpy.ops.object.select_all(action='DESELECT')
+        for obj in objects:
+            obj.select_set(True)
+        bpy.context.view_layer.objects.active = objects[0]
+        if len(objects) > 1:
+            bpy.ops.object.join()
+        objects[0].name = f'rig-{key}--{mat.name.lower().replace(" ", "-")}'
+
+# Visibilidade hemisférica de curto alcance em CavityAO, igual ao caminhão. O
+# gradiente inferior acrescenta terra seca sem abrir um material/draw extra.
+opaque = [obj for obj in bpy.context.scene.objects if obj.type == 'MESH'
+          and obj.data.materials and obj.data.materials[0] != glass]
+vertices, polygons = [], []
+for obj in opaque:
+    start = len(vertices)
+    vertices.extend([obj.matrix_world @ vertex.co for vertex in obj.data.vertices])
+    polygons.extend([tuple(start + index for index in polygon.vertices) for polygon in obj.data.polygons])
+bvh = BVHTree.FromPolygons(vertices, polygons)
+samples = 18
+directions = []
+for index in range(samples):
+    radius = math.sqrt((index + .5) / samples)
+    angle = index * 2.399963229728653
+    directions.append(Vector((radius * math.cos(angle), radius * math.sin(angle), math.sqrt(1 - radius * radius))))
+for obj in opaque:
+    colors = obj.data.color_attributes.get('CavityAO') or obj.data.color_attributes.new(
+        name='CavityAO', type='FLOAT_COLOR', domain='POINT')
+    obj.data.color_attributes.active_color = colors
+    normal_matrix = obj.matrix_world.to_3x3().inverted().transposed()
+    for vertex in obj.data.vertices:
+        normal = (normal_matrix @ vertex.normal).normalized()
+        rotation = Vector((0, 0, 1)).rotation_difference(normal)
+        world = obj.matrix_world @ vertex.co
+        origin = world + normal * .006
+        visibility = 0
+        for direction in directions:
+            hit, _, _, distance = bvh.ray_cast(origin, rotation @ direction, 2.0)
+            visibility += 1 if hit is None else min(1, (distance / 2.0) ** .60)
+        ao = .18 + .82 * visibility / samples
+        dirt = max(0, min(1, (1.48 - world.z) / 1.20))
+        noise = .72 + .28 * (math.sin(world.x * 11.7 + world.y * 7.3) * .5 + .5)
+        dirt *= noise
+        current = colors.data[vertex.index].color
+        base = tuple(current[:3]) if any(current[:3]) else (1, 1, 1)
+        colors.data[vertex.index].color = (
+            base[0] * ao * (1 - dirt * .16),
+            base[1] * ao * (1 - dirt * .27),
+            base[2] * ao * (1 - dirt * .46), 1)
 
 triangles = sum(len(poly.vertices) - 2 for obj in bpy.context.scene.objects if obj.type == 'MESH' for poly in obj.data.polygons)
 out = os.path.abspath(os.environ.get('AGRI_TRACTOR_OUT', 'public/models/sompo/generated-agri-tractor.glb'))
@@ -372,5 +461,6 @@ bpy.ops.export_scene.gltf(
     export_yup=True,
     export_apply=True,
     export_materials='EXPORT',
+    export_vertex_color='ACTIVE',
 )
 print('AGRI_TRACTOR_EXPORTED', out, os.path.getsize(out), 'triangles', triangles, 'materials', len(bpy.data.materials))
