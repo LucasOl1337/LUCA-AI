@@ -4,6 +4,8 @@ Leia SOMENTE ao instalar, executar, testar, diagnosticar estado local ou prepara
 
 ## Local
 
+Para operar o runtime por terminal, consulte [CLI para agentes](cli.md). `node bin/luca.js health`, `preflight`, `state` e `commands` cobrem diagnostico e descoberta. Testes isolados do CLI: `npm run test:cli`.
+
 Node.js e Python 3 (`heartbeat_monitor.py`).
 
 ```powershell

@@ -1,4 +1,5 @@
-import { formatLabTime, parseLabSite, type LabCase } from '../../shared/lab-telemetry.js';
+import { LAB_CONCLUSION_CATEGORIES, renderLabReport } from '../../shared/lab-report.js';
+import { parseLabSite, type LabCase } from '../../shared/lab-telemetry.js';
 
 async function loadSiteFolder(folder: string) {
   const responses = await Promise.all(['manifest.json', 'mapa.geojson'].map(file => fetch(`/datasets/${folder}/${file}`)));
@@ -28,7 +29,7 @@ export const LAB_EXAMPLES: LabExample[] = [
 ];
 
 export type Category = 'operational' | 'mechanical' | 'environmental' | 'combined' | 'inconclusive';
-export const categories: Record<Category, string> = { operational: 'Operacional', mechanical: 'Mecânica', environmental: 'Ambiental', combined: 'Combinada', inconclusive: 'Inconclusiva' };
+export const categories: Record<Category, string> = LAB_CONCLUSION_CATEGORIES;
 export interface HypothesisReview { analysisId: string; hypothesisId: string; stance: 'agree' | 'disagree' | 'pending'; note: string }
 export interface ConclusionDraft { observations: string; category: Category; action: string; hypothesisReviews: HypothesisReview[] }
 export interface Conclusion extends ConclusionDraft { id: string; version: number; createdAt: string; [key: string]: unknown }
@@ -55,14 +56,5 @@ export function downloadFile(content: string, filename: string, type: string) {
 }
 
 export function exportLabReport(labCase: LabCase, record: SavedCase | null, author: string) {
-  const esc = (value: unknown) => String(value ?? 'Não informado').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
-  const paragraphs = (value: unknown): string => {
-    if (Array.isArray(value)) return `<ul>${value.map(item => `<li>${paragraphs(item)}</li>`).join('')}</ul>`;
-    if (value && typeof value === 'object') return `<dl>${Object.entries(value).map(([key, item]) => `<dt>${esc(key)}</dt><dd>${paragraphs(item)}</dd>`).join('')}</dl>`;
-    return esc(value);
-  };
-  const events = labCase.events.map(event => `<tr><td>${esc(formatLabTime(event.elapsedMs))}</td><td>${esc(event.title)}</td><td>${esc(event.description)}</td></tr>`).join('');
-  const conclusions = record?.conclusions || [];
-  const html = `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Relatório · ${esc(labCase.title)}</title><style>body{max-width:960px;margin:48px auto;padding:0 24px;color:#20352f;font:15px/1.65 system-ui}h1{font-size:32px}h2{border-top:1px solid #ced8d3;padding-top:24px;margin-top:36px}small{color:#556b62}table{border-collapse:collapse;width:100%}td,th{text-align:left;border-bottom:1px solid #dce4de;padding:10px;vertical-align:top}dt{font-weight:600}dd{margin-left:18px;white-space:pre-wrap}article{padding:16px;border:1px solid #dce4de;margin:12px 0;break-inside:avoid}p{white-space:pre-wrap}@media print{body{margin:0}button{display:none}}</style><button onclick="window.print()">Imprimir / salvar PDF</button><small>LUCA-AI · LABORATÓRIO VIRTUAL · SOMPO</small><h1>${esc(labCase.title)}</h1><p>Caso ${esc(record?.id || labCase.id)}\nResponsável pela exportação: ${esc(author)}\nExportado em: ${esc(new Date().toLocaleString('pt-BR'))}</p><h2>Origem e cobertura</h2><p>Arquivo: ${esc(labCase.fileName)}\nMáquina: ${esc(labCase.machineId)}\nInício: ${esc(labCase.startedAt)} · Duração: ${esc(formatLabTime(labCase.durationMs))}\n${labCase.samples.length} amostras. Dados ${labCase.synthetic ? 'sintéticos' : 'importados'}.</p><p>Fontes: CAN/ECU, GNSS, IMU/INS e sensores externos conforme o dicionário associado. Ausências são preservadas. A reconstrução mantém a última amostra até a seguinte e não estima posição durante lacunas.</p><p>${esc(labCase.manifest?.map_warning || 'Geometrias associadas ao arquivo pelo analista. Sem imagem de satélite fornecida.')}</p>${paragraphs(labCase.warnings)}<h2>Área e imagem aérea</h2>${paragraphs({ area: labCase.manifest?.site || "Não identificada", imagem: labCase.manifest?.satellite || "Não fornecida", relevo: labCase.manifest?.elevation || "Não carregado", camadas: labCase.polygons.map(p => ({ id: p.id, papel: p.role })) })}<h2>Eventos calculados e evidências</h2><table><thead><tr><th>Tempo</th><th>Evento</th><th>Evidência</th></tr></thead><tbody>${events || '<tr><td colspan="3">Nenhum evento pelas regras aplicáveis.</td></tr>'}</tbody></table><h2>Análises e versões</h2>${record?.analyses.length ? record.analyses.map(a => `<article><h3>Análise v${esc(a.version)} · ${esc(a.status)}</h3>${paragraphs(a)}</article>`).join('') : '<p>Nenhuma análise de IA executada.</p>'}<h2>Conclusão humana e versões</h2>${conclusions.length ? conclusions.map(c => `<article><h3>Conclusão v${esc(c.version)} · ${esc(categories[c.category])}</h3><p>${esc(c.observations)}</p><p>Ação registrada: ${esc(c.action)}\nRegistro: ${esc(c.createdAt)}</p>${paragraphs(c.hypothesisReviews)}</article>`).join('') : '<p>Nenhuma conclusão registrada.</p>'}<h2>Limitações</h2><p>Eventos indicam condições observadas, não comprovam causa ou culpa. Limites do pacote sintético são didáticos. Ações registradas não enviam mensagens nem comandos à máquina.</p></html>`;
-  downloadFile(html, `relatorio-${record?.id || labCase.id}.html`, 'text/html;charset=utf-8');
+  downloadFile(renderLabReport(labCase, record, author), `relatorio-${record?.id || labCase.id}.html`, 'text/html;charset=utf-8');
 }

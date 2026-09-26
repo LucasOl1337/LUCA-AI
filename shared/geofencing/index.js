@@ -10,3 +10,4 @@ export * from './agri.js';
 export * from './agri-scenarios.js';
 export * from './episode-dossier.js';
 export * from './manifest.js';
+export * from './simulation-sample.js';

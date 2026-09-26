@@ -4,6 +4,7 @@
 
 | Onde | Quando abrir |
 | --- | --- |
+| `bin/luca.js` e `cli/` | Ao operar ou alterar o CLI para agentes, sua ajuda, transporte, perfis ou catalogo de comandos. |
 | `src/` | SOMENTE ao alterar a interface React ou o cliente HTTP/WebSocket. |
 | `server/` | SOMENTE ao alterar o runtime Express, estado local, agentes ou APIs. |
 | `server/deliberations/` | SOMENTE ao alterar a API de deliberacao para harnesses. |
@@ -22,6 +23,9 @@
 
 | Documento | Quando ler |
 | --- | --- |
+| [`docs/cli.md`](./docs/cli.md) | Ao usar o app pelo terminal: instalacao, autenticacao, receitas, arquivos, jobs, testes e limites. |
+| [`docs/cli-reference.md`](./docs/cli-reference.md) | Ao consultar todos os comandos/argumentos/rotas; gerado de `cli/catalog.js`. |
+| [`docs/cli-plan.md`](./docs/cli-plan.md) | Ao consultar o inventario inicial e as decisoes do CLI. |
 | [`README.md`](./README.md) | SOMENTE ao chegar ao projeto sem contexto. |
 | [`docs/operacao.md`](./docs/operacao.md) | SOMENTE ao instalar, executar, testar, diagnosticar estado local ou preparar release. |
 | [`docs/integracoes.md`](./docs/integracoes.md) | SOMENTE ao mudar roteador LLM, Kamui, personas Yume, anexos ou a publicacao pela VM. |

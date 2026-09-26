@@ -8,6 +8,20 @@ Painel para criar, acompanhar e revisar missoes executadas por agentes de IA. In
 
 Consulte [`INDEX.md`](./INDEX.md) para localizar codigo e documentacao.
 
+## CLI para agentes
+
+Node >=22, sem build ou dependencias extras. Opera todas as APIs do app e os calculos locais de simulacao/replay.
+
+```bash
+node bin/luca.js --help
+node bin/luca.js commands
+node bin/luca.js health
+node bin/luca.js auth login --email agente@example.test --password-stdin
+node bin/luca.js team run --data @rodada.json --wait
+```
+
+`npm link --ignore-scripts` disponibiliza `luca` no terminal. [Guia e receitas](docs/cli.md), [referencia completa](docs/cli-reference.md). JSON em stdout, arquivos/stdin, perfis por ambiente e acompanhamento de jobs. Validacao: `npm run test:cli`.
+
 ## Fluxo padrao de entrega
 
 Toda alteracao solicitada pelo dono e concluida deve seguir o fluxo completo: validar, criar commit atomico, enviar para `origin/main` e fazer deploy na VM de producao. Esta e uma ordem permanente; nao espere uma nova confirmacao a cada entrega. Interrompa uma dessas etapas somente quando o dono pedir explicitamente ou quando houver um bloqueio real de seguranca ou validacao, que deve ser informado com clareza.

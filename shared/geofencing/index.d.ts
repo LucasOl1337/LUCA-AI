@@ -4,3 +4,4 @@ export * from './sites.js';
 export * from './machine-profiles.js';
 export * from './agri.js';
 export * from './agri-scenarios.js';
+export * from './simulation-sample.js';

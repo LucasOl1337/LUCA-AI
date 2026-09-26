@@ -15,6 +15,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE_INCLUDE = [
   'package.json',
   'package-lock.json',
+  'bin',
+  'cli',
   'server',
   'shared',
   'deploy',

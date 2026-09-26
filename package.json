@@ -1,7 +1,7 @@
 {
   "name": "luca-ai-heartbeat",
   "private": true,
-  "version": "0.5.12",
+  "version": "0.6.0",
   "type": "module",
   "scripts": {
     "dev:full": "node server/index.js",
@@ -16,7 +16,10 @@
     "stage:release": "node deploy/stage-release.mjs",
     "deploy:stage": "node deploy/stage-release.mjs",
     "promo": "npm run build && node promo/scripts/capture-product.mjs && remotion render promo/src/index.tsx Promo promo/dist/luca-ai-commercial.mp4 --codec=h264 --crf=16 --overwrite --public-dir=promo/public",
-    "demo:sompo": "node scripts/sompo-demo.mjs"
+    "demo:sompo": "node scripts/sompo-demo.mjs",
+    "cli": "node bin/luca.js",
+    "test:cli": "node --test \"tests/cli*.test.js\"",
+    "cli:docs": "node cli/reference.js"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "0.10.32",
@@ -42,5 +45,11 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.9.3",
     "vite": "^7.1.12"
+  },
+  "bin": {
+    "luca": "bin/luca.js"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

@@ -12,3 +12,11 @@ Este checkout contem o painel React e o runtime Express (local e producao na VM)
 4. Nunca escreva no Yume; leia personas pelo GET do Kamui em `server/kamui-client.js`.
 5. Trate `worker/` e migrations do Durable Object como legado: so altere com ordem do dono; nao confunda com o proxy de borda em `deploy/luca-ai-vm-proxy.js`.
 6. Consulte INDEX.md para onde esta cada coisa e quando ler cada documento.
+
+## CLI para agentes
+
+Use `node bin/luca.js --help` para operar o app sem navegador. `node bin/luca.js commands` descobre offline todos os comandos, argumentos, campos e rotas em JSON. Guia: [docs/cli.md](docs/cli.md); referencia: [docs/cli-reference.md](docs/cli-reference.md).
+
+O CLI usa a mesma API e permissoes do painel. Padrao localhost; configure perfis com `profile set NOME --url URL`. Autenticacao por `auth login --email EMAIL --password-stdin` ou `LUCA_PASSWORD`; nunca copie cookies do navegador. `LUCA_MACHINE_TOKEN` vale so para deliberacoes. JSON em stdout, erros em stderr, `--data @arquivo.json`/stdin e `--output` para arquivos. Jobs aceitam `--wait`; interromper a espera nao cancela o job. Nao reenvie mutacoes cegamente apos timeout.
+
+Ao criar/alterar uma API, atualize `cli/catalog.js`, rode `npm run cli:docs` e `npm run test:cli`. O teste de cobertura falha quando uma rota Express fica sem comando. Os testes CLI usam runtime local isolado; a regra de nao testar mutacoes contra producao continua valendo.

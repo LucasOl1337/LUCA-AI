@@ -12,9 +12,9 @@ Por decisão de 13/09/2026 o geofencing é um **módulo isolado**: tudo dele mor
 
 | Pasta | Conteúdo |
 |---|---|
-| `shared/geofencing/` | `engine.js` (motor: faixas, episódios, grade), `radar.js` (radar por instante e textos), `sites.js` (talhões sintéticos e relevo), `machine-profiles.js` (limite de inclinação por equipamento), `agri-scenarios.js` (os dois cenários do `/sompo`), `agri.js` (posição de cena, episódios da corrida, `withSompoAgriGeofence`), `episode-dossier.js` (texto do resumo e do dossiê), `manifest.js` (validação de `rules.hazards` e `machine.profile`), `index.js` (barrel). Cada `.js` tem seu `.d.ts`. |
+| `shared/geofencing/` | `engine.js` (motor: faixas, episódios, grade), `radar.js` (radar por instante e textos), `sites.js` (talhões sintéticos e relevo), `machine-profiles.js` (limite de inclinação por equipamento), `agri-scenarios.js` (os dois cenários do `/sompo`), `agri.js` (posição de cena, episódios da corrida, `withSompoAgriGeofence`), `episode-dossier.js` (texto do resumo e do dossiê), `manifest.js` (validação de `rules.hazards` e `machine.profile`), `simulation-sample.js` (campos da amostra compartilhados por painel/CLI), `index.js` (barrel). Cada `.js` tem seu `.d.ts`. |
 | `server/geofencing/` | `episode-geofence.js` (recalcula os episódios de faixa sobre a série gravada) e todos os testes do módulo (`engine`, `radar`, `sites`, `operacao-scene`, `piracicaba-dataset`). |
-| `src/geofencing/` | `SompoGeofencePanel.tsx`, `SompoGeofenceMap.tsx`, `SompoGeofenceReadout.tsx` (HUD), `SompoGeofenceFlag.tsx` (card do painel de telemetria), `sompoGeofenceRaw.ts` (campos da amostra), `createSompoGeofenceLayer.ts` (faixas no chão da cena 3D), `geofencing.css`, e `lab/` (`LabMiniMap`, `LabBandLegend`, `LabGeofencePanel`, `labBands`). |
+| `src/geofencing/` | `SompoGeofencePanel.tsx`, `SompoGeofenceMap.tsx`, `SompoGeofenceReadout.tsx` (HUD), `SompoGeofenceFlag.tsx` (card do painel de telemetria), `createSompoGeofenceLayer.ts` (faixas no chão da cena 3D), `geofencing.css`, e `lab/` (`LabMiniMap`, `LabBandLegend`, `LabGeofencePanel`, `labBands`). |
 | `scripts/geofencing/` | `demo-operacao.cjs` (validação visual, Windows/Edge) e `generate-piracicaba-dataset.mjs`. |
 
 Pontos de contato fora do módulo, todos marcados com o comentário `geofencing (módulo ...)` no código:
@@ -25,7 +25,7 @@ Pontos de contato fora do módulo, todos marcados com o comentário `geofencing 
 - `shared/sompo-lab-export.js`: GNSS sintético a partir de `posX`/`posZ` quando a amostra tem posição.
 - `server/sompo-telemetry-history.js`: cinco colunas (`pos_x`, `pos_z`, `heading_deg`, `geofence_hazard`, `geofence_band`), `scenario_id`/`outcome_id` no episódio, validação da amostra crua e a chamada a `summarizeEpisodeGeofence`.
 - `server/lab-cases.js`: episódios de faixa no contexto dos agentes quando o caso tem `geofence`.
-- `src/components/SompoTruckSimulator.tsx`: `agriSnapshot = withSompoAgriGeofence(createSompoAgriSimulationSnapshot(...))`, painel, mapa, HUD e `sompoGeofenceRawFields`, todos condicionados a `preview.geofence`.
+- `src/components/SompoTruckSimulator.tsx`: `agriSnapshot = withSompoAgriGeofence(createSompoAgriSimulationSnapshot(...))`, painel, mapa e HUD; a serialização chama `shared/sompo-simulation-sample.js`, que usa `sompoGeofenceRawFields` pelo barrel. Campos de geofencing são condicionados a `preview.geofence`.
 - `src/components/SompoTelemetryPanel.tsx`: `<SompoGeofenceFlag>` (null sem `risks.proximity`).
 - `src/components/sompo/createSompoAgriStage.ts` e `createSompoAgriScene.ts`: `createSompoGeofenceLayer` (grupo vazio sem talhão), relevo dos ambientes `geofence-*`, câmera e plantio do talhão 2 atrás da flag `operation`.
 - `src/components/lab/LabScene.tsx`, `src/pages/LaboratorioPage.tsx`, `src/lib/lab-client.ts`: faixas na cena, legenda, minimapa, painel e os dois exemplos Piracicaba.

@@ -1,3 +1,4 @@
+import { snapshotToSimulationRaw } from '../../shared/sompo-simulation-sample.js';
 import {
   useEffect,
   useMemo,
@@ -25,7 +26,6 @@ import SompoStudio, { type SompoStudioAsset } from './sompo/SompoStudio';
 import SompoGeofenceMap from '../geofencing/SompoGeofenceMap';
 import SompoGeofencePanel from '../geofencing/SompoGeofencePanel';
 import SompoGeofenceReadout from '../geofencing/SompoGeofenceReadout';
-import { sompoGeofenceRawFields } from '../geofencing/sompoGeofenceRaw';
 import { withSompoAgriGeofence, type SompoAgriMaybeGeofenceSnapshot } from '../../shared/geofencing/index.js';
 import { createSompoPlayback } from './sompo/sompoPlayback';
 import { downloadSompoFile, loadSompoStudioConfig, type SompoStudioConfig, type SompoRenderStats } from './sompo/sompoStudioConfig';
@@ -191,31 +191,6 @@ function captureEpisodeFrameDataUrl(source: HTMLCanvasElement): string | null {
 const agriSnapshot: typeof createSompoAgriSimulationSnapshot = (scenarioId, outcomeId, options) =>
   withSompoAgriGeofence(createSompoAgriSimulationSnapshot(scenarioId, outcomeId, options), scenarioId, outcomeId, options?.elapsedMs ?? 0);
 
-function snapshotToSimulationRaw(snapshot: SompoTelemetrySnapshot): Record<string, unknown> {
-  const readings = snapshot.readings;
-  return {
-    ...sompoGeofenceRawFields(snapshot), // geofencing: vazio fora dos cenários com talhão
-    trator: snapshot.tractorId,
-    timestamp: snapshot.deviceTimestamp,
-    distancia: readings.distance,
-    temperatura: readings.temperature,
-    umidade: readings.humidity,
-    pitch: readings.pitch,
-    roll: readings.roll,
-    aceleracaoX: readings.acceleration?.x,
-    aceleracaoY: readings.acceleration?.y,
-    aceleracaoZ: readings.acceleration?.z,
-    rotacaoX: readings.rotation?.x,
-    rotacaoY: readings.rotation?.y,
-    rotacaoZ: readings.rotation?.z,
-    velocidade: readings.speedKph,
-    velocidadeRoda: readings.wheelSpeedKph,
-    riscoColisao: snapshot.risks.collision,
-    riscoInclinacao: snapshot.risks.inclination,
-    scenarioLabel: snapshot.source.scenarioLabel,
-    observedAt: snapshot.observedAt,
-  };
-}
 
 function formatReading(value: number | null | undefined, suffix: string) {
   if (!Number.isFinite(value)) return '-';
