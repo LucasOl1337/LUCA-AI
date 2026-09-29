@@ -1,14 +1,12 @@
 # LUCA-AI
 
-Painel pra criar, acompanhar e revisar missões executadas por agentes de IA. Você define a missão, os agentes trabalham e cada rodada fica registrada pra revisão. Em produção em [luca-ai.com.br](https://luca-ai.com.br).
+Painel para criar, acompanhar e revisar missoes executadas por agentes de IA. Inclui o modulo SOMPO (`/sompo`, telemetria e gêmeo digital do ESP32), o laboratorio do sensor (`/sensor`, o IMU do ESP32 por dentro em 3D; ver [`docs/sensor-lab.md`](docs/sensor-lab.md)) e o Laboratorio Virtual (`/laboratorio`, replay e investigacao de incidentes a partir de arquivos CSV/JSON de telemetria, com cena 3D e relatorio). Veja [`docs/laboratorio-fazendas.md`](docs/laboratorio-fazendas.md) para os limites da reconstrucao geografica.
 
-Módulos: SOMPO (`/sompo`, telemetria e gêmeo digital do ESP32), laboratório do sensor (`/sensor`, o IMU do ESP32 por dentro em 3D; ver [`docs/sensor-lab.md`](docs/sensor-lab.md)) e Laboratório Virtual (`/laboratorio`, replay e investigação de incidentes a partir de telemetria CSV/JSON, com cena 3D e relatório). Os limites da reconstrução geográfica estão em [`docs/laboratorio-fazendas.md`](docs/laboratorio-fazendas.md).
-
-**EN:** A dashboard to create, follow and review missions run by AI agents, live at [luca-ai.com.br](https://luca-ai.com.br). It includes ESP32 telemetry with a digital twin, a 3D sensor lab and a virtual lab for replaying incidents from telemetry files.
+**Status:** producao real na VM `sennin-kvm` (Hostinger); `sennin-azure` e shadow e nao aparece na borda. Interface React + runtime Express. Dominio publico `https://luca-ai.com.br` via proxy de borda (`deploy/luca-ai-vm-proxy.js`) e Cloudflare Tunnel. `worker/` e legado e nao faz parte da producao.
 
 **Stack:** React, TypeScript, Vite, Tailwind CSS, Express, WebSocket, Node Test Runner.
 
-Consulte [`INDEX.md`](./INDEX.md) pra localizar código e documentação. Regras de operação pra agentes ficam em [`AGENTS.md`](./AGENTS.md).
+Consulte [`INDEX.md`](./INDEX.md) para localizar codigo e documentacao.
 
 ## CLI para agentes
 
@@ -23,3 +21,7 @@ node bin/luca.js team run --data @rodada.json --wait
 ```
 
 `npm link --ignore-scripts` disponibiliza `luca` no terminal. [Guia e receitas](docs/cli.md), [referencia completa](docs/cli-reference.md). JSON em stdout, arquivos/stdin, perfis por ambiente e acompanhamento de jobs. Validacao: `npm run test:cli`.
+
+## Fluxo padrao de entrega
+
+Toda alteracao solicitada pelo dono e concluida deve seguir o fluxo completo: validar, criar commit atomico, enviar para `origin/main` e fazer deploy na VM de producao. Esta e uma ordem permanente; nao espere uma nova confirmacao a cada entrega. Interrompa uma dessas etapas somente quando o dono pedir explicitamente ou quando houver um bloqueio real de seguranca ou validacao, que deve ser informado com clareza.
