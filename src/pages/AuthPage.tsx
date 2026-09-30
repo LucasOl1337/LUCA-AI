@@ -52,7 +52,7 @@ export default function AuthPage() {
         </div>
         <div className="auth-copy">
           <span className="auth-kicker">PERSONA WORKBENCH</span>
-          <h1>Uma missão.<br />Uma equipe inteira<br />pensando com você.</h1>
+          <h1>Uma equipe inteira.<br />Um novo ponto de vista.</h1>
           <p>Coordene personas especializadas, acompanhe cada decisão e transforme contexto em execução.</p>
         </div>
         <SentinelOwl />

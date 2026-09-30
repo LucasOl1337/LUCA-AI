@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-export interface SentinelScene { turn: (angle: number) => void; reset: () => void; dispose: () => void }
+export interface SentinelScene { turn: (angle: number) => void; reset: () => void; zoom: (factor: number) => void; dispose: () => void }
 const MODEL = '/models/luca/sentinel-63714d75.glb';
 
 function disposeObject(root: THREE.Object3D) {
@@ -26,13 +27,13 @@ function disposeObject(root: THREE.Object3D) {
 
 /** No animation loop: GPU work happens only on load, resize or an explicit turn. */
 export function createSentinelScene(canvas: HTMLCanvasElement, onReady: () => void, onError: () => void): SentinelScene {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'low-power' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.85;
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#050d18');
+  renderer.setClearColor(0x000000, 0);
   const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 50);
   const pivot = new THREE.Group();
   scene.add(pivot);
@@ -60,6 +61,16 @@ export function createSentinelScene(canvas: HTMLCanvasElement, onReady: () => vo
   let disposed = false;
   let loaded = false;
   let radius = 1;
+  let dimensions = new THREE.Vector3(1, 1, 1);
+  let fittedDistance = 5;
+  const orbit = new OrbitControls(camera, canvas);
+  orbit.enablePan = false;
+  orbit.enableDamping = false;
+  orbit.rotateSpeed = 0.7;
+  orbit.zoomSpeed = 0.8;
+  orbit.minPolarAngle = Math.PI * 0.18;
+  orbit.maxPolarAngle = Math.PI * 0.82;
+  orbit.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
   let visible = true;
 
   function render() {
@@ -74,12 +85,18 @@ export function createSentinelScene(canvas: HTMLCanvasElement, onReady: () => vo
     renderer.setSize(Math.round(width), Math.round(height), false);
     composer.setSize(Math.round(width), Math.round(height));
     camera.aspect = width / height;
-    const limitingFov = Math.min(THREE.MathUtils.degToRad(camera.fov), 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect));
-    camera.position.set(0, 0.05, radius / Math.sin(limitingFov / 2) * 1.07);
-    camera.lookAt(0, 0, 0);
+    const halfFov = THREE.MathUtils.degToRad(camera.fov / 2);
+    fittedDistance = Math.max(dimensions.y / (2 * Math.tan(halfFov)), dimensions.x / (2 * Math.tan(halfFov) * camera.aspect)) * 1.12 + dimensions.z / 2;
+    camera.position.set(0, 0, fittedDistance);
+    orbit.target.set(0, 0, 0);
+    orbit.minDistance = fittedDistance * 0.4;
+    orbit.maxDistance = fittedDistance * 1.8;
+    orbit.update();
+    orbit.saveState();
     camera.updateProjectionMatrix();
     render();
   }
+  orbit.addEventListener('change', render);
   const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(canvas);
   const intersectionObserver = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; render(); });
@@ -91,11 +108,20 @@ export function createSentinelScene(canvas: HTMLCanvasElement, onReady: () => vo
 
   const controls: SentinelScene = {
     turn(angle) { pivot.rotation.y += angle; render(); },
-    reset() { pivot.rotation.y = 0; render(); },
+    reset() { pivot.rotation.y = 0; orbit.reset(); render(); },
+    zoom(factor) {
+      const offset = camera.position.clone().sub(orbit.target);
+      offset.setLength(THREE.MathUtils.clamp(offset.length() * factor, orbit.minDistance, orbit.maxDistance));
+      camera.position.copy(orbit.target).add(offset);
+      orbit.update();
+      render();
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
       abort.abort();
+      orbit.removeEventListener('change', render);
+      orbit.dispose();
       resizeObserver.disconnect();
       intersectionObserver.disconnect();
       document.removeEventListener('visibilitychange', visibilityChanged);
@@ -122,6 +148,7 @@ export function createSentinelScene(canvas: HTMLCanvasElement, onReady: () => vo
       gltf.scene.position.sub(sphere.center);
       pivot.add(gltf.scene);
       radius = sphere.radius;
+      dimensions = box.getSize(new THREE.Vector3());
       camera.near = Math.max(radius / 100, 0.001);
       camera.far = radius * 30;
       loaded = true;
