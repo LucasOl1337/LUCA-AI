@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import SentinelOwl from '@/components/SentinelOwl';
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, UserRound } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppLocation } from '@/hooks/useAppLocation';
@@ -44,7 +45,7 @@ export default function AuthPage() {
 
   return (
     <main className="auth-shell">
-      <section className="auth-story" aria-label="Apresentação do LUCA">
+      <section className="auth-story auth-story-sentinel" aria-label="Apresentação do LUCA">
         <div className="auth-brand">
           <img src="/icon-192.png" alt="" />
           <div><strong>LUCA</strong><span>centro operacional</span></div>
@@ -54,6 +55,7 @@ export default function AuthPage() {
           <h1>Uma missão.<br />Uma equipe inteira<br />pensando com você.</h1>
           <p>Coordene personas especializadas, acompanhe cada decisão e transforme contexto em execução.</p>
         </div>
+        <SentinelOwl />
         <div className="auth-route-line" aria-hidden="true"><i /><i /><i /><i /><i /></div>
       </section>
 
