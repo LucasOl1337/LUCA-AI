@@ -7,6 +7,8 @@ export interface SompoVehicle {
   placa: string;
   modelo: string;
   modelo3d: SompoVehicleModel3dId;
+  /** ID do ESP32 no feed físico (ex. 001); vazio ou ausente = sem dispositivo. */
+  dispositivo?: string;
   exemplo?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -23,6 +25,7 @@ export const SOMPO_VEHICLE_MODELS_3D: Readonly<Record<SompoVehicleModel3dId, Som
 export const SOMPO_VEHICLE_ID_PATTERN: RegExp;
 export const SOMPO_VEHICLE_PLATE_MAX: number;
 export const SOMPO_VEHICLE_MODEL_MAX: number;
+export const SOMPO_VEHICLE_DEVICE_PATTERN: RegExp;
 export const SOMPO_VEHICLE_SEED: readonly Readonly<SompoVehicle>[];
 export function defaultModel3dFor(veiculo: string): SompoVehicleModel3dId;
 export function validateSompoVehicle(input: unknown, options?: { partial?: boolean }):
@@ -35,3 +38,4 @@ export function pickActiveSompoVehicle<T extends Pick<SompoVehicle, 'id' | 'mode
   vehicles: readonly T[],
   options?: { requestedId?: string; preferModel3d?: SompoVehicleModel3dId },
 ): { vehicle: T | null; missingId: string };
+export function findSompoVehicleByDevice<T extends Pick<SompoVehicle, 'dispositivo'>>(vehicles: readonly T[], deviceId: string | null | undefined): T | null;

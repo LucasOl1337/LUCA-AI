@@ -6,7 +6,7 @@ import test from 'node:test';
 import express from 'express';
 import { createAuthService } from './auth.js';
 import { registerSompoVehicleRoutes } from './sompo-vehicles.js';
-import { SOMPO_VEHICLE_SEED, pickActiveSompoVehicle, validateSompoVehicle } from '../shared/sompo-vehicles.js';
+import { SOMPO_VEHICLE_SEED, findSompoVehicleByDevice, pickActiveSompoVehicle, validateSompoVehicle } from '../shared/sompo-vehicles.js';
 
 async function fixture(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-vehicles-test-'));
@@ -144,4 +144,47 @@ test('active vehicle: ?veiculo= wins, otherwise the preferred 3D model, unknown 
   assert.equal(missing.vehicle.id, 'caminhao-scania0001');
   assert.equal(missing.missingId, 'trator-9999');
   assert.deepEqual(pickActiveSompoVehicle([], { requestedId: 'x' }), { vehicle: null, missingId: 'x' });
+});
+
+test('dispositivo: seed sem associação, um feed por veículo, cadastro antigo lê como vazio', async (t) => {
+  const { request, register, directory } = await fixture(t);
+  const cookie = await register('feed');
+  const seeded = await request('/api/sompo/vehicles', { cookie });
+  assert.deepEqual(seeded.body.vehicles.map((item) => item.dispositivo), ['', ''], 'trator-0001 não vira o feed 001 por nome');
+
+  const bad = await request('/api/sompo/vehicles/trator-0001', { cookie, method: 'PUT', body: { dispositivo: '00 1' } });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.body.field, 'dispositivo');
+  const linked = await request('/api/sompo/vehicles/trator-0001', { cookie, method: 'PUT', body: { dispositivo: ' 001 ' } });
+  assert.equal(linked.status, 200);
+  assert.equal(linked.body.vehicle.dispositivo, '001');
+  const again = await request('/api/sompo/vehicles/trator-0001', { cookie, method: 'PUT', body: { dispositivo: '001', modelo: 'MAX' } });
+  assert.equal(again.status, 200, 'o próprio veículo pode regravar o mesmo dispositivo');
+
+  const taken = await request('/api/sompo/vehicles', { cookie, body: { id: 'trator-0002', veiculo: 'Trator', placa: 'TRT0002', modelo: 'Valtra', dispositivo: '001' } });
+  assert.equal(taken.status, 409);
+  assert.equal(taken.body.error, 'sompo_vehicle_duplicate_device');
+  assert.equal(taken.body.field, 'dispositivo');
+  assert.match(taken.body.message, /trator-0001/);
+  const stolen = await request('/api/sompo/vehicles/caminhao-scania0001', { cookie, method: 'PUT', body: { dispositivo: '001' } });
+  assert.equal(stolen.status, 409);
+
+  const unlinked = await request('/api/sompo/vehicles/trator-0001', { cookie, method: 'PUT', body: { dispositivo: '' } });
+  assert.equal(unlinked.body.vehicle.dispositivo, '');
+  assert.equal((await request('/api/sompo/vehicles/caminhao-scania0001', { cookie, method: 'PUT', body: { dispositivo: '001' } })).status, 200);
+
+  // Arquivo gravado pelo corte 1, sem o campo.
+  const [workspace] = fs.readdirSync(path.join(directory, 'workspaces'));
+  const file = path.join(directory, 'workspaces', workspace, 'sompo-vehicles.json');
+  fs.writeFileSync(file, JSON.stringify({ version: 1, vehicles: [{ id: 'trator-0001', veiculo: 'Trator', placa: 'TRT0001', modelo: 'X', modelo3d: 'trator-max', exemplo: false }] }));
+  const legacy = await request('/api/sompo/vehicles', { cookie });
+  assert.equal(legacy.body.vehicles[0].dispositivo, '');
+});
+
+test('findSompoVehicleByDevice só casa associação explícita', () => {
+  const list = [{ id: 'trator-0001', dispositivo: '' }, { id: 'trator-0002', dispositivo: '001' }];
+  assert.equal(findSompoVehicleByDevice(list, '001')?.id, 'trator-0002');
+  assert.equal(findSompoVehicleByDevice(SOMPO_VEHICLE_SEED, '001'), null);
+  assert.equal(findSompoVehicleByDevice(list, ''), null);
+  assert.equal(findSompoVehicleByDevice(list, null), null);
 });

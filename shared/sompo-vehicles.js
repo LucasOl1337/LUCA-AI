@@ -11,10 +11,12 @@ export const SOMPO_VEHICLE_MODELS_3D = Object.freeze({
 export const SOMPO_VEHICLE_ID_PATTERN = /^[a-z0-9-]{3,60}$/;
 export const SOMPO_VEHICLE_PLATE_MAX = 16;
 export const SOMPO_VEHICLE_MODEL_MAX = 80;
+// Dispositivo = o `trator` que o ESP32 publica no feed (hoje `001`). Vazio é "sem dispositivo".
+export const SOMPO_VEHICLE_DEVICE_PATTERN = /^[A-Za-z0-9_-]{1,32}$/;
 
 export const SOMPO_VEHICLE_SEED = Object.freeze([
-  Object.freeze({ id: 'caminhao-scania0001', veiculo: 'Caminhão', placa: 'ABC1D23', modelo: 'Scania R450', modelo3d: 'caminhao-sompo', exemplo: true }),
-  Object.freeze({ id: 'trator-0001', veiculo: 'Trator', placa: 'TRT0001', modelo: 'John Deere 6110J', modelo3d: 'trator-max', exemplo: true }),
+  Object.freeze({ id: 'caminhao-scania0001', veiculo: 'Caminhão', placa: 'ABC1D23', modelo: 'Scania R450', modelo3d: 'caminhao-sompo', dispositivo: '', exemplo: true }),
+  Object.freeze({ id: 'trator-0001', veiculo: 'Trator', placa: 'TRT0001', modelo: 'John Deere 6110J', modelo3d: 'trator-max', dispositivo: '', exemplo: true }),
 ]);
 
 export const defaultModel3dFor = (veiculo) => (veiculo === 'Trator' ? 'trator-max' : 'caminhao-sompo');
@@ -60,6 +62,13 @@ export function validateSompoVehicle(input, { partial = false } = {}) {
     if (!Object.hasOwn(SOMPO_VEHICLE_MODELS_3D, modelo3d)) return fail('modelo3d', 'Modelo 3D: escolha caminhao-sompo ou trator-max.');
     vehicle.modelo3d = modelo3d;
   }
+  if (!partial || 'dispositivo' in source) {
+    const dispositivo = textOf(source.dispositivo);
+    if (dispositivo && !SOMPO_VEHICLE_DEVICE_PATTERN.test(dispositivo)) {
+      return fail('dispositivo', 'Dispositivo: use o ID que o ESP32 publica no feed (ex. 001), com até 32 letras, números, hífen ou sublinhado. Deixe vazio se o veículo não tem dispositivo.');
+    }
+    vehicle.dispositivo = dispositivo;
+  }
   return { ok: true, vehicle };
 }
 
@@ -83,4 +92,14 @@ export function pickActiveSompoVehicle(vehicles, { requestedId = '', preferModel
   if (requested) return { vehicle: requested, missingId: '' };
   const fallback = list.find((vehicle) => vehicle.modelo3d === preferModel3d) || list[0] || null;
   return { vehicle: fallback, missingId: requestedId && !requested ? requestedId : '' };
+}
+
+/**
+ * Veículo associado a um dispositivo do feed físico. Só por associação explícita
+ * no campo `dispositivo`: `trator-0001` não vira o feed `001` por semelhança de nome.
+ */
+export function findSompoVehicleByDevice(vehicles, deviceId) {
+  const id = typeof deviceId === 'string' ? deviceId.trim() : '';
+  if (!id || !Array.isArray(vehicles)) return null;
+  return vehicles.find((vehicle) => (vehicle.dispositivo || '') === id) || null;
 }

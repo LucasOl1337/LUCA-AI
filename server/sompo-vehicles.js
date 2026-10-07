@@ -26,7 +26,8 @@ export function registerSompoVehicleRoutes(app, { dataDir = process.env.LUCA_DAT
   const read = () => {
     try {
       const stored = JSON.parse(fs.readFileSync(file(), 'utf8'));
-      return Array.isArray(stored?.vehicles) ? stored.vehicles : seedRecords();
+      // Cadastro gravado antes do campo dispositivo: ausente vale "sem dispositivo".
+      return Array.isArray(stored?.vehicles) ? stored.vehicles.map((item) => ({ ...item, dispositivo: item.dispositivo || '' })) : seedRecords();
     } catch (error) {
       if (error.code === 'ENOENT') return seedRecords();
       throw error;
@@ -47,6 +48,14 @@ export function registerSompoVehicleRoutes(app, { dataDir = process.env.LUCA_DAT
   const checkModel = (vehicle) => {
     const result = checkSompoVehicleModel(vehicle);
     if (!result.ok) throw new VehicleError(result.message, 400, 'sompo_vehicle_invalid', result.field);
+  };
+  // Um dispositivo alimenta um veículo só; dois veículos no mesmo feed misturariam identidades.
+  const checkDevice = (vehicles, vehicle) => {
+    if (!vehicle.dispositivo) return;
+    const owner = vehicles.find((item) => item.id !== vehicle.id && (item.dispositivo || '') === vehicle.dispositivo);
+    if (owner) {
+      throw new VehicleError(`Dispositivo: o ${vehicle.dispositivo} já está associado a ${owner.id}. Desassocie lá antes.`, 409, 'sompo_vehicle_duplicate_device', 'dispositivo');
+    }
   };
   const route = (handler) => async (req, res) => {
     if (!req.auth?.user?.id || req.auth.user.id === 'system') {
@@ -79,6 +88,7 @@ export function registerSompoVehicleRoutes(app, { dataDir = process.env.LUCA_DAT
     if (vehicles.some((item) => item.id.toLowerCase() === vehicle.id)) {
       throw new VehicleError(`ID: já existe um veículo com o ID ${vehicle.id}. Escolha outro.`, 409, 'sompo_vehicle_duplicate_id', 'id');
     }
+    checkDevice(vehicles, vehicle);
     if (vehicles.length >= MAX_VEHICLES) throw new VehicleError(`Limite de ${MAX_VEHICLES} veículos por conta.`, 400, 'sompo_vehicle_limit');
     const now = new Date().toISOString();
     const record = { ...vehicle, exemplo: false, createdAt: now, updatedAt: now };
@@ -100,6 +110,7 @@ export function registerSompoVehicleRoutes(app, { dataDir = process.env.LUCA_DAT
     if (patch.veiculo && !('modelo3d' in changes) && patch.veiculo !== vehicles[index].veiculo) patch.modelo3d = defaultModel3dFor(patch.veiculo);
     const record = { ...vehicles[index], ...patch, exemplo: false, updatedAt: new Date().toISOString() };
     checkModel(record);
+    checkDevice(vehicles, record);
     const next = vehicles.slice();
     next[index] = record;
     save(next);

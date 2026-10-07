@@ -700,7 +700,7 @@ Cadastrar veículo.
 
 `POST /api/sompo/vehicles`; autenticação: **session**.
 
-`--id` (string, obrigatório): Minúsculas, números e hífen<br>`--veiculo` (string, obrigatório): Caminhão ou Trator<br>`--placa` (string, obrigatório): Placa ou identificação interna (ex. TRT0001)<br>`--modelo` (string, obrigatório): Modelo (cadastro)<br>`--modelo3d` (string): caminhao-sompo ou trator-max
+`--id` (string, obrigatório): Minúsculas, números e hífen<br>`--veiculo` (string, obrigatório): Caminhão ou Trator<br>`--placa` (string, obrigatório): Placa ou identificação interna (ex. TRT0001)<br>`--modelo` (string, obrigatório): Modelo (cadastro)<br>`--modelo3d` (string): caminhao-sompo ou trator-max<br>`--dispositivo` (string): ID do ESP32 no feed (ex. 001); vazio = sem dispositivo
 
 ### `sompo vehicles update <id>`
 
@@ -708,7 +708,7 @@ Editar veículo; o ID não muda.
 
 `PUT /api/sompo/vehicles/:id`; autenticação: **session**.
 
-`--veiculo` (string)<br>`--placa` (string)<br>`--modelo` (string)<br>`--modelo3d` (string)
+`--veiculo` (string)<br>`--placa` (string)<br>`--modelo` (string)<br>`--modelo3d` (string)<br>`--dispositivo` (string): ID do ESP32 no feed; vazio desassocia
 
 ### `sompo risk list`
 
