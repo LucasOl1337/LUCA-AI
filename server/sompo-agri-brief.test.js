@@ -13,6 +13,7 @@ import {
   getSompoAgriTravelMeters,
   isSompoAgriScenarioId,
 } from '../shared/sompo-agri-brief.js';
+import { createSompoSimulationSnapshot } from '../shared/sompo-telemetry-simulator.js';
 
 const observedAt = '2026-09-11T15:00:00.000Z';
 
@@ -67,6 +68,10 @@ test('snapshot agrícola: proveniência correta, roll amplo e gravidade rotacion
   assert.equal(clean.source.outcomeId, 'clean-pass');
   assert.equal(clean.source.kind, 'simulation');
   assert.equal(clean.source.distanceSensorPosition, 'front');
+  assert.equal(clean.source.path, 'simulation://sompo/colheitadeira/SIM-001/esp32');
+  assert.equal(rolled.source.path, 'simulation://sompo/trator/SIM-001/esp32');
+  assert.equal(createSompoAgriSimulationSnapshot('max-field-operation', undefined, options).source.path, 'simulation://sompo/trator-max/SIM-001/esp32');
+  assert.equal(createSompoSimulationSnapshot({}, options).source.path, 'simulation://sompo/caminhao/SIM-001/esp32', 'caminhão segue igual');
   const frame = getSompoAgriFrame('agri-harvest-dust', 5_000, 'clean-pass');
   assert.equal(clean.risks.collision, frame.collisionRisk);
   assert.ok(Math.abs(clean.readings.pitch - frame.pitch) <= frame.roughness * 0.28 + 0.01);

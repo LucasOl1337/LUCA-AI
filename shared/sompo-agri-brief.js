@@ -88,6 +88,9 @@ export function getSompoAgriTravelMeters(scenarioId, elapsedMs = 0, outcomeId) {
  * scriptFrame (faixas amplas de roll, gravidade rotacionada, taxas do roteiro)
  * e a proveniência aponta o cenário/desfecho agrícolas reais.
  */
+// Segmento da origem por máquina: o snapshot agrícola não sai mais como caminhão.
+const AGRI_SOURCE_SEGMENT = Object.freeze({ 'max-tractor': 'trator-max', tractor: 'trator', harvester: 'colheitadeira' });
+
 export function createSompoAgriSimulationSnapshot(scenarioId, outcomeId, {
   observedAt = new Date().toISOString(),
   elapsedMs = 0,
@@ -104,6 +107,7 @@ export function createSompoAgriSimulationSnapshot(scenarioId, outcomeId, {
     connectedAt,
     scriptFrame,
     sourceOverride: {
+      path: `simulation://sompo/${AGRI_SOURCE_SEGMENT[frame.equipmentId] ?? 'trator'}/SIM-001/esp32`,
       scenarioId: frame.scenarioId,
       scenarioLabel: frame.outcomeId === getSompoAgriScenario(scenarioId).defaultOutcomeId
         ? frame.scenarioLabel
