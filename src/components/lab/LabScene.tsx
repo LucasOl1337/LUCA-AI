@@ -79,6 +79,15 @@ function disposeScene(scene: THREE.Scene) {
   geometries.forEach((geometry) => geometry.dispose());
 }
 
+// Nome da máquina no aviso de palco local: o mesmo critério que escolhe o modelo 3D.
+function labStageMachineLabel(labCase: LabCase | null | undefined) {
+  const machine = labCase?.manifest?.machine;
+  if (machine?.model === 'Caminhão SOMPO') return 'Caminhão';
+  if (machine?.model3d_id === 'trator-max') return 'Trator MAX';
+  if (/colheitadeira|harvester/i.test(String(machine?.model ?? ''))) return 'Colheitadeira';
+  return 'Trator';
+}
+
 export default function LabScene({ labCase, site, elapsedMs, cameraMode, selectedEventId, onSelectEvent, showDetails = false, onTerrain }: LabSceneProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const elapsedRef = useRef(elapsedMs);
@@ -689,7 +698,7 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
         )}
         {labCase && !frame?.recordingGap && !frame?.position && labVehiclePose(frame).visible && (
           <div className="lab-scene-status" role="status" data-lab-scene-status>
-            <strong>Caminhão no palco local</strong>
+            <strong>{labStageMachineLabel(labCase)} no palco local</strong>
             <span>Sem GPS neste episódio: o modelo 3D usa a IMU registrada. Não há trajetória geográfica.</span>
           </div>
         )}
