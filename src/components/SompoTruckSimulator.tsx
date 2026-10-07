@@ -841,6 +841,9 @@ export default function SompoTruckSimulator({
       setStudioConfig(current => ({ ...current, equipment: current.truck }));
       setControls(next);
     }
+    // O efeito de troca de veículo roda no mesmo commit do deep-link: sem isto ele
+    // lê a seleção do render anterior e devolve a cena ao case padrão.
+    currentSelectionRef.current = { scenarioId, outcomeId: resolvedOutcome };
     onScenarioSelectRef.current?.(scenarioId, resolvedOutcome);
   }
   const selectScenarioRef = useRef(selectScenario);
