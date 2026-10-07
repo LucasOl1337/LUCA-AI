@@ -21,9 +21,9 @@ interface SompoVehiclesPanelProps {
   onUse: (vehicle: SompoVehicle) => void;
 }
 
-type Draft = Pick<SompoVehicle, 'id' | 'veiculo' | 'placa' | 'modelo' | 'modelo3d'>;
+type Draft = Pick<SompoVehicle, 'id' | 'veiculo' | 'placa' | 'modelo' | 'modelo3d'> & { dispositivo: string };
 
-const EMPTY_DRAFT: Draft = { id: '', veiculo: 'Trator', placa: '', modelo: '', modelo3d: 'trator-max' };
+const EMPTY_DRAFT: Draft = { id: '', veiculo: 'Trator', placa: '', modelo: '', modelo3d: 'trator-max', dispositivo: '' };
 const MODEL_OPTIONS = Object.values(SOMPO_VEHICLE_MODELS_3D);
 
 export function SompoVehicleIcon({ veiculo }: { veiculo: SompoVehicleType }) {
@@ -41,7 +41,7 @@ export default function SompoVehiclesPanel({ vehicles, loading, error, activeId,
     setEditing({
       mode,
       draft: vehicle
-        ? { id: vehicle.id, veiculo: vehicle.veiculo, placa: vehicle.placa, modelo: vehicle.modelo, modelo3d: vehicle.modelo3d }
+        ? { id: vehicle.id, veiculo: vehicle.veiculo, placa: vehicle.placa, modelo: vehicle.modelo, modelo3d: vehicle.modelo3d, dispositivo: vehicle.dispositivo ?? '' }
         : { ...EMPTY_DRAFT },
     });
   }
@@ -109,6 +109,7 @@ export default function SompoVehiclesPanel({ vehicles, loading, error, activeId,
                 <div><dt>Veículo</dt><dd>{vehicle.veiculo}</dd></div>
                 <div><dt>Placa</dt><dd>{vehicle.placa}</dd></div>
                 <div><dt>Modelo 3D</dt><dd>{SOMPO_VEHICLE_MODELS_3D[vehicle.modelo3d]?.label ?? vehicle.modelo3d}</dd></div>
+                <div><dt>Dispositivo</dt><dd data-empty={!vehicle.dispositivo || undefined}>{vehicle.dispositivo ? `ESP32 ${vehicle.dispositivo}` : 'sem dispositivo'}</dd></div>
               </dl>
               <div className="sompo-vehicles-actions">
                 <button type="button" onClick={() => onUse(vehicle)}><Play aria-hidden="true" /> Usar no simulador</button>
@@ -172,6 +173,15 @@ export default function SompoVehiclesPanel({ vehicles, loading, error, activeId,
                 <option key={item.id} value={item.id}>{item.label}</option>
               ))}
             </select>
+          </label>
+          <label>
+            <span>Dispositivo (ESP32)</span>
+            <input
+              name="dispositivo" value={draft.dispositivo} aria-invalid={invalid('dispositivo')} autoComplete="off"
+              placeholder="ex. 001" aria-describedby="sompo-vehicle-device-hint"
+              onChange={(event) => patch({ dispositivo: event.target.value })}
+            />
+            <small id="sompo-vehicle-device-hint">O ID que o ESP32 publica no feed. Com ele, o modo físico mostra este veículo. Vazio = sem dispositivo.</small>
           </label>
           {fieldError && <p className="sompo-vehicles-error" role="alert">{fieldError.message}</p>}
           <div className="sompo-vehicles-actions">

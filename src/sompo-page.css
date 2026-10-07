@@ -399,6 +399,11 @@
   overflow-wrap: anywhere;
 }
 
+.sompo-vehicles-list dd[data-empty] {
+  color: rgba(210, 230, 215, 0.5);
+  font-style: italic;
+}
+
 .sompo-vehicles-actions {
   display: flex;
   flex-wrap: wrap;

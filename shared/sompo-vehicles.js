@@ -5,7 +5,7 @@ export const SOMPO_VEHICLE_TYPES = Object.freeze(['Caminhão', 'Trator']);
 
 export const SOMPO_VEHICLE_MODELS_3D = Object.freeze({
   'caminhao-sompo': Object.freeze({ id: 'caminhao-sompo', label: 'Caminhão SOMPO (atual)', vehicleType: 'Caminhão' }),
-  'trator-max': Object.freeze({ id: 'trator-max', label: 'Trator MAX (fotos do brinquedo)', vehicleType: 'Trator' }),
+  'trator-max': Object.freeze({ id: 'trator-max', label: 'Trator MAX (miniatura das fotos)', vehicleType: 'Trator' }),
 });
 
 export const SOMPO_VEHICLE_ID_PATTERN = /^[a-z0-9-]{3,60}$/;

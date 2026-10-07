@@ -32,6 +32,7 @@ import {
   SOMPO_VEHICLE_MODELS_3D,
   SOMPO_VEHICLE_SEED,
   pickActiveSompoVehicle,
+  findSompoVehicleByDevice,
   type SompoVehicle,
 } from '../../shared/sompo-vehicles.js';
 import { SOMPO_AGRI_SCENARIOS } from '../../shared/sompo-agri-scenarios.js';
@@ -367,6 +368,10 @@ function SompoWorkspace() {
   }, [telemetrySourceMode, viewMode]);
   const firebaseTelemetry = currentSompoTelemetry(streamedTelemetry || bootstrapTelemetry, telemetryClock);
   const telemetry = telemetrySourceMode === 'simulation' ? simulatedTelemetry : firebaseTelemetry;
+  // Modo físico: o veículo é o que tem o dispositivo do feed gravado no cadastro, nunca o escolhido na simulação.
+  const feedDeviceId = firebaseTelemetry?.tractorId || '001';
+  const feedVehicle = findSompoVehicleByDevice(vehicles, feedDeviceId);
+  const barVehicle = telemetrySourceMode === 'firebase' ? feedVehicle : activeVehicle;
   // A faixa segue o que está no canvas. O deep-link só entra se o simulador
   // ainda não publicou cenário: senão a regulação segura o dropdown embaixo.
   const storyKeys = sompoActiveStoryKeys({
@@ -740,15 +745,16 @@ function SompoWorkspace() {
           ) : viewMode === 'telemetry' ? (
             <>
               <section className="sompo-vehicle-bar" aria-label="Veículo no simulador">
-                {activeVehicle && <SompoVehicleIcon veiculo={activeVehicle.veiculo} />}
+                {barVehicle && <SompoVehicleIcon veiculo={barVehicle.veiculo} />}
                 <label>
                   <span>Veículo</span>
                   <select
                     name="sompo-vehicle"
-                    value={activeVehicle?.id ?? ''}
+                    value={barVehicle?.id ?? ''}
                     disabled={telemetrySourceMode === 'firebase' || vehicles.length === 0}
                     onChange={(event) => navigate({ veiculo: event.target.value }, 'replace')}
                   >
+                    {!barVehicle && <option value="">Sem veículo associado</option>}
                     {vehicles.map((vehicle) => (
                       <option key={vehicle.id} value={vehicle.id}>{vehicle.modelo} · {vehicle.placa}</option>
                     ))}
@@ -756,7 +762,9 @@ function SompoWorkspace() {
                 </label>
                 <small>
                   {telemetrySourceMode === 'firebase'
-                    ? 'Feed 001 não associado a veículo do cadastro'
+                    ? feedVehicle
+                      ? `Feed ${feedDeviceId} associado · ${SOMPO_VEHICLE_MODELS_3D[feedVehicle.modelo3d]?.label ?? feedVehicle.modelo3d}`
+                      : `Feed ${feedDeviceId} sem veículo associado; preencha Dispositivo no cadastro`
                     : missingVehicleId
                       ? `"${missingVehicleId}" não está no cadastro; usando ${activeVehicle?.id ?? 'o padrão'}`
                       : `${activeVehicle ? SOMPO_VEHICLE_MODELS_3D[activeVehicle.modelo3d]?.label ?? activeVehicle.modelo3d : 'Sem veículo'} · cases com dados sintéticos`}
@@ -830,6 +838,7 @@ function SompoWorkspace() {
                     key="firebase"
                     source="firebase"
                     telemetry={firebaseTelemetry}
+                    vehicle={feedVehicle}
                   />
                 ) : (
                   <div className="sompo-simulator-loading" role="status">
