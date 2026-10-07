@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Box, Camera, Check, Download, FolderOpen, Palette, Save, SlidersHorizontal, Truck, Upload, Wheat } from 'lucide-react';
+import { Box, Camera, Check, Download, FolderOpen, Palette, Save, SlidersHorizontal, Tractor, Truck, Upload, Wheat } from 'lucide-react';
 import { downloadSompoFile, parseSompoStudioConfig, saveSompoStudioConfig, SOMPO_STUDIO_DEFAULT, type SompoStudioConfig } from './sompoStudioConfig';
 import './sompo-studio.css';
 
@@ -9,20 +9,25 @@ const assets = [
   { id: 'generated', title: 'Caminhão reconstruído', subtitle: 'Biblioteca original', icon: Box },
   { id: 'tractor', title: 'Trator agrícola', subtitle: 'Talhão e solo úmido', icon: Truck },
   { id: 'harvester', title: 'Colheitadeira', subtitle: 'Lavoura e corte visual', icon: Wheat },
+  { id: 'max-tractor', title: 'Trator MAX', subtitle: 'Miniatura das fotos', icon: Tractor },
 ] as const;
 export type SompoStudioAsset = typeof assets[number]['id'];
+// O veículo do cadastro decide o modelo: com o MAX ativo a oficina só oferece o MAX,
+// e sem ele o MAX não aparece (trocar de máquina é trocar de veículo).
+const assetsFor = (maxMode: boolean) => assets.filter(item => (item.id === 'max-tractor') === maxMode);
 function readLibrary(): SompoStudioConfig[] {
   try { const data: unknown = JSON.parse(localStorage.getItem(LIBRARY_KEY) || '[]'); return Array.isArray(data) ? data.slice(0, 20).map(parseSompoStudioConfig) : []; }
   catch { return []; }
 }
 
-export default function SompoStudio({ config, onChange, asset, onAsset, onSnapshot, onExportModel }: {
+export default function SompoStudio({ config, onChange, asset, onAsset, onSnapshot, onExportModel, maxMode = false }: {
   config: SompoStudioConfig;
   onChange: (config: SompoStudioConfig) => void;
   asset: SompoStudioAsset;
   onAsset: (asset: SompoStudioAsset) => void;
   onSnapshot: () => void;
   onExportModel: () => Promise<void>;
+  maxMode?: boolean;
 }) {
   const [tab, setTab] = useState<'scene' | 'materials' | 'library'>('scene');
   const [message, setMessage] = useState('');
@@ -45,7 +50,7 @@ export default function SompoStudio({ config, onChange, asset, onAsset, onSnapsh
       <button type="button" aria-pressed={tab === 'library'} onClick={() => setTab('library')}><FolderOpen />Biblioteca</button>
     </div>
     {tab === 'scene' && <div className="sompo-studio-panel">
-      <fieldset><legend>Equipamento</legend><div className="sompo-studio-assets">{assets.map(item => <button type="button" key={item.id} aria-pressed={asset === item.id} onClick={() => onAsset(item.id)}><item.icon /><span><strong>{item.title}</strong><small>{item.subtitle}</small></span>{asset === item.id && <Check />}</button>)}</div></fieldset>
+      <fieldset><legend>Equipamento</legend><div className="sompo-studio-assets">{assetsFor(maxMode).map(item => <button type="button" key={item.id} aria-pressed={asset === item.id} onClick={() => onAsset(item.id)}><item.icon /><span><strong>{item.title}</strong><small>{item.subtitle}</small></span>{asset === item.id && <Check />}</button>)}</div></fieldset>
       <fieldset><legend>Luz e atmosfera</legend><div className="sompo-studio-lighting">{(['day', 'golden', 'overcast'] as const).map((mode, index) => <button type="button" key={mode} data-light={mode} aria-pressed={config.lighting === mode} onClick={() => set('lighting', mode)}><span />{['Dia', 'Fim de tarde', 'Nublado'][index]}</button>)}</div></fieldset>
       <label className="sompo-studio-range">Exposição <output>{config.exposure.toFixed(2)}</output><input aria-label="Exposição da cena" type="range" min="0.65" max="1.4" step="0.05" value={config.exposure} onChange={event => set('exposure', Number(event.target.value))} /></label>
       <label className="sompo-studio-range">Vento na vegetação <output>{config.wind.toFixed(1)}</output><input aria-label="Vento na vegetação" type="range" min="0" max="2" step="0.1" value={config.wind} onChange={event => set('wind', Number(event.target.value))} /></label>
@@ -58,7 +63,7 @@ export default function SompoStudio({ config, onChange, asset, onAsset, onSnapsh
         <label className="sompo-studio-range">Separar as peças <output>{Math.round(config.exploded * 100)}%</output><input aria-label="Separar peças do caminhão" type="range" min="0" max="1" step="0.05" value={config.exploded} onChange={event => set('exploded', Number(event.target.value))} /></label>
         <label className="sompo-studio-check"><input type="checkbox" checked={config.wireframe} onChange={event => set('wireframe', event.target.checked)} />Inspecionar a malha</label>
         <p className="sompo-studio-note">Cabine, baú, chassi e rodas têm peças próprias. Ao voltar à simulação, a montagem é restaurada.</p>
-      </> : <div className="sompo-studio-empty"><Box /><h4>Modelo reconstruído</h4><p>A textura pertence à malha original. Para criar uma pintura editável e inspecionar peças separadas, escolha o caminhão modular.</p><button type="button" onClick={() => onAsset('modular')}>Usar caminhão modular</button></div>}
+      </> : asset === 'max-tractor' ? <div className="sompo-studio-empty"><Tractor /><h4>Trator MAX</h4><p>Malha procedural com as cores e proporções medidas nas fotos da miniatura. A pintura editável e as peças separadas são do caminhão modular, que entra ao escolher um veículo Caminhão no cadastro.</p></div> : <div className="sompo-studio-empty"><Box /><h4>Modelo reconstruído</h4><p>A textura pertence à malha original. Para criar uma pintura editável e inspecionar peças separadas, escolha o caminhão modular.</p><button type="button" onClick={() => onAsset('modular')}>Usar caminhão modular</button></div>}
     </div>}
     {tab === 'library' && <div className="sompo-studio-panel">
       <label className="sompo-studio-name">Nome da variação<input value={config.name} maxLength={70} onChange={event => set('name', event.target.value)} /></label>

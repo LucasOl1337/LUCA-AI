@@ -3,7 +3,7 @@ export interface SompoStudioConfig {
   version: 1;
   name: string;
   truck: 'modular' | 'generated';
-  equipment: 'modular' | 'generated' | 'tractor' | 'harvester';
+  equipment: 'modular' | 'generated' | 'tractor' | 'harvester' | 'max-tractor';
   lighting: SompoLighting;
   paint: string;
   cargo: string;
@@ -32,7 +32,7 @@ export function parseSompoStudioConfig(input: unknown): SompoStudioConfig {
   return {
     version: 1, name: typeof value.name === 'string' ? value.name.trim().slice(0, 70) || base.name : base.name,
     truck: value.truck === 'generated' ? 'generated' : 'modular',
-    equipment: value.equipment === 'tractor' || value.equipment === 'harvester' || value.equipment === 'generated' ? value.equipment : value.truck === 'generated' ? 'generated' : 'modular',
+    equipment: value.equipment === 'tractor' || value.equipment === 'harvester' || value.equipment === 'max-tractor' || value.equipment === 'generated' ? value.equipment : value.truck === 'generated' ? 'generated' : 'modular',
     lighting: value.lighting === 'day' || value.lighting === 'overcast' ? value.lighting : 'golden',
     paint: color(value.paint, base.paint), cargo: color(value.cargo, base.cargo),
     roughness: clamp(value.roughness, 0.2, 1, base.roughness), exposure: clamp(value.exposure, 0.65, 1.4, base.exposure),

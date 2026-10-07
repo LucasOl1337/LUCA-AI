@@ -7,6 +7,9 @@ test('studio presets accept portable values and reject unversioned input',async(
   assert.throws(()=>parseSompoStudioConfig({paint:'#ffffff'}),/versão 1/);
   const preset=parseSompoStudioConfig({version:1,paint:'#cc4411',roughness:99,exposure:-1,wind:NaN,exploded:Infinity,assetUrl:'https://example.com/a.glb',script:'x',wireframe:'true'});
   assert.equal(preset.paint,'#cc4411');assert.equal(preset.roughness,1);assert.equal(preset.exposure,.65);assert.equal(preset.wind,SOMPO_STUDIO_DEFAULT.wind);assert.equal(preset.exploded,0);assert.equal(preset.wireframe,false);assert.equal('script' in preset,false);assert.equal('assetUrl' in preset,false);
+  // Preset salvo com o Trator MAX volta como MAX, não como trator agrícola.
+  assert.equal(parseSompoStudioConfig({version:1,equipment:'max-tractor'}).equipment,'max-tractor');
+  assert.equal(parseSompoStudioConfig({version:1,equipment:'max'}).equipment,'modular');
 });
 test('playback keeps pause, speed, seek and scenario restart on one logical clock',async()=>{
  const {createSompoPlayback}=await moduleAt('../src/components/sompo/sompoPlayback.ts');const clock=createSompoPlayback();

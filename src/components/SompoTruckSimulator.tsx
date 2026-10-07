@@ -130,6 +130,12 @@ const MAX_SCENARIO_IDS = AGRI_SCENARIO_IDS.filter((id) => SOMPO_AGRI_SCENARIOS[i
 const FIELD_SCENARIO_IDS = AGRI_SCENARIO_IDS.filter((id) => SOMPO_AGRI_SCENARIOS[id].equipmentId !== 'max-tractor');
 const MAX_DEFAULT_SCENARIO: SompoAgriScenarioId = 'max-field-operation';
 const isMaxScenario = (id: string) => (MAX_SCENARIO_IDS as string[]).includes(id);
+// Case de abertura de cada máquina agrícola da Oficina 3D, e o caminho de volta.
+const STUDIO_ASSET_SCENARIO = { tractor: 'agri-field-bogging', harvester: 'agri-harvest-dust', 'max-tractor': MAX_DEFAULT_SCENARIO } as const satisfies Record<string, SompoAgriScenarioId>;
+const studioAssetFor = (scenarioId: SompoAgriScenarioId) => {
+  const equipmentId = getSompoAgriFrame(scenarioId, 0).equipmentId;
+  return equipmentId === 'max-tractor' ? 'max-tractor' : equipmentId === 'harvester' ? 'harvester' : 'tractor';
+};
 
 interface SompoAgriRun {
   scenarioId: SompoAgriScenarioId;
@@ -337,7 +343,11 @@ export default function SompoTruckSimulator({
   const historyReplay = useRef(false);
   const [captureMessage, setCaptureMessage] = useState('');
   const [controls, setControls] = useState<SompoSimulationControls>(INITIAL_CONTROLS);
-  const [agriRun, setAgriRun] = useState<SompoAgriRun | null>(() => !isFirebase && ['tractor', 'harvester'].includes(studioConfig.equipment) ? { scenarioId: studioConfig.equipment === 'harvester' ? 'agri-harvest-dust' : 'agri-field-bogging', outcomeId: studioConfig.equipment === 'harvester' ? 'clean-pass' : getSompoAgriOutcomes('agri-field-bogging')[0].id } : null);
+  const [agriRun, setAgriRun] = useState<SompoAgriRun | null>(() => {
+    if (isFirebase || !['tractor', 'harvester', 'max-tractor'].includes(studioConfig.equipment)) return null;
+    const scenarioId = STUDIO_ASSET_SCENARIO[studioConfig.equipment as 'tractor' | 'harvester' | 'max-tractor'];
+    return { scenarioId, outcomeId: getSompoAgriOutcomes(scenarioId)[0].id };
+  });
   const [axisCalibration, setAxisCalibration] = useState<SompoAxisCalibration>(loadAxisCalibration);
   const [preview, setPreview] = useState<SompoAgriMaybeGeofenceSnapshot>(() => (
     telemetry || createSompoSimulationSnapshot(INITIAL_CONTROLS, { elapsedMs: 0 })
@@ -832,8 +842,7 @@ export default function SompoTruckSimulator({
       const outcome = outcomes.find((item) => item.id === outcomeId) || outcomes[0];
       resolvedOutcome = outcome.id;
       setAgriRun({ scenarioId, outcomeId: outcome.id });
-      // O Studio ainda não lista o MAX (corte 2): ele conta como trator ali.
-      setStudioConfig(current => ({ ...current, equipment: getSompoAgriFrame(scenarioId, 0).equipmentId === 'harvester' ? 'harvester' : 'tractor' }));
+      setStudioConfig(current => ({ ...current, equipment: studioAssetFor(scenarioId) }));
     } else {
       const next = controlsForScenario(scenarioId, outcomeId);
       resolvedOutcome = next.outcomeId || '';
@@ -890,9 +899,13 @@ export default function SompoTruckSimulator({
   }, [maxMode, isFirebase, episodeActive, requestedScenario]);
 
   function selectStudioAsset(asset: SompoStudioAsset) {
+    // Preset de outra máquina (biblioteca ou arquivo) não troca o veículo: a cena fica.
+    if ((asset === 'max-tractor') !== maxMode) {
+      setStudioConfig(current => ({ ...current, equipment: agriRun ? studioAssetFor(agriRun.scenarioId) : current.truck }));
+      return;
+    }
     setStudioConfig(current => ({ ...current, equipment: asset }));
-    if (asset === 'tractor') selectScenario('agri-field-bogging');
-    else if (asset === 'harvester') selectScenario('agri-harvest-dust');
+    if (asset === 'tractor' || asset === 'harvester' || asset === 'max-tractor') selectScenario(STUDIO_ASSET_SCENARIO[asset]);
     else { setStudioConfig(current => ({ ...current, truck: asset })); selectScenario('normal'); }
   }
 
@@ -1188,7 +1201,7 @@ export default function SompoTruckSimulator({
         ) : mapOpen && agriRun && preview.geofence ? (
           <SompoGeofenceMap scenarioId={agriRun.scenarioId} outcomeId={agriRun.outcomeId} elapsedMs={preview.deviceTimestamp ?? 0} position={preview.position ?? null} />
         ) : studioOpen ? <div><SompoStudio config={studioConfig} onChange={setStudioConfig}
-          asset={agriRun ? getSompoAgriFrame(agriRun.scenarioId, 0).equipmentId === 'harvester' ? 'harvester' : 'tractor' : studioConfig.truck}
+          asset={agriRun ? studioAssetFor(agriRun.scenarioId) : studioConfig.truck} maxMode={maxMode}
           onAsset={selectStudioAsset} onSnapshot={() => { snapshotRequested.current = true; setCaptureMessage(''); }}
           onExportModel={async () => { if (!sceneApiRef.current?.exportModel) throw new Error('O modelo ainda está carregando.'); const data = await sceneApiRef.current.exportModel(); downloadSompoFile(new Blob([data], { type: 'model/gltf-binary' }), 'sompo-modelo.glb'); }}
         /><p className="sompo-studio-message" role="status">{captureMessage}</p></div> : (
