@@ -2,7 +2,7 @@
 
 Gerada por `npm run cli:docs` a partir de `cli/catalog.js`. Não editar à mão.
 
-114 comandos; 93 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
+117 comandos; 96 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
 
 IDs são argumentos posicionais. Campos comuns podem ser flags; corpos completos usam `--data @arquivo.json`. Flags prevalecem sobre o corpo; objetos aninhados não são mesclados. Campos string são literais; apenas campos JSON e `--data` interpretam `@arquivo`/`-`.
 
@@ -685,6 +685,30 @@ Baixar frame do episódio.
 `GET /api/sompo/telemetry/episode/:publicId/frames/:seq`; autenticação: **session**.
 
 Nenhum; consulte a descrição para entradas por `--data`.
+
+### `sompo vehicles list`
+
+Listar veículos cadastrados da conta.
+
+`GET /api/sompo/vehicles`; autenticação: **session**.
+
+Nenhum; consulte a descrição para entradas por `--data`.
+
+### `sompo vehicles create`
+
+Cadastrar veículo.
+
+`POST /api/sompo/vehicles`; autenticação: **session**.
+
+`--id` (string, obrigatório): Minúsculas, números e hífen<br>`--veiculo` (string, obrigatório): Caminhão ou Trator<br>`--placa` (string, obrigatório): Placa ou identificação interna (ex. TRT0001)<br>`--modelo` (string, obrigatório): Modelo (cadastro)<br>`--modelo3d` (string): caminhao-sompo ou trator-max
+
+### `sompo vehicles update <id>`
+
+Editar veículo; o ID não muda.
+
+`PUT /api/sompo/vehicles/:id`; autenticação: **session**.
+
+`--veiculo` (string)<br>`--placa` (string)<br>`--modelo` (string)<br>`--modelo3d` (string)
 
 ### `sompo risk list`
 

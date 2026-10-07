@@ -218,6 +218,7 @@ import {
 } from './sompo-telemetry-history.js';
 import { registerSompoRiskRoutes } from './sompo-risk.js';
 import { registerLabCaseRoutes } from './lab-cases.js';
+import { registerSompoVehicleRoutes } from './sompo-vehicles.js';
 
 const app = express();
 const personaRunJobs = createPersonaRunJobStore();
@@ -385,6 +386,7 @@ app.use('/api', (req, res, next) => {
   runWithWorkspaceUser(userId, () => next(), req.auth?.user?.role);
 });
 registerLabCaseRoutes(app);
+registerSompoVehicleRoutes(app);
 authService.registerAdminRoutes(app, {
   getUserChatLibrary: getChatLibrarySnapshotForUser,
   getUserChatSession: getChatSessionForUser,
