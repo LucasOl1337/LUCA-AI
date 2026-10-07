@@ -50,6 +50,7 @@ import {
   isSompoAgriScenarioId,
 } from '../../shared/sompo-agri-brief.js';
 import { mountSompoAgriStage } from './sompo/createSompoAgriStage';
+import type { SompoVehicle } from '../../shared/sompo-vehicles.js';
 import {
   SOMPO_RURAL_SCRIPTS,
   getSompoRuralFrame,
@@ -80,6 +81,8 @@ interface SompoTruckSimulatorProps {
   requestedOutcome?: string;
   /** Devolve a seleção do dropdown para a URL, para a faixa de regulação acompanhar. */
   onScenarioSelect?: (scenarioId: string, outcomeId: string) => void;
+  /** Veículo do cadastro em uso: decide o modelo 3D e quais cases aparecem. */
+  vehicle?: SompoVehicle | null;
 }
 
 type EpisodeRunState =
@@ -121,6 +124,12 @@ interface SceneApi {
 
 const SCENARIO_IDS = Object.keys(SOMPO_SIMULATION_SCENARIOS) as SompoSimulationScenarioId[];
 const AGRI_SCENARIO_IDS = Object.keys(SOMPO_AGRI_SCENARIOS) as SompoAgriScenarioId[];
+// Cases do Trator MAX só aparecem com esse veículo selecionado; o resto do
+// catálogo segue igual ao de antes do cadastro.
+const MAX_SCENARIO_IDS = AGRI_SCENARIO_IDS.filter((id) => SOMPO_AGRI_SCENARIOS[id].equipmentId === 'max-tractor');
+const FIELD_SCENARIO_IDS = AGRI_SCENARIO_IDS.filter((id) => SOMPO_AGRI_SCENARIOS[id].equipmentId !== 'max-tractor');
+const MAX_DEFAULT_SCENARIO: SompoAgriScenarioId = 'max-field-operation';
+const isMaxScenario = (id: string) => (MAX_SCENARIO_IDS as string[]).includes(id);
 
 interface SompoAgriRun {
   scenarioId: SompoAgriScenarioId;
@@ -306,8 +315,12 @@ export default function SompoTruckSimulator({
   requestedScenario = '',
   requestedOutcome = '',
   onScenarioSelect,
+  vehicle = null,
 }: SompoTruckSimulatorProps) {
   const isFirebase = source === 'firebase';
+  const maxMode = vehicle?.modelo3d === 'trator-max';
+  const scenarioAllowed = (id: string) => (maxMode ? isMaxScenario(id) : !isMaxScenario(id));
+  const [vehicleNotice, setVehicleNotice] = useState('');
   const physicalTwin = usePhysicalTwin(telemetry, isFirebase);
   const [studioOpen, setStudioOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false); // Mapa do talhão no lugar dos controles; a cena 3D continua rodando.
@@ -636,6 +649,11 @@ export default function SompoTruckSimulator({
         scenarioLabel: plan.scenarioLabel,
         scenarioId: plan.scenarioId,
         outcomeId: plan.outcomeId,
+        ...(vehicle ? {
+          vehicleId: vehicle.id,
+          vehicleSnapshot: { id: vehicle.id, veiculo: vehicle.veiculo, placa: vehicle.placa, modelo: vehicle.modelo, modelo3d: vehicle.modelo3d },
+          model3dId: vehicle.modelo3d,
+        } : {}),
       });
       if (!result?.ok || !result.episode?.publicId) throw new Error('sompo_episode_start_failed');
       publicId = result.episode.publicId;
@@ -787,6 +805,7 @@ export default function SompoTruckSimulator({
       const outcome = outcomes.find((item) => item.id === outcomeId) || outcomes[0];
       resolvedOutcome = outcome.id;
       setAgriRun({ scenarioId, outcomeId: outcome.id });
+      // O Studio ainda não lista o MAX (corte 2): ele conta como trator ali.
       setStudioConfig(current => ({ ...current, equipment: getSompoAgriFrame(scenarioId, 0).equipmentId === 'harvester' ? 'harvester' : 'tractor' }));
     } else {
       const next = controlsForScenario(scenarioId, outcomeId);
@@ -807,7 +826,8 @@ export default function SompoTruckSimulator({
     const valid = !requestedScenario
       || isSompoAgriScenarioId(requestedScenario)
       || requestedScenario in SOMPO_SIMULATION_SCENARIOS;
-    if (!valid) return;
+    // Veículo vence cenário: um case de outro veículo na URL fica para o efeito abaixo trocar.
+    if (!valid || (requestedScenario && !scenarioAllowed(requestedScenario))) return;
     const action = sompoRequestedScenarioAction({
       requested: { scenarioId: requestedScenario, outcomeId: requestedOutcome },
       current: currentSelectionRef.current,
@@ -821,7 +841,23 @@ export default function SompoTruckSimulator({
         action.outcomeId,
       );
     }
-  }, [requestedScenario, requestedOutcome, isFirebase, episodeActive]);
+  }, [requestedScenario, requestedOutcome, isFirebase, episodeActive, maxMode]);
+
+  // Troca de veículo leva a cena para um case compatível: o MAX abre na
+  // operação de campo; caminhão (ou nenhum) volta ao cenário padrão.
+  useEffect(() => {
+    if (isFirebase || episodeActive) return;
+    const current = currentSelectionRef.current.scenarioId;
+    const requested = requestedScenario && !scenarioAllowed(requestedScenario) ? requestedScenario : '';
+    if (scenarioAllowed(current) && !requested) return;
+    const next = maxMode ? MAX_DEFAULT_SCENARIO : 'normal';
+    const conflicting = requested || current;
+    const conflictLabel = isSompoAgriScenarioId(conflicting)
+      ? SOMPO_AGRI_SCENARIOS[conflicting].label
+      : SOMPO_SIMULATION_SCENARIOS[conflicting as SompoSimulationScenarioId]?.label;
+    if (requested) setVehicleNotice(`"${conflictLabel ?? conflicting}" é de outro veículo; abrimos o case padrão de ${vehicle?.modelo ?? 'caminhão'}.`);
+    if (!scenarioAllowed(current) || requested) selectScenarioRef.current(next);
+  }, [maxMode, isFirebase, episodeActive, requestedScenario]);
 
   function selectStudioAsset(asset: SompoStudioAsset) {
     setStudioConfig(current => ({ ...current, equipment: asset }));
@@ -1143,8 +1179,13 @@ export default function SompoTruckSimulator({
           </div>
 
           <label className="sompo-scenario-select">
-            <span>Escolha entre {SCENARIO_IDS.length + AGRI_SCENARIO_IDS.length} cenários</span>
-            <select name="sompo-scenario" value={agriRun ? agriRun.scenarioId : controls.scenarioId} disabled={episodeActive} onChange={(event) => selectScenario(event.target.value as SompoSimulationScenarioId | SompoAgriScenarioId)}>
+            <span>Escolha entre {maxMode ? MAX_SCENARIO_IDS.length : SCENARIO_IDS.length + FIELD_SCENARIO_IDS.length} cenários{maxMode ? ' do Trator MAX' : ''}</span>
+            <select name="sompo-scenario" value={agriRun ? agriRun.scenarioId : controls.scenarioId} disabled={episodeActive} onChange={(event) => { setVehicleNotice(''); selectScenario(event.target.value as SompoSimulationScenarioId | SompoAgriScenarioId); }}>
+              {maxMode ? (
+                <optgroup label="Trator MAX · dados sintéticos">
+                  {MAX_SCENARIO_IDS.map((id) => <option key={id} value={id}>{SOMPO_AGRI_SCENARIOS[id].label}</option>)}
+                </optgroup>
+              ) : (<>
               <optgroup label="Sinistros e emergências · roteiros">
                 {SCENARIO_IDS.filter((id) => !!SOMPO_RURAL_SCRIPTS[id]).map((id) => <option key={id} value={id}>{SOMPO_SIMULATION_SCENARIOS[id].label}</option>)}
               </optgroup>
@@ -1152,9 +1193,11 @@ export default function SompoTruckSimulator({
                 {SCENARIO_IDS.filter((id) => !SOMPO_RURAL_SCRIPTS[id]).map((id) => <option key={id} value={id}>{SOMPO_SIMULATION_SCENARIOS[id].label}</option>)}
               </optgroup>
               <optgroup label="Operações agrícolas · trator e colheitadeira">
-                {AGRI_SCENARIO_IDS.map((id) => <option key={id} value={id}>{SOMPO_AGRI_SCENARIOS[id].label}</option>)}
+                {FIELD_SCENARIO_IDS.map((id) => <option key={id} value={id}>{SOMPO_AGRI_SCENARIOS[id].label}</option>)}
               </optgroup>
+              </>)}
             </select>
+            {vehicleNotice && <small className="sompo-scenario-vehicle-notice" role="status">{vehicleNotice}</small>}
           </label>
           {scenarioOutcomes.length > 1 && (
             <label className="sompo-scenario-select sompo-outcome-select">

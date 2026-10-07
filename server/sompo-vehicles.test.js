@@ -6,7 +6,7 @@ import test from 'node:test';
 import express from 'express';
 import { createAuthService } from './auth.js';
 import { registerSompoVehicleRoutes } from './sompo-vehicles.js';
-import { validateSompoVehicle } from '../shared/sompo-vehicles.js';
+import { SOMPO_VEHICLE_SEED, pickActiveSompoVehicle, validateSompoVehicle } from '../shared/sompo-vehicles.js';
 
 async function fixture(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-vehicles-test-'));
@@ -133,4 +133,15 @@ test('shared validator normalises ids and fills the 3D model from the type', () 
   assert.equal(result.ok, true);
   assert.equal(result.vehicle.id, 'trator-0003');
   assert.equal(result.vehicle.modelo3d, 'trator-max');
+});
+
+test('active vehicle: ?veiculo= wins, otherwise the preferred 3D model, unknown id falls back with a note', () => {
+  const list = SOMPO_VEHICLE_SEED;
+  assert.equal(pickActiveSompoVehicle(list, { requestedId: 'trator-0001' }).vehicle.id, 'trator-0001');
+  assert.equal(pickActiveSompoVehicle(list, {}).vehicle.id, 'caminhao-scania0001', 'link antigo continua caminhão');
+  assert.equal(pickActiveSompoVehicle(list, { preferModel3d: 'trator-max' }).vehicle.id, 'trator-0001');
+  const missing = pickActiveSompoVehicle(list, { requestedId: 'trator-9999' });
+  assert.equal(missing.vehicle.id, 'caminhao-scania0001');
+  assert.equal(missing.missingId, 'trator-9999');
+  assert.deepEqual(pickActiveSompoVehicle([], { requestedId: 'x' }), { vehicle: null, missingId: 'x' });
 });

@@ -124,7 +124,7 @@
 /* Modos SOMPO */
 .sompo-view-switch {
   display: inline-grid;
-  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
   gap: 4px;
   margin-bottom: 18px;
   padding: 4px;
@@ -195,6 +195,296 @@
   margin-top: 2px;
   color: rgba(210, 230, 215, 0.46);
   font-size: 10.5px;
+}
+
+/* Veículo em uso no simulador: fica acima da origem pra caber na primeira tela do celular. */
+.sompo-vehicle-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 8px 10px 8px 12px;
+  border-radius: 14px;
+  background: rgba(7, 14, 11, 0.84);
+  box-shadow: 0 0 0 1px rgba(232, 201, 106, 0.22);
+  backdrop-filter: blur(14px);
+  color: rgba(240, 247, 242, 0.86);
+}
+
+.sompo-vehicle-bar > svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  color: #e8c96a;
+}
+
+.sompo-vehicle-bar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sompo-vehicle-bar label > span {
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(210, 230, 215, 0.6);
+}
+
+.sompo-vehicle-bar select {
+  min-width: 0;
+  max-width: 260px;
+  min-height: 34px;
+  padding: 4px 8px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #f3da8e;
+  font-size: 12.5px;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(232, 201, 106, 0.28);
+}
+
+.sompo-vehicle-bar select option {
+  background: #0b1510;
+  color: #f0f7f2;
+}
+
+.sompo-vehicle-bar small {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: rgba(210, 230, 215, 0.55);
+  font-size: 11px;
+}
+
+.sompo-vehicle-bar button,
+.sompo-vehicles button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 5px 11px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(240, 247, 242, 0.86);
+  font-size: 12px;
+  font-weight: 650;
+  box-shadow: inset 0 0 0 1px oklch(1 0 0 / 0.1);
+}
+
+.sompo-vehicle-bar button:hover,
+.sompo-vehicles button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.sompo-vehicle-bar :focus-visible,
+.sompo-vehicles :focus-visible {
+  outline: 2px solid #e8c96a;
+  outline-offset: 2px;
+}
+
+/* Cadastro de veículos */
+.sompo-vehicles {
+  margin-bottom: 14px;
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(7, 14, 11, 0.86);
+  box-shadow: 0 0 0 1px oklch(1 0 0 / 0.1);
+  backdrop-filter: blur(14px);
+  color: rgba(240, 247, 242, 0.9);
+}
+
+.sompo-vehicles button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.sompo-vehicles-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.sompo-vehicles-head h2 {
+  font-size: 18px;
+  font-weight: 750;
+}
+
+.sompo-vehicles-head p {
+  margin-top: 3px;
+  color: rgba(210, 230, 215, 0.6);
+  font-size: 12.5px;
+}
+
+.sompo-vehicles .sompo-vehicles-add,
+.sompo-vehicles-form button[type='submit'] {
+  background: rgba(201, 162, 39, 0.2);
+  color: #f3da8e;
+  box-shadow: inset 0 0 0 1px rgba(232, 201, 106, 0.32);
+}
+
+.sompo-vehicles-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+.sompo-vehicles-list > li {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 0 1px oklch(1 0 0 / 0.08);
+}
+
+.sompo-vehicles-list > li[data-active] {
+  box-shadow: inset 0 0 0 1px rgba(232, 201, 106, 0.42);
+}
+
+.sompo-vehicles-card-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sompo-vehicles-card-title svg {
+  width: 20px;
+  height: 20px;
+  color: #e8c96a;
+}
+
+.sompo-vehicles-card-title strong {
+  font-size: 14px;
+}
+
+.sompo-vehicles-badge {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(210, 230, 215, 0.72);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sompo-vehicles-badge[data-tone='active'] {
+  background: rgba(201, 162, 39, 0.2);
+  color: #f3da8e;
+}
+
+.sompo-vehicles-list dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.sompo-vehicles-list dt {
+  color: rgba(210, 230, 215, 0.5);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sompo-vehicles-list dd {
+  margin-top: 1px;
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+.sompo-vehicles-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sompo-vehicles-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(232, 201, 106, 0.22);
+}
+
+.sompo-vehicles-form > header,
+.sompo-vehicles-form > .sompo-vehicles-error,
+.sompo-vehicles-form > .sompo-vehicles-actions {
+  grid-column: 1 / -1;
+}
+
+.sompo-vehicles-form > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sompo-vehicles-form h3 {
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.sompo-vehicles-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sompo-vehicles-form label > span {
+  color: rgba(210, 230, 215, 0.66);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sompo-vehicles-form label > small {
+  color: rgba(210, 230, 215, 0.46);
+  font-size: 10.5px;
+}
+
+.sompo-vehicles-form input,
+.sompo-vehicles-form select {
+  min-height: 38px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #f0f7f2;
+  font-size: 13px;
+  box-shadow: inset 0 0 0 1px oklch(1 0 0 / 0.14);
+}
+
+.sompo-vehicles-form select option {
+  background: #0b1510;
+}
+
+.sompo-vehicles-form input:disabled {
+  opacity: 0.6;
+}
+
+.sompo-vehicles-form [aria-invalid='true'] {
+  box-shadow: inset 0 0 0 1px #f27a6b;
+}
+
+.sompo-vehicles-error {
+  margin-bottom: 10px;
+  color: #f6a196;
+  font-size: 12.5px;
+}
+
+.sompo-vehicles-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(210, 230, 215, 0.7);
+  font-size: 13px;
 }
 
 /* Origem da telemetria */
@@ -2255,8 +2545,48 @@
 @media (max-width: 560px) {
   .sompo-view-switch {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
+  }
+
+  .sompo-view-switch button {
+    min-height: 42px;
+    padding: 6px 10px;
+  }
+
+  .sompo-view-switch small {
+    display: none;
+  }
+
+  .sompo-vehicle-bar {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .sompo-vehicle-bar label {
+    flex: 1 1 0;
+  }
+
+  .sompo-vehicle-bar select {
+    flex: 1 1 auto;
+    max-width: none;
+  }
+
+  .sompo-vehicle-bar small {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .sompo-vehicles {
+    padding: 14px;
+  }
+
+  .sompo-vehicles-head {
+    flex-direction: column;
+  }
+
+  .sompo-vehicles-form {
+    grid-template-columns: 1fr;
   }
 
   .sompo-source-switch {
@@ -2371,6 +2701,7 @@
 }
 .sompo-outcome-select select { padding: 9px 10px; }
 .sompo-outcome-select small { font-size: 10px; line-height: 1.4; color: #9dac9f; }
+.sompo-scenario-vehicle-notice { display: block; margin-top: 4px; font-size: 10.5px; line-height: 1.4; color: #f0d78a; }
 .sompo-scenario-phase { display: grid; gap: 8px; padding: 13px; border-left: 3px solid #e6c769; background: #e6c7690d; }
 .sompo-scenario-phase > span { font-size: 12px; color: #e9cc7c; }
 .sompo-scenario-phase strong { font-size: 22px; color: #f3f5ef; }

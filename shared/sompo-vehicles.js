@@ -71,3 +71,16 @@ export function checkSompoVehicleModel(vehicle) {
   }
   return { ok: true };
 }
+
+/**
+ * Veículo em uso no simulador. O `?veiculo=` vence; sem ele (ou com um ID que
+ * não está no cadastro) vale o primeiro veículo do modelo 3D preferido, que a
+ * página tira do cenário pedido. Assim um link antigo de caminhão continua caminhão.
+ */
+export function pickActiveSompoVehicle(vehicles, { requestedId = '', preferModel3d = 'caminhao-sompo' } = {}) {
+  const list = Array.isArray(vehicles) ? vehicles : [];
+  const requested = list.find((vehicle) => vehicle.id === requestedId);
+  if (requested) return { vehicle: requested, missingId: '' };
+  const fallback = list.find((vehicle) => vehicle.modelo3d === preferModel3d) || list[0] || null;
+  return { vehicle: fallback, missingId: requestedId && !requested ? requestedId : '' };
+}

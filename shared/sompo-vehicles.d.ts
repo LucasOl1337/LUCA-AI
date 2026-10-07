@@ -31,3 +31,7 @@ export function validateSompoVehicle(input: unknown, options?: { partial?: boole
 export function checkSompoVehicleModel(vehicle: Pick<SompoVehicle, 'veiculo' | 'modelo3d'>):
   | { ok: true }
   | { ok: false; field: string; message: string };
+export function pickActiveSompoVehicle<T extends Pick<SompoVehicle, 'id' | 'modelo3d'>>(
+  vehicles: readonly T[],
+  options?: { requestedId?: string; preferModel3d?: SompoVehicleModel3dId },
+): { vehicle: T | null; missingId: string };

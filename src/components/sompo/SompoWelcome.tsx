@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Activity, ArrowRight, ArrowUpRight, ChartColumn, Wheat, X } from 'lucide-react';
+import { Activity, ArrowRight, ArrowUpRight, CarFront, ChartColumn, Wheat, X } from 'lucide-react';
 import { useAppLocation } from '@/hooks/useAppLocation';
 import { SOMPO_EXAMPLE_CASES } from '@/lib/sompo-cases';
 import SompoBrazilMap from './SompoBrazilMap';
@@ -10,6 +10,7 @@ const AREAS = [
   { aba: 'telemetria', icon: Activity, title: 'Telemetria', description: 'Sinais do equipamento e cenários de risco para apoiar a prevenção em tempo real.', detail: 'Sinais em tempo real' },
   { aba: 'casos', icon: Wheat, title: 'Casos agrícolas', description: 'Evidências e ocorrências analisadas com os agentes para reduzir perdas e custos.', detail: `${SOMPO_EXAMPLE_CASES.length} cenários de exemplo` },
   { aba: 'safra', icon: ChartColumn, title: 'Safra', description: 'Compare jornadas, alertas e episódios para decidir o que mudar na próxima safra.', detail: 'Desempenho da frota' },
+  { aba: 'veiculos', icon: CarFront, title: 'Veículos', description: 'Cadastre caminhões e tratores da conta e escolha qual modelo 3D roda no simulador.', detail: 'Cadastro e modelo 3D' },
 ];
 
 const MISSIONS = [

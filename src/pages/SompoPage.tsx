@@ -5,6 +5,7 @@ import {
   ArrowRight,
   Box as BoxIcon,
   Building2,
+  CarFront,
   ChartColumn,
   Database,
   Download,
@@ -25,11 +26,20 @@ import { findSompoStoryForScenario } from '@/lib/sompo-stories';
 import { sompoActiveStoryKeys } from '@/lib/sompo-scenario-selection';
 import SompoRiskPanel from '@/components/SompoRiskPanel';
 import SompoWelcome from '@/components/sompo/SompoWelcome';
+import SompoVehiclesPanel, { SompoVehicleIcon } from '@/components/sompo/SompoVehiclesPanel';
+import { listSompoVehicles } from '@/lib/sompo-vehicles-client';
+import {
+  SOMPO_VEHICLE_MODELS_3D,
+  SOMPO_VEHICLE_SEED,
+  pickActiveSompoVehicle,
+  type SompoVehicle,
+} from '../../shared/sompo-vehicles.js';
+import { SOMPO_AGRI_SCENARIOS } from '../../shared/sompo-agri-scenarios.js';
 import { useTheme } from '@/hooks/useTheme';
 import { useChatLibrary } from '@/hooks/useChatLibrary';
 import { useAppLocation } from '@/hooks/useAppLocation';
 import { useLuca } from '@/hooks/useLucaState';
-import { getSompoView, GRAVIDADE_VALUES, PRODUTO_PARAM, PRODUTO_VALUE, SOMPO_ABA, SOMPO_TELEMETRY_ABA, SOMPO_FLEET_ABA } from '../../shared/app-location.js';
+import { getSompoView, GRAVIDADE_VALUES, PRODUTO_PARAM, PRODUTO_VALUE, SOMPO_ABA, SOMPO_TELEMETRY_ABA, SOMPO_FLEET_ABA, SOMPO_VEHICLES_ABA } from '../../shared/app-location.js';
 import { lucaApi } from '@/lib/api';
 import { downloadFile } from '@/lib/lab-client';
 import { pickFailureCopy } from '@/lib/surface-failure';
@@ -72,7 +82,7 @@ const SompoTruckSimulator = lazy(() => import('@/components/SompoTruckSimulator'
 
 type ProductFilter = 'all' | SompoProductLine;
 type SeverityFilter = 'all' | SompoCaseSeverity;
-type SompoViewMode = 'telemetry' | 'cases' | 'fleet';
+type SompoViewMode = 'telemetry' | 'cases' | 'fleet' | 'vehicles';
 type TelemetrySourceMode = 'firebase' | 'simulation';
 
 /** Orçamento de anexos da bancada (mesmo teto do chat: 4 por rodada). */
@@ -210,7 +220,40 @@ function SompoWorkspace() {
   const [telemetryExporting, setTelemetryExporting] = useState<'json' | 'csv' | null>(null);
   const [telemetryExportMessage, setTelemetryExportMessage] = useState<string | null>(null);
   const [telemetryExportError, setTelemetryExportError] = useState<string | null>(null);
+  // Cadastro de veículos da conta. Até a API responder (ou se falhar) valem os
+  // dois exemplos, pra o simulador abrir com o modelo certo mesmo offline.
+  const [vehicles, setVehicles] = useState<SompoVehicle[]>(() => SOMPO_VEHICLE_SEED.map((vehicle) => ({ ...vehicle })));
+  const [vehiclesLoading, setVehiclesLoading] = useState(true);
+  const [vehiclesError, setVehiclesError] = useState<string | null>(null);
   const telemetryRequestBusyRef = useRef(false);
+
+  useEffect(() => {
+    let alive = true;
+    listSompoVehicles()
+      .then((list) => { if (alive) { setVehicles(list); setVehiclesError(null); } })
+      .catch((err: unknown) => {
+        if (alive) setVehiclesError(`${err instanceof Error ? err.message : 'Não foi possível carregar o cadastro.'} Mostrando os veículos de exemplo.`);
+      })
+      .finally(() => { if (alive) setVehiclesLoading(false); });
+    return () => { alive = false; };
+  }, []);
+
+  // Veículo vence cenário: sem ?veiculo=, um case do MAX na URL abre o trator; o resto, o caminhão.
+  const requestedMaxScenario = (SOMPO_AGRI_SCENARIOS as Record<string, { equipmentId: string }>)[location.cenario]?.equipmentId === 'max-tractor';
+  const { vehicle: activeVehicle, missingId: missingVehicleId } = pickActiveSompoVehicle(vehicles, {
+    requestedId: location.veiculo,
+    preferModel3d: requestedMaxScenario ? 'trator-max' : 'caminhao-sompo',
+  });
+
+  function openVehicleInSimulator(vehicle: SompoVehicle) {
+    navigate({ aba: SOMPO_TELEMETRY_ABA, veiculo: vehicle.id, fonte: '', caso: '' }, 'push');
+  }
+
+  function saveVehicle(saved: SompoVehicle) {
+    setVehicles((current) => (current.some((item) => item.id === saved.id)
+      ? current.map((item) => (item.id === saved.id ? saved : item))
+      : [...current, saved]));
+  }
 
   const loadTelemetry = useCallback(async (kind: 'initial' | 'manual' = 'manual') => {
     if (telemetryRequestBusyRef.current) return;
@@ -378,7 +421,7 @@ function SompoWorkspace() {
 
   function setViewMode(mode: SompoViewMode) {
     navigate({
-      aba: mode === 'fleet' ? SOMPO_FLEET_ABA : mode === 'cases' ? SOMPO_ABA : SOMPO_TELEMETRY_ABA,
+      aba: mode === 'fleet' ? SOMPO_FLEET_ABA : mode === 'cases' ? SOMPO_ABA : mode === 'vehicles' ? SOMPO_VEHICLES_ABA : SOMPO_TELEMETRY_ABA,
       caso: mode === 'cases' ? location.caso : '',
       fonte: mode === 'telemetry' && location.fonte === 'firebase' ? 'firebase' : '',
     }, 'replace');
@@ -641,7 +684,7 @@ function SompoWorkspace() {
             <div className="sompo-metrics">
               <div className="sompo-metric">
                 <strong>{(viewMode === 'fleet' ? firebaseTelemetry : telemetry)?.tractorId || '001'}</strong>
-                <span>{viewMode !== 'fleet' && telemetrySourceMode === 'simulation' ? 'caminhão' : 'trator'}</span>
+                <span>{viewMode !== 'fleet' && telemetrySourceMode === 'simulation' ? (activeVehicle?.veiculo.toLowerCase() ?? 'caminhão') : 'trator'}</span>
               </div>
               <div className="sompo-metric">
                 <strong>{SOMPO_EXAMPLE_CASES.length}</strong>
@@ -675,14 +718,51 @@ function SompoWorkspace() {
               <ChartColumn />
               <span><strong>Safra</strong><small>Desempenho da frota</small></span>
             </button>
+            <button type="button" aria-pressed={viewMode === 'vehicles'} onClick={() => setViewMode('vehicles')}>
+              <CarFront />
+              <span><strong>Veículos</strong><small>Cadastro e modelo 3D</small></span>
+            </button>
           </section>
 
-          {viewMode === 'fleet' ? (
+          {viewMode === 'vehicles' ? (
+            <SompoVehiclesPanel
+              vehicles={vehicles}
+              loading={vehiclesLoading}
+              error={vehiclesError}
+              activeId={activeVehicle?.id ?? ''}
+              onSaved={saveVehicle}
+              onUse={openVehicleInSimulator}
+            />
+          ) : viewMode === 'fleet' ? (
             <Suspense fallback={<div className="sompo-simulator-loading" role="status">Carregando desempenho da frota…</div>}>
               <SompoFleetPanel telemetry={firebaseTelemetry ?? null} episodeVersion={recordedEpisode?.publicId || ''} onRefreshTelemetry={() => loadTelemetry('manual')} />
             </Suspense>
           ) : viewMode === 'telemetry' ? (
             <>
+              <section className="sompo-vehicle-bar" aria-label="Veículo no simulador">
+                {activeVehicle && <SompoVehicleIcon veiculo={activeVehicle.veiculo} />}
+                <label>
+                  <span>Veículo</span>
+                  <select
+                    name="sompo-vehicle"
+                    value={activeVehicle?.id ?? ''}
+                    disabled={telemetrySourceMode === 'firebase' || vehicles.length === 0}
+                    onChange={(event) => navigate({ veiculo: event.target.value }, 'replace')}
+                  >
+                    {vehicles.map((vehicle) => (
+                      <option key={vehicle.id} value={vehicle.id}>{vehicle.modelo} · {vehicle.placa}</option>
+                    ))}
+                  </select>
+                </label>
+                <small>
+                  {telemetrySourceMode === 'firebase'
+                    ? 'Feed 001 não associado a veículo do cadastro'
+                    : missingVehicleId
+                      ? `"${missingVehicleId}" não está no cadastro; usando ${activeVehicle?.id ?? 'o padrão'}`
+                      : `${activeVehicle ? SOMPO_VEHICLE_MODELS_3D[activeVehicle.modelo3d]?.label ?? activeVehicle.modelo3d : 'Sem veículo'} · cases com dados sintéticos`}
+                </small>
+                <button type="button" onClick={() => setViewMode('vehicles')}>Gerenciar</button>
+              </section>
               <section className="sompo-source-switch" aria-label="Origem dos dados da telemetria">
                 <div className="sompo-source-switch-label">
                   <span>Origem dos dados</span>
@@ -743,6 +823,7 @@ function SompoWorkspace() {
                     requestedScenario={location.cenario}
                     requestedOutcome={location.desfecho}
                     onScenarioSelect={(cenario, desfecho) => navigate({ cenario, desfecho }, 'replace')}
+                    vehicle={activeVehicle}
                   />
                 ) : firebaseTelemetry ? (
                   <SompoTruckSimulator
