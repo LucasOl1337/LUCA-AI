@@ -263,7 +263,8 @@ def wheel(label, axle, side, rig, front):
     r, w = axle['r'], axle['w']
     cx, cy, cz = axle['x'], r, side * axle['z']
     h = w / 2
-    inner, outer, shoulder = 0.60 * r, 0.93 * r, 0.11 * r
+    # Flanco preto alto: nas fotos 12 e 13 o pneu ocupa de ~0,57 do raio até a banda.
+    inner, outer, shoulder = 0.565 * r, 0.93 * r, 0.11 * r
     outline = [(inner, -h * 0.9)]
     outline += [(outer - shoulder + math.cos(a) * shoulder, -h + shoulder + math.sin(a) * shoulder)
                 for a in (math.radians(d) for d in (-90, -60, -30, 0))]
@@ -271,8 +272,9 @@ def wheel(label, axle, side, rig, front):
                 for a in (math.radians(d) for d in (0, 30, 60, 90))]
     outline += [(inner, h * 0.9)]
     lathe(f'{label}-pneu', (cx, cy, cz), outline, tire, 44 if front else 52, rig)
-    # Aro azul: fino na dianteira, largo na traseira, como nas fotos 12 e 13.
-    ring = (0.54 * r, 0.62 * r) if front else (0.48 * r, 0.65 * r)
+    # Aro azul fino colado no flanco, medido nas fotos 12 e 13: ~0,45 a 0,57 do raio na
+    # dianteira e ~0,46 a 0,58 na traseira. O miolo preto fica dentro dele.
+    ring = (0.45 * r, 0.575 * r) if front else (0.46 * r, 0.585 * r)
     for face in (-1, 1):
         a = face * (h - 0.035)
         lathe(f'{label}-aro', (cx, cy, cz), [(ring[0], a - 0.025), (ring[1], a - 0.025), (ring[1], a + 0.025), (ring[0], a + 0.025)],

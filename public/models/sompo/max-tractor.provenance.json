@@ -147,6 +147,6 @@
     "Lamps are vertex-coloured on the shared body material; the runtime decides emission",
     "Dimensions are a configured scale of the toy, not measured on a real machine"
   ],
-  "sha256": "cca88eaf18cde4a5bd0740936193b7baa9cf1d35dc9ac98ed390822f246f8c32",
+  "sha256": "aea81983a2fea3e9b17f10ac4d4927f1b698bb87f3b874fb6026335e2f9e1a46",
   "bytes": 2988612
 }
