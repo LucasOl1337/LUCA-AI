@@ -10,6 +10,8 @@
 import { freeze, phase, outcome, scenario } from './sompo-agri-scenario-builders.js';
 // geofencing (módulo shared/geofencing): os dois cenários com talhão entram no catálogo pelo spread abaixo.
 import { GEOFENCING_AGRI_SCENARIOS } from './geofencing/agri-scenarios.js';
+// Trator MAX: cases próprios montados sobre o catálogo base (sem ciclo de import).
+import { createSompoMaxTractorScenarios } from './sompo-max-tractor-scenarios.js';
 
 const BASE_FRAME = freeze({
   yaw: 0,
@@ -53,9 +55,18 @@ export const SOMPO_AGRI_EQUIPMENT = freeze({
     nominalSizeM: freeze({ length: 9.2, width: 7.6, height: 4.0 }),
     forwardAxis: '+X',
   }),
+  // Trator de brinquedo das fotos; escala de 4,5 m é configuração (ver provenance).
+  'max-tractor': freeze({
+    id: 'max-tractor',
+    label: 'Trator MAX',
+    assetUrl: '/models/sompo/max-tractor.glb',
+    provenanceUrl: '/models/sompo/max-tractor.provenance.json',
+    nominalSizeM: freeze({ length: 4.5, width: 2.7, height: 3.2 }),
+    forwardAxis: '+X',
+  }),
 });
 
-export const SOMPO_AGRI_SCENARIOS = freeze({
+const AGRI_BASE_SCENARIOS = {
   'agri-harvest-dust': scenario({
     scenarioId: 'agri-harvest-dust',
     label: 'Colheita com poeira',
@@ -396,7 +407,15 @@ export const SOMPO_AGRI_SCENARIOS = freeze({
   }),
 
   ...GEOFENCING_AGRI_SCENARIOS,
+};
+
+export const SOMPO_AGRI_SCENARIOS = freeze({
+  ...AGRI_BASE_SCENARIOS,
+  ...createSompoMaxTractorScenarios(AGRI_BASE_SCENARIOS),
 });
+
+/** Equipamentos com chassi de trator (rodas desiguais, eixo dianteiro esterçante). */
+export const isSompoTractorLike = (equipmentId) => equipmentId === 'tractor' || equipmentId === 'max-tractor';
 
 const finite = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));

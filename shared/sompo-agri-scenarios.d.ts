@@ -1,6 +1,6 @@
 import type { SompoSimulationControls } from './sompo-telemetry-simulator.js';
 
-export type SompoAgriEquipmentId = 'tractor' | 'harvester';
+export type SompoAgriEquipmentId = 'tractor' | 'harvester' | 'max-tractor';
 export type SompoAgriScenarioId =
   | 'agri-harvest-dust'
   | 'agri-tractor-rollover'
@@ -9,7 +9,11 @@ export type SompoAgriScenarioId =
   | 'agri-barn-maneuver'
   | 'agri-night-operation'
   | 'agri-geofencing'
-  | 'agri-geofencing-operacao';
+  | 'agri-geofencing-operacao'
+  | 'max-field-operation'
+  | 'max-front-obstacle'
+  | 'max-slope-rollover'
+  | 'max-field-bogging';
 export type SompoAgriEnvironmentId =
   | 'row-crop-field'
   | 'sloped-field'
@@ -60,6 +64,8 @@ export interface SompoAgriScenario extends Omit<SompoSimulationControls, 'scenar
   readonly distanceSensorPosition: 'front' | 'rear';
   /** Origem em x declarada (metros de cena). Sem ela o percurso é centrado em x. */
   readonly startX?: number;
+  /** Obstáculo parado à frente do sensor: posição inicial em metros a partir do emissor. */
+  readonly obstacle?: Readonly<{ kind: 'hay-bale'; startGapM: number }>;
   readonly phases: readonly Readonly<SompoAgriPhase>[];
   readonly outcomes: Readonly<Record<string, Readonly<SompoAgriOutcome>>>;
 }
@@ -105,6 +111,7 @@ export interface SompoAgriVisualFrame extends Omit<SompoSimulationControls, 'sce
 export const SOMPO_AGRI_EQUIPMENT: Readonly<Record<SompoAgriEquipmentId, Readonly<SompoAgriEquipment>>>;
 export const SOMPO_AGRI_SCENARIOS: Readonly<Record<SompoAgriScenarioId, Readonly<SompoAgriScenario>>>;
 
+export function isSompoTractorLike(equipmentId: string): equipmentId is 'tractor' | 'max-tractor';
 export function getSompoAgriScenario(scenarioId?: string): Readonly<SompoAgriScenario>;
 export function getSompoAgriOutcomePhases(scenario: Readonly<SompoAgriScenario>, outcome?: Readonly<SompoAgriOutcome>): readonly Readonly<SompoAgriPhase>[];
 export function getSompoAgriFrame(scenarioId: string, elapsedMs?: number, outcomeId?: string): SompoAgriVisualFrame;
