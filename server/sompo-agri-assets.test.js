@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { build } from 'esbuild';
-import { getSompoAgriFrame, getSompoAgriKeyframes } from '../shared/sompo-agri-scenarios.js';
+import { SOMPO_AGRI_SCENARIOS, getSompoAgriFrame, getSompoAgriKeyframes } from '../shared/sompo-agri-scenarios.js';
 import { integrateSompoMotion } from '../shared/sompo-motion.js';
 
 const root = new URL('../public/models/sompo/', import.meta.url);
@@ -16,7 +16,7 @@ function moduleUrl(source) {
   return `data:text/javascript;base64,${Buffer.from(output).toString('base64')}`;
 }
 
-for (const name of ['generated-agri-tractor', 'generated-agri-harvester']) {
+for (const name of ['generated-agri-tractor', 'generated-agri-harvester', 'max-tractor']) {
   test(`${name}: GLB procedural sem Draco, dentro do orçamento e com proveniência verificável`, () => {
     const harvester = name === 'generated-agri-harvester';
     const bytes = readFileSync(new URL(`${name}.glb`, root));
@@ -66,6 +66,21 @@ for (const name of ['generated-agri-tractor', 'generated-agri-harvester']) {
       }
       assert.ok(readFileSync(new URL(provenance.referenceImage, root)).length > 100);
       assert.match(license, /build-agri-harvester\.py/);
+    } else if (name === 'max-tractor') {
+      // Trator MAX: brinquedo das fotos do Lucas, sem imagem embutida.
+      assert.equal(provenance.method, 'Procedural Blender modeling from dimensioned primitives and custom meshes');
+      assert.match(provenance.reproducibleCommand, /build-max-tractor\.py/);
+      assert.equal(provenance.references.length, 14);
+      assert.ok(provenance.references.every(ref => /^missoes\/trator-referencias\/.+\.jpg$/.test(ref.path) && /^[0-9a-f]{64}$/.test(ref.sha256)));
+      assert.equal(provenance.scale.kind, 'configuration', 'escala do brinquedo é configuração, não medida real');
+      assert.equal(provenance.scale.nominalLengthM, 4.5);
+      assert.equal(provenance.rig.ultrasonicEmitter.facing, '+X');
+      for (const part of ['rig-body', 'rig-hitch', 'rig-wheel-0-1', 'rig-wheel-0--1', 'rig-wheel-1-1', 'rig-wheel-1--1']) {
+        assert.ok(document.nodes.some(node => node.name === part), `${part} authored in GLB`);
+      }
+      const [front, rear] = provenance.rig.axles;
+      assert.ok(rear.radius > front.radius * 1.2, 'roda traseira visivelmente maior que a dianteira');
+      assert.match(license, /build-max-tractor\.py/);
     } else {
       const source = readFileSync(new URL(provenance.sourceImage, root));
       assert.equal(provenance.sourceImageSha256, createHash('sha256').update(source).digest('hex'));
@@ -119,20 +134,20 @@ test('loader agrícola recupera PBR externo e ajusta os dois modelos ao chão', 
   globalThis.self = globalThis;
   globalThis.fetch = (input) => {
     const url = typeof input === 'string' ? input : input.url;
-    if (/^\/models\/sompo\/generated-agri-(tractor|harvester)\.(glb|textures\.json)$/.test(url)) {
+    if (/^\/models\/sompo\/(generated-agri-(tractor|harvester)|max-tractor)\.(glb|textures\.json)$/.test(url)) {
       return Promise.resolve(new Response(readFileSync(new URL('../public' + url, import.meta.url))));
     }
     throw new Error(`Unexpected URL ${url}`);
   };
   try {
-    for (const equipmentId of ['tractor', 'harvester']) {
+    for (const equipmentId of ['tractor', 'harvester', 'max-tractor']) {
       const model = await loadSompoAgriAsset(equipmentId, new AbortController().signal);
       assert.ok(model);
       assert.equal(model.name, `sompo-agri-${equipmentId}-asset`);
       assert.equal(model.userData.equipmentId, equipmentId);
       model.updateMatrixWorld(true);
       // As duas máquinas saem do Blender com a frente em +X.
-      const authored = model.getObjectByName(equipmentId === 'tractor' ? 'trator-agricola-procedural' : 'harvester-body-surface');
+      const authored = model.getObjectByName({ tractor: 'trator-agricola-procedural', 'max-tractor': 'max-trator-procedural' }[equipmentId] ?? 'harvester-body-surface');
       if (authored) {
         const front = new THREE.Vector3(1, 0, 0);
         const heading = authored.localToWorld(front).sub(authored.localToWorld(new THREE.Vector3())).normalize();
@@ -140,7 +155,7 @@ test('loader agrícola recupera PBR externo e ajusta os dois modelos ao chão', 
       }
       const bounds = new THREE.Box3().setFromObject(model);
       assert.ok(Math.abs(bounds.min.y) < 1e-5, `${equipmentId}: ground contact`);
-      assert.ok(bounds.max.x - bounds.min.x <= (equipmentId === 'tractor' ? 5.8 : 9.2) + 1e-5);
+      assert.ok(bounds.max.x - bounds.min.x <= ({ tractor: 5.8, 'max-tractor': 4.5 }[equipmentId] ?? 9.2) + 1e-5);
       const surfaces = [];
       model.traverse((node) => { if (node.isMesh) surfaces.push(node); });
       assert.ok(surfaces.length > 0);
@@ -160,13 +175,15 @@ test('loader agrícola recupera PBR externo e ajusta os dois modelos ao chão', 
         wheel.spin.traverse(child => { vertices += child.geometry?.attributes.position.count ?? 0; });
         return vertices > 200;
       }));
-      const scenarioId = equipmentId === 'tractor' ? 'agri-hydraulic-failure' : 'agri-harvest-dust';
+      const scenarioId = { tractor: 'agri-hydraulic-failure', harvester: 'agri-harvest-dust' }[equipmentId]
+        ?? Object.values(SOMPO_AGRI_SCENARIOS).find(scenario => scenario.equipmentId === equipmentId).scenarioId;
       const frames = getSompoAgriKeyframes(scenarioId);
       const update = t => rig.update(getSompoAgriFrame(scenarioId, t), integrateSompoMotion(frames, t) / 3.6, integrateSompoMotion(frames, t, 'headerSpeed', false) * .8, false);
       update(4000); const wheelPose = rig.wheels[0].spin.rotation.z, implementPose = rig.implement.rotation.toArray(), reelPose = rig.rotor.rotation.z;
       update(4500); assert.notEqual(rig.wheels[0].spin.rotation.z, wheelPose);
       if (equipmentId === 'harvester') assert.notEqual(rig.rotor.rotation.z, reelPose);
-      else assert.notDeepEqual(rig.implement.rotation.toArray(), implementPose);
+      else if (equipmentId === 'tractor') assert.notDeepEqual(rig.implement.rotation.toArray(), implementPose);
+      // MAX não tem implemento: o cilindro traseiro fica parado.
       update(4000); assert.equal(rig.wheels[0].spin.rotation.z, wheelPose); assert.deepEqual(rig.implement.rotation.toArray(), implementPose);
       const parent = new THREE.Group(); parent.add(rig.root);
       for (const roll of [0, 17, 45, 88]) {

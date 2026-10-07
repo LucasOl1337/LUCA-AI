@@ -1,0 +1,152 @@
+{
+  "asset": "max-tractor.glb",
+  "generatedBy": "LUCA-AI",
+  "createdAt": "2026-10-07",
+  "method": "Procedural Blender modeling from dimensioned primitives and custom meshes",
+  "generator": "scripts/sompo/build-max-tractor.py",
+  "blenderVersion": "5.2.0 LTS",
+  "subject": "Brinquedo \"MAX TRATOR\" azul do Lucas com o HC-SR04 montado na frente",
+  "references": [
+    {
+      "path": "missoes/trator-referencias/01-b202b5aa702a.jpg",
+      "sha256": "24cb3751d7aafbf9ad68cd2021ef145cf75915cfb4974d7d13b93be32d0a0c87"
+    },
+    {
+      "path": "missoes/trator-referencias/02-eab87590d92b.jpg",
+      "sha256": "55227eecdeb9fd0a0b32ea27d46196632d828cf4c691399193fad8c1ca0ae4d7"
+    },
+    {
+      "path": "missoes/trator-referencias/03-62ae79a2ac90.jpg",
+      "sha256": "8dae42464537880695bcea4688f275a5a3bdeac9a05060acf692e4d6ac1266f4"
+    },
+    {
+      "path": "missoes/trator-referencias/04-d14684310270.jpg",
+      "sha256": "5f2419f1de84c511e4def99d188fd42b088f0f559a2a7c8fbbeb2f39de8468f3"
+    },
+    {
+      "path": "missoes/trator-referencias/05-5a5eda300820.jpg",
+      "sha256": "43425fec6738497eec8cb18e0eed5275c0988affeb4ef82f6eda5d7200a48681"
+    },
+    {
+      "path": "missoes/trator-referencias/06-32f46673f65c.jpg",
+      "sha256": "5cf56e61b297b565eb310b61a4a094a28887dd3a91f64e5e874ebfc9da16b17e"
+    },
+    {
+      "path": "missoes/trator-referencias/07-b4ae44024889.jpg",
+      "sha256": "2022136cb167f9bb3c43a9f7bbe6099fbc5f94ecfd367277b164d394b217dfe9"
+    },
+    {
+      "path": "missoes/trator-referencias/08-cb71208bf583.jpg",
+      "sha256": "588313bb6ba085a7f4b4679cc921200e0501a417bb465196965ad557d939b527"
+    },
+    {
+      "path": "missoes/trator-referencias/09-0975ccc4ca13.jpg",
+      "sha256": "bc8ea288c7ff9bf25ffc3fa2142c206af1f16f72c1b493a874a4717c3d44b320"
+    },
+    {
+      "path": "missoes/trator-referencias/10-6125781d015f.jpg",
+      "sha256": "0c8606c362d8a468be6c2dd97e6106fc4137fd667de85dcf234f91d9f51bf1b5"
+    },
+    {
+      "path": "missoes/trator-referencias/11-ee16a91e3f63.jpg",
+      "sha256": "e5fbf428ca8cb3ada5493d7718f53abe2bf0ed9aee625ffd23d1eaa18bd7426d"
+    },
+    {
+      "path": "missoes/trator-referencias/12-817a14cbd0a6.jpg",
+      "sha256": "12bfa58e730e442c17e540f64d59839be9b20295add023b23c9dd2825ca237c8"
+    },
+    {
+      "path": "missoes/trator-referencias/13-ac79ed44fe84.jpg",
+      "sha256": "99125af085f47f56d480b3c751d497cfd6d9897d4c1f33481877ad5cfb2fd68f"
+    },
+    {
+      "path": "missoes/trator-referencias/14-55e22ad95560.jpg",
+      "sha256": "17e3ddd35c2072eb22edf381459b67f6fa37d42c2e6c924065a7a1cd84d71f65"
+    }
+  ],
+  "referenceRole": "Fotos originais do brinquedo, usadas só para proporção, cor e posição das peças; nenhuma geometria ou textura foi reconstruída delas",
+  "authorship": "Original procedural geometry authored for LUCA-AI; the side lettering is Blender text converted to mesh, no image",
+  "scale": {
+    "kind": "configuration",
+    "nominalLengthM": 4.5,
+    "measuredLengthPx": 1040,
+    "measuredInPhoto": "missoes/trator-referencias/13-ac79ed44fe84.jpg",
+    "metresPerPixel": 0.00433,
+    "note": "O brinquedo foi ampliado para o porte de um trator de campo (4,5 m). Não é medida real de máquina; muda só pela configuração NOMINAL_LENGTH do gerador.",
+    "appliedFactor": 0.97526
+  },
+  "dimensionsM": {
+    "length": 4.5,
+    "width": 2.643,
+    "height": 3.1208
+  },
+  "axes": {
+    "forward": "+X",
+    "up": "+Y",
+    "lateral": "+Z (lado do escapamento)"
+  },
+  "rig": {
+    "axles": [
+      {
+        "x": 1.3391,
+        "y": 0.6827,
+        "z": 0.8972,
+        "radius": 0.6827,
+        "inner": 0.7022,
+        "steer": true
+      },
+      {
+        "x": -1.3234,
+        "y": 0.8972,
+        "z": 1.0435,
+        "radius": 0.8972,
+        "inner": 0.7705,
+        "steer": false
+      }
+    ],
+    "hitch": [
+      -1.8793,
+      0.8582,
+      -0.0
+    ],
+    "ultrasonicEmitter": {
+      "position": [
+        2.2461,
+        0.7363,
+        -0.0
+      ],
+      "facing": "+X"
+    }
+  },
+  "geometry": {
+    "triangles": 48368,
+    "primitives": 6,
+    "materials": 2,
+    "parts": [
+      "rounded blue hood with black ribbed nose and two headlights",
+      "MAX / TRATOR lettering as mesh on both hood sides",
+      "open cab: four black pillars, seat, steering wheel, grey roof with handle",
+      "front and rear roof lamps",
+      "tall grey exhaust with perforated guard",
+      "black steps between axles",
+      "blue rear fenders with two lamps each and blue rear panel",
+      "black ribbed front ballast block carrying the HC-SR04 and its four wires",
+      "rear black cylinder with coiled USB cable stub",
+      "small front and large rear lugged tyres with blue rims",
+      "CavityAO vertex colour"
+    ]
+  },
+  "triangles": 48368,
+  "materials": "Two consolidated PBR materials (body and wheels) with colour and CavityAO per vertex; no image textures and no manufacturer marks",
+  "externalManifest": "max-tractor.textures.json",
+  "reproducibleCommand": "blender -b --factory-startup --python scripts/sompo/build-max-tractor.py",
+  "license": "SOMPO-AGRI-ASSET-LICENSE.txt",
+  "limitations": [
+    "Visual simulator asset of a toy, not a CAD model of a real tractor",
+    "No implement: the photos show none, only the toy rear cylinder",
+    "Lamps are vertex-coloured on the shared body material; the runtime decides emission",
+    "Dimensions are a configured scale of the toy, not measured on a real machine"
+  ],
+  "sha256": "cca88eaf18cde4a5bd0740936193b7baa9cf1d35dc9ac98ed390822f246f8c32",
+  "bytes": 2988612
+}

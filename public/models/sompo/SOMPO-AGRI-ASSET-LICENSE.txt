@@ -8,6 +8,8 @@ Files covered:
 - generated-agri-harvester-source.png (visual reference)
 - generated-agri-harvester.glb (original procedural geometry and PBR materials,
   authored for LUCA-AI by scripts/sompo/build-agri-harvester.py)
+- max-tractor.glb (original procedural geometry and PBR materials of the
+  MAX TRATOR toy, authored for LUCA-AI by scripts/sompo/build-max-tractor.py)
 
 The source images were generated for LUCA-AI through the locally authorized
 9Router route cx/gpt-image-2 on 2026-09-11. Their prompts intentionally request
@@ -23,3 +25,8 @@ directory for the other reconstructed assets that still use it.
 
 Each .provenance.json records the applicable reference, construction method,
 measured triangle count, output hash and known limits.
+
+max-tractor.glb references the owner's own photos of the toy in
+missoes/trator-referencias, used only for proportion, colour and part
+placement. Its lettering is Blender text converted to mesh; no photo, image
+texture or downloaded geometry is embedded.
