@@ -8,6 +8,7 @@ import { convertSompoDataset, SOMPO_EXPORT_MAX_SAMPLES, SOMPO_EXPORT_MAX_JSON_BY
 import { summarizeEpisodeGeofence } from './geofencing/episode-geofence.js';
 import { aggregateSompoFleet } from '../shared/sompo-fleet.js';
 import { inferredImageMime } from './image-signature.js';
+import { SOMPO_VEHICLE_ID_PATTERN, SOMPO_VEHICLE_MODELS_3D, validateSompoVehicle } from '../shared/sompo-vehicles.js';
 
 export const SOMPO_TELEMETRY_HISTORY_DEFAULT_LIMIT = 2000;
 export const SOMPO_TELEMETRY_HISTORY_DEFAULT_WINDOW_MIN = 15;
@@ -106,6 +107,40 @@ function finiteNumber(value) {
   if (value === null || value === undefined || typeof value === 'boolean' || (typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') return null;
   const number = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(number) ? number : null;
+}
+
+function parseVehicleSnapshot(value) {
+  if (!value) return null;
+  try { return JSON.parse(value); } catch { return null; }
+}
+
+/**
+ * Valida o veículo enviado na abertura do episódio. Tudo opcional (o
+ * caminhão sem cadastro segue gravando), mas o que vier tem de ser coerente:
+ * id no formato do cadastro, modelo 3D conhecido e retrato válido.
+ */
+function episodeVehicle({ vehicleId, vehicleSnapshot, model3dId }) {
+  const empty = (value) => value === null || value === undefined || value === '';
+  if (empty(vehicleId) && empty(vehicleSnapshot) && empty(model3dId)) {
+    return { vehicleId: null, vehicleSnapshot: null, model3dId: null };
+  }
+  const invalid = (message) => httpError(400, 'sompo_telemetry_episode_vehicle_invalid', message);
+  const id = typeof vehicleId === 'string' ? vehicleId.trim().toLowerCase() : '';
+  if (!SOMPO_VEHICLE_ID_PATTERN.test(id)) throw invalid('vehicleId do episódio inválido: use o ID do cadastro de veículos.');
+  if (typeof model3dId !== 'string' || !Object.hasOwn(SOMPO_VEHICLE_MODELS_3D, model3dId)) {
+    throw invalid(`model3dId do episódio inválido. Conhecidos: ${Object.keys(SOMPO_VEHICLE_MODELS_3D).join(', ')}.`);
+  }
+  let snapshot = null;
+  if (!empty(vehicleSnapshot)) {
+    const checked = validateSompoVehicle(vehicleSnapshot);
+    if (!checked.ok) throw invalid(`vehicleSnapshot do episódio inválido: ${checked.message}`);
+    if (checked.vehicle.id !== id || checked.vehicle.modelo3d !== model3dId) {
+      throw invalid('vehicleSnapshot do episódio não bate com vehicleId e model3dId.');
+    }
+    const { id: snapshotId, veiculo, placa, modelo, modelo3d } = checked.vehicle;
+    snapshot = JSON.stringify({ id: snapshotId, veiculo, placa, modelo, modelo3d });
+  }
+  return { vehicleId: id, vehicleSnapshot: snapshot, model3dId };
 }
 
 function optionalText(value) {
@@ -668,7 +703,9 @@ export function createSompoTelemetryHistory({
     `);
     // O episódio lembra o roteiro gravado: é por ele que o servidor resolve o talhão (polígonos e regras) depois.
     const episodeColumns = db.prepare('PRAGMA table_info(sompo_telemetry_episodes)').all();
-    for (const column of ['scenario_id', 'outcome_id']) {
+    // Veículo do cadastro (corte 1 do Trator): id, retrato no momento da gravação e modelo 3D.
+    // Episódio anterior fica com as três nulas, lido como "registro anterior ao cadastro".
+    for (const column of ['scenario_id', 'outcome_id', 'vehicle_id', 'vehicle_snapshot', 'model3d_id']) {
       if (!episodeColumns.some((item) => item.name === column)) db.exec(`ALTER TABLE sompo_telemetry_episodes ADD COLUMN ${column} TEXT NULL`);
     }
   } catch (error) {
@@ -690,8 +727,9 @@ export function createSompoTelemetryHistory({
   const insertEpisodeStatement = db.prepare(`
     INSERT INTO sompo_telemetry_episodes (
       public_id, kind, tractor_id, source_kind, scenario_label,
-      started_at, started_ms, status, scenario_id, outcome_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'recording', ?, ?)
+      started_at, started_ms, status, scenario_id, outcome_id,
+      vehicle_id, vehicle_snapshot, model3d_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'recording', ?, ?, ?, ?, ?)
   `);
 
   const episodeByPublicIdStatement = db.prepare(`
@@ -708,7 +746,10 @@ export function createSompoTelemetryHistory({
       ended_ms AS endedMs,
       status,
       scenario_id AS scenarioId,
-      outcome_id AS outcomeId
+      outcome_id AS outcomeId,
+      vehicle_id AS vehicleId,
+      vehicle_snapshot AS vehicleSnapshot,
+      model3d_id AS model3dId
     FROM sompo_telemetry_episodes
     WHERE public_id = ?
   `);
@@ -936,6 +977,9 @@ export function createSompoTelemetryHistory({
       durationMs: endedMs === null ? null : Math.max(0, endedMs - startedMs),
       scenarioId: row.scenarioId ?? null,
       outcomeId: row.outcomeId ?? null,
+      vehicleId: row.vehicleId ?? null,
+      vehicleSnapshot: parseVehicleSnapshot(row.vehicleSnapshot),
+      model3dId: row.model3dId ?? null,
     };
   }
 
@@ -986,8 +1030,9 @@ export function createSompoTelemetryHistory({
     return episode;
   }
 
-  function startEpisode({ kind, tractorId = '001', sourceKind = 'simulation', scenarioLabel = null, scenarioId = null, outcomeId = null } = {}) {
+  function startEpisode({ kind, tractorId = '001', sourceKind = 'simulation', scenarioLabel = null, scenarioId = null, outcomeId = null, vehicleId = null, vehicleSnapshot = null, model3dId = null } = {}) {
     assertOpen();
+    const vehicle = episodeVehicle({ vehicleId, vehicleSnapshot, model3dId });
     for (const [name, value] of [['scenarioId', scenarioId], ['outcomeId', outcomeId]]) {
       if (value !== null && value !== undefined && value !== '' && (typeof value !== 'string' || !/^[a-z0-9-]{1,80}$/i.test(value))) {
         throw httpError(400, 'sompo_telemetry_episode_scenario_invalid', `${name} do episódio inválido: use o id do roteiro (letras, números e hífen).`);
@@ -1020,6 +1065,9 @@ export function createSompoTelemetryHistory({
         startedMs,
         optionalText(scenarioId),
         optionalText(outcomeId),
+        vehicle.vehicleId,
+        vehicle.vehicleSnapshot,
+        vehicle.model3dId,
       );
     } catch (error) {
       rethrowSqlite(error, 'startEpisode');
@@ -1457,6 +1505,9 @@ export function createSompoTelemetryEpisodeStartHttpHandler(history) {
         scenarioLabel: body.scenarioLabel,
         scenarioId: body.scenarioId,
         outcomeId: body.outcomeId,
+        vehicleId: body.vehicleId,
+        vehicleSnapshot: body.vehicleSnapshot,
+        model3dId: body.model3dId,
       });
       res.json({ ok: true, episode });
     } catch (error) {

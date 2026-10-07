@@ -278,7 +278,7 @@ test('migração idempotente: DB pré-existente sem episode_id ganha a coluna e 
   const episodeInspect = new DatabaseSync(dbPath);
   const episodeColumns = episodeInspect.prepare('PRAGMA table_info(sompo_telemetry_episodes)').all();
   episodeInspect.close();
-  for (const name of ['scenario_id', 'outcome_id']) {
+  for (const name of ['scenario_id', 'outcome_id', 'vehicle_id', 'vehicle_snapshot', 'model3d_id']) {
     assert.ok(episodeColumns.some((column) => column.name === name), `coluna ${name} migrada`);
   }
 
@@ -292,6 +292,9 @@ test('migração idempotente: DB pré-existente sem episode_id ganha a coluna e 
   const episode = history.startEpisode({ kind: 'colisao' });
   assert.equal(episode.scenarioId, null);
   assert.equal(episode.outcomeId, null);
+  assert.equal(episode.vehicleId, null, 'episódio sem veículo: registro anterior ao cadastro');
+  assert.equal(episode.vehicleSnapshot, null);
+  assert.equal(episode.model3dId, null);
   assert.equal(history.recordMany([
     simSnapshotAt(scriptedRaw(0, {}), new Date(BASE_MS + 61_000).toISOString()),
   ], { episodeId: episode.publicId }), 1);
@@ -337,6 +340,41 @@ test('episódio guarda scenarioId e outcomeId do roteiro, devolve os dois na lei
     await start({ body: { kind: 'roteiro', scenarioId } }, rejected);
     assert.equal(rejected.statusCode, 400, String(scenarioId));
     assert.equal(rejected.body.error, 'sompo_telemetry_episode_scenario_invalid');
+  }
+});
+
+test('episódio guarda o veículo do cadastro (id, retrato e modelo 3D) e rejeita veículo incoerente', async (t) => {
+  const { dbPath, cleanup } = tempDb();
+  const history = createSompoTelemetryHistory({ dbPath, now: () => BASE_MS });
+  t.after(() => {
+    history.close();
+    cleanup();
+  });
+  const start = createSompoTelemetryEpisodeStartHttpHandler(history);
+  const get = createSompoTelemetryEpisodeGetHttpHandler(history);
+  const snapshot = { id: 'trator-0001', veiculo: 'Trator', placa: 'TRT0001', modelo: 'John Deere 6110J', modelo3d: 'trator-max' };
+
+  const started = mockRes();
+  await start({ body: { kind: 'roteiro', trator: 'SIM-001', scenarioId: 'max-front-obstacle', outcomeId: 'safe-stop', vehicleId: 'trator-0001', vehicleSnapshot: snapshot, model3dId: 'trator-max' } }, started);
+  assert.equal(started.statusCode, 200);
+  assert.equal(started.body.episode.tractorId, 'SIM-001', 'o dispositivo simulado continua SIM-001');
+  const read = mockRes();
+  await get({ params: { publicId: started.body.episode.publicId } }, read);
+  assert.equal(read.body.episode.vehicleId, 'trator-0001');
+  assert.equal(read.body.episode.model3dId, 'trator-max');
+  assert.deepEqual(read.body.episode.vehicleSnapshot, snapshot);
+
+  const rejectedBodies = [
+    { vehicleId: 'Trator 1', model3dId: 'trator-max' },
+    { vehicleId: 'trator-0001', model3dId: 'trator-gigante' },
+    { vehicleId: 'trator-0001', model3dId: 'trator-max', vehicleSnapshot: { ...snapshot, placa: '' } },
+    { vehicleId: 'trator-0001', model3dId: 'caminhao-sompo', vehicleSnapshot: snapshot },
+  ];
+  for (const body of rejectedBodies) {
+    const rejected = mockRes();
+    await start({ body: { kind: 'roteiro', ...body } }, rejected);
+    assert.equal(rejected.statusCode, 400, JSON.stringify(body));
+    assert.equal(rejected.body.error, 'sompo_telemetry_episode_vehicle_invalid');
   }
 });
 

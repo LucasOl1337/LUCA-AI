@@ -91,7 +91,7 @@ export const commands = [
   cmd('sompo history', 'GET', `${telemetry}/history`, 'Histórico da telemetria', history),
   cmd('sompo export', 'GET', `${telemetry}/export`, 'Exportar CSV/JSON para laboratório', [...history, s('format', 'csv ou json'), s('episode-id')], { download: true }),
   cmd('sompo simulation record', 'POST', `${telemetry}/simulation`, 'Gravar amostras declaradas de simulação', [j('samples', '', true), s('episode-id')]),
-  cmd('sompo episodes start', 'POST', `${telemetry}/episode`, 'Iniciar episódio de simulação', [s('kind', 'colisao ou roteiro', true), s('trator'), s('scenario-label'), s('scenario-id'), s('outcome-id')]),
+  cmd('sompo episodes start', 'POST', `${telemetry}/episode`, 'Iniciar episódio de simulação', [s('kind', 'colisao ou roteiro', true), s('trator'), s('scenario-label'), s('scenario-id'), s('outcome-id'), s('vehicle-id', 'ID do cadastro de veículos'), j('vehicle-snapshot', 'Retrato do veículo: id, veiculo, placa, modelo, modelo3d'), s('model3d-id', 'caminhao-sompo ou trator-max')]),
   cmd('sompo episodes get', 'GET', `${telemetry}/episode/:publicId`, 'Ler episódio, resumo e frames'),
   cmd('sompo episodes finish', 'POST', `${telemetry}/episode/:publicId/finish`, 'Fechar episódio', [s('status', 'complete ou aborted')]),
   cmd('sompo episodes frames upload', 'POST', `${telemetry}/episode/:publicId/frames`, 'Enviar frames com dataUrl, offsetMs, fase e label', [j('frames', '', true)]),

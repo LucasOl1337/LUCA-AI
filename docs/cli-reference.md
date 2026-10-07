@@ -652,7 +652,7 @@ Iniciar episódio de simulação.
 
 `POST /api/sompo/telemetry/episode`; autenticação: **session**.
 
-`--kind` (string, obrigatório): colisao ou roteiro<br>`--trator` (string)<br>`--scenario-label` (string)<br>`--scenario-id` (string)<br>`--outcome-id` (string)
+`--kind` (string, obrigatório): colisao ou roteiro<br>`--trator` (string)<br>`--scenario-label` (string)<br>`--scenario-id` (string)<br>`--outcome-id` (string)<br>`--vehicle-id` (string): ID do cadastro de veículos<br>`--vehicle-snapshot` (json): Retrato do veículo: id, veiculo, placa, modelo, modelo3d<br>`--model3d-id` (string): caminhao-sompo ou trator-max
 
 ### `sompo episodes get <publicId>`
 
