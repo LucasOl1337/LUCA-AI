@@ -256,6 +256,12 @@ function SompoWorkspace() {
       : [...current, saved]));
   }
 
+  function removeVehicle(removed: SompoVehicle) {
+    setVehicles((current) => current.filter((item) => item.id !== removed.id));
+    // Link apontando pro excluído não vira aviso de "veículo não encontrado": volta ao padrão.
+    if (location.veiculo === removed.id) navigate({ veiculo: '' }, 'replace');
+  }
+
   const loadTelemetry = useCallback(async (kind: 'initial' | 'manual' = 'manual') => {
     if (telemetryRequestBusyRef.current) return;
     telemetryRequestBusyRef.current = true;
@@ -736,6 +742,7 @@ function SompoWorkspace() {
               error={vehiclesError}
               activeId={activeVehicle?.id ?? ''}
               onSaved={saveVehicle}
+              onDeleted={removeVehicle}
               onUse={openVehicleInSimulator}
             />
           ) : viewMode === 'fleet' ? (

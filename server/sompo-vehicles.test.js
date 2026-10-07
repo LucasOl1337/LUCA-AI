@@ -188,3 +188,31 @@ test('findSompoVehicleByDevice só casa associação explícita', () => {
   assert.equal(findSompoVehicleByDevice(list, ''), null);
   assert.equal(findSompoVehicleByDevice(list, null), null);
 });
+
+test('exclusão: some do cadastro, libera o dispositivo e não volta o exemplo', async (t) => {
+  const { request, register, restart } = await fixture(t);
+  const cookie = await register('exclui');
+  const other = await register('vizinho');
+  await request('/api/sompo/vehicles/trator-0001', { cookie, method: 'PUT', body: { dispositivo: '001' } });
+
+  assert.equal((await request('/api/sompo/vehicles/trator-0001', { method: 'DELETE' })).status, 401);
+  const missing = await request('/api/sompo/vehicles/nao-existe', { cookie, method: 'DELETE' });
+  assert.equal(missing.status, 404);
+  assert.equal(missing.body.error, 'sompo_vehicle_not_found');
+
+  const removed = await request('/api/sompo/vehicles/TRATOR-0001', { cookie, method: 'DELETE' });
+  assert.equal(removed.status, 200);
+  assert.equal(removed.body.vehicle.id, 'trator-0001');
+  assert.equal(removed.body.vehicle.dispositivo, '001');
+  assert.equal((await request('/api/sompo/vehicles/trator-0001', { cookie, method: 'DELETE' })).status, 404);
+
+  await restart();
+  const listed = await request('/api/sompo/vehicles', { cookie });
+  assert.deepEqual(listed.body.vehicles.map((item) => item.id), ['caminhao-scania0001'], 'exemplo excluído não volta pela seed');
+  const relinked = await request('/api/sompo/vehicles/caminhao-scania0001', { cookie, method: 'PUT', body: { dispositivo: '001' } });
+  assert.equal(relinked.status, 200, 'dispositivo do excluído fica livre');
+  assert.equal((await request('/api/sompo/vehicles', { cookie: other })).body.vehicles.length, 2, 'outra conta não é afetada');
+
+  assert.equal((await request('/api/sompo/vehicles/caminhao-scania0001', { cookie, method: 'DELETE' })).status, 200);
+  assert.deepEqual((await request('/api/sompo/vehicles', { cookie })).body.vehicles, [], 'cadastro vazio fica vazio');
+});

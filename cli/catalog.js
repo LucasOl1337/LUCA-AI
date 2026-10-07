@@ -99,6 +99,7 @@ export const commands = [
   cmd('sompo vehicles list', 'GET', '/api/sompo/vehicles', 'Listar veículos cadastrados da conta'),
   cmd('sompo vehicles create', 'POST', '/api/sompo/vehicles', 'Cadastrar veículo', [s('id', 'Minúsculas, números e hífen', true), s('veiculo', 'Caminhão ou Trator', true), s('placa', 'Placa ou identificação interna (ex. TRT0001)', true), s('modelo', 'Modelo (cadastro)', true), s('modelo3d', 'caminhao-sompo ou trator-max'), s('dispositivo', 'ID do ESP32 no feed (ex. 001); vazio = sem dispositivo')]),
   cmd('sompo vehicles update', 'PUT', '/api/sompo/vehicles/:id', 'Editar veículo; o ID não muda', [s('veiculo'), s('placa'), s('modelo'), s('modelo3d'), s('dispositivo', 'ID do ESP32 no feed; vazio desassocia')]),
+  cmd('sompo vehicles delete', 'DELETE', '/api/sompo/vehicles/:id', 'Excluir veículo; episódios gravados mantêm o retrato do veículo'),
   cmd('sompo risk list', 'GET', '/api/sompo/risk', 'Avaliações registradas', [s('trator'), s('fonte')]),
   cmd('sompo risk assess', 'POST', '/api/sompo/risk', 'Calcular e registrar avaliação de risco', [s('source-kind', 'simulation ou firebase', true), j('raw'), j('context', '', true)]),
   cmd('lab cases list', 'GET', '/api/lab/cases', 'Listar casos do laboratório'),

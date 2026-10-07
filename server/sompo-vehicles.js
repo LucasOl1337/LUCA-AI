@@ -116,4 +116,15 @@ export function registerSompoVehicleRoutes(app, { dataDir = process.env.LUCA_DAT
     save(next);
     res.json({ ok: true, vehicle: record });
   }));
+
+  // Episódios gravados guardam o retrato do veículo (vehicleSnapshot): excluir
+  // do cadastro não apaga histórico nem caso do Laboratório. O dispositivo fica livre.
+  app.delete('/api/sompo/vehicles/:id', route((req, res) => {
+    const id = String(req.params.id || '').toLowerCase();
+    const vehicles = read();
+    const removed = vehicles.find((item) => item.id.toLowerCase() === id);
+    if (!removed) throw new VehicleError('Veículo não encontrado.', 404, 'sompo_vehicle_not_found');
+    save(vehicles.filter((item) => item !== removed));
+    res.json({ ok: true, vehicle: removed });
+  }));
 }

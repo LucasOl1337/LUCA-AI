@@ -2,7 +2,7 @@
 
 Gerada por `npm run cli:docs` a partir de `cli/catalog.js`. Não editar à mão.
 
-117 comandos; 96 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
+118 comandos; 97 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
 
 IDs são argumentos posicionais. Campos comuns podem ser flags; corpos completos usam `--data @arquivo.json`. Flags prevalecem sobre o corpo; objetos aninhados não são mesclados. Campos string são literais; apenas campos JSON e `--data` interpretam `@arquivo`/`-`.
 
@@ -709,6 +709,14 @@ Editar veículo; o ID não muda.
 `PUT /api/sompo/vehicles/:id`; autenticação: **session**.
 
 `--veiculo` (string)<br>`--placa` (string)<br>`--modelo` (string)<br>`--modelo3d` (string)<br>`--dispositivo` (string): ID do ESP32 no feed; vazio desassocia
+
+### `sompo vehicles delete <id>`
+
+Excluir veículo; episódios gravados mantêm o retrato do veículo.
+
+`DELETE /api/sompo/vehicles/:id`; autenticação: **session**.
+
+Nenhum; consulte a descrição para entradas por `--data`.
 
 ### `sompo risk list`
 

@@ -10,7 +10,7 @@ export class SompoVehicleRequestError extends Error {
   }
 }
 
-async function vehicleRequest<T>(path: string, method: 'GET' | 'POST' | 'PUT', body?: unknown): Promise<T> {
+async function vehicleRequest<T>(path: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: unknown): Promise<T> {
   const response = await fetch(`/api/sompo/vehicles${path}`, {
     method,
     credentials: 'same-origin',
@@ -37,4 +37,8 @@ export async function createSompoVehicle(vehicle: Omit<SompoVehicle, 'exemplo' |
 
 export async function updateSompoVehicle(id: string, changes: Partial<Omit<SompoVehicle, 'id' | 'exemplo' | 'createdAt' | 'updatedAt'>>) {
   return (await vehicleRequest<{ vehicle: SompoVehicle }>(`/${encodeURIComponent(id)}`, 'PUT', changes)).vehicle;
+}
+
+export async function deleteSompoVehicle(id: string) {
+  return (await vehicleRequest<{ vehicle: SompoVehicle }>(`/${encodeURIComponent(id)}`, 'DELETE')).vehicle;
 }

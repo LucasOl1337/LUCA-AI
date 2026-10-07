@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Loader2, Pencil, Play, Plus, Tractor, Truck, X } from 'lucide-react';
+import { Loader2, Pencil, Play, Plus, Tractor, Trash2, Truck, X } from 'lucide-react';
 import {
   SOMPO_VEHICLE_MODELS_3D,
   SOMPO_VEHICLE_TYPES,
@@ -10,7 +10,7 @@ import {
   type SompoVehicleModel3dId,
   type SompoVehicleType,
 } from '../../../shared/sompo-vehicles.js';
-import { createSompoVehicle, updateSompoVehicle, SompoVehicleRequestError } from '@/lib/sompo-vehicles-client';
+import { createSompoVehicle, deleteSompoVehicle, updateSompoVehicle, SompoVehicleRequestError } from '@/lib/sompo-vehicles-client';
 
 interface SompoVehiclesPanelProps {
   vehicles: SompoVehicle[];
@@ -18,6 +18,7 @@ interface SompoVehiclesPanelProps {
   error: string | null;
   activeId: string;
   onSaved: (vehicle: SompoVehicle) => void;
+  onDeleted: (vehicle: SompoVehicle) => void;
   onUse: (vehicle: SompoVehicle) => void;
 }
 
@@ -30,11 +31,31 @@ export function SompoVehicleIcon({ veiculo }: { veiculo: SompoVehicleType }) {
   return veiculo === 'Trator' ? <Tractor aria-hidden="true" /> : <Truck aria-hidden="true" />;
 }
 
-/** Cadastro de veículos da conta: lista, cria, edita e escolhe o que vai pro simulador. */
-export default function SompoVehiclesPanel({ vehicles, loading, error, activeId, onSaved, onUse }: SompoVehiclesPanelProps) {
+/** Cadastro de veículos da conta: lista, cria, edita, exclui e escolhe o que vai pro simulador. */
+export default function SompoVehiclesPanel({ vehicles, loading, error, activeId, onSaved, onDeleted, onUse }: SompoVehiclesPanelProps) {
   const [editing, setEditing] = useState<{ mode: 'create' | 'edit'; draft: Draft } | null>(null);
   const [fieldError, setFieldError] = useState<{ field: string; message: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  // Exclusão em dois passos, no próprio card: o primeiro clique só pede confirmação.
+  const [confirmingId, setConfirmingId] = useState('');
+  const [deletingId, setDeletingId] = useState('');
+  const [deleteError, setDeleteError] = useState<{ id: string; message: string } | null>(null);
+
+  async function remove(vehicle: SompoVehicle) {
+    if (deletingId) return;
+    setDeletingId(vehicle.id);
+    setDeleteError(null);
+    try {
+      await deleteSompoVehicle(vehicle.id);
+      setConfirmingId('');
+      if (editing?.draft.id === vehicle.id) setEditing(null);
+      onDeleted(vehicle);
+    } catch (err) {
+      setDeleteError({ id: vehicle.id, message: err instanceof Error ? err.message : 'Não foi possível excluir o veículo.' });
+    } finally {
+      setDeletingId('');
+    }
+  }
 
   function open(mode: 'create' | 'edit', vehicle?: SompoVehicle) {
     setFieldError(null);
@@ -114,7 +135,25 @@ export default function SompoVehiclesPanel({ vehicles, loading, error, activeId,
               <div className="sompo-vehicles-actions">
                 <button type="button" onClick={() => onUse(vehicle)}><Play aria-hidden="true" /> Usar no simulador</button>
                 <button type="button" onClick={() => open('edit', vehicle)} aria-label={`Editar ${vehicle.id}`}><Pencil aria-hidden="true" /> Editar</button>
+                {confirmingId !== vehicle.id && (
+                  <button type="button" onClick={() => { setConfirmingId(vehicle.id); setDeleteError(null); }} aria-label={`Excluir ${vehicle.id}`}><Trash2 aria-hidden="true" /> Excluir</button>
+                )}
               </div>
+              {confirmingId === vehicle.id && (
+                <div className="sompo-vehicles-confirm" role="group" aria-label={`Confirmar exclusão de ${vehicle.id}`}>
+                  <p>
+                    Excluir {vehicle.id} do cadastro? Episódios já gravados e casos do Laboratório mantêm o retrato do veículo.
+                    {vehicle.dispositivo ? ` O ESP32 ${vehicle.dispositivo} fica sem veículo associado.` : ''}
+                  </p>
+                  {deleteError?.id === vehicle.id && <p className="sompo-vehicles-error" role="alert">{deleteError.message}</p>}
+                  <div className="sompo-vehicles-actions">
+                    <button type="button" data-tone="danger" onClick={() => remove(vehicle)} disabled={deletingId === vehicle.id}>
+                      {deletingId === vehicle.id ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Trash2 aria-hidden="true" />} Excluir de vez
+                    </button>
+                    <button type="button" onClick={() => setConfirmingId('')} disabled={deletingId === vehicle.id}>Cancelar</button>
+                  </div>
+                </div>
+              )}
             </li>
           ))}
         </ul>
