@@ -2543,7 +2543,8 @@
 }
 
 @media (max-width: 560px) {
-  .sompo-view-switch {
+  /* Com quatro abas, 2x2 segura o chip do veículo na primeira tela (vence a regra de 640px). */
+  .sompo-page .sompo-view-switch {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
@@ -2572,9 +2573,27 @@
     max-width: none;
   }
 
+  /* O select ocupa a primeira linha inteira; nota e Gerenciar descem juntos. */
+  .sompo-vehicle-bar label > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .sompo-vehicle-bar label {
+    flex-basis: calc(100% - 30px);
+  }
+
   .sompo-vehicle-bar small {
     order: 3;
-    flex-basis: 100%;
+    flex: 1 1 0;
+  }
+
+  .sompo-vehicle-bar button {
+    order: 4;
   }
 
   .sompo-vehicles {
