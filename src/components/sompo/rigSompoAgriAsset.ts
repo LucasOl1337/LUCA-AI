@@ -251,6 +251,30 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
     const material = (node as THREE.Mesh).material as THREE.Material | undefined;
     if (material && !Array.isArray(material)) wear(material);
   });
+  // Trator MAX: as lentes do GLB são cor de vértice no material único do corpo, sem
+  // emissão própria. Lentes finas por cima, nas posições do gerador (escala 0,97526 e
+  // +0,0518 m em X, como `sim()` em build-max-tractor.py), acendem pelo frame sem tocar
+  // no GLB e ficam fora do desgaste.
+  const maxLenses = equipmentId === 'max-tractor' ? {
+    head: new THREE.MeshStandardMaterial({ name: 'max-lente-farol', color: 0xd9dde0, emissive: 0xfff0cd, emissiveIntensity: 0, roughness: .2 }),
+    roof: new THREE.MeshStandardMaterial({ name: 'max-lente-teto', color: 0xd9dde0, emissive: 0xf4f6ff, emissiveIntensity: 0, roughness: .2 }),
+    amber: new THREE.MeshStandardMaterial({ name: 'max-lente-ambar', color: 0xe0700a, emissive: 0xff9a1f, emissiveIntensity: 0, roughness: .3 }),
+    red: new THREE.MeshStandardMaterial({ name: 'max-lente-vermelha', color: 0x8a0f0a, emissive: 0xff2714, emissiveIntensity: 0, roughness: .3 }),
+  } : null;
+  if (maxLenses) {
+    const disc = new THREE.CylinderGeometry(1, 1, .008, 16).rotateZ(Math.PI / 2);
+    const lens = (name: string, material: THREE.Material, x: number, y: number, z: number, radius: number) => {
+      const mesh = new THREE.Mesh(disc, material); mesh.name = name;
+      mesh.position.set(x, y, z); mesh.scale.set(1, radius, radius); body.add(mesh);
+    };
+    for (const side of [-1, 1]) {
+      const head = new THREE.Mesh(new THREE.BoxGeometry(.008, .146, .195), maxLenses.head);
+      head.name = 'max-lente-farol'; head.position.set(1.7723, 1.1703, side * .1365); body.add(head);
+      lens('max-lente-teto', maxLenses.roof, .3923, 3.0574, side * .2536, .0536);
+      lens('max-lente-ambar', maxLenses.amber, .3923, 3.0574, side * .3901, .0536);
+      lens('max-lente-traseira', maxLenses.red, -1.4492, 3.0331, side * .3121, .0439);
+    }
+  }
   const initialHitch = implement.position.clone();
   const hydraulics: { barrel: THREE.Mesh; rod: THREE.Mesh; base: THREE.Vector3; end: THREE.Vector3 }[] = [];
   const end = new THREE.Vector3(), direction = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
@@ -310,6 +334,12 @@ export function rigSompoAgriAsset(source: THREE.Object3D, equipmentId: SompoAgri
       worklampMaterial.emissiveIntensity = tractorLike(equipmentId) ? authoredLight : frame.workLights * 4.2;
       const beaconPulse = Math.pow(Math.max(0, Math.sin(frame.atMs / 1000 * 7)), 2);
       beaconDomeMaterial.emissiveIntensity = frame.beacon * (1.1 + beaconPulse * 5);
+      if (maxLenses) {
+        maxLenses.head.emissiveIntensity = frame.headlights * 4.2;
+        maxLenses.roof.emissiveIntensity = Math.max(frame.headlights * .6, frame.workLights) * 4.2;
+        maxLenses.amber.emissiveIntensity = frame.beacon * (1.1 + beaconPulse * 5);
+        maxLenses.red.emissiveIntensity = Math.max(frame.brakeLights * 3, frame.headlights > .3 ? .55 : 0);
+      }
     },
   };
 }
