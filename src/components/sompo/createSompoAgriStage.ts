@@ -64,6 +64,8 @@ function fallbackMachine(equipmentId: SompoAgriEquipmentId) {
 }
 
 const HAY_BALE_RADIUS = 0.72;
+// Face interna da parede do fundo do barracão, em x local (createBarn: D=6, chapa de 0,18 m).
+const BARN_BACK_WALL_INNER_X = 5.91;
 
 /** Fardo redondo de feno deitado no caminho do Trator MAX: obstáculo sem animal nem pessoa. */
 function createHayBale() {
@@ -221,7 +223,19 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   }));
   // geofencing (módulo src/geofencing): faixas no chão, tinta no plantio e contornos do talhão; grupo vazio sem talhão.
   worldRoot.add(createSompoGeofenceLayer({ scenarioId, outcomeId, field, operation }));
-  if (scenario.environmentId === 'farm-barn') {
+  const barnWall = scenario.equipmentId === 'max-tractor' && scenario.obstacle?.kind === 'barn-back-wall' ? scenario.obstacle : null;
+  if (barnWall) {
+    // Trator MAX entra de frente: fachada com o vão virada para o trator e a face
+    // interna da parede do fundo (x local 5,91) a `startGapM` à frente do emissor
+    // do HC-SR04. Espelhado em z para o lado aberto continuar virado para a câmera
+    // (o three.js inverte a face pelo determinante); o vão (centro z=1 no barracão)
+    // cai na linha do percurso.
+    const barn = field.root.getObjectByName('sompo-agri-barn');
+    const wallX = startX + SOMPO_AGRI_RIG_LAYOUT['max-tractor'].sensor[0] + barnWall.startGapM;
+    if (barn) { barn.rotation.y = 0; barn.scale.z = -1; barn.position.set(wallX - BARN_BACK_WALL_INNER_X, 0, 1); }
+    // O pilar de balanço é da ré do trator agrícola; aqui ficaria no corredor.
+    if (field.barnPost) field.barnPost.visible = false;
+  } else if (scenario.environmentId === 'farm-barn') {
     // O barracão gira para a manobra de ré terminar estacionada lá dentro.
     // A porta fica ~1 m atrás da ponta do implemento em t=0. O conjunto
     // começa fora e a ré termina com o implemento dentro do vão.
@@ -270,7 +284,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   // Aqui a régua é métrica (cm/100), e o obstáculo é fixo no mundo.
   const sensorBeam = max ? createUltrasonicBeam(SOMPO_AGRI_RIG_LAYOUT['max-tractor'].sensor) : null;
   if (sensorBeam) machine.add(sensorBeam.group);
-  const obstacle = max && scenario.obstacle && !physical ? createHayBale() : null;
+  const obstacle = max && scenario.obstacle?.kind === 'hay-bale' && !physical ? createHayBale() : null;
   if (obstacle && scenario.obstacle) {
     const nearX = startX + SOMPO_AGRI_RIG_LAYOUT['max-tractor'].sensor[0] + scenario.obstacle.startGapM;
     obstacle.position.set(nearX + HAY_BALE_RADIUS, field.groundHeight(nearX + HAY_BALE_RADIUS, 0), 0);
@@ -310,7 +324,12 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   orbit.maxDistance = operation ? 650 : 30;
   orbit.maxPolarAngle = Math.PI * 0.49;
   orbit.target.set(startX, 1.6, 0);
-  camera.position.set(startX + 10.5, 5.2, 12.5);
+  // Visão geral: o MAX tem 4,5 m e some no talhão a 17 m; chega mais perto e mais
+  // baixo para o trator ocupar o quadro em vez dos silos ao fundo.
+  // No galpão a câmera recua para fora da linha de pilares do vão aberto e sobe
+  // até perto do beiral: o olhar passa entre os pilares e pega a parede do fundo.
+  const overview = barnWall ? { x: 1.2, y: 4.6, z: 12.5 } : max ? { x: 6.2, y: 3.4, z: 7.6 } : { x: 10.5, y: 5.2, z: 12.5 };
+  camera.position.set(startX + overview.x, overview.y, overview.z);
 
   let focusTarget: 'truck' | 'sensor' = 'truck';
   let overviewPending = operation; // Visão geral do talhão inteiro: só na montagem e ao clicar, não a cada relayout.
@@ -466,7 +485,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
         ? focusPoint.set(machine.position.x + 2.5, machine.position.y + 2.2, machine.position.z)
         : focusPoint.set(machine.position.x, machine.position.y + 1.6, machine.position.z);
       orbit.target.copy(anchor);
-      camera.position.set(anchor.x + (target === 'sensor' ? 6 : 10.5), machine.position.y + (target === 'sensor' ? 4 : 5.2), anchor.z + (target === 'sensor' ? 6.5 : 12.5));
+      camera.position.set(anchor.x + (target === 'sensor' ? 6 : overview.x), machine.position.y + (target === 'sensor' ? 4 : overview.y), anchor.z + (target === 'sensor' ? 6.5 : overview.z));
       orbit.update();
     },
     adjust(action) {

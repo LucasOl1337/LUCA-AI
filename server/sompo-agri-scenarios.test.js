@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SOMPO_MAX_TRACTOR_AGRI_PARITY } from '../shared/sompo-max-tractor-scenarios.js';
+import { SOMPO_MAX_TRACTOR_AGRI_PARITY, SOMPO_MAX_TRACTOR_TRUCK_PARITY } from '../shared/sompo-max-tractor-scenarios.js';
+import { SOMPO_SIMULATION_SCENARIOS } from '../shared/sompo-telemetry-simulator.js';
 import { createSompoMotionPath } from '../shared/sompo-motion.js';
 import {
   SOMPO_AGRI_EQUIPMENT,
@@ -19,13 +20,15 @@ const EXPECTED = [
   'agri-hydraulic-failure',
   'agri-night-operation',
   'agri-tractor-rollover',
+  'max-barn-approach',
   'max-field-bogging',
   'max-field-operation',
   'max-front-obstacle',
+  'max-night-operation',
   'max-slope-rollover',
 ];
 
-test('catálogo agrícola cobre as operações, os quatro cases do MAX e os três equipamentos', () => {
+test('catálogo agrícola cobre as operações, os seis cases do MAX e os três equipamentos', () => {
   assert.deepEqual(Object.keys(SOMPO_AGRI_SCENARIOS).sort(), EXPECTED);
   assert.deepEqual(Object.keys(SOMPO_AGRI_EQUIPMENT).sort(), ['harvester', 'max-tractor', 'tractor']);
   assert.match(SOMPO_AGRI_EQUIPMENT['max-tractor'].assetUrl, /max-tractor\.glb$/);
@@ -150,9 +153,9 @@ test('troca de direção só acontece entre pontas imobilizadas', () => {
   }
 });
 
-test('Trator MAX: quatro cases próprios, sem canais de implemento', () => {
+test('Trator MAX: seis cases próprios, sem canais de implemento', () => {
   const max = Object.values(SOMPO_AGRI_SCENARIOS).filter((item) => item.equipmentId === 'max-tractor');
-  assert.deepEqual(max.map((item) => item.scenarioId).sort(), ['max-field-bogging', 'max-field-operation', 'max-front-obstacle', 'max-slope-rollover']);
+  assert.deepEqual(max.map((item) => item.scenarioId).sort(), ['max-barn-approach', 'max-field-bogging', 'max-field-operation', 'max-front-obstacle', 'max-night-operation', 'max-slope-rollover']);
   for (const item of max) {
     assert.equal(item.distanceSensorPosition, 'front', `${item.scenarioId}: HC-SR04 na frente`);
     for (const selectedOutcome of Object.values(item.outcomes)) {
@@ -216,4 +219,67 @@ test('todo case agrícola tem destino no Trator MAX, com motivo quando não vira
     else assert.ok(entry.reason?.length > 10, id);
   }
   assert.equal(SOMPO_MAX_TRACTOR_AGRI_PARITY['agri-hydraulic-failure'].status, 'incompativel');
+  assert.ok(Object.values(SOMPO_MAX_TRACTOR_AGRI_PARITY).every((entry) => entry.status !== 'pendente'), 'nenhum case agrícola fica pendente');
+});
+
+test('Trator MAX: galpão de frente mede a parede do fundo pela própria cinemática', () => {
+  const scenario = getSompoAgriScenario('max-barn-approach');
+  assert.equal(scenario.environmentId, 'farm-barn');
+  assert.equal(scenario.obstacle.kind, 'barn-back-wall');
+  // Face interna do fundo a 11,91 m do vão: o emissor começa do lado de fora.
+  assert.ok(scenario.obstacle.startGapM > 11.91 + 2, 'começa antes do vão');
+  for (const [outcomeId, finalCm, tolerance] of [['parked', 60, 4], ['wall-contact', 2, 1]]) {
+    const path = createSompoMotionPath((atMs) => getSompoAgriFrame('max-barn-approach', atMs, outcomeId), scenario.totalMs);
+    const point = { x: 0, z: 0 };
+    for (let atMs = 0; atMs <= scenario.totalMs; atMs += 100) {
+      const frame = getSompoAgriFrame('max-barn-approach', atMs, outcomeId);
+      const gapCm = (scenario.obstacle.startGapM - path.sample(atMs, point).x) * 100;
+      if (gapCm <= 390) assert.ok(Math.abs(frame.distance - Math.max(2, gapCm)) <= 10, `${outcomeId}/${atMs}: lido ${frame.distance}, geométrico ${gapCm.toFixed(1)}`);
+      else assert.ok(frame.distance >= 380, `${outcomeId}/${atMs}: fora do alcance satura`);
+      assert.ok(gapCm >= 0, `${outcomeId}/${atMs}: não atravessa a parede`);
+    }
+    const end = getSompoAgriFrame('max-barn-approach', scenario.totalMs, outcomeId);
+    assert.equal(end.speedKph, 0);
+    assert.ok(Math.abs(end.distance - finalCm) <= tolerance, `${outcomeId}: final ${end.distance} cm`);
+    const alert = getSompoAgriFrame('max-barn-approach', 13_500, outcomeId);
+    assert.ok(Math.abs(alert.distance - 150) <= 2, `alerta perto de 150 cm, lido ${alert.distance}`);
+    assert.equal(alert.collisionRisk, true);
+    assert.equal(getSompoAgriFrame('max-barn-approach', 12_000, outcomeId).collisionRisk, false);
+    assert.equal(getSompoAgriFrame('max-barn-approach', 0, outcomeId).headlights, 1);
+  }
+});
+
+test('Trator MAX: noite acende faróis e a falha apaga e para', () => {
+  assert.equal(getSompoAgriScenario('max-night-operation').environmentId, 'row-crop-field-night');
+  const lit = getSompoAgriFrame('max-night-operation', 8_000, 'lit-pass');
+  assert.equal(lit.headlights, 1);
+  assert.equal(lit.workLights, 1);
+  assert.equal(lit.distance, 400);
+  const dark = getSompoAgriFrame('max-night-operation', 14_000, 'light-failure');
+  assert.equal(dark.headlights, 0);
+  assert.equal(dark.speedKph, 0);
+  assert.equal(getSompoAgriFrame('max-front-obstacle', 3_000, 'safe-stop').headlights, 1, 'obstáculo com farol aceso');
+});
+
+test('os 20 cases do caminhão têm destino no Trator MAX, com motivo', () => {
+  assert.equal(Object.keys(SOMPO_SIMULATION_SCENARIOS).length, 20);
+  assert.deepEqual(Object.keys(SOMPO_MAX_TRACTOR_TRUCK_PARITY).sort(), Object.keys(SOMPO_SIMULATION_SCENARIOS).sort());
+  for (const [id, entry] of Object.entries(SOMPO_MAX_TRACTOR_TRUCK_PARITY)) {
+    assert.ok(['adaptado', 'incompativel'].includes(entry.status), id);
+    assert.ok(entry.reason.length > 20, `${id}: motivo`);
+    if (entry.status === 'adaptado') {
+      const target = SOMPO_AGRI_SCENARIOS[entry.maxId];
+      assert.equal(target?.equipmentId, 'max-tractor', `${id}: aponta um case do MAX`);
+      if (entry.outcomeId) assert.ok(target.outcomes[entry.outcomeId], `${id}: desfecho ${entry.outcomeId} existe`);
+    } else assert.equal(entry.maxId, undefined, id);
+  }
+  // Velocidade de rodovia não vira case do MAX.
+  for (const id of ['steep-descent', 'tire-blowout', 'aquaplaning', 'brake-failure', 'driver-drowsiness', 'fast-corner']) {
+    assert.equal(SOMPO_MAX_TRACTOR_TRUCK_PARITY[id].status, 'incompativel', id);
+  }
+  // Calor: mesma temperatura ambiente do sensor, sem flag térmica.
+  const hot = getSompoAgriFrame('max-field-operation', 10_500, 'hot-weather');
+  assert.equal(hot.temperature, 43);
+  assert.equal(hot.collisionRisk, false);
+  assert.equal(hot.inclinationRisk, false);
 });

@@ -13,7 +13,9 @@ export type SompoAgriScenarioId =
   | 'max-field-operation'
   | 'max-front-obstacle'
   | 'max-slope-rollover'
-  | 'max-field-bogging';
+  | 'max-field-bogging'
+  | 'max-barn-approach'
+  | 'max-night-operation';
 export type SompoAgriEnvironmentId =
   | 'row-crop-field'
   | 'sloped-field'
@@ -65,7 +67,7 @@ export interface SompoAgriScenario extends Omit<SompoSimulationControls, 'scenar
   /** Origem em x declarada (metros de cena). Sem ela o percurso é centrado em x. */
   readonly startX?: number;
   /** Obstáculo parado à frente do sensor: posição inicial em metros a partir do emissor. */
-  readonly obstacle?: Readonly<{ kind: 'hay-bale'; startGapM: number }>;
+  readonly obstacle?: Readonly<{ kind: 'hay-bale' | 'barn-back-wall'; startGapM: number }>;
   readonly phases: readonly Readonly<SompoAgriPhase>[];
   readonly outcomes: Readonly<Record<string, Readonly<SompoAgriOutcome>>>;
 }
