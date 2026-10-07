@@ -33,6 +33,7 @@ export const PERSONA_FILTRO = Object.freeze(['all', 'visiveis', 'ocultas', 'edit
 export const SOMPO_ABA = 'casos';
 export const SOMPO_TELEMETRY_ABA = 'telemetria';
 export const SOMPO_FLEET_ABA = 'safra';
+export const SOMPO_VEHICLES_ABA = 'veiculos';
 export const LUCA_ABA = 'atividade';
 export const ADMIN_ABAS = Object.freeze(['personas', 'configuracao']);
 export const CONFIG_TIPO = Object.freeze(['team', 'individual']);
@@ -89,6 +90,7 @@ const EMPTY_QUERY = Object.freeze({
   modo: '',
   cenario: '',
   desfecho: '',
+  veiculo: '',
 });
 
 export function emptyAppLocation() {
@@ -130,7 +132,7 @@ function parseQuery(search) {
     ? (ORDEM_PARAM[ordemRaw] ? ordemRaw : ORDEM_API[ordemRaw])
     : '';
   const abaRaw = readParam(search, 'aba');
-  const aba = [SOMPO_ABA, SOMPO_TELEMETRY_ABA, SOMPO_FLEET_ABA, LUCA_ABA, ...ADMIN_ABAS].includes(abaRaw) ? abaRaw : '';
+  const aba = [SOMPO_ABA, SOMPO_TELEMETRY_ABA, SOMPO_FLEET_ABA, SOMPO_VEHICLES_ABA, LUCA_ABA, ...ADMIN_ABAS].includes(abaRaw) ? abaRaw : '';
 
   return {
     busca: readParam(search, 'busca'),
@@ -152,6 +154,8 @@ function parseQuery(search) {
     modo: readParam(search, 'modo') === 'individual' ? 'individual' : '',
     cenario: readParam(search, 'cenario'),
     desfecho: readParam(search, 'desfecho'),
+    // Veículo do cadastro (aba Veículos): precede cenário e preset do estúdio.
+    veiculo: readParam(search, 'veiculo'),
   };
 }
 
@@ -228,12 +232,14 @@ export function formatAppUrl(location) {
     if (loc.aba === SOMPO_FLEET_ABA) params.set('aba', SOMPO_FLEET_ABA);
     if (loc.aba === SOMPO_ABA) params.set('aba', SOMPO_ABA);
     if (loc.aba === SOMPO_TELEMETRY_ABA) params.set('aba', SOMPO_TELEMETRY_ABA);
+    if (loc.aba === SOMPO_VEHICLES_ABA) params.set('aba', SOMPO_VEHICLES_ABA);
     setIfPresent(params, 'busca', loc.busca);
     setIfPresent(params, 'produto', loc.produto);
     setIfPresent(params, 'gravidade', loc.gravidade);
     setIfPresent(params, 'caso', loc.caso);
     setIfPresent(params, 'cenario', loc.cenario);
     setIfPresent(params, 'desfecho', loc.desfecho);
+    setIfPresent(params, 'veiculo', loc.veiculo);
     if (loc.aba !== SOMPO_ABA && loc.fonte === 'simulacao') params.set('fonte', 'simulacao');
     if (loc.aba !== SOMPO_ABA && loc.fonte === 'firebase') params.set('fonte', 'firebase');
   }
@@ -285,6 +291,7 @@ export function mergeAppLocation(current, patch) {
 /** A entrada fica em /sompo; links compartilhados continuam abrindo a área escolhida. */
 export function getSompoView(location) {
   if (location.aba === SOMPO_FLEET_ABA) return 'fleet';
+  if (location.aba === SOMPO_VEHICLES_ABA) return 'vehicles';
   if (location.aba === SOMPO_ABA) return 'cases';
   if (location.aba === SOMPO_TELEMETRY_ABA || location.fonte) return 'telemetry';
   if (location.caso || location.produto || location.gravidade || location.busca) return 'cases';

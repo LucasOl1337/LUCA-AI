@@ -22,6 +22,7 @@ export interface AppLocation {
     modo: string;
     cenario: string;
     desfecho: string;
+    veiculo: string;
   }
 
 export const APP_PAGES: readonly AppPageId[];
@@ -30,7 +31,8 @@ export const PERSONA_FILTRO: readonly string[];
 export const SOMPO_ABA: 'casos';
 export const SOMPO_TELEMETRY_ABA: 'telemetria';
 export const SOMPO_FLEET_ABA: 'safra';
-export function getSompoView(location: Partial<AppLocation>): 'welcome' | 'cases' | 'telemetry' | 'fleet';
+export const SOMPO_VEHICLES_ABA: 'veiculos';
+export function getSompoView(location: Partial<AppLocation>): 'welcome' | 'cases' | 'telemetry' | 'fleet' | 'vehicles';
 export const LUCA_ABA: 'atividade';
 export const ADMIN_ABAS: readonly string[];
 export const CONFIG_TIPO: readonly string[];

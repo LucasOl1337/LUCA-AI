@@ -83,6 +83,8 @@ test('toda tela alcançável redonda no parser sem perder o endereço', () => {
     ['/sompo?fonte=simulacao', '/sompo?fonte=simulacao'],
     ['/sompo?aba=casos', '/sompo?aba=casos'],
     ['/sompo?aba=safra', '/sompo?aba=safra'],
+    ['/sompo?aba=veiculos', '/sompo?aba=veiculos'],
+    ['/sompo?aba=telemetria&veiculo=trator-0001', '/sompo?aba=telemetria&veiculo=trator-0001'],
     ['/sompo?aba=casos&produto=penhor&gravidade=alta&caso=penhor-trator-incendio', '/sompo?aba=casos&produto=penhor&gravidade=alta&caso=penhor-trator-incendio'],
     ['/luca-ai', '/luca-ai'],
     ['/luca-ai?modo=individual', '/luca-ai?modo=individual'],
@@ -159,4 +161,11 @@ test('App lê a barra em vez de luca.activePage', () => {
 test('Safra is a distinct view even with legacy scenario parameters', () => {
   assert.equal(getSompoView(parseAppLocation('/sompo?aba=safra')), 'fleet');
   assert.equal(getSompoView(parseAppLocation('/sompo?aba=safra&fonte=firebase&caso=old')), 'fleet');
+});
+
+test('Veículos is its own SOMPO tab and the selected vehicle survives the URL', () => {
+  assert.equal(getSompoView(parseAppLocation('/sompo?aba=veiculos')), 'vehicles');
+  const location = parseAppLocation('/sompo?aba=telemetria&veiculo=trator-0001&cenario=max-front-obstacle');
+  assert.equal(location.veiculo, 'trator-0001');
+  assert.equal(getSompoView(location), 'telemetry');
 });
