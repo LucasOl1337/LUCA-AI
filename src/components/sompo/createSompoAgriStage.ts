@@ -23,8 +23,21 @@ import { createSompoPostProcessing } from './createSompoPostProcessing';
 import { createSompoRenderMeter } from './sompoStage';
 import { exportSompoModel } from './refineSompoTruck';
 import { SOMPO_STUDIO_DEFAULT, type SompoStudioConfig, type SompoRenderStats } from './sompoStudioConfig';
+import { sensorReadingToPose, type SompoAxisCalibration } from './sensorPose.js';
+import { frameDamping } from './frameDamping.js';
+import type { SompoTelemetrySnapshot } from '@/lib/types';
 
 export type SompoAgriStageApi = SompoStageApi;
+
+/** Modo físico: a máquina do cadastro acoplada ao ESP32 do feed, em vez do roteiro. */
+export interface SompoAgriPhysicalInput {
+  previewRef: { current: SompoTelemetrySnapshot };
+  axisCalibrationRef: { current: SompoAxisCalibration };
+}
+
+function dampAngle(current: number, target: number, factor: number) {
+  return current + Math.atan2(Math.sin(target - current), Math.cos(target - current)) * factor;
+}
 
 
 /** Silhueta honesta com as dimensões nominais quando o GLB gerado não carrega. */
@@ -86,13 +99,14 @@ function createUltrasonicBeam(origin: readonly [number, number, number]) {
   pulse.rotation.y = Math.PI / 2; pulse.name = 'ultrasonic-pulse'; group.add(pulse);
   return {
     group,
-    update(distanceCm: number, alert: boolean, elapsedMs: number) {
+    update(distanceCm: number, alert: boolean, elapsedMs: number, uncertain = false) {
       // 400 cm é "sem eco": feixe no alcance máximo e mais apagado.
       const echo = distanceCm < 395;
       const length = Math.max(.02, Math.min(4, distanceCm / 100));
       for (const child of group.children) if (child !== pulse) child.scale.set(length, 1, 1);
       cone.scale.set(length, length, length);
-      const color = alert ? 0xff5d52 : 0x7dff9a;
+      // Leitura física velha ou desconhecida: âmbar, como o feixe do caminhão.
+      const color = uncertain ? 0xc9ad74 : alert ? 0xff5d52 : 0x7dff9a;
       lineMaterial.color.set(color); coneMaterial.color.set(color); (pulse.material as THREE.MeshBasicMaterial).color.set(color);
       lineMaterial.opacity = echo ? (alert ? 1 : .78) : .4;
       coneMaterial.opacity = echo ? (alert ? .26 : .16) : .07;
@@ -110,7 +124,7 @@ function createUltrasonicBeam(origin: readonly [number, number, number]) {
  * real em forma fechada: separado do loop do caminhão para não arriscar o
  * fluxo rural. Desmontado e remontado a cada troca de cenário/desfecho.
  */
-export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats }: {
+export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical }: {
   mount: HTMLElement;
   scenarioId: SompoAgriScenarioId;
   outcomeId: string;
@@ -122,6 +136,8 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   studioRef?: { current: SompoStudioConfig };
   getElapsed?: (time: number) => number;
   onStats?: (stats: SompoRenderStats) => void;
+  /** Sem roteiro: pose do IMU e distância do HC-SR04. Parado no talhão, porque sem GNSS não há trajetória. */
+  physical?: SompoAgriPhysicalInput;
 }): SompoAgriStageApi | null {
   const scenario = getSompoAgriScenario(scenarioId);
   const operation = scenario.environmentId === 'geofence-operacao';
@@ -254,7 +270,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   // Aqui a régua é métrica (cm/100), e o obstáculo é fixo no mundo.
   const sensorBeam = max ? createUltrasonicBeam(SOMPO_AGRI_RIG_LAYOUT['max-tractor'].sensor) : null;
   if (sensorBeam) machine.add(sensorBeam.group);
-  const obstacle = max && scenario.obstacle ? createHayBale() : null;
+  const obstacle = max && scenario.obstacle && !physical ? createHayBale() : null;
   if (obstacle && scenario.obstacle) {
     const nearX = startX + SOMPO_AGRI_RIG_LAYOUT['max-tractor'].sensor[0] + scenario.obstacle.startGapM;
     obstacle.position.set(nearX + HAY_BALE_RADIUS, field.groundHeight(nearX + HAY_BALE_RADIUS, 0), 0);
@@ -323,16 +339,49 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   let frameId = 0;
   const cameraShift = new THREE.Vector3();
 
+  // Quadro base do modo físico: luzes e solo de operação diurna, tudo parado.
+  const physicalBase = physical
+    ? { ...getSompoAgriFrame(scenarioId, 0, outcomeId), speedKph: 0, wheelSpeedKph: 0, yawRate: 0, roughness: 0, mud: 0, shudder: 0, vertical: 0, sink: 0, lateral: 0, roll: 0, pitch: 0, yaw: 0 }
+    : null;
+  let physicalHeading = 0;
+  let previousTime = performance.now();
+
   function render(time: number) {
     meter.begin();
+    const frameDelta = Math.max(0, (time - previousTime) / 1000);
+    previousTime = time;
     const elapsed = getElapsed ? getElapsed(time) : Math.max(0, time - startedAtRef.current);
-    const frame = getSompoAgriFrame(scenarioId, elapsed, outcomeId);
-    path.sample(reduceMotion.matches ? 0 : elapsed, pathPoint);
+    const snapshot = physical?.previewRef.current;
+    const physicalCurrent = !!snapshot && snapshot.freshness === 'fresh' && snapshot.connection.state === 'live';
+    const frame = physicalBase && snapshot
+      ? { ...physicalBase, distance: Number.isFinite(snapshot.readings.distance) ? Number(snapshot.readings.distance) : NaN, collisionRisk: !!snapshot.risks.collision }
+      : getSompoAgriFrame(scenarioId, elapsed, outcomeId);
+    path.sample(reduceMotion.matches || physical ? 0 : elapsed, pathPoint);
     const x = startX + pathPoint.x;
     // Authored lateral slip only applies where the script calls for it (capotamento,
     // tranco de contato); normal steering follows the integrated heading.
-    const z = pathPoint.z + (useLateral ? frame.lateral : 0);
-    machine.rotation.set(THREE.MathUtils.degToRad(frame.roll), THREE.MathUtils.degToRad(frame.yaw), THREE.MathUtils.degToRad(frame.pitch), 'YZX');
+    const z = pathPoint.z + (useLateral && !physical ? frame.lateral : 0);
+    if (physical && snapshot) {
+      // Mesma conversão de eixos do caminhão físico (calibração da página), com amortecimento.
+      const attitudeKnown = Number.isFinite(snapshot.readings.pitch) && Number.isFinite(snapshot.readings.roll);
+      const pose = sensorReadingToPose({
+        pitch: snapshot.readings.pitch,
+        roll: snapshot.readings.roll,
+        yawRate: snapshot.readings.rotation?.z,
+        currentHeading: physicalHeading,
+        deltaSeconds: reduceMotion.matches || !physicalCurrent ? 0 : Math.min(0.04, frameDelta),
+      }, physical.axisCalibrationRef.current);
+      physicalHeading = pose.rotationY;
+      const damping = reduceMotion.matches ? 1 : frameDamping(frameDelta, 5);
+      machine.rotation.set(
+        attitudeKnown ? dampAngle(machine.rotation.x, pose.rotationX, damping) : machine.rotation.x,
+        reduceMotion.matches ? 0 : pose.rotationY,
+        attitudeKnown ? dampAngle(machine.rotation.z, pose.rotationZ, damping) : machine.rotation.z,
+        'YZX',
+      );
+    } else {
+      machine.rotation.set(THREE.MathUtils.degToRad(frame.roll), THREE.MathUtils.degToRad(frame.yaw), THREE.MathUtils.degToRad(frame.pitch), 'YZX');
+    }
     // Chacoalho físico: slip de roda e roughness do roteiro viram tremor de
     // alta frequência + balanço lento das tentativas de desatolamento.
     const wheelKph = frame.wheelSpeedKph ?? frame.speedKph;
@@ -350,8 +399,9 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
       machine.rotation.x += tremor * 0.012 * Math.sin(elapsed * 0.047);
       machine.rotation.z += tremor * 0.009 * Math.sin(elapsed * 0.059 + 1.9);
     }
-    rig?.update(frame, integrateSompoMotion(keyframes, elapsed) / 3.6,
-      integrateSompoMotion(keyframes, elapsed, 'headerSpeed', false) * .8, reduceMotion.matches);
+    // Sem odômetro no ESP32: no modo físico as rodas ficam paradas, como no caminhão físico.
+    rig?.update(frame, physical ? 0 : integrateSompoMotion(keyframes, elapsed) / 3.6,
+      physical ? 0 : integrateSompoMotion(keyframes, elapsed, 'headerSpeed', false) * .8, reduceMotion.matches);
     const contactHeight = rig?.supportHeight(machine.rotation, x, z, field.groundHeight) ?? 0;
     machine.position.set(x, field.groundHeight(x, z) + contactHeight + THREE.MathUtils.clamp(frame.vertical, -0.6, 1) - frame.sink * .5, z);
     if (effort > 0.02) machine.position.y += effort * .014 * (0.5 + 0.5 * Math.sin(shakeT * 51));
@@ -368,7 +418,11 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     beaconSweep.intensity = reduceMotion.matches ? 0 : frame.beacon * 34;
     const sweepAngle = clock * 5.4;
     beaconSweep.target.position.set(beaconX + Math.cos(sweepAngle) * 11, -beaconTop, beaconZ + Math.sin(sweepAngle) * 11);
-    sensorBeam?.update(frame.distance, frame.collisionRisk, reduceMotion.matches ? 0 : elapsed);
+    if (sensorBeam) {
+      // Sem leitura de distância não há alvo: esconde o feixe em vez de inventar alcance.
+      sensorBeam.group.visible = Number.isFinite(frame.distance);
+      if (sensorBeam.group.visible) sensorBeam.update(frame.distance, frame.collisionRisk, reduceMotion.matches ? 0 : elapsed, !!physical && (!physicalCurrent || snapshot?.status === 'unknown'));
+    }
     focusPoint.set(machine.position.x + (focusTarget === 'sensor' ? 2.5 : 0), machine.position.y + (focusTarget === 'sensor' ? 2.2 : 1.6), machine.position.z);
     if (operation && focusTarget === 'truck') focusPoint.set(0, 0, 0);
     cameraShift.copy(focusPoint).sub(orbit.target);

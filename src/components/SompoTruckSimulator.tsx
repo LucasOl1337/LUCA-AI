@@ -319,6 +319,8 @@ export default function SompoTruckSimulator({
 }: SompoTruckSimulatorProps) {
   const isFirebase = source === 'firebase';
   const maxMode = vehicle?.modelo3d === 'trator-max';
+  // Feed físico associado (campo dispositivo) a um veículo de modelo MAX: palco agrícola sem roteiro.
+  const physicalMax = isFirebase && maxMode;
   const scenarioAllowed = (id: string) => (maxMode ? isMaxScenario(id) : !isMaxScenario(id));
   const [vehicleNotice, setVehicleNotice] = useState('');
   const physicalTwin = usePhysicalTwin(telemetry, isFirebase);
@@ -743,6 +745,31 @@ export default function SompoTruckSimulator({
     const mount = mountRef.current;
     if (!mount) return undefined;
 
+    if (physicalMax) {
+      setModelStatus('loading');
+      setModelAsset(null);
+      const stage = mountSompoAgriStage({
+        mount,
+        scenarioId: MAX_DEFAULT_SCENARIO,
+        outcomeId: getSompoAgriOutcomes(MAX_DEFAULT_SCENARIO)[0].id,
+        startedAtRef,
+        onModelStatus: (status, asset) => {
+          setModelStatus(status);
+          setModelAsset(asset);
+        },
+        onWebglError: () => setWebglError(true),
+        studioRef, getElapsed, onStats: setRenderStats,
+        physical: { previewRef, axisCalibrationRef },
+      });
+      if (!stage) return undefined;
+      setWebglError(false);
+      sceneApiRef.current = stage;
+      return () => {
+        sceneApiRef.current = null;
+        stage.dispose();
+      };
+    }
+
     // Palco agrícola: renderer independente (campo + equipamento gerado),
     // montado no mesmo canvas sem tocar no fluxo do caminhão rural.
     if (agriRun) {
@@ -780,7 +807,7 @@ export default function SompoTruckSimulator({
     if (!stage) return undefined;
     sceneApiRef.current = stage;
     return () => { sceneApiRef.current = null; stage.dispose(); };
-  }, [agriRun, isFirebase, studioConfig.truck]);
+  }, [agriRun, isFirebase, studioConfig.truck, physicalMax]);
 
   const onScenarioSelectRef = useRef(onScenarioSelect);
   onScenarioSelectRef.current = onScenarioSelect;
@@ -1052,7 +1079,7 @@ export default function SompoTruckSimulator({
         <div>
           <span><BoxIcon /> {isFirebase ? 'Gêmeo digital' : 'Laboratório virtual'}</span>
           <h2 id="sompo-simulator-title">
-            {isFirebase ? 'Caminhão 3D acoplado ao dispositivo físico' : agriRun ? 'Operação agrícola · laboratório de sinistros' : 'Estrada rural · laboratório de sinistros'}
+            {isFirebase ? `${physicalMax ? 'Trator' : 'Caminhão'} 3D acoplado ao dispositivo físico` : agriRun ? 'Operação agrícola · laboratório de sinistros' : 'Estrada rural · laboratório de sinistros'}
           </h2>
           <p>
             {isFirebase
@@ -1094,7 +1121,9 @@ export default function SompoTruckSimulator({
               ? undefined
               : agriRun
                 ? `Modelo 3D interativo de ${activeScenario.label.toLowerCase()} com telemetria virtual. Setas esquerda e direita giram; setas para cima e para baixo controlam o zoom.`
-                : `Modelo 3D interativo de um caminhão com caixa ESP32 ${isFirebase ? 'movido pela telemetria física' : 'virtual'}. Setas esquerda e direita giram; setas para cima e para baixo controlam o zoom.`}
+                : physicalMax
+                  ? `Modelo 3D interativo do ${vehicle?.modelo ?? 'trator'} com o HC-SR04 do ESP32 ${vehicle?.dispositivo ?? ''}, inclinado pela telemetria física e parado no talhão (sem GNSS). Setas esquerda e direita giram; setas para cima e para baixo controlam o zoom.`
+                  : `Modelo 3D interativo de um caminhão com caixa ESP32 ${isFirebase ? 'movido pela telemetria física' : 'virtual'}. Setas esquerda e direita giram; setas para cima e para baixo controlam o zoom.`}
           >
             {webglError && (
               <div className="sompo-simulator-webgl" role="status">
@@ -1130,7 +1159,7 @@ export default function SompoTruckSimulator({
           {studioOpen && renderStats && <div className="sompo-simulator-stats" aria-label="Métricas do render"><span>{renderStats.fps} FPS</span><span>{renderStats.cpuMs.toFixed(1)} ms CPU</span><span>{renderStats.calls} chamadas</span><span>{Math.round(renderStats.triangles / 1000)} mil triângulos</span></div>}
           <p className="sompo-simulator-hint">Arraste para girar · use as setas para navegar</p>
           <p className="sompo-simulator-credit">
-            {agriRun ? (
+            {agriRun || physicalMax ? (
               modelStatus === 'gltf'
                 ? `${modelAsset ?? 'Equipamento agrícola'} · modelagem procedural Blender por LUCA-AI`
                 : modelStatus === 'loading' ? 'Carregando equipamento agrícola…' : 'Silhueta nominal · GLB agrícola indisponível'
