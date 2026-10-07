@@ -1320,6 +1320,7 @@ export function createSompoTelemetryHistory({
       const { episode, summary, samples, frames } = getEpisode(publicId);
       return {
         publicId, tractorId: episode.tractorId, sourceKind: episode.sourceKind,
+        vehicleId: episode.vehicleId ?? null, model3dId: episode.model3dId ?? null,
         scenarioLabel: episode.scenarioLabel, status: episode.status,
         startedAt: episode.startedAt, endedAt: episode.endedAt,
         sampleCount: samples.length, peakAcceleration: summary.impact?.accMagnitude ?? null,

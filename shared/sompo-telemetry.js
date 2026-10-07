@@ -1,5 +1,6 @@
 // geofencing (módulo shared/geofencing): linha do resumo humano e bloco do dossiê do episódio gravado.
 import { episodeGeofenceHeadline, episodeGeofenceLines } from './geofencing/episode-dossier.js';
+import { SOMPO_VEHICLE_MODELS_3D } from './sompo-vehicles.js';
 
 export const SOMPO_TELEMETRY_PATH = '/trator/001/sensores';
 export const SOMPO_MISSION_DOSSIER_DELIMITER = '--- DOSSIÊ TÉCNICO ---';
@@ -364,6 +365,24 @@ function episodeFlagLine(summary) {
   return 'sem flag de colisão ativa no fim do episódio';
 }
 
+/**
+ * Veículo gravado no episódio (snapshot do cadastro no momento da gravação).
+ * Episódio antigo, sem snapshot, continua descrito como o caminhão do simulador.
+ */
+function episodeVehicleIdentity(episode) {
+  const snapshot = episode?.vehicleSnapshot;
+  const model = SOMPO_VEHICLE_MODELS_3D[episode?.model3dId];
+  if (!snapshot || typeof snapshot !== 'object' || !model) {
+    return { noun: 'caminhão', headline: `caminhão ${episode?.tractorId || 'SIM-001'}`, line: null };
+  }
+  const noun = snapshot.veiculo === 'Trator' ? 'trator' : 'caminhão';
+  return {
+    noun,
+    headline: `${noun} ${snapshot.id} (${snapshot.modelo})`,
+    line: `Veículo do episódio (cadastro no momento da gravação; editar o cadastro depois não muda este registro): ${snapshot.id} · ${snapshot.veiculo} · ${snapshot.modelo} · placa/ID ${snapshot.placa} · modelo 3D ${model.label} · simulador ${episode.tractorId || 'SIM-001'}`,
+  };
+}
+
 function buildEpisodeHumanSummary(episode, summary, frames = []) {
   const kindLabel = episodeKindLabel(episode.kind);
   const duration = episodeDurationSeconds(episode, summary);
@@ -402,7 +421,7 @@ const EPISODE_NO_FRAMES_LINE = 'Sem evidência visual: nenhum frame do simulador
  * "Anexo N" segue a ordem dos anexos da missão) + frames registrados mas fora do
  * orçamento de anexos, declarados explicitamente: nunca descartados em silêncio.
  */
-function episodeVisualEvidenceLines(frames) {
+function episodeVisualEvidenceLines(frames, noun = 'caminhão') {
   const list = Array.isArray(frames) ? frames : [];
   if (list.length === 0) return [EPISODE_NO_FRAMES_LINE];
   const attached = list.filter((frame) => frame.attached !== false);
@@ -423,7 +442,7 @@ function episodeVisualEvidenceLines(frames) {
   for (const frame of skipped) {
     lines.push(`- Registrado no episódio mas NÃO anexado (orçamento de anexos da bancada): ${describe(frame)}`);
   }
-  lines.push('Instrução: cruzem cada imagem com a telemetria do mesmo instante e digam explicitamente se batem ou divergem (ex.: "a distância registrada no dado confere com a posição do caminhão no Anexo 3?"). Citem os frames pelo número do anexo ao usar um exemplo visual na resposta. Concluam com a severidade do evento para a seguradora e a ação de prevenção no momento exato em que ela deveria ocorrer.');
+  lines.push(`Instrução: cruzem cada imagem com a telemetria do mesmo instante e digam explicitamente se batem ou divergem (ex.: "a distância registrada no dado confere com a posição do ${noun} no Anexo 3?"). Citem os frames pelo número do anexo ao usar um exemplo visual na resposta. Concluam com a severidade do evento para a seguradora e a ação de prevenção no momento exato em que ela deveria ocorrer.`);
   return lines;
 }
 
@@ -605,9 +624,11 @@ export function buildSompoEpisodeMission(episode, samples, summary, teamLabel, f
   const alertFinding = episodeAlertFindingLine(summary, collisionAlertExpected);
   const tractionFinding = episodeTractionFindingLine(summary);
   const visualData = buildSompoEpisodeVisualData(summary, { collisionAlertExpected });
+  const vehicle = episodeVehicleIdentity(episode);
 
   const briefing = [
-    `[SIMULAÇÃO] Episódio SOMPO: ${kindLabel}, caminhão ${episode.tractorId || 'SIM-001'}`,
+    `[SIMULAÇÃO] Episódio SOMPO: ${kindLabel}, ${vehicle.headline}`,
+    ...(vehicle.line ? [vehicle.line] : []),
     `Equipe selecionada para avaliar: ${teamLabel || 'equipe de risco agro'}`,
     `Identificador do episódio: ${episode.publicId}`,
     `Status: ${episode.status}`,
@@ -646,7 +667,7 @@ export function buildSompoEpisodeMission(episode, samples, summary, teamLabel, f
         })(),
       ]),
     '',
-    ...episodeVisualEvidenceLines(frames),
+    ...episodeVisualEvidenceLines(frames, vehicle.noun),
     '',
     'Objetivo: avaliar o EVENTO em sua totalidade (dinâmica, sequência causal e severidade do episódio inteiro, não leituras isoladas) e recomendar a resposta operacional adequada.',
     '',

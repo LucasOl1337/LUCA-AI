@@ -11,6 +11,8 @@ export interface FleetMachine extends Omit<FleetJourney, 'id' | 'startedAt' | 'e
 }
 export interface FleetEpisode {
   publicId: string; tractorId: string; sourceKind: FleetOrigin; scenarioLabel: string | null; status: string;
+  /** Veículo do cadastro gravado no episódio; null em episódio anterior ao cadastro. */
+  vehicleId?: string | null; model3dId?: string | null;
   startedAt: string; endedAt: string | null; sampleCount: number;
   peakAcceleration: number | null; peakAt: string | null;
   phases: { id: string; label: string; startedAt: string; endedAt: string; durationMs: number }[];

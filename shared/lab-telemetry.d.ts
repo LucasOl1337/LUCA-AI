@@ -57,7 +57,7 @@ export interface LabPolygon { id: string; role: 'property_boundary' | 'allowed_a
 export interface LabManifest {
   version?: string | number;
   synthetic?: boolean;
-  machine?: { id: string; model?: string; implement?: string; profile?: { max_roll_deg?: number; max_pitch_deg?: number; platform_width_m?: number; operating_speed_kmh?: number; reaction_time_s?: number; [key: string]: number | undefined } };
+  machine?: { id: string; model?: string; model3d_id?: string; vehicle?: { id: string; veiculo: string; placa: string; modelo: string }; implement?: string; profile?: { max_roll_deg?: number; max_pitch_deg?: number; platform_width_m?: number; operating_speed_kmh?: number; reaction_time_s?: number; [key: string]: number | undefined } };
   duration_s?: number;
   export_rate_hz?: number;
   coordinate_reference?: string;
@@ -135,3 +135,6 @@ export function polygonContains(point: LabPoint, polygon: LabPolygon): boolean;
 export function polygonDistance(point: LabPoint, polygon: LabPolygon): number;
 export function hasPosition(sample: Pick<LabSample, 'gnss_fix' | 'x' | 'z'>): boolean;
 export function hashText(text: string): string;
+export interface LabCaseVehicle { id: string; veiculo: string; placa: string; modelo: string; model3dId: string; model3dLabel: string }
+export const LAB_VEHICLE_MODELS_3D: Readonly<Record<string, string>>;
+export function labCaseVehicle(manifest: LabManifest | null | undefined): LabCaseVehicle | null;

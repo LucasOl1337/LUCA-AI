@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
-import { parseLabCase, LAB_UNITS } from '../shared/lab-telemetry.js';
+import { parseLabCase, labCaseVehicle, LAB_UNITS } from '../shared/lab-telemetry.js';
 import { call9RouterChat } from './router-client.js';
 import { ROUTER_MODEL } from './config.js';
 import { requireWorkspaceUserId, runWithWorkspaceUser } from './workspace-context.js';
@@ -117,6 +117,8 @@ function evidenceContext(parsed) {
     allowedIndices: new Set(selected),
     payload: {
       machineId: parsed.machineId,
+      // Veículo do cadastro no momento da gravação do episódio SOMPO; campos conferidos, nada além deles.
+      vehicle: labCaseVehicle(parsed.manifest),
       synthetic: parsed.synthetic,
       sensorProfile: parsed.hasEsp32 ? 'esp32' : 'vehicle',
       units: Object.fromEntries(Object.keys(parsed.samples[0]).filter(key => LAB_UNITS[key]).map(key => [key, LAB_UNITS[key]])),

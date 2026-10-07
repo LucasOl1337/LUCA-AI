@@ -134,6 +134,7 @@ function validateManifest(manifest) {
     if (image.resolution_m != null && (!finite(image.resolution_m) || image.resolution_m <= 0)) fail('Imagem aérea: resolução deve ser positiva, em metros por pixel.');
   }
   if (manifest.machine != null && (!object(manifest.machine) || typeof manifest.machine.id !== 'string' || !manifest.machine.id.trim())) fail('Identificação de máquina inválida no manifesto.');
+  if (manifest.machine?.vehicle != null && labCaseVehicle(manifest) === null) fail('Veículo do manifesto inválido: informe id, veiculo, placa e modelo como texto, com modelo 3D conhecido.');
   for (const field of ['duration_s', 'export_rate_hz']) {
     if (manifest[field] != null && (!finite(manifest[field]) || manifest[field] <= 0)) fail(`Metadado ${field} deve ser um número positivo.`);
   }
@@ -221,6 +222,23 @@ export function parseLabSite(manifest = null, map = null, fallbackOrigin = [0, 0
   const polygons = buildPolygons(map, origin, warnings);
   if (manifest?.map_warning) warnings.push(String(manifest.map_warning));
   return { manifest, map, origin, polygons, warnings };
+}
+
+// Nome que o Laboratório usa pra cada modelo 3D do cadastro; o do caminhão é o mesmo da demonstração da fazenda.
+export const LAB_VEHICLE_MODELS_3D = Object.freeze({ 'caminhao-sompo': 'Caminhão SOMPO', 'trator-max': 'Trator MAX' });
+
+/**
+ * Veículo do cadastro SOMPO gravado no episódio de origem (manifest.machine.vehicle).
+ * Retorna só campos conferidos; null quando o caso não traz veículo ou ele não fecha.
+ */
+export function labCaseVehicle(manifest) {
+  const machine = manifest?.machine;
+  const vehicle = machine?.vehicle;
+  if (!object(vehicle) || !Object.hasOwn(LAB_VEHICLE_MODELS_3D, machine.model3d_id)) return null;
+  const text = value => typeof value === 'string' && value.trim() && value.length <= 80 ? value.trim() : null;
+  const picked = { id: text(vehicle.id), veiculo: text(vehicle.veiculo), placa: text(vehicle.placa), modelo: text(vehicle.modelo) };
+  if (Object.values(picked).some(value => value === null)) return null;
+  return { ...picked, model3dId: machine.model3d_id, model3dLabel: LAB_VEHICLE_MODELS_3D[machine.model3d_id] };
 }
 
 export function associateLabSite(manifest, site) {

@@ -1,4 +1,4 @@
-import { LAB_COLUMNS, LAB_ESP32_COLUMNS, LAB_UNITS, parseLabCase } from './lab-telemetry.js';
+import { LAB_COLUMNS, LAB_ESP32_COLUMNS, LAB_UNITS, LAB_VEHICLE_MODELS_3D, parseLabCase } from './lab-telemetry.js';
 
 export const SOMPO_EXPORT_MAX_SAMPLES = 10_000;
 export const SOMPO_EXPORT_MAX_JSON_BYTES = 8 * 1024 * 1024;
@@ -14,6 +14,15 @@ const SIGNALS = {
 };
 const FLAGS = { riscoColisao: 'collision_warning_active', riscoInclinacao: 'inclination_warning_active' };
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+
+/** Identidade do veículo gravada no episódio. Episódio antigo, sem snapshot, segue só com o tractorId. */
+function episodeMachine(tractorId, episode) {
+  const snapshot = object(episode?.vehicleSnapshot) ? episode.vehicleSnapshot : null;
+  const model3dId = typeof episode?.model3dId === 'string' && Object.hasOwn(LAB_VEHICLE_MODELS_3D, episode.model3dId) ? episode.model3dId : null;
+  if (!snapshot || !model3dId) return { id: tractorId };
+  const { id, veiculo, placa, modelo } = snapshot;
+  return { id: tractorId, model: LAB_VEHICLE_MODELS_3D[model3dId], model3d_id: model3dId, vehicle: { id, veiculo, placa, modelo } };
+}
 
 function fail(message, status = 400) {
   const error = new Error(message);
@@ -128,7 +137,7 @@ export function convertSompoDataset(input) {
   if (wheelSpeedDropped) warnings.push('velocidadeRoda (perímetro da roda) não tem coluna no esquema do Laboratório; permanece apenas no JSON do episódio.');
   const manifest = {
     version: '1.0', synthetic: sourceKind === 'simulation', profile: 'esp32',
-    machine: { id: tractorId }, source_kind: sourceKind, timestamp_basis: timestampBasis,
+    machine: episodeMachine(tractorId, input.episode), source_kind: sourceKind, timestamp_basis: timestampBasis,
     source_schema: 'sompo-telemetry-v1', duration_s: (rows.at(-1).ms - rows[0].ms) / 1000,
     files: [{ file: fileName, samples: rows.length }],
     original_sample_count: input.samples.length, removed_exact_duplicates: input.samples.length - rows.length,

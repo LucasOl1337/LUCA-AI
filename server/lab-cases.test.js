@@ -7,7 +7,10 @@ import express from 'express';
 import { createAuthService } from './auth.js';
 import { registerLabCaseRoutes } from './lab-cases.js';
 import { convertSompoDataset } from '../shared/sompo-lab-export.js';
-import { parseLabCase } from '../shared/lab-telemetry.js';
+import { labCaseVehicle, parseLabCase } from '../shared/lab-telemetry.js';
+import { createSompoAgriSimulationSnapshot, getSompoAgriEpisodePlan } from '../shared/sompo-agri-brief.js';
+import { buildSompoEpisodeMission } from '../shared/sompo-telemetry.js';
+import { createSompoTelemetryHistory } from './sompo-telemetry-history.js';
 
 const fixtureDir = path.resolve('datasets/laboratorio-virtual-v1');
 const jsonFixture = (name) => JSON.parse(fs.readFileSync(path.join(fixtureDir, name), 'utf8'));
@@ -65,6 +68,89 @@ test('ESP32 JSON conversion survives Lab save/reload and supplies sensor evidenc
   assert.equal(evidence.units.acceleration_x_raw, 'unidade de origem');
   assert.equal(evidence.events.find(e => e.type === 'device_collision_warning').elapsedMs, 2000);
   assert.equal(result.body.analysis.hypotheses[0].evidence[0].values.obstacle_distance_cm, 20);
+});
+
+// Critério 5 da missão do trator: o episódio sintético do MAX passa por gravação, fim,
+// reabertura, Laboratório e análise sem perder veículo nem quadros.
+test('episódio do Trator MAX: grava, finaliza, reabre, vai pro Laboratório e é analisado com identidade e quadros', async (t) => {
+  const store = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-lab-test-max-'));
+  t.after(() => fs.rmSync(store, { recursive: true, force: true }));
+  const dbPath = path.join(store, 'sompo-telemetry.db');
+  const framesDir = path.join(store, 'sompo-episodes');
+  const baseMs = Date.parse('2026-10-07T12:00:00.000Z');
+  let clock = baseMs;
+  const plan = getSompoAgriEpisodePlan('max-front-obstacle', 'safe-stop');
+  const snapshot = { id: 'trator-0001', veiculo: 'Trator', placa: 'TRT0001', modelo: 'John Deere 6110J', modelo3d: 'trator-max' };
+  const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+
+  let history = createSompoTelemetryHistory({ dbPath, framesDir, now: () => clock });
+  const episode = history.startEpisode({
+    kind: 'roteiro', tractorId: 'SIM-001', sourceKind: 'simulation', scenarioLabel: plan.scenarioLabel,
+    scenarioId: plan.scenarioId, outcomeId: plan.outcomeId, vehicleId: snapshot.id, vehicleSnapshot: snapshot, model3dId: 'trator-max',
+  });
+  const snapshots = [];
+  for (let ms = 0; ms <= plan.totalMs; ms += plan.sampleIntervalMs) {
+    snapshots.push(createSompoAgriSimulationSnapshot(plan.scenarioId, plan.outcomeId, { elapsedMs: ms, observedAt: new Date(baseMs + ms).toISOString() }));
+  }
+  assert.equal(history.recordMany(snapshots, { episodeId: episode.publicId }), snapshots.length);
+  history.addEpisodeFrames(episode.publicId, plan.frameMoments.map(({ offsetMs, fase, label }) => ({ dataUrl: png, offsetMs, fase, label })));
+  clock = baseMs + plan.totalMs;
+  assert.equal(history.finishEpisode(episode.publicId, { status: 'complete' }).status, 'complete');
+  history.close();
+
+  // Reabre num processo novo do histórico: identidade e quadros vêm do disco.
+  history = createSompoTelemetryHistory({ dbPath, framesDir, now: () => clock });
+  t.after(() => history.close());
+  const detail = history.getEpisode(episode.publicId);
+  assert.equal(detail.episode.status, 'complete');
+  assert.equal(detail.episode.vehicleId, 'trator-0001');
+  assert.equal(detail.episode.model3dId, 'trator-max');
+  assert.deepEqual(detail.episode.vehicleSnapshot, snapshot);
+  assert.equal(detail.samples.length, snapshots.length);
+  assert.deepEqual(detail.frames.map(({ fase, label, offsetMs }) => ({ fase, label, offsetMs })), plan.frameMoments.map(({ fase, label, offsetMs }) => ({ fase, label, offsetMs })));
+  assert.ok(history.readEpisodeFrame(episode.publicId, 1).buffer.length > 0);
+
+  // Missão da bancada pela aba Telemetria.
+  const mission = buildSompoEpisodeMission(detail.episode, detail.samples, detail.summary, 'Equipe agro', detail.frames.map((frame) => ({ ...frame, attached: true })));
+  assert.match(mission, /\[SIMULAÇÃO\] Episódio SOMPO: .*, trator trator-0001 \(John Deere 6110J\)/);
+  assert.match(mission, /trator-0001 · Trator · John Deere 6110J · placa\/ID TRT0001 · modelo 3D Trator MAX \(miniatura das fotos\) · simulador SIM-001/);
+  assert.match(mission, /posição do trator no Anexo 3/);
+  assert.doesNotMatch(mission, /caminhão SIM-001/);
+  assert.equal(mission.match(/- Anexo \d+:/g).length, plan.frameMoments.length);
+
+  // Laboratório: o JSON exportado vira caso salvo, volta do disco e chega à análise com o veículo.
+  const dataset = JSON.parse(JSON.stringify(history.exportDataset({ episodeId: episode.publicId })));
+  const converted = convertSompoDataset(dataset);
+  assert.deepEqual(converted.manifest.machine, { id: 'SIM-001', model: 'Trator MAX', model3d_id: 'trator-max', vehicle: { id: 'trator-0001', veiculo: 'Trator', placa: 'TRT0001', modelo: 'John Deere 6110J' } });
+  assert.equal(converted.manifest.source_episode_id, episode.publicId);
+  const calls = [];
+  const { request, register } = await fixture(t, { chat: async (args) => { calls.push(args); return { content: JSON.stringify(validResponse), toolCalls: [], finishReason: 'stop' }; } });
+  const cookie = await register('trator-max');
+  const saved = await request('/api/lab/cases', { cookie, body: { name: 'Trator MAX com obstáculo frontal', sourceName: converted.fileName, rawCsv: converted.csv, metadata: converted.manifest, schema: converted.schema } });
+  assert.equal(saved.status, 201);
+  const root = `/api/lab/cases/${saved.body.case.id}`;
+  const restored = (await request(root, { cookie })).body.case;
+  const parsed = parseLabCase(restored.rawCsv, { fileName: restored.sourceName, manifest: restored.metadata, schema: restored.schema });
+  assert.equal(parsed.synthetic, true, 'episódio do simulador continua sintético no Laboratório');
+  assert.equal(parsed.samples.length, snapshots.length);
+  assert.deepEqual(labCaseVehicle(parsed.manifest), { id: 'trator-0001', veiculo: 'Trator', placa: 'TRT0001', modelo: 'John Deere 6110J', model3dId: 'trator-max', model3dLabel: 'Trator MAX' });
+  const analysis = await request(`${root}/analyses`, { cookie, body: {} });
+  assert.equal(analysis.status, 201);
+  const evidence = JSON.parse(calls[0].user).telemetry;
+  assert.equal(evidence.machineId, 'SIM-001');
+  assert.equal(evidence.synthetic, true);
+  assert.deepEqual(evidence.vehicle, labCaseVehicle(parsed.manifest));
+});
+
+test('episódio anterior ao cadastro segue como caminhão SIM-001; veículo malformado no manifesto é recusado', () => {
+  const samples = [0, 1].map(i => ({ tractorId: 'SIM-001', sourceKind: 'simulation', observedAt: `2026-10-07T12:00:0${i}.000Z`, distancia: 300, pitch: 0, roll: 0 }));
+  const old = convertSompoDataset({ samples, episode: { publicId: 'antigo', tractorId: 'SIM-001', vehicleId: null, vehicleSnapshot: null, model3dId: null } });
+  assert.deepEqual(old.manifest.machine, { id: 'SIM-001' });
+  assert.equal(labCaseVehicle(old.manifest), null);
+  const mission = buildSompoEpisodeMission({ publicId: 'antigo', kind: 'roteiro', status: 'complete', tractorId: 'SIM-001' }, [], { count: 0 }, 'Equipe');
+  assert.match(mission, /caminhão SIM-001/);
+  const bad = { ...old.manifest, machine: { id: 'SIM-001', model3d_id: 'trator-max', vehicle: { id: 'trator-0001', veiculo: 'Trator', placa: '', modelo: 'X' } } };
+  assert.throws(() => parseLabCase(old.csv, { fileName: old.fileName, manifest: bad, schema: old.schema }), /Veículo do manifesto inválido/);
 });
 
 async function fixture(t, { chat } = {}) {

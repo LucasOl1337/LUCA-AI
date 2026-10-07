@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDownToLine, ArrowLeft, ArrowRight, Check, ChevronRight, Compass, Droplets, FileText, FolderOpen, History, LoaderCircle, Map, Pause, Play, RotateCcw, Save, ScanLine, Search, ShieldCheck, SkipBack, SkipForward, Thermometer, Tractor, Upload, Waves, WifiOff, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { parseLabCase, parseLabSite, associateLabSite, getReplayFrame, formatLabTime, polygonDistance, type LabCase, type LabSite } from '../../shared/lab-telemetry.js';
+import { parseLabCase, parseLabSite, associateLabSite, labCaseVehicle, getReplayFrame, formatLabTime, polygonDistance, type LabCase, type LabSite } from '../../shared/lab-telemetry.js';
 import { convertSompoDataset } from '../../shared/sompo-lab-export.js';
 import { createFarmDemo } from '../../shared/lab-farm-demo.js';
 import LabEsp32Replay from '@/components/lab/LabEsp32Replay';
@@ -59,6 +59,8 @@ export default function LaboratorioPage() {
   const positionRef = useRef(elapsedMs); positionRef.current = elapsedMs;
   const frame = useMemo(() => labCase ? getReplayFrame(labCase, elapsedMs) : null, [labCase, elapsedMs]);
   const selectedEvent = labCase?.events.find(event => event.id === selectedEventId);
+  // Veículo do cadastro gravado no episódio SOMPO de origem; editar o cadastro depois não muda o caso.
+  const caseVehicle = labCaseVehicle(labCase?.manifest);
   const currentAnalysis = record?.analyses.find(a => a.id === analysisId) || record?.analyses[record.analyses.length - 1];
   useEffect(() => { if (error) setPanelOpen(true); }, [error]);
 
@@ -317,7 +319,7 @@ export default function LaboratorioPage() {
             <p className="lab-footnote">Exemplos fictícios. As coordenadas servem apenas de referência; não representam uma propriedade real.</p>
           </>}
           {step === 1 && labCase && <>
-            <div className="lab-case-summary"><Tractor size={20} /><div><strong>{labCase.machineId}</strong><small>{labCase.samples.length.toLocaleString('pt-BR')} amostras · {formatLabTime(labCase.durationMs)}</small></div><span className="lab-chip">{labCase.synthetic ? 'Sintético' : 'CSV'}</span></div>
+            <div className="lab-case-summary"><Tractor size={20} /><div><strong>{labCase.machineId}</strong><small>{labCase.samples.length.toLocaleString('pt-BR')} amostras · {formatLabTime(labCase.durationMs)}</small>{caseVehicle && <small data-lab-case-vehicle>{caseVehicle.veiculo} {caseVehicle.id} · {caseVehicle.modelo} · {caseVehicle.placa} · modelo 3D {caseVehicle.model3dLabel}</small>}</div><span className="lab-chip">{labCase.synthetic ? 'Sintético' : 'CSV'}</span></div>
             <div className="lab-section-label">Eventos registrados <span>{labCase.events.length}</span></div>
             {!labCase.events.length && <div className="lab-empty"><ShieldCheck /><strong>Nenhum evento detectado</strong><p>As amostras disponíveis não acionaram as regras aplicáveis. Isso não comprova ausência de problemas fora da cobertura dos sensores.</p></div>}
             <div className="lab-event-list">{labCase.events.map(event => <button key={event.id} className={`${selectedEventId === event.id ? 'selected' : ''} ${event.transition === 'end' ? 'resolved' : ''}`} onClick={() => selectEvent(event.id)} data-lab-event={event.id}><span className="lab-event-symbol">{event.type === 'hazard_band' ? String(event.evidence.hazard).startsWith('water') ? <Waves size={15} /> : <ScanLine size={15} /> : event.type === 'near_water' ? <Droplets size={15} /> : event.type === 'coolant_warning' ? <Thermometer size={15} /> : event.type === 'gnss_unavailable' ? <WifiOff size={15} /> : <ScanLine size={15} />}</span><span><strong>{event.title}</strong><small>{formatLabTime(event.elapsedMs)}</small></span><ChevronRight size={14} /></button>)}</div>

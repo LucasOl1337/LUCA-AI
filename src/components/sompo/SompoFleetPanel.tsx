@@ -39,7 +39,7 @@ function EpisodeEvidence({ episode }: { episode: FleetEpisode }) {
     finally { setLoading(false); }
   }
   return <details className="sompo-fleet-episode" onToggle={event => { if (event.currentTarget.open) void load(); }}>
-    <summary>{episode.scenarioLabel || 'Episódio gravado'}<small>{episode.tractorId} · {sourceLabel(episode.sourceKind)} · {date(episode.startedAt)} UTC · {episode.status === 'complete' ? 'Concluído' : episode.status === 'recording' ? 'Gravando' : 'Interrompido'}</small></summary>
+    <summary>{episode.scenarioLabel || 'Episódio gravado'}<small>{episode.vehicleId ? `${episode.vehicleId} · ` : ''}{episode.tractorId} · {sourceLabel(episode.sourceKind)} · {date(episode.startedAt)} UTC · {episode.status === 'complete' ? 'Concluído' : episode.status === 'recording' ? 'Gravando' : 'Interrompido'}</small></summary>
     <p>{episode.sampleCount} amostras · {episode.frameCount} imagens · pico |a| {number(episode.peakAcceleration)} {episode.sourceKind === 'firebase' ? 'u. origem' : 'm/s²'}{episode.peakAt && ` em ${date(episode.peakAt)} UTC`}</p>
     <p>{episode.phases.map(phase => `${phase.label}: ${seconds(phase.durationMs)}`).join(' · ') || 'Fases indisponíveis sem amostras.'} Fases estimadas pelo pico, sem confirmação de impacto.</p>
     {loading && <p role="status">Carregando evidências…</p>}

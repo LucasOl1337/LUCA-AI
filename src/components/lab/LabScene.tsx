@@ -383,7 +383,8 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
     }
 
     const isTruck = labCase?.manifest?.machine?.model === 'Caminhão SOMPO';
-    const wantsHarvester = !isTruck && /colheitadeira|harvester/i.test(String(labCase?.manifest?.machine?.model ?? ''));
+    const wantsMax = !isTruck && labCase?.manifest?.machine?.model3d_id === 'trator-max';
+    const wantsHarvester = !isTruck && !wantsMax && /colheitadeira|harvester/i.test(String(labCase?.manifest?.machine?.model ?? ''));
     const tractor = isTruck ? createSompoTruckModel({ sensorLabel: 'DEMONSTRAÇÃO' }) : createLabTractor();
     let pivot = isTruck ? SOMPO_TRUCK_PIVOT_Y : 1.1;
     if ('rayGroup' in tractor) tractor.rayGroup.visible = false;
@@ -391,10 +392,10 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
     tractor.root.position.y = -pivot;
     vehicle.add(tractor.root);
     scene.add(vehicle);
-    // Colheitadeira: o GLB gerado para o simulador (e8c1535). O trator fica até o GLB carregar e volta se ele falhar.
+    // Colheitadeira (e8c1535) ou Trator MAX do episódio: o GLB do simulador. O trator genérico fica até o GLB carregar e volta se ele falhar.
     const assetController = new AbortController();
     let harvester: Awaited<ReturnType<typeof loadLabHarvester>> = null;
-    if (wantsHarvester) void loadLabHarvester(assetController.signal).then((loaded) => {
+    if (wantsHarvester || wantsMax) void loadLabHarvester(assetController.signal, wantsMax ? 'max-tractor' : 'harvester').then((loaded) => {
       if (!loaded || disposed) { loaded?.dispose(); return; }
       harvester = loaded; pivot = loaded.pivotY;
       vehicle.remove(tractor.root); loaded.root.position.y = -pivot; vehicle.add(loaded.root);
