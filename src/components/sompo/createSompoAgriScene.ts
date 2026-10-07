@@ -4,7 +4,7 @@ import { createSompoCropRows } from './createSompoCropRows';
 import { geofenceFieldRelief, geofenceOperacaoRelief } from '../../../shared/geofencing/index.js'; // geofencing: relevo dos talhões sintéticos
 import { grassTuftGeometry, varySompoSurface } from './createSompoRoadDetails';
 import { disposeSompoObject } from './sompoStage';
-import type { SompoAgriVisualFrame } from '../../../shared/sompo-agri-scenarios.js';
+import type { SompoAgriEquipmentId, SompoAgriVisualFrame } from '../../../shared/sompo-agri-scenarios.js';
 
 export const SOMPO_AGRI_ENVIRONMENTS = Object.freeze({
   'geofence-operacao': Object.freeze({ sky: 0xb8d6dd, ground: 0x6f542d, crop: 0xb99438, slope: 0, mud: 0, night: false, barn: false, relief: geofenceOperacaoRelief as (x: number, z: number) => number }),
@@ -652,14 +652,17 @@ function createRuts() {
   return { root, material };
 }
 
-export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAgriEnvironmentId, compact = false, equipmentId: 'tractor' | 'harvester' = 'harvester') {
+// Boca do escapamento do Trator MAX (provenance: tubo em +Z, curva pra frente no topo).
+const MAX_EXHAUST = [0.1, 3.04, 0.82] as const;
+
+export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAgriEnvironmentId, compact = false, equipmentId: SompoAgriEquipmentId = 'harvester') {
   const definition = SOMPO_AGRI_ENVIRONMENTS[environmentId] || SOMPO_AGRI_ENVIRONMENTS['row-crop-field'];
   const root = new THREE.Group();
   root.name = `sompo-agri-environment-${environmentId}`;
   const terrain = createTerrain(definition);
   root.add(terrain);
   const operation = environmentId === 'geofence-operacao';
-  const crops = definition.barn ? null : createSompoCropRows((x,z)=>terrainHeight(x,z,definition.slope,(definition as { relief?: (x: number, z: number) => number }).relief), compact, equipmentId === 'tractor' ? .32 : 1, operation, equipmentId === 'harvester');
+  const crops = definition.barn ? null : createSompoCropRows((x,z)=>terrainHeight(x,z,definition.slope,(definition as { relief?: (x: number, z: number) => number }).relief), compact, equipmentId !== 'harvester' ? .32 : 1, operation, equipmentId === 'harvester');
   if (crops) root.add(crops.root);
   const weeds = definition.barn ? null : createEdgeWeeds((x, z) => terrainHeight(x, z, definition.slope, (definition as { relief?: (x: number, z: number) => number }).relief));
   if (weeds) root.add(weeds.root);
@@ -827,9 +830,10 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
 
       if (exhaust.visible) {
         const p = exhaust.geometry.attributes.position, alpha = exhaust.geometry.attributes.particleAlpha;
-        const ox = frame.equipmentId === 'harvester' ? -1.2 : 0.02;
-        const oy = frame.equipmentId === 'harvester' ? 3.35 : 3.34;
-        const oz = frame.equipmentId === 'harvester' ? -0.5 : 0.08;
+        // Trator MAX: escape alto no lado direito do capô (fotos do brinquedo).
+        const ox = frame.equipmentId === 'harvester' ? -1.2 : frame.equipmentId === 'max-tractor' ? MAX_EXHAUST[0] : 0.02;
+        const oy = frame.equipmentId === 'harvester' ? 3.35 : frame.equipmentId === 'max-tractor' ? MAX_EXHAUST[1] : 3.34;
+        const oz = frame.equipmentId === 'harvester' ? -0.5 : frame.equipmentId === 'max-tractor' ? MAX_EXHAUST[2] : 0.08;
         for (let i = 0; i < p.count; i++) {
           const life = .55 + (i % 5) * .22;
           const age = (seconds + i * .11) % life;

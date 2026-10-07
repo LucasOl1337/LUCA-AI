@@ -11,6 +11,8 @@ import {
   getSompoAgriFrame,
   getSompoAgriKeyframes,
   getSompoAgriScenario,
+  isSompoTractorLike,
+  type SompoAgriEquipmentId,
   type SompoAgriScenarioId,
 } from '../../../shared/sompo-agri-scenarios.js';
 import { createSompoGeofenceLayer } from '../../geofencing/createSompoGeofenceLayer';
@@ -26,8 +28,8 @@ export type SompoAgriStageApi = SompoStageApi;
 
 
 /** Silhueta honesta com as dimensões nominais quando o GLB gerado não carrega. */
-function fallbackMachine(equipmentId: 'tractor' | 'harvester') {
-  const tractor = equipmentId === 'tractor';
+function fallbackMachine(equipmentId: SompoAgriEquipmentId) {
+  const tractor = isSompoTractorLike(equipmentId);
   const group = new THREE.Group(); group.name = `agri-${equipmentId}-fallback`;
   const paint = new THREE.MeshStandardMaterial({ color: 0x1f6b35, roughness: .55, metalness: .2 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x181c1e, roughness: .9 });
@@ -40,10 +42,67 @@ function fallbackMachine(equipmentId: 'tractor' | 'harvester') {
     const wheel = new THREE.Mesh(new THREE.CylinderGeometry(axle.radius, axle.radius, tractor ? .42 : .62, 28), dark);
     wheel.rotation.x = Math.PI / 2; wheel.position.set(axle.x, axle.y, side * axle.z); group.add(wheel);
   }
-  const implement = new THREE.Mesh(new THREE.BoxGeometry(tractor ? 1.9 : 1.6, .18, tractor ? 1.1 : 5.4), paint);
-  implement.position.set(tractor ? -1.9 : 3.5, .55, 0); group.add(implement);
+  if (equipmentId !== 'max-tractor') {
+    const implement = new THREE.Mesh(new THREE.BoxGeometry(tractor ? 1.9 : 1.6, .18, tractor ? 1.1 : 5.4), paint);
+    implement.position.set(tractor ? -1.9 : 3.5, .55, 0); group.add(implement);
+  }
   group.traverse((node) => { const mesh = node as THREE.Mesh; if (mesh.isMesh) mesh.castShadow = mesh.receiveShadow = true; });
   return group;
+}
+
+const HAY_BALE_RADIUS = 0.72;
+
+/** Fardo redondo de feno deitado no caminho do Trator MAX: obstáculo sem animal nem pessoa. */
+function createHayBale() {
+  const group = new THREE.Group(); group.name = 'agri-max-obstacle-hay-bale';
+  const straw = new THREE.MeshStandardMaterial({ color: 0xcaa45a, roughness: .95 });
+  const face = new THREE.MeshStandardMaterial({ color: 0xb48c45, roughness: 1 });
+  const twine = new THREE.MeshStandardMaterial({ color: 0x8a6a2e, roughness: .9 });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(HAY_BALE_RADIUS, HAY_BALE_RADIUS, 1.25, 32, 1), [straw, face, face]);
+  body.rotation.x = Math.PI / 2; body.position.y = HAY_BALE_RADIUS; group.add(body);
+  for (const z of [-.38, 0, .38]) {
+    const band = new THREE.Mesh(new THREE.TorusGeometry(HAY_BALE_RADIUS + .005, .018, 6, 40), twine);
+    band.position.set(0, HAY_BALE_RADIUS, z); group.add(band);
+  }
+  group.traverse((node) => { const mesh = node as THREE.Mesh; if (mesh.isMesh) mesh.castShadow = mesh.receiveShadow = true; });
+  return group;
+}
+
+/** Feixe do HC-SR04: duas linhas divergentes e um cone translúcido; verde em operação, vermelho em alerta. */
+function createUltrasonicBeam(origin: readonly [number, number, number]) {
+  const group = new THREE.Group(); group.name = 'agri-max-ultrasonic-range';
+  group.position.fromArray(origin);
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0x7dff9a, transparent: true, opacity: .78 });
+  for (const z of [-.12, .12]) {
+    const ray = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, z), new THREE.Vector3(1, 0, z + Math.sign(z) * .26)]), lineMaterial);
+    ray.name = `ultrasonic-ray-${z > 0 ? 'left' : 'right'}`; group.add(ray);
+  }
+  // Cone de ~30° (abertura nominal do HC-SR04), com o vértice no emissor.
+  const coneGeometry = new THREE.ConeGeometry(Math.tan(THREE.MathUtils.degToRad(15)), 1, 28, 1, true);
+  coneGeometry.translate(0, -.5, 0); coneGeometry.rotateZ(Math.PI / 2);
+  const coneMaterial = new THREE.MeshBasicMaterial({ color: 0x7dff9a, transparent: true, opacity: .16, side: THREE.DoubleSide, depthWrite: false });
+  const cone = new THREE.Mesh(coneGeometry, coneMaterial); cone.name = 'ultrasonic-cone'; group.add(cone);
+  const pulse = new THREE.Mesh(new THREE.TorusGeometry(1, .012, 6, 36), new THREE.MeshBasicMaterial({ color: 0x7dff9a, transparent: true, opacity: .5, depthWrite: false }));
+  pulse.rotation.y = Math.PI / 2; pulse.name = 'ultrasonic-pulse'; group.add(pulse);
+  return {
+    group,
+    update(distanceCm: number, alert: boolean, elapsedMs: number) {
+      // 400 cm é "sem eco": feixe no alcance máximo e mais apagado.
+      const echo = distanceCm < 395;
+      const length = Math.max(.02, Math.min(4, distanceCm / 100));
+      for (const child of group.children) if (child !== pulse) child.scale.set(length, 1, 1);
+      cone.scale.set(length, length, length);
+      const color = alert ? 0xff5d52 : 0x7dff9a;
+      lineMaterial.color.set(color); coneMaterial.color.set(color); (pulse.material as THREE.MeshBasicMaterial).color.set(color);
+      lineMaterial.opacity = echo ? (alert ? 1 : .78) : .4;
+      coneMaterial.opacity = echo ? (alert ? .26 : .16) : .07;
+      const phase = (elapsedMs / 600) % 1;
+      pulse.position.x = phase * length;
+      const ring = Math.max(.04, Math.tan(THREE.MathUtils.degToRad(15)) * phase * length);
+      pulse.scale.set(ring, ring, ring);
+      (pulse.material as THREE.MeshBasicMaterial).opacity = (1 - phase) * (echo ? .55 : .25);
+    },
+  };
 }
 
 /**
@@ -175,9 +234,10 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   machine.position.set(startX, 0, 0);
   worldRoot.add(machine);
 
+  const max = scenario.equipmentId === 'max-tractor';
   // Luzes de trabalho/faróis/giroflex comandados pelo frame (essenciais à noite).
   const headlight = new THREE.SpotLight(0xf3ecd8, 0, 52, Math.PI / 6.5, 0.45, 1.2);
-  headlight.position.set(scenario.equipmentId === 'harvester' ? 2.15 : 1.5, scenario.equipmentId === 'harvester' ? 2.9 : 2.3, 0);
+  headlight.position.set(scenario.equipmentId === 'harvester' ? 2.15 : max ? 1.9 : 1.5, scenario.equipmentId === 'harvester' ? 2.9 : max ? 1.15 : 2.3, 0);
   headlight.target.position.set(20, -0.5, 0);
   machine.add(headlight, headlight.target);
   // Projetores iluminam onde o trabalho acontece: a plataforma da
@@ -187,9 +247,19 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   workLight.position.set(workAhead ? 1.9 : -0.55, workAhead ? 3.55 : 2.45, 0);
   workLight.target.position.set(workAhead ? 5.6 : -4.8, workAhead ? 0.2 : 0.4, 0);
   machine.add(workLight, workLight.target);
-  const beaconTop = scenario.equipmentId === 'harvester' ? 3.9 : 2.62;
+  const beaconTop = scenario.equipmentId === 'harvester' ? 3.9 : max ? 3.3 : 2.62;
   const beacon = new THREE.PointLight(0xff9a1f, 0, 14, 1.8);
   const beaconX = scenario.equipmentId === 'harvester' ? 0.6 : -0.1, beaconZ = scenario.equipmentId === 'harvester' ? 0.2 : 0.25;
+  // HC-SR04 do Trator MAX: feixe e cone saem do emissor na frente, como no caminhão.
+  // Aqui a régua é métrica (cm/100), e o obstáculo é fixo no mundo.
+  const sensorBeam = max ? createUltrasonicBeam(SOMPO_AGRI_RIG_LAYOUT['max-tractor'].sensor) : null;
+  if (sensorBeam) machine.add(sensorBeam.group);
+  const obstacle = max && scenario.obstacle ? createHayBale() : null;
+  if (obstacle && scenario.obstacle) {
+    const nearX = startX + SOMPO_AGRI_RIG_LAYOUT['max-tractor'].sensor[0] + scenario.obstacle.startGapM;
+    obstacle.position.set(nearX + HAY_BALE_RADIUS, field.groundHeight(nearX + HAY_BALE_RADIUS, 0), 0);
+    worldRoot.add(obstacle);
+  }
   beacon.position.set(beaconX, beaconTop, beaconZ);
   machine.add(beacon);
   // Giroflex de verdade varre o campo: um feixe estreito girando no topo.
@@ -298,6 +368,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     beaconSweep.intensity = reduceMotion.matches ? 0 : frame.beacon * 34;
     const sweepAngle = clock * 5.4;
     beaconSweep.target.position.set(beaconX + Math.cos(sweepAngle) * 11, -beaconTop, beaconZ + Math.sin(sweepAngle) * 11);
+    sensorBeam?.update(frame.distance, frame.collisionRisk, reduceMotion.matches ? 0 : elapsed);
     focusPoint.set(machine.position.x + (focusTarget === 'sensor' ? 2.5 : 0), machine.position.y + (focusTarget === 'sensor' ? 2.2 : 1.6), machine.position.z);
     if (operation && focusTarget === 'truck') focusPoint.set(0, 0, 0);
     cameraShift.copy(focusPoint).sub(orbit.target);
