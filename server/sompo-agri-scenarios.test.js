@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { SOMPO_MAX_TRACTOR_AGRI_PARITY } from '../shared/sompo-max-tractor-scenarios.js';
 import { createSompoMotionPath } from '../shared/sompo-motion.js';
 import {
   SOMPO_AGRI_EQUIPMENT,
@@ -205,4 +206,14 @@ test('Trator MAX: leitura do HC-SR04 bate com a distância geométrica até o fa
     assert.equal(alert.collisionRisk, true);
     assert.equal(getSompoAgriFrame('max-front-obstacle', 6_000, outcomeId).collisionRisk, false);
   }
+});
+
+test('todo case agrícola tem destino no Trator MAX, com motivo quando não vira case', () => {
+  const sources = Object.values(SOMPO_AGRI_SCENARIOS).filter((item) => item.equipmentId !== 'max-tractor').map((item) => item.scenarioId);
+  assert.deepEqual(Object.keys(SOMPO_MAX_TRACTOR_AGRI_PARITY).sort(), sources.sort());
+  for (const [id, entry] of Object.entries(SOMPO_MAX_TRACTOR_AGRI_PARITY)) {
+    if (entry.status === 'adaptado') assert.equal(SOMPO_AGRI_SCENARIOS[entry.maxId]?.equipmentId, 'max-tractor', id);
+    else assert.ok(entry.reason?.length > 10, id);
+  }
+  assert.equal(SOMPO_MAX_TRACTOR_AGRI_PARITY['agri-hydraulic-failure'].status, 'incompativel');
 });

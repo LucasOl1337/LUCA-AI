@@ -53,6 +53,21 @@ function scriptedApproach({ startGapM, speedProfile, events, totalMs, denseFromM
   });
 }
 
+/**
+ * Destino de cada case agrícola no Trator MAX: adaptado (com o id do case MAX),
+ * incompatível (com motivo) ou pendente (com o corte que fecha).
+ */
+export const SOMPO_MAX_TRACTOR_AGRI_PARITY = freeze({
+  'agri-harvest-dust': { status: 'incompativel', reason: 'Case da colhedora; o MAX é trator e não colhe.' },
+  'agri-tractor-rollover': { status: 'adaptado', maxId: 'max-slope-rollover' },
+  'agri-hydraulic-failure': { status: 'incompativel', reason: 'O MAX das fotos não tem implemento nem hidráulico de engate; não há o que falhar.' },
+  'agri-field-bogging': { status: 'adaptado', maxId: 'max-field-bogging' },
+  'agri-barn-maneuver': { status: 'pendente', reason: 'Galpão abordado de frente pelo HC-SR04; entra no corte 2.' },
+  'agri-night-operation': { status: 'pendente', reason: 'Fecha na matriz de paridade do corte 2.' },
+  'agri-geofencing': { status: 'incompativel', reason: 'Colheitadeira guiada por trajetória GNSS mapeada; trajetória GNSS fica fora da missão do MAX.' },
+  'agri-geofencing-operacao': { status: 'incompativel', reason: 'Colheitadeira guiada por trajetória GNSS mapeada; trajetória GNSS fica fora da missão do MAX.' },
+});
+
 // 6 km/h = 1,667 m/s. O alerta de 150 cm cai em 7,0 s quando o fardo começa a 13,17 m.
 const OBSTACLE_START_GAP_M = 1.5 + ((6 / 3.6) * 7);
 
