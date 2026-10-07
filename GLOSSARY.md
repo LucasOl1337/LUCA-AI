@@ -2,6 +2,20 @@
 
 Termos de domínio do LUCA-AI. Um termo, um significado; código e interface seguem estes nomes.
 
+## Laboratório do sensor
+
+**Ensaio do sensor**:
+Demonstração controlada de um fenômeno que ajuda a entender uma leitura e sua interpretação na operação.
+_Evitar_: Case, quando não há um cenário com desfechos.
+
+**Leitura simulada**:
+Valor produzido por um ensaio, não uma medição do equipamento físico.
+_Evitar_: Leitura ao vivo, dado medido.
+
+**Limite didático**:
+Referência configurada para uma demonstração, não uma certificação de estabilidade ou segurança do equipamento.
+_Evitar_: Limite seguro do veículo.
+
 ## SOMPO: cadastro de veículos
 
 - **Veículo**: máquina cadastrada na aba Veículos do SOMPO, por conta. Campos: `id` (minúsculas, números e hífen, imutável e único), `veiculo` (o Tipo), `placa` (placa ou, em máquina agrícola, identificação interna como `TRT0001`), `modelo` (o modelo comercial, rotulado "Modelo (cadastro)" na tela), `modelo3d` e `dispositivo` (opcional). Contrato em `shared/sompo-vehicles.js`.

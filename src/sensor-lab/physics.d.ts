@@ -1,4 +1,5 @@
 export type SensorScenarioId = 'encosta' | 'curva' | 'frenada' | 'buraco';
+export type SensorVehicle = 'caminhao' | 'trator';
 export type SensorRiskLevel = 'estavel' | 'atencao' | 'risco' | 'tombou';
 
 export interface Vec3 { x: number; y: number; z: number }
@@ -46,6 +47,8 @@ export interface SensorFlags {
 }
 
 export interface SensorReading {
+  vehicle: SensorVehicle;
+  distanceCm: number | null;
   id: SensorScenarioId;
   param: number;
   t: number;
@@ -119,10 +122,27 @@ export const THRESHOLDS: Readonly<{
 }>;
 export const SLOPE_TIP_DEG: number;
 export const SENSOR_SCENARIOS: readonly SensorScenario[];
+export const TRACTOR_SCENARIOS: readonly SensorScenario[];
+export const TRACTOR: typeof TRUCK;
+export function sensorVehicleProfile(vehicle?: SensorVehicle): typeof TRUCK;
+export function sensorScenarios(vehicle?: SensorVehicle): readonly SensorScenario[];
 
-export function getSensorScenario(id: string): SensorScenario;
-export function scenarioTimeline(id: SensorScenarioId, param: number): SensorTimeline;
-export function scenarioPeriod(id: SensorScenarioId, param: number): number;
+export function getSensorScenario(id: string, vehicle?: SensorVehicle): SensorScenario;
+export function scenarioTimeline(id: SensorScenarioId, param: number, vehicle?: SensorVehicle): SensorTimeline;
+export function scenarioPeriod(id: SensorScenarioId, param: number, vehicle?: SensorVehicle): number;
 export function memsResponse(force: Vec3): MemsReading;
-export function sampleSensorLab(id: SensorScenarioId, param: number, t: number): SensorReading;
+export function sampleSensorLab(id: SensorScenarioId, param: number, t: number, vehicle?: SensorVehicle): SensorReading;
 export function telemetryPacket(reading: SensorReading): TelemetryPacket;
+export interface OperationalTelemetry extends TelemetryPacket {
+  trator: string;
+  timestamp: number;
+  pitch: number;
+  roll: number;
+  distancia: number | null;
+  temperatura: number | null;
+  umidade: number | null;
+  riscoColisao: boolean | null;
+  panelProximity: 'unavailable' | 'clear' | 'attention' | 'danger';
+  panelInclination: boolean;
+}
+export function operationalTelemetry(reading: SensorReading): OperationalTelemetry;

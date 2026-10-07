@@ -56,6 +56,14 @@ export const TRUCK = Object.freeze({
   cruiseKph: 50,
 });
 
+/** Configuração didática, não medida no equipamento MAX. */
+export const TRACTOR = Object.freeze({
+  ...TRUCK, trackM: 1.8, cgHeightM: 1.25, wheelbaseM: 2.4,
+  rolloverG: 0.4, rollGradientDegPerG: 8, pitchGradientDegPerG: 4,
+  curveRadiusM: 4, cruiseKph: 6,
+});
+export const sensorVehicleProfile = (vehicle = 'caminhao') => vehicle === 'trator' ? TRACTOR : TRUCK;
+
 /** Frações do limiar de tombamento e limites de evento (ilustrativos). */
 export const THRESHOLDS = Object.freeze({
   attention: 0.6,
@@ -75,8 +83,17 @@ export const SENSOR_SCENARIOS = Object.freeze([
   Object.freeze({ id: 'buraco', label: 'Buraco', key: '4', param: Object.freeze({ label: 'Profundidade', unit: 'cm', min: 2, max: 14, step: 0.5, value: 5, digits: 1 }) }),
 ]);
 
-export function getSensorScenario(id) {
-  return SENSOR_SCENARIOS.find((scenario) => scenario.id === id) || SENSOR_SCENARIOS[1];
+export const TRACTOR_SCENARIOS = Object.freeze([
+  SENSOR_SCENARIOS[0],
+  Object.freeze({ id: 'curva', label: 'Curva de talhão', key: '2', param: Object.freeze({ label: 'Velocidade', unit: 'km/h', min: 4, max: 8, step: 0.5, value: 6, digits: 1 }) }),
+  Object.freeze({ id: 'frenada', label: 'Parada diante de obstáculo', key: '3', param: Object.freeze({ label: 'Velocidade de aproximação', unit: 'km/h', min: 4, max: 8, step: 0.5, value: 6, digits: 1 }) }),
+  Object.freeze({ id: 'buraco', label: 'Solo irregular', key: '4', param: Object.freeze({ label: 'Desnível', unit: 'cm', min: 2, max: 10, step: 0.5, value: 4, digits: 1 }) }),
+]);
+export const sensorScenarios = (vehicle = 'caminhao') => vehicle === 'trator' ? TRACTOR_SCENARIOS : SENSOR_SCENARIOS;
+
+export function getSensorScenario(id, vehicle = 'caminhao') {
+  const scenarios = sensorScenarios(vehicle);
+  return scenarios.find((scenario) => scenario.id === id) || scenarios[1];
 }
 
 const clamp = (value, lo, hi) => Math.min(hi, Math.max(lo, value));
@@ -143,17 +160,30 @@ function curveK(t) {
   return 0;
 }
 
-function brakeTimes(decelG) {
-  const v0 = TRUCK.cruiseKph / 3.6;
+function brakeTimes(decelG, profile = TRUCK) {
+  const v0 = profile.cruiseKph / 3.6;
   const a = decelG * G;
   const stopAt = BRAKE.cruise + BRAKE.onset + Math.max(0, (v0 - (a * BRAKE.onset) / 2) / a);
   return { v0, a, stopAt, period: stopAt + BRAKE.hold };
 }
 
-function bumpTimes(depthCm) {
-  const v = TRUCK.cruiseKph / 3.6;
+function bumpTimes(depthCm, profile = TRUCK) {
+  const v = profile.cruiseKph / 3.6;
   const front = BUMP.cruise;
-  return { v, front, rear: front + TRUCK.wheelbaseM / v, amplitudeG: depthCm * BUMP.gPerCm };
+  return { v, front, rear: front + profile.wheelbaseM / v, amplitudeG: depthCm * BUMP.gPerCm * (profile === TRACTOR ? 0.4 : 1) };
+}
+
+/** Operador reage a 150 cm e para a 40 cm. A distância integra a velocidade. */
+function approach(kph, t) {
+  const v = kph / 3.6;
+  const reactionAt = 2.5 / v;
+  const brakeDuration = 2.2 / v;
+  const tau = clamp(t - reactionAt, 0, brakeDuration);
+  const a = v / brakeDuration;
+  const gapM = 4 - v * Math.min(t, reactionAt) - v * tau + a * tau * tau / 2;
+  return { distanceCm: Math.max(40, gapM * 100), speedKph: (v - a * tau) * 3.6,
+    acceleration: t >= reactionAt && tau < brakeDuration ? -a : 0,
+    reactionAt, stopAt: reactionAt + brakeDuration };
 }
 
 /** Pulso vertical de uma roda no buraco: queda curta, batida na borda, balanço da carroceria. */
@@ -173,14 +203,15 @@ const timelineCache = new Map();
  * houver) e dos avisos. Os avisos vêm da mesma razão lateral que derruba o
  * caminhão, então a antecedência é consequência da física, não um número colado.
  */
-export function scenarioTimeline(id, param) {
-  const key = `${id}:${param}`;
+export function scenarioTimeline(id, param, vehicle = 'caminhao') {
+  const profile = sensorVehicleProfile(vehicle);
+  const key = `${vehicle}:${id}:${param}`;
   const cached = timelineCache.get(key);
   if (cached) return cached;
   let result;
   if (id === 'encosta') {
-    const ratio = Math.tan(rad(param)) / TRUCK.rolloverG;
-    const tips = param >= SLOPE_TIP_DEG;
+    const ratio = Math.tan(rad(param)) / profile.rolloverG;
+    const tips = param >= toDeg(Math.atan(profile.rolloverG));
     result = {
       periodS: tips ? SLOPE_STAND_S + TIP_FALL_S + TIP_REST_S : Infinity,
       tipAtS: tips ? SLOPE_STAND_S : null,
@@ -190,7 +221,7 @@ export function scenarioTimeline(id, param) {
     };
   } else if (id === 'curva') {
     const v = param / 3.6;
-    const fullRatio = (v * v) / TRUCK.curveRadiusM / G / TRUCK.rolloverG;
+    const fullRatio = (v * v) / profile.curveRadiusM / G / profile.rolloverG;
     const crossing = (fraction) => (fullRatio >= fraction ? CURVE.straightIn + CURVE.entry * invertSmooth(fraction / fullRatio) : null);
     const tipAtS = crossing(1);
     result = {
@@ -200,8 +231,12 @@ export function scenarioTimeline(id, param) {
       attentionAtS: crossing(THRESHOLDS.attention),
       peakRatio: fullRatio,
     };
+  } else if (id === 'frenada' && vehicle === 'trator') {
+    const { stopAt, reactionAt } = approach(param, 0);
+    result = { periodS: stopAt + 3, tipAtS: null, alertAtS: reactionAt,
+      attentionAtS: 2 / (param / 3.6), peakRatio: 0 };
   } else if (id === 'frenada') {
-    const { period } = brakeTimes(param);
+    const { period } = brakeTimes(param, profile);
     const onsetAt = (fraction) => BRAKE.cruise + BRAKE.onset * invertSmooth(fraction);
     result = {
       periodS: period,
@@ -211,7 +246,7 @@ export function scenarioTimeline(id, param) {
       peakRatio: param / THRESHOLDS.hardBrakeG,
     };
   } else {
-    const { front, amplitudeG } = bumpTimes(param);
+    const { front, amplitudeG } = bumpTimes(param, profile);
     // O aviso sai do pico do próprio sinal, amostrado como o firmware faria.
     let peakG = 0, peakAt = front;
     for (let tau = 0; tau < 0.35; tau += 0.001) {
@@ -232,8 +267,9 @@ export function scenarioTimeline(id, param) {
 }
 
 /** Estado cinemático do veículo no instante t (já dentro do laço). */
-function vehicleAt(id, param, t) {
-  const timeline = scenarioTimeline(id, param);
+function vehicleAt(id, param, t, vehicle = 'caminhao') {
+  const profile = sensorVehicleProfile(vehicle);
+  const timeline = scenarioTimeline(id, param, vehicle);
   const state = {
     phase: 'parado',
     speedKph: 0,
@@ -256,7 +292,7 @@ function vehicleAt(id, param, t) {
   if (id === 'encosta') {
     state.roadRoll = rad(param);
     state.ratio = timeline.peakRatio;
-    state.bodyRoll = rad(TRUCK.rollGradientDegPerG * Math.tan(state.roadRoll) * 0.35);
+    state.bodyRoll = rad(profile.rollGradientDegPerG * Math.tan(state.roadRoll) * 0.35);
     state.phase = param < 0.5 ? 'nivelado' : 'na encosta';
     if (timeline.tipAtS !== null && t >= timeline.tipAtS) {
       const tau = t - timeline.tipAtS;
@@ -272,13 +308,13 @@ function vehicleAt(id, param, t) {
     const tipAt = timeline.tipAtS;
     const tipping = tipAt !== null && t >= tipAt;
     const k = tipping ? curveK(tipAt) : curveK(t);
-    const lateral = ((v * v) / TRUCK.curveRadiusM) * k;
+    const lateral = ((v * v) / profile.curveRadiusM) * k;
     state.speedKph = param;
     state.curveK = k;
-    state.yawRate = (v / TRUCK.curveRadiusM) * k;
+    state.yawRate = (v / profile.curveRadiusM) * k;
     state.accel.y = lateral;
-    state.ratio = lateral / G / TRUCK.rolloverG;
-    state.bodyRoll = rad(TRUCK.rollGradientDegPerG * (lateral / G));
+    state.ratio = lateral / G / profile.rolloverG;
+    state.bodyRoll = rad(profile.rollGradientDegPerG * (lateral / G));
     const { straightIn, entry, hold, exit } = CURVE;
     state.phase = t < straightIn ? 'reta' : t < straightIn + entry ? 'entrando na curva' : t < straightIn + entry + hold ? 'na curva' : t < straightIn + entry + hold + exit ? 'saindo da curva' : 'reta';
     if (tipping) {
@@ -297,7 +333,15 @@ function vehicleAt(id, param, t) {
   }
 
   if (id === 'frenada') {
-    const { v0, a, stopAt } = brakeTimes(param);
+    if (vehicle === 'trator') {
+      const motion = approach(param, t);
+      state.speedKph = motion.speedKph;
+      state.accel.x = motion.acceleration;
+      state.bodyPitch = rad(-motion.acceleration / G * profile.pitchGradientDegPerG);
+      state.phase = t < motion.reactionAt ? 'aproximando' : t < motion.stopAt ? 'operador freando' : 'operador parou';
+      return state;
+    }
+    const { v0, a, stopAt } = brakeTimes(param, profile);
     const brakeStart = BRAKE.cruise;
     if (t < brakeStart) {
       state.speedKph = v0 * 3.6;
@@ -312,18 +356,18 @@ function vehicleAt(id, param, t) {
         : (a * BRAKE.onset) / 2 + a * (t - brakeStart - onsetSpent);
       state.speedKph = Math.max(0, v0 - lost) * 3.6;
       state.accel.x = -a * ramp;
-      state.bodyPitch = rad(TRUCK.pitchGradientDegPerG * param * ramp);
+      state.bodyPitch = rad(profile.pitchGradientDegPerG * param * ramp);
       state.phase = 'freando';
       return state;
     }
     const after = t - stopAt;
-    const dive = rad(TRUCK.pitchGradientDegPerG * param);
+    const dive = rad(profile.pitchGradientDegPerG * param);
     state.bodyPitch = dive * Math.exp(-3 * after) * Math.cos(2 * Math.PI * 1.4 * after);
     state.phase = 'parado';
     return state;
   }
 
-  const { v, front, rear, amplitudeG } = bumpTimes(param);
+  const { v, front, rear, amplitudeG } = bumpTimes(param, profile);
   const rearAmplitude = amplitudeG * BUMP.rearShare;
   state.speedKph = v * 3.6;
   const zFront = bumpPulse(t - front, amplitudeG);
@@ -392,27 +436,28 @@ function classify(id, state, forceG, timeline, t) {
   return { level, flags };
 }
 
-export function scenarioPeriod(id, param) {
-  return scenarioTimeline(id, param).periodS;
+export function scenarioPeriod(id, param, vehicle = 'caminhao') {
+  return scenarioTimeline(id, param, vehicle).periodS;
 }
 
 /**
  * Leitura completa do laboratório. `t` é o tempo desde o início do ensaio; os
  * roteiros com período finito se repetem sozinhos.
  */
-export function sampleSensorLab(id, param, t) {
-  const scenario = getSensorScenario(id);
+export function sampleSensorLab(id, param, t, vehicle = 'caminhao') {
+  const profile = sensorVehicleProfile(vehicle);
+  const scenario = getSensorScenario(id, vehicle);
   const value = clamp(Number.isFinite(param) ? param : scenario.param.value, scenario.param.min, scenario.param.max);
-  const timeline = scenarioTimeline(scenario.id, value);
+  const timeline = scenarioTimeline(scenario.id, value, vehicle);
   const loopT = Number.isFinite(timeline.periodS) ? ((t % timeline.periodS) + timeline.periodS) % timeline.periodS : Math.max(0, t);
-  const state = vehicleAt(scenario.id, value, loopT);
+  const state = vehicleAt(scenario.id, value, loopT, vehicle);
   const force = specificForce(state);
   const forceG = { x: force.x / G, y: force.y / G, z: force.z / G };
 
   // Giroscópio: derivada numérica das atitudes + guinada analítica da curva.
   const dt = 1e-3;
-  const before = vehicleAt(scenario.id, value, Math.max(0, loopT - dt));
-  const after = vehicleAt(scenario.id, value, loopT + dt);
+  const before = vehicleAt(scenario.id, value, Math.max(0, loopT - dt), vehicle);
+  const after = vehicleAt(scenario.id, value, loopT + dt, vehicle);
   const span = loopT - dt < 0 ? dt : 2 * dt;
   const rollOf = (s) => s.roadRoll + s.bodyRoll + s.tip * s.tipSide;
   const pitchOf = (s) => s.roadPitch + s.bodyPitch;
@@ -422,12 +467,19 @@ export function sampleSensorLab(id, param, t) {
     z: toDeg(state.yawRate),
   };
 
-  const { level, flags } = classify(scenario.id, state, forceG, timeline, loopT);
+  let { level, flags } = classify(scenario.id, state, forceG, timeline, loopT);
+  const distanceCm = vehicle === 'trator' && scenario.id === 'frenada' ? approach(value, loopT).distanceCm : null;
+  if (distanceCm !== null) {
+    level = distanceCm <= 100 ? 'risco' : distanceCm < 200 ? 'atencao' : 'estavel';
+    flags = { riscoInclinacao: false, frenagemBrusca: false, impacto: false };
+  }
   const alertLeadS = timeline.tipAtS !== null && timeline.alertAtS !== null ? timeline.tipAtS - timeline.alertAtS : null;
   // Mesma razão que decide o tombamento: lateral sobre vertical, no chão.
   const lateralG = scenario.id === 'encosta' ? Math.tan(state.roadRoll) : state.accel.y / G;
 
   return {
+    vehicle,
+    distanceCm,
     id: scenario.id,
     param: value,
     t,
@@ -438,7 +490,7 @@ export function sampleSensorLab(id, param, t) {
     road: { rollDeg: toDeg(state.roadRoll), pitchDeg: toDeg(state.roadPitch) },
     body: { rollDeg: toDeg(state.bodyRoll), pitchDeg: toDeg(state.bodyPitch), heaveM: state.heaveM },
     tip: { deg: toDeg(state.tip), side: state.tipSide },
-    curve: { k: state.curveK, radiusM: TRUCK.curveRadiusM },
+    curve: { k: state.curveK, radiusM: profile.curveRadiusM },
     lateralG,
     ratio: state.ratio,
     force,
@@ -449,6 +501,22 @@ export function sampleSensorLab(id, param, t) {
     alertLeadS,
     timeline,
     mems: memsResponse(force),
+  };
+}
+
+/** Campos ausentes ficam nulos, sem inventar medição do equipamento. */
+export function operationalTelemetry(reading) {
+  const tractor = reading.vehicle === 'trator';
+  const pitch = reading.road.pitchDeg + reading.body.pitchDeg;
+  const roll = reading.road.rollDeg + reading.body.rollDeg + reading.tip.deg * reading.tip.side;
+  const distance = reading.distanceCm;
+  return {
+    ...telemetryPacket(reading), trator: tractor ? 'demo-trator' : 'demo-caminhao',
+    timestamp: Math.round(reading.t * 1000), pitch, roll, distancia: distance,
+    temperatura: tractor ? 27 : null, umidade: tractor ? 55 : null,
+    riscoColisao: distance === null ? null : distance <= 150,
+    panelProximity: distance === null ? 'unavailable' : distance <= 100 ? 'danger' : distance < 200 ? 'attention' : 'clear',
+    panelInclination: Math.max(Math.abs(pitch), Math.abs(roll)) >= 20 || reading.flags.riscoInclinacao,
   };
 }
 

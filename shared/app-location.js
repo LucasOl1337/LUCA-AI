@@ -217,6 +217,8 @@ export function formatAppUrl(location) {
   const path = PAGE_PATHS[page];
   const params = new URLSearchParams();
 
+  if (page === 'sensor' && loc.veiculo === 'trator') params.set('veiculo', 'trator');
+
   if (page === 'personas') {
     setIfPresent(params, 'busca', loc.busca);
     if (loc.filtro && loc.filtro !== 'all') params.set('filtro', loc.filtro);

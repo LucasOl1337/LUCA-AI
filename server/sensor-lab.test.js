@@ -13,6 +13,9 @@ import {
   sampleSensorLab,
   scenarioTimeline,
   telemetryPacket,
+  operationalTelemetry,
+  TRACTOR,
+  TRACTOR_SCENARIOS,
 } from '../src/sensor-lab/physics.js';
 import { formatAppUrl, parseAppLocation } from '../shared/app-location.js';
 
@@ -100,4 +103,69 @@ test('a rota /sensor abre o laboratório', () => {
   assert.equal(parseAppLocation('/sensor').page, 'sensor');
   assert.equal(parseAppLocation('/sensor/').page, 'sensor');
   assert.equal(formatAppUrl({ page: 'sensor', caso: 'antigo' }), '/sensor');
+});
+
+test('o link do MAX preserva a escolha, sem confundir com veículo cadastrado', () => {
+  const loc = parseAppLocation('/sensor?veiculo=trator');
+  assert.equal(loc.veiculo, 'trator');
+  assert.equal(formatAppUrl(loc), '/sensor?veiculo=trator');
+  assert.equal(formatAppUrl({ page: 'sensor', veiculo: 'caminhao' }), '/sensor');
+  assert.equal(formatAppUrl({ page: 'sensor', veiculo: '001' }), '/sensor');
+});
+
+test('os quatro ensaios do MAX são determinísticos e usam velocidades agrícolas', () => {
+  assert.equal(TRACTOR.rolloverG, 0.4);
+  for (const scenario of TRACTOR_SCENARIOS) {
+    for (const param of [scenario.param.min, scenario.param.value, scenario.param.max]) {
+      for (const t of [0, 0.2, 1.5, 3, 5, 9]) {
+        const reading = sampleSensorLab(scenario.id, param, t, 'trator');
+        assert.deepEqual(reading, sampleSensorLab(scenario.id, param, t, 'trator'));
+        assert.ok(reading.speedKph >= 0 && reading.speedKph <= 8);
+        assert.ok(Object.values(reading.forceG).every(Number.isFinite));
+      }
+    }
+  }
+  assert.equal(sampleSensorLab('curva', 70, 5, 'trator').param, 8);
+  assert.equal(sampleSensorLab('curva', 70, 5).param, 70);
+  assert.equal(sampleSensorLab('encosta', 24, 3, 'trator').phase, 'tombado');
+  assert.equal(sampleSensorLab('curva', 8, 5, 'trator').tip.deg, 0);
+});
+
+test('a parada cruza 200 e 100 cm, reage a 150 cm e para a 40 cm sem colisão', () => {
+  for (const kph of [4, 6, 8]) {
+    const v = kph / 3.6;
+    const reaction = 2.5 / v;
+    const stop = 4.7 / v;
+    const at = t => operationalTelemetry(sampleSensorLab('frenada', kph, t, 'trator'));
+    near(at(0).distancia, 400, 1e-8, 'abertura');
+    assert.equal(at(2 / v + 0.001).panelProximity, 'attention');
+    assert.equal(at(reaction - 0.001).riscoColisao, false);
+    assert.equal(at(reaction + 0.001).riscoColisao, true);
+    assert.equal(at(stop - 0.1).panelProximity, 'danger');
+    near(at(stop + 1).distancia, 40, 1e-8, 'parada');
+    assert.equal(sampleSensorLab('frenada', kph, stop + 1, 'trator').speedKph, 0);
+    for (let t = 0.01; t < stop - 0.01; t += 0.03) {
+      const reading = sampleSensorLab('frenada', kph, t, 'trator');
+      const velocity = (at(t - 0.001).distancia - at(t + 0.001).distancia) / 100 / 0.002;
+      near(velocity, reading.speedKph / 3.6, 0.002, 'distância integrada');
+    }
+  }
+});
+
+test('ausência de simulação não vira zero ou false e os eixos vêm da pose', () => {
+  const truck = operationalTelemetry(sampleSensorLab('encosta', 8, 0));
+  assert.equal(truck.distancia, null);
+  assert.equal(truck.temperatura, null);
+  assert.equal(truck.umidade, null);
+  assert.equal(truck.riscoColisao, null);
+  assert.equal(truck.trator, 'demo-caminhao');
+  const reading = sampleSensorLab('encosta', 20, 0.2, 'trator');
+  const tractor = operationalTelemetry(reading);
+  assert.equal(tractor.trator, 'demo-trator');
+  assert.equal(tractor.timestamp, 200);
+  assert.equal(tractor.temperatura, 27);
+  assert.equal(tractor.umidade, 55);
+  assert.equal(tractor.pitch, reading.road.pitchDeg + reading.body.pitchDeg);
+  assert.equal(tractor.roll, reading.road.rollDeg + reading.body.rollDeg);
+  assert.equal(tractor.panelInclination, true);
 });
