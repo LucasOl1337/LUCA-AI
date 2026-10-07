@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { THRESHOLDS, TRUCK, telemetryPacket, type SensorReading } from '../physics.js';
+import { THRESHOLDS, TRUCK, operationalTelemetry, type SensorReading } from '../physics.js';
 import { roundedBoxAt } from './geometry';
 import { DISPLAY_FONT, MONO_FONT, makeCanvas } from './textures';
 
@@ -112,10 +112,10 @@ export function createScope(materials: ScopeMaterials): Scope {
   let lastPush = -1;
   let clock = 0;
   let flash: Record<string, number> = {};
-  let previousPacket: Record<string, unknown> = {};
+  let previousPacket: Partial<ReturnType<typeof operationalTelemetry>> = {};
 
   function push(reading: SensorReading) {
-    // Amostragem de 100 Hz no relógio contínuo do laboratório.
+    // Guarda a leitura disponível do relógio simulado, sem frequência de hardware.
     clock = reading.t;
     if (lastPush >= 0 && reading.t - lastPush < 0.01) return;
     lastPush = reading.t;
@@ -149,12 +149,11 @@ export function createScope(materials: ScopeMaterials): Scope {
     ctx.textBaseline = 'middle';
     ctx.font = `600 22px ${MONO_FONT}`;
     ctx.fillStyle = '#8fa3bb';
-    ctx.fillText('ESP32 · IMU 6 EIXOS', PLOT.x0, 44);
+    ctx.fillText('LEITURA SIMULADA · SEM CONEXÃO', PLOT.x0, 44);
     const blink = (now * 2) % 1 < 0.5;
     ctx.fillStyle = blink ? '#5eead4' : '#1e5c52';
-    ctx.beginPath(); ctx.arc(PLOT.x0 + 292, 44, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(PLOT.x0 + 470, 44, 7, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#8fa3bb';
-    ctx.fillText('100 Hz', PLOT.x0 + 310, 44);
     ctx.textAlign = 'right';
     ctx.fillText(`t = ${reading.t.toFixed(1).replace('.', ',')} s`, PLOT.x1, 44);
     ctx.textAlign = 'left';
@@ -227,7 +226,7 @@ export function createScope(materials: ScopeMaterials): Scope {
     }
 
     // Pacote do contrato.
-    const packet = telemetryPacket(reading) as unknown as Record<string, number | boolean>;
+    const packet = operationalTelemetry(reading);
     const px = 1080, py = 92;
     ctx.fillStyle = 'rgba(14,22,34,.9)';
     ctx.fillRect(px - 10, py, W - px - 34, 470);
@@ -235,19 +234,22 @@ export function createScope(materials: ScopeMaterials): Scope {
     ctx.strokeRect(px - 10, py, W - px - 34, 470);
     ctx.font = `600 15px ${MONO_FONT}`;
     ctx.fillStyle = '#6f829a';
-    ctx.fillText('PUBLICA', px + 4, py + 26);
+    ctx.fillText('CONTRATO · DEMO', px + 4, py + 26);
     ctx.fillStyle = '#9fb3c8';
-    ctx.fillText('trator/001/sensores', px + 4, py + 50);
+    ctx.fillText(packet.trator, px + 4, py + 50);
     ctx.font = `500 16px ${MONO_FONT}`;
     let line = py + 92;
-    const shown = ['aceleracaoX', 'aceleracaoY', 'aceleracaoZ', 'rotacaoX', 'rotacaoY', 'rotacaoZ', 'riscoInclinacao'];
+    const shown = ['distancia', 'pitch', 'roll', 'temperatura', 'umidade', 'riscoColisao', 'riscoInclinacao'] as const;
     for (const key of shown) {
       const value = packet[key];
       if (previousPacket[key] !== value) flash[key] = now;
       const age = now - (flash[key] ?? -10);
       ctx.fillStyle = '#7f93aa';
-      ctx.fillText(key, px + 4, line);
-      const text = typeof value === 'boolean' ? String(value) : (value as number).toFixed(key.startsWith('rot') ? 1 : 2);
+      ctx.font = `500 12px ${MONO_FONT}`;
+      ctx.fillText(key, px + 4, line - 12);
+      const unit = key === 'distancia' ? ' cm' : key === 'temperatura' ? ' °C' : key === 'umidade' ? ' %' : '°';
+      const text = value === null ? 'não simulado' : typeof value === 'boolean' ? String(value) : `${value.toFixed(1)}${unit}`;
+      ctx.font = `500 15px ${MONO_FONT}`;
       ctx.fillStyle = typeof value === 'boolean'
         ? (value ? '#ff6b6b' : '#5eead4')
         : age < 0.25 ? '#ffffff' : '#d6e2ee';
@@ -259,9 +261,10 @@ export function createScope(materials: ScopeMaterials): Scope {
     previousPacket = packet;
     ctx.font = `500 14px ${MONO_FONT}`;
     ctx.fillStyle = '#5f7289';
-    ctx.fillText('g · °/s · amostra a cada 10 ms', px + 4, py + 450);
+    ctx.fillText('Sem envio de dados', px + 4, py + 450);
 
     // Caminho do dado até o LUCA.
+    ctx.fillText('No equipamento real, o dado seguiria:', 720, 652);
     const stages = ['ESP32', 'MQTT', 'Firebase', 'LUCA'];
     const sy = 604;
     const sx0 = px, sx1 = W - 70;
@@ -283,7 +286,8 @@ export function createScope(materials: ScopeMaterials): Scope {
 
     // Faixa de estado.
     const key = reading.flags.frenagemBrusca ? 'frenada' : reading.flags.impacto ? 'impacto' : reading.level;
-    const status = STATUS[key] ?? STATUS.estavel;
+    const status = reading.distanceCm !== null && reading.level === 'risco'
+      ? { text: 'OBSTÁCULO PRÓXIMO', color: '#ff6b6b' } : STATUS[key] ?? STATUS.estavel;
     const by = 690;
     ctx.fillStyle = 'rgba(12,18,28,.95)';
     ctx.fillRect(0, by - 20, W, H - by + 20);
@@ -298,8 +302,9 @@ export function createScope(materials: ScopeMaterials): Scope {
     ctx.font = `500 20px ${MONO_FONT}`;
     ctx.fillStyle = '#c7d4e2';
     ctx.textAlign = 'right';
-    const detail = reading.id === 'curva' || reading.id === 'encosta'
-      ? `${Math.round(Math.max(0, reading.ratio) * 100)}% do limite de tombamento`
+    const detail = reading.distanceCm !== null ? `${reading.distanceCm.toFixed(0)} cm · operador avalia`
+      : reading.id === 'curva' || reading.id === 'encosta'
+      ? `${Math.round(Math.max(0, reading.ratio) * 100)}% do limite deste ensaio`
       : reading.id === 'frenada'
         ? `${Math.abs(reading.forceG.x).toFixed(2).replace('.', ',')} g de frenada`
         : `${Math.abs(reading.forceG.z - 1).toFixed(2).replace('.', ',')} g além da gravidade`;

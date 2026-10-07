@@ -4,7 +4,7 @@ import { createSompoTruckModel } from '@/components/sompo/createSompoTruckModel'
 import { refineSompoTruck } from '@/components/sompo/refineSompoTruck';
 import { SOMPO_STUDIO_DEFAULT } from '@/components/sompo/sompoStudioConfig';
 import { disposeSompoObject } from '@/components/sompo/sompoStage';
-import { TRUCK, THRESHOLDS, type SensorReading } from '../physics.js';
+import { TRUCK, THRESHOLDS, sensorVehicleProfile, type SensorReading, type SensorVehicle } from '../physics.js';
 import { boxAt, merge, roundedBoxAt } from './geometry';
 import { asphaltTexture } from './textures';
 
@@ -55,6 +55,7 @@ export interface MotionRig {
   anchors: Record<string, THREE.Object3D>;
   pickables: THREE.Object3D[];
   sensorBox: THREE.Object3D;
+  setVehicle(vehicle: SensorVehicle): void;
   update(reading: SensorReading, dt: number, reduced: boolean, camera: THREE.Camera): void;
   dispose(): void;
 }
@@ -66,7 +67,7 @@ function xray(color: THREE.Color, opacity = 1) {
   return new THREE.MeshBasicMaterial({ color: color.clone(), transparent: true, opacity, depthTest: false, depthWrite: false, toneMapped: true });
 }
 
-export function createMotionRig(materials: RigMaterials, palette: RigPalette): MotionRig {
+export function createMotionRig(materials: RigMaterials, palette: RigPalette, onModelStatus: (status: string) => void): MotionRig {
   const group = new THREE.Group();
   group.name = 'motion-rig';
   const disposables: { dispose(): void }[] = [];
@@ -225,6 +226,61 @@ export function createMotionRig(materials: RigMaterials, palette: RigPalette): M
   pulse.rotation.y = Math.PI / 2;
   pulse.position.x = 0.2;
   truckModel.sensorGroup.add(pulse);
+
+  const tractorHolder = new THREE.Group();
+  tractorHolder.name = 'sensor-max-holder';
+  tractorHolder.visible = false;
+  truckHolder.add(tractorHolder);
+  const tractorSensor = new THREE.Object3D();
+  tractorSensor.position.set(2.2461, 0.7363, 0);
+  tractorHolder.add(tractorSensor);
+  let selected: SensorVehicle = 'caminhao';
+  let tractorLoading = false;
+  let tractorModel: THREE.Object3D | null = null;
+  const obstacleMaterial = track(new THREE.MeshStandardMaterial({ color: 0xba8849, roughness: 0.94 }));
+  const obstacle = new THREE.Mesh(track(new THREE.BoxGeometry(0.12, 0.26, 0.3)), obstacleMaterial);
+  obstacle.name = 'sensor-front-obstacle';
+  obstacle.castShadow = obstacle.receiveShadow = true;
+  obstacle.visible = false;
+  lane.add(obstacle);
+  const beamGeometry = track(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(1, 0, 0)]));
+  const beam = new THREE.Line(beamGeometry, track(new THREE.LineBasicMaterial({ color: 0x5eead4 })));
+  beam.name = 'sensor-distance-beam';
+  beam.visible = false;
+  lane.add(beam);
+
+  function setVehicle(vehicle: SensorVehicle) {
+    selected = vehicle;
+    const tractor = vehicle === 'trator';
+    truckModel.root.visible = !tractor;
+    tractorHolder.visible = tractor;
+    const sensorParent = tractor ? tractorSensor : truckModel.sensorGroup;
+    sensorParent.add(sensorBox, anchors.esp32, pulse);
+    sensorBox.position.set(0, 0, 0);
+    anchors.esp32.position.set(0.1, 0.35, 0.6);
+    const profile = sensorVehicleProfile(vehicle);
+    cgGroup.position.set(tractor ? 0 : CG.x, profile.cgHeightM, 0);
+    const contact = tractor ? 1.0435 : OUTER_CONTACT_M;
+    tip.position.z = contact * TRUCK_SCALE;
+    tipInner.position.z = -contact * TRUCK_SCALE;
+    zones.scale.set(tractor ? 2.6625 / (AXLE_SPAN.front - AXLE_SPAN.rear) : 1, 1, profile.cgHeightM / TRUCK.cgHeightM);
+    onModelStatus(tractor ? tractorModel ? 'Trator MAX carregado' : 'Carregando Trator MAX…' : 'Caminhão');
+    if (!tractor || tractorLoading || tractorModel) return;
+    tractorLoading = true;
+    void Promise.all([
+      import('@/components/sompo/loadSompoAgriAsset'),
+      import('@/components/sompo/rigSompoAgriAsset'),
+    ]).then(async ([asset, rig]) => {
+      const loaded = await asset.loadSompoAgriAsset('max-tractor', assetAbort.signal);
+      if (!loaded) throw new Error('Modelo MAX não carregado');
+      if (assetAbort.signal.aborted) { asset.disposeSompoAgriAsset(loaded); return; }
+      tractorModel = rig.rigSompoAgriAsset(loaded, 'max-tractor').root;
+      tractorHolder.add(tractorModel);
+      if (selected === 'trator') onModelStatus('Trator MAX carregado');
+    }).catch(() => {
+      if (!assetAbort.signal.aborted && selected === 'trator') onModelStatus('Modelo MAX indisponível. Selecione Caminhão e tente novamente.');
+    }).finally(() => { tractorLoading = false; });
+  }
 
   // ---------------------------------------------------------------- raio-X
   const cgGroup = new THREE.Group();
@@ -399,6 +455,24 @@ export function createMotionRig(materials: RigMaterials, palette: RigPalette): M
     wheelTravel += (reading.speedKph / 3.6) * dt;
     roadTexture.offset.x = (wheelTravel * TRUCK_SCALE) / (DECK.w - 0.08);
     modular.update(SOMPO_STUDIO_DEFAULT, elapsed * 1000, wheelTravel, reading.curve.k * 0.12, 0.25, 0, reduced, reading.speedKph);
+    if (tractorModel && selected === 'trator') {
+      tractorModel.traverse((node) => {
+        if (node instanceof THREE.Group && node.name.startsWith('agri-wheel-')) {
+          node.rotation.z = -wheelTravel / Number(node.userData.radius || 1);
+        }
+      });
+    }
+    obstacle.visible = beam.visible = selected === 'trator' && reading.distanceCm !== null;
+    if (obstacle.visible && reading.distanceCm !== null) {
+      // Distância até a face do obstáculo, na mesma escala do emissor frontal.
+      group.updateMatrixWorld(true);
+      const origin = lane.worldToLocal(tractorSensor.getWorldPosition(new THREE.Vector3()));
+      const range = reading.distanceCm / 100 * TRUCK_SCALE;
+      obstacle.position.set(origin.x + range + 0.06, DECK_TOP + 0.13, origin.z);
+      beamGeometry.setFromPoints([origin, new THREE.Vector3(origin.x + range, origin.y, origin.z)]);
+      obstacle.userData.distanceCm = reading.distanceCm;
+      obstacle.userData.scaleM = TRUCK_SCALE;
+    }
 
     const tone = levelColor(palette, reading.level);
     ledMaterial.color.copy(tone).multiplyScalar(2.2);
@@ -432,13 +506,13 @@ export function createMotionRig(materials: RigMaterials, palette: RigPalette): M
     const denom = direction.dot(deckNormal);
     const tipped = reading.tip.deg > 1;
     hit.visible = dash.visible = !tipped && denom < -0.2;
-    zones.visible = !tipped;
+    zones.visible = !tipped && reading.distanceCm === null;
     if (hit.visible) {
       const t = deckPoint.clone().sub(cgWorld).dot(deckNormal) / denom;
       const hitWorld = cgWorld.clone().addScaledVector(direction, t);
       const hitLocal = lane.worldToLocal(hitWorld.clone());
       hit.position.set(hitLocal.x, DECK_TOP + 0.004, hitLocal.z);
-      const ratio = Math.abs(hitLocal.z) / limitZ;
+      const ratio = Math.abs(hitLocal.z) / (sensorVehicleProfile(selected).rolloverG * sensorVehicleProfile(selected).cgHeightM * TRUCK_SCALE);
       color.copy(ratio >= 1 ? palette.danger : ratio >= THRESHOLDS.alert ? palette.danger : ratio >= THRESHOLDS.attention ? palette.warn : palette.ok);
       hitMaterial.color.copy(color).multiplyScalar(2.4);
       const localCg = group.worldToLocal(cgWorld.clone());
@@ -458,11 +532,13 @@ export function createMotionRig(materials: RigMaterials, palette: RigPalette): M
     anchors,
     pickables: [deckPlate, road, deckUnder],
     sensorBox,
+    setVehicle,
     update,
     dispose() {
       assetAbort.abort();
       modular.dispose();
       disposeSompoObject(truckModel.root);
+      if (tractorModel) disposeSompoObject(tractorModel);
       disposables.forEach((item) => item.dispose());
     },
   };

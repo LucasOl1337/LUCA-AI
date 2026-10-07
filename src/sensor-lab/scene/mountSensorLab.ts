@@ -9,6 +9,7 @@ import {
   sampleSensorLab,
   type SensorReading,
   type SensorScenarioId,
+  type SensorVehicle,
 } from '../physics.js';
 import { createImuPackage, PACKAGE, PACKAGE_HEIGHT } from './imuPackage';
 import { createLabelLayer, type LabelSpec } from './labels';
@@ -24,13 +25,15 @@ export type SensorLabEvent = { kind: 'atencao' | 'risco' | 'tombou' | 'frenada' 
 
 export const SENSOR_VIEWS: readonly { id: SensorView; label: string }[] = [
   { id: 'bancada', label: 'Bancada' },
-  { id: 'caminhao', label: 'Caminhão' },
+  { id: 'caminhao', label: 'Veículo' },
   { id: 'chip', label: 'Chip' },
   { id: 'massa', label: 'Massa' },
   { id: 'dedos', label: 'Dedos' },
 ];
 
 export interface SensorLabOptions {
+  vehicle: SensorVehicle;
+  onModelStatus(status: string): void;
   scenario: SensorScenarioId;
   param: number;
   exploded: boolean;
@@ -48,6 +51,7 @@ export interface SensorLabOptions {
 }
 
 export interface SensorLabApi {
+  setVehicle(vehicle: SensorVehicle): void;
   setScenario(id: SensorScenarioId, param: number): void;
   setParam(value: number): void;
   setExploded(open: boolean): void;
@@ -149,7 +153,8 @@ export function mountSensorLab(container: HTMLElement, options: SensorLabOptions
   const room = createRoom(materials);
   scene.add(room.group);
 
-  const rig = createMotionRig(materials, palette);
+  const rig = createMotionRig(materials, palette, options.onModelStatus);
+  rig.setVehicle(state.vehicle);
   rig.group.position.copy(RIG_POSITION);
   scene.add(rig.group);
 
@@ -183,12 +188,12 @@ export function mountSensorLab(container: HTMLElement, options: SensorLabOptions
   post.setDepthOfField(!compact);
 
   // ------------------------------------------------------------- etiquetas
-  let reading = sampleSensorLab(state.scenario, state.param, 0);
+  let reading = sampleSensorLab(state.scenario, state.param, 0, state.vehicle);
   const memsAnchors = chip.mems.anchors;
   const labelSpecs: LabelSpec[] = [
     { id: 'hexapod', title: 'Plataforma de movimento', object: rig.anchors.hexapod, views: ['bancada'], detail: () => 'seis atuadores' },
-    { id: 'esp32', title: 'ESP32 + IMU', object: rig.anchors.esp32, views: ['bancada', 'caminhao'], detail: () => '100 leituras/s', tone: 'plus' },
-    { id: 'cg', title: 'Centro de gravidade', object: rig.anchors.cg, views: ['caminhao'], detail: () => '1,75 m do chão' },
+    { id: 'esp32', title: 'ESP32 + sensores', object: rig.anchors.esp32, views: ['bancada', 'caminhao'], detail: () => 'demonstração local', tone: 'plus' },
+    { id: 'cg', title: 'Centro de gravidade', object: rig.anchors.cg, views: ['caminhao'], detail: () => 'posição ilustrativa' },
     { id: 'load', title: 'Seta de carga', object: rig.anchors.load, views: ['caminhao'], tone: 'force', detail: () => `${pt(Math.abs(reading.lateralG), 2)} g de lado`, when: () => reading.tip.deg < 5 },
     { id: 'limit', title: 'Limite de tombamento', object: rig.anchors.limit, views: ['caminhao'], tone: 'danger', detail: () => `${Math.round(Math.max(0, reading.ratio) * 100)}% usado`, when: () => reading.tip.deg < 1 },
     { id: 'mold', title: 'Tampa de epóxi', object: chip.anchors.mold, views: ['chip'], detail: () => 'marcação a laser', when: () => explode > 0.6 },
@@ -394,12 +399,7 @@ export function mountSensorLab(container: HTMLElement, options: SensorLabOptions
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
     camera.fov = camera.aspect < 0.8 ? 40 : 30;
-    // O centro óptico vai para o meio da área livre à direita do texto de abertura.
-    const intro = container.parentElement?.querySelector('.sensor-intro');
-    const introRight = intro ? intro.getBoundingClientRect().right - rect.left + 16 : 0;
-    const hudInset = width > 860 ? THREE.MathUtils.clamp(introRight, 0, width * 0.34) : 0;
-    if (hudInset > 0) camera.setViewOffset(width, height, -hudInset / 2, 0, width, height);
-    else camera.clearViewOffset();
+    camera.clearViewOffset();
     camera.updateProjectionMatrix();
     post.setSize(width, height);
   }
@@ -452,7 +452,7 @@ export function mountSensorLab(container: HTMLElement, options: SensorLabOptions
     frame++;
     if (!state.paused) simTime += dt;
 
-    reading = sampleSensorLab(state.scenario, state.param, simTime);
+    reading = sampleSensorLab(state.scenario, state.param, simTime, state.vehicle);
 
     // Massa de prova: alvo pela física, balanço desenhado em câmera lenta.
     const perG = (state.amplified ? VISUAL_GAP_PER_G : REAL_GAP_PER_G) * DRAWN_GAP;
@@ -581,8 +581,16 @@ export function mountSensorLab(container: HTMLElement, options: SensorLabOptions
   }
 
   return {
+    setVehicle(vehicle) {
+      state.vehicle = vehicle;
+      state.param = getSensorScenario(state.scenario, vehicle).param.value;
+      rig.setVehicle(vehicle);
+      simTime = 0;
+      scope.reset();
+      massVelocity.set(0, 0);
+    },
     setScenario(id, param) {
-      const scenario = getSensorScenario(id);
+      const scenario = getSensorScenario(id, state.vehicle);
       state.scenario = scenario.id;
       state.param = param;
       simTime = 0;

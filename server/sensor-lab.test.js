@@ -141,6 +141,7 @@ test('a parada cruza 200 e 100 cm, reage a 150 cm e para a 40 cm sem colisão', 
     assert.equal(at(2 / v + 0.001).panelProximity, 'attention');
     assert.equal(at(reaction - 0.001).riscoColisao, false);
     assert.equal(at(reaction + 0.001).riscoColisao, true);
+    assert.equal(at(reaction + 0.001).panelProximity, 'danger', 'flag já destaca perigo antes dos 100 cm');
     assert.equal(at(stop - 0.1).panelProximity, 'danger');
     near(at(stop + 1).distancia, 40, 1e-8, 'parada');
     assert.equal(sampleSensorLab('frenada', kph, stop + 1, 'trator').speedKph, 0);

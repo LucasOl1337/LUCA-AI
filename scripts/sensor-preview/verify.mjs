@@ -1,0 +1,123 @@
+import assert from 'node:assert/strict';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { chromium } from 'playwright';
+
+// Use somente CDP da bancada validada, com vaga pesada já reservada.
+const endpoint = process.env.SENSOR_BENCH_CDP;
+const output = process.env.SENSOR_PROOF_DIR;
+if (!endpoint || !output) throw new Error('Informe SENSOR_BENCH_CDP e SENSOR_PROOF_DIR da bancada própria');
+const origin = 'http://127.0.0.1:5211';
+await mkdir(output, { recursive: true });
+const browser = await chromium.connectOverCDP(endpoint);
+const page = await browser.contexts()[0].newPage();
+const errors = [];
+const requests = [];
+const checks = [];
+page.on('pageerror', error => errors.push(error.message));
+page.on('request', request => requests.push({ url: request.url(), method: request.method() }));
+const check = (name, value) => { assert.ok(value, name); checks.push(name); };
+const time = () => page.evaluate(() => window.__sensorLab.time);
+const reading = () => page.evaluate(() => window.__sensorLab.reading);
+const seek = async value => {
+  await page.evaluate(value => { window.__sensorLab.time = value; }, value);
+  await page.waitForFunction(value => Math.abs(window.__sensorLab.reading.t - value) < 0.001, value);
+  await page.waitForTimeout(200);
+};
+const shot = async name => page.screenshot({ path: `${output}/${name}.png` });
+const noOverflow = async label => check(label, await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && [...document.querySelectorAll('.sensor-lab')].every(el => el.scrollWidth <= el.clientWidth)));
+try {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(`${origin}/?sensorDebug`);
+  await page.waitForSelector('[data-ready="true"]');
+  await page.waitForTimeout(3600);
+  check('Caminhão inicial, sem GLB MAX carregado', !requests.some(item => /max.*\.glb/i.test(item.url)));
+  await page.getByRole('button', { name: 'Pausar', exact: true }).click();
+  const pausedAt = await time();
+  await page.waitForTimeout(300);
+  check('Pausa congela relógio', await time() === pausedAt);
+  for (const id of ['encosta', 'curva', 'frenada', 'buraco']) {
+    await page.getByRole('combobox').selectOption(id);
+    await seek(3);
+    const r = await reading();
+    check(`Caminhão: ${id}`, r.id === id && r.vehicle === 'caminhao' && Object.values(r.forceG).every(Number.isFinite));
+  }
+  await page.getByRole('combobox').selectOption('curva');
+  await seek(5);
+  await shot('sensor-caminhao-desktop');
+  await noOverflow('Desktop sem overflow');
+  await page.getByRole('button', { name: 'Trator MAX', exact: true }).click();
+  await page.getByText('Trator MAX carregado', { exact: true }).waitFor();
+  check('MAX selecionado e URL compartilhável', page.url().includes('veiculo=trator'));
+  check('GLB MAX requisitado após seleção', requests.some(item => /max.*\.glb/i.test(item.url)));
+  for (const id of ['encosta', 'curva', 'frenada', 'buraco']) {
+    await page.getByRole('combobox').selectOption(id);
+    await seek(2);
+    const r = await reading();
+    check(`MAX: ${id}`, r.id === id && r.vehicle === 'trator' && r.speedKph >= 0 && r.speedKph <= 8);
+  }
+  await page.getByRole('combobox').selectOption('frenada');
+  await seek(1.3);
+  check('Atenção entre 150 e 200 cm', await page.locator('.sensor-decision').getAttribute('data-risk') === 'attention');
+  await seek(1.6);
+  check('Flag aos 150 cm destaca perigo antes dos 100 cm', await page.locator('.sensor-decision').getAttribute('data-risk') === 'danger' && (await reading()).distanceCm > 100);
+  await seek(1.86);
+  check('Parada cruza 100 cm', (await reading()).distanceCm < 100);
+  const geometry = await page.evaluate(() => {
+    const beam = window.__sensorLab.scene.getObjectByName('sensor-distance-beam');
+    const p = beam.geometry.attributes.position;
+    return { cm: Math.hypot(p.getX(1) - p.getX(0), p.getY(1) - p.getY(0), p.getZ(1) - p.getZ(0)) / 0.19 * 100, reading: window.__sensorLab.reading.distanceCm };
+  });
+  check('Distância geométrica do emissor confere com leitura', Math.abs(geometry.cm - geometry.reading) < 0.001);
+  await shot('sensor-max-parada-desktop');
+  await seek(4);
+  check('Operador para a 40 cm', Math.abs((await reading()).distanceCm - 40) < 0.001 && (await reading()).speedKph === 0);
+  await page.getByRole('button', { name: 'Reiniciar ensaio' }).click();
+  await page.waitForFunction(() => window.__sensorLab.reading.t === 0);
+  check('Repetir reinicia a 400 cm', (await reading()).distanceCm === 400);
+  await page.getByRole('button', { name: 'Continuar', exact: true }).click();
+  await page.waitForFunction(() => window.__sensorLab.time > 0.1);
+  check('Continuar retoma relógio', await time() > 0);
+  await page.getByRole('button', { name: 'Pausar', exact: true }).click();
+  await page.goBack();
+  await page.waitForFunction(() => window.__sensorLab.reading.vehicle === 'caminhao');
+  check('Voltar restaura caminhão', await page.getByRole('button', { name: 'Caminhão', exact: true }).getAttribute('aria-pressed') === 'true');
+  await page.goForward();
+  await page.waitForFunction(() => window.__sensorLab.reading.vehicle === 'trator');
+  await page.reload();
+  await page.waitForSelector('[data-ready="true"]');
+  await page.getByText('Trator MAX carregado', { exact: true }).waitFor();
+  check('Reload preserva MAX', (await reading()).vehicle === 'trator');
+  await page.getByRole('button', { name: 'Pausar', exact: true }).click();
+  await page.getByRole('button', { name: 'Por dentro do sensor', exact: true }).click();
+  await page.waitForTimeout(1600);
+  check('MEMS opcional abre vistas internas', await page.getByRole('button', { name: 'Massa', exact: true }).count() === 1);
+  await shot('sensor-mems-desktop');
+  await page.getByRole('button', { name: 'Movimento ampliado', exact: true }).click();
+  check('Modo real disponível', await page.getByRole('button', { name: 'Movimento real', exact: true }).count() === 1);
+  await page.getByRole('button', { name: 'Voltar à operação', exact: true }).click();
+  await page.locator('.sensor-process').scrollIntoViewIfNeeded();
+  await shot('sensor-processo-desktop');
+  check('Fluxo contém Safra e aviso de 15 s', (await page.locator('.sensor-process').innerText()).includes('15 s') && (await page.locator('.sensor-process').innerText()).includes('Safra'));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: 'Caminhão', exact: true }).click();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(1500);
+  await shot('sensor-caminhao-mobile');
+  await noOverflow('Caminhão mobile sem overflow');
+  await page.getByRole('button', { name: 'Trator MAX', exact: true }).click();
+  await page.getByRole('combobox').selectOption('frenada');
+  await seek(1.86);
+  await shot('sensor-max-parada-mobile');
+  await page.locator('.sensor-operation-readings').scrollIntoViewIfNeeded();
+  await shot('sensor-max-leituras-mobile');
+  await noOverflow('MAX mobile sem overflow');
+  await page.locator('.sensor-process').scrollIntoViewIfNeeded();
+  await shot('sensor-processo-mobile');
+  check('Nenhuma requisição de API, mutação ou origem externa', requests.every(item => item.url.startsWith(origin) && !item.url.includes('/api/') && item.method === 'GET'));
+  check('Sem erros JavaScript', errors.length === 0);
+  await writeFile(`${output}/sensor-ui-proof.json`, JSON.stringify({ checks, geometry, errors, requests }, null, 2));
+  console.log(JSON.stringify({ passed: checks.length, checks, geometry, errors }, null, 2));
+} finally {
+  await page.close();
+  await browser.close();
+}

@@ -299,6 +299,8 @@ export function createImuPackage(materials: PackageMaterials, palette: MemsPalet
     capMaterial.opacity = capFade;
     capGroup.visible = capFade > 0.01;
     moldGroup.position.set(0, MOLD_TOP_Y + e * EXPLODED.mold.y, 0);
+    // No corte aberto fica só o contorno. A superfície com marcação oculta o die.
+    slab.visible = e < 0.7;
     const solid = 1 - e * 0.92;
     for (const material of [ghost, moldTop]) {
       material.transparent = e > 0.001;

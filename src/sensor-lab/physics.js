@@ -510,12 +510,13 @@ export function operationalTelemetry(reading) {
   const pitch = reading.road.pitchDeg + reading.body.pitchDeg;
   const roll = reading.road.rollDeg + reading.body.rollDeg + reading.tip.deg * reading.tip.side;
   const distance = reading.distanceCm;
+  const collisionFlag = distance === null ? null : distance <= 150;
   return {
     ...telemetryPacket(reading), trator: tractor ? 'demo-trator' : 'demo-caminhao',
     timestamp: Math.round(reading.t * 1000), pitch, roll, distancia: distance,
     temperatura: tractor ? 27 : null, umidade: tractor ? 55 : null,
-    riscoColisao: distance === null ? null : distance <= 150,
-    panelProximity: distance === null ? 'unavailable' : distance <= 100 ? 'danger' : distance < 200 ? 'attention' : 'clear',
+    riscoColisao: collisionFlag,
+    panelProximity: distance === null ? 'unavailable' : distance <= 100 || collisionFlag ? 'danger' : distance < 200 ? 'attention' : 'clear',
     panelInclination: Math.max(Math.abs(pitch), Math.abs(roll)) >= 20 || reading.flags.riscoInclinacao,
   };
 }
