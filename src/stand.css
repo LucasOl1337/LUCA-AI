@@ -50,3 +50,46 @@
   color: var(--l-navy-deep, #64d2ff);
   z-index: 5;
 }
+
+.stand-avatar { display: block; width: 100%; height: 100%; }
+
+/* Atração: avatar médio, chamada grande, marca no rodapé. */
+.stand-atracao { flex: 1; display: grid; grid-template-columns: minmax(0, 44fr) minmax(0, 56fr); grid-template-rows: 1fr auto; align-items: center; gap: 2vmin 4vmin; min-height: 0; }
+.stand-avatar-atracao { height: min(62vh, 44vw); width: auto; justify-self: end; animation: stand-flutua 4.5s ease-in-out infinite; }
+.stand-chamada-titulo { margin: 0; font-size: clamp(32px, 7.4vmin, 120px); line-height: 1.04; font-weight: 800; letter-spacing: -0.02em; text-wrap: balance; }
+.stand-chamada-titulo strong { color: #64d2ff; }
+.stand-chamada-sub { margin: 2.4vmin 0 0; font-size: clamp(18px, 3.4vmin, 52px); font-weight: 500; color: rgba(255, 255, 255, 0.72); text-wrap: balance; }
+.stand-marca { grid-column: 1 / -1; margin: 0; text-align: center; font-size: clamp(16px, 2.6vmin, 40px); font-weight: 600; color: rgba(255, 255, 255, 0.62); }
+.stand-marca-luca { color: #43d18a; font-weight: 800; letter-spacing: 0.04em; }
+
+/* Conversa: avatar grande, indicador e legenda de até 2 linhas embaixo. */
+.stand-conversa { flex: 1; display: flex; flex-direction: column; align-items: center; min-height: 0; }
+.stand-avatar-conversa { flex: 1; min-height: 0; width: auto; max-width: 100%; }
+.stand-conversa-texto { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 1.6vmin; }
+.stand-legenda {
+  margin: 0; max-width: 32ch; min-height: 2.3em; text-align: center; text-wrap: balance;
+  font-size: clamp(26px, 5vmin, 84px); line-height: 1.15; font-weight: 700;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.stand-indicador { margin: 0; display: inline-flex; align-items: center; gap: 1.4vmin; padding: 0.8vmin 2.2vmin; border-radius: 999px; background: rgba(255, 255, 255, 0.06); font-size: clamp(16px, 2.8vmin, 44px); font-weight: 700; color: rgba(255, 255, 255, 0.8); }
+.stand-indicador-ponto { display: inline-flex; gap: 0.6vmin; }
+.stand-indicador-ponto i { width: 1.3vmin; height: 1.3vmin; border-radius: 50%; background: currentColor; opacity: 0.5; }
+.stand-indicador[data-voz='ouvindo'] { color: #64d2ff; }
+.stand-indicador[data-voz='ouvindo'] i { animation: stand-pulsa 1.1s ease-in-out infinite; }
+.stand-indicador[data-voz='pensando'] { color: #0a84ff; }
+.stand-indicador[data-voz='pensando'] i { animation: stand-pulsa 0.9s ease-in-out infinite; }
+.stand-indicador[data-voz='falando'] { color: #43d18a; }
+.stand-indicador[data-voz='falando'] i { opacity: 1; }
+.stand-indicador i:nth-child(2) { animation-delay: 0.15s !important; }
+.stand-indicador i:nth-child(3) { animation-delay: 0.3s !important; }
+
+/* Vídeo: tela cheia, avatar pequeno no canto superior esquerdo da área segura. */
+.stand-video { position: absolute; inset: 0; background: #000; }
+.stand-video-player { width: 100%; height: 100%; object-fit: contain; }
+.stand-video-avatar { position: absolute; top: var(--stand-margem); left: var(--stand-margem); width: 16vmin; height: 16vmin; border-radius: 50%; background: rgba(9, 12, 17, 0.78); border: 0.3vmin solid rgba(100, 210, 255, 0.6); padding: 0.6vmin; overflow: hidden; }
+.stand-video-titulo { position: absolute; left: var(--stand-margem); right: var(--stand-margem); bottom: var(--stand-margem); margin: 0; text-align: center; font-size: clamp(16px, 2.8vmin, 44px); font-weight: 700; text-shadow: 0 0.3vmin 1.2vmin rgba(0, 0, 0, 0.9); }
+.stand[data-tela='video'] .stand-seguro { pointer-events: none; }
+
+@keyframes stand-flutua { 50% { transform: translateY(-1.2vmin); } }
+@keyframes stand-pulsa { 50% { opacity: 1; transform: scale(1.25); } }
+@media (prefers-reduced-motion: reduce) { .stand-avatar-atracao, .stand-indicador i { animation: none !important; } }
