@@ -26,6 +26,18 @@ _Evitar_: Limite seguro do veículo.
 
 ## Stand do trator
 
+**Stand**:
+O quiosque em volta do trator, com o monitor, o microfone e a página `/stand` em tela cheia. Quem opera o quiosque é a equipe do stand; Operador é quem dirige o trator.
+_Evitar_: Operador (para a equipe do stand), totem.
+
+**Avatar LUCA**:
+O personagem que fala pela IA do stand: SVG 2D com a boca seguindo o nível do áudio (`src/components/stand/AvatarLuca.tsx`). Na tela aparece só como "LUCA". Variações por `?variante=`: `coruja` (padrão), `operario` e `robo`.
+_Evitar_: Mascote, bot, Sompo (a Sompo só aparece como texto).
+
+**Atração / Conversa / Vídeo**:
+As três telas do Stand. Atração chama o público e volta sozinha após 10 s de voz ociosa. Conversa mostra o Avatar LUCA grande, o indicador ouvindo/pensando/falando e a legenda. Vídeo toca um Vídeo do stand em tela cheia com o avatar pequeno no canto e, ao terminar ou ser pulado (tecla N), volta para Conversa.
+_Evitar_: Modo, cena.
+
 **Vídeo do stand**:
 Resposta pré-gravada a uma pergunta central do público do stand, identificada por um id (`pipeline-completo`, `painel-sompo`, `painel-segurado`).
 _Evitar_: Clipe, demo, apresentação.
