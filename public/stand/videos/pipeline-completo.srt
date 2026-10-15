@@ -1,0 +1,91 @@
+1
+00:00:00,350 --> 00:00:04,568
+No campo, um trator pode bater ou tombar em poucos segundos.
+
+2
+00:00:04,568 --> 00:00:07,450
+Quase sempre ninguém vê o risco chegando.
+
+3
+00:00:07,450 --> 00:00:11,035
+E se desse para enxergar o risco antes do acidente?
+
+4
+00:00:11,935 --> 00:00:15,504
+Na frente do trator, um sensor mede a distância até o
+
+5
+00:00:15,504 --> 00:00:19,208
+que vem pela frente. Uma placa pequena lê esse sensor e
+
+6
+00:00:19,208 --> 00:00:22,777
+manda as leituras pela internet até o painel do LUCA.
+
+7
+00:00:24,477 --> 00:00:28,746
+No painel, o mesmo caso roda no simulador, com dados sintéticos.
+
+8
+00:00:28,746 --> 00:00:32,481
+O fardo entra no alcance do sensor, o alerta acende a um
+
+9
+00:00:32,481 --> 00:00:36,083
+metro e meio e o operador freia a tempo, sem encostar.
+
+10
+00:00:36,983 --> 00:00:40,511
+Esse momento vira um episódio gravado. Com um clique,
+
+11
+00:00:40,511 --> 00:00:43,907
+o painel registra o roteiro inteiro, fase por fase,
+
+12
+00:00:43,907 --> 00:00:46,370
+com imagens datadas de cada instante.
+
+13
+00:00:47,270 --> 00:00:50,890
+Com mais um clique, o episódio inteiro vai para a bancada:
+
+14
+00:00:50,890 --> 00:00:53,199
+uma equipe de agentes de IA que lê os
+
+15
+00:00:53,199 --> 00:00:55,758
+dados e as imagens, cada um no seu papel.
+
+16
+00:00:56,658 --> 00:01:00,828
+Minutos depois, a bancada devolve um veredito: o que aconteceu,
+
+17
+00:01:00,828 --> 00:01:04,469
+qual a gravidade para a seguradora e o que fazer agora.
+
+18
+00:01:04,469 --> 00:01:07,844
+Este parecer foi gerado de verdade, nesta gravação.
+
+19
+00:01:11,544 --> 00:01:14,869
+A seguradora e o segurado olham a mesma evidência:
+
+20
+00:01:14,869 --> 00:01:18,061
+o episódio gravado, com as imagens de cada fase,
+
+21
+00:01:18,061 --> 00:01:22,051
+no painel da safra. A parada a tempo deixa de ser invisível.
+
+22
+00:01:23,551 --> 00:01:28,831
+Hoje, dentro do painel, isso já funciona com casos de exemplo.
+
+23
+00:01:28,831 --> 00:01:31,896
+Quer ver um caso? Pergunta pro LUCA.
