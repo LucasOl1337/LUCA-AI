@@ -2,7 +2,7 @@
 
 Gerada por `npm run cli:docs` a partir de `cli/catalog.js`. Não editar à mão.
 
-121 comandos; 100 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
+122 comandos; 101 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
 
 IDs são argumentos posicionais. Campos comuns podem ser flags; corpos completos usam `--data @arquivo.json`. Flags prevalecem sobre o corpo; objetos aninhados não são mesclados. Campos string são literais; apenas campos JSON e `--data` interpretam `@arquivo`/`-`.
 
@@ -720,7 +720,7 @@ Nenhum; consulte a descrição para entradas por `--data`.
 
 ### `stand status`
 
-Estado do cérebro de voz do stand: ligado, modelo, limites e sessões na hora.
+Estado do cérebro de voz do stand: provedor, ligado ou motivo, limites e sessões na hora.
 
 `GET /api/stand/status`; autenticação: **session**.
 
@@ -728,7 +728,7 @@ Nenhum; consulte a descrição para entradas por `--data`.
 
 ### `stand sessao`
 
-Abrir sessão de voz: devolve token efêmero da Realtime (503 stand_desligado sem chave).
+Abrir sessão de voz: token efêmero, conexão e configuração da sessão (503 stand_desligado sem credencial).
 
 `POST /api/stand/sessao`; autenticação: **session**.
 
@@ -740,7 +740,15 @@ Executar uma ferramenta da IA do stand.
 
 `POST /api/stand/ferramenta`; autenticação: **session**.
 
-`--nome` (string, obrigatório): buscar_no_repo, pesquisar_web, tocar_video ou acao_site<br>`--args` (json): Argumentos JSON da ferramenta
+`--nome` (string, obrigatório): buscar_no_repo, pesquisar_web, tocar_video ou uma ação do site (abrir_aba, rodar_cenario...)<br>`--args` (json): Argumentos JSON da ferramenta
+
+### `stand rotear`
+
+Decidir se uma pergunta transcrita toca, oferece ou não usa vídeo do stand.
+
+`POST /api/stand/rotear`; autenticação: **session**.
+
+`--texto` (string, obrigatório): Pergunta transcrita
 
 ### `sompo risk list`
 

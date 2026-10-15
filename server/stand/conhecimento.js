@@ -145,7 +145,8 @@ export function montarPromptBase({ raiz = RAIZ_REPO } = {}) {
     '- O que ainda é protótipo: pesos do score são acadêmicos, não oficiais da Sompo, e não houve homologação em campo.',
     ...(stories.length ? ['', 'Problemas que o LUCA resolve para a seguradora:', ...stories] : []),
     '',
-    'Ferramentas: use buscar_no_repo quando precisar de um detalhe do sistema; use pesquisar_web para fatos de fora (mercado, seguro rural, notícias); use tocar_video quando houver um vídeo pronto para a pergunta, dizendo antes uma frase curta do que ele mostra; use acao_site para mostrar o próprio site na tela.',
+    'Ferramentas: use buscar_no_repo quando precisar de um detalhe do sistema; use pesquisar_web para fatos de fora (mercado, seguro rural, notícias); use tocar_video quando houver um vídeo pronto para a pergunta, dizendo antes uma frase curta do que ele mostra; use as ações do site (abrir_aba, abrir_caso, rodar_cenario, gravar_episodio, analisar_na_bancada, voltar_inicio) para mostrar o próprio site na tela; se a ação falhar, fale a mensagem devolvida.',
+    'Notas que começam com "Roteador:" vêm do sistema, não da pessoa: siga a decisão de vídeo delas sem mencioná-las.',
     ...(videos ? ['', videos] : []),
   ].join('\n');
 }

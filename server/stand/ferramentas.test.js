@@ -18,8 +18,11 @@ function raizComVideo(t) {
   return raiz;
 }
 
-test('tools declaradas no formato Realtime, com os quatro nomes do contrato', () => {
-  assert.deepEqual(FERRAMENTAS_STAND.map((f) => f.name), ['buscar_no_repo', 'pesquisar_web', 'tocar_video', 'acao_site']);
+test('tools no formato Realtime: as três do cérebro mais uma por ação do site (M3)', () => {
+  assert.deepEqual(FERRAMENTAS_STAND.map((f) => f.name), [
+    'buscar_no_repo', 'pesquisar_web', 'tocar_video',
+    'abrir_aba', 'voltar_inicio', 'abrir_caso', 'rodar_cenario', 'gravar_episodio', 'analisar_na_bancada',
+  ]);
   for (const f of FERRAMENTAS_STAND) {
     assert.equal(f.type, 'function');
     assert.equal(f.parameters.type, 'object');
@@ -46,12 +49,16 @@ test('tocar_video com o manifesto real da M7 conhece pipeline-completo', async (
   assert.ok(r.ok || r.erro === 'video_sem_arquivo', JSON.stringify(r));
 });
 
-test('acao_site repassa ação bem formada e recusa nome inválido', async () => {
-  const ok = await executarFerramentaStand('acao_site', { acao: 'abrir_aba', args: { aba: 'telemetria' } });
+test('ações do site passam pelo validador da M3 e viram evento acao_site', async () => {
+  const ok = await executarFerramentaStand('abrir_aba', { aba: 'telemetria' });
   assert.deepEqual(ok.evento, { tipo: 'acao_site', acao: 'abrir_aba', args: { aba: 'telemetria' } });
-  const semArgs = await executarFerramentaStand('acao_site', { acao: 'voltar_inicio', args: ['x'] });
-  assert.deepEqual(semArgs.evento.args, {});
-  assert.equal((await executarFerramentaStand('acao_site', { acao: 'rm -rf /' })).erro, 'acao_invalida');
+  const cenario = await executarFerramentaStand('rodar_cenario', { id: 'stand-inclinacao' });
+  assert.deepEqual(cenario.evento, { tipo: 'acao_site', acao: 'rodar_cenario', args: { id: 'stand-inclinacao' } });
+  assert.deepEqual((await executarFerramentaStand('voltar_inicio', {})).evento.args, {});
+  const ruim = await executarFerramentaStand('abrir_aba', { aba: 'admin' });
+  assert.equal(ruim.erro, 'acao_invalida');
+  assert.match(ruim.mensagem, /Opções: telemetria/);
+  assert.equal((await executarFerramentaStand('acao_site', { acao: 'abrir_aba' })).erro, 'ferramenta_desconhecida');
 });
 
 test('pesquisar_web usa web_search/fetch_url do agent-tools e propaga falha', async () => {

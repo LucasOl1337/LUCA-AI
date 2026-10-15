@@ -2,8 +2,11 @@
 // Realtime ({type, name, description, parameters}) e executor no servidor.
 // O navegador recebe a chamada da IA, repassa a /api/stand/ferramenta e
 // devolve o resultado à sessão; `evento` (quando houver) vai pra página.
+// As ações do site são uma ferramenta por ação, com enum, vindas da M3
+// (`shared/stand/acoes-site.ts`), e passam pelo validador dela.
 import fs from 'node:fs';
 import path from 'node:path';
+import { ferramentasAcaoSite, validarAcaoSite } from '../../shared/stand/acoes-site.ts';
 import { executeAgentTool } from '../agent-tools.js';
 import { buscarNoRepo, RAIZ_REPO } from './conhecimento.js';
 import { carregarManifesto } from './roteador-video.js';
@@ -42,23 +45,11 @@ export const FERRAMENTAS_STAND = Object.freeze([
       required: ['id'],
     },
   },
-  {
-    type: 'function',
-    name: 'acao_site',
-    description: 'Mostra o próprio site do LUCA-AI na tela: a página executa a ação como se fosse uma pessoa clicando.',
-    parameters: {
-      type: 'object',
-      properties: {
-        acao: { type: 'string', description: 'Nome da ação, por exemplo abrir_aba' },
-        args: { type: 'object', description: 'Argumentos da ação', additionalProperties: true },
-      },
-      required: ['acao'],
-    },
-  },
+  ...ferramentasAcaoSite('realtime'),
 ]);
 
 const NOMES = new Set(FERRAMENTAS_STAND.map((f) => f.name));
-const NOME_ACAO = /^[a-z][a-z0-9_]{1,48}$/;
+const ACOES = new Set(ferramentasAcaoSite('realtime').map((f) => f.name));
 
 function erro(ferramenta, codigo) {
   return { ok: false, ferramenta, erro: codigo };
@@ -122,10 +113,11 @@ export async function executarFerramentaStand(nome, args = {}, deps = {}) {
     return { ok: true, ferramenta, id, titulo: video.titulo, evento: { tipo: 'tocar_video', id } };
   }
 
-  // acao_site: a lista fechada e o executor são da M3; aqui só valida a forma
-  // e repassa o evento para a página.
-  const acao = String(entrada.acao || '').trim();
-  if (!NOME_ACAO.test(acao)) return erro(ferramenta, 'acao_invalida');
-  const argsAcao = entrada.args && typeof entrada.args === 'object' && !Array.isArray(entrada.args) ? entrada.args : {};
-  return { ok: true, ferramenta, acao, evento: { tipo: 'acao_site', acao, args: argsAcao } };
+  // Ação do site (M3): valida aqui e a página/executor valida de novo.
+  if (ACOES.has(ferramenta)) {
+    const validacao = validarAcaoSite(ferramenta, entrada);
+    if (!validacao.ok) return { ...erro(ferramenta, 'acao_invalida'), mensagem: validacao.motivo };
+    return { ok: true, ferramenta, evento: { tipo: 'acao_site', acao: validacao.acao, args: validacao.args } };
+  }
+  return erro(ferramenta, 'ferramenta_desconhecida');
 }
