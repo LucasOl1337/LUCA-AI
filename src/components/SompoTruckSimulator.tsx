@@ -10,6 +10,7 @@ import {
   Box as BoxIcon,
   Cpu,
   Disc,
+  Eye,
   Focus,
   Map as MapIcon,
   Play,
@@ -70,6 +71,12 @@ import {
 import { sompoDistanceSensorCopy } from '../../shared/sompo-distance-sensor.js';
 import { usePhysicalTwin } from './sompo/usePhysicalTwin';
 import PhysicalTwinPanel, { PhysicalTwinOverlay } from './sompo/PhysicalTwinPanel';
+import { createFirstPersonRig } from './sompo/firstPersonCamera';
+import { nudgeLook, type LookState } from './sompo/firstPersonLook';
+import { FirstPersonHud, StandScenarioButtons } from './sompo/firstPersonHud';
+import { rumble, useStandGamepad } from './sompo/gamepadLoop';
+import type { StandPadAction, StandPadReading } from './sompo/gamepadMapping';
+import { getStandScenario, standScenarioFor, type StandScenarioId } from './sompo/standScenarios';
 
 interface SompoTruckSimulatorProps {
   source: 'firebase' | 'simulation';
@@ -378,6 +385,19 @@ export default function SompoTruckSimulator({
   const episodeActive = episodeRun.status === 'starting'
     || episodeRun.status === 'recording'
     || episodeRun.status === 'finishing';
+
+  // Stand do trator: cabine em primeira pessoa e cenários do stand, só com o MAX roteirizado.
+  const standMode = maxMode && !isFirebase;
+  const cabinAvailable = standMode && !!agriRun;
+  const [cabin, setCabin] = useState(false);
+  const cabinRef = useRef(false);
+  cabinRef.current = cabin && cabinAvailable;
+  const lookRef = useRef<LookState>({ yaw: 0, pitch: 0 });
+  const driveRef = useRef<StandPadReading['drive']>({ steer: 0, throttle: 0, brake: 0, stick: 0 });
+  const [cameraRig] = useState(() => createFirstPersonRig(cabinRef, lookRef));
+  const [standScenario, setStandScenario] = useState<StandScenarioId | null>(null);
+  const standStartPendingRef = useRef(false);
+  const lookDragRef = useRef<{ x: number; y: number } | null>(null);
 
   const episodeActiveRef = useRef(episodeActive);
   episodeActiveRef.current = episodeActive;
@@ -797,6 +817,7 @@ export default function SompoTruckSimulator({
         onWebglError: () => setWebglError(true),
         onAfterRender: captureDueEpisodeFrames,
         studioRef, getElapsed, onStats: setRenderStats,
+        cameraRig,
       });
       if (!stage) return undefined;
       setWebglError(false);
@@ -921,7 +942,54 @@ export default function SompoTruckSimulator({
     else selectScenario(controls.scenarioId, controls.outcomeId);
   }
 
+  /** Cenário do stand: seleciona case + desfecho e grava o episódio assim que o palco remontar. */
+  function runStandScenario(id: StandScenarioId) {
+    const item = getStandScenario(id);
+    if (!item || !standMode || episodeActive) return;
+    selectScenario(item.caseId, item.desfechoId);
+    setStandScenario(id);
+    standStartPendingRef.current = true;
+  }
+  useEffect(() => {
+    if (!standStartPendingRef.current || !agriRun || !episodePlan) return;
+    standStartPendingRef.current = false;
+    void startEpisodeRun();
+  }, [agriRun, episodePlan]);
+  const activeStand = standScenario && agriRun
+    && getStandScenario(standScenario)?.caseId === agriRun.scenarioId
+    && getStandScenario(standScenario)?.desfechoId === agriRun.outcomeId ? standScenario : null;
+
+  function toggleCabin(next?: boolean) {
+    if (!cabinAvailable) return;
+    lookRef.current = { yaw: 0, pitch: 0 };
+    setCabin((current) => next ?? !current);
+  }
+  function handleStandPad(action: StandPadAction) {
+    if (action === 'toggle-cabin') toggleCabin();
+    else if (action === 'restart') { if (!episodeActive) restartScenario(); }
+    else { const item = standScenarioFor(action); if (item) runStandScenario(item.id); }
+  }
+  const padConnected = useStandGamepad({ enabled: standMode, lookRef, driveRef, onAction: handleStandPad });
+
+  // Vibração acompanha o snapshot que está na tela: alerta ao acender, contato ao entrar na fase.
+  const standCuesRef = useRef({ alert: false, contact: false });
+  useEffect(() => {
+    if (!standMode || !agriRun) return;
+    const alert = !!(preview.risks.collision || preview.risks.inclination);
+    const contact = getSompoAgriFrame(agriRun.scenarioId, preview.deviceTimestamp ?? 0, agriRun.outcomeId).phaseId === 'contact';
+    if (alert && !standCuesRef.current.alert) rumble('alert');
+    if (contact && !standCuesRef.current.contact) rumble('contact');
+    standCuesRef.current = { alert, contact };
+  }, [preview, standMode, agriRun]);
+
   function handleCameraKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (cabinRef.current) {
+      const delta = { ArrowLeft: [10, 0], ArrowRight: [-10, 0], ArrowUp: [0, 6], ArrowDown: [0, -6] }[event.key];
+      if (!delta) return;
+      event.preventDefault();
+      lookRef.current = nudgeLook(lookRef.current, delta[0], delta[1]);
+      return;
+    }
     const action = {
       ArrowLeft: 'rotate-left',
       ArrowRight: 'rotate-right',
@@ -1133,9 +1201,21 @@ export default function SompoTruckSimulator({
             tabIndex={webglError ? undefined : 0}
             aria-keyshortcuts={webglError ? undefined : 'ArrowLeft ArrowRight ArrowUp ArrowDown'}
             onKeyDown={handleCameraKeyDown}
+            onPointerDown={(event) => { if (cabinRef.current) lookDragRef.current = { x: event.clientX, y: event.clientY }; }}
+            onPointerMove={(event) => {
+              const drag = lookDragRef.current;
+              if (!drag || !cabinRef.current) return;
+              // Arrastar para a direita vira o olhar para a direita: 0,25° por pixel.
+              lookRef.current = nudgeLook(lookRef.current, (drag.x - event.clientX) * 0.25, (drag.y - event.clientY) * 0.25);
+              lookDragRef.current = { x: event.clientX, y: event.clientY };
+            }}
+            onPointerUp={() => { lookDragRef.current = null; }}
+            onPointerLeave={() => { lookDragRef.current = null; }}
             aria-label={webglError
               ? undefined
-              : agriRun
+              : cabin && cabinAvailable
+                ? `Vista da cabine do Trator MAX em ${activeScenario.label.toLowerCase()}, com telemetria simulada. Arraste ou use as setas para olhar ao redor.`
+                : agriRun
                 ? `Modelo 3D interativo de ${activeScenario.label.toLowerCase()} com telemetria virtual. Setas esquerda e direita giram; setas para cima e para baixo controlam o zoom.`
                 : physicalMax
                   ? `Modelo 3D interativo do ${vehicle?.modelo ?? 'trator'} com o HC-SR04 do ESP32 ${vehicle?.dispositivo ?? ''}, inclinado pela telemetria física e parado no talhão (sem GNSS). Setas esquerda e direita giram; setas para cima e para baixo controlam o zoom.`
@@ -1154,7 +1234,21 @@ export default function SompoTruckSimulator({
             <span><span className="sompo-simulator-led" /> {isFirebase ? `${physicalTwin.replay ? 'Replay' : 'ESP32 físico'} · trator ${preview.tractorId}` : 'ESP32 virtual transmitindo'}</span>
             <span>{isFirebase ? `tick ${preview.deviceTimestamp ?? '-'}` : `${Math.round(preview.deviceTimestamp || 0)} ms`}</span>
           </div>
-          {!isFirebase && (
+          {cabin && cabinAvailable && (
+            <FirstPersonHud
+              mode="cenario"
+              data={{
+                speedKph: agriPreview?.speedKph ?? null,
+                distanceCm: preview.readings.distance,
+                collision: !!preview.risks.collision,
+                inclination: !!preview.risks.inclination,
+                pitch: preview.readings.pitch,
+                roll: preview.readings.roll,
+                phase: agriPreview?.phaseLabel ?? '',
+              }}
+            />
+          )}
+          {!isFirebase && !(cabin && cabinAvailable) && (
             <div className="sompo-simulator-readout" aria-label="Resumo do cenário">
               <div><span>{(ruralPreview ?? agriPreview)?.phaseLabel || 'Condução livre'}</span><strong>{formatReading((ruralPreview ?? agriPreview)?.speedKph ?? controls.speedKph, ' km/h')}</strong></div>
               <div data-alert={preview.risks.collision || preview.risks.inclination}>
@@ -1165,15 +1259,25 @@ export default function SompoTruckSimulator({
             </div>
           )}
           <div className="sompo-simulator-camera" role="group" aria-label="Controles da câmera 3D">
-            <button type="button" onClick={() => sceneApiRef.current?.focus('truck')}>
+            {cabinAvailable && (
+              <button type="button" aria-pressed={cabin} onClick={() => toggleCabin()}>
+                <Eye /> Cabine{padConnected ? ' (✕)' : ''}
+              </button>
+            )}
+            <button type="button" onClick={() => { setCabin(false); sceneApiRef.current?.focus('truck'); }}>
               <Truck /> Visão geral
             </button>
-            <button type="button" onClick={() => sceneApiRef.current?.focus('sensor')}>
+            <button type="button" onClick={() => { setCabin(false); sceneApiRef.current?.focus('sensor'); }}>
               <Focus /> {agriRun ? 'Inspecionar máquina' : 'Focar ESP32'}
             </button>
           </div>
+          {standMode && (
+            <StandScenarioButtons disabled={episodeActive} active={activeStand} onRun={runStandScenario} />
+          )}
           {studioOpen && renderStats && <div className="sompo-simulator-stats" aria-label="Métricas do render"><span>{renderStats.fps} FPS</span><span>{renderStats.cpuMs.toFixed(1)} ms CPU</span><span>{renderStats.calls} chamadas</span><span>{Math.round(renderStats.triangles / 1000)} mil triângulos</span></div>}
-          <p className="sompo-simulator-hint">Arraste para girar · use as setas para navegar</p>
+          <p className="sompo-simulator-hint">{cabin && cabinAvailable
+            ? `Arraste ou use as setas para olhar${padConnected ? ' · analógico direito olha · □ △ ○ cenários · Options reinicia' : ''}`
+            : 'Arraste para girar · use as setas para navegar'}</p>
           <p className="sompo-simulator-credit">
             {agriRun || physicalMax ? (
               modelStatus === 'gltf'

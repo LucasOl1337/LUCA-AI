@@ -1,0 +1,41 @@
+/* Stand do trator (M4): painel da cabine e botões dos cenários do stand, sobre a cena 3D. */
+.sompo-fp-hud {
+  position: absolute; top: 53px; left: 14px; display: grid; gap: 6px;
+  max-width: min(420px, calc(100% - 28px)); pointer-events: none; color: #edf3ed;
+}
+.sompo-fp-badge {
+  justify-self: start; padding: 3px 9px; border-radius: 999px; background: #e8c96a; color: #1d1a0d;
+  font-size: 10px; font-weight: 800; letter-spacing: .1em;
+}
+.sompo-fp-hud dl { display: flex; gap: 6px; margin: 0; }
+.sompo-fp-hud dl > div {
+  padding: 7px 10px; border: 1px solid #ffffff26; border-radius: 9px; background: #12241fd9;
+}
+.sompo-fp-hud dt { font-size: 10px; color: #d0dfd4; }
+.sompo-fp-hud dd { margin: 2px 0 0; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sompo-fp-hud [data-alert='true'] { background: #6c261ee8; border-color: #ffb39787; }
+.sompo-fp-hud > p {
+  justify-self: start; margin: 0; padding: 5px 10px; border-radius: 8px; background: #040b08c2; font-size: 11.5px;
+}
+.sompo-fp-hud[data-alert='true'] > p { background: #b3261e; font-weight: 700; }
+
+.sompo-fp-scenarios {
+  position: absolute; right: 14px; bottom: 112px; display: grid; gap: 6px; justify-items: end;
+}
+.sompo-fp-scenarios button {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 12px;
+  border-radius: 10px; background: rgba(4, 11, 8, .82); color: rgba(229, 241, 232, .9);
+  font-size: 12px; font-weight: 650; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14);
+}
+.sompo-fp-scenarios button:hover:not(:disabled) { background: rgba(232, 201, 106, .18); color: #f6df98; }
+.sompo-fp-scenarios button[aria-pressed='true'] { box-shadow: inset 0 0 0 2px #e8c96a; }
+.sompo-fp-scenarios button:disabled { opacity: .5; cursor: progress; }
+.sompo-fp-scenarios kbd {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: #ffffff1f; font: inherit; font-size: 12px;
+}
+@media (max-width: 700px) {
+  .sompo-fp-hud { top: 48px; left: 10px; }
+  .sompo-fp-hud dd { font-size: 13px; }
+  .sompo-fp-scenarios { right: 10px; bottom: 104px; }
+}
