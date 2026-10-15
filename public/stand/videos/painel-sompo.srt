@@ -1,0 +1,43 @@
+1
+00:00:00,350 --> 00:00:04,278
+E se a seguradora enxergasse o risco antes do sinistro?
+
+2
+00:00:05,178 --> 00:00:09,250
+No painel, a seguradora começa por casos de exemplo do campo,
+
+3
+00:00:09,250 --> 00:00:11,586
+ao lado de dados públicos do setor.
+
+4
+00:00:12,486 --> 00:00:16,565
+Na safra, ela compara a frota. Esta frota é de demonstração:
+
+5
+00:00:16,565 --> 00:00:21,393
+três máquinas, quatro meses, e o que foi prevenção ou dano em cada uma.
+
+6
+00:00:22,293 --> 00:00:27,448
+Cada episódio gravado chega com as imagens datadas do momento do risco.
+
+7
+00:00:27,448 --> 00:00:30,134
+Este foi gravado agora, no simulador.
+
+8
+00:00:31,034 --> 00:00:35,302
+Com um clique, as evidências vão para a bancada de agentes de IA,
+
+9
+00:00:35,302 --> 00:00:39,242
+que discute e devolve uma recomendação para a próxima safra.
+
+10
+00:00:40,142 --> 00:00:43,673
+Valores e apólices ainda não entram nesta versão.
+
+11
+00:00:43,673 --> 00:00:48,069
+O que a seguradora vê é a evidência, organizada para decidir.

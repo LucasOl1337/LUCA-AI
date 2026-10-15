@@ -1,0 +1,43 @@
+1
+00:00:00,350 --> 00:00:03,028
+O que o seu trator conta sobre você?
+
+2
+00:00:03,928 --> 00:00:06,887
+Hoje, dentro do painel, o produtor cadastra
+
+3
+00:00:06,887 --> 00:00:09,296
+a máquina dele e abre no simulador.
+
+4
+00:00:10,196 --> 00:00:15,070
+Numa curva em ladeira, o sensor percebe a inclinação e o alerta acende
+
+5
+00:00:15,070 --> 00:00:17,647
+antes do tombamento. O operador reduz
+
+6
+00:00:17,647 --> 00:00:20,293
+e o trator estabiliza. Aqui, simulado.
+
+7
+00:00:21,193 --> 00:00:26,201
+Esse momento vira um episódio gravado, com imagens datadas de cada fase.
+
+8
+00:00:27,101 --> 00:00:29,796
+A parada a tempo deixa de ser invisível:
+
+9
+00:00:29,796 --> 00:00:33,099
+a boa prática vira evidência a favor do segurado.
+
+10
+00:00:33,999 --> 00:00:37,814
+Uma tela só do produtor, ligada à apólice dele,
+
+11
+00:00:37,814 --> 00:00:40,737
+ainda não existe. É o próximo passo.
