@@ -91,3 +91,67 @@ test('os três cenários do stand apontam para case + desfecho do MAX com plano 
   assert.equal(standScenarioFor('scenario:c').id, 'stand-reacao-atrasada');
   assert.equal(standScenarioFor('toggle-cabin'), null);
 });
+
+const { createFreeDriveState, stepFreeDrive, freeDriveReadings, FREE_DRIVE } = await load('../src/components/sompo/firstPersonDrive.ts');
+const drive = (state, input, seconds, obstacles = []) => {
+  for (let t = 0; t < seconds; t += 1 / 60) state = stepFreeDrive(state, input, 1 / 60, obstacles);
+  return state;
+};
+
+test('condução livre: R2 cheio chega ao teto de 12 km/h e não passa', () => {
+  const state = drive(createFreeDriveState(0), { steer: 0, throttle: 1, brake: 0 }, 9);
+  assert.ok(Math.abs(state.speed * 3.6 - FREE_DRIVE.maxForwardKph) < 1e-6);
+  assert.ok(state.x > 15 && Math.abs(state.z) < 1e-9);
+  // Na borda do talhão (±45 m) a máquina para em vez de sair do campo.
+  const edge = drive(createFreeDriveState(40), { steer: 0, throttle: 1, brake: 0 }, 9);
+  assert.equal(edge.x, FREE_DRIVE.fieldHalfM);
+  assert.equal(edge.speed, 0);
+});
+
+test('condução livre: R2 pela metade acelera menos; sem pedal a máquina para sozinha', () => {
+  const half = drive(createFreeDriveState(0), { steer: 0, throttle: 0.5, brake: 0 }, 2);
+  const full = drive(createFreeDriveState(0), { steer: 0, throttle: 1, brake: 0 }, 2);
+  assert.ok(half.speed > 0 && half.speed < full.speed);
+  assert.equal(drive(full, { steer: 0, throttle: 0, brake: 0 }, 10).speed, 0);
+});
+
+test('condução livre: L2 freia mais rápido que soltar, e parado com L2 engata ré lenta', () => {
+  const moving = drive(createFreeDriveState(0), { steer: 0, throttle: 1, brake: 0 }, 6);
+  const braked = drive(moving, { steer: 0, throttle: 0, brake: 1 }, 1);
+  const coasted = drive(moving, { steer: 0, throttle: 0, brake: 0 }, 1);
+  assert.ok(braked.speed < coasted.speed);
+  const reverse = drive(createFreeDriveState(0), { steer: 0, throttle: 0, brake: 1 }, 6);
+  assert.ok(reverse.speed < 0 && reverse.speed * 3.6 >= -FREE_DRIVE.maxReverseKph - 1e-9);
+  assert.equal(freeDriveReadings(reverse, []).reverse, true);
+});
+
+test('condução livre: analógico para a direita vira para a direita (+Z)', () => {
+  const state = drive(createFreeDriveState(0), { steer: 1, throttle: 1, brake: 0 }, 3);
+  assert.ok(state.z > 0.5, `z ${state.z}`);
+  assert.ok(state.heading < 0);
+  const still = drive(createFreeDriveState(0), { steer: 1, throttle: 0, brake: 0 }, 2);
+  assert.equal(still.heading, 0); // parado, esterçar não gira a máquina
+});
+
+test('condução livre: alerta a 150 cm e parada no fardo sem atravessar', () => {
+  const bale = [{ x: 10, z: 0, radius: 0.72 }];
+  let state = createFreeDriveState(0);
+  let alerted = null;
+  for (let i = 0; i < 60 * 20 && !state.contact; i += 1) {
+    state = stepFreeDrive(state, { steer: 0, throttle: 1, brake: 0 }, 1 / 60, bale);
+    const reading = freeDriveReadings(state, bale);
+    if (reading.collision && alerted === null) alerted = reading.distanceCm;
+  }
+  assert.ok(alerted !== null && alerted <= 150 && alerted > 140, `alerta em ${alerted}`);
+  assert.equal(state.contact, true);
+  assert.equal(state.speed, 0);
+  assert.ok(Math.abs(state.x + FREE_DRIVE.sensorAheadM - (10 - 0.72)) < 1e-6);
+  assert.equal(freeDriveReadings(state, bale).distanceCm, 2);
+  assert.equal(freeDriveReadings(state, bale).contact, true);
+});
+
+test('condução livre: fardo fora da linha de frente não dá eco', () => {
+  const reading = freeDriveReadings(createFreeDriveState(0), [{ x: 4, z: 3, radius: 0.72 }]);
+  assert.equal(reading.distanceCm, FREE_DRIVE.echoLimitCm);
+  assert.equal(reading.collision, false);
+});
