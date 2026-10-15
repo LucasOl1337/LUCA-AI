@@ -23,7 +23,11 @@ const LIMITE_BYTES = 15 * 1024 * 1024;
 
 const timings = JSON.parse(readFileSync(path.join(dir, 'timings.json'), 'utf8'));
 const narracao = JSON.parse(readFileSync(path.join(dir, 'narracao', 'narracao.json'), 'utf8'));
-const m = timings.rastro.marcas;
+// Marcas no tempo do vídeo (alinhar-marcas.py); o relógio do script atrasa sob swiftshader.
+const arqMarcasVideo = path.join(dir, 'marcas-video.json');
+if (!existsSync(arqMarcasVideo)) throw new Error('rode antes: python3 promo/src/stand/sompo/alinhar-marcas.py DIR');
+const rastroVideo = JSON.parse(readFileSync(arqMarcasVideo, 'utf8')).rastro;
+const m = rastroVideo.marcas;
 const duracaoCaptura = Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', path.join(dir, 'cena.mp4')], {encoding: 'utf8'}).trim());
 const marca = (nome, desloca = 0) => {
   if (m[nome] === undefined) throw new Error(`marca ${nome} ausente em timings.json`);
@@ -76,7 +80,7 @@ for (const p of linha.planos) {
   if (p.inicioCaptura !== null && p.inicioCaptura + p.dur > duracaoCaptura - 0.1) p.inicioCaptura = Math.max(0, duracaoCaptura - 0.1 - p.dur);
 }
 
-const props = {titulo: roteiro, captura: 'captura/cena.mp4', rastro: timings.rastro, linha, fechamento: FECHAMENTO};
+const props = {titulo: roteiro, captura: 'captura/cena.mp4', rastro: rastroVideo, linha, fechamento: FECHAMENTO};
 writeFileSync(path.join(dir, 'props.json'), JSON.stringify(props, null, 2));
 const destino = path.join(repoDir, 'public', 'stand', 'videos');
 mkdirSync(destino, {recursive: true});

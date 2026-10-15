@@ -299,7 +299,7 @@ async function main() {
               const rot = String(st?.roleLabel || st?.roleId || '').trim();
               if (rot && !etapas.has(rot)) { etapas.add(rot); marca(`b5_etapa_${rot.toLowerCase().replace(/\s+/g, '_')}`); }
             }
-            if (['completed', 'failed', 'succeeded', 'error', 'cancelled'].includes(String(estado.status))) break;
+            if (['complete', 'completed', 'failed', 'succeeded', 'error', 'cancelled'].includes(String(estado.status))) break;
           } catch {}
         }
         await sleep(1500);
