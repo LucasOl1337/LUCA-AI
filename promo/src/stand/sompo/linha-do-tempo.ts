@@ -31,15 +31,21 @@ export type LinhaDoTempo = {
 export const RESPIRO = { antes: 0.35, depois: 0.55, fim: 1.2 } as const;
 const MAX_CARACTERES = 74;
 
-/** Quebra a narração em legendas curtas (até ~2 linhas), cortando em pontuação ou espaço. */
+/**
+ * Quebra a narração no menor número de legendas de até MAX_CARACTERES,
+ * equilibradas (sem palavra órfã no fim), cortando em pontuação perto do
+ * meio quando der, senão no espaço mais próximo do meio.
+ */
 export function quebrarLegenda(texto: string): string[] {
   const partes: string[] = [];
   let resto = texto.trim();
   while (resto.length > MAX_CARACTERES) {
+    const alvo = resto.length / Math.ceil(resto.length / MAX_CARACTERES);
     const janela = resto.slice(0, MAX_CARACTERES + 1);
-    let corte = Math.max(janela.lastIndexOf('. '), janela.lastIndexOf(': '), janela.lastIndexOf(', '), janela.lastIndexOf('? '));
-    if (corte < MAX_CARACTERES * 0.45) corte = janela.lastIndexOf(' ');
-    else corte += 1;
+    const espacos = [...janela.matchAll(/ /g)].map((x) => x.index ?? 0).filter((i) => i > 0);
+    const pontuados = espacos.filter((i) => /[.,:?;]/.test(janela[i - 1]) && Math.abs(i - alvo) <= alvo * 0.35);
+    const candidatos = pontuados.length ? pontuados : espacos;
+    const corte = candidatos.reduce((a, b) => (Math.abs(b - alvo) < Math.abs(a - alvo) ? b : a), candidatos[0] ?? MAX_CARACTERES);
     partes.push(resto.slice(0, corte).trim());
     resto = resto.slice(corte).trim();
   }

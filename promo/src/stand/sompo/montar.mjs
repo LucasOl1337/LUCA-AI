@@ -32,7 +32,7 @@ const marca = (nome, desloca = 0) => {
 
 /** Planos de cada bloco: onde a captura mostra o que a narração diz. */
 const PLANOS = {
-  'painel-sompo': {
+  'painel-sompo': () => ({
     b1: [{inicio: marca('b1_welcome', -0.4)}],
     b2: [{inicio: marca('b2_casos', -0.2), dur: 5.5}, {inicio: marca('b2_grade', -0.2)}],
     b3: [{inicio: marca('b3_safra_demo', -0.3)}],
@@ -41,16 +41,16 @@ const PLANOS = {
       ? [{inicio: marca('b5_clique', -1.2), dur: 3}, {inicio: marca('b5_sessao', -0.5), dur: 2.5}, {inicio: marca('b5_entrega', -0.8)}]
       : [{inicio: marca('b5_clique', -1.2), dur: 3}, {inicio: marca('b5_sessao', -0.5)}],
     b6: [{inicio: marca('b6_rodape', -0.3), dur: 4.5}, {inicio: null}],
-  },
-  'painel-segurado': {
+  }),
+  'painel-segurado': () => ({
     b1: [{inicio: marca('b1_veiculos', -0.3)}],
     b2: [{inicio: marca('b2_simulador', -1.4)}],
     b3: [{inicio: marca('b3_cenario', -2.2), dur: 4}, {inicio: m.b3_alerta !== undefined ? marca('b3_alerta', -0.5) : marca('b3_cenario', 1.5)}],
     b4: [{inicio: marca('b4_gravar', -1.2)}],
     b5: [{inicio: marca('b5_frames', -2.5)}],
     b6: [{inicio: null}],
-  },
-}[roteiro];
+  }),
+}[roteiro]();
 
 const FECHAMENTO = {
   'painel-sompo': {linha1: 'Evidência do campo, organizada para decidir.', linha2: 'LUCA-AI · painel SOMPO'},

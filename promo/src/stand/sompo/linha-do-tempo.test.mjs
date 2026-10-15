@@ -35,3 +35,11 @@ test('legenda quebra em pedaços legíveis e cobre toda a fala do bloco', () => 
   assert.equal(lt.trechos[0].inicio, RESPIRO.antes);
   assert.equal(lt.trechos.at(-1).fim, RESPIRO.antes + 8);
 });
+
+test('legenda não deixa palavra órfã no fim', () => {
+  const texto = 'Hoje, dentro do painel, o produtor cadastra a máquina dele e abre no simulador.';
+  const pedacos = quebrarLegenda(texto);
+  assert.equal(pedacos.length, 2);
+  assert.ok(pedacos.every((p) => p.split(' ').length >= 4), pedacos.join(' | '));
+  assert.equal(pedacos.join(' '), texto);
+});
