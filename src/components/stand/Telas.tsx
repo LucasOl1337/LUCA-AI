@@ -6,13 +6,13 @@ import type { EstadoVoz } from './canal';
 
 interface BaseTela { variante: VarianteAvatar; nivel: MutableRefObject<number> }
 
-export function Atracao({ variante, nivel }: BaseTela) {
+export function Atracao({ variante, nivel, chamada }: BaseTela & { chamada: string }) {
   return (
     <section className="stand-atracao" aria-label="Atração">
       <AvatarLuca variante={variante} voz="ocioso" nivel={nivel} className="stand-avatar stand-avatar-atracao" />
       <div className="stand-chamada">
         <p className="stand-chamada-titulo">Pega o microfone e pergunta pro <strong>LUCA</strong></p>
-        <p className="stand-chamada-sub">Ele explica como a IA acompanha o trator no campo.</p>
+        <p className="stand-chamada-sub">{chamada}</p>
       </div>
       <p className="stand-marca"><span className="stand-marca-luca">LUCA-AI</span> · demonstração para Sompo</p>
     </section>

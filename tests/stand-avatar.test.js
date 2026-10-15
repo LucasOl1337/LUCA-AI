@@ -40,9 +40,11 @@ test('as 3 variações renderizam SVG com rig e sem ids', () => {
 
 test('atalhos da equipe do stand', () => {
   const chamadas = [];
-  const atalhos = Object.fromEntries(['encerrar', 'reiniciar', 'pularVideo', 'demonstrar', 'alternarGrade', 'alternarTelaCheia', 'sair']
+  const atalhos = Object.fromEntries(['iniciar', 'encerrar', 'reiniciar', 'pularVideo', 'demonstrar', 'alternarGrade', 'alternarTelaCheia', 'sair']
     .map((nome) => [nome, () => chamadas.push(nome)]));
   const tecla = (key, extra = {}) => tratarTecla({ key, shiftKey: false, ctrlKey: false, metaKey: false, altKey: false, ...extra }, atalhos);
+  assert.ok(tecla(' '));
+  assert.ok(tecla('Enter'));
   assert.ok(tecla('Escape'));
   assert.ok(tecla('r'));
   assert.ok(tecla('N'));
@@ -51,5 +53,5 @@ test('atalhos da equipe do stand', () => {
   assert.ok(tecla('Q', { shiftKey: true }));
   assert.equal(tecla('q'), false);
   assert.equal(tecla('r', { ctrlKey: true }), false);
-  assert.deepEqual(chamadas, ['encerrar', 'reiniciar', 'pularVideo', 'demonstrar', 'alternarTelaCheia', 'sair']);
+  assert.deepEqual(chamadas, ['iniciar', 'iniciar', 'encerrar', 'reiniciar', 'pularVideo', 'demonstrar', 'alternarTelaCheia', 'sair']);
 });

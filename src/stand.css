@@ -93,3 +93,7 @@
 @keyframes stand-flutua { 50% { transform: translateY(-1.2vmin); } }
 @keyframes stand-pulsa { 50% { opacity: 1; transform: scale(1.25); } }
 @media (prefers-reduced-motion: reduce) { .stand-avatar-atracao, .stand-indicador i { animation: none !important; } }
+
+/* Aviso só para a equipe do stand: pequeno, apagado, no canto de baixo. */
+.stand-aviso-equipe { position: absolute; left: 0; bottom: 0; margin: 0; font: 600 1.4vmin 'JetBrains Mono', monospace; color: rgba(255, 159, 10, 0.55); }
+.stand[data-tela='atracao'] { cursor: pointer; }

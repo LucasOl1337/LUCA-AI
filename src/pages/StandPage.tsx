@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type CSSProperties } from 'react';
 import { useAppLocation } from '@/hooks/useAppLocation';
+import { useSessaoVoz } from '@/stand-voz/useSessaoVoz';
 import { VARIANTE_PADRAO, type VarianteAvatar } from '@/components/stand/AvatarLuca';
-import type { CanalStand } from '@/components/stand/canal';
-import { criarCanalStub, VIDEOS_STUB, type CanalStub } from '@/components/stand/canalStub';
+import { canalReal, type CanalStand } from '@/components/stand/canal';
+import { criarCanalStub } from '@/components/stand/canalStub';
 import { reduzirTela, telaInicial, type EntradaTela, type EstadoTela } from '@/components/stand/telaStand';
 import { Atracao, Conversa, PlayerVideo } from '@/components/stand/Telas';
 import { tratarTecla, type AtalhosStand } from '@/components/stand/atalhos';
+import { avisoParaEquipe, chamadaDeInicio } from '@/components/stand/avisos';
+import { criarRepasseAcao, videoDoStand } from '@/components/stand/videosStand';
 import '@/stand.css';
 
 /** Margem segura padrão (% de cada lado): a moldura de MDF come as bordas. */
@@ -23,45 +26,62 @@ export default function StandPage() {
   const { location, navigate } = useAppLocation();
   const margem = location.margem ? Number(location.margem) : MARGEM_PADRAO;
   const variante = VARIANTES.find((v) => v === location.variante) ?? VARIANTE_PADRAO;
+  const modoStub = location.stub === '1';
   const [grade, setGrade] = useState(false);
   const [estado, despachar] = useReducer(reduzirAgora, undefined, telaInicial);
+  const voz = useSessaoVoz();
   const nivel = useRef(0);
-  const canal = useRef<CanalStand & Partial<Pick<CanalStub, 'demonstrar'>> | null>(null);
+  const canal = useRef<CanalStand>(canalReal);
+  const demonstrar = useRef<() => void>(() => undefined);
   const videoRef = useRef(estado.videoId);
   videoRef.current = estado.videoId;
 
   const sair = useCallback(() => navigate({ page: 'inicio' }, 'push'), [navigate]);
 
-  // Até a M1 publicar o canal real, o stub faz o papel do cérebro de voz.
+  // Cérebro de voz real (M1) ou, com ?stub=1, a fala de teste local.
   useEffect(() => {
-    const stub = criarCanalStub();
-    canal.current = stub;
-    const cancelar = stub.assinar((evento) => {
+    const stub = modoStub ? criarCanalStub() : null;
+    const atual = stub ?? canalReal;
+    canal.current = atual;
+    demonstrar.current = stub ? stub.demonstrar : () => undefined;
+    const repasse = criarRepasseAcao();
+    const cancelar = atual.assinar((evento) => {
       if (evento.tipo === 'nivel_audio') nivel.current = evento.valor;
+      else if (evento.tipo === 'acao_site') repasse.repassar(evento.acao, evento.args ?? {});
       else despachar(evento);
     });
     const relogio = window.setInterval(() => despachar({ tipo: 'relogio' }), 500);
-    return () => { cancelar(); window.clearInterval(relogio); stub.parar(); canal.current = null; };
-  }, []);
+    return () => { cancelar(); window.clearInterval(relogio); repasse.fechar(); stub?.parar(); };
+  }, [modoStub]);
+
+  /** Gesto do público ou da equipe: liga o microfone (precisa de clique ou tecla).
+   * `voz.iniciar` já ignora quando há sessão; não ler `voz.ativa` aqui (fica velho no R). */
+  const { iniciar: iniciarVoz, encerrar: encerrarVoz } = voz;
+  const iniciar = useCallback(() => {
+    if (modoStub) demonstrar.current();
+    else void iniciarVoz();
+  }, [modoStub, iniciarVoz]);
 
   const terminarVideo = useCallback(() => {
     const id = videoRef.current;
     if (!id) return;
     despachar({ tipo: 'video_terminou' });
-    canal.current?.enviar({ tipo: 'video_terminou', id });
+    canal.current.enviar({ tipo: 'video_terminou', id });
   }, []);
 
   useEffect(() => {
     const mandar = (tipo: 'encerrar' | 'reiniciar') => {
       nivel.current = 0;
       despachar({ tipo });
-      canal.current?.enviar({ tipo });
+      canal.current.enviar({ tipo });
+      encerrarVoz();
     };
     const atalhos: AtalhosStand = {
+      iniciar,
       encerrar: () => mandar('encerrar'),
-      reiniciar: () => mandar('reiniciar'),
+      reiniciar: () => { mandar('reiniciar'); iniciar(); },
       pularVideo: terminarVideo,
-      demonstrar: () => canal.current?.demonstrar?.(),
+      demonstrar: iniciar,
       alternarGrade: () => setGrade((g) => !g),
       alternarTelaCheia,
       sair,
@@ -71,21 +91,34 @@ export default function StandPage() {
     };
     window.addEventListener('keydown', aoTeclar);
     return () => window.removeEventListener('keydown', aoTeclar);
-  }, [sair, terminarVideo]);
+  }, [sair, terminarVideo, iniciar, encerrarVoz]);
 
-  const video = estado.tela === 'video' ? VIDEOS_STUB[estado.videoId] : undefined;
+  const video = estado.tela === 'video' ? videoDoStand(estado.videoId, modoStub) : undefined;
   const videoAusente = estado.tela === 'video' && !video;
   useEffect(() => { if (videoAusente) terminarVideo(); }, [videoAusente, terminarVideo]);
 
+  const aviso = modoStub ? 'modo de teste (?stub=1): fala gravada, sem microfone' : avisoParaEquipe(voz.fim);
+
   return (
-    <main className="stand" style={{ '--stand-margem': `${margem}%` } as CSSProperties} data-grade={grade || undefined} data-margem={`${margem}%`} data-tela={estado.tela}>
+    <main
+      className="stand"
+      style={{ '--stand-margem': `${margem}%` } as CSSProperties}
+      data-grade={grade || undefined}
+      data-margem={`${margem}%`}
+      data-tela={estado.tela}
+      data-sessao={voz.ativa ? 'ativa' : voz.fim?.motivo ?? 'parada'}
+      onPointerDown={estado.tela === 'atracao' ? iniciar : undefined}
+    >
       {video && (
         <PlayerVideo variante={variante} nivel={nivel} voz={estado.voz} arquivo={video.arquivo} titulo={video.titulo} aoTerminar={terminarVideo} />
       )}
       <div className="stand-seguro">
-        {estado.tela === 'atracao' && <Atracao variante={variante} nivel={nivel} />}
+        {estado.tela === 'atracao' && (
+          <Atracao variante={variante} nivel={nivel} chamada={chamadaDeInicio(modoStub ? false : voz.ativa, voz.fim)} />
+        )}
         {estado.tela === 'conversa' && <Conversa variante={variante} nivel={nivel} voz={estado.voz} legenda={estado.legenda} />}
         <p className="stand-selo" aria-label="Assistente de IA">Assistente de IA</p>
+        {aviso && estado.tela === 'atracao' && <p className="stand-aviso-equipe">{aviso}</p>}
       </div>
     </main>
   );

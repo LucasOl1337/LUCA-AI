@@ -1,6 +1,8 @@
 /** Atalhos de teclado da equipe do stand (teclado escondido atrás do monitor). */
 
 export interface AtalhosStand {
+  /** Liga a conversa por voz (gesto exigido pelo microfone). */
+  iniciar(): void;
   encerrar(): void;
   reiniciar(): void;
   pularVideo(): void;
@@ -16,7 +18,8 @@ type Tecla = Pick<KeyboardEvent, 'key' | 'shiftKey' | 'ctrlKey' | 'metaKey' | 'a
 export function tratarTecla(evento: Tecla, atalhos: AtalhosStand): boolean {
   if (evento.ctrlKey || evento.metaKey || evento.altKey) return false;
   const tecla = evento.key.toLowerCase();
-  if (tecla === 'escape') atalhos.encerrar();
+  if (tecla === ' ' || tecla === 'enter') atalhos.iniciar();
+  else if (tecla === 'escape') atalhos.encerrar();
   else if (tecla === 'q' && evento.shiftKey) atalhos.sair();
   else if (evento.shiftKey) return false;
   else if (tecla === 'r') atalhos.reiniciar();
