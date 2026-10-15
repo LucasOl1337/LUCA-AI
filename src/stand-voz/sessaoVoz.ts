@@ -57,6 +57,8 @@ export class SessaoVoz {
   /** Roteamento adiantado: começa a cada transcrição parcial nova, antes do fim da fala. */
   private preRoteio: { texto: string; decisao: Promise<DecisaoRoteador> } | null = null;
   private videosTocados = new Set<string>();
+  /** Vídeo na tela: o microfone não vai ao provedor, senão o VAD responde à narração do vídeo. */
+  private videoTocando = false;
   private relogioNivel = 0;
   private relogioSilencio = 0;
   private relogioTeto = 0;
@@ -113,7 +115,12 @@ export class SessaoVoz {
     this.armarSilencio();
     this.desligarPagina = assinarEventosPagina((evento) => {
       if (evento.tipo === 'encerrar') this.encerrar();
-      if (evento.tipo === 'video_terminou') this.notaDeSistema(`O vídeo ${evento.id} terminou. Pergunte, em uma frase, se ficou alguma dúvida.`, true);
+      if (evento.tipo === 'video_terminou') {
+        this.videoTocando = false;
+        this.enviar({ type: 'input_audio_buffer.clear' });
+        this.armarSilencio();
+        this.notaDeSistema(`O vídeo ${evento.id} terminou. Pergunte, em uma frase, se ficou alguma dúvida.`, true);
+      }
       if (evento.tipo === 'reiniciar') this.encerrar();
     });
     this.mudarEstado('ouvindo');
@@ -160,6 +167,11 @@ export class SessaoVoz {
   }
 
   private aoMicrofone(pcm: Int16Array, nivel: number): void {
+    if (this.videoTocando) {
+      // Durante o vídeo a sessão não ouve; o relógio de silêncio também fica parado.
+      this.armarSilencio();
+      return;
+    }
     this.enviar({ type: 'input_audio_buffer.append', audio: base64DePcm16(pcm) });
     // Barge-in local: corta a voz da IA antes de o VAD do servidor confirmar.
     if (this.estado === 'falando' && this.detector.alimentar(nivel, 50)) this.interromper();
@@ -240,6 +252,7 @@ export class SessaoVoz {
     const evento = dados.evento;
     if (evento?.tipo === 'tocar_video' && evento.id) {
       this.videosTocados.add(evento.id);
+      this.videoTocando = true;
       emitirEventoStand({ tipo: 'tocar_video', id: evento.id });
     }
     if (evento?.tipo === 'acao_site' && evento.acao) emitirEventoStand({ tipo: 'acao_site', acao: evento.acao, args: evento.args ?? {} });
