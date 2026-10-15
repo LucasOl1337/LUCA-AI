@@ -11,7 +11,7 @@
 | 3 | 11–24 s | Numa curva em ladeira, o sensor percebe a inclinação e o alerta acende antes do tombamento. O operador reduz e o trator estabiliza. Aqui, simulado. | Cenário "Trator MAX em curva inclinada", desfecho de parada controlada ("Velocidade cai a tempo e o trator estabiliza na pendente"), com "Alerta de inclinação" acendendo. Selo "Telemetria sintética" visível | `shared/sompo-max-tractor-scenarios.js:230-238`; `shared/sompo-agri-scenarios.js:148-156`; `src/components/SompoTruckSimulator.tsx:1103-1108,1160-1161` | simulado |
 | 4 | 24–34 s | Esse momento vira um episódio gravado, com imagens datadas de cada fase. | "Gravar episódio deste cenário" → "Gravando episódio… frames n/5" → "Episódio registrado" | `SompoTruckSimulator.tsx:1278-1311` | real (gravação) + simulado (telemetria) |
 | 5 | 34–42 s | A parada a tempo deixa de ser invisível: a boa prática vira evidência a favor do segurado. | Aba Safra, "Último episódio gravado" aberto com as imagens do episódio que acabou de ser gravado | `src/lib/sompo-stories.ts:74-80`; `src/components/sompo/SompoFleetPanel.tsx:37-55,108` | real |
-| 6 | 42–48 s | Uma tela só do produtor, ligada à apólice dele, é o próximo passo. | Fechamento com a marca LUCA-AI (sem tela de produto) | Lacuna declarada no relatório da M6 | — |
+| 6 | 42–48 s | Uma tela só do produtor, ligada à apólice dele, ainda não existe. É o próximo passo. | Fechamento com a marca LUCA-AI (sem tela de produto) | Lacuna declarada no relatório da M6 | — |
 
 ## Termos
 

@@ -20,7 +20,7 @@ export const ROTEIROS: Record<RoteiroId, BlocoRoteiro[]> = {
     { id: 'b1', narracao: 'E se a seguradora enxergasse o risco antes do sinistro?', verdade: 'real', detalhe: 'tela do app' },
     {
       id: 'b2',
-      narracao: 'No painel do LUCA, a seguradora começa pelos casos de exemplo do campo, como seca, granizo, geada e penhor de máquinas, ao lado de dados públicos do setor.',
+      narracao: 'No painel, a seguradora começa por casos de exemplo do campo, ao lado de dados públicos do setor.',
       verdade: 'demonstrativo',
       detalhe: 'casos de exemplo · dados públicos',
       fonte: 'Fontes: Globo Rural / Forbes Agro (2012–2023) · Embrapa · CNA e MAPA/ZARC',
@@ -78,7 +78,7 @@ export const ROTEIROS: Record<RoteiroId, BlocoRoteiro[]> = {
     },
     {
       id: 'b6',
-      narracao: 'Uma tela só do produtor, ligada à apólice dele, é o próximo passo.',
+      narracao: 'Uma tela só do produtor, ligada à apólice dele, ainda não existe. É o próximo passo.',
       verdade: 'esquema',
       detalhe: 'próximo passo, ainda não existe',
     },
