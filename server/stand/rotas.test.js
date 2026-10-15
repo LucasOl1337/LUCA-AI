@@ -9,11 +9,11 @@ const CHAVE = 'xai-teste-nao-real';
 const LIMITES = { silencio_s: 20, teto_s: 240, sessoes_por_hora: 30 };
 const roteadorFalso = async () => ({ preaquecer: async () => ({}), rotearPergunta: async (t) => (t.includes('fluxo') ? { id: 'pipeline-completo', confianca: 1, decisao: 'tocar' } : null) });
 
-async function subir(t, { env = {}, fetchImpl, guarda, criarRoteador = roteadorFalso } = {}) {
+async function subir(t, { env = {}, fetchImpl, guarda, criarRoteador = roteadorFalso, publicado = () => true } = {}) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => { req.auth = { user: { id: req.headers['x-conta'] || 'demo' } }; next(); });
-  registerStandRoutes(app, { env, fetchImpl, guarda, criarRoteador, instrucoes: () => 'prompt-base' });
+  registerStandRoutes(app, { env, fetchImpl, guarda, criarRoteador, publicado, instrucoes: () => 'prompt-base' });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((ok) => server.once('listening', ok));
   t.after(() => server.close());
@@ -103,6 +103,11 @@ test('rotear devolve a decisão da M7; roteador quebrado vira null', async (t) =
   assert.equal((await pedir('/api/stand/rotear', { texto: ' ' })).status, 400);
   const quebrado = await subir(t, { criarRoteador: async () => { throw new Error('sem 9router'); } });
   assert.deepEqual(await (await quebrado('/api/stand/rotear', { texto: 'oi' })).json(), { ok: true, decisao: null });
+});
+
+test('rotear descarta vídeo cujo mp4 ainda não foi publicado', async (t) => {
+  const pedir = await subir(t, { publicado: (id) => id !== 'pipeline-completo' });
+  assert.deepEqual(await (await pedir('/api/stand/rotear', { texto: 'como funciona o fluxo do dado?' })).json(), { ok: true, decisao: null });
 });
 
 test('microfone e api.x.ai só liberados em /stand', () => {

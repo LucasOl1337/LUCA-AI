@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { executarFerramentaStand, FERRAMENTAS_STAND } from './ferramentas.js';
+import { executarFerramentaStand, FERRAMENTAS_STAND, videoPublicado } from './ferramentas.js';
 
 const manifesto = [
   { id: 'pipeline-completo', titulo: 'O caminho do dado', arquivo: '/stand/videos/pipeline-completo.mp4' },
@@ -42,6 +42,15 @@ test('tocar_video recusa id fora do manifesto, mp4 ausente e manifesto ilegível
   assert.equal((await executarFerramentaStand('tocar_video', { id: 'painel-sompo' }, deps)).erro, 'video_sem_arquivo');
   const semManifesto = { lerManifesto: () => { throw new Error('ENOENT'); }, raiz };
   assert.equal((await executarFerramentaStand('tocar_video', { id: 'pipeline-completo' }, semManifesto)).erro, 'video_indisponivel');
+});
+
+test('videoPublicado: só vale com id no manifesto e mp4 no disco', (t) => {
+  const raiz = raizComVideo(t);
+  const deps = { lerManifesto: () => manifesto, raiz };
+  assert.equal(videoPublicado('pipeline-completo', deps), true);
+  assert.equal(videoPublicado('painel-sompo', deps), false);
+  assert.equal(videoPublicado('inventado', deps), false);
+  assert.equal(videoPublicado('pipeline-completo', { lerManifesto: () => { throw new Error('ENOENT'); }, raiz }), false);
 });
 
 test('tocar_video com o manifesto real da M7 conhece pipeline-completo', async () => {

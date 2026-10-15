@@ -26,6 +26,8 @@ interface EventoProvedor { type: string; [chave: string]: any }
 const HZ = 24000;
 const ROTEAR_MS = 1600;
 
+type DecisaoRoteador = { id: string; decisao: 'tocar' | 'oferecer' } | null;
+
 async function postar<T>(caminho: string, corpo: unknown): Promise<{ status: number; dados: T }> {
   const resposta = await fetch(caminho, {
     method: 'POST',
@@ -52,6 +54,8 @@ export class SessaoVoz {
   /** Respostas cujo áudio e legenda ignoramos (automáticas do VAD ou interrompidas). */
   private canceladas = new Set<string>();
   private ultimaPergunta = '';
+  /** Roteamento adiantado: começa a cada transcrição parcial nova, antes do fim da fala. */
+  private preRoteio: { texto: string; decisao: Promise<DecisaoRoteador> } | null = null;
   private videosTocados = new Set<string>();
   private relogioNivel = 0;
   private relogioSilencio = 0;
@@ -202,13 +206,21 @@ export class SessaoVoz {
     if (responder) { this.respostaNossa = true; this.enviar({ type: 'response.create' }); }
   }
 
-  /** Pergunta fechada: pergunta ao roteador (M7) e pede a resposta com a decisão. */
+  /** Consulta o roteador (M7) uma vez por texto; repetir o mesmo texto reaproveita a consulta. */
+  private rotear(texto: string): Promise<DecisaoRoteador> {
+    if (this.preRoteio?.texto !== texto) {
+      const decisao = postar<{ decisao: DecisaoRoteador }>('/api/stand/rotear', { texto })
+        .then((r) => r.dados.decisao ?? null)
+        .catch(() => null);
+      this.preRoteio = { texto, decisao };
+    }
+    return this.preRoteio.decisao;
+  }
+
+  /** Pergunta fechada: espera a decisão do roteador e pede a resposta com ela. */
   private async aoPerguntaTranscrita(texto: string): Promise<void> {
     const limite = new Promise<null>((ok) => window.setTimeout(() => ok(null), ROTEAR_MS));
-    const consulta = postar<{ decisao: { id: string; decisao: 'tocar' | 'oferecer' } | null }>('/api/stand/rotear', { texto })
-      .then((r) => r.dados.decisao ?? null)
-      .catch(() => null);
-    const decisao = await Promise.race([consulta, limite]);
+    const decisao = await Promise.race([this.rotear(texto), limite]);
     if (!this.ws) return;
     if (decisao && !this.videosTocados.has(decisao.id)) {
       this.notaDeSistema(`Roteador: decisao=${decisao.decisao} id=${decisao.id}.`);
@@ -249,6 +261,7 @@ export class SessaoVoz {
         if (m.transcript) {
           this.ultimaPergunta = String(m.transcript);
           emitirEventoStand({ tipo: 'legenda', texto: this.ultimaPergunta });
+          void this.rotear(this.ultimaPergunta);
         }
         break;
       case 'input_audio_buffer.committed':

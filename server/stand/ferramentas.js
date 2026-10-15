@@ -4,11 +4,9 @@
 // devolve o resultado à sessão; `evento` (quando houver) vai pra página.
 // As ações do site são uma ferramenta por ação, com enum, vindas da M3
 // (`shared/stand/acoes-site.ts`), e passam pelo validador dela.
-import fs from 'node:fs';
-import path from 'node:path';
 import { ferramentasAcaoSite, validarAcaoSite } from '../../shared/stand/acoes-site.ts';
 import { executeAgentTool } from '../agent-tools.js';
-import { buscarNoRepo, RAIZ_REPO } from './conhecimento.js';
+import { buscarNoRepo, RAIZ_REPO, videoTemArquivo } from './conhecimento.js';
 import { carregarManifesto } from './roteador-video.js';
 
 export const FERRAMENTAS_STAND = Object.freeze([
@@ -55,10 +53,14 @@ function erro(ferramenta, codigo) {
   return { ok: false, ferramenta, erro: codigo };
 }
 
-function videoTemArquivo(arquivo, raiz) {
-  const relativo = String(arquivo || '').replace(/^\/+/, '');
-  if (!relativo || relativo.includes('..')) return false;
-  return ['dist', 'public'].some((pasta) => fs.existsSync(path.join(raiz, pasta, relativo)));
+/** O vídeo existe no manifesto da M7 e o mp4 já está publicado? */
+export function videoPublicado(id, { lerManifesto = () => carregarManifesto(), raiz = RAIZ_REPO } = {}) {
+  try {
+    const video = lerManifesto().find((item) => item.id === id);
+    return Boolean(video && videoTemArquivo(video.arquivo, raiz));
+  } catch {
+    return false;
+  }
 }
 
 /**

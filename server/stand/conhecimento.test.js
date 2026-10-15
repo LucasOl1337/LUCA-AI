@@ -43,3 +43,21 @@ test('prompt-base fala com investidor, marca simulação e traz as user stories'
   assert.match(prompt, /tocar_video/);
   assert.ok(prompt.length < 6000, `prompt longo demais: ${prompt.length}`);
 });
+
+test('prompt-base só anuncia vídeos com mp4 publicado', () => {
+  const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'stand-prompt-'));
+  try {
+    fs.mkdirSync(path.join(raiz, 'public/stand/videos'), { recursive: true });
+    fs.writeFileSync(path.join(raiz, 'public/stand/videos/pronto.mp4'), 'mp4');
+    const lerManifesto = () => [
+      { id: 'pronto', titulo: 'Vídeo pronto', arquivo: '/stand/videos/pronto.mp4', resumo_falado: 'a' },
+      { id: 'faltando', titulo: 'Vídeo sem arquivo', arquivo: '/stand/videos/faltando.mp4', resumo_falado: 'b' },
+    ];
+    const prompt = montarPromptBase({ raiz, lerManifesto });
+    assert.match(prompt, /`pronto`/);
+    assert.doesNotMatch(prompt, /`faltando`/);
+    assert.doesNotMatch(montarPromptBase({ raiz, lerManifesto: () => lerManifesto().slice(1) }), /Vídeos pré-gravados/);
+  } finally {
+    fs.rmSync(raiz, { recursive: true, force: true });
+  }
+});

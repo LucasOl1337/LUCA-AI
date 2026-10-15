@@ -2,7 +2,7 @@
 // stand loga com uma conta demo. A credencial do provedor fica só no servidor;
 // o navegador recebe um token efêmero e a configuração da sessão, e fala com o
 // provedor direto. Nenhum áudio passa pelo Express nem é gravado.
-import { FERRAMENTAS_STAND, executarFerramentaStand } from './ferramentas.js';
+import { FERRAMENTAS_STAND, executarFerramentaStand, videoPublicado } from './ferramentas.js';
 import { montarPromptBase } from './conhecimento.js';
 import { provedorXai } from './provedor-xai.js';
 
@@ -55,6 +55,7 @@ export function registerStandRoutes(app, {
   provedores = PROVEDORES_VOZ,
   criarRoteador = roteadorPadrao,
   instrucoes = () => montarPromptBase(),
+  publicado = videoPublicado,
 } = {}) {
   const conta = (req) => String(req.auth?.user?.id || '');
   let roteador = null;
@@ -113,12 +114,14 @@ export function registerStandRoutes(app, {
   });
 
   // Pergunta transcrita → decisão de vídeo da M7 ({id, confianca, decisao} ou null).
+  // Vídeo sem mp4 publicado vira null: a IA responde ao vivo em vez de prometer
+  // um vídeo que `tocar_video` recusaria.
   app.post('/api/stand/rotear', async (req, res) => {
     const texto = String(req.body?.texto || '').trim().slice(0, 500);
     if (!texto) return res.status(400).json({ ok: false, error: 'texto_vazio' });
     try {
       const decisao = await (await obterRoteador()).rotearPergunta(texto);
-      res.json({ ok: true, decisao });
+      res.json({ ok: true, decisao: decisao && publicado(decisao.id) ? decisao : null });
     } catch {
       res.json({ ok: true, decisao: null });
     }

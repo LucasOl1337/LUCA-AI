@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { promptVideos } from './roteador-video.js';
+import { carregarManifesto, promptVideos } from './roteador-video.js';
 
 export const RAIZ_REPO = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -118,18 +118,29 @@ function userStories(raiz) {
   }
 }
 
-/** Instrução dos vídeos (M7), com a lista do manifesto; sem manifesto, fica de fora. */
-function promptVideosDaM7() {
+/** O mp4 do manifesto existe em dist/ (produção) ou public/ (dev)? */
+export function videoTemArquivo(arquivo, raiz = RAIZ_REPO) {
+  const relativo = String(arquivo || '').replace(/^\/+/, '');
+  if (!relativo || relativo.includes('..')) return false;
+  return ['dist', 'public'].some((pasta) => fs.existsSync(path.join(raiz, pasta, relativo)));
+}
+
+/**
+ * Instrução dos vídeos (M7) só com os vídeos cujo mp4 já está publicado: a IA
+ * não anuncia vídeo que `tocar_video` recusaria. Sem nenhum, fica de fora.
+ */
+function promptVideosDaM7(raiz, lerManifesto) {
   try {
-    return promptVideos();
+    const publicados = lerManifesto().filter((video) => videoTemArquivo(video.arquivo, raiz));
+    return publicados.length ? promptVideos(publicados) : '';
   } catch {
     return '';
   }
 }
 
-export function montarPromptBase({ raiz = RAIZ_REPO } = {}) {
+export function montarPromptBase({ raiz = RAIZ_REPO, lerManifesto = () => carregarManifesto() } = {}) {
   const stories = userStories(raiz);
-  const videos = promptVideosDaM7();
+  const videos = promptVideosDaM7(raiz, lerManifesto);
   return [
     'Você é o operador LUCA, o assistente de IA do LUCA-AI, falando em voz alta num stand com um trator de MDF.',
     'Quem pergunta é investidor, fundo de crédito ou visitante. Fale português do Brasil, sem jargão técnico, em frases curtas: no máximo três por resposta, e termine convidando a próxima pergunta quando fizer sentido.',
