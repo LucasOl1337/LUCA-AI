@@ -675,7 +675,7 @@ function SompoWorkspace() {
 
       <div className="sompo-page-scroll">
         <div className="sompo-page-inner">
-          <a className="sompo-back-home" href="/sompo" onClick={(event) => {
+          <a className="sompo-back-home" href="/sompo" data-stand-alvo="inicio-sompo" onClick={(event) => {
             if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
             event.preventDefault();
             navigate({ aba: '', fonte: '', caso: '', produto: '', gravidade: '', busca: '' });
@@ -711,6 +711,7 @@ function SompoWorkspace() {
           <section className="sompo-view-switch" aria-label="Modo SOMPO">
             <button
               type="button"
+              data-stand-alvo="aba-telemetria"
               aria-pressed={viewMode === 'telemetry'}
               onClick={() => setViewMode('telemetry')}
             >
@@ -719,17 +720,18 @@ function SompoWorkspace() {
             </button>
             <button
               type="button"
+              data-stand-alvo="aba-casos"
               aria-pressed={viewMode === 'cases'}
               onClick={() => setViewMode('cases')}
             >
               <Wheat />
               <span><strong>Casos agrícolas</strong><small>Cenários para avaliação</small></span>
             </button>
-            <button type="button" aria-pressed={viewMode === 'fleet'} onClick={() => setViewMode('fleet')}>
+            <button type="button" data-stand-alvo="aba-safra" aria-pressed={viewMode === 'fleet'} onClick={() => setViewMode('fleet')}>
               <ChartColumn />
               <span><strong>Safra</strong><small>Desempenho da frota</small></span>
             </button>
-            <button type="button" aria-pressed={viewMode === 'vehicles'} onClick={() => setViewMode('vehicles')}>
+            <button type="button" data-stand-alvo="aba-veiculos" aria-pressed={viewMode === 'vehicles'} onClick={() => setViewMode('vehicles')}>
               <CarFront />
               <span><strong>Veículos</strong><small>Cadastro e modelo 3D</small></span>
             </button>
@@ -786,6 +788,7 @@ function SompoWorkspace() {
                 <div className="sompo-source-switch-options">
                   <button
                     type="button"
+                    data-stand-alvo="fonte-simulador"
                     aria-pressed={telemetrySourceMode === 'simulation'}
                     onClick={() => {
                       navigate({ fonte: '' }, 'replace');

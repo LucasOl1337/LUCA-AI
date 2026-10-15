@@ -154,6 +154,7 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
                   type="button"
                   key={item.id}
                   onClick={() => navigate(item.id)}
+                  data-stand-alvo={`menu-${item.id}`}
                   className={`rift-item w-full ${selected ? 'active' : ''} ${compact ? 'justify-center !px-0' : ''}`}
                   title={compact ? item.label : undefined}
                   aria-current={selected ? 'page' : undefined}

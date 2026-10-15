@@ -7,6 +7,7 @@ import ConfiguracaoPage from '@/pages/ConfiguracaoPage';
 import SompoPage from '@/pages/SompoPage';
 import LaboratorioPage from '@/pages/LaboratorioPage';
 import AdminPage from '@/pages/AdminPage';
+import StandExecutorHost from '@/components/stand/executor/StandExecutorHost';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppLocation } from '@/hooks/useAppLocation';
 import { ChatLibraryProvider, useChatLibrary } from '@/hooks/useChatLibrary';
@@ -54,6 +55,7 @@ export default function App() {
   return (
     <ChatLibraryProvider>
       <LucaSessionAddress />
+      <StandExecutorHost />
       <Layout activePage={authorizedPage} onPageChange={goToPage}>
         {renderPage()}
       </Layout>
