@@ -1,0 +1,298 @@
+/**
+ * Sessão de voz ao vivo do stand (M1). Fala com o provedor configurado no
+ * servidor (hoje xAI Grok Voice, WebSocket com eventos no formato da OpenAI
+ * Realtime) e publica no barramento os eventos do contrato
+ * `shared/stand/eventos.ts`. Nada de áudio passa pelo servidor do LUCA.
+ *
+ * Fluxo de um turno: VAD do servidor fecha a fala → transcrição pronta →
+ * cancelamos a resposta automática, perguntamos ao roteador de vídeos (M7) e
+ * pedimos a resposta com a decisão dele numa nota de sistema.
+ */
+import type { EstadoStand } from '../../shared/stand/eventos.ts';
+import { assinarEventosPagina, emitirEventoStand } from './barramento';
+import { criarDetectorFala, floatDeBase64Pcm16, LegendaCorrente, nivelNormalizado, rms, base64DePcm16 } from './protocolo';
+
+export interface SessaoServidor {
+  provedor: string;
+  conexao: { transporte: 'websocket'; url: string; protocolos: string[] };
+  sessao: Record<string, unknown>;
+  limites: { silencio_s: number; teto_s: number };
+}
+
+export type FimSessao = 'encerrada' | 'silencio' | 'teto' | 'erro' | 'desligado';
+
+interface EventoProvedor { type: string; [chave: string]: any }
+
+const HZ = 24000;
+const ROTEAR_MS = 1600;
+
+async function postar<T>(caminho: string, corpo: unknown): Promise<{ status: number; dados: T }> {
+  const resposta = await fetch(caminho, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(corpo ?? {}),
+  });
+  return { status: resposta.status, dados: (await resposta.json().catch(() => ({}))) as T };
+}
+
+export class SessaoVoz {
+  private ws: WebSocket | null = null;
+  private contexto: AudioContext | null = null;
+  private microfone: MediaStream | null = null;
+  private captura: AudioWorkletNode | null = null;
+  private saida: GainNode | null = null;
+  private fontes = new Set<AudioBufferSourceNode>();
+  private proximoInicio = 0;
+  private estado: EstadoStand = 'ocioso';
+  private legenda = new LegendaCorrente();
+  private detector = criarDetectorFala();
+  private respostaAtual: string | null = null;
+  private respostaNossa = false;
+  /** Respostas cujo áudio e legenda ignoramos (automáticas do VAD ou interrompidas). */
+  private canceladas = new Set<string>();
+  private ultimaPergunta = '';
+  private videosTocados = new Set<string>();
+  private relogioNivel = 0;
+  private relogioSilencio = 0;
+  private relogioTeto = 0;
+  private desligarPagina: (() => void) | null = null;
+  private limites = { silencio_s: 20, teto_s: 240 };
+  private encerrando = false;
+
+  constructor(private aoTerminar: (motivo: FimSessao, detalhe?: string) => void = () => {}) {}
+
+  async iniciar(): Promise<void> {
+    try {
+      await this.conectar();
+    } catch (erro) {
+      this.terminar('erro', erro instanceof Error ? erro.message : 'falha_ao_iniciar');
+    }
+  }
+
+  private async conectar(): Promise<void> {
+    const { status, dados } = await postar<SessaoServidor & { error?: string; motivo?: string; token?: string }>('/api/stand/sessao', {});
+    if (status === 503) return this.terminar('desligado', dados.motivo || dados.error);
+    if (status !== 200 || !dados.conexao) return this.terminar('erro', dados.error || `HTTP ${status}`);
+    this.limites = dados.limites;
+
+    this.contexto = new AudioContext({ sampleRate: HZ, latencyHint: 'interactive' });
+    this.saida = this.contexto.createGain();
+    const analisador = this.contexto.createAnalyser();
+    analisador.fftSize = 1024;
+    this.saida.connect(analisador);
+    analisador.connect(this.contexto.destination);
+    this.microfone = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+    });
+    await this.contexto.audioWorklet.addModule('/stand-voz/captura-pcm.worklet.js');
+    this.captura = new AudioWorkletNode(this.contexto, 'captura-pcm');
+    this.contexto.createMediaStreamSource(this.microfone).connect(this.captura);
+
+    const ws = new WebSocket(dados.conexao.url, dados.conexao.protocolos);
+    this.ws = ws;
+    await new Promise<void>((ok, falha) => {
+      ws.onopen = () => ok();
+      ws.onerror = () => falha(new Error('websocket_falhou'));
+    });
+    ws.onmessage = (ev) => this.aoEvento(JSON.parse(String(ev.data)) as EventoProvedor);
+    ws.onclose = () => this.terminar(this.encerrando ? 'encerrada' : 'erro', 'conexao_fechada');
+    this.enviar({ type: 'session.update', session: dados.sessao });
+
+    this.captura.port.onmessage = (ev: MessageEvent<{ pcm: Int16Array; rms: number }>) => this.aoMicrofone(ev.data.pcm, ev.data.rms);
+    const amostras = new Float32Array(analisador.fftSize);
+    this.relogioNivel = window.setInterval(() => {
+      analisador.getFloatTimeDomainData(amostras);
+      emitirEventoStand({ tipo: 'nivel_audio', valor: this.estado === 'falando' ? nivelNormalizado(rms(amostras)) : 0 });
+    }, 33);
+    this.relogioTeto = window.setTimeout(() => this.encerrar('teto'), this.limites.teto_s * 1000);
+    this.armarSilencio();
+    this.desligarPagina = assinarEventosPagina((evento) => {
+      if (evento.tipo === 'encerrar') this.encerrar();
+      if (evento.tipo === 'video_terminou') this.notaDeSistema(`O vídeo ${evento.id} terminou. Pergunte, em uma frase, se ficou alguma dúvida.`, true);
+      if (evento.tipo === 'reiniciar') this.encerrar();
+    });
+    this.mudarEstado('ouvindo');
+  }
+
+  encerrar(motivo: FimSessao = 'encerrada'): void {
+    this.encerrando = true;
+    this.terminar(motivo);
+  }
+
+  private terminar(motivo: FimSessao, detalhe?: string): void {
+    if (this.estado === 'ocioso' && !this.ws && motivo !== 'desligado' && motivo !== 'erro') return;
+    window.clearInterval(this.relogioNivel);
+    window.clearTimeout(this.relogioSilencio);
+    window.clearTimeout(this.relogioTeto);
+    this.desligarPagina?.();
+    this.desligarPagina = null;
+    this.cortarAudio();
+    const ws = this.ws;
+    this.ws = null;
+    if (ws) { ws.onclose = null; ws.close(); }
+    this.microfone?.getTracks().forEach((t) => t.stop());
+    this.microfone = null;
+    void this.contexto?.close();
+    this.contexto = null;
+    this.mudarEstado('ocioso');
+    emitirEventoStand({ tipo: 'legenda', texto: '' });
+    this.aoTerminar(motivo, detalhe);
+  }
+
+  private enviar(evento: Record<string, unknown>): void {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(evento));
+  }
+
+  private mudarEstado(valor: EstadoStand): void {
+    if (this.estado === valor) return;
+    this.estado = valor;
+    emitirEventoStand({ tipo: 'estado', valor });
+  }
+
+  private armarSilencio(): void {
+    window.clearTimeout(this.relogioSilencio);
+    this.relogioSilencio = window.setTimeout(() => this.encerrar('silencio'), this.limites.silencio_s * 1000);
+  }
+
+  private aoMicrofone(pcm: Int16Array, nivel: number): void {
+    this.enviar({ type: 'input_audio_buffer.append', audio: base64DePcm16(pcm) });
+    // Barge-in local: corta a voz da IA antes de o VAD do servidor confirmar.
+    if (this.estado === 'falando' && this.detector.alimentar(nivel, 50)) this.interromper();
+    if (this.estado !== 'falando') this.detector.zerar();
+  }
+
+  private interromper(): void {
+    this.cortarAudio();
+    if (this.respostaAtual) {
+      this.canceladas.add(this.respostaAtual);
+      this.respostaAtual = null;
+      this.enviar({ type: 'response.cancel' });
+    }
+    this.mudarEstado('ouvindo');
+  }
+
+  private cortarAudio(): void {
+    for (const fonte of this.fontes) { try { fonte.stop(); } catch { /* já parou */ } }
+    this.fontes.clear();
+    this.proximoInicio = 0;
+  }
+
+  private tocarPedaco(base64: string): void {
+    if (!this.contexto || !this.saida) return;
+    const amostras = floatDeBase64Pcm16(base64);
+    if (!amostras.length) return;
+    const buffer = this.contexto.createBuffer(1, amostras.length, HZ);
+    buffer.copyToChannel(amostras, 0);
+    const fonte = this.contexto.createBufferSource();
+    fonte.buffer = buffer;
+    fonte.connect(this.saida);
+    const inicio = Math.max(this.contexto.currentTime + 0.02, this.proximoInicio);
+    fonte.start(inicio);
+    this.proximoInicio = inicio + buffer.duration;
+    this.fontes.add(fonte);
+    fonte.onended = () => {
+      this.fontes.delete(fonte);
+      if (!this.fontes.size && this.estado === 'falando' && !this.respostaAtual) this.mudarEstado('ouvindo');
+    };
+  }
+
+  private notaDeSistema(texto: string, responder = false): void {
+    this.enviar({ type: 'conversation.item.create', item: { type: 'message', role: 'system', content: [{ type: 'input_text', text: texto }] } });
+    if (responder) { this.respostaNossa = true; this.enviar({ type: 'response.create' }); }
+  }
+
+  /** Pergunta fechada: pergunta ao roteador (M7) e pede a resposta com a decisão. */
+  private async aoPerguntaTranscrita(texto: string): Promise<void> {
+    const limite = new Promise<null>((ok) => window.setTimeout(() => ok(null), ROTEAR_MS));
+    const consulta = postar<{ decisao: { id: string; decisao: 'tocar' | 'oferecer' } | null }>('/api/stand/rotear', { texto })
+      .then((r) => r.dados.decisao ?? null)
+      .catch(() => null);
+    const decisao = await Promise.race([consulta, limite]);
+    if (!this.ws) return;
+    if (decisao && !this.videosTocados.has(decisao.id)) {
+      this.notaDeSistema(`Roteador: decisao=${decisao.decisao} id=${decisao.id}.`);
+    } else {
+      this.notaDeSistema('Roteador: nenhum vídeo; responda ao vivo.');
+    }
+    this.respostaNossa = true;
+    this.enviar({ type: 'response.create' });
+  }
+
+  private async aoChamarFerramenta(nome: string, idChamada: string, argumentos: string): Promise<void> {
+    let args: unknown = {};
+    try { args = JSON.parse(argumentos || '{}'); } catch { /* argumentos quebrados viram objeto vazio */ }
+    const { dados } = await postar<{ ok: boolean; evento?: { tipo: string; id?: string; acao?: string; args?: Record<string, unknown> } }>(
+      '/api/stand/ferramenta', { nome, args },
+    ).catch(() => ({ dados: { ok: false, erro: 'servidor_indisponivel' } as { ok: boolean; evento?: undefined } }));
+    const evento = dados.evento;
+    if (evento?.tipo === 'tocar_video' && evento.id) {
+      this.videosTocados.add(evento.id);
+      emitirEventoStand({ tipo: 'tocar_video', id: evento.id });
+    }
+    if (evento?.tipo === 'acao_site' && evento.acao) emitirEventoStand({ tipo: 'acao_site', acao: evento.acao, args: evento.args ?? {} });
+    this.enviar({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: idChamada, output: JSON.stringify(dados) } });
+    // Depois do vídeo, quem pede a próxima fala é o fim dele (`video_terminou`).
+    if (evento?.tipo !== 'tocar_video') { this.respostaNossa = true; this.enviar({ type: 'response.create' }); }
+  }
+
+  private aoEvento(m: EventoProvedor): void {
+    const idResposta: string | undefined = m.response_id ?? m.response?.id;
+    const ignorada = Boolean(idResposta && this.canceladas.has(idResposta));
+    switch (m.type) {
+      case 'input_audio_buffer.speech_started':
+        this.armarSilencio();
+        if (this.estado === 'falando') this.interromper();
+        this.mudarEstado('ouvindo');
+        break;
+      case 'conversation.item.input_audio_transcription.completed':
+        if (m.transcript) {
+          this.ultimaPergunta = String(m.transcript);
+          emitirEventoStand({ tipo: 'legenda', texto: this.ultimaPergunta });
+        }
+        break;
+      case 'input_audio_buffer.committed':
+        this.mudarEstado('pensando');
+        break;
+      case 'response.created':
+        if (!this.respostaNossa) {
+          // Resposta automática do VAD: cancelamos e refazemos com a decisão
+          // do roteador. A transcrição final já chegou neste ponto.
+          if (idResposta) this.canceladas.add(idResposta);
+          this.enviar({ type: 'response.cancel' });
+          this.mudarEstado('pensando');
+          if (this.ultimaPergunta) void this.aoPerguntaTranscrita(this.ultimaPergunta);
+          break;
+        }
+        this.respostaNossa = false;
+        this.respostaAtual = idResposta ?? null;
+        this.legenda.reiniciar();
+        this.mudarEstado('pensando');
+        break;
+      case 'response.output_audio.delta':
+        if (ignorada) break;
+        this.mudarEstado('falando');
+        this.tocarPedaco(String(m.delta || ''));
+        break;
+      case 'response.output_audio_transcript.delta':
+        if (ignorada) break;
+        emitirEventoStand({ tipo: 'legenda', texto: this.legenda.adicionar(String(m.delta || '')) });
+        break;
+      case 'response.function_call_arguments.done':
+        if (!ignorada) void this.aoChamarFerramenta(String(m.name), String(m.call_id), String(m.arguments || '{}'));
+        break;
+      case 'response.done':
+        if (ignorada) {
+          this.canceladas.delete(idResposta as string);
+          break;
+        }
+        if (idResposta === this.respostaAtual) this.respostaAtual = null;
+        this.armarSilencio();
+        if (!this.fontes.size && this.estado !== 'ouvindo') this.mudarEstado('ouvindo');
+        break;
+      case 'error':
+        console.warn('[stand] erro do provedor de voz:', m.error?.code || m.error?.type || 'desconhecido');
+        break;
+    }
+  }
+}
