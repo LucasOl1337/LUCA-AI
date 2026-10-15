@@ -41,3 +41,19 @@ _Evitar_: Classificação (termo da bancada de agentes), intent.
 **Fora de escopo**:
 Pergunta que pede resposta ao vivo, sem vídeo, mesmo quando cita trator ou Sompo.
 _Evitar_: Pergunta inválida.
+
+**Cenário do stand**:
+Um Case com desfecho fixo, disparado por um clique ou por um botão do controle, que grava um episódio e tem uma pergunta associada que o Roteamento de pergunta usa para achar o vídeo. Hoje: obstáculo com alerta a tempo, inclinação perigosa e reação atrasada.
+_Evitar_: Cenário pré-programado, roteiro.
+
+**Reação atrasada**:
+O alerta toca no mesmo instante de um desfecho seguro, mas o operador freia tarde e há contato. O atraso é humano, não do sistema.
+_Evitar_: Alerta atrasado.
+
+**Modo cabine**:
+Câmera em primeira pessoa no assento do operador, com olhar livre limitado. É uma câmera, não muda os dados do cenário.
+_Evitar_: Simulador em primeira pessoa (quando se refere só à câmera).
+
+**Condução livre**:
+O operador dirige com o controle, sem roteiro. Não grava episódio, e o que aparece na tela é rotulado SIMULADO.
+_Evitar_: Case livre, desfecho manual.
