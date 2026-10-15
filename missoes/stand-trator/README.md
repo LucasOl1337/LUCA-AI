@@ -32,6 +32,7 @@ Todos os arquivos ficam em `shared/stand/`. Quem cria cada um está indicado aba
 ## Regras pra todos os executores
 
 - Ler `AGENTS.md` e `INDEX.md` do repo antes. Worktree em `/home/lol/Projects/` (nunca `/tmp`). Não usar `git clean`, `reset --hard`, `stash` nem `checkout --`.
+- Rota nova no Express exige atualizar `cli/catalog.js` e rodar `npm run cli:docs` e `npm run test:cli` (regra do `AGENTS.md`). O CLI `node bin/luca.js` serve pra operar e testar o app sem navegador.
 - Nada de fuzz e nada de teste contra a produção (`luca-ai.com.br`). Teste local e focado.
 - Render de vídeo, WebGL pesado ou gravação longa só entra pela fila da bancada: `agent-bench fila NOME rodar -- CMD`. Navegação e captura acontecem na bancada (skill `human-agent-coexistence`), nunca na tela do Lucas.
 - Dado simulado aparece como simulado. Não inventar número de sinistralidade, cliente ou resultado.
