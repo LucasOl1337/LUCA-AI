@@ -20,7 +20,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useDeferredFlag } from '@/hooks/useDeferredFlag';
 import SidebarSessionsRail from '@/components/SidebarSessionsRail';
 
-export type PageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'laboratorio' | 'sensor' | 'sonolencia' | 'admin';
+export type PageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'laboratorio' | 'sensor' | 'sonolencia' | 'admin' | 'stand';
 
 interface LayoutProps {
   activePage: PageId;

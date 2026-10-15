@@ -1,0 +1,52 @@
+/* /stand: monitor do trator, visto a 2–3 m. Tokens --l-* de src/index.css. */
+@font-face { font-family: 'Stand Outfit'; src: url('/fonts/outfit-latin.woff2') format('woff2'); font-weight: 300 800; font-display: swap; }
+
+.stand {
+  --stand-margem: 6%;
+  --stand-verde: #43d18a;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 42%, rgba(10, 132, 255, 0.16), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 50% 100%, rgba(67, 209, 138, 0.10), transparent 70%),
+    var(--l-void, #090c11);
+  color: var(--l-text, rgba(255, 255, 255, 0.94));
+  font-family: 'Stand Outfit', 'Inter', system-ui, sans-serif;
+  cursor: none;
+  user-select: none;
+}
+
+.stand-carregando { position: fixed; inset: 0; display: grid; place-items: center; background: #090c11; color: rgba(255, 255, 255, 0.6); font: 600 3vmin system-ui, sans-serif; }
+
+/* Área segura: nada importante fora dela (a moldura cobre as bordas). */
+.stand-seguro {
+  position: absolute;
+  inset: var(--stand-margem);
+  display: flex;
+  flex-direction: column;
+}
+
+.stand[data-grade] .stand-seguro { outline: 0.3vmin dashed rgba(255, 159, 10, 0.9); outline-offset: 0; }
+.stand[data-grade]::after {
+  content: 'área segura ' attr(data-margem);
+  position: absolute; left: 50%; top: calc(var(--stand-margem) / 2); transform: translate(-50%, -50%);
+  font: 600 1.6vmin 'JetBrains Mono', monospace; color: rgba(255, 159, 10, 0.95);
+}
+
+.stand-selo {
+  position: absolute;
+  top: 0;
+  right: 0;
+  margin: 0;
+  padding: 0.9vmin 1.8vmin;
+  border-radius: 999px;
+  border: 0.25vmin solid rgba(100, 210, 255, 0.55);
+  background: rgba(10, 132, 255, 0.16);
+  font-size: 2.4vmin;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--l-navy-deep, #64d2ff);
+  z-index: 5;
+}

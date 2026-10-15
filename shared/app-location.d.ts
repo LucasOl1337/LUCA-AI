@@ -1,4 +1,4 @@
-export type AppPageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'laboratorio' | 'sensor' | 'sonolencia' | 'admin';
+export type AppPageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'laboratorio' | 'sensor' | 'sonolencia' | 'admin' | 'stand';
 export type AppLocationKind = 'app' | 'auth' | 'leitura';
 
 export interface AppLocation {
@@ -23,6 +23,8 @@ export interface AppLocation {
     cenario: string;
     desfecho: string;
     veiculo: string;
+    margem: string;
+    variante: string;
   }
 
 export const APP_PAGES: readonly AppPageId[];

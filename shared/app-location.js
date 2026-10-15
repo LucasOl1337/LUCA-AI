@@ -14,6 +14,7 @@ export const APP_PAGES = Object.freeze([
   'sonolencia',
   'sensor',
   'admin',
+  'stand',
 ]);
 
 export const PAGE_PATHS = Object.freeze({
@@ -26,6 +27,7 @@ export const PAGE_PATHS = Object.freeze({
   sonolencia: '/sonolencia',
   sensor: '/sensor',
   admin: '/admin',
+  stand: '/stand',
 });
 
 // 'principais' e 'ativadas' ficam só por compatibilidade com links antigos.
@@ -72,6 +74,13 @@ export const PRODUTO_VALUE = Object.freeze({
 });
 
 export const GRAVIDADE_VALUES = Object.freeze(['critica', 'alta', 'media', 'baixa']);
+export const STAND_VARIANTES = Object.freeze(['coruja', 'operario', 'robo']);
+
+/** Margem segura do /stand em % de cada lado (0–20); vazio = padrão da página. */
+function parseMargem(raw) {
+  if (!/^\d{1,2}$/.test(raw)) return '';
+  return Number(raw) <= 20 ? String(Number(raw)) : '';
+}
 
 const EMPTY_QUERY = Object.freeze({
   busca: '',
@@ -91,6 +100,8 @@ const EMPTY_QUERY = Object.freeze({
   cenario: '',
   desfecho: '',
   veiculo: '',
+  margem: '',
+  variante: '',
 });
 
 export function emptyAppLocation() {
@@ -156,6 +167,8 @@ function parseQuery(search) {
     desfecho: readParam(search, 'desfecho'),
     // Veículo do cadastro (aba Veículos): precede cenário e preset do estúdio.
     veiculo: readParam(search, 'veiculo'),
+    margem: parseMargem(readParam(search, 'margem')),
+    variante: STAND_VARIANTES.includes(readParam(search, 'variante')) ? readParam(search, 'variante') : '',
   };
 }
 
@@ -218,6 +231,11 @@ export function formatAppUrl(location) {
   const params = new URLSearchParams();
 
   if (page === 'sensor' && loc.veiculo === 'trator') params.set('veiculo', 'trator');
+
+  if (page === 'stand') {
+    setIfPresent(params, 'margem', parseMargem(String(loc.margem || '')));
+    if (STAND_VARIANTES.includes(loc.variante)) params.set('variante', loc.variante);
+  }
 
   if (page === 'personas') {
     setIfPresent(params, 'busca', loc.busca);

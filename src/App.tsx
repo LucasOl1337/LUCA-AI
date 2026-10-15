@@ -16,6 +16,7 @@ import { isAppPage } from '../shared/app-location.js';
 const ADMIN_PAGES: PageId[] = ['personas', 'configuracao', 'admin'];
 const SonolenciaPage = lazy(() => import('@/sonolencia/SonolenciaPage'));
 const SensorLabPage = lazy(() => import('@/sensor-lab/SensorLabPage'));
+const StandPage = lazy(() => import('@/pages/StandPage'));
 
 export default function App() {
   const { user } = useAuth();
@@ -49,8 +50,20 @@ export default function App() {
       case 'sensor':      return <Suspense fallback={<p role="status" className="p-8">Abrindo o laboratório do sensor…</p>}><SensorLabPage /></Suspense>;
       case 'sonolencia': return <Suspense fallback={<p role="status" className="p-8">Carregando monitor de sonolência…</p>}><SonolenciaPage /></Suspense>;
       case 'admin':       return <AdminPage />;
+      case 'stand':       return null;
     }
   };
+
+  // O stand ocupa o monitor do trator inteiro: sem sidebar, dock nem menu.
+  if (authorizedPage === 'stand') {
+    return (
+      <ChatLibraryProvider>
+        <Suspense fallback={<div className="stand-carregando" role="status">Abrindo o stand…</div>}>
+          <StandPage />
+        </Suspense>
+      </ChatLibraryProvider>
+    );
+  }
 
   return (
     <ChatLibraryProvider>
