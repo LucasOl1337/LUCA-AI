@@ -1,0 +1,39 @@
+{
+  "nota": "Tabela fixa escrita à mão (M7). Não gerar em lote. esperado = id do vídeo ou null (resposta ao vivo).",
+  "casos": [
+    { "pergunta": "como que funciona o fluxo do dado até a entrega para os agentes?", "esperado": "pipeline-completo" },
+    { "pergunta": "o que é isso aqui, como funciona?", "esperado": "pipeline-completo" },
+    { "pergunta": "explica pra mim o caminho da informação desde o trator", "esperado": "pipeline-completo" },
+    { "pergunta": "esse sensor aí manda os dados pra quem?", "esperado": "pipeline-completo" },
+    { "pergunta": "como a ia percebe que teve um acidente no campo", "esperado": "pipeline-completo" },
+    { "pergunta": "qual é o passo a passo do look ai", "esperado": "pipeline-completo" },
+    { "pergunta": "e esses agentes, o que eles fazem com o dado do trator", "esperado": "pipeline-completo" },
+
+    { "pergunta": "e a sompo, o que ela consegue ver?", "esperado": "painel-sompo" },
+    { "pergunta": "o que a seguradora enxerga no painel dela", "esperado": "painel-sompo" },
+    { "pergunta": "como é a tela da sompa", "esperado": "painel-sompo" },
+    { "pergunta": "pra seguradora, qual a vantagem disso", "esperado": "painel-sompo" },
+    { "pergunta": "a seguradora acompanha todos os tratores segurados de uma vez?", "esperado": "painel-sompo" },
+    { "pergunta": "mostra o painel da seguradora", "esperado": "painel-sompo" },
+
+    { "pergunta": "e o produtor, o que ele vê?", "esperado": "painel-segurado" },
+    { "pergunta": "o que o segurado enxerga", "esperado": "painel-segurado" },
+    { "pergunta": "o agricultor que tem o trator consegue ver alguma coisa?", "esperado": "painel-segurado" },
+    { "pergunta": "qual a vantagem pro dono da máquina", "esperado": "painel-segurado" },
+    { "pergunta": "mostra a tela do produtor rural", "esperado": "painel-segurado" },
+    { "pergunta": "o fazendeiro recebe os alertas do trator dele?", "esperado": "painel-segurado" },
+
+    { "pergunta": "que horas são?", "esperado": null },
+    { "pergunta": "quem fez esse projeto?", "esperado": null },
+    { "pergunta": "vocês são da sompo?", "esperado": null },
+    { "pergunta": "quanto custa o seguro de um trator?", "esperado": null },
+    { "pergunta": "qual a temperatura do trator agora?", "esperado": null },
+    { "pergunta": "onde fica o banheiro?", "esperado": null },
+    { "pergunta": "você é uma pessoa de verdade?", "esperado": null },
+    { "pergunta": "posso jogar no simulador com o controle?", "esperado": null },
+    { "pergunta": "qual o nome da empresa de vocês e como eu entro em contato?", "esperado": null },
+    { "pergunta": "esse trator é de verdade ou é de brinquedo?", "esperado": null },
+    { "pergunta": "quanto vocês estão captando de investimento?", "esperado": null },
+    { "pergunta": "me conta uma piada", "esperado": null }
+  ]
+}

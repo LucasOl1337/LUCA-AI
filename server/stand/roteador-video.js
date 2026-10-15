@@ -11,16 +11,22 @@ import { ROUTER_API_KEY, ROUTER_BASE_URL } from '../config.js';
 
 const aqui = path.dirname(fileURLToPath(import.meta.url));
 export const CAMINHO_MANIFESTO = path.resolve(aqui, '../../shared/stand/videos.json');
+export const CAMINHO_FORA_DE_ESCOPO = path.join(aqui, 'roteador-video.fora-de-escopo.json');
 const CAMINHO_PROMPT = path.join(aqui, 'prompt-videos.md');
 
+// Grupo reservado: frases que pedem resposta ao vivo. Ganhar dele dá `null`.
+export const FORA_DE_ESCOPO = '__fora_de_escopo__';
+
 export const MODELO_PADRAO = 'openrouter/openai/text-embedding-3-small';
-export const DIMENSOES = 256;
+export const DIMENSOES = Number(process.env.STAND_EMBEDDING_DIMS) || 256;
 export const TIMEOUT_PERGUNTA_MS = 1500;
 const TIMEOUT_LOTE_MS = 15000;
 
-// Calibrados com `node server/stand/roteador-calibrar.js` sobre a tabela
-// `roteador-video.avaliacao.json` (resultado na entrega da M7).
-export const LIMIARES = Object.freeze({ tocar: 0.6, oferecer: 0.45, margem: 0.03 });
+// Calibrados em 15/10/2026 com `node server/stand/roteador-calibrar.js`
+// (text-embedding-3-small, 256 dims) sobre `roteador-video.avaliacao.json`:
+// `tocar` de 0.40 a 0.575 dá 96,8% de acerto e 0 falso positivo; 0.55 fica no
+// meio do platô. A partir de 0.60 cai pra 93,5%.
+export const LIMIARES = Object.freeze({ tocar: 0.55, oferecer: 0.45, margem: 0.03 });
 
 const ID_VALIDO = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
@@ -113,13 +119,19 @@ export function cosseno(a, b) {
   return aa && bb ? ab / Math.sqrt(aa * bb) : 0;
 }
 
-// Nota de cada id = maior cosseno entre a pergunta e os exemplos dele.
+export function carregarForaDeEscopo(caminho = CAMINHO_FORA_DE_ESCOPO) {
+  return JSON.parse(fs.readFileSync(caminho, 'utf8')).perguntas;
+}
+
+// Nota de cada grupo = maior cosseno entre a pergunta e os exemplos dele.
+// Se o grupo mais próximo é o fora de escopo, devolve null. A margem conta
+// contra o segundo grupo, inclusive o fora de escopo: perto dele vira `oferecer`.
 export function classificar(vetor, vetoresPorId, limiares = LIMIARES) {
   const notas = Object.entries(vetoresPorId)
     .map(([id, vetores]) => ({ id, nota: Math.max(...vetores.map((v) => cosseno(vetor, v))) }))
     .sort((a, b) => b.nota - a.nota);
   const [primeiro, segundo] = notas;
-  if (!primeiro || primeiro.nota < limiares.oferecer) return null;
+  if (!primeiro || primeiro.id === FORA_DE_ESCOPO || primeiro.nota < limiares.oferecer) return null;
   const confianca = Math.round(primeiro.nota * 1000) / 1000;
   const margem = primeiro.nota - (segundo?.nota ?? -1);
   const decisao = primeiro.nota >= limiares.tocar && margem >= limiares.margem ? 'tocar' : 'oferecer';
@@ -131,6 +143,7 @@ export function classificar(vetor, vetoresPorId, limiares = LIMIARES) {
 // (a IA responde ao vivo); não há plano B por palavra-chave.
 export function criarRoteador({
   manifesto = carregarManifesto(),
+  foraDeEscopo = carregarForaDeEscopo(),
   embed = criarEmbedder(),
   cache = criarCacheEmDisco(path.join(process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'), 'stand', 'embeddings.json')),
   limiares = LIMIARES,
@@ -141,17 +154,18 @@ export function criarRoteador({
   async function vetoresDosExemplos() {
     if (vetoresPorId) return vetoresPorId;
     const chaveDe = (texto) => `${embed.chave}|${hashTexto(texto)}`;
-    const todos = manifesto.flatMap((item) => item.perguntas_exemplo);
+    const grupos = [
+      ...manifesto.map((item) => [item.id, item.perguntas_exemplo]),
+      [FORA_DE_ESCOPO, foraDeEscopo],
+    ].filter(([, textos]) => textos.length);
+    const todos = grupos.flatMap(([, textos]) => textos);
     const faltando = todos.filter((texto) => !cache.get(chaveDe(texto)));
     if (faltando.length) {
       const vetores = await embed(faltando, { timeoutMs: TIMEOUT_LOTE_MS });
       faltando.forEach((texto, i) => cache.set(chaveDe(texto), vetores[i]));
       cache.salvar();
     }
-    vetoresPorId = Object.fromEntries(manifesto.map((item) => [
-      item.id,
-      item.perguntas_exemplo.map((texto) => cache.get(chaveDe(texto))),
-    ]));
+    vetoresPorId = Object.fromEntries(grupos.map(([id, textos]) => [id, textos.map((t) => cache.get(chaveDe(t)))]));
     return vetoresPorId;
   }
 
@@ -176,4 +190,24 @@ export function promptVideos(manifesto = carregarManifesto()) {
     .map((item) => `- \`${item.id}\`: ${item.titulo}. Resumo falado: "${item.resumo_falado}"`)
     .join('\n');
   return fs.readFileSync(CAMINHO_PROMPT, 'utf8').replace('{{VIDEOS}}', lista).trim();
+}
+
+// Mede a tabela de avaliação com vetores já calculados (fixture ou calibração).
+// acerto: caso com vídeo esperado que deu `tocar` no id certo, ou caso `null`
+// que não deu `tocar`. falsoPositivo: caso `null` que deu `tocar`.
+export function avaliarTabela(casos, vetorDe, vetoresPorId, limiares = LIMIARES) {
+  const linhas = casos.map((caso) => {
+    const r = classificar(vetorDe(caso.pergunta), vetoresPorId, limiares);
+    const tocou = r?.decisao === 'tocar' ? r.id : null;
+    return { ...caso, resultado: r, certo: tocou === caso.esperado };
+  });
+  const comVideo = linhas.filter((l) => l.esperado);
+  const semVideo = linhas.filter((l) => !l.esperado);
+  return {
+    linhas,
+    acerto: linhas.filter((l) => l.certo).length / linhas.length,
+    acertoComVideo: comVideo.filter((l) => l.certo).length / comVideo.length,
+    falsosPositivos: semVideo.filter((l) => l.resultado?.decisao === 'tocar').length,
+    nullEmOferecer: semVideo.filter((l) => l.resultado?.decisao === 'oferecer').length,
+  };
 }

@@ -1,0 +1,24 @@
+{
+  "nota": "Âncoras fora de escopo (M7), escritas à mão. Se a pergunta fica mais perto destas frases que de qualquer vídeo, o roteador devolve null e a IA responde ao vivo. Não copiar frases da tabela de avaliação.",
+  "perguntas": [
+    "vocês trabalham pra qual empresa",
+    "vocês são funcionários da seguradora",
+    "essa empresa é parceira da sompo",
+    "quem é o dono disso aqui",
+    "quem são vocês",
+    "qual o seu nome",
+    "tudo bem com você",
+    "quanto tá marcando o sensor agora",
+    "qual a distância que ele está medindo neste momento",
+    "o motor do trator tá quente agora",
+    "isso aqui foi feito de madeira",
+    "esse trator anda ou é só enfeite",
+    "esse monitor é de que marca",
+    "quanto custa pra contratar o serviço",
+    "qual o faturamento da empresa",
+    "dá pra dirigir o trator no videogame",
+    "vocês têm cartão de visita",
+    "onde eu compro isso",
+    "qual a previsão do tempo pra amanhã"
+  ]
+}
