@@ -72,6 +72,7 @@ import { sompoDistanceSensorCopy } from '../../shared/sompo-distance-sensor.js';
 import { usePhysicalTwin } from './sompo/usePhysicalTwin';
 import PhysicalTwinPanel, { PhysicalTwinOverlay } from './sompo/PhysicalTwinPanel';
 import { createFirstPersonRig } from './sompo/firstPersonCamera';
+import { createFreeDriveSource, type FreeDriveInput, type FreeDrivePose } from './sompo/firstPersonDrive';
 import { nudgeLook, type LookState } from './sompo/firstPersonLook';
 import { FirstPersonHud, StandScenarioButtons } from './sompo/firstPersonHud';
 import { rumble, useStandGamepad } from './sompo/gamepadLoop';
@@ -394,7 +395,16 @@ export default function SompoTruckSimulator({
   cabinRef.current = cabin && cabinAvailable;
   const lookRef = useRef<LookState>({ yaw: 0, pitch: 0 });
   const driveRef = useRef<StandPadReading['drive']>({ steer: 0, throttle: 0, brake: 0, stick: 0 });
-  const [cameraRig] = useState(() => createFirstPersonRig(cabinRef, lookRef));
+  // Condução livre: R2/L2 na cabine assumem a máquina; o roteiro pausa e nada vira episódio.
+  const [freeDrive, setFreeDrive] = useState(false);
+  const freeRef = useRef(false);
+  freeRef.current = freeDrive && cabin && cabinAvailable;
+  const freePoseRef = useRef<FreeDrivePose | null>(null);
+  const [freePose, setFreePose] = useState<FreeDrivePose | null>(null);
+  const [cameraRig] = useState(() => ({
+    ...createFirstPersonRig(cabinRef, lookRef),
+    drive: createFreeDriveSource(freeRef, driveRef as { current: FreeDriveInput }, freePoseRef),
+  }));
   const [standScenario, setStandScenario] = useState<StandScenarioId | null>(null);
   const standStartPendingRef = useRef(false);
   const lookDragRef = useRef<{ x: number; y: number } | null>(null);
@@ -946,6 +956,7 @@ export default function SompoTruckSimulator({
   function runStandScenario(id: StandScenarioId) {
     const item = getStandScenario(id);
     if (!item || !standMode || episodeActive) return;
+    leaveFreeDrive();
     selectScenario(item.caseId, item.desfechoId);
     setStandScenario(id);
     standStartPendingRef.current = true;
@@ -962,14 +973,44 @@ export default function SompoTruckSimulator({
   function toggleCabin(next?: boolean) {
     if (!cabinAvailable) return;
     lookRef.current = { yaw: 0, pitch: 0 };
+    leaveFreeDrive();
     setCabin((current) => next ?? !current);
+  }
+  function leaveFreeDrive() {
+    if (!freeRef.current && !freeDrive) return;
+    freeRef.current = false;
+    setFreeDrive(false);
+    playback.current.setPlaying(true, performance.now(), startedAtRef.current);
+    setPlaying(true);
   }
   function handleStandPad(action: StandPadAction) {
     if (action === 'toggle-cabin') toggleCabin();
-    else if (action === 'restart') { if (!episodeActive) restartScenario(); }
+    else if (action === 'restart') { if (!episodeActive) { leaveFreeDrive(); restartScenario(); } }
     else { const item = standScenarioFor(action); if (item) runStandScenario(item.id); }
   }
   const padConnected = useStandGamepad({ enabled: standMode, lookRef, driveRef, onAction: handleStandPad });
+
+  // R2 ou L2 na cabine, fora de episódio, assume a máquina; o painel e a vibração seguem a pose livre.
+  useEffect(() => {
+    if (!cabin || !cabinAvailable || episodeActive) return undefined;
+    const cues = { alert: false, contact: false };
+    const timer = window.setInterval(() => {
+      const input = driveRef.current;
+      if (!freeRef.current && (input.throttle > 0.1 || input.brake > 0.1)) {
+        playback.current.setPlaying(false, performance.now(), startedAtRef.current);
+        setPlaying(false);
+        freeRef.current = true;
+        setFreeDrive(true);
+      }
+      const pose = freePoseRef.current;
+      setFreePose(pose);
+      if (!pose) return;
+      if (pose.collision && !cues.alert) rumble('alert');
+      if (pose.contact && !cues.contact) rumble('contact');
+      cues.alert = pose.collision; cues.contact = pose.contact;
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [cabin, cabinAvailable, episodeActive]);
 
   // Vibração acompanha o snapshot que está na tela: alerta ao acender, contato ao entrar na fase.
   const standCuesRef = useRef({ alert: false, contact: false });
@@ -1234,7 +1275,20 @@ export default function SompoTruckSimulator({
             <span><span className="sompo-simulator-led" /> {isFirebase ? `${physicalTwin.replay ? 'Replay' : 'ESP32 físico'} · trator ${preview.tractorId}` : 'ESP32 virtual transmitindo'}</span>
             <span>{isFirebase ? `tick ${preview.deviceTimestamp ?? '-'}` : `${Math.round(preview.deviceTimestamp || 0)} ms`}</span>
           </div>
-          {cabin && cabinAvailable && (
+          {cabin && cabinAvailable && (freeDrive && freePose ? (
+            <FirstPersonHud
+              mode="livre"
+              data={{
+                speedKph: freePose.speedKph,
+                distanceCm: freePose.distanceCm,
+                collision: freePose.collision,
+                inclination: false,
+                pitch: 0,
+                roll: 0,
+                phase: freePose.contact ? 'Encostou no obstáculo' : freePose.direction < 0 ? 'Ré' : 'R2 acelera · L2 freia · Options volta ao cenário',
+              }}
+            />
+          ) : (
             <FirstPersonHud
               mode="cenario"
               data={{
@@ -1247,7 +1301,7 @@ export default function SompoTruckSimulator({
                 phase: agriPreview?.phaseLabel ?? '',
               }}
             />
-          )}
+          ))}
           {!isFirebase && !(cabin && cabinAvailable) && (
             <div className="sompo-simulator-readout" aria-label="Resumo do cenário">
               <div><span>{(ruralPreview ?? agriPreview)?.phaseLabel || 'Condução livre'}</span><strong>{formatReading((ruralPreview ?? agriPreview)?.speedKph ?? controls.speedKph, ' km/h')}</strong></div>
@@ -1264,10 +1318,10 @@ export default function SompoTruckSimulator({
                 <Eye /> Cabine{padConnected ? ' (✕)' : ''}
               </button>
             )}
-            <button type="button" onClick={() => { setCabin(false); sceneApiRef.current?.focus('truck'); }}>
+            <button type="button" onClick={() => { leaveFreeDrive(); setCabin(false); sceneApiRef.current?.focus('truck'); }}>
               <Truck /> Visão geral
             </button>
-            <button type="button" onClick={() => { setCabin(false); sceneApiRef.current?.focus('sensor'); }}>
+            <button type="button" onClick={() => { leaveFreeDrive(); setCabin(false); sceneApiRef.current?.focus('sensor'); }}>
               <Focus /> {agriRun ? 'Inspecionar máquina' : 'Focar ESP32'}
             </button>
           </div>
@@ -1276,7 +1330,7 @@ export default function SompoTruckSimulator({
           )}
           {studioOpen && renderStats && <div className="sompo-simulator-stats" aria-label="Métricas do render"><span>{renderStats.fps} FPS</span><span>{renderStats.cpuMs.toFixed(1)} ms CPU</span><span>{renderStats.calls} chamadas</span><span>{Math.round(renderStats.triangles / 1000)} mil triângulos</span></div>}
           <p className="sompo-simulator-hint">{cabin && cabinAvailable
-            ? `Arraste ou use as setas para olhar${padConnected ? ' · analógico direito olha · □ △ ○ cenários · Options reinicia' : ''}`
+            ? `Arraste ou use as setas para olhar${padConnected ? ' · analógico direito olha · R2/L2 dirigem · □ △ ○ cenários · Options reinicia' : ''}`
             : 'Arraste para girar · use as setas para navegar'}</p>
           <p className="sompo-simulator-credit">
             {agriRun || physicalMax ? (

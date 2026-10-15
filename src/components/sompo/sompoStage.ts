@@ -10,7 +10,17 @@ export interface SompoStageApi {
 }
 
 /** Câmera alternativa do palco (ex. cabine): quando ativa, substitui a órbita no quadro. */
-export interface SompoCameraRig { active(): boolean; update(camera: THREE.PerspectiveCamera, machine: THREE.Object3D): void }
+export interface SompoCameraRig {
+  active(): boolean;
+  update(camera: THREE.PerspectiveCamera, machine: THREE.Object3D): void;
+  /** Condução livre: pose da máquina neste quadro, ou null para seguir o roteiro. */
+  drive?(dt: number, scene: { from: { x: number; z: number; heading: number }; obstacles: { x: number; z: number; radius: number }[] }): SompoDrivePose | null;
+}
+export interface SompoDrivePose {
+  x: number; z: number; heading: number; travel: number;
+  speedKph: number; direction: 1 | -1; yawRateDeg: number;
+  distanceCm: number; collision: boolean; braking: boolean;
+}
 
 /** A bounded rendering budget, shared by both stages; selected at mount. */
 export function sompoRenderBudget() {

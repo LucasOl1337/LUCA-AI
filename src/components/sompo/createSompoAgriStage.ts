@@ -375,14 +375,24 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     const elapsed = getElapsed ? getElapsed(time) : Math.max(0, time - startedAtRef.current);
     const snapshot = physical?.previewRef.current;
     const physicalCurrent = !!snapshot && snapshot.freshness === 'fresh' && snapshot.connection.state === 'live';
-    const frame = physicalBase && snapshot
+    const scripted = physicalBase && snapshot
       ? { ...physicalBase, distance: Number.isFinite(snapshot.readings.distance) ? Number(snapshot.readings.distance) : NaN, collisionRisk: !!snapshot.risks.collision }
       : getSompoAgriFrame(scenarioId, elapsed, outcomeId);
+    // Condução livre (cabine do stand): o controle substitui o roteiro na pose, rodas e sensor.
+    const drive = physical ? null : cameraRig?.drive?.(frameDelta, {
+      from: { x: machine.position.x, z: machine.position.z, heading: machine.rotation.y },
+      obstacles: obstacle ? [{ x: obstacle.position.x, z: obstacle.position.z, radius: HAY_BALE_RADIUS }] : [],
+    }) ?? null;
+    const frame = drive ? {
+      ...scripted, speedKph: drive.speedKph, wheelSpeedKph: drive.speedKph, direction: drive.direction, yawRate: drive.yawRateDeg,
+      yaw: THREE.MathUtils.radToDeg(drive.heading), roll: 0, pitch: 0, lateral: 0, vertical: 0, sink: 0, roughness: 0, shudder: 0,
+      distance: drive.distanceCm, collisionRisk: drive.collision, brakeLights: drive.braking ? 1 : 0,
+    } : scripted;
     path.sample(reduceMotion.matches || physical ? 0 : elapsed, pathPoint);
-    const x = startX + pathPoint.x;
+    const x = drive ? drive.x : startX + pathPoint.x;
     // Authored lateral slip only applies where the script calls for it (capotamento,
     // tranco de contato); normal steering follows the integrated heading.
-    const z = pathPoint.z + (useLateral && !physical ? frame.lateral : 0);
+    const z = drive ? drive.z : pathPoint.z + (useLateral && !physical ? frame.lateral : 0);
     if (physical && snapshot) {
       // Mesma conversão de eixos do caminhão físico (calibração da página), com amortecimento.
       const attitudeKnown = Number.isFinite(snapshot.readings.pitch) && Number.isFinite(snapshot.readings.roll);
@@ -422,7 +432,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
       machine.rotation.z += tremor * 0.009 * Math.sin(elapsed * 0.059 + 1.9);
     }
     // Sem odômetro no ESP32: no modo físico as rodas ficam paradas, como no caminhão físico.
-    rig?.update(frame, physical ? 0 : integrateSompoMotion(keyframes, elapsed) / 3.6,
+    rig?.update(frame, physical ? 0 : drive ? drive.travel : integrateSompoMotion(keyframes, elapsed) / 3.6,
       physical ? 0 : integrateSompoMotion(keyframes, elapsed, 'headerSpeed', false) * .8, reduceMotion.matches);
     const contactHeight = rig?.supportHeight(machine.rotation, x, z, field.groundHeight) ?? 0;
     machine.position.set(x, field.groundHeight(x, z) + contactHeight + THREE.MathUtils.clamp(frame.vertical, -0.6, 1) - frame.sink * .5, z);
