@@ -16,7 +16,7 @@ import {
   type SompoAgriScenarioId,
 } from '../../../shared/sompo-agri-scenarios.js';
 import { createSompoGeofenceLayer } from '../../geofencing/createSompoGeofenceLayer';
-import { createSompoRenderer, sompoRenderBudget, disposeSompoObject, type SompoStageApi } from './sompoStage';
+import { createSompoRenderer, sompoRenderBudget, disposeSompoObject, type SompoStageApi, type SompoCameraRig } from './sompoStage';
 import { createSompoEnvironmentAssets } from './createSompoEnvironmentAssets';
 import { createSompoAtmosphere } from './createSompoAtmosphere';
 import { createSompoPostProcessing } from './createSompoPostProcessing';
@@ -126,7 +126,7 @@ function createUltrasonicBeam(origin: readonly [number, number, number]) {
  * real em forma fechada: separado do loop do caminhão para não arriscar o
  * fluxo rural. Desmontado e remontado a cada troca de cenário/desfecho.
  */
-export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical }: {
+export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig }: {
   mount: HTMLElement;
   scenarioId: SompoAgriScenarioId;
   outcomeId: string;
@@ -140,6 +140,8 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   onStats?: (stats: SompoRenderStats) => void;
   /** Sem roteiro: pose do IMU e distância do HC-SR04. Parado no talhão, porque sem GNSS não há trajetória. */
   physical?: SompoAgriPhysicalInput;
+  /** Câmera de cabine opcional; sem ela (ou inativa) a órbita segue igual. */
+  cameraRig?: SompoCameraRig;
 }): SompoAgriStageApi | null {
   const scenario = getSompoAgriScenario(scenarioId);
   const operation = scenario.environmentId === 'geofence-operacao';
@@ -364,6 +366,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     : null;
   let physicalHeading = 0;
   let previousTime = performance.now();
+  let rigWasActive = false;
 
   function render(time: number) {
     meter.begin();
@@ -442,12 +445,25 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
       sensorBeam.group.visible = Number.isFinite(frame.distance);
       if (sensorBeam.group.visible) sensorBeam.update(frame.distance, frame.collisionRisk, reduceMotion.matches ? 0 : elapsed, !!physical && (!physicalCurrent || snapshot?.status === 'unknown'));
     }
-    focusPoint.set(machine.position.x + (focusTarget === 'sensor' ? 2.5 : 0), machine.position.y + (focusTarget === 'sensor' ? 2.2 : 1.6), machine.position.z);
-    if (operation && focusTarget === 'truck') focusPoint.set(0, 0, 0);
-    cameraShift.copy(focusPoint).sub(orbit.target);
-    camera.position.add(cameraShift);
-    orbit.target.copy(focusPoint);
-    orbit.update();
+    const rigActive = !!cameraRig?.active();
+    if (rigActive !== rigWasActive) {
+      // Saindo da cabine: volta à visão geral com o FOV do enquadramento.
+      rigWasActive = rigActive; orbit.enabled = !rigActive;
+      if (!rigActive) {
+        focusTarget = 'truck'; resize();
+        orbit.target.set(machine.position.x, machine.position.y + 1.6, machine.position.z);
+        camera.position.set(machine.position.x + overview.x, machine.position.y + overview.y, machine.position.z + overview.z);
+      }
+    }
+    if (rigActive) cameraRig!.update(camera, machine);
+    else {
+      focusPoint.set(machine.position.x + (focusTarget === 'sensor' ? 2.5 : 0), machine.position.y + (focusTarget === 'sensor' ? 2.2 : 1.6), machine.position.z);
+      if (operation && focusTarget === 'truck') focusPoint.set(0, 0, 0);
+      cameraShift.copy(focusPoint).sub(orbit.target);
+      camera.position.add(cameraShift);
+      orbit.target.copy(focusPoint);
+      orbit.update();
+    }
     atmosphere.update(studio, camera, machine.position, elapsed, scenario.environmentId === 'muddy-field', night);
     if (operation && focusTarget === 'truck' && scene.fog instanceof THREE.Fog) { scene.fog.near = 500; scene.fog.far = 800; }
     if (night && scene.fog instanceof THREE.Fog) {

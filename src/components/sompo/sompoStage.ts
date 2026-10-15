@@ -9,6 +9,9 @@ export interface SompoStageApi {
   dispose(): void;
 }
 
+/** Câmera alternativa do palco (ex. cabine): quando ativa, substitui a órbita no quadro. */
+export interface SompoCameraRig { active(): boolean; update(camera: THREE.PerspectiveCamera, machine: THREE.Object3D): void }
+
 /** A bounded rendering budget, shared by both stages; selected at mount. */
 export function sompoRenderBudget() {
   const compact = window.matchMedia('(max-width: 700px), (pointer: coarse)').matches;
