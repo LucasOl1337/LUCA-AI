@@ -71,3 +71,15 @@ _Evitar_: Segurado, motorista (em máquina agrícola).
 **Seguradora**:
 A Sompo vendo o painel: casos de exemplo, dados públicos do setor, frota e episódios. Não há carteira real de apólices no app.
 _Evitar_: Carteira da Sompo (para os casos de exemplo).
+
+**Ação do site**:
+Pedido da IA do stand para operar o próprio app, escolhido de uma lista fechada (abrir aba, abrir caso, rodar Cenário do stand, gravar episódio, analisar na bancada, voltar ao início). Pedido fora da lista é recusado e a IA explica que não pode.
+_Evitar_: Comando, automação, macro.
+
+**Executor do stand**:
+A camada do app que realiza uma Ação do site na tela como uma pessoa: cursor visível indo até o Alvo, destaque e clique de verdade.
+_Evitar_: Bot, robô, piloto automático.
+
+**Alvo**:
+O elemento da tela que uma Ação do site clica ou escolhe. Se não aparece, a ação falha com mensagem, sem atalho invisível.
+_Evitar_: Botão (quando é um seletor), seletor CSS.
