@@ -219,6 +219,8 @@ import {
 import { registerSompoRiskRoutes } from './sompo-risk.js';
 import { registerLabCaseRoutes } from './lab-cases.js';
 import { registerSompoVehicleRoutes } from './sompo-vehicles.js';
+import { registerStandRoutes } from './stand/rotas.js';
+import { cabecalhosDeSeguranca } from './cabecalhos-seguranca.js';
 
 const app = express();
 const personaRunJobs = createPersonaRunJobStore();
@@ -262,15 +264,7 @@ const PERSONA_ROSTER_SYNC_INTERVAL_MS = Math.max(
 app.disable('x-powered-by');
 app.set('trust proxy', 'loopback');
 app.use((req, res, next) => {
-  const visionWorker = /^\/assets\/drowsiness-worker-[\w-]+\.js$/.test(req.path);
-  const scriptPolicy = visionWorker ? "'self' 'wasm-unsafe-eval'" : "'self'";
-  res.setHeader('Content-Security-Policy', `default-src 'self'; base-uri 'self'; connect-src 'self' ws: wss:; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; media-src 'self' blob:; object-src 'none'; script-src ${scriptPolicy}; style-src 'self' 'unsafe-inline'`);
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Permissions-Policy', /^\/sonolencia\/?$/.test(req.path)
-    ? 'camera=(self), microphone=(), geolocation=()'
-    : 'camera=(), microphone=(), geolocation=()');
+  for (const [nome, valor] of Object.entries(cabecalhosDeSeguranca(req.path))) res.setHeader(nome, valor);
   if (req.path.startsWith('/api/')) {
     res.setHeader('Cache-Control', 'no-store');
   }
@@ -387,6 +381,7 @@ app.use('/api', (req, res, next) => {
 });
 registerLabCaseRoutes(app);
 registerSompoVehicleRoutes(app);
+registerStandRoutes(app);
 authService.registerAdminRoutes(app, {
   getUserChatLibrary: getChatLibrarySnapshotForUser,
   getUserChatSession: getChatSessionForUser,

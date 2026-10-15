@@ -2,7 +2,7 @@
 
 Gerada por `npm run cli:docs` a partir de `cli/catalog.js`. Não editar à mão.
 
-118 comandos; 97 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
+121 comandos; 100 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
 
 IDs são argumentos posicionais. Campos comuns podem ser flags; corpos completos usam `--data @arquivo.json`. Flags prevalecem sobre o corpo; objetos aninhados não são mesclados. Campos string são literais; apenas campos JSON e `--data` interpretam `@arquivo`/`-`.
 
@@ -717,6 +717,30 @@ Excluir veículo; episódios gravados mantêm o retrato do veículo.
 `DELETE /api/sompo/vehicles/:id`; autenticação: **session**.
 
 Nenhum; consulte a descrição para entradas por `--data`.
+
+### `stand status`
+
+Estado do cérebro de voz do stand: ligado, modelo, limites e sessões na hora.
+
+`GET /api/stand/status`; autenticação: **session**.
+
+Nenhum; consulte a descrição para entradas por `--data`.
+
+### `stand sessao`
+
+Abrir sessão de voz: devolve token efêmero da Realtime (503 stand_desligado sem chave).
+
+`POST /api/stand/sessao`; autenticação: **session**.
+
+Nenhum; consulte a descrição para entradas por `--data`.
+
+### `stand ferramenta`
+
+Executar uma ferramenta da IA do stand.
+
+`POST /api/stand/ferramenta`; autenticação: **session**.
+
+`--nome` (string, obrigatório): buscar_no_repo, pesquisar_web, tocar_video ou acao_site<br>`--args` (json): Argumentos JSON da ferramenta
 
 ### `sompo risk list`
 
