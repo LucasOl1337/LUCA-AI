@@ -58,6 +58,10 @@ _Evitar_: Simulador em primeira pessoa (quando se refere só à câmera).
 O operador dirige com o controle, sem roteiro. Não grava episódio, e o que aparece na tela é rotulado SIMULADO.
 _Evitar_: Case livre, desfecho manual.
 
+**Veredito da bancada**:
+O que a bancada de agentes devolve sobre um episódio gravado: o que aconteceu, a severidade para a seguradora e o que fazer agora. É um parecer de agentes de IA, citado só pelo que a sessão mostra.
+_Evitar_: Classificação, laudo, decisão da seguradora.
+
 ## Pessoas do seguro rural
 
 **Segurado**:
