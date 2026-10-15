@@ -15,6 +15,8 @@ Cenário do stand `stand-obstaculo-a-tempo` (case `max-front-obstacle`, desfecho
 
 ## Blocos
 
+A narração abaixo é o resumo de cada bloco. O texto exato falado, com as pausas e a versão do plano B, está em `promo/src/stand/pipeline/roteiro.ts`.
+
 | # | Tempo | Narração (voz oficial) | Tela | Prova no código | Rótulo |
 |---|---|---|---|---|---|
 | 1 | 0–8 s | No campo, um trator pode bater ou tombar em segundos. E se desse para ver o risco antes do acidente? | Trator MAX andando em linha, com o fardo à frente | `shared/sompo-max-tractor-scenarios.js:168-192` | simulado |
@@ -22,7 +24,7 @@ Cenário do stand `stand-obstaculo-a-tempo` (case `max-front-obstacle`, desfecho
 | 3 | 20–34 s | No painel, o mesmo caso aparece no simulador. O obstáculo entra no alcance, o alerta acende a um metro e meio e o operador para a tempo. | Aba Telemetria, cenário "Trator MAX com obstáculo frontal", desfecho "Parada segura", com o selo de telemetria sintética visível. Zoom no alerta | `shared/sompo-max-tractor-scenarios.js:185-192`; `src/components/SompoTruckSimulator.tsx:1103-1108` | simulado |
 | 4 | 34–46 s | Esse momento vira um episódio gravado, com imagens datadas de cada fase. | Clique em "Gravar episódio deste cenário" → "Gravando episódio… frames n/5" → "Episódio registrado" | `src/components/SompoTruckSimulator.tsx:1278-1311` | real (gravação) + simulado (telemetria) |
 | 5 | 46–58 s | Com um clique, o episódio inteiro vai para a bancada: uma equipe de agentes de IA que lê os dados e as imagens. | Clique em "Analisar episódio na bancada" → sessão LUCA-AI com o Conselho de Estratégia rodando, etapa por etapa | `src/pages/SompoPage.tsx:554-657,936`; `shared/luca-preset-seed.js:49-70` | real |
-| 6 | 58–76 s | A bancada devolve um veredito: o que aconteceu, quão grave foi e o que fazer agora. | Trecho da entrega final com veredito e severidade, citado só pelo que estiver na tela. Marca "minutos depois" no corte de tempo | `shared/sompo-telemetry.js:322,598` | real (parecer gerado na captura) |
+| 6 | 58–76 s | A bancada devolve um veredito: o que aconteceu, qual a gravidade e o que fazer agora. | Trecho da entrega final com veredito e severidade, citado só pelo que estiver na tela. Marca "minutos depois" no corte de tempo | `shared/sompo-telemetry.js:322,598` | real (parecer gerado na captura) |
 | 7 | 76–90 s | A seguradora e o segurado olham a mesma evidência: o episódio gravado, com as imagens, lado a lado com a frota. | Aba Safra, "Último episódio gravado" com as imagens do episódio que a captura gravou | `src/components/sompo/SompoFleetPanel.tsx:37-55,107` | real |
 | 8 | 90–100 s | Hoje, dentro do painel, isso já funciona com casos de exemplo. Quer ver um caso? Pergunta pro LUCA. | Fechamento com a marca LUCA-AI | — | — |
 
