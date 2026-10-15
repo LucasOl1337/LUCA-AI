@@ -3,7 +3,8 @@ import test from 'node:test';
 import { loadFrontendModule } from './support/load-frontend-module.js';
 
 const { chamadaDeInicio, avisoParaEquipe } = await loadFrontendModule('../../src/components/stand/avisos.ts');
-const { videoDoStand, criarRepasseAcao } = await loadFrontendModule('../../src/components/stand/videosStand.ts');
+const { videoDoStand } = await loadFrontendModule('../../src/components/stand/videosStand.ts');
+const { enviarAcaoSite } = await loadFrontendModule('../../src/components/stand/executor/ponte.ts');
 
 test('Atração convida a tocar na tela e não mostra erro ao público', () => {
   assert.equal(chamadaDeInicio(false, null), 'Toca na tela pra começar a conversa.');
@@ -27,16 +28,14 @@ test('vídeos saem do manifesto da M7; o de teste só no modo stub', () => {
   assert.equal(videoDoStand('', true), undefined);
 });
 
-test('acao_site vai pro BroadcastChannel luca-stand com id', async () => {
-  const ouvinte = new BroadcastChannel('luca-stand');
-  const recebido = new Promise((ok) => { ouvinte.onmessage = (ev) => ok(ev.data); });
-  const repasse = criarRepasseAcao();
-  const enviado = repasse.repassar('abrir_aba', { aba: 'telemetria' });
-  const msg = await recebido;
-  repasse.fechar();
-  ouvinte.close();
-  assert.deepEqual(msg, enviado);
-  assert.equal(msg.tipo, 'acao_site');
-  assert.equal(msg.acao, 'abrir_aba');
-  assert.match(msg.id, /^stand-\d+-1$/);
+test('acao_site da página chega ao executor (M3) e o resultado volta pelo id', async () => {
+  globalThis.window ??= globalThis;
+  const executor = new BroadcastChannel('luca-stand');
+  executor.onmessage = ({ data }) => {
+    if (data.tipo === 'acao_site') executor.postMessage({ tipo: 'acao_site_resultado', id: data.id, ok: true, mensagem: `fiz ${data.acao}` });
+  };
+  const resultado = await enviarAcaoSite('abrir_aba', { aba: 'telemetria' });
+  executor.close();
+  assert.equal(resultado.ok, true);
+  assert.equal(resultado.mensagem, 'fiz abrir_aba');
 });

@@ -8,7 +8,8 @@ import { reduzirTela, telaInicial, type EntradaTela, type EstadoTela } from '@/c
 import { Atracao, Conversa, PlayerVideo } from '@/components/stand/Telas';
 import { tratarTecla, type AtalhosStand } from '@/components/stand/atalhos';
 import { avisoParaEquipe, chamadaDeInicio } from '@/components/stand/avisos';
-import { criarRepasseAcao, videoDoStand } from '@/components/stand/videosStand';
+import { videoDoStand } from '@/components/stand/videosStand';
+import { enviarAcaoSite } from '@/components/stand/executor/ponte';
 import '@/stand.css';
 
 /** Margem segura padrão (% de cada lado): a moldura de MDF come as bordas. */
@@ -44,14 +45,16 @@ export default function StandPage() {
     const atual = stub ?? canalReal;
     canal.current = atual;
     demonstrar.current = stub ? stub.demonstrar : () => undefined;
-    const repasse = criarRepasseAcao();
     const cancelar = atual.assinar((evento) => {
       if (evento.tipo === 'nivel_audio') nivel.current = evento.valor;
-      else if (evento.tipo === 'acao_site') repasse.repassar(evento.acao, evento.args ?? {});
+      else if (evento.tipo === 'acao_site') {
+        // Executor do stand (M3) noutra janela; a falha fica no console da equipe.
+        void enviarAcaoSite(evento.acao, evento.args ?? {}).then((r) => { if (!r.ok) console.warn('[stand] ação no site falhou:', r.mensagem); });
+      }
       else despachar(evento);
     });
     const relogio = window.setInterval(() => despachar({ tipo: 'relogio' }), 500);
-    return () => { cancelar(); window.clearInterval(relogio); repasse.fechar(); stub?.parar(); };
+    return () => { cancelar(); window.clearInterval(relogio); stub?.parar(); };
   }, [modoStub]);
 
   /** Gesto do público ou da equipe: liga o microfone (precisa de clique ou tecla).
