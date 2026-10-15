@@ -1,0 +1,61 @@
+[
+  {
+    "id": "pipeline-completo",
+    "titulo": "O caminho do dado, do campo até a bancada de agentes",
+    "arquivo": "/stand/videos/pipeline-completo.mp4",
+    "duracao_s": null,
+    "perguntas_exemplo": [
+      "como que funciona o fluxo do dado até a entrega para os agentes",
+      "como funciona o sistema de vocês do começo ao fim",
+      "o que esse trator faz",
+      "me explica como funciona isso aqui",
+      "de onde vem o dado e pra onde ele vai",
+      "o sensor manda a informação pra onde",
+      "como a inteligência artificial analisa o que acontece no campo",
+      "como vocês descobrem o risco de acidente na lavoura",
+      "o que acontece quando o trator quase bate em alguma coisa",
+      "como funciona o look ai",
+      "mostra o processo inteiro da luca ai",
+      "como a informação sai da máquina e chega na seguradora",
+      "o que é essa bancada de agentes"
+    ],
+    "resumo_falado": "Vou te mostrar o caminho inteiro: o sensor no trator percebe o risco no campo, o dado chega no painel e uma bancada de agentes de IA analisa e classifica o que aconteceu. As cenas de risco do vídeo são simuladas."
+  },
+  {
+    "id": "painel-sompo",
+    "titulo": "O que a seguradora vê no painel",
+    "arquivo": "/stand/videos/painel-sompo.mp4",
+    "duracao_s": null,
+    "perguntas_exemplo": [
+      "o que a sompo vê nesse sistema",
+      "como fica o painel pra seguradora",
+      "o que a seguradora ganha com isso",
+      "como a sompa acompanha os tratores dos clientes",
+      "o que aparece pro pessoal da seguradora",
+      "como a seguradora enxerga a carteira e a frota",
+      "a seguradora consegue ver os episódios de risco",
+      "me mostra a visão da sompo",
+      "como o analista de seguro usa isso no dia a dia",
+      "como a seguradora vê a análise feita pelos agentes"
+    ],
+    "resumo_falado": "Aqui é a visão da seguradora: ela acompanha a carteira e a frota num painel só, vê os episódios de risco registrados e a análise que a bancada de agentes fez de cada um. Os dados do vídeo são de demonstração."
+  },
+  {
+    "id": "painel-segurado",
+    "titulo": "O que o produtor segurado vê",
+    "arquivo": "/stand/videos/painel-segurado.mp4",
+    "duracao_s": null,
+    "perguntas_exemplo": [
+      "o que o produtor vê",
+      "e o segurado, o que ele enxerga no sistema",
+      "o que o dono do trator ganha com isso",
+      "como fica pro agricultor",
+      "o fazendeiro consegue ver os alertas do trator dele",
+      "me mostra a visão do segurado",
+      "o produtor rural acompanha o histórico da máquina dele",
+      "o que melhora no seguro do produtor",
+      "o cliente da seguradora vê o que aconteceu com o trator dele"
+    ],
+    "resumo_falado": "Agora a visão do produtor: ele acompanha o próprio trator, os alertas e o histórico, e entende o que pode melhorar no seguro dele. Os dados do vídeo são de demonstração."
+  }
+]
