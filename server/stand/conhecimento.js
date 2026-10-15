@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promptVideos } from './roteador-video.js';
 
 export const RAIZ_REPO = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -117,9 +118,10 @@ function userStories(raiz) {
   }
 }
 
-function promptVideosDaM7(raiz) {
+/** Instrução dos vídeos (M7), com a lista do manifesto; sem manifesto, fica de fora. */
+function promptVideosDaM7() {
   try {
-    return fs.readFileSync(path.join(raiz, 'server/stand/prompt-videos.md'), 'utf8').trim();
+    return promptVideos();
   } catch {
     return '';
   }
@@ -127,7 +129,7 @@ function promptVideosDaM7(raiz) {
 
 export function montarPromptBase({ raiz = RAIZ_REPO } = {}) {
   const stories = userStories(raiz);
-  const videos = promptVideosDaM7(raiz);
+  const videos = promptVideosDaM7();
   return [
     'Você é o operador LUCA, o assistente de IA do LUCA-AI, falando em voz alta num stand com um trator de MDF.',
     'Quem pergunta é investidor, fundo de crédito ou visitante. Fale português do Brasil, sem jargão técnico, em frases curtas: no máximo três por resposta, e termine convidando a próxima pergunta quando fizer sentido.',
