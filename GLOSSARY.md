@@ -23,3 +23,21 @@ _Evitar_: Limite seguro do veículo.
 - **Modelo 3D**: a malha usada no simulador, campo `modelo3d` do cadastro e coluna `model3d_id` do episódio. Hoje: `caminhao-sompo` (caminhão atual) e `trator-max` (o trator de brinquedo das fotos em `missoes/trator-referencias`, equipamento `max-tractor` na cena agrícola). Não confundir com o "Modelo (cadastro)", que é texto livre.
 - **Dispositivo**: o ESP32 que manda telemetria, identificado por `tractorId`/`trator` (`001` no Firebase, `SIM-001` no simulador). Não é o Veículo: a associação é explícita, pelo campo `dispositivo` do cadastro (vazio = sem dispositivo; um dispositivo por veículo na conta). Nome parecido não associa: `trator-0001` só vira o feed `001` se alguém gravar `001` no campo. Com associação, o modo físico mostra o Modelo 3D do veículo; sem ela, mostra a situação.
 - **Case**: um cenário do simulador com seus desfechos (ex. obstáculo frontal com parada segura ou toque leve). Os dados de case são sintéticos e aparecem rotulados assim na tela. Um episódio gravado guarda o case (`scenario_id`, `outcome_id`) e, desde o cadastro, o veículo (`vehicle_id`, `vehicle_snapshot`, `model3d_id`).
+
+## Stand do trator
+
+**Vídeo do stand**:
+Resposta pré-gravada a uma pergunta central do público do stand, identificada por um id (`pipeline-completo`, `painel-sompo`, `painel-segurado`).
+_Evitar_: Clipe, demo, apresentação.
+
+**Resumo falado**:
+Uma ou duas frases que a IA diz antes de tocar um Vídeo do stand.
+_Evitar_: Legenda, descrição.
+
+**Roteamento de pergunta**:
+Decisão sobre uma pergunta do público: tocar um Vídeo do stand, oferecê-lo ou responder ao vivo.
+_Evitar_: Classificação (termo da bancada de agentes), intent.
+
+**Fora de escopo**:
+Pergunta que pede resposta ao vivo, sem vídeo, mesmo quando cita trator ou Sompo.
+_Evitar_: Pergunta inválida.
