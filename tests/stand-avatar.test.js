@@ -16,6 +16,8 @@ test('boca fechada fica no mínimo e aberta chega à escala 1', () => {
   assert.match(rigTransform('abre', p, RIG_PARADO), /scale\(1 0\.050\)/);
   assert.match(rigTransform('abre', p, { ...RIG_PARADO, boca: 1 }), /scale\(1 1\.000\)/);
   assert.equal(rigTransform('desce', { k: 12 }, { ...RIG_PARADO, boca: 0.5 }), 'translate(0 6.00)');
+  // Coruja: min 0 some com a boca de vez quando fechada.
+  assert.match(rigTransform('abre', { cx: 200, cy: 282, min: 0 }, RIG_PARADO), /scale\(1 0\.000\)/);
 });
 
 test('piscada fecha no meio e reabre no fim', () => {

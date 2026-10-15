@@ -74,7 +74,7 @@ function Coruja() {
           </g>
         </g>
       ))}
-      <g {...rig('abre', { cx: 200, cy: 280, min: 0.05 })}>
+      <g {...rig('abre', { cx: 200, cy: 282, min: 0 })}>
         <ellipse cx="200" cy="306" rx="36" ry="30" fill="#4a1018" stroke="#b86a0a" strokeWidth="2" />
         <ellipse cx="200" cy="324" rx="20" ry="8" fill="#e0606a" />
       </g>
