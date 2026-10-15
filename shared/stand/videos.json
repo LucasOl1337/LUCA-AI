@@ -25,7 +25,7 @@
     "id": "painel-sompo",
     "titulo": "O que a seguradora vê no painel",
     "arquivo": "/stand/videos/painel-sompo.mp4",
-    "duracao_s": null,
+    "duracao_s": 49.3,
     "perguntas_exemplo": [
       "o que a sompo vê nesse sistema",
       "como fica o painel pra seguradora",
@@ -38,13 +38,13 @@
       "como o analista de seguro usa isso no dia a dia",
       "como a seguradora vê a análise feita pelos agentes"
     ],
-    "resumo_falado": "Aqui é a visão da seguradora: ela acompanha a carteira e a frota num painel só, vê os episódios de risco registrados e a análise que a bancada de agentes fez de cada um. Os dados do vídeo são de demonstração."
+    "resumo_falado": "Aqui é a visão da seguradora: casos de exemplo do campo, uma frota de demonstração e um episódio gravado no simulador. Com um clique, a bancada de agentes de IA analisa as evidências e recomenda o que mudar na próxima safra. Valores e apólices ainda não entram."
   },
   {
     "id": "painel-segurado",
     "titulo": "O que o produtor segurado vê",
     "arquivo": "/stand/videos/painel-segurado.mp4",
-    "duracao_s": null,
+    "duracao_s": 42.0,
     "perguntas_exemplo": [
       "o que o produtor vê",
       "e o segurado, o que ele enxerga no sistema",
@@ -56,6 +56,6 @@
       "o que melhora no seguro do produtor",
       "o cliente da seguradora vê o que aconteceu com o trator dele"
     ],
-    "resumo_falado": "Agora a visão do produtor: ele acompanha o próprio trator, os alertas e o histórico, e entende o que pode melhorar no seguro dele. Os dados do vídeo são de demonstração."
+    "resumo_falado": "Aqui é o lado do produtor, hoje dentro do painel: ele cadastra o trator, testa uma curva em ladeira no simulador e a parada a tempo vira um episódio gravado a favor dele. Uma tela só do produtor ainda não existe."
   }
 ]
