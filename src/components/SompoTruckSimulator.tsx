@@ -1282,10 +1282,11 @@ export default function SompoTruckSimulator({
                 speedKph: freePose.speedKph,
                 distanceCm: freePose.distanceCm,
                 collision: freePose.collision,
+                contact: freePose.contact,
                 inclination: false,
                 pitch: 0,
                 roll: 0,
-                phase: freePose.contact ? 'Encostou no obstáculo' : freePose.direction < 0 ? 'Ré' : 'R2 acelera · L2 freia · Options volta ao cenário',
+                phase: freePose.direction < 0 ? 'Ré' : 'R2 acelera · L2 freia · Options volta ao cenário',
               }}
             />
           ) : (

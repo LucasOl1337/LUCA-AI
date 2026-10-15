@@ -9,6 +9,8 @@ export interface FirstPersonHudData {
   pitch: number | null;
   roll: number | null;
   phase: string;
+  /** Encostou no obstáculo: vale mais que o alerta, que continua aceso. */
+  contact?: boolean;
 }
 
 const fmt = (value: number | null, digits: number, unit: string) => (
@@ -20,7 +22,7 @@ const fmt = (value: number | null, digits: number, unit: string) => (
  * HC-SR04, atitude e fase), com o selo SIMULADO sempre visível.
  */
 export function FirstPersonHud({ data, mode }: { data: FirstPersonHudData; mode: 'cenario' | 'livre' }) {
-  const alert = data.collision ? 'Alerta de colisão' : data.inclination ? 'Alerta de inclinação' : null;
+  const alert = data.contact ? 'Contato com o obstáculo' : data.collision ? 'Alerta de colisão' : data.inclination ? 'Alerta de inclinação' : null;
   return (
     <div className="sompo-fp-hud" data-alert={!!alert} aria-live="polite" aria-label="Painel da cabine">
       <span className="sompo-fp-badge">SIMULADO{mode === 'livre' ? ' · condução livre' : ''}</span>
