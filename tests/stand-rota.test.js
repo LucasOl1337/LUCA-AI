@@ -18,6 +18,13 @@ test('/stand guarda margem e variante válidas e descarta o resto', () => {
   assert.equal(parseAppLocation('/stand?variante=dragao').variante, '');
 });
 
+test('/stand?stub=1 liga o modo de teste e só aceita 1', () => {
+  assert.equal(parseAppLocation('/stand?stub=1').stub, '1');
+  assert.equal(parseAppLocation('/stand?stub=sim').stub, '');
+  assert.equal(formatAppUrl({ page: 'stand', stub: '1', variante: 'coruja' }), '/stand?variante=coruja&stub=1');
+  assert.equal(formatAppUrl({ page: 'sompo', stub: '1' }), '/sompo');
+});
+
 test('margem e variante não vazam para outras páginas', () => {
   assert.equal(formatAppUrl({ page: 'sompo', margem: '8', variante: 'robo' }), '/sompo');
 });

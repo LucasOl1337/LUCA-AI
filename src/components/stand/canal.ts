@@ -1,29 +1,15 @@
 /**
  * Canal entre o cérebro de voz (M1) e a página /stand (M2).
  *
- * Os tipos copiam o contrato 1 de missoes/stand-trator/README.md até a M1
- * publicar shared/stand/eventos.ts; quando sair, troque esta cópia por um
- * re-export daquele arquivo. É o único ponto de troca.
- *
- * Semântica combinada (respostas r1):
- * - `legenda.texto` é a frase corrente inteira e substitui a anterior.
- * - `nivel_audio` chega a ~30 Hz, RMS normalizado 0..1; a página suaviza.
- * - A página devolve `video_terminou`, `reiniciar` e `encerrar`.
+ * Tipos do contrato da M1 (`shared/stand/eventos.ts`). Dois canais com a
+ * mesma forma: o real (barramento de `src/stand-voz/`) e o stub de teste.
  */
+import type { EstadoStand, EventoCerebro, EventoPagina } from '../../../shared/stand/eventos.ts';
+import { assinarEventosCerebro, emitirEventoStand } from '../../stand-voz/barramento';
 
-export type EstadoVoz = 'ocioso' | 'ouvindo' | 'pensando' | 'falando';
-
-export type EventoStand =
-  | { tipo: 'estado'; valor: EstadoVoz }
-  | { tipo: 'nivel_audio'; valor: number }
-  | { tipo: 'legenda'; texto: string }
-  | { tipo: 'tocar_video'; id: string }
-  | { tipo: 'acao_site'; acao: string; args?: Record<string, unknown> };
-
-export type EventoPagina =
-  | { tipo: 'video_terminou'; id: string }
-  | { tipo: 'reiniciar' }
-  | { tipo: 'encerrar' };
+export type EstadoVoz = EstadoStand;
+export type EventoStand = EventoCerebro;
+export type { EventoPagina };
 
 export interface CanalStand {
   /** Recebe os eventos do cérebro. Devolve a função que cancela a assinatura. */
@@ -31,6 +17,9 @@ export interface CanalStand {
   /** Avisa o cérebro do que aconteceu na página. */
   enviar(evento: EventoPagina): void;
 }
+
+/** Canal do cérebro de voz real (M1). */
+export const canalReal: CanalStand = { assinar: assinarEventosCerebro, enviar: emitirEventoStand };
 
 /** Barramento em memória: base do stub e dos testes. */
 export function criarBarramento() {

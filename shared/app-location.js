@@ -102,6 +102,7 @@ const EMPTY_QUERY = Object.freeze({
   veiculo: '',
   margem: '',
   variante: '',
+  stub: '',
 });
 
 export function emptyAppLocation() {
@@ -169,6 +170,8 @@ function parseQuery(search) {
     veiculo: readParam(search, 'veiculo'),
     margem: parseMargem(readParam(search, 'margem')),
     variante: STAND_VARIANTES.includes(readParam(search, 'variante')) ? readParam(search, 'variante') : '',
+    // /stand?stub=1: fala de teste local no lugar do cérebro de voz.
+    stub: readParam(search, 'stub') === '1' ? '1' : '',
   };
 }
 
@@ -235,6 +238,7 @@ export function formatAppUrl(location) {
   if (page === 'stand') {
     setIfPresent(params, 'margem', parseMargem(String(loc.margem || '')));
     if (STAND_VARIANTES.includes(loc.variante)) params.set('variante', loc.variante);
+    if (loc.stub === '1') params.set('stub', '1');
   }
 
   if (page === 'personas') {

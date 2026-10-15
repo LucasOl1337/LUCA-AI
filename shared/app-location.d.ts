@@ -25,6 +25,7 @@ export interface AppLocation {
     veiculo: string;
     margem: string;
     variante: string;
+    stub: string;
   }
 
 export const APP_PAGES: readonly AppPageId[];
