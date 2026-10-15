@@ -4,8 +4,8 @@
 
 import type { Trecho, Verdade } from '../estilo.ts';
 
-/** Trecho da captura usado num bloco: `inicio` em segundos da captura, `dur` em segundos de vídeo. */
-export type PlanoCaptura = { inicio: number; dur?: number };
+/** Trecho da captura usado num bloco: `inicio` em segundos da captura (null = cartão da marca), `dur` em segundos de vídeo. */
+export type PlanoCaptura = { inicio: number | null; dur?: number };
 
 export type BlocoMontagem = {
   id: string;

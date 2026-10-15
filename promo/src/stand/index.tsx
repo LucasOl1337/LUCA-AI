@@ -4,6 +4,7 @@ import { AvatarCanto } from './AvatarCanto.tsx';
 import { Legenda, SeloVerdade } from './Legenda.tsx';
 import { ZoomCursor } from './ZoomCursor.tsx';
 import { ALTURA, COR, FPS, LARGURA, s, type Rastro } from './estilo.ts';
+import { metadadosPainel, PainelM6, PROPS_VAZIAS } from './sompo/PainelM6.tsx';
 
 // Raiz Remotion dos Vídeos do stand. Cada missão registra a própria
 // composição aqui (M5: PipelineCompleto; M6: PainelSompo, PainelSegurado).
@@ -30,6 +31,8 @@ const StandBase: React.FC = () => (
 const Raiz: React.FC = () => (
   <>
     <Composition id="StandBase" component={StandBase} durationInFrames={s(5)} fps={FPS} width={LARGURA} height={ALTURA} />
+    <Composition id="PainelSompo" component={PainelM6} calculateMetadata={metadadosPainel} defaultProps={PROPS_VAZIAS} durationInFrames={1} fps={FPS} width={LARGURA} height={ALTURA} />
+    <Composition id="PainelSegurado" component={PainelM6} calculateMetadata={metadadosPainel} defaultProps={PROPS_VAZIAS} durationInFrames={1} fps={FPS} width={LARGURA} height={ALTURA} />
   </>
 );
 
