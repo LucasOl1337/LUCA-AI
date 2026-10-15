@@ -13,7 +13,7 @@ import {fileURLToPath} from 'node:url';
 import {paraSrt} from '../legendas.ts';
 import {montarLinhaDoTempo} from '../sompo/linha-do-tempo.ts';
 import {PIPELINE} from './roteiro.ts';
-import {planosDoPipeline} from './planos.ts';
+import {comPausas, planosDoPipeline, rastroEmVideo} from './planos.ts';
 
 const repoDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 const argv = process.argv.slice(2);
@@ -25,11 +25,16 @@ const LIMITE_BYTES = 25 * 1024 * 1024;
 const ID = 'pipeline-completo';
 
 const timings = JSON.parse(readFileSync(path.join(dir, 'timings.json'), 'utf8'));
+const calibracao = JSON.parse(readFileSync(path.join(dir, 'calibracao.json'), 'utf8'));
 const narracao = JSON.parse(readFileSync(path.join(dirNarracao, 'narracao.json'), 'utf8'));
-const temEntrega = timings.rastro.marcas.b6_entrega !== undefined;
-if (narracao.plano_b === temEntrega) throw new Error(`narração ${narracao.plano_b ? 'plano B' : 'principal'} não bate com a captura (${temEntrega ? 'com' : 'sem'} entrega)`);
+const temEntrega = timings.rastro.marcas.b6_entrega !== undefined && timings.run?.status === 'complete';
+// Sem entrega real o vídeo segue o plano B (só o envio). Este montador cobre o caminho com entrega;
+// o plano B exige outros cortes e não é montado aqui por acidente.
+if (!temEntrega || narracao.plano_b) throw new Error('montar.mjs cobre só a captura com entrega real e narração principal');
 const duracaoCaptura = Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', path.join(dir, 'cena.mp4')], {encoding: 'utf8'}).trim());
-const PLANOS = planosDoPipeline(timings.rastro.marcas);
+const PLANOS = planosDoPipeline(calibracao.cortes);
+const rastro = rastroEmVideo(timings.rastro, calibracao.ancoras);
+const PAUSAS = {b2: 0.8, b6: 2.8, b7: 0.6};
 
 const publico = path.join(dir, 'public');
 for (const sub of ['captura', 'narracao', 'brand']) mkdirSync(path.join(publico, sub), {recursive: true});
@@ -40,15 +45,28 @@ const blocos = PIPELINE.map((b) => {
   const n = narracao.blocos.find((x) => x.id === b.id);
   if (!n) throw new Error(`narração do bloco ${b.id} ausente`);
   copyFileSync(path.join(dirNarracao, n.arquivo), path.join(publico, 'narracao', n.arquivo));
-  const detalhe = b.id === 'b6' && !temEntrega ? 'sessão da bancada' : b.detalhe;
-  return {id: b.id, texto: n.texto, narracao: `narracao/${n.arquivo}`, duracaoNarracao: n.duracao, verdade: b.verdade, detalhe, planos: PLANOS[b.id]};
+  // Legenda = o que a voz diz (texto do roteiro que gerou o áudio, conferido por STT).
+  return {id: b.id, texto: n.texto, narracao: `narracao/${n.arquivo}`, duracaoNarracao: n.duracao, verdade: b.verdade, detalhe: b.detalhe, planos: PLANOS[b.id]};
 });
-const linha = montarLinhaDoTempo(blocos);
-for (const p of linha.planos) {
-  if (p.inicioCaptura !== null && p.inicioCaptura + p.dur > duracaoCaptura - 0.1) p.inicioCaptura = Math.max(0, duracaoCaptura - 0.1 - p.dur);
-}
+const linha = comPausas(montarLinhaDoTempo(blocos), PAUSAS);
+// O enquadramento fixo segue o plano de origem (mesmo bloco, mesmo início na captura).
+// Plano que passa do fim da captura vira vídeo + último quadro congelado (ultimo.png).
+const FIM_UTIL = duracaoCaptura - 0.2;
+execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-ss', String(FIM_UTIL), '-i', path.join(dir, 'cena.mp4'), '-frames:v', '1', path.join(publico, 'captura', 'ultimo.png')]);
+linha.planos = linha.planos.flatMap((p) => {
+  const origem = PLANOS[p.bloco].find((x) => x.inicio === p.inicioCaptura);
+  const base = origem?.enquadra ? {...p, enquadra: origem.enquadra} : p;
+  if (p.inicioCaptura === null || p.inicioCaptura + p.dur <= FIM_UTIL) return [base];
+  const emVideo = Math.max(0, FIM_UTIL - p.inicioCaptura);
+  console.warn(`plano ${p.bloco}: ${(p.dur - emVideo).toFixed(2)} s congelados no último quadro`);
+  return [
+    ...(emVideo > 0 ? [{...base, dur: emVideo}] : []),
+    {...base, de: p.de + emVideo, dur: p.dur - emVideo, inicioCaptura: FIM_UTIL, still: 'captura/ultimo.png', enquadraDesde: emVideo},
+  ];
+});
+if (linha.total < 90 || linha.total > 110) throw new Error(`duração ${linha.total.toFixed(1)} s fora de 90–110 s`);
 
-const props = {captura: 'captura/cena.mp4', rastro: timings.rastro, linha, blocoEsquema: 'b2'};
+const props = {captura: 'captura/cena.mp4', duracaoCaptura, rastro, linha, blocoEsquema: 'b2'};
 writeFileSync(path.join(dir, 'props.json'), JSON.stringify(props, null, 2));
 const destino = path.join(repoDir, 'public', 'stand', 'videos');
 mkdirSync(destino, {recursive: true});

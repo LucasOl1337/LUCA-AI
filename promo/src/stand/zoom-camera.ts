@@ -83,3 +83,23 @@ export function pulsoEm(t: number, cliques: PontoNoTempo[]) {
   }
   return 0;
 }
+
+/**
+ * Câmera num recorte fixo da captura, com aproximação lenta (2% em 6 s), para
+ * planos sem clique (ex.: o palco 3D). Mesma convenção de `cameraEm`.
+ */
+export function cameraFixa(
+  recorte: { x: number; y: number; largura: number; altura: number },
+  viewport: { largura: number; altura: number },
+  segundos: number,
+): Camera {
+  const base = Math.min(viewport.largura / recorte.largura, viewport.altura / recorte.altura);
+  const escala = base * (1 + 0.02 * Math.min(1, segundos / 6));
+  const cx = recorte.x + recorte.largura / 2;
+  const cy = recorte.y + recorte.altura / 2;
+  const meiaL = viewport.largura / (2 * escala);
+  const meiaA = viewport.altura / (2 * escala);
+  const fx = Math.min(viewport.largura - meiaL, Math.max(meiaL, cx));
+  const fy = Math.min(viewport.altura - meiaA, Math.max(meiaA, cy));
+  return { escala, tx: viewport.largura / 2 - fx * escala, ty: viewport.altura / 2 - fy * escala };
+}

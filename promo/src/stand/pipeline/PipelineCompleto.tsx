@@ -4,7 +4,8 @@ import { AvatarCanto } from '../AvatarCanto.tsx';
 import { Legenda, SeloVerdade } from '../Legenda.tsx';
 import { ZoomCursor } from '../ZoomCursor.tsx';
 import { COR, FONTE, FPS, s, type Rastro } from '../estilo.ts';
-import type { LinhaDoTempo } from '../sompo/linha-do-tempo.ts';
+import type { LinhaDoTempo, PlanoFinal } from '../sompo/linha-do-tempo.ts';
+import type { Recorte } from './planos.ts';
 
 /**
  * Vídeo pipeline-completo (M5). Props geradas por `montar.mjs`: captura real
@@ -13,8 +14,9 @@ import type { LinhaDoTempo } from '../sompo/linha-do-tempo.ts';
  */
 export type PropsPipeline = {
   captura: string;
+  duracaoCaptura?: number;
   rastro: Rastro;
-  linha: LinhaDoTempo;
+  linha: Omit<LinhaDoTempo, 'planos'> & { planos: Array<PlanoFinal & { enquadra?: Recorte; still?: string; enquadraDesde?: number }> };
   /** Bloco desenhado como esquema (sem tela de produto). */
   blocoEsquema: string;
 };
@@ -25,6 +27,9 @@ const NOS = [
   { titulo: 'Internet', sub: 'leva as leituras' },
   { titulo: 'Painel do LUCA', sub: 'mostra e grava' },
 ];
+
+/** Janela da captura: abaixo da faixa do avatar e do selo, para não cobrir texto da tela. */
+const JANELA = { x: 186, y: 196, largura: 1548, altura: 871 };
 
 /** Esquema animado: trator → sensor → placa → internet → painel. Desenho, não tela do app. */
 const Esquema: React.FC = () => {
@@ -83,12 +88,12 @@ const Fechamento: React.FC = () => (
 );
 
 export const PipelineCompleto: React.FC<PropsPipeline> = ({ captura, rastro, linha, blocoEsquema }) => (
-  <AbsoluteFill style={{ background: COR.fundo }}>
+  <AbsoluteFill style={{ background: `radial-gradient(circle at 50% 30%, #13233a 0%, ${COR.fundo} 75%)` }}>
     <style>{`@font-face{font-family:'Luca Mono';src:url('${staticFile('brand/jetbrains-mono.woff2')}') format('woff2');font-weight:100 900}`}</style>
     {linha.planos.map((plano, i) => (
       <Sequence key={`p${i}`} from={s(plano.de)} durationInFrames={Math.max(1, s(plano.de + plano.dur) - s(plano.de))}>
         {plano.inicioCaptura !== null
-          ? <ZoomCursor src={captura} rastro={rastro} inicio={plano.inicioCaptura} />
+          ? <ZoomCursor src={plano.still ?? captura} rastro={rastro} inicio={plano.inicioCaptura} enquadra={plano.enquadra} enquadraDesde={plano.enquadraDesde} cursor={!plano.enquadra} caixa={JANELA} />
           : plano.bloco === blocoEsquema ? <Esquema /> : <Fechamento />}
       </Sequence>
     ))}

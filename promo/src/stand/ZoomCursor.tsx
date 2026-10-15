@@ -1,7 +1,7 @@
 import React from 'react';
 import { Img, OffthreadVideo, staticFile, useCurrentFrame } from 'remotion';
 import { COR, FPS, type Rastro } from './estilo.ts';
-import { cameraEm, cursorEm, pulsoEm } from './zoom-camera.ts';
+import { cameraEm, cameraFixa, cursorEm, pulsoEm } from './zoom-camera.ts';
 
 /**
  * Captura real com zoom no cursor (estilo Screen Studio) guiado pelo rastro.
@@ -15,10 +15,14 @@ export const ZoomCursor: React.FC<{
   cursor?: boolean;
   /** Retângulo de destino no quadro final. */
   caixa?: { x: number; y: number; largura: number; altura: number };
-}> = ({ src, rastro, inicio = 0, cursor = true, caixa = { x: 0, y: 0, largura: 1920, altura: 1080 } }) => {
+  /** Recorte fixo da captura (com leve aproximação lenta), em vez do zoom por clique. */
+  enquadra?: { x: number; y: number; largura: number; altura: number };
+  /** Segundos já decorridos do enquadramento (continua a aproximação lenta entre planos). */
+  enquadraDesde?: number;
+}> = ({ src, rastro, inicio = 0, cursor = true, caixa = { x: 0, y: 0, largura: 1920, altura: 1080 }, enquadra, enquadraDesde = 0 }) => {
   const frame = useCurrentFrame();
   const t = inicio + frame / FPS;
-  const cam = cameraEm(t, rastro);
+  const cam = enquadra ? cameraFixa(enquadra, rastro.viewport, enquadraDesde + frame / FPS) : cameraEm(t, rastro);
   const ponto = cursorEm(t, rastro.cursor);
   const pulso = pulsoEm(t, rastro.cliques);
   const ajuste = caixa.largura / rastro.viewport.largura;
