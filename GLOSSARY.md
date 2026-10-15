@@ -57,3 +57,17 @@ _Evitar_: Simulador em primeira pessoa (quando se refere só à câmera).
 **Condução livre**:
 O operador dirige com o controle, sem roteiro. Não grava episódio, e o que aparece na tela é rotulado SIMULADO.
 _Evitar_: Case livre, desfecho manual.
+
+## Pessoas do seguro rural
+
+**Segurado**:
+O produtor rural titular da apólice. É dono da máquina e do resultado, mesmo quando não a dirige. Hoje não tem visão própria no LUCA-AI: vê o mesmo painel SOMPO que qualquer conta.
+_Evitar_: Cliente, usuário, operador (quando se refere ao titular).
+
+**Operador**:
+Quem dirige a máquina no campo. Pode ser o próprio segurado ou um funcionário. É quem recebe o alerta na cabine.
+_Evitar_: Segurado, motorista (em máquina agrícola).
+
+**Seguradora**:
+A Sompo vendo o painel: casos de exemplo, dados públicos do setor, frota e episódios. Não há carteira real de apólices no app.
+_Evitar_: Carteira da Sompo (para os casos de exemplo).
