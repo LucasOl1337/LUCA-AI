@@ -1,15 +1,17 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import type { EstadoVoz } from './canal';
 import { RIG_PARADO, animarAvatar, rigTransform } from './avatarRig';
+import AvatarCorujaA from './AvatarCorujaA';
 
 /**
- * Avatar LUCA: o "operário" do trator, em SVG 2D. Três variações para o
- * Lucas escolher pelo print; a coruja de capacete é a padrão (respostas r1).
- * Sem defs/ids: várias cópias convivem na mesma página e o SVG exporta limpo.
+ * Avatar LUCA. Padrão: a coruja A (arte aprovada animada em camadas, em
+ * `AvatarCorujaA`). As três variações vetoriais antigas seguem por `?variante=`.
+ * Sem defs/ids nas vetoriais: várias cópias convivem e o SVG exporta limpo.
  */
 
-export type VarianteAvatar = 'coruja' | 'operario' | 'robo';
-export const VARIANTE_PADRAO: VarianteAvatar = 'coruja';
+export type VarianteAvatar = 'coruja-a' | 'coruja' | 'operario' | 'robo';
+export const VARIANTES_AVATAR: readonly VarianteAvatar[] = ['coruja-a', 'coruja', 'operario', 'robo'];
+export const VARIANTE_PADRAO: VarianteAvatar = 'coruja-a';
 
 const COR = {
   navy: '#0a84ff', ceu: '#64d2ff', verde: '#43d18a', fundo: '#0b1624', corpo: '#14263f',
@@ -144,7 +146,7 @@ function Robo() {
   );
 }
 
-const DESENHOS: Record<VarianteAvatar, () => ReactNode> = { coruja: Coruja, operario: Operario, robo: Robo };
+const DESENHOS: Record<Exclude<VarianteAvatar, 'coruja-a'>, () => ReactNode> = { coruja: Coruja, operario: Operario, robo: Robo };
 
 export interface AvatarLucaProps {
   variante?: VarianteAvatar;
@@ -156,7 +158,14 @@ export interface AvatarLucaProps {
   className?: string;
 }
 
-export default function AvatarLuca({ variante = VARIANTE_PADRAO, voz = 'ocioso', nivel, parado = false, className }: AvatarLucaProps) {
+export default function AvatarLuca(props: AvatarLucaProps) {
+  const { variante = VARIANTE_PADRAO, voz = 'ocioso', nivel, parado = false, className } = props;
+  const nivelInterno = useRef(0);
+  if (variante === 'coruja-a') return <AvatarCorujaA voz={voz} nivel={nivel ?? nivelInterno} parado={parado} className={className} />;
+  return <AvatarVetorial {...props} variante={variante} />;
+}
+
+function AvatarVetorial({ variante, voz = 'ocioso', nivel, parado = false, className }: AvatarLucaProps & { variante: Exclude<VarianteAvatar, 'coruja-a'> }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const vozRef = useRef(voz);
   vozRef.current = voz;

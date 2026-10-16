@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type CSSProperties } from 'react';
 import { useAppLocation } from '@/hooks/useAppLocation';
 import { useSessaoVoz } from '@/stand-voz/useSessaoVoz';
-import { VARIANTE_PADRAO, type VarianteAvatar } from '@/components/stand/AvatarLuca';
+import { VARIANTE_PADRAO, VARIANTES_AVATAR } from '@/components/stand/AvatarLuca';
 import { canalReal, type CanalStand } from '@/components/stand/canal';
 import { criarCanalStub } from '@/components/stand/canalStub';
 import { reduzirTela, telaInicial, type EntradaTela, type EstadoTela } from '@/components/stand/telaStand';
@@ -20,13 +20,12 @@ function alternarTelaCheia() {
   else void document.documentElement.requestFullscreen?.().catch(() => undefined);
 }
 
-const VARIANTES: readonly VarianteAvatar[] = ['coruja', 'operario', 'robo'];
 const reduzirAgora = (atual: EstadoTela, entrada: EntradaTela) => reduzirTela(atual, entrada, Date.now());
 
 export default function StandPage() {
   const { location, navigate } = useAppLocation();
   const margem = location.margem ? Number(location.margem) : MARGEM_PADRAO;
-  const variante = VARIANTES.find((v) => v === location.variante) ?? VARIANTE_PADRAO;
+  const variante = VARIANTES_AVATAR.find((v) => v === location.variante) ?? VARIANTE_PADRAO;
   const modoStub = location.stub === '1';
   const [grade, setGrade] = useState(false);
   const [estado, despachar] = useReducer(reduzirAgora, undefined, telaInicial);
