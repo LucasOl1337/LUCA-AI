@@ -9,7 +9,7 @@ import { carregarManifesto, promptVideos } from './roteador-video.js';
 export const RAIZ_REPO = fileURLToPath(new URL('../../', import.meta.url));
 
 export const DOCUMENTOS_PERMITIDOS = Object.freeze([
-  'README.md',
+  'docs/stand-publico.md',
   'INDEX.md',
   'GLOSSARY.md',
   'docs/sompo.md',
@@ -21,6 +21,9 @@ export const DOCUMENTOS_PERMITIDOS = Object.freeze([
   'docs/sonolencia.md',
   'src/lib/sompo-stories.ts',
 ]);
+
+/** Documento escrito para o público do stand ganha da documentação técnica no empate de termos. */
+const PESO_DOCUMENTO = Object.freeze({ 'docs/stand-publico.md': 1.4 });
 
 const PALAVRAS_VAZIAS = new Set(('a o os as um uma uns umas de do da dos das em no na nos nas para pra por com sem que '
   + 'como e é ao aos se ele ela eles elas isso esse essa este esta me te lhe qual quais quando onde ou mas mais muito '
@@ -81,6 +84,9 @@ export function carregarIndice({ raiz = RAIZ_REPO, documentos = DOCUMENTOS_PERMI
 
 let indicePadrao = null;
 
+/** No máximo este número de trechos por documento, para a resposta cruzar fontes. */
+const TRECHOS_POR_DOCUMENTO = 2;
+
 /** Pontua por IDF: termo raro no índice vale mais; termo no título da seção vale o dobro. */
 export function buscarNoRepo(consulta, { indice, limite = 5, maxChars = 600 } = {}) {
   const base = indice ?? (indicePadrao ??= carregarIndice());
@@ -90,15 +96,21 @@ export function buscarNoRepo(consulta, { indice, limite = 5, maxChars = 600 } = 
     const frequencia = base.filter((t) => t.radicais.has(r)).length;
     return [r, frequencia ? Math.log(1 + base.length / frequencia) : 0];
   }));
+  const porDocumento = new Map();
   return base
     .map((trecho) => ({
       trecho,
-      pontos: pedidos.reduce((soma, r) => soma
+      pontos: (PESO_DOCUMENTO[trecho.caminho] ?? 1) * pedidos.reduce((soma, r) => soma
         + (trecho.radicais.has(r) ? peso.get(r) : 0)
         + (trecho.radicaisTitulo.has(r) ? peso.get(r) : 0), 0),
     }))
     .filter((item) => item.pontos > 0)
     .sort((a, b) => b.pontos - a.pontos || a.trecho.texto.length - b.trecho.texto.length)
+    .filter(({ trecho }) => {
+      const vistos = porDocumento.get(trecho.caminho) ?? 0;
+      porDocumento.set(trecho.caminho, vistos + 1);
+      return vistos < TRECHOS_POR_DOCUMENTO;
+    })
     .slice(0, Math.max(1, Math.min(limite, 5)))
     .map(({ trecho }) => ({
       caminho: trecho.caminho,
@@ -156,6 +168,7 @@ export function montarPromptBase({ raiz = RAIZ_REPO, lerManifesto = () => carreg
     '- O que ainda é protótipo: pesos do score são acadêmicos, não oficiais da Sompo, e não houve homologação em campo.',
     ...(stories.length ? ['', 'Problemas que o LUCA resolve para a seguradora:', ...stories] : []),
     '',
+    'Dúvida de quem não conhece o projeto (o que é, como o sensor funciona, o que a Sompo ganha, o que é a bancada de agentes, o que ainda é protótipo): explique como para um leigo e, se faltar detalhe, chame buscar_no_repo; o documento docs/stand-publico.md foi escrito para isso. Se a busca não trouxer a resposta, diga que não sabe e sugira falar com a equipe do stand.',
     'Ferramentas: use buscar_no_repo quando precisar de um detalhe do sistema; use pesquisar_web para fatos de fora (mercado, seguro rural, notícias); use tocar_video quando houver um vídeo pronto para a pergunta, dizendo antes uma frase curta do que ele mostra; use as ações do site (abrir_aba, abrir_caso, rodar_cenario, gravar_episodio, analisar_na_bancada, voltar_inicio) para mostrar o próprio site na tela; se a ação falhar, fale a mensagem devolvida.',
     'Notas que começam com "Roteador:" vêm do sistema, não da pessoa: siga a decisão de vídeo delas sem mencioná-las.',
     ...(videos ? ['', videos] : []),

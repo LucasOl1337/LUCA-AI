@@ -12,7 +12,7 @@ test('pergunta do aceite traz o fluxo de docs/sompo.md', () => {
 });
 
 test('busca só enxerga a lista branca: código do servidor e deploy ficam fora', () => {
-  assert.ok(!DOCUMENTOS_PERMITIDOS.some((doc) => doc.startsWith('server/') || doc.startsWith('deploy/') || doc === 'docs/operacao.md'));
+  assert.ok(!DOCUMENTOS_PERMITIDOS.some((doc) => doc.startsWith('server/') || doc.startsWith('deploy/') || doc === 'docs/operacao.md' || doc === 'README.md'));
   const indice = carregarIndice();
   const caminhos = new Set(indice.map((t) => t.caminho));
   for (const caminho of caminhos) assert.ok(DOCUMENTOS_PERMITIDOS.includes(caminho), caminho);
@@ -21,13 +21,14 @@ test('busca só enxerga a lista branca: código do servidor e deploy ficam fora'
 test('documento ausente é ignorado e consulta vazia não devolve nada', () => {
   const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'stand-conhecimento-'));
   try {
-    fs.writeFileSync(path.join(raiz, 'README.md'), '# LUCA\n\nO trator manda telemetria.\n');
+    fs.writeFileSync(path.join(raiz, 'GLOSSARY.md'), '# LUCA\n\nO trator manda telemetria.\n');
+    fs.writeFileSync(path.join(raiz, 'README.md'), '# LUCA\n\nDeploy na VM de produção com telemetria.\n');
     fs.mkdirSync(path.join(raiz, 'server'));
     fs.writeFileSync(path.join(raiz, 'server/segredo.js'), 'const telemetria = "token interno";\n');
     const indice = carregarIndice({ raiz });
     assert.equal(indice.length, 1);
     const [achado] = buscarNoRepo('telemetria do trator', { indice });
-    assert.deepEqual(achado, { caminho: 'README.md', secao: 'LUCA', trecho: '# LUCA\nO trator manda telemetria.' });
+    assert.deepEqual(achado, { caminho: 'GLOSSARY.md', secao: 'LUCA', trecho: '# LUCA\nO trator manda telemetria.' });
     assert.deepEqual(buscarNoRepo('token interno', { indice }), []);
     assert.deepEqual(buscarNoRepo('o que é', { indice }), []);
   } finally {
@@ -60,4 +61,12 @@ test('prompt-base só anuncia vídeos com mp4 publicado', () => {
   } finally {
     fs.rmSync(raiz, { recursive: true, force: true });
   }
+});
+
+test('perguntas comuns do público caem primeiro no documento do stand', () => {
+  for (const pergunta of ['o que é o LUCA-AI?', 'como o sensor do trator funciona?', 'o que a Sompo ganha com isso?', 'o que é a bancada de agentes?', 'quanto custa?']) {
+    const [primeiro] = buscarNoRepo(pergunta);
+    assert.equal(primeiro?.caminho, 'docs/stand-publico.md', pergunta);
+  }
+  assert.match(buscarNoRepo('como o sensor do trator funciona?').map((r) => r.trecho).join(' '), /ESP32/);
 });
