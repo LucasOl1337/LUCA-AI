@@ -12,6 +12,8 @@
 #   STAND_DADOS=~/.local/state/luca-stand   LUCA_DATA_DIR isolado (contas e banco locais do stand)
 #   STAND_SEM_BUILD=1         reaproveita o dist/ atual
 #   XAI_API_KEY | XAI_OAUTH_AUTH_FILE   credencial da voz, só no env (padrão: ~/.grok/auth.json se existir)
+#   ROUTER_BASE_URL + ROUTER_API_KEY    9Router dos embeddings do roteador de vídeo
+#                             (padrão: STAND_ROTEADOR=hostinger pelo comando `rotas`, se existir)
 set -euo pipefail
 
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -59,6 +61,12 @@ subir() {
       export XAI_OAUTH_AUTH_FILE="$HOME/.grok/auth.json"
     fi
     [[ -z "${XAI_API_KEY:-}" && -z "${XAI_OAUTH_AUTH_FILE:-}" ]] && echo "aviso: sem XAI_API_KEY/XAI_OAUTH_AUTH_FILE, o stand abre mas fica sem voz" >&2
+    if [[ -z "${ROUTER_BASE_URL:-}" ]] && command -v rotas >/dev/null; then
+      local roteador="${STAND_ROTEADOR:-hostinger}"
+      ROUTER_BASE_URL="$(node -e 'const j=require(process.argv[1]);process.stdout.write(j.routers?.[process.argv[2]]?.base_url||"")' "$HOME/.config/rotas/routers.json" "$roteador" 2>/dev/null || true)"
+      [[ -n "$ROUTER_BASE_URL" ]] && export ROUTER_BASE_URL && export ROUTER_API_KEY="${ROUTER_API_KEY:-$(rotas chave "$roteador" 2>/dev/null || true)}"
+    fi
+    [[ -z "${ROUTER_BASE_URL:-}" ]] && echo "aviso: sem ROUTER_BASE_URL, o roteador de vídeo fica sem embeddings e a IA responde ao vivo" >&2
     HOST=127.0.0.1 PORT="$PORTA" LUCA_DATA_DIR="$DADOS" LUCA_SOMPO_OFFLINE="${LUCA_SOMPO_OFFLINE:-true}" \
       nohup node server/index.js >"$LOG" 2>&1 &
     echo $! >"$PIDFILE"

@@ -25,6 +25,7 @@ scripts/stand-tailnet.sh desligar   # tira o serve da 8444 e para o runtime
 | `STAND_DADOS` | `~/.local/state/luca-stand` | `LUCA_DATA_DIR` do stand: contas, banco, `runtime.log` e `runtime.pid`. |
 | `STAND_SEM_BUILD` | vazio | `1` reaproveita o `dist/` atual. |
 | `XAI_API_KEY` ou `XAI_OAUTH_AUTH_FILE` | `~/.grok/auth.json`, se existir | Credencial da voz (xAI). Fica só no ambiente do processo. Sem ela o stand abre, mas fica sem voz. |
+| `ROUTER_BASE_URL` e `ROUTER_API_KEY` | 9Router `STAND_ROTEADOR` (padrão `hostinger`) lido pelo comando `rotas` | Embeddings do roteador de vídeo. Sem eles a IA ainda conversa, mas não escolhe Vídeo do stand pela pergunta. |
 
 No PC `lol`, as portas HTTPS 443, 8096 e 8443 do `tailscale serve` já são de outros serviços. O script recusa uma porta que já aponta para outro destino e, no `desligar`, só mexe na porta dele.
 
