@@ -31,7 +31,7 @@ O quiosque em volta do trator, com o monitor, o microfone e a página `/stand` e
 _Evitar_: Operador (para a equipe do stand), totem.
 
 **Avatar LUCA**:
-O personagem que fala pela IA do stand: SVG 2D com a boca seguindo o nível do áudio (`src/components/stand/AvatarLuca.tsx`). Na tela aparece só como "LUCA". Variações por `?variante=`: `coruja` (padrão), `operario` e `robo`.
+O personagem que fala pela IA do stand (`src/components/stand/AvatarLuca.tsx`). O padrão é a `coruja-a`: a arte aprovada da coruja tech branca e azul com headset, animada em camadas SVG (piscar, olhar, respiração, visor), e a voz aparece no halo e nas luzes do headset, sem boca. Na tela aparece só como "LUCA". Variações vetoriais antigas por `?variante=`: `coruja`, `operario` e `robo`.
 _Evitar_: Mascote, bot, Sompo (a Sompo só aparece como texto).
 
 **Atração / Conversa / Vídeo**:
