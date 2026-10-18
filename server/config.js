@@ -16,8 +16,8 @@ export const PACKAGE_VERSION = readProjectVersion();
 export const HOST = process.env.HOST ?? '127.0.0.1';
 export const PORT = Number(process.env.PORT ?? 4242);
 export const ROUTER_API_KEY = process.env.ROUTER_API_KEY ?? process.env.NINE_ROUTER_API_KEY ?? '';
-// Producao/Maestro na sennin: 20129. 20128 e nginx e devolve 403.
-export const ROUTER_BASE_URL = process.env.ROUTER_BASE_URL ?? 'http://127.0.0.1:20129/v1';
+// O transporte de produto usa exclusivamente a conta Railway.
+export const ROUTER_BASE_URL = 'https://9router-production-056a.up.railway.app/v1';
 export const ROUTER_TIMEOUT_MS = Number(process.env.ROUTER_TIMEOUT_MS ?? 120000);
 export const REQUIRE_CLOUDFLARE_ACCESS = process.env.REQUIRE_CLOUDFLARE_ACCESS === 'true';
 export const CLOUDFLARE_ACCESS_EMAILS = Object.freeze(
@@ -36,7 +36,9 @@ export const API_RATE_LIMIT_WINDOW_MS = Number(process.env.API_RATE_LIMIT_WINDOW
 // Catalogo fechado do 9Router. O nivel de esforco faz parte da propria rota
 // (sufixo "(effort)" no ID); o LUCA nao cria variants nem envia controles de
 // raciocinio ao provider.
+export const PRODUCT_TEXT_MODEL = 'cx/gpt-6-astra-high';
 const NINE_ROUTER_PROFILE_DEFINITIONS = [
+  ['gpt-6-astra-high', 'GPT 6 Astra High · Railway', PRODUCT_TEXT_MODEL],
   ['claude-fable-5-medium', 'Claude Fable 5 Medium', 'cc/claude-fable-5(medium)'],
   ['claude-fable-5-high', 'Claude Fable 5 High', 'cc/claude-fable-5(high)'],
   ['claude-fable-5-max', 'Claude Fable 5 Max', 'cc/claude-fable-5(max)'],
@@ -88,8 +90,8 @@ export const NINE_ROUTER_ROUTE_IDS = Object.freeze([
 ]);
 
 const NINE_ROUTER_ROUTE_ID_SET = new Set(NINE_ROUTER_ROUTE_IDS);
-const DEFAULT_ROUTER_MODEL = 'cx/gpt-5.6-sol(high)';
-const DEFAULT_SPECIALIST_MODEL = 'cx/gpt-5.6-sol(max)';
+const DEFAULT_ROUTER_MODEL = PRODUCT_TEXT_MODEL;
+const DEFAULT_SPECIALIST_MODEL = PRODUCT_TEXT_MODEL;
 
 export function isAllowed9RouterModel(value) {
   return NINE_ROUTER_ROUTE_ID_SET.has(String(value || '').trim());

@@ -68,7 +68,7 @@ test('call9Router envia somente a rota pronta, sem controles de esforco', async 
       maxTokens: 16,
     });
     assert.equal(output, 'OK');
-    assert.equal(requestBody.model, 'cx/gpt-5.6-sol(max)');
+    assert.equal(requestBody.model, 'cx/gpt-6-astra-high');
     assert.equal(requestBody.stream, true);
     assert.equal(
       Object.keys(requestBody).some((key) => /reason|thinking|effort/i.test(key)),

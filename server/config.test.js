@@ -20,6 +20,7 @@ import {
 } from './config.js';
 
 const EXPECTED_ROUTE_IDS = [
+  'cx/gpt-6-astra-high',
   'cc/claude-fable-5(medium)',
   'cc/claude-fable-5(high)',
   'cc/claude-fable-5(max)',
@@ -45,10 +46,11 @@ const EXPECTED_ROUTE_IDS = [
   'gcli/grok-4.5(high)',
 ];
 
-test('catalogo 9Router expoe 25 perfis visuais e 23 rotas permitidas', () => {
-  assert.equal(NINE_ROUTER_MODEL_PROFILES.length, 25);
+test('catalogo 9Router inclui Astra High e preserva aliases legados', () => {
+  assert.equal(NINE_ROUTER_MODEL_PROFILES.length, 26);
   assert.deepEqual(NINE_ROUTER_ROUTE_IDS, EXPECTED_ROUTE_IDS);
-  assert.equal(new Set(NINE_ROUTER_MODEL_PROFILES.map((profile) => profile.id)).size, 25);
+  assert.equal(new Set(NINE_ROUTER_MODEL_PROFILES.map((profile) => profile.id)).size, 26);
+
 });
 
 test('perfis Ultra sao aliases visuais das rotas (max)', () => {
@@ -67,8 +69,9 @@ test('configuracao 9Router declara capacidades maximas sem controles de esforco'
   assert.equal(Object.keys(NINE_ROUTER_CAPABILITIES).some((key) => /reason|thinking|effort/i.test(key)), false);
 });
 
-test('defaults usam a base local e uma rota da whitelist', () => {
-  assert.equal(ROUTER_BASE_URL, 'http://127.0.0.1:20129/v1');
+test('defaults usam Railway e Astra High', () => {
+  assert.equal(ROUTER_BASE_URL, 'https://9router-production-056a.up.railway.app/v1');
+  assert.equal(ROUTER_MODEL, 'cx/gpt-6-astra-high');
   assert.equal(isAllowed9RouterModel(ROUTER_MODEL), true);
 });
 

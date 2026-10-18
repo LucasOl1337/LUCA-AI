@@ -8,6 +8,7 @@ import {
   assertAllowed9RouterModel,
   assertAllowedImageGenerationModel,
   imageSizeForAspectRatio,
+  PRODUCT_TEXT_MODEL,
 } from './config.js';
 
 function extractChoiceContent(data) {
@@ -318,7 +319,8 @@ export async function call9RouterChat({
   timeoutMs = ROUTER_TIMEOUT_MS,
   stream = true,
 } = {}) {
-  const route = assertAllowed9RouterModel(model);
+  assertAllowed9RouterModel(model);
+  const route = PRODUCT_TEXT_MODEL;
   const headers = {
     'Content-Type': 'application/json',
   };
