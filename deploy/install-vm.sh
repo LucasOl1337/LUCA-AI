@@ -39,14 +39,13 @@ find /var/lib/luca-ai -type f -exec chmod 600 {} +
 # Preserve credentials and unrelated operational settings from this service.
 test -f /etc/sennin/luca-ai.env
 cp -a /etc/sennin/luca-ai.env "$backup/luca-ai.env"
-set -a
-source /etc/sennin/luca-ai.env
-set +a
-test -n "${ROUTER_API_KEY:-}"
-test -n "${KAMUI_INTERNAL_API_TOKEN:-}"
 python3 - <<'PY'
 from pathlib import Path
 p = Path('/etc/sennin/luca-ai.env')
+existing = dict(line.split('=', 1) for line in p.read_text().splitlines() if '=' in line and not line.startswith('#'))
+for key in ('ROUTER_API_KEY', 'KAMUI_INTERNAL_API_TOKEN'):
+    if not existing.get(key, '').strip().strip('\"\''):
+        raise SystemExit(f'required service setting missing: {key}')
 values = {
     'ROUTER_BASE_URL': 'https://9router-production-056a.up.railway.app/v1',
     'ROUTER_MODEL': 'cx/gpt-6-astra-high',
