@@ -19,44 +19,11 @@ import {
   VISUAL_PERSONA_SLUG,
 } from './config.js';
 
-const EXPECTED_ROUTE_IDS = [
-  'cx/gpt-6-astra-high',
-  'cc/claude-fable-5(medium)',
-  'cc/claude-fable-5(high)',
-  'cc/claude-fable-5(max)',
-  'cc/claude-opus-5(medium)',
-  'cc/claude-opus-5(high)',
-  'cc/claude-opus-5(max)',
-  'cx/gpt-5.6-sol(medium)',
-  'cx/gpt-5.6-sol(high)',
-  'cx/gpt-5.6-sol(max)',
-  'cx/gpt-5.6-luna(medium)',
-  'cx/gpt-5.6-luna(xhigh)',
-  'cx/gpt-5.6-luna(max)',
-  'cx/gpt-6-luna(medium)',
-  'cx/gpt-6-sol(medium)',
-  'cx/gpt-6-sol(high)',
-  'cx/gpt-6-sol(xhigh)',
-  'cx/gpt-6-astra(medium)',
-  'cx/gpt-6-astra(high)',
-  'cx/gpt-6-astra(xhigh)',
-  'gcli/grok-4.6',
-  'gcli/grok-4.6(high)',
-  'gcli/grok-4.7',
-  'gcli/grok-4.5(high)',
-];
+const EXPECTED_ROUTE_IDS = ['cx/gpt-6-astra-high'];
 
-test('catalogo 9Router inclui Astra High e preserva aliases legados', () => {
-  assert.equal(NINE_ROUTER_MODEL_PROFILES.length, 26);
+test('catalogo textual expoe somente Astra High Railway', () => {
+  assert.equal(NINE_ROUTER_MODEL_PROFILES.length, 1);
   assert.deepEqual(NINE_ROUTER_ROUTE_IDS, EXPECTED_ROUTE_IDS);
-  assert.equal(new Set(NINE_ROUTER_MODEL_PROFILES.map((profile) => profile.id)).size, 26);
-
-});
-
-test('perfis Ultra sao aliases visuais das rotas (max)', () => {
-  const profiles = new Map(NINE_ROUTER_MODEL_PROFILES.map((profile) => [profile.name, profile.model]));
-  assert.equal(profiles.get('GPT 5.6 Sol Ultra'), profiles.get('GPT 5.6 Sol Max'));
-  assert.equal(profiles.get('GPT 5.6 Luna Ultra'), profiles.get('GPT 5.6 Luna Max'));
 });
 
 test('configuracao 9Router declara capacidades maximas sem controles de esforco', () => {
@@ -85,7 +52,7 @@ test('timeout do 9Router tolera juiz lento sem cortar o veredito', () => {
 test('sanitizacao e fronteira do cliente bloqueiam rotas externas', () => {
   assert.equal(sanitize9RouterModel('cx/gpt-5.4-mini-xhigh'), ROUTER_MODEL);
   assert.equal(sanitize9RouterModel('cx/gpt-5.6-sol-xhigh'), ROUTER_MODEL);
-  assert.equal(assertAllowed9RouterModel('gcli/grok-4.6(high)'), 'gcli/grok-4.6(high)');
+  assert.equal(assertAllowed9RouterModel('cx/gpt-6-astra-high'), 'cx/gpt-6-astra-high');
   assert.throws(
     () => assertAllowed9RouterModel('kimi/k3'),
     /9router_model_not_allowed/,

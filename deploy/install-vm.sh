@@ -36,29 +36,28 @@ chown -R luca-ai:luca-ai /var/lib/luca-ai
 chmod 700 /var/lib/luca-ai
 find /var/lib/luca-ai -type f -exec chmod 600 {} +
 
+# Preserve credentials and unrelated operational settings from this service.
+test -f /etc/sennin/luca-ai.env
+cp -a /etc/sennin/luca-ai.env "$backup/luca-ai.env"
 set -a
-# Chaves reutilizadas somente dentro da VM e nunca impressas nem copiadas ao repositório.
-source /etc/sennin/yume.env
-# Token interno do Kamui: sem ele o proxy não injeta YUME_INTERNAL_API_TOKEN no tether.
-if [[ -f /etc/sennin/kamui.env ]]; then
-  # shellcheck disable=SC1091
-  source /etc/sennin/kamui.env
-fi
+source /etc/sennin/luca-ai.env
 set +a
-test -n "${YUME_9ROUTER_API_KEY:-}"
+test -n "${ROUTER_API_KEY:-}"
 test -n "${KAMUI_INTERNAL_API_TOKEN:-}"
-install -d -o root -g root -m 750 /etc/sennin
-env_tmp="$(mktemp /etc/sennin/luca-ai.env.XXXXXX)"
-chmod 600 "$env_tmp"
-printf '%s\n' \
-  'ROUTER_BASE_URL=http://127.0.0.1:20129/v1' \
-  'ROUTER_MODEL=cx/gpt-5.6-sol(high)' \
-  'IMAGE_GENERATION_MODEL=cx/gpt-image-2' \
-  'KAMUI_BASE=http://127.0.0.1:1338' \
-  'LUCA_ADMIN_EMAILS=lucasplays2000@gmail.com' \
-  "ROUTER_API_KEY=$YUME_9ROUTER_API_KEY" \
-  "KAMUI_INTERNAL_API_TOKEN=$KAMUI_INTERNAL_API_TOKEN" > "$env_tmp"
-mv "$env_tmp" /etc/sennin/luca-ai.env
+python3 - <<'PY'
+from pathlib import Path
+p = Path('/etc/sennin/luca-ai.env')
+values = {
+    'ROUTER_BASE_URL': 'https://9router-production-056a.up.railway.app/v1',
+    'ROUTER_MODEL': 'cx/gpt-6-astra-high',
+    'MISSION_TRANSFORMER_MODEL': 'cx/gpt-6-astra-high',
+    'DESIGNER_MODEL': 'cx/gpt-6-astra-high',
+    'MAESTRO_MODEL': 'cx/gpt-6-astra-high',
+}
+lines = [line for line in p.read_text().splitlines() if line.split('=', 1)[0] not in values]
+p.write_text('\n'.join(lines + [f'{k}={v}' for k, v in values.items()]) + '\n')
+p.chmod(0o600)
+PY
 
 ln -s "$release" "$release_root/current.next"
 mv -Tf "$release_root/current.next" "$release_root/current"

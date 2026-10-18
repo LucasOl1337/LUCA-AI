@@ -39,31 +39,6 @@ export const API_RATE_LIMIT_WINDOW_MS = Number(process.env.API_RATE_LIMIT_WINDOW
 export const PRODUCT_TEXT_MODEL = 'cx/gpt-6-astra-high';
 const NINE_ROUTER_PROFILE_DEFINITIONS = [
   ['gpt-6-astra-high', 'GPT 6 Astra High · Railway', PRODUCT_TEXT_MODEL],
-  ['claude-fable-5-medium', 'Claude Fable 5 Medium', 'cc/claude-fable-5(medium)'],
-  ['claude-fable-5-high', 'Claude Fable 5 High', 'cc/claude-fable-5(high)'],
-  ['claude-fable-5-max', 'Claude Fable 5 Max', 'cc/claude-fable-5(max)'],
-  ['claude-opus-5-medium', 'Claude Opus 5 Medium', 'cc/claude-opus-5(medium)'],
-  ['claude-opus-5-high', 'Claude Opus 5 High', 'cc/claude-opus-5(high)'],
-  ['claude-opus-5-max', 'Claude Opus 5 Max', 'cc/claude-opus-5(max)'],
-  ['gpt-5-6-sol-medium', 'GPT 5.6 Sol Medium', 'cx/gpt-5.6-sol(medium)'],
-  ['gpt-5-6-sol-high', 'GPT 5.6 Sol High', 'cx/gpt-5.6-sol(high)'],
-  ['gpt-5-6-sol-max', 'GPT 5.6 Sol Max', 'cx/gpt-5.6-sol(max)'],
-  ['gpt-5-6-sol-ultra', 'GPT 5.6 Sol Ultra', 'cx/gpt-5.6-sol(max)'],
-  ['gpt-5-6-luna-medium', 'GPT 5.6 Luna Medium', 'cx/gpt-5.6-luna(medium)'],
-  ['gpt-5-6-luna-xhigh', 'GPT 5.6 Luna xhigh', 'cx/gpt-5.6-luna(xhigh)'],
-  ['gpt-5-6-luna-max', 'GPT 5.6 Luna Max', 'cx/gpt-5.6-luna(max)'],
-  ['gpt-5-6-luna-ultra', 'GPT 5.6 Luna Ultra', 'cx/gpt-5.6-luna(max)'],
-  ['gpt-6-luna-medium', 'GPT 6 Luna Medium', 'cx/gpt-6-luna(medium)'],
-  ['gpt-6-sol-medium', 'GPT 6 Sol Medium', 'cx/gpt-6-sol(medium)'],
-  ['gpt-6-sol-high', 'GPT 6 Sol High', 'cx/gpt-6-sol(high)'],
-  ['gpt-6-sol-xhigh', 'GPT 6 Sol xhigh', 'cx/gpt-6-sol(xhigh)'],
-  ['gpt-6-astra-medium', 'GPT 6 Astra Medium', 'cx/gpt-6-astra(medium)'],
-  ['gpt-6-astra-high', 'GPT 6 Astra High', 'cx/gpt-6-astra(high)'],
-  ['gpt-6-astra-xhigh', 'GPT 6 Astra xhigh', 'cx/gpt-6-astra(xhigh)'],
-  ['grok-4-6', 'Grok 4.6', 'gcli/grok-4.6'],
-  ['grok-4-6-high', 'Grok 4.6 High', 'gcli/grok-4.6(high)'],
-  ['grok-4-7', 'Grok 4.7', 'gcli/grok-4.7'],
-  ['grok-4-5-high', 'Grok 4.5 High', 'gcli/grok-4.5(high)'],
 ];
 
 export const NINE_ROUTER_CAPABILITIES = Object.freeze({
@@ -90,25 +65,26 @@ export const NINE_ROUTER_ROUTE_IDS = Object.freeze([
 ]);
 
 const NINE_ROUTER_ROUTE_ID_SET = new Set(NINE_ROUTER_ROUTE_IDS);
+const LEGACY_TEXT_ROUTE = /^(?:cx\/gpt-(?:5\.6|6)-(?:sol|luna|astra)\((?:medium|high|xhigh|max)\)|cc\/claude-(?:fable|opus)-5\((?:medium|high|max)\)|gcli\/grok-4\.[567](?:\(high\))?)$/;
 const DEFAULT_ROUTER_MODEL = PRODUCT_TEXT_MODEL;
 const DEFAULT_SPECIALIST_MODEL = PRODUCT_TEXT_MODEL;
 
 export function isAllowed9RouterModel(value) {
-  return NINE_ROUTER_ROUTE_ID_SET.has(String(value || '').trim());
+  return NINE_ROUTER_ROUTE_ID_SET.has(String(value || '').trim()) || LEGACY_TEXT_ROUTE.test(String(value || '').trim());
 }
 
 export function sanitize9RouterModel(value, fallback = DEFAULT_ROUTER_MODEL) {
-  const model = String(value || '').trim();
-  const safeFallback = isAllowed9RouterModel(fallback) ? String(fallback).trim() : DEFAULT_ROUTER_MODEL;
-  return isAllowed9RouterModel(model) ? model : safeFallback;
+  void value;
+  void fallback;
+  return PRODUCT_TEXT_MODEL;
 }
 
 export function assertAllowed9RouterModel(value) {
   const model = String(value || '').trim();
-  if (!isAllowed9RouterModel(model)) {
+  if (!isAllowed9RouterModel(model) && !LEGACY_TEXT_ROUTE.test(model)) {
     throw new Error(`9router_model_not_allowed: ${model || '(vazio)'}`);
   }
-  return model;
+  return PRODUCT_TEXT_MODEL;
 }
 
 export const ROUTER_MODEL = sanitize9RouterModel(process.env.ROUTER_MODEL, DEFAULT_ROUTER_MODEL);
@@ -263,8 +239,6 @@ export function resolvePersonaRuntimeModel({
   overrideModel = '',
   fallback = ROUTER_MODEL,
 } = {}) {
-  if (isAllowed9RouterModel(overrideModel)) return String(overrideModel).trim();
-  if (isAllowed9RouterModel(localModel)) return String(localModel).trim();
-  if (isAllowed9RouterModel(yumeModel)) return String(yumeModel).trim();
-  return sanitize9RouterModel(fallback, ROUTER_MODEL);
+  void localModel; void yumeModel; void overrideModel; void fallback;
+  return PRODUCT_TEXT_MODEL;
 }

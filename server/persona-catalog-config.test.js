@@ -73,7 +73,7 @@ test('override do admin entra no card normalizado sem tocar no valor original do
   assert.equal(persona.visible, false);
   assert.equal(persona.customized, true);
   assert.equal(persona.hasPromptOverride, true);
-  assert.equal(persona.model, 'cx/gpt-5.6-sol(high)');
+  assert.equal(persona.model, 'cx/gpt-6-astra-high');
   assert.equal(persona.adminModel, 'cx/gpt-5.6-sol(high)');
   assert.equal(persona.modelOverridden, true);
 
@@ -111,12 +111,12 @@ test('Persona Source aplica prompt, nome e modelo do admin na resolucao', async 
   assert.equal(loaded.name, 'Juiz Severo');
   assert.equal(loaded.systemPrompt, 'PROMPT DO ADMIN');
   assert.equal(loaded.promptOverridden, true);
-  assert.equal(loaded.model, 'cx/gpt-5.6-sol(high)');
+  assert.equal(loaded.model, 'cx/gpt-6-astra-high');
   assert.equal(loaded.adminModel, 'cx/gpt-5.6-sol(high)');
   // O cache continua guardando o prompt autoritativo do Yume, nao o override.
   assert.equal(records.find((r) => r.slug === 'juiz').cachedSystemPrompt, 'PROMPT DO YUME');
 
   // Escolha explicita da rodada ainda vence o admin.
   const forced = await source.resolve('juiz', { modelOverride: 'cx/gpt-5.6-sol(max)' });
-  assert.equal(forced.model, 'cx/gpt-5.6-sol(max)');
+  assert.equal(forced.model, 'cx/gpt-6-astra-high');
 });

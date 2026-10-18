@@ -87,8 +87,8 @@ test('modelos do template são sanitizados e formato legado continua válido', a
       },
     });
     assert.deepEqual(created.models, {
-      aurora: 'gcli/grok-4.5(high)',
-      'supervisor-agentes-ia': 'cx/gpt-5.6-sol(max)',
+      aurora: 'cx/gpt-6-astra-high',
+      'supervisor-agentes-ia': 'cx/gpt-6-astra-high',
       'especialista-visual': 'cc/claude-fable-5(high)',
     });
 
@@ -105,7 +105,7 @@ test('modelos do template são sanitizados e formato legado continua válido', a
     assert.deepEqual(reloadedLegacy?.participants, ['medico']);
     assert.deepEqual(
       reloadedLegacy?.models,
-      { 'especialista-visual': 'cc/claude-fable-5(high)' },
+      { 'especialista-visual': 'cx/gpt-6-astra-high' },
       'template salvo sem models recebe apenas o default visual',
     );
 
@@ -138,7 +138,7 @@ test('templates sempre incluem o especialista visual com a rota visual default',
     assert.equal(team.models['especialista-visual'], 'cc/claude-fable-5(high)');
 
     const individual = templates.getTeamTemplatesSnapshot().individual[0];
-    assert.equal(individual.models['especialista-visual'], 'cc/claude-fable-5(high)');
+    assert.equal(individual.models['especialista-visual'], 'cx/gpt-6-astra-high');
   }, 'admin');
 });
 
@@ -171,8 +171,8 @@ test('store legado migra o modelo visual de todos os templates para a rota defau
 
   workspace.runWithWorkspaceUser(userId, () => {
     const snapshot = templates.getTeamTemplatesSnapshot();
-    assert.equal(snapshot.team[0].models['especialista-visual'], 'cc/claude-fable-5(high)');
-    assert.equal(snapshot.individual[0].models['especialista-visual'], 'cc/claude-fable-5(high)');
+    assert.equal(snapshot.team[0].models['especialista-visual'], 'cx/gpt-6-astra-high');
+    assert.equal(snapshot.individual[0].models['especialista-visual'], 'cx/gpt-6-astra-high');
   });
 
   const persisted = JSON.parse(fs.readFileSync(storePath, 'utf8'));

@@ -150,12 +150,12 @@ test('Persona Source concentra cache de prompt e precedencia de modelo', async (
   const first = await source.loadMany(['aurora'], {
     modelOverrides: { aurora: 'cc/claude-fable-5(max)' },
   });
-  assert.equal(first.entries[0].loaded.model, 'cc/claude-fable-5(max)');
+  assert.equal(first.entries[0].loaded.model, 'cx/gpt-6-astra-high');
   assert.equal(first.entries[0].loaded.systemPrompt, 'PROMPT YUME');
   assert.equal(first.entries[0].loaded.cached, false);
 
   const second = await source.resolve('aurora');
-  assert.equal(second.model, 'cx/gpt-5.6-sol(high)');
+  assert.equal(second.model, 'cx/gpt-6-astra-high');
   assert.equal(second.cached, true);
   assert.deepEqual(calls.prompt, ['aurora']);
 });

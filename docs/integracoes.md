@@ -4,7 +4,7 @@ Leia SOMENTE ao mudar roteador LLM, Kamui, personas Yume, anexos ou a publicacao
 
 ## 9Router
 
-`server/router-client.js` fala API OpenAI-compatible. Padrao em `server/config.js`: `http://127.0.0.1:20129/v1`. `20128` e nginx e devolve 403 — nao use. Override: `ROUTER_BASE_URL`. Credencial: `ROUTER_API_KEY` ou `NINE_ROUTER_API_KEY`.
+`server/router-client.js` usa exclusivamente `https://9router-production-056a.up.railway.app/v1` e Astra High para texto/visão. O catálogo público expõe somente essa rota; escolhas legadas são lidas sem regravar o Yume e normalizadas na chamada. Credencial Railway: `ROUTER_API_KEY` ou `NINE_ROUTER_API_KEY`. O instalador preserva as demais variáveis do serviço. Imagem mantém catálogo próprio.
 
 O catalogo fechado vive em `server/config.js`. Rota fora da lista nunca vai ao provider. O nivel de esforco vai embutido no ID da rota (`(medium)`, `(high)`, `(xhigh)`, `(max)`); Ultra e alias da rota `(max)` e o cliente nao envia campos de esforco.
 

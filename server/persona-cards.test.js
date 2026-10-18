@@ -28,7 +28,7 @@ test('normaliza personas do Yume com flag de importacao e avatar proxy local', (
 
   assert.equal(personas.length, 1);
   assert.equal(personas[0].imported, true);
-  assert.equal(personas[0].model, 'cx/gpt-5.6-sol(high)');
+  assert.equal(personas[0].model, ROUTER_MODEL);
   assert.equal(personas[0].yumeModel, 'glm-5.1');
   assert.equal(personas[0].localModel, 'cx/gpt-5.6-sol(high)');
   assert.equal(personas[0].modelOverridden, true);
@@ -48,7 +48,7 @@ test('secundária cacheada aparece como imported no catálogo normalizado', () =
   assert.equal(personas[0].imported, true);
   assert.equal(personas[1].imported, true);
   assert.equal(personas[1].is_official, false);
-  assert.equal(personas[1].model, 'cc/claude-fable-5(max)');
+  assert.equal(personas[1].model, ROUTER_MODEL);
 });
 
 test('expoe modelo Yume valido no 9Router mesmo sem import, e marca motor efetivo', () => {
@@ -60,7 +60,7 @@ test('expoe modelo Yume valido no 9Router mesmo sem import, e marca motor efetiv
 
   assert.equal(personas[0].imported, false);
   assert.equal(personas[0].yumeModel, 'gcli/grok-4.6');
-  assert.equal(personas[0].model, 'gcli/grok-4.6');
+  assert.equal(personas[0].model, ROUTER_MODEL);
   assert.equal(personas[0].modelOverridden, false);
 
   assert.equal(personas[1].imported, false);
@@ -68,7 +68,7 @@ test('expoe modelo Yume valido no 9Router mesmo sem import, e marca motor efetiv
   // rota fora do catalogo 9Router cai no default do LUCA
   assert.equal(personas[1].model, ROUTER_MODEL);
 
-  assert.equal(personas[2].model, 'gcli/grok-4.5(high)');
+  assert.equal(personas[2].model, ROUTER_MODEL);
   assert.equal(personas[2].modelOverridden, false);
 });
 
@@ -80,7 +80,7 @@ test('import sem override local preserva motor do Yume no seletor', () => {
   assert.equal(personas[0].imported, true);
   assert.equal(personas[0].localModel, '');
   assert.equal(personas[0].yumeModel, 'gcli/grok-4.5(high)');
-  assert.equal(personas[0].model, 'gcli/grok-4.5(high)');
+  assert.equal(personas[0].model, ROUTER_MODEL);
   assert.equal(personas[0].modelOverridden, false);
 });
 
@@ -91,27 +91,27 @@ test('resolvePersonaRuntimeModel prioriza override > local > yume > fallback', (
       yumeModel: 'gcli/grok-4.6',
       overrideModel: 'cc/claude-fable-5(max)',
     }),
-    'cc/claude-fable-5(max)',
+    ROUTER_MODEL,
   );
   assert.equal(
     resolvePersonaRuntimeModel({
       localModel: 'cx/gpt-5.6-sol(high)',
       yumeModel: 'gcli/grok-4.6',
     }),
-    'cx/gpt-5.6-sol(high)',
+    ROUTER_MODEL,
   );
   assert.equal(
     resolvePersonaRuntimeModel({
       yumeModel: 'gcli/grok-4.6',
     }),
-    'gcli/grok-4.6',
+    ROUTER_MODEL,
   );
   assert.equal(
     resolvePersonaRuntimeModel({
       localModel: '',
       yumeModel: 'gcli/grok-4.5(high)',
     }),
-    'gcli/grok-4.5(high)',
+    ROUTER_MODEL,
   );
   assert.equal(resolvePersonaRuntimeModel({ yumeModel: 'glm-5.2' }), ROUTER_MODEL);
 });
@@ -125,7 +125,7 @@ test('especialista visual usa a rota visual default e respeita override explíci
       is_official: true,
     },
   ]);
-  assert.equal(defaultVisual.model, 'cc/claude-fable-5(high)');
+  assert.equal(defaultVisual.model, ROUTER_MODEL);
   assert.equal(defaultVisual.localModel, '');
 
   const [overriddenVisual] = normalizeYumePersonasForLuca(
@@ -137,7 +137,7 @@ test('especialista visual usa a rota visual default e respeita override explíci
     }],
     [{ slug: 'especialista-visual', model: 'gcli/grok-4.6(high)' }],
   );
-  assert.equal(overriddenVisual.model, 'gcli/grok-4.6(high)');
+  assert.equal(overriddenVisual.model, ROUTER_MODEL);
   assert.equal(overriddenVisual.localModel, 'gcli/grok-4.6(high)');
 });
 

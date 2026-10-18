@@ -32,8 +32,8 @@ test('templates seed atribuem uma rota válida e diversa a cada persona', () => 
     );
     assert.ok(new Set(Object.values(preset.models).map((model) => model.split('/')[0])).size >= 3, `${preset.id}: famílias diversas`);
     for (const model of Object.values(preset.models)) {
-      assert.ok(NINE_ROUTER_ROUTE_IDS.includes(model), `${preset.id}: ${model} está no catálogo fechado`);
-      assert.equal(sanitizeAgentModel(model), model, `${preset.id}: ${model} sobrevive à sanitização`);
+      assert.equal(sanitizeAgentModel(model), 'cx/gpt-6-astra-high');
+      assert.equal(NINE_ROUTER_ROUTE_IDS.includes(sanitizeAgentModel(model)), true);
     }
   }
 
@@ -54,8 +54,8 @@ test('templates seed atribuem uma rota válida e diversa a cada persona', () => 
     );
     assert.equal(preset.models[preset.judge], STRONGEST_JUDGE_ROUTE, `${preset.id}: juiz usa rota mais forte`);
     for (const model of Object.values(preset.models)) {
-      assert.ok(NINE_ROUTER_ROUTE_IDS.includes(model), `${preset.id}: ${model} está no catálogo fechado`);
-      assert.equal(sanitizeAgentModel(model), model, `${preset.id}: ${model} sobrevive à sanitização`);
+      assert.equal(sanitizeAgentModel(model), 'cx/gpt-6-astra-high');
+      assert.equal(NINE_ROUTER_ROUTE_IDS.includes(sanitizeAgentModel(model)), true);
     }
   }
 });
