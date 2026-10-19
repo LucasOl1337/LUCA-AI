@@ -214,6 +214,21 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     if (qualidade.degrau !== anterior) aplicarDegrau();
   });
   if (adaptiveQuality) aplicarDegrau();
+  // Sonda da bancada (só com `window.__sondaPalco = true` antes de montar, e qualidade automática): fixa pixel ratio, pós e sombras para medir o que pesa.
+  if (adaptiveQuality && typeof window !== 'undefined' && (window as unknown as { __sondaPalco?: boolean }).__sondaPalco === true) {
+    (window as unknown as { __palcoSonda?: unknown }).__palcoSonda = {
+      fixar({ pixelRatio, pos, sombras }: { pixelRatio?: number; pos?: boolean; sombras?: boolean }) {
+        qualidade = { ...qualidade, travado: true };
+        if (pixelRatio !== undefined) { renderer.setPixelRatio(pixelRatio); post.setPixelRatio(pixelRatio); }
+        if (pos !== undefined) post.setEnabled(pos);
+        if (sombras !== undefined && renderer.shadowMap.enabled !== sombras) {
+          renderer.shadowMap.enabled = sombras;
+          scene.traverse((node) => { const mesh = node as THREE.Mesh; if (mesh.isMesh) for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) m.needsUpdate = true; });
+        }
+        return { pixelRatio: renderer.getPixelRatio(), sombras: renderer.shadowMap.enabled };
+      },
+    };
+  }
   const assets = createSompoEnvironmentAssets(scene, renderer, { background: false, intensity: night ? 0.30 : 0.68, initialWet: scenario.environmentId === 'muddy-field', onHdri: (kind, tex) => atmosphere.setSkyTexture(kind, tex) });
   assets.surface(field.terrain.material, 'dirt', 45, 30);
   // Talhão da operação é visto de cima e ocupa o campo todo: sem colcha vizinha.

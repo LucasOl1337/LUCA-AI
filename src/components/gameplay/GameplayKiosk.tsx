@@ -132,7 +132,10 @@ export default function GameplayKiosk({ criarCabine }: { criarCabine?: CriarCabi
       startedAtRef: inicio,
       onModelStatus: (status) => { mount.dataset.modelo = status; },
       onWebglError: () => setFalhaWebgl(true),
-      onStats: (stats: SompoRenderStats) => { mount.dataset.fps = String(stats.fps); mount.dataset.calls = String(stats.calls); },
+      onStats: (stats: SompoRenderStats) => {
+        mount.dataset.fps = String(stats.fps); mount.dataset.calls = String(stats.calls);
+        mount.dataset.cpuMs = stats.cpuMs.toFixed(1); mount.dataset.triangulos = String(stats.triangles);
+      },
       cameraRig: rig,
       adaptiveQuality: true,
       obstaclesRef: obstaculosDoPalco(motor),
