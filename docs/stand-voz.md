@@ -15,6 +15,21 @@ Sem a credencial do provedor escolhido, `GET /api/stand/status` responde `ligado
 
 ## Fluxo de um turno (`elevenlabs`)
 
+### Tour guiado
+
+"Me mostra tudo" ou "o que tem aqui?" permite ao cérebro escolher `tour_iniciar`,
+sem argumentos. O servidor toca o roteiro fixo `TOUR_STAND` de
+`shared/stand/acoes-site.ts`: sonolência, Trator MAX no laboratório do sensor,
+ensaio de curva e volta para a Coruja. As falas são prontas e usam o mesmo cache
+por voz e modelo da saudação. O modelo só escolhe o tour, sem escrever a narração.
+O tour conta uma resposta. A câmera não liga e nenhuma etapa grava dados.
+
+As ações chegam com `apos_fala:true`. O cliente espera o áudio anterior terminar
+antes de mudar a página, e o stand executa os controles em ordem. Uma nova fala
+do visitante corta o áudio e descarta as ações ainda não consumidas do turno.
+O provedor xAI de reserva recusa esse comando, pois o roteiro depende do fluxo
+de áudio do `SessaoTurnos`.
+
 ```mermaid
 sequenceDiagram
   participant N as Navegador
