@@ -26,5 +26,6 @@ O código do simulador é carregado sob demanda, e `preCarregarSimulador` adiant
 
 - Toda mudança no `SompoTruckSimulator` aparece nos dois lugares. O que vale só para o totem fica atrás da prop `kiosk`.
 - O totem nunca chega a `/sompo` nem aos botões dele que escrevem. As Telas do app da Vitrine seguem a mesma regra: componentes só de leitura em `src/components/stand/`, sem iframe nem navegação.
+- Montar o simulador dentro do `/stand` não bastava para isso. Até `9e2f5eb`, no kiosk, □ △ ○ abriam episódio, e o histórico ia para `/api/sompo/telemetry/simulation` a cada 2 s. Toda escrita do simulador agora passa por `sompoTelemetryWriter` (`src/components/sompo/sompoTelemetryWriter.ts`), que devolve `null` no kiosk. Sem a porta, □ △ ○ só tocam o cenário. `tests/stand-kiosk-sem-escrita.test.js` falha se o simulador voltar a chamar `lucaApi` direto.
 - O pacote do `/stand` passa a depender do Three.js. O carregamento sob demanda mantém Coruja e Vitrine leves, mas a primeira entrada na Simulação pode levar alguns segundos num aparelho fraco.
 - Para tirar a Simulação do `/stand`, basta trocar o modo por um link. O que dá trabalho desfazer são os ajustes presos à prop `kiosk` no simulador.

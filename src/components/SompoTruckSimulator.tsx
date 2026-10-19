@@ -32,7 +32,7 @@ import { createSompoPlayback } from './sompo/sompoPlayback';
 import { downloadSompoFile, loadSompoStudioConfig, type SompoStudioConfig, type SompoRenderStats } from './sompo/sompoStudioConfig';
 import { mountSompoRuralStage } from './sompo/createSompoRuralStage';
 import type { SompoTelemetrySnapshot } from '@/lib/types';
-import { lucaApi } from '@/lib/api';
+import { sompoTelemetryWriter } from './sompo/sompoTelemetryWriter';
 import { sompoRequestedScenarioAction } from '@/lib/sompo-scenario-selection';
 import {
   DEFAULT_SOMPO_AXIS_CALIBRATION,
@@ -338,6 +338,8 @@ export default function SompoTruckSimulator({
   const maxMode = vehicle?.modelo3d === 'trator-max';
   // Feed físico associado (campo dispositivo) a um veículo de modelo MAX: palco agrícola sem roteiro.
   const physicalMax = isFirebase && maxMode;
+  // No kiosk do /stand não há escrita no servidor: □ △ ○ tocam o cenário sem gravar episódio (ADR 0001).
+  const writer = useMemo(() => sompoTelemetryWriter({ kiosk }), [kiosk]);
   const scenarioAllowed = (id: string) => (maxMode ? isMaxScenario(id) : !isMaxScenario(id));
   const [vehicleNotice, setVehicleNotice] = useState('');
   const physicalTwin = usePhysicalTwin(telemetry, isFirebase);
@@ -497,11 +499,12 @@ export default function SompoTruckSimulator({
   }, [agriRun, episodeActive, controls, isFirebase, studioOpen, playing, playbackRate]);
 
   useEffect(() => {
-    if (isFirebase) {
+    if (isFirebase || !writer) {
       pendingSamplesRef.current = [];
       setHistoryOffline(false);
       return undefined;
     }
+    const porta = writer;
 
     let cancelled = false;
     async function flushHistory() {
@@ -510,7 +513,7 @@ export default function SompoTruckSimulator({
       if (batch.length === 0) return;
       flushBusyRef.current = true;
       try {
-        await lucaApi.postSompoTelemetrySimulation(batch);
+        await porta.postSompoTelemetrySimulation(batch);
         if (!cancelled) setHistoryOffline(false);
       } catch {
         // A falha é transitória: preserve as amostras mais recentes para a
@@ -532,14 +535,15 @@ export default function SompoTruckSimulator({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [isFirebase]);
+  }, [isFirebase, writer]);
 
   // Gravação de episódio: dono do relógio, das amostras e do finish.
   useEffect(() => {
-    if (episodeRun.status !== 'recording') return undefined;
+    if (episodeRun.status !== 'recording' || !writer) return undefined;
     const handle = episodeRunRef.current;
     if (!handle) return undefined;
     const run: EpisodeRunHandle = handle;
+    const porta = writer;
 
     let settled = false;
     let activeFlush: Promise<void> | null = null;
@@ -557,7 +561,7 @@ export default function SompoTruckSimulator({
       episodeCaptureRef.current = null;
       setEpisodeRun({ status: 'error', message });
       // Marca aborted no servidor; se a rede seguir fora, o timeout de 10 min resolve.
-      void lucaApi.postSompoTelemetryEpisodeFinish(run.publicId, 'aborted').catch(() => undefined);
+      void porta.postSompoTelemetryEpisodeFinish(run.publicId, 'aborted').catch(() => undefined);
     }
 
     // Falha no envio dos frames NÃO derruba o episódio: os dados valem sozinhos,
@@ -572,7 +576,7 @@ export default function SompoTruckSimulator({
       try {
         // Um frame por request para ficar folgado no limite de body do servidor.
         for (const frame of frames) {
-          await lucaApi.postSompoTelemetryEpisodeFrames(run.publicId, [frame]);
+          await porta.postSompoTelemetryEpisodeFrames(run.publicId, [frame]);
           uploaded += 1;
         }
       } catch {
@@ -592,13 +596,13 @@ export default function SompoTruckSimulator({
         // está em voo. Espere esse lote antes de fechar o episódio no servidor.
         if (activeFlush) await activeFlush;
         while (run.queue.length > 0) {
-          await lucaApi.postSompoTelemetrySimulation(
+          await porta.postSompoTelemetrySimulation(
             run.queue.splice(0, SIMULATION_HISTORY_MAX_BATCH),
             run.publicId,
           );
         }
         await uploadCapturedFrames();
-        const result = await lucaApi.postSompoTelemetryEpisodeFinish(run.publicId, 'complete');
+        const result = await porta.postSompoTelemetryEpisodeFinish(run.publicId, 'complete');
         if (!result?.ok) throw new Error('sompo_episode_finish_failed');
         episodeRunRef.current = null;
         episodeCaptureRef.current = null;
@@ -616,7 +620,7 @@ export default function SompoTruckSimulator({
           status: 'error',
           message: 'Falha de rede ao fechar o episódio. Gravação abortada. O simulador continua ativo.',
         });
-        void lucaApi.postSompoTelemetryEpisodeFinish(run.publicId, 'aborted').catch(() => undefined);
+        void porta.postSompoTelemetryEpisodeFinish(run.publicId, 'aborted').catch(() => undefined);
       }
     }
 
@@ -663,7 +667,7 @@ export default function SompoTruckSimulator({
       if (activeFlush) return activeFlush;
       const batch = run.queue.splice(0, SIMULATION_HISTORY_MAX_BATCH);
       if (batch.length === 0) return null;
-      activeFlush = lucaApi.postSompoTelemetrySimulation(batch, run.publicId)
+      activeFlush = porta.postSompoTelemetrySimulation(batch, run.publicId)
         .then(() => undefined)
         .finally(() => {
           activeFlush = null;
@@ -680,15 +684,15 @@ export default function SompoTruckSimulator({
     return () => {
       stopTimers();
     };
-  }, [episodeRun.status]);
+  }, [episodeRun.status, writer]);
 
   async function startEpisodeRun() {
     const plan = episodePlan;
-    if (isFirebase || episodeActive || !plan) return;
+    if (!writer || isFirebase || episodeActive || !plan) return;
     setEpisodeRun({ status: 'starting' });
     let publicId = '';
     try {
-      const result = await lucaApi.postSompoTelemetryEpisodeStart({
+      const result = await writer.postSompoTelemetryEpisodeStart({
         kind: plan.kind,
         trator: 'SIM-001',
         scenarioLabel: plan.scenarioLabel,
@@ -963,7 +967,7 @@ export default function SompoTruckSimulator({
     leaveFreeDrive();
     selectScenario(item.caseId, item.desfechoId);
     setStandScenario(id);
-    standStartPendingRef.current = true;
+    standStartPendingRef.current = writer !== null;
   }
   useEffect(() => {
     if (!standStartPendingRef.current || !agriRun || !episodePlan) return;
