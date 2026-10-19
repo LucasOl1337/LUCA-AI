@@ -28,15 +28,39 @@ _Evitar_: Limite seguro do veículo.
 
 **Stand**:
 O quiosque em volta do trator, com o monitor, o microfone e a página `/stand` em tela cheia. Quem opera o quiosque é a equipe do stand; Operador é quem dirige o trator.
-_Evitar_: Operador (para a equipe do stand), totem.
+_Evitar_: Operador (para a equipe do stand), totem (para o quiosque inteiro).
+
+**Totem**:
+O aparelho do quiosque: monitor, computador e controle DualSense, com a página `/stand` aberta em tela cheia na conta `totem`. É o equipamento, não a página nem o stand.
+_Evitar_: Stand (para o aparelho), kiosk.
+
+**Modo do stand**:
+O que a página `/stand` está mostrando: Coruja, Vitrine ou Simulação. Troca pela barra de modos (aparece 5 s depois de um toque) ou por L1/R1 no controle; PS volta para Coruja. Lógica pura em `src/components/stand/modoStand.ts`.
+_Evitar_: Tela (Tela é Atração, Conversa ou Vídeo, dentro de Coruja), cena.
+
+**Coruja**:
+O Modo do stand em que o Avatar LUCA atende o público por voz, com as telas Atração, Conversa e Vídeo. Sem voz no servidor, a Atração não promete microfone e o toque leva à Vitrine.
+_Evitar_: Modo voz, assistente.
+
+**Vitrine**:
+O Modo do stand que toca os Vídeos do stand em carrossel, com o título numa linha. No controle, setas trocam o vídeo e ✕ pausa.
+_Evitar_: Playlist, demo.
+
+**Simulação**:
+O Modo do stand com o simulador do Trator MAX em tela cheia, sem cabeçalho nem painel, jogado no controle. Nunca entra sozinho; sem uso por 90 s avisa e volta para Coruja. Não é a página `/sompo`.
+_Evitar_: Simulador (para o modo), jogo.
+
+**Repouso**:
+O ciclo sem ninguém por perto: Coruja na Atração, depois de 60 s sem toque, controle ou voz vai para a Vitrine, e no fim de cada volta da Vitrine sem ninguém retorna à Coruja.
+_Evitar_: Ocioso, standby (termo do supervisor).
 
 **Avatar LUCA**:
 O personagem que fala pela IA do stand (`src/components/stand/AvatarLuca.tsx`). O padrão é a `coruja-a`: a arte aprovada da coruja tech branca e azul com headset, animada em camadas SVG (piscar, olhar, respiração, visor), e a voz aparece no halo e nas luzes do headset, sem boca. Na tela aparece só como "LUCA". Variações vetoriais antigas por `?variante=`: `coruja`, `operario` e `robo`.
 _Evitar_: Mascote, bot, Sompo (a Sompo só aparece como texto).
 
 **Atração / Conversa / Vídeo**:
-As três telas do Stand. Atração chama o público e volta sozinha após 10 s de voz ociosa. Conversa mostra o Avatar LUCA grande, o indicador ouvindo/pensando/falando e a legenda. Vídeo toca um Vídeo do stand em tela cheia com o avatar pequeno no canto e, ao terminar ou ser pulado (tecla N), volta para Conversa.
-_Evitar_: Modo, cena.
+As três telas do modo Coruja. Atração chama o público e volta sozinha após 10 s de voz ociosa. Conversa mostra o Avatar LUCA grande, o indicador ouvindo/pensando/falando e a legenda. Vídeo toca um Vídeo do stand em tela cheia com o avatar pequeno no canto e, ao terminar ou ser pulado (tecla N), volta para Conversa.
+_Evitar_: Modo (Modo é Coruja, Vitrine ou Simulação), cena.
 
 **Vídeo do stand**:
 Resposta pré-gravada a uma pergunta central do público do stand, identificada por um id (`pipeline-completo`, `painel-sompo`, `painel-segurado`).

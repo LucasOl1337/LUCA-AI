@@ -55,12 +55,19 @@
 
 /* Atração: avatar médio, chamada grande, marca no rodapé. */
 .stand-atracao { flex: 1; display: grid; grid-template-columns: minmax(0, 44fr) minmax(0, 56fr); grid-template-rows: 1fr auto; align-items: center; gap: 2vmin 4vmin; min-height: 0; }
-.stand-avatar-atracao { height: min(62vh, 44vw); width: auto; justify-self: end; animation: stand-flutua 4.5s ease-in-out infinite; }
+/* Cabe na coluna: sem `max-width` o SVG (quase quadrado) estourava a coluna e saía cortado na borda esquerda. */
+.stand-avatar-atracao { height: auto; width: 100%; max-height: min(62vh, 100%); justify-self: end; animation: stand-flutua 4.5s ease-in-out infinite; }
 .stand-chamada-titulo { margin: 0; font-size: clamp(32px, 7.4vmin, 120px); line-height: 1.04; font-weight: 800; letter-spacing: -0.02em; text-wrap: balance; }
 .stand-chamada-titulo strong { color: #64d2ff; }
 .stand-chamada-sub { margin: 2.4vmin 0 0; font-size: clamp(18px, 3.4vmin, 52px); font-weight: 500; color: rgba(255, 255, 255, 0.72); text-wrap: balance; }
 .stand-marca { grid-column: 1 / -1; margin: 0; text-align: center; font-size: clamp(16px, 2.6vmin, 40px); font-weight: 600; color: rgba(255, 255, 255, 0.62); }
 .stand-marca-luca { color: #43d18a; font-weight: 800; letter-spacing: 0.04em; }
+/* Retrato (1080x1920): coruja em cima, chamada embaixo. */
+@media (max-aspect-ratio: 4 / 5) {
+  .stand-atracao { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto auto; text-align: center; padding-bottom: 9vmin; }
+  .stand-avatar-atracao { justify-self: center; max-height: 46vh; }
+  .stand-chamada-titulo { font-size: clamp(32px, 5.2vmax, 110px); }
+}
 
 /* Conversa: avatar grande, indicador e legenda de até 2 linhas embaixo. */
 .stand-conversa { flex: 1; display: flex; flex-direction: column; align-items: center; min-height: 0; }
@@ -95,5 +102,66 @@
 @media (prefers-reduced-motion: reduce) { .stand-avatar-atracao, .stand-indicador i { animation: none !important; } }
 
 /* Aviso só para a equipe do stand: pequeno, apagado, no canto de baixo. */
-.stand-aviso-equipe { position: absolute; left: 0; bottom: 0; margin: 0; font: 600 1.4vmin 'JetBrains Mono', monospace; color: rgba(255, 159, 10, 0.55); }
+/* Canto de baixo à direita: o centro de baixo é da barra de modos. */
+.stand-aviso-equipe { position: absolute; right: 0; bottom: 0; margin: 0; text-align: right; font: 600 1.4vmin 'JetBrains Mono', monospace; color: rgba(255, 159, 10, 0.55); }
 .stand[data-tela='atracao'] { cursor: pointer; }
+
+/* ── Modo do stand: Vitrine, Simulação e camada de navegação (totem) ── */
+.stand-camada { pointer-events: none; z-index: 20; }
+.stand-camada > * { pointer-events: auto; }
+
+/* Barra de modos: 3 botões discretos na borda de baixo da área segura; some 5 s depois do toque. */
+.stand-barra {
+  position: absolute; left: 50%; bottom: 0; transform: translate(-50%, 1vmin);
+  display: flex; gap: 1vmin; padding: 0.8vmin; border-radius: 999px;
+  background: rgba(9, 12, 17, 0.72); border: 0.2vmin solid rgba(100, 210, 255, 0.28);
+  backdrop-filter: blur(8px);
+  opacity: 0; pointer-events: none; transition: opacity 0.35s, transform 0.35s;
+}
+.stand-barra[data-visivel] { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.stand-barra button {
+  min-width: 14vmin; min-height: 6.4vmin; padding: 0 2.6vmin; border: 0; border-radius: 999px;
+  background: transparent; color: rgba(255, 255, 255, 0.78);
+  font: 700 clamp(14px, 2.4vmin, 36px) 'Stand Outfit', system-ui, sans-serif; cursor: pointer;
+}
+.stand-barra button[aria-pressed='true'] { background: rgba(10, 132, 255, 0.85); color: #fff; }
+
+/* Dica do controle: pequena, no canto de cima à esquerda (o selo fica à direita). */
+.stand-dica {
+  position: absolute; top: 0; left: 0; margin: 0; display: inline-flex; align-items: center; gap: 1vmin;
+  padding: 0.6vmin 1.6vmin; border-radius: 999px; background: rgba(9, 12, 17, 0.6);
+  font: 600 clamp(12px, 1.9vmin, 30px) 'Stand Outfit', system-ui, sans-serif; color: rgba(255, 255, 255, 0.72);
+  pointer-events: none !important;
+}
+.stand-dica kbd { font: inherit; font-weight: 800; padding: 0.1vmin 0.9vmin; border-radius: 0.6vmin; background: rgba(255, 255, 255, 0.14); color: #fff; }
+
+.stand-aviso-saida {
+  position: absolute; left: 50%; top: 40%; transform: translateX(-50%); margin: 0; max-width: 90%;
+  padding: 2vmin 3.6vmin; border-radius: 2vmin; background: rgba(9, 12, 17, 0.88); border: 0.3vmin solid rgba(255, 159, 10, 0.7);
+  font: 700 clamp(18px, 3.4vmin, 54px) 'Stand Outfit', system-ui, sans-serif; text-align: center; text-wrap: balance;
+}
+
+/* Vitrine: vídeo em tela cheia; o título vai no topo porque os vídeos já trazem legenda queimada embaixo. */
+.stand-vitrine { position: absolute; inset: 0; background: #000; }
+.stand-vitrine-legenda {
+  position: absolute; left: 50%; top: var(--stand-margem); transform: translateX(-50%); max-width: 56%;
+  margin: 0; padding: 0.8vmin 2.4vmin; border-radius: 999px; background: rgba(9, 12, 17, 0.78);
+  text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: clamp(16px, 2.6vmin, 44px); font-weight: 700;
+}
+.stand-vitrine-pausa {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0;
+  padding: 1.6vmin 3vmin; border-radius: 999px; background: rgba(9, 12, 17, 0.8);
+  font-size: clamp(18px, 3vmin, 48px); font-weight: 700;
+}
+.stand-vitrine-vazia { display: grid; place-items: center; color: rgba(255, 255, 255, 0.6); font-size: 3vmin; }
+.stand-aviso-mudo { right: var(--stand-margem); bottom: calc(var(--stand-margem) / 2); }
+
+/* Simulação: o simulador do MAX ocupa o monitor inteiro. */
+.stand-simulacao { position: absolute; inset: 0; background: #07100c; cursor: default; }
+.stand-simulacao-carregando { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font-size: 3.4vmin; color: rgba(255, 255, 255, 0.7); }
+.stand-simulacao .sompo-simulator.is-kiosk { margin: 0; height: 100%; border-radius: 0; box-shadow: none; backdrop-filter: none; }
+.stand-simulacao .is-kiosk .sompo-simulator-workspace { display: block; height: 100%; min-height: 0; }
+.stand-simulacao .is-kiosk .sompo-simulator-stage { height: 100%; min-height: 0; aspect-ratio: auto; border-radius: 0; }
+/* Cenários no meio da borda direita: embaixo ficam os botões de câmera e a barra de modos. */
+.stand-simulacao .is-kiosk .sompo-fp-scenarios { bottom: auto; top: 50%; transform: translateY(-50%); }

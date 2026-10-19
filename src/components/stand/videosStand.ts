@@ -9,6 +9,11 @@ const DO_MANIFESTO: Record<string, VideoStand> = Object.fromEntries(
   (manifesto as Array<{ id: string; titulo: string; arquivo: string }>).map((v) => [v.id, { titulo: v.titulo, arquivo: v.arquivo }]),
 );
 
+/** Carrossel da Vitrine: os vídeos do manifesto, na ordem dele. */
+export const VIDEOS_VITRINE: readonly VideoStand[] = Object.freeze(
+  (manifesto as Array<{ titulo: string; arquivo: string }>).map((v) => ({ titulo: v.titulo, arquivo: v.arquivo })),
+);
+
 export function videoDoStand(id: string, stub: boolean): VideoStand | undefined {
   if (!id) return undefined;
   return (stub ? VIDEOS_STUB[id] : undefined) ?? DO_MANIFESTO[id];
