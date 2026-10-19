@@ -123,6 +123,21 @@ test('transport distinguishes HTTP, logical errors, HTML fallbacks, redirects, t
   await assert.rejects(fs.stat(absent), { code: 'ENOENT' });
 });
 
+test('stand turno writes the NDJSON stream to stdout without --output', async t => {
+  const directory = await temporary(t);
+  const ndjson = '{"t":"frase","texto":"Oi"}\n{"t":"fim","motivo":"ok"}\n';
+  let corpo = null;
+  const url = await fixture(t, async (req, res) => {
+    let s = ''; for await (const d of req) s += d; corpo = JSON.parse(s);
+    res.writeHead(200, { 'content-type': 'application/x-ndjson' }); res.end(ndjson);
+  });
+  const env = { LUCA_URL: url, LUCA_CLI_CONFIG: path.join(directory, 'config.json') };
+  const result = await cli(['stand', 'turno', '--conversa-id', 'c1', '--texto', 'O que é?'], { env });
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(result.stdout, ndjson);
+  assert.deepEqual(corpo, { conversa_id: 'c1', texto: 'O que é?' });
+});
+
 test('jobs resume after transient polling failure, terminate on failure, retain ID on timeout and SIGINT', async t => {
   const directory = await temporary(t);
   let posts = 0, gets = 0, mode = 'complete';
