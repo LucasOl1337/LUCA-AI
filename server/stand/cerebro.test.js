@@ -297,3 +297,12 @@ test('tour_iniciar: outra ferramenta na mesma rodada não roda; toda tool_call t
 test('FALAS traz as falas do tour (cacheadas como as outras falas prontas)', () => {
   for (const passo of TOUR_STAND.filter((p) => 'fala' in p)) assert.equal(FALAS[passo.fala], passo.texto);
 });
+
+test('tour_iniciar: argumentos extras são recusados sem executar roteiro', async () => {
+  const conversa = novaConversa({ conta: 'demo' });
+  const chamada = chamadaTour();
+  chamada[0].ferramentas[0].function.arguments = '{"pagina":"admin"}';
+  const { linhas } = await rodar({ conversa, entrada: { texto: 'me mostra tudo' }, roteiros: [chamada, [{ texto: 'Não posso abrir essa página.' }]] });
+  assert.ok(!linhas.some((l) => l.t === 'evento'));
+  assert.match(conversa.historico.find((m) => m.role === 'tool').content, /não aceita/);
+});

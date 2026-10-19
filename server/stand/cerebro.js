@@ -6,7 +6,7 @@
 import { randomUUID } from 'node:crypto';
 import { cadeiaCerebroStand, ROUTER_API_KEY, ROUTER_BASE_URL } from '../config.js';
 import { FERRAMENTAS_STAND } from './ferramentas.js';
-import { TOUR_STAND } from '../../shared/stand/acoes-site.ts';
+import { TOUR_STAND, validarAcaoSite } from '../../shared/stand/acoes-site.ts';
 
 // Q5 do grill: por sessão, 8 respostas, 300 tokens por resposta e 2.000
 // caracteres de TTS. Os 240 s e os 20 s de silêncio continuam em LIMITES_STAND.
@@ -442,6 +442,13 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
         continue;
       }
       if (chamada.function.name === 'tour_iniciar') {
+        let args;
+        try { args = JSON.parse(chamada.function.arguments || '{}'); } catch { args = null; }
+        const validado = validarAcaoSite('tour_iniciar', args);
+        if (!validado.ok) {
+          conversa.historico.push({ role: 'tool', tool_call_id: chamada.id, content: JSON.stringify({ ok: false, erro: validado.motivo }) });
+          continue;
+        }
         tourFeito = true;
         const tour = await tocarTour();
         conversa.historico.push({ role: 'tool', tool_call_id: chamada.id, content: JSON.stringify({ ok: true, tour: tour.completo ? 'concluído' : 'interrompido' }) });
