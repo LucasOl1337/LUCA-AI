@@ -17,6 +17,8 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
   if (sompoRenderBudget().compact) {
     return {
       resize(_width: number, _height: number) {},
+      setPixelRatio(_ratio: number) {},
+      setEnabled(_enabled: boolean) {},
       render(_delta: number) { renderer.render(scene, camera); },
       dispose() {},
     };
@@ -77,12 +79,16 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
       }`,
   });
   composer.addPass(grade);
+  // Totem com FPS baixo desliga a cadeia inteira e cai no render direto.
+  let enabled = true;
   return {
     resize(width: number, height: number) {
       composer.setSize(Math.max(1, width), Math.max(1, height));
       grade.uniforms.resolution.value.set(Math.max(1, width), Math.max(1, height));
     },
-    render(_delta: number) { composer.render(); },
+    setPixelRatio(ratio: number) { composer.setPixelRatio(ratio); },
+    setEnabled(value: boolean) { enabled = value; },
+    render(_delta: number) { if (enabled) composer.render(); else renderer.render(scene, camera); },
     dispose() { ambientOcclusion.dispose(); composer.dispose(); target.dispose(); },
   };
 }

@@ -50,6 +50,14 @@ _Evitar_: Playlist, demo.
 O Modo do stand com o simulador do Trator MAX em tela cheia, sem cabeçalho nem painel, jogado no controle. Nunca entra sozinho; sem uso por 90 s avisa e volta para Coruja. Não é a página `/sompo`.
 _Evitar_: Simulador (para o modo), jogo.
 
+**Qualidade automática**:
+Na Simulação do totem, o render desce degraus (pixel ratio, pós, sombras) quando o FPS fica abaixo de 40 por 3 s, e só mantém a descida se ela render 15 % de FPS; sem ganho, volta e trava (o gargalo é CPU). Lógica pura em `src/components/sompo/qualidadeAdaptativa.ts`; o degrau atual aparece em `data-qualidade` no palco. Só no kiosk; `/sompo` não muda.
+_Evitar_: Modo leve, low-spec.
+
+**Tempo do ensaio**:
+O relógio do ESP32 virtual na Simulação (segundos desde o início do cenário), no canto de cima à direita. Em `/sompo` continua em ms.
+_Evitar_: Latência (não é latência).
+
 **Repouso**:
 O ciclo sem ninguém por perto: Coruja na Atração, depois de 60 s sem toque, controle ou voz vai para a Vitrine, e no fim de cada volta da Vitrine sem ninguém retorna à Coruja.
 _Evitar_: Ocioso, standby (termo do supervisor).

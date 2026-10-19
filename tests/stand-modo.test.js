@@ -6,7 +6,7 @@ const {
   reduzirModo, modoInicial, avisoDeSaida, barraVisivel, REPOUSO_MS, SIMULACAO_PARADA_MS, BARRA_MS,
 } = await loadFrontendModule('../../src/components/stand/modoStand.ts');
 const { lerNavegacao } = await loadFrontendModule('../../src/components/stand/navegacaoPad.ts');
-const { chamadaSemVoz, vozDoStand } = await loadFrontendModule('../../src/components/stand/avisos.ts');
+const { avisoDeControle, chamadaSemVoz, vozDoStand } = await loadFrontendModule('../../src/components/stand/avisos.ts');
 
 const VIDEOS = 3;
 const passo = (estado, entrada, agora) => reduzirModo(estado, entrada, agora, VIDEOS);
@@ -131,4 +131,22 @@ test('textos sem voz não prometem microfone e mudam com o controle conectado', 
   for (const texto of Object.values({ ...chamadaSemVoz(true), ...chamadaSemVoz(false) })) {
     assert.doesNotMatch(texto, /microfone|pergunt|fala/i);
   }
+});
+
+test('DualSense no layout standard do Chromium (USB e Bluetooth): 18 botões, touchpad no 17 não navega', () => {
+  // MapperDualSense (Linux/Windows/macOS) entrega 0 ✕ 1 ○ 2 □ 3 △ 4 L1 5 R1 6 L2 7 R2 8 Create 9 Options
+  // 10 L3 11 R3 12–15 D-pad 16 PS 17 touchpad.
+  const dualsense = (apertados) => ({ mapping: 'standard', axes: [0, 0, 0, 0], buttons: Array.from({ length: 18 }, (_, i) => ({ pressed: apertados.includes(i), value: apertados.includes(i) ? 1 : 0 })) });
+  assert.deepEqual(lerNavegacao(dualsense([17]), { pressed: [] }, 'coruja').acoes, []);
+  assert.equal(lerNavegacao(dualsense([17]), { pressed: [] }, 'coruja').ativo, true);
+  assert.deepEqual(lerNavegacao(dualsense([16]), { pressed: [] }, 'simulacao').acoes, [{ tipo: 'ir', modo: 'coruja' }]);
+});
+
+test('controle sem mapping standard vira aviso curto pra equipe, sem o sufixo de vendor/produto', () => {
+  assert.equal(avisoDeControle(null), '');
+  assert.equal(
+    avisoDeControle('Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)'),
+    'controle não reconhecido (Wireless Controller) · use o DualSense no cabo USB',
+  );
+  assert.equal(avisoDeControle('(054c-0ce6)'), 'controle não reconhecido (controle) · use o DualSense no cabo USB');
 });

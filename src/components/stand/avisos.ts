@@ -42,3 +42,13 @@ export function avisoParaEquipe(fim: Fim, status: StatusStand | null = null): st
   if (fim.motivo === 'erro') return `voz caiu: ${fim.detalhe || 'erro'} · espaço tenta de novo`;
   return '';
 }
+
+/**
+ * Controle conectado sem mapping standard: o navegador não sabe onde está cada
+ * botão e o stand ignora o controle. Diz à equipe o que fazer (cabo USB do DualSense).
+ */
+export function avisoDeControle(idDesconhecido: string | null): string {
+  if (!idDesconhecido) return '';
+  const nome = idDesconhecido.replace(/\s*\(.*$/, '').trim().slice(0, 40) || 'controle';
+  return `controle não reconhecido (${nome}) · use o DualSense no cabo USB`;
+}

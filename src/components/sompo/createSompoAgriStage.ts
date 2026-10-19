@@ -21,6 +21,7 @@ import { createSompoEnvironmentAssets } from './createSompoEnvironmentAssets';
 import { createSompoAtmosphere } from './createSompoAtmosphere';
 import { createSompoPostProcessing } from './createSompoPostProcessing';
 import { createSompoRenderMeter } from './sompoStage';
+import { DEGRAUS, pixelRatioDoDegrau, qualidadeInicial, regularQualidade } from './qualidadeAdaptativa';
 import { exportSompoModel } from './refineSompoTruck';
 import { SOMPO_STUDIO_DEFAULT, type SompoStudioConfig, type SompoRenderStats } from './sompoStudioConfig';
 import { sensorReadingToPose, type SompoAxisCalibration } from './sensorPose.js';
@@ -126,7 +127,7 @@ function createUltrasonicBeam(origin: readonly [number, number, number]) {
  * real em forma fechada: separado do loop do caminhão para não arriscar o
  * fluxo rural. Desmontado e remontado a cada troca de cenário/desfecho.
  */
-export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig }: {
+export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig, adaptiveQuality = false }: {
   mount: HTMLElement;
   scenarioId: SompoAgriScenarioId;
   outcomeId: string;
@@ -142,6 +143,8 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   physical?: SompoAgriPhysicalInput;
   /** Câmera de cabine opcional; sem ela (ou inativa) a órbita segue igual. */
   cameraRig?: SompoCameraRig;
+  /** Totem: desce pixel ratio, pós e sombras quando o FPS cai (qualidadeAdaptativa). */
+  adaptiveQuality?: boolean;
 }): SompoAgriStageApi | null {
   const scenario = getSompoAgriScenario(scenarioId);
   const operation = scenario.environmentId === 'geofence-operacao';
@@ -183,7 +186,29 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   const field = createSompoAgriScene(worldRoot, scenario.environmentId, budget.compact, scenario.equipmentId);
   const atmosphere = createSompoAtmosphere(scene, renderer, field.sun);
   const post = createSompoPostProcessing(renderer, scene, camera);
-  const meter = createSompoRenderMeter(renderer, onStats);
+  // Qualidade automática (só no totem): o medidor de 1 s alimenta o regulador.
+  let qualidade = qualidadeInicial(Math.max(0, DEGRAUS.findIndex(d => d.pixelRatio <= renderer.getPixelRatio())));
+  const aplicarDegrau = () => {
+    const degrau = DEGRAUS[qualidade.degrau];
+    const ratio = pixelRatioDoDegrau(degrau, window.devicePixelRatio);
+    // setPixelRatio do three já refaz o tamanho do canvas e dos alvos do composer.
+    if (ratio !== renderer.getPixelRatio()) { renderer.setPixelRatio(ratio); post.setPixelRatio(ratio); }
+    post.setEnabled(degrau.pos);
+    if (renderer.shadowMap.enabled !== degrau.sombras) {
+      renderer.shadowMap.enabled = degrau.sombras;
+      // Liga/desliga sombra muda o programa dos materiais: recompila uma vez.
+      scene.traverse((node) => { const mesh = node as THREE.Mesh; if (mesh.isMesh) for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) m.needsUpdate = true; });
+    }
+    mount.dataset.qualidade = String(qualidade.degrau);
+  };
+  const meter = createSompoRenderMeter(renderer, (stats) => {
+    onStats?.(stats);
+    if (!adaptiveQuality) return;
+    const anterior = qualidade.degrau;
+    qualidade = regularQualidade(qualidade, stats.fps, performance.now());
+    if (qualidade.degrau !== anterior) aplicarDegrau();
+  });
+  if (adaptiveQuality) aplicarDegrau();
   const assets = createSompoEnvironmentAssets(scene, renderer, { background: false, intensity: night ? 0.30 : 0.68, initialWet: scenario.environmentId === 'muddy-field', onHdri: (kind, tex) => atmosphere.setSkyTexture(kind, tex) });
   assets.surface(field.terrain.material, 'dirt', 45, 30);
   // Talhão da operação é visto de cima e ocupa o campo todo: sem colcha vizinha.

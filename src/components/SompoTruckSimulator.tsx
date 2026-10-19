@@ -831,6 +831,7 @@ export default function SompoTruckSimulator({
         onAfterRender: captureDueEpisodeFrames,
         studioRef, getElapsed, onStats: setRenderStats,
         cameraRig,
+        adaptiveQuality: kiosk,
       });
       if (!stage) return undefined;
       setWebglError(false);
@@ -851,7 +852,7 @@ export default function SompoTruckSimulator({
     if (!stage) return undefined;
     sceneApiRef.current = stage;
     return () => { sceneApiRef.current = null; stage.dispose(); };
-  }, [agriRun, isFirebase, studioConfig.truck, physicalMax]);
+  }, [agriRun, isFirebase, studioConfig.truck, physicalMax, kiosk]);
 
   const onScenarioSelectRef = useRef(onScenarioSelect);
   onScenarioSelectRef.current = onScenarioSelect;
@@ -1281,7 +1282,11 @@ export default function SompoTruckSimulator({
           {isFirebase && <PhysicalTwinOverlay twin={physicalTwin} />}
           <div className="sompo-simulator-stage-badges" aria-hidden="true">
             <span><span className="sompo-simulator-led" /> {isFirebase ? `${physicalTwin.replay ? 'Replay' : 'ESP32 físico'} · trator ${preview.tractorId}` : 'ESP32 virtual transmitindo'}</span>
-            <span>{isFirebase ? `tick ${preview.deviceTimestamp ?? '-'}` : `${Math.round(preview.deviceTimestamp || 0)} ms`}</span>
+            <span>{isFirebase
+              ? `tick ${preview.deviceTimestamp ?? '-'}`
+              : kiosk
+                ? `Tempo do ensaio · ${((preview.deviceTimestamp || 0) / 1000).toFixed(1).replace('.', ',')} s`
+                : `${Math.round(preview.deviceTimestamp || 0)} ms`}</span>
           </div>
           {cabin && cabinAvailable && (freeDrive && freePose ? (
             <FirstPersonHud

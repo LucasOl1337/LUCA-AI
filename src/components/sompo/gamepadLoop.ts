@@ -9,6 +9,13 @@ export function firstStandardPad(): Gamepad | null {
   return null;
 }
 
+/** Controle conectado que o navegador não reconheceu (mapping vazio): id para o aviso da equipe. */
+export function unmappedPadId(): string | null {
+  if (typeof navigator === 'undefined' || !navigator.getGamepads) return null;
+  for (const pad of navigator.getGamepads()) if (pad?.connected && pad.mapping !== 'standard') return pad.id;
+  return null;
+}
+
 /**
  * Lê o controle a cada quadro: o analógico direito move `lookRef` (com retorno
  * ao centro), `driveRef` recebe analógico esquerdo e gatilhos, e cada botão

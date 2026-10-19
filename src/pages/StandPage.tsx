@@ -7,7 +7,7 @@ import { criarCanalStub } from '@/components/stand/canalStub';
 import { reduzirTela, telaInicial, type EntradaTela, type EstadoTela } from '@/components/stand/telaStand';
 import { Atracao, Conversa, PlayerVideo } from '@/components/stand/Telas';
 import { tratarTecla, type AtalhosStand } from '@/components/stand/atalhos';
-import { avisoParaEquipe, chamadaDeInicio, chamadaSemVoz, vozDoStand, type StatusStand } from '@/components/stand/avisos';
+import { avisoDeControle, avisoParaEquipe, chamadaDeInicio, chamadaSemVoz, vozDoStand, type StatusStand } from '@/components/stand/avisos';
 import { VIDEOS_VITRINE, videoDoStand } from '@/components/stand/videosStand';
 import { enviarAcaoSite } from '@/components/stand/executor/ponte';
 import { avisoDeSaida, barraVisivel, modoInicial, reduzirModo, type EntradaModo, type EstadoModo } from '@/components/stand/modoStand';
@@ -130,7 +130,8 @@ export default function StandPage() {
     despacharModo(acao);
   }, [vozStand, estado.tela, iniciar]);
   const mexeuNoPad = useCallback(() => despacharModo({ tipo: 'atividade' }), []);
-  const controleConectado = usePadStand({ modo: modo.modo, aoAgir: agirNoPad, aoMexer: mexeuNoPad });
+  const { conectado: controleConectado, desconhecido: controleDesconhecido } = usePadStand({ modo: modo.modo, aoAgir: agirNoPad, aoMexer: mexeuNoPad });
+  const avisoControle = avisoDeControle(controleDesconhecido);
 
   /** Toque na tela: acende a barra; na Atração, conversa (com voz) ou mostra a Vitrine (sem voz). */
   const tocar = useCallback(() => {
@@ -218,6 +219,7 @@ export default function StandPage() {
       <div className="stand-seguro stand-camada">
         {controleConectado && <DicaControle modo={modo.modo} />}
         {segundosParaSair !== null && <AvisoSaida segundos={segundosParaSair} />}
+        {avisoControle && <p className="stand-aviso-equipe stand-aviso-controle">{avisoControle}</p>}
         <BarraModos modo={modo.modo} visivel={barraVisivel(modo, agora)} aoEscolher={(m) => { despacharModo({ tipo: 'atividade', toque: true }); despacharModo({ tipo: 'ir', modo: m }); }} />
       </div>
     </main>
