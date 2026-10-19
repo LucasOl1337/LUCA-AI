@@ -43,8 +43,12 @@ O Modo do stand em que o Avatar LUCA atende o público por voz, com as telas Atr
 _Evitar_: Modo voz, assistente.
 
 **Vitrine**:
-O Modo do stand que toca os Vídeos do stand em carrossel, com o título numa linha. No controle, setas trocam o vídeo e ✕ pausa.
+O Modo do stand que toca em carrossel os Vídeos do stand intercalados com Telas do app (vídeo, Lab, vídeo, Trator agora, vídeos restantes), com o título numa linha. No controle, setas trocam o item e ✕ pausa (o replay congela). Ordem e pulos em `src/components/stand/vitrineStand.ts`.
 _Evitar_: Playlist, demo.
+
+**Tela do app**:
+Um item da Vitrine que mostra o app de verdade, só lendo: o replay do Laboratório (tombamento em declive de Piracicaba, dados sintéticos, a 4x até o fim ou 45 s) ou o Trator agora (leitura do sensor do trator do stand, 20 s, com "Ao vivo" só com sinal fresco do Firebase). Não grava caso, não sobe arquivo e só faz GET. Sem WebGL, dado que não chega em 6 s, sinal velho, 401 ou 502: sai da volta sem buraco, e o motivo fica em `data-pulada` para a equipe.
+_Evitar_: Iframe, demo do app, print.
 
 **Simulação**:
 O Modo do stand com o simulador do Trator MAX em tela cheia, sem cabeçalho nem painel, jogado no controle. Nunca entra sozinho; sem uso por 90 s avisa e volta para Coruja. Não é a página `/sompo`.

@@ -1,6 +1,6 @@
-import { lazy, memo, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, memo, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { MODOS, ROTULO_MODO, type Modo } from './modoStand';
-import type { VideoStand } from './videosStand';
+import type { ItemVitrine } from './vitrineStand';
 
 /** Vitrine, Simulação e a barra de modos do totem (grill r1, Q1–Q7). */
 
@@ -12,7 +12,12 @@ export function preCarregarSimulador() {
   void carregarSimulador();
 }
 
-export function VitrineStand({ video, pausado, aoTerminar }: { video: VideoStand | undefined; pausado: boolean; aoTerminar(): void }) {
+/**
+ * Vitrine: vídeos do stand intercalados com Telas do app (`telaApp`, já montada pela página).
+ * `pulos` vai em `data-pulada` só para a equipe: o público nunca vê o motivo.
+ */
+export function VitrineStand({ item, pausado, aoTerminar, telaApp, pulos }: { item: ItemVitrine | undefined; pausado: boolean; aoTerminar(): void; telaApp?: ReactNode; pulos?: string }) {
+  const video = item?.tipo === 'video' ? item.video : undefined;
   const ref = useRef<HTMLVideoElement | null>(null);
   const [mudo, setMudo] = useState(false);
 
@@ -42,13 +47,15 @@ export function VitrineStand({ video, pausado, aoTerminar }: { video: VideoStand
     return () => window.removeEventListener('pointerdown', liberar, { capture: true });
   }, [mudo]);
 
-  if (!video) return <section className="stand-vitrine stand-vitrine-vazia" aria-label="Vitrine"><p>Vitrine sem vídeos</p></section>;
+  if (!item) return <section className="stand-vitrine stand-vitrine-vazia" aria-label="Vitrine" data-pulada={pulos}><p>Vitrine sem vídeos</p></section>;
   return (
-    <section className="stand-vitrine" aria-label={`Vitrine: ${video.titulo}`} data-pausado={pausado || undefined}>
-      <video key={video.arquivo} ref={ref} className="stand-video-player" src={video.arquivo} playsInline preload="auto" onEnded={aoTerminar} onError={aoTerminar} />
-      <p className="stand-vitrine-legenda">{video.titulo}</p>
+    <section className="stand-vitrine" aria-label={`Vitrine: ${item.titulo}`} data-item={item.tipo} data-pausado={pausado || undefined} data-pulada={pulos}>
+      {video
+        ? <video key={video.arquivo} ref={ref} className="stand-video-player" src={video.arquivo} playsInline preload="auto" onEnded={aoTerminar} onError={aoTerminar} />
+        : telaApp}
+      <p className="stand-vitrine-legenda">{item.titulo}</p>
       {pausado && <p className="stand-vitrine-pausa" role="status">Pausado · ✕ continua</p>}
-      {mudo && <p className="stand-aviso-equipe stand-aviso-mudo">sem som até um toque (kiosk sem --autoplay-policy)</p>}
+      {mudo && video && <p className="stand-aviso-equipe stand-aviso-mudo">sem som até um toque (kiosk sem --autoplay-policy)</p>}
     </section>
   );
 }

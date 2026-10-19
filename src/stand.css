@@ -160,6 +160,48 @@
   font-size: clamp(18px, 3vmin, 48px); font-weight: 700;
 }
 .stand-vitrine-vazia { display: grid; place-items: center; color: rgba(255, 255, 255, 0.6); font-size: 3vmin; }
+
+/* Tela do app (Q3 b): o app de verdade, sem controles; só o que se lê de longe. */
+.stand-tela-app { position: absolute; inset: 0; }
+.stand-tela-lab .lab-scene { min-height: 0 !important; }
+.stand-tela-lab .lab-scene-overlay > :not(.lab-scene-active-event, .lab-scene-status, .lab-scene-attribution) { display: none; }
+.stand-tela-lab .lab-scene-status > span { display: none; }
+.stand-tela-lab .lab-scene-active-event {
+  position: absolute; left: 50%; bottom: calc(var(--stand-margem) + 2vmin); transform: translateX(-50%); max-width: 80%;
+  padding: 1.4vmin 3vmin; border-radius: 999px; background: rgba(160, 60, 20, 0.92); color: #fff;
+  font: 700 clamp(16px, 3vmin, 48px) 'Stand Outfit', system-ui, sans-serif; text-align: center;
+}
+.stand-tela-lab .lab-scene-status { left: var(--stand-margem); top: calc(var(--stand-margem) + 7vmin); font-size: clamp(14px, 2vmin, 32px); }
+.stand-tela-lab .lab-scene[data-site] .lab-scene-attribution, .stand-tela-lab .lab-scene .lab-scene-attribution { left: var(--stand-margem); right: var(--stand-margem); bottom: calc(var(--stand-margem) / 3); max-width: none; text-align: center; font-size: clamp(11px, 1.3vmin, 20px); color: rgba(255, 255, 255, 0.85); background: rgba(9, 12, 17, 0.7); }
+
+.stand-tela-trator {
+  display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 4vmin;
+  padding: calc(var(--stand-margem) + 9vmin) calc(var(--stand-margem) + 2vmin) var(--stand-margem);
+  background: radial-gradient(circle at 30% 50%, #12261d, #050a08 70%);
+}
+.stand-ao-vivo {
+  position: absolute; right: var(--stand-margem); top: var(--stand-margem); margin: 0; display: flex; align-items: center; gap: 1vmin;
+  padding: 0.8vmin 2vmin; border-radius: 999px; background: rgba(9, 12, 17, 0.78); font-size: clamp(14px, 2.2vmin, 36px); font-weight: 700; color: var(--stand-verde);
+}
+.stand-ao-vivo i { width: 1.4vmin; height: 1.4vmin; border-radius: 50%; background: var(--stand-verde); animation: stand-pulso 1.4s ease-in-out infinite; }
+@keyframes stand-pulso { 50% { opacity: 0.25; } }
+.stand-trator-figura { display: grid; place-items: center; }
+.stand-trator-figura svg { width: 34vmin; height: 34vmin; color: var(--stand-verde); stroke-width: 1.4; transition: transform 0.6s ease; }
+.stand-trator-leituras { margin: 0; display: grid; gap: 2.4vmin; }
+.stand-trator-leituras div { display: flex; justify-content: space-between; align-items: baseline; gap: 2vmin; border-bottom: 0.2vmin solid rgba(255, 255, 255, 0.12); padding-bottom: 1.2vmin; }
+.stand-trator-leituras dt { font-size: clamp(14px, 2.4vmin, 38px); color: rgba(255, 255, 255, 0.7); }
+.stand-trator-leituras dd { margin: 0; font: 700 clamp(22px, 5vmin, 80px) 'Stand Outfit', system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.stand-trator-leituras small { font-size: 0.5em; margin-left: 0.6vmin; color: rgba(255, 255, 255, 0.6); }
+.stand-trator-alerta {
+  position: absolute; left: 50%; bottom: calc(var(--stand-margem) + 1vmin); transform: translateX(-50%); margin: 0;
+  padding: 1.4vmin 3vmin; border-radius: 999px; background: rgba(200, 70, 20, 0.92); font-size: clamp(16px, 3vmin, 48px); font-weight: 700;
+}
+.stand-tela-trator[data-alerta] .stand-trator-figura svg { color: #ff9f0a; }
+@media (orientation: portrait) {
+  .stand-tela-trator { grid-template-columns: 1fr; align-content: center; }
+  /* Em pé a dica L1/R1 ocupa o canto: o título desce uma linha e pode usar a largura toda. */
+  .stand-vitrine-legenda { top: calc(var(--stand-margem) + 6vmin); max-width: 90%; }
+}
 .stand-aviso-mudo { right: var(--stand-margem); bottom: calc(var(--stand-margem) / 2); }
 /* Controle não reconhecido: mesmo canto, uma linha acima do aviso de som. */
 .stand-aviso-controle { pointer-events: none; bottom: 2.4vmin; }

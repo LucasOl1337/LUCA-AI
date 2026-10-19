@@ -9,6 +9,8 @@ import { Atracao, Conversa, PlayerVideo } from '@/components/stand/Telas';
 import { tratarTecla, type AtalhosStand } from '@/components/stand/atalhos';
 import { avisoDeControle, avisoParaEquipe, chamadaDeInicio, chamadaSemVoz, vozDoStand, type StatusStand } from '@/components/stand/avisos';
 import { VIDEOS_VITRINE, videoDoStand } from '@/components/stand/videosStand';
+import { descreverPulos, disponiveis, montarItens } from '@/components/stand/vitrineStand';
+import { TelaLab, TelaTrator, useTelasDoApp } from '@/components/stand/TelasDoApp';
 import { enviarAcaoSite } from '@/components/stand/executor/ponte';
 import { avisoDeSaida, barraVisivel, modoInicial, reduzirModo, type EntradaModo, type EstadoModo } from '@/components/stand/modoStand';
 import type { AcaoNavegacao } from '@/components/stand/navegacaoPad';
@@ -25,7 +27,9 @@ function alternarTelaCheia() {
 }
 
 const reduzirAgora = (atual: EstadoTela, entrada: EntradaTela) => reduzirTela(atual, entrada, Date.now());
-const reduzirModoAgora = (atual: EstadoModo, entrada: EntradaModo) => reduzirModo(atual, entrada, Date.now(), VIDEOS_VITRINE.length);
+
+/** Carrossel da Vitrine: vídeos do manifesto com as Telas do app no meio (Q3 b). */
+const ITENS_VITRINE = montarItens(VIDEOS_VITRINE);
 
 /** Status da voz no servidor: o texto da Atração segue `ligado` + `motivo` (inclusive `teto_diario`). */
 const STATUS_A_CADA_MS = 60_000;
@@ -56,7 +60,12 @@ export default function StandPage() {
   const modoStub = location.stub === '1';
   const [grade, setGrade] = useState(false);
   const [estado, despachar] = useReducer(reduzirAgora, undefined, telaInicial);
+  // Tela do app fora do ar sai da volta: o reducer lê quais itens estão prontos agora.
+  const prontos = useRef<boolean[]>(disponiveis(ITENS_VITRINE, {}));
+  const reduzirModoAgora = useCallback((atual: EstadoModo, entrada: EntradaModo) => reduzirModo(atual, entrada, Date.now(), prontos.current), []);
   const [modo, despacharModo] = useReducer(reduzirModoAgora, undefined, () => modoInicial(Date.now()));
+  const telas = useTelasDoApp(modo.modo === 'vitrine');
+  prontos.current = disponiveis(ITENS_VITRINE, telas.prontidao);
   const [agora, setAgora] = useState(() => Date.now());
   const voz = useSessaoVoz();
   const status = useStatusStand(!modoStub, voz.fim);
@@ -180,7 +189,18 @@ export default function StandPage() {
   const aviso = modoStub ? 'modo de teste (?stub=1): fala gravada, sem microfone' : avisoParaEquipe(voz.fim, status);
   const semVoz = vozStand !== 'ligada' ? chamadaSemVoz(controleConectado) : null;
   const segundosParaSair = avisoDeSaida(modo, agora);
-  const terminarVitrine = useCallback(() => despacharModo({ tipo: 'video_terminou' }), []);
+  // `volta` remonta a Tela do app quando o mesmo item se repete (zera o relógio dela).
+  const [volta, setVolta] = useState(0);
+  const terminarVitrine = useCallback(() => { setVolta((v) => v + 1); despacharModo({ tipo: 'video_terminou' }); }, []);
+  const itemVitrine = ITENS_VITRINE[modo.video];
+  const telaApp = itemVitrine?.tipo === 'lab' && telas.caso
+    ? <TelaLab key={volta} caso={telas.caso} pausado={modo.pausado} aoTerminar={terminarVitrine} aoFalhar={telas.labFalhou} />
+    : itemVitrine?.tipo === 'trator'
+      ? <TelaTrator key={volta} trator={telas.trator} pausado={modo.pausado} aoTerminar={terminarVitrine} />
+      : undefined;
+  // Voltou pra Vitrine num item que saiu do ar (L1/R1 guarda o índice): segue pro próximo.
+  const itemFora = modo.modo === 'vitrine' && !!itemVitrine && !prontos.current[modo.video];
+  useEffect(() => { if (itemFora) terminarVitrine(); }, [itemFora, terminarVitrine]);
 
   return (
     <main
@@ -213,7 +233,7 @@ export default function StandPage() {
         </div>
       )}
       {modo.modo === 'vitrine' && (
-        <VitrineStand video={VIDEOS_VITRINE[modo.video]} pausado={modo.pausado} aoTerminar={terminarVitrine} />
+        <VitrineStand item={itemVitrine} pausado={modo.pausado} aoTerminar={terminarVitrine} telaApp={telaApp} pulos={descreverPulos(telas.prontidao)} />
       )}
       {modo.modo === 'simulacao' && <SimulacaoStand />}
       <div className="stand-seguro stand-camada">

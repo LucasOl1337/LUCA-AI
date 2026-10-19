@@ -23,6 +23,8 @@ interface LabSceneProps {
   onSelectEvent?: (eventId: string) => void;
   showDetails?: boolean;
   onTerrain?: (sample: ((x: number, z: number) => number | null) | null) => void;
+  /** Avisa quando o 3D cai (sem contexto ou contexto perdido); o stand tira a Tela do app da volta. */
+  onWebglError?: () => void;
 }
 
 type Point = { x: number; z: number };
@@ -88,7 +90,7 @@ function labStageMachineLabel(labCase: LabCase | null | undefined) {
   return 'Trator';
 }
 
-export default function LabScene({ labCase, site, elapsedMs, cameraMode, selectedEventId, onSelectEvent, showDetails = false, onTerrain }: LabSceneProps) {
+export default function LabScene({ labCase, site, elapsedMs, cameraMode, selectedEventId, onSelectEvent, showDetails = false, onTerrain, onWebglError }: LabSceneProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const elapsedRef = useRef(elapsedMs);
   const modeRef = useRef(cameraMode);
@@ -101,6 +103,8 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
   const detailsRef = useRef(showDetails); detailsRef.current = showDetails;
   const terrainCallback = useRef(onTerrain); terrainCallback.current = onTerrain;
   const [webglError, setWebglError] = useState(false);
+  const webglErrorCallback = useRef(onWebglError); webglErrorCallback.current = onWebglError;
+  useEffect(() => { if (webglError) webglErrorCallback.current?.(); }, [webglError]);
   const [satelliteState, setSatelliteState] = useState<'none' | 'loading' | 'ready' | 'error'>('none');
   elapsedRef.current = elapsedMs;
   modeRef.current = cameraMode;

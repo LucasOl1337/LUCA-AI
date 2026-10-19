@@ -21,7 +21,7 @@ export interface EstadoModo {
   modo: Modo;
   /** Último toque, botão, tecla ou voz; também marca as trocas automáticas. */
   marco: number;
-  /** Vídeo da Vitrine (índice no manifesto). */
+  /** Item da Vitrine (índice na lista de `vitrineStand.montarItens`: vídeos e Telas do app). */
   video: number;
   pausado: boolean;
   /** A barra de modos aparece até este instante (ms). */
@@ -45,8 +45,31 @@ export function modoInicial(agora: number): EstadoModo {
 
 const girar = (indice: number, passo: number, total: number) => (total > 0 ? (indice + passo + total) % total : 0);
 
-/** `totalVideos` vem do manifesto da Vitrine; com zero vídeos a Vitrine fica parada. */
-export function reduzirModo(atual: EstadoModo, entrada: EntradaModo, agora: number, totalVideos: number): EstadoModo {
+/**
+ * Próximo item disponível da Vitrine; pula Tela do app que não está pronta.
+ * `deuVolta`: andando pra frente, passou do último item (fim de uma volta).
+ */
+export function proximoItem(indice: number, direcao: 1 | -1, disponivel: readonly boolean[]): { indice: number; deuVolta: boolean } {
+  const total = disponivel.length;
+  let i = indice;
+  let deuVolta = false;
+  for (let n = 0; n < total; n += 1) {
+    const seguinte = girar(i, direcao, total);
+    if (direcao === 1 && seguinte <= i) deuVolta = true;
+    i = seguinte;
+    if (disponivel[i]) return { indice: i, deuVolta };
+  }
+  return { indice: 0, deuVolta: true };
+}
+
+const mascara = (itens: number | readonly boolean[]): readonly boolean[] => (typeof itens === 'number' ? Array.from({ length: itens }, () => true) : itens);
+
+/**
+ * `itens`: quantos itens a Vitrine tem (todos prontos) ou quais estão prontos agora.
+ * Com zero itens a Vitrine fica parada.
+ */
+export function reduzirModo(atual: EstadoModo, entrada: EntradaModo, agora: number, itens: number | readonly boolean[]): EstadoModo {
+  const disponivel = mascara(itens);
   switch (entrada.tipo) {
     case 'ir':
       if (entrada.modo === atual.modo) return { ...atual, marco: agora };
@@ -59,17 +82,16 @@ export function reduzirModo(atual: EstadoModo, entrada: EntradaModo, agora: numb
       return { ...atual, marco: agora, barraAte: entrada.toque ? agora + BARRA_MS : atual.barraAte };
     case 'trocar_video':
       if (atual.modo !== 'vitrine') return { ...atual, marco: agora };
-      return { ...atual, video: girar(atual.video, entrada.direcao, totalVideos), pausado: false, marco: agora };
+      return { ...atual, video: proximoItem(atual.video, entrada.direcao, disponivel).indice, pausado: false, marco: agora };
     case 'pausar':
       if (atual.modo !== 'vitrine') return { ...atual, marco: agora };
       return { ...atual, pausado: !atual.pausado, marco: agora };
     case 'video_terminou': {
       if (atual.modo !== 'vitrine') return atual;
-      const proximo = girar(atual.video, 1, totalVideos);
-      const fimDaVolta = proximo === 0;
+      const { indice, deuVolta } = proximoItem(atual.video, 1, disponivel);
       // Sem ninguém por perto, cada volta completa devolve o monitor à Coruja.
-      if (fimDaVolta && agora - atual.marco >= REPOUSO_MS) return { ...atual, modo: 'coruja', video: 0, marco: agora };
-      return { ...atual, video: proximo };
+      if (deuVolta && agora - atual.marco >= REPOUSO_MS) return { ...atual, modo: 'coruja', video: 0, marco: agora };
+      return { ...atual, video: indice };
     }
     case 'relogio': {
       const parado = agora - atual.marco;
