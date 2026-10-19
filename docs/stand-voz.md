@@ -68,13 +68,6 @@ O teto diário soma o TTS (caracteres × 0,5 no turbo/flash, × 1 nos outros) e 
 | `STAND_TETO_DIARIO_CREDITOS` | `25000` | Teto diário de créditos ElevenLabs. |
 | `ROUTER_API_KEY` | vazio | 9Router Railway (cérebro e embeddings do roteador de vídeo). |
 
-## Decisão: Claude no cérebro do stand (19/10/2026)
+## Decisões
 
-**Contexto.** Desde 18/10, todo o produto usa só o Astra (`cx/gpt-6-astra-*`), e `server/config.js` recusa outro modelo. A voz do stand responde em tempo real, e o Lucas pediu Claude/Sonnet para ela.
-
-**Decisão.** Exceção só no cérebro do stand: `cadeiaCerebroStand` aceita `cc/claude-*`, com a cadeia Sonnet 5 → Haiku 4.5 → Astra → fala pronta. A rota `cc/` passa pelo mesmo 9Router Railway, sem conta nova. Fora do stand, a regra do Astra continua (teste em `server/config.test.js`).
-
-**Consequências.**
-- Se o p50 do primeiro áudio passar de 3,5 s, a troca para Haiku como padrão sobe ao Lucas com números.
-- Retenção: o modo sem retenção da ElevenLabs (`enable_logging=false`) só existe no plano enterprise. O stand segue o padrão do provedor, aceito em 19/10.
-- A Grok Voice fica como reserva por env, até alguém decidir tirá-la.
+- [ADR 0002](./adr/0002-claude-no-cerebro-da-voz-do-stand.md): Claude no cérebro da voz do stand, exceção à regra do Astra.

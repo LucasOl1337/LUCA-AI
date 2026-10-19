@@ -70,6 +70,18 @@ _Evitar_: Mascote, bot, Sompo (a Sompo só aparece como texto).
 As três telas do modo Coruja. Atração chama o público e volta sozinha após 10 s de voz ociosa. Conversa mostra o Avatar LUCA grande, o indicador ouvindo/pensando/falando e a legenda. Vídeo toca um Vídeo do stand em tela cheia com o avatar pequeno no canto e, ao terminar ou ser pulado (tecla N), volta para Conversa.
 _Evitar_: Modo (Modo é Coruja, Vitrine ou Simulação), cena.
 
+**Turno de voz**:
+Uma pergunta do público e a resposta falada do LUCA: o Scribe transcreve no navegador, o servidor pensa com Claude e devolve frases com áudio por `POST /api/stand/turno`. Detalhes em `docs/stand-voz.md`.
+_Evitar_: Mensagem, request.
+
+**Interrupção**:
+O público fala por cima do LUCA: a voz abaixa na hora e, se a transcrição parcial tiver palavras de verdade que não sejam eco, a fala para e o turno anterior é abortado.
+_Evitar_: Barge-in (só no código e nas docs técnicas), corte.
+
+**Teto diário de créditos**:
+Limite de créditos ElevenLabs (TTS + Scribe) gastos pela voz do stand num dia de Brasília, contado no servidor. Estourado, a voz pausa até a meia-noite e o status diz `teto_diario`.
+_Evitar_: Cota, franquia.
+
 **Vídeo do stand**:
 Resposta pré-gravada a uma pergunta central do público do stand, identificada por um id (`pipeline-completo`, `painel-sompo`, `painel-segurado`).
 _Evitar_: Clipe, demo, apresentação.
