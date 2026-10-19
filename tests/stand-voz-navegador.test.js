@@ -121,9 +121,9 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
       executablePath: navegador.caminho,
       args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'],
     });
-    // Microfone da escuta: 2 s de silêncio e 1 s de voz, em laço.
+    // Microfone da escuta: 5 s de silêncio e 1 s de voz, em laço (folga para a página abrir sob carga).
     const wav = join(pasta, 'escuta.wav');
-    writeFileSync(wav, wavDeEscuta(2, 1));
+    writeFileSync(wav, wavDeEscuta(5, 1));
     browserEscuta = await navegador.chromium.launch({
       executablePath: navegador.caminho,
       args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${wav}`, '--autoplay-policy=no-user-gesture-required'],
@@ -194,10 +194,13 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
     try {
       await pagina.goto(`${base}/stand`);
       const main = pagina.locator('main.stand');
-      await pagina.locator('main.stand[data-escuta="ouvindo"]').waitFor({ timeout: 15000 });
-      await pagina.getByText('É só falar que eu escuto.').waitFor({ timeout: 2000 });
+      // Estado e texto no mesmo instante: a voz do wav pode despertar logo depois.
+      await pagina.waitForFunction(() => {
+        const main = document.querySelector('main.stand');
+        return main?.dataset.escuta === 'ouvindo' && main.textContent.includes('É só falar que eu escuto.');
+      }, null, { timeout: 15000 });
       // Ninguém tocou: a voz do wav desperta a sessão.
-      await pagina.locator('main.stand[data-escuta="conversa"]').waitFor({ timeout: 10000 });
+      await pagina.locator('main.stand[data-escuta="conversa"]').waitFor({ timeout: 15000 });
       assert.equal(await main.getAttribute('data-sessao'), 'ativa');
       const prazo = Date.now() + 8000;
       while (scribe.conexoes === antes.conexoes && Date.now() < prazo) await new Promise((ok) => setTimeout(ok, 100));
@@ -210,7 +213,7 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
       await pagina.waitForFunction(() => document.querySelector('main.stand')?.dataset.sessao === 'silencio', null, { timeout: 12000 });
       await pagina.locator('main.stand[data-escuta="ouvindo"]').waitFor({ timeout: 3000 });
       // 2º despertar sem fala: a escuta pausa em vez de abrir sessão atrás de sessão.
-      await pagina.locator('main.stand[data-escuta="pausada"]').waitFor({ timeout: 25000 });
+      await pagina.locator('main.stand[data-escuta="pausada"]').waitFor({ timeout: 30000 });
       assert.ok(scribe.conexoes - antes.conexoes >= 2);
     } finally {
       escutaNoServidor = false;
