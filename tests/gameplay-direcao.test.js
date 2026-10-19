@@ -128,3 +128,54 @@ test('sensor: só enxerga o que está na linha da frente e até 400 cm', () => {
   const deLado = { ...perto, z: 2 };
   assert.equal(fisica.leituraSensor(pose, [deLado]).eco, false);
 });
+
+test('guinada: entra progressivamente e conserva brevemente o giro ao centralizar o volante', () => {
+  const mundo = { obstaculos: [], tetoKph: 6 };
+  const comando = { esterco: 1, acelerador: 1, freio: 0 };
+  const inicial = { ...fisica.criarTrator(0), velocidade: 6 / 3.6 };
+  const alvo = -(inicial.velocidade / fisica.TRATOR.entreEixosM) * Math.tan(fisica.TRATOR.estercoMaxRad);
+  const primeiro = fisica.passoTrator(inicial, comando, 0.1, mundo);
+  assert(primeiro.guinada < 0 && primeiro.guinada > alvo);
+  const esperado = alvo * (1 - Math.exp(-0.1 / fisica.TRATOR.guinadaTauS));
+  assert(Math.abs(primeiro.guinada - esperado) < 1e-12);
+  const centralizou = fisica.passoTrator(primeiro, { ...comando, esterco: 0 }, 0.1, mundo);
+  assert(centralizou.guinada < 0 && centralizou.guinada > primeiro.guinada);
+  assert(centralizou.rumo < primeiro.rumo, 'a carroceria não interrompe o giro instantaneamente');
+  const inverteu = fisica.passoTrator(primeiro, { ...comando, esterco: -1 }, 1 / 60, mundo);
+  assert(inverteu.guinada < 0 && inverteu.guinada > primeiro.guinada, 'não salta para o lado oposto');
+});
+
+test('guinada: mesmo rumo e taxa em um passo de 100 ms ou dois de 50 ms a velocidade constante', () => {
+  const mundo = { obstaculos: [], tetoKph: 6 };
+  const comando = { esterco: 1, acelerador: 1, freio: 0 };
+  const inicial = { ...fisica.criarTrator(0), velocidade: 6 / 3.6 };
+  const inteiro = fisica.passoTrator(inicial, comando, 0.1, mundo);
+  const metade = fisica.passoTrator(inicial, comando, 0.05, mundo);
+  const dividido = fisica.passoTrator(metade, comando, 0.05, mundo);
+  assert(Math.abs(inteiro.rumo - dividido.rumo) < 1e-12);
+  assert(Math.abs(inteiro.guinada - dividido.guinada) < 1e-12);
+});
+
+test('guinada: parado não gira, contato zera a taxa, ré inverte o sentido', () => {
+  const mundo = { obstaculos: [], tetoKph: 6 };
+  const parado = { ...fisica.criarTrator(0), guinada: -0.2 };
+  const fim = fisica.passoTrator(parado, { esterco: 1, acelerador: 0, freio: 0 }, 0.1, mundo);
+  assert.equal(fim.rumo, parado.rumo);
+  assert.equal(fim.guinada, 0);
+  const re = fisica.passoTrator({ ...fisica.criarTrator(0), velocidade: -1 }, { esterco: 1, acelerador: 0, freio: 1 }, 0.1, mundo);
+  assert(re.guinada > 0 && re.rumo > 0);
+  const obstaculos = [fisica.fardoAFrente({ x: 0, z: 0, rumoGraus: 0 }, 0.01)];
+  const contato = fisica.passoTrator({ ...fisica.criarTrator(0), velocidade: 1, guinada: -0.1 }, { esterco: 0, acelerador: 1, freio: 0 }, 0.1, { ...mundo, obstaculos });
+  assert.equal(contato.contato, true);
+  assert.equal(contato.guinada, 0);
+});
+
+test('volante: soltar pad retorna ao centro em 0,4 s sem ultrapassar zero; pedais não esperam o aro', () => {
+  let comando = { esterco: 1, acelerador: 1, freio: 0 };
+  const caminho = [];
+  for (let i = 0; i < 5; i += 1) caminho.push((comando = volante.passoVolante(comando, { esterco: 0, acelerador: 0, freio: 1 }, 0.1)).esterco);
+  assert.deepEqual(caminho, [0.75, 0.5, 0.25, 0, 0]);
+  assert.deepEqual([comando.acelerador, comando.freio], [0, 1]);
+  const semTempo = volante.passoVolante({ esterco: -1, acelerador: 0, freio: 0 }, volante.COMANDO_PARADO, 0);
+  assert.equal(semTempo.esterco, -1);
+});

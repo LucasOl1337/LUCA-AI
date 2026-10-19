@@ -15,6 +15,8 @@ export const TRATOR = Object.freeze({
   arrasto: 0.5, // m/s² rolando sem pedal
   estercoMaxRad: 0.48, // limite visual do rig (sompoSteeringAngle)
   entreEixosM: 2.6625, // SOMPO_AGRI_RIG_LAYOUT['max-tractor']
+  /** Resposta da guinada: alcança 95% do alvo em ~0,54 s, sem salto ao inverter o volante. */
+  guinadaTauS: 0.18,
   bitolaM: 2.087, // eixo traseiro: 2 × z 1.0435 do mesmo layout
   /** Emissor do HC-SR04 à frente da origem da máquina. */
   sensorFrenteM: 2.2461,
@@ -81,8 +83,13 @@ export function passoTrator(estado: EstadoTrator, comando: ComandoVolante, dt: n
   } else {
     v = Math.min(0, v + (TRATOR.arrasto + acelerador * TRATOR.frenagem) * segundos);
   }
-  const guinada = -(v / TRATOR.entreEixosM) * Math.tan(esterco * TRATOR.estercoMaxRad);
-  const rumo = estado.rumo + guinada * segundos;
+  const alvoGuinada = -(v / TRATOR.entreEixosM) * Math.tan(esterco * TRATOR.estercoMaxRad);
+  const retencao = Math.exp(-segundos / TRATOR.guinadaTauS);
+  // Integral exata do filtro para alvo constante: não muda a curva só por trocar o FPS.
+  const guinada = v === 0 ? 0 : alvoGuinada + (estado.guinada - alvoGuinada) * retencao;
+  const giro = v === 0 ? 0 : alvoGuinada * segundos
+    + (estado.guinada - alvoGuinada) * TRATOR.guinadaTauS * (1 - retencao);
+  const rumo = estado.rumo + giro;
   let passo = v * segundos;
   let contato = false;
   if (passo > 0) {
@@ -93,7 +100,7 @@ export function passoTrator(estado: EstadoTrator, comando: ComandoVolante, dt: n
   const x = limitar(livreX, -TRATOR.cercaM, TRATOR.cercaM), z = limitar(livreZ, -TRATOR.cercaM, TRATOR.cercaM);
   if (x !== livreX || z !== livreZ) v = 0;
   return {
-    x, z, rumo, velocidade: v, percurso: estado.percurso + passo, guinada,
+    x, z, rumo, velocidade: v, percurso: estado.percurso + passo, guinada: v === 0 ? 0 : guinada,
     // Continua encostado enquanto empurra o fardo parado.
     contato: contato || (estado.contato && v === 0 && acelerador > 0),
   };
