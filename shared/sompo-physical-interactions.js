@@ -1,11 +1,28 @@
 // Visual interpretation only: never changes device flags or sends commands.
 export const SOMPO_CARGO_LIMITS = { temperature: 30, humidity: 75 };
 const finite = value => typeof value === 'number' && Number.isFinite(value);
+/** Faixas do painel: atenção abaixo de 200 cm, perigo até 100 cm ou com a flag; inclinação a partir de 20° ou com a flag. */
+export const SOMPO_PANEL_BANDS = Object.freeze({ attentionCm: 200, dangerCm: 100, inclinationDeg: 20 });
+
+/**
+ * Regra visual do painel, sem trava de fonte: serve ao gêmeo físico (com a trava
+ * `live` por fora) e à cabine do gameplay, que lê leituras simuladas a cada quadro.
+ */
+export function physicalRiskBands({ distance: rawDistance, pitch, roll, collisionFlag, inclinationFlag } = {}) {
+  const distance = finite(rawDistance) && rawDistance > 0 && rawDistance < 999 ? rawDistance : null;
+  const angle = Math.max(Math.abs(finite(pitch) ? pitch : 0), Math.abs(finite(roll) ? roll : 0));
+  const proximity = distance !== null ? Math.max(0, Math.min(1, (SOMPO_PANEL_BANDS.attentionCm - distance) / 175)) : 0;
+  const collision = collisionFlag === true || (distance !== null && distance <= SOMPO_PANEL_BANDS.dangerCm);
+  const inclination = inclinationFlag === true || angle >= SOMPO_PANEL_BANDS.inclinationDeg;
+  const proximityLevel = collision ? 'danger' : distance === null ? 'unavailable' : proximity > 0 ? 'attention' : 'clear';
+  return { distance, angle, proximity, collision, inclination, proximityLevel };
+}
+
 export function physicalInteractionState(snapshot, previous = null, limits = SOMPO_CARGO_LIMITS) {
   const live = snapshot?.source.kind === 'firebase' && snapshot.freshness === 'fresh' && snapshot.connection.state === 'live';
   const r = snapshot?.readings;
-  const distance = finite(r?.distance) && r.distance > 0 && r.distance < 999 ? r.distance : null;
-  const angle = Math.max(Math.abs(r?.pitch || 0), Math.abs(r?.roll || 0));
+  const bands = physicalRiskBands({ distance: r?.distance, pitch: r?.pitch, roll: r?.roll, collisionFlag: snapshot?.risks.collision, inclinationFlag: snapshot?.risks.inclination });
+  const { distance, angle } = bands;
   const magnitude = r?.acceleration?.magnitude;
   const before = previous?.readings.acceleration?.magnitude;
   const contiguous = previous?.tractorId === snapshot?.tractorId
@@ -15,9 +32,9 @@ export function physicalInteractionState(snapshot, previous = null, limits = SOM
   // Magnitude avoids treating a change of gravity direction as an impact.
   const shock = live && contiguous && finite(magnitude) && finite(before)
     ? Math.min(1, Math.max(0, (Math.abs(magnitude - before) - 2.5) / 8)) : 0;
-  const proximity = live && distance !== null ? Math.max(0, Math.min(1, (200 - distance) / 175)) : 0;
-  const collision = live && (snapshot.risks.collision === true || (distance !== null && distance <= 100));
-  const inclination = live && (snapshot.risks.inclination === true || angle >= 20);
+  const proximity = live ? bands.proximity : 0;
+  const collision = live && bands.collision;
+  const inclination = live && bands.inclination;
   const heat = live && finite(r?.temperature) && r.temperature > limits.temperature;
   const damp = live && finite(r?.humidity) && r.humidity > limits.humidity;
   const labels = [];
