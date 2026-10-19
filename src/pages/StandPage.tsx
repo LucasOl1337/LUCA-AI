@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type CSSProperties } from 'react';
 import { useAppLocation } from '@/hooks/useAppLocation';
+import { useAuth } from '@/hooks/useAuth';
 import { useSessaoVoz } from '@/stand-voz/useSessaoVoz';
 import { useEscuta } from '@/stand-voz/useEscuta';
 import type { Emprestimo } from '@/stand-voz/sessaoTurnos';
@@ -44,14 +45,20 @@ const STATUS_A_CADA_MS = 60_000;
  */
 const MODOS_COM_ESCUTA: readonly string[] = ['coruja', 'vitrine', 'site'];
 
-function useStatusStand(ativo: boolean, fimSessao: unknown) {
+function useStatusStand(ativo: boolean, fimSessao: unknown, aoPerderSessao: () => void) {
   const [status, setStatus] = useState<StatusStand | null>(null);
+  const perdeu = useRef(aoPerderSessao);
+  perdeu.current = aoPerderSessao;
   useEffect(() => {
     if (!ativo) return undefined;
     let vivo = true;
     const buscar = () => {
       fetch('/api/stand/status', { credentials: 'same-origin' })
-        .then(async (r) => (r.ok ? r.json() : { ligado: false, motivo: `status_http_${r.status}` }))
+        .then(async (r) => {
+          // Sessão caiu com o stand aberto: o useAuth confere e o main.tsx troca para o Stand sem login.
+          if (r.status === 401) perdeu.current();
+          return r.ok ? r.json() : { ligado: false, motivo: `status_http_${r.status}` };
+        })
         .then((dados) => { if (vivo && dados) setStatus({ ligado: !!dados.ligado, motivo: dados.motivo ?? null, escuta: !!dados.escuta }); })
         // Sem status, não promete microfone: o totem segue com Vitrine e Simulação.
         .catch(() => { if (vivo) setStatus({ ligado: false, motivo: 'status_indisponivel' }); });
@@ -78,7 +85,8 @@ export default function StandPage() {
   prontos.current = disponiveis(ITENS_VITRINE, telas.prontidao);
   const [agora, setAgora] = useState(() => Date.now());
   const voz = useSessaoVoz();
-  const status = useStatusStand(!modoStub, voz.fim);
+  const { refreshSession } = useAuth();
+  const status = useStatusStand(!modoStub, voz.fim, refreshSession);
   const vozStand = modoStub ? 'ligada' : vozDoStand(status, voz.fim, agora);
   /** Escuta ligada no servidor: abre o microfone (Totem-Voz) e deixa a Vitrine muda (Totem-Tela). */
   const escutaLigada = escutaNoStand(status, vozStand, modoStub);

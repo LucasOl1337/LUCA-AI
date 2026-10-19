@@ -214,6 +214,8 @@
 .stand-aviso-mudo { right: var(--stand-margem); bottom: calc(var(--stand-margem) / 2); }
 /* Controle não reconhecido: mesmo canto, uma linha acima do aviso de som. */
 .stand-aviso-controle { pointer-events: none; bottom: 2.4vmin; }
+/* Stand sem login: o aviso da equipe fica no canto de cima, longe da barra e da legenda. */
+.stand-aviso-sem-login { pointer-events: none; top: 0; bottom: auto; }
 
 /* Simulação: o simulador do MAX ocupa o monitor inteiro. */
 .stand-simulacao { position: absolute; inset: 0; background: #07100c; cursor: default; }

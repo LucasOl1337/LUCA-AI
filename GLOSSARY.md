@@ -66,6 +66,10 @@ _Evitar_: Latência (não é latência).
 O ciclo sem ninguém por perto: Coruja na Atração, depois de 60 s sem toque, controle ou voz vai para a Vitrine, e no fim de cada volta da Vitrine sem ninguém retorna à Coruja.
 _Evitar_: Ocioso, standby (termo do supervisor).
 
+**Stand sem login**:
+O `/stand` quando o navegador do totem não tem sessão (401). No lugar da tela de login mostra a Coruja sem voz e a Vitrine só com os vídeos públicos; Simulação, Site, voz, escuta e Telas do app ficam de fora, porque leem a API. O aviso "sem login" no canto é para a equipe: Shift+Q abre o login ali mesmo e, ao entrar, o stand completo volta (`src/components/stand/StandSemLogin.tsx`).
+_Evitar_: Modo offline, modo de demonstração (a internet pode estar ok; o que falta é a sessão).
+
 **Avatar LUCA**:
 O personagem que fala pela IA do stand (`src/components/stand/AvatarLuca.tsx`). O padrão é a `coruja-a`: a arte aprovada da coruja tech branca e azul com headset, animada em camadas SVG (piscar, olhar, respiração, visor), e a voz aparece no halo e nas luzes do headset, sem boca. Na tela aparece só como "LUCA". Variações vetoriais antigas por `?variante=`: `coruja`, `operario` e `robo`.
 _Evitar_: Mascote, bot, Sompo (a Sompo só aparece como texto).
