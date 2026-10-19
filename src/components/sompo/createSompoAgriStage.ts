@@ -21,7 +21,7 @@ import { createSompoEnvironmentAssets } from './createSompoEnvironmentAssets';
 import { createSompoAtmosphere } from './createSompoAtmosphere';
 import { createSompoPostProcessing } from './createSompoPostProcessing';
 import { createSompoRenderMeter } from './sompoStage';
-import { DEGRAUS, pixelRatioDoDegrau, qualidadeInicial, regularQualidade } from './qualidadeAdaptativa';
+import { PERFIL_PADRAO, pixelRatioDoDegrau, qualidadeInicial, regularQualidade, type PerfilQualidade } from './qualidadeAdaptativa';
 import { exportSompoModel } from './refineSompoTruck';
 import { SOMPO_STUDIO_DEFAULT, type SompoStudioConfig, type SompoRenderStats } from './sompoStudioConfig';
 import { sensorReadingToPose, type SompoAxisCalibration } from './sensorPose.js';
@@ -127,7 +127,7 @@ function createUltrasonicBeam(origin: readonly [number, number, number]) {
  * real em forma fechada: separado do loop do caminhão para não arriscar o
  * fluxo rural. Desmontado e remontado a cada troca de cenário/desfecho.
  */
-export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig, adaptiveQuality = false, obstaclesRef, assetUrl }: {
+export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig, adaptiveQuality = false, obstaclesRef, assetUrl, qualityProfile = PERFIL_PADRAO }: {
   mount: HTMLElement;
   scenarioId: SompoAgriScenarioId;
   outcomeId: string;
@@ -152,6 +152,8 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   obstaclesRef?: { current: readonly { x: number; z: number; radius: number }[] };
   /** GLB da máquina no lugar do catálogo (gameplay: MAX com cabine). Sem ele, a URL de sempre. */
   assetUrl?: string;
+  /** Degraus e limiares da qualidade automática; o padrão é o do totem clássico. */
+  qualityProfile?: PerfilQualidade;
 }): SompoAgriStageApi | null {
   const scenario = getSompoAgriScenario(scenarioId);
   const operation = scenario.environmentId === 'geofence-operacao';
@@ -194,9 +196,10 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   const atmosphere = createSompoAtmosphere(scene, renderer, field.sun);
   const post = createSompoPostProcessing(renderer, scene, camera);
   // Qualidade automática (só no totem): o medidor de 1 s alimenta o regulador.
-  let qualidade = qualidadeInicial(Math.max(0, DEGRAUS.findIndex(d => d.pixelRatio <= renderer.getPixelRatio())));
+  const degraus = qualityProfile.degraus;
+  let qualidade = qualidadeInicial(qualityProfile.degrauInicial ?? Math.max(0, degraus.findIndex(d => d.pixelRatio <= renderer.getPixelRatio())), qualityProfile);
   const aplicarDegrau = () => {
-    const degrau = DEGRAUS[qualidade.degrau];
+    const degrau = degraus[qualidade.degrau];
     const ratio = pixelRatioDoDegrau(degrau, window.devicePixelRatio);
     // setPixelRatio do three já refaz o tamanho do canvas e dos alvos do composer.
     if (ratio !== renderer.getPixelRatio()) { renderer.setPixelRatio(ratio); post.setPixelRatio(ratio); }
@@ -212,7 +215,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     onStats?.(stats);
     if (!adaptiveQuality) return;
     const anterior = qualidade.degrau;
-    qualidade = regularQualidade(qualidade, stats.fps, performance.now());
+    qualidade = regularQualidade(qualidade, stats.fps, performance.now(), qualityProfile);
     if (qualidade.degrau !== anterior) aplicarDegrau();
   });
   if (adaptiveQuality) aplicarDegrau();

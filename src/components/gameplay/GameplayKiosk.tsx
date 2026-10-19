@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type * as THREE from 'three';
 import { getSompoAgriOutcomes } from '../../../shared/sompo-agri-brief.js';
 import { mountSompoAgriStage } from '../sompo/createSompoAgriStage';
+import { PERFIL_GAMEPLAY } from '../sompo/qualidadeAdaptativa';
 import type { SompoCameraRig, SompoDrivePose } from '../sompo/sompoStage';
 import type { SompoRenderStats } from '../sompo/sompoStudioConfig';
 import { createFirstPersonRig } from '../sompo/firstPersonCamera';
@@ -139,6 +140,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl }: { criarCabine?
       },
       cameraRig: rig,
       adaptiveQuality: true,
+      qualityProfile: PERFIL_GAMEPLAY,
       obstaclesRef: obstaculosDoPalco(motor),
       assetUrl: modeloUrl,
     });
