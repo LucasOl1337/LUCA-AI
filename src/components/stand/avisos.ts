@@ -28,6 +28,14 @@ function caiuNaAbertura(fim: Fim, agora: number): boolean {
 }
 
 /**
+ * Escuta ligada no stand: voz ligada e `escuta` no status do servidor (`STAND_ESCUTA` ≠ 0).
+ * Sinal único para a Escuta (Totem-Voz) e para a Vitrine muda (Totem-Tela). Nunca no stub.
+ */
+export function escutaNoStand(status: StatusStand | null, voz: VozStand, stub = false): boolean {
+  return !stub && voz === 'ligada' && Boolean(status?.escuta);
+}
+
+/**
  * Motivo do modo sem voz, para a equipe e para os testes (`data-motivo` no
  * `<main>`): o motivo do servidor, `desligado:<detalhe>` ou `erro:<detalhe>`.
  * Vazio com voz.

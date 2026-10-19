@@ -9,7 +9,7 @@ import { criarCanalStub } from '@/components/stand/canalStub';
 import { reduzirTela, telaInicial, type EntradaTela, type EstadoTela } from '@/components/stand/telaStand';
 import { Atracao, Conversa, PlayerVideo } from '@/components/stand/Telas';
 import { tratarTecla, type AtalhosStand } from '@/components/stand/atalhos';
-import { avisoDeControle, avisoParaEquipe, chamadaDeInicio, chamadaSemVoz, motivoSemVoz, vozDoStand, type StatusStand } from '@/components/stand/avisos';
+import { avisoDeControle, avisoParaEquipe, chamadaDeInicio, chamadaSemVoz, escutaNoStand, motivoSemVoz, vozDoStand, type StatusStand } from '@/components/stand/avisos';
 import { VIDEOS_VITRINE, videoDoStand } from '@/components/stand/videosStand';
 import { descreverPulos, disponiveis, montarItens } from '@/components/stand/vitrineStand';
 import { TelaLab, TelaTrator, useTelasDoApp } from '@/components/stand/TelasDoApp';
@@ -77,6 +77,8 @@ export default function StandPage() {
   const voz = useSessaoVoz();
   const status = useStatusStand(!modoStub, voz.fim);
   const vozStand = modoStub ? 'ligada' : vozDoStand(status, voz.fim, agora);
+  /** Escuta ligada no servidor: abre o microfone (Totem-Voz) e deixa a Vitrine muda (Totem-Tela). */
+  const escutaLigada = escutaNoStand(status, vozStand, modoStub);
   const { iniciar: iniciarVoz, encerrar: encerrarVoz } = voz;
   // Escuta: na Coruja, alguém falando abre a conversa sem toque (Lucas, 19/10).
   const despertar = useCallback((emprestimo: Emprestimo) => {
@@ -84,7 +86,7 @@ export default function StandPage() {
     void iniciarVoz(emprestimo);
   }, [iniciarVoz]);
   const escuta = useEscuta({
-    ativa: !modoStub && vozStand === 'ligada' && Boolean(status?.escuta) && MODOS_COM_ESCUTA.includes(modo.modo),
+    ativa: escutaLigada && MODOS_COM_ESCUTA.includes(modo.modo),
     emConversa: voz.ativa,
     fim: voz.fim,
     despertar,
@@ -274,7 +276,7 @@ export default function StandPage() {
         </div>
       )}
       {modo.modo === 'vitrine' && (
-        <VitrineStand item={itemVitrine} pausado={modo.pausado} aoTerminar={terminarVitrine} telaApp={telaApp} pulos={descreverPulos(telas.prontidao)} />
+        <VitrineStand item={itemVitrine} pausado={modo.pausado} aoTerminar={terminarVitrine} telaApp={telaApp} pulos={descreverPulos(telas.prontidao)} semSom={escutaLigada} />
       )}
       {modo.modo === 'simulacao' && <SimulacaoStand />}
       {modo.modo === 'site' && modo.pagina && (

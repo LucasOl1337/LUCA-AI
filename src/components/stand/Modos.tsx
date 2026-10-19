@@ -15,8 +15,10 @@ export function preCarregarSimulador() {
 /**
  * Vitrine: vídeos do stand intercalados com Telas do app (`telaApp`, já montada pela página).
  * `pulos` vai em `data-pulada` só para a equipe: o público nunca vê o motivo.
+ * `semSom`: com a Escuta ligada o microfone fica aberto, então os vídeos tocam mudos
+ * (a coruja não pode se ouvir). A fala fica na legenda, que já vem queimada nos vídeos.
  */
-export function VitrineStand({ item, pausado, aoTerminar, telaApp, pulos }: { item: ItemVitrine | undefined; pausado: boolean; aoTerminar(): void; telaApp?: ReactNode; pulos?: string }) {
+export function VitrineStand({ item, pausado, aoTerminar, telaApp, pulos, semSom = false }: { item: ItemVitrine | undefined; pausado: boolean; aoTerminar(): void; telaApp?: ReactNode; pulos?: string; semSom?: boolean }) {
   const video = item?.tipo === 'video' ? item.video : undefined;
   const ref = useRef<HTMLVideoElement | null>(null);
   const [mudo, setMudo] = useState(false);
@@ -26,17 +28,17 @@ export function VitrineStand({ item, pausado, aoTerminar, telaApp, pulos }: { it
     const el = ref.current;
     if (!el) return;
     if (pausado) { el.pause(); return; }
-    el.muted = false;
+    el.muted = semSom;
     el.play().then(() => setMudo(false)).catch(() => {
       el.muted = true;
-      setMudo(true);
+      setMudo(!semSom);
       void el.play().catch(() => undefined);
     });
-  }, [video?.arquivo, pausado]);
+  }, [video?.arquivo, pausado, semSom]);
 
   // Um toque na tela dá ativação ao documento; dali em diante o som é liberado.
   useEffect(() => {
-    if (!mudo) return undefined;
+    if (!mudo || semSom) return undefined;
     const liberar = () => {
       const el = ref.current;
       if (!el) return;
@@ -49,13 +51,13 @@ export function VitrineStand({ item, pausado, aoTerminar, telaApp, pulos }: { it
 
   if (!item) return <section className="stand-vitrine stand-vitrine-vazia" aria-label="Vitrine" data-pulada={pulos}><p>Vitrine sem vídeos</p></section>;
   return (
-    <section className="stand-vitrine" aria-label={`Vitrine: ${item.titulo}`} data-item={item.tipo} data-pausado={pausado || undefined} data-pulada={pulos}>
+    <section className="stand-vitrine" aria-label={`Vitrine: ${item.titulo}`} data-item={item.tipo} data-pausado={pausado || undefined} data-pulada={pulos} data-som={semSom ? 'mudo_escuta' : undefined}>
       {video
-        ? <video key={video.arquivo} ref={ref} className="stand-video-player" src={video.arquivo} playsInline preload="auto" onEnded={aoTerminar} onError={aoTerminar} />
+        ? <video key={video.arquivo} ref={ref} className="stand-video-player" src={video.arquivo} muted={semSom} playsInline preload="auto" onEnded={aoTerminar} onError={aoTerminar} />
         : telaApp}
       <p className="stand-vitrine-legenda">{item.titulo}</p>
       {pausado && <p className="stand-vitrine-pausa" role="status">Pausado · ✕ continua</p>}
-      {mudo && video && <p className="stand-aviso-equipe stand-aviso-mudo">sem som até um toque (kiosk sem --autoplay-policy)</p>}
+      {mudo && !semSom && video && <p className="stand-aviso-equipe stand-aviso-mudo">sem som até um toque (kiosk sem --autoplay-policy)</p>}
     </section>
   );
 }
