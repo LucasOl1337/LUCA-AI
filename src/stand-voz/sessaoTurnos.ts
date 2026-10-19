@@ -12,7 +12,7 @@ import { assinarEventosPagina, emitirEventoStand } from './barramento';
 import { SEM_FALA_MS } from './escuta';
 import { base64DePcm16, criarDetectorFala } from './protocolo';
 import type { EtapaSessao, FimSessao, SessaoDeVoz, SessaoServidor } from './sessaoVoz';
-import { eventoScribe, interrompeFala, lerNdjson, mensagemAudioScribe, pareceEco, vaiAoCerebro, type LinhaTurno } from './turnos';
+import { eventoScribe, interrompeFala, lerNdjson, mensagemAudioScribe, pareceEco, vaiAoCerebro, valeEnquantoPensa, type LinhaTurno } from './turnos';
 
 export interface SessaoServidorTurnos extends Omit<SessaoServidor, 'conexao'> {
   conexao: { transporte: 'scribe'; url: string };
@@ -241,6 +241,9 @@ export class SessaoTurnos implements SessaoDeVoz {
     if (evento.tipo === 'outro' || this.videoTocando || !evento.texto) return;
     const durante = this.emFalaOuCauda();
     if (pareceEco(evento.texto, this.textoFalado(), { durante })) return;
+    // Resposta a caminho: 1 palavra solta não atropela o turno. Na fala, "sim"
+    // curto por cima do fim da pergunta do LUCA é resposta e continua valendo.
+    if (this.estado === 'pensando' && !valeEnquantoPensa(evento.texto, this.textoFalado())) return;
     if (evento.tipo === 'parcial') {
       if (this.estado === 'falando' || this.fila?.tocando) {
         // 2º tempo do barge-in: palavras de verdade por cima da fala.

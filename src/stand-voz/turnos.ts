@@ -101,6 +101,16 @@ export function interrompeFala(parcial: string, falado: string): boolean {
 }
 
 /**
+ * Trecho ouvido com a resposta a caminho (estado `pensando`): só troca a
+ * legenda ou refaz a pergunta com 2+ palavras de verdade. O Scribe às
+ * vezes devolve um "Oi?" solto no silêncio logo depois de fechar a frase
+ * (prova de 19/10, 67 s); isso não é o visitante e não pode atropelar a resposta.
+ */
+export function valeEnquantoPensa(texto: string, falado: string): boolean {
+  return interrompeFala(texto, falado);
+}
+
+/**
  * Pergunta que vale um turno: pelo menos 2 letras. Ruído e "hã" isolado não
  * gastam uma das 8 respostas da conversa.
  */
