@@ -127,15 +127,19 @@ O operador dirige com o controle, sem roteiro. Não grava episódio, e o que apa
 _Evitar_: Case livre, desfecho manual.
 
 **Desafio**:
-Um trecho curto da Simulação, de até 90 s, com começo, objetivo e fim, jogado no Modo cabine com teto de 6 km/h (fora dele a Condução livre segue a 12 km/h). Hoje: o fardo à frente (parar antes do fardo com o alerta tocando); o pendente lateral entra quando o terreno tiver inclinação. Termina ao parar perto do obstáculo, ao encostar nele ou ao estourar o tempo. Não grava episódio. Lista em `src/components/gameplay/desafios.ts`.
+Um trecho curto da Simulação, de até 90 s, com começo, objetivo e fim, jogado no Modo cabine com teto de 6 km/h (fora dele a Condução livre segue a 12 km/h). Hoje: o fardo à frente (parar antes do fardo com o alerta tocando). O pendente lateral (atravessar 30 m de encosta e frear quando o alerta de inclinação de 20° tocar) já está escrito, mas fica desligado até o terreno ter inclinação. O fardo termina ao parar perto do obstáculo, ao encostar nele ou ao estourar o tempo. O pendente termina ao parar depois do alerta, ao atravessar, ao Tombar ou ao estourar o tempo. Não grava episódio. Lista em `src/components/gameplay/desafios.ts`.
 _Evitar_: Missão, fase, nível.
 
 **Painel da cabine**:
 O que o operador vê do sistema LUCA-AI dentro da cabine durante a Simulação: distância do sensor frontal na cor da faixa (verde a partir de 200 cm, amarelo abaixo, vermelho até 100 cm ou com alerta), a faixa vermelha "Obstáculo a 1,5 m · freie" no alto do para-brisa quando o alerta de 150 cm acende, o bipe e o selo SIMULADO sempre visível. A regra de cor é a mesma do `/sompo` (`physicalRiskBands` em `shared/sompo-physical-interactions.js`); a tradução do estado em cor, rótulo e bipe está em `src/components/gameplay/alertaCabine.ts`.
 _Evitar_: HUD (só no código antigo `firstPersonHud`), dashboard.
 
+**Tombou**:
+Desfecho do pendente lateral quando a rolagem ou a arfagem passa de 35°. O número vem do cenário de tombamento do `/sompo`, em que a parada controlada para em 27° e o tombamento passa por 33° e 39°. É limite de jogo, não medido nem certificado. O alerta continua sendo o de 20° do painel.
+_Evitar_: Capotou.
+
 **Resultado do desafio**:
-A tela de 10 s no fim de um Desafio: distância em que o alerta acendeu, tempo de reação (do alerta ao primeiro freio) e quanto sobrou até o obstáculo, mais uma frase (parou a tempo ou Reação atrasada). Sem ranking, sem nome e sem gravar nada.
+A tela de 10 s no fim de um Desafio: distância em que o alerta acendeu, tempo de reação (do alerta ao primeiro freio) e quanto sobrou até o obstáculo, mais uma frase (parou a tempo ou Reação atrasada). No pendente lateral: inclinação em que o alerta acendeu, tempo de reação e grau máximo que a máquina atingiu. Sem ranking, sem nome e sem gravar nada.
 _Evitar_: Placar, score (o score 0–100 do `/sompo` mede outra coisa).
 
 **Veredito da bancada**:

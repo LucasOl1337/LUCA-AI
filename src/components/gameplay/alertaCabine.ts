@@ -20,7 +20,7 @@ export interface AlertaCabine {
   faixa: FaixaCabine;
   /** "2,4 m", ou "+4 m" sem eco. */
   distanciaTexto: string;
-  /** Faixa vermelha no alto do para-brisa. */
+  /** Faixa vermelha no alto do para-brisa: alerta de 150 cm ou inclinação a partir de 20°. */
   alerta: boolean;
   /** Texto da faixa vermelha; vazio sem alerta. */
   rotuloAlerta: string;
@@ -33,6 +33,8 @@ export interface AlertaCabine {
 }
 
 export const ROTULO_ALERTA_CABINE = 'Obstáculo a 1,5 m · freie';
+/** Faixa vermelha do risco de tombamento: rolagem ou arfagem a partir de 20°. */
+export const rotuloInclinacaoCabine = (graus: number) => `Inclinação de ${graus}° · freie`;
 export const BIPE_LENTO_MS = 600;
 export const BIPE_RAPIDO_MS = 200;
 
@@ -51,27 +53,32 @@ export function alertaCabine(estado: EstadoGameplay): AlertaCabine {
   const faixa: FaixaCabine = faixas.proximityLevel === 'danger' ? 'perigo'
     : faixas.proximityLevel === 'attention' ? 'atencao' : 'livre';
   const perto = faixas.distance !== null && faixas.distance <= 100;
+  const graus = Math.round(faixas.angle);
 
   let bipe: BipeCabine = MUDO;
   if (fase === 'dirigindo') {
     if (contato || perto) bipe = { intervaloMs: 0, frequenciaHz: 1320 };
     else if (sensor.alerta) bipe = { intervaloMs: BIPE_RAPIDO_MS, frequenciaHz: 1180 };
+    // Mesmo ritmo do alerta, tom mais grave: dá para saber qual dos dois sem olhar.
+    else if (faixas.inclination) bipe = { intervaloMs: BIPE_RAPIDO_MS, frequenciaHz: 660 };
     else if (faixa === 'atencao') bipe = { intervaloMs: BIPE_LENTO_MS, frequenciaHz: 880 };
   }
 
   const rotulo = contato ? 'Contato com o obstáculo'
     : sensor.alerta ? 'Alerta de colisão'
+      : faixas.inclination ? 'Risco de tombamento'
       : faixa === 'atencao' ? 'Obstáculo à frente'
         : sensor.eco ? 'Caminho livre' : 'Sem obstáculo no alcance';
 
   return {
     faixa,
     distanciaTexto: sensor.eco ? metros(sensor.distanciaCm) : '+4 m',
-    alerta: sensor.alerta,
-    rotuloAlerta: sensor.alerta ? ROTULO_ALERTA_CABINE : '',
+    alerta: sensor.alerta || faixas.inclination,
+    // Os dois juntos: o obstáculo vem primeiro, é o que pede freio mais rápido.
+    rotuloAlerta: sensor.alerta ? ROTULO_ALERTA_CABINE : faixas.inclination ? rotuloInclinacaoCabine(graus) : '',
     rotulo,
     velocidadeTexto: `${Math.round(maquina.velocidadeKph)} km/h${maquina.re ? ' · ré' : ''}`,
-    inclinacao: { ligada: faixas.inclination, graus: Math.round(faixas.angle) },
+    inclinacao: { ligada: faixas.inclination, graus },
     bipe,
   };
 }

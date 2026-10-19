@@ -45,7 +45,7 @@ export function DesafioCabine({ canal, desafio = DESAFIO_FARDO, som = true }: { 
       avaliar();
     });
     const semEvento = canal.aoEvento((evento) => {
-      rastro.current = eventoDesafio(rastro.current, evento, canal.ler());
+      rastro.current = eventoDesafio(rastro.current, evento, canal.ler(), desafio);
     });
     return () => { semMudanca(); semEvento(); };
   }, [etapa.tipo, canal, desafio]);

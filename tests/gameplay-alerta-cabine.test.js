@@ -67,6 +67,22 @@ test('inclinação liga a partir de 20° na rolagem ou arfagem', () => {
   assert.equal(alertaCabine(estado({ arfagem: 22 })).inclinacao.ligada, true);
 });
 
+test('risco de tombamento acende a faixa vermelha e bipa mais grave; obstáculo tem prioridade', () => {
+  const calmo = alertaCabine(estado({ rolagem: -19.4 }));
+  assert.equal(calmo.alerta, false);
+  assert.equal(calmo.rotuloAlerta, '');
+  const inclinado = alertaCabine(estado({ rolagem: -21.2 }));
+  assert.equal(inclinado.alerta, true);
+  assert.equal(inclinado.rotuloAlerta, 'Inclinação de 21° · freie');
+  assert.equal(inclinado.rotulo, 'Risco de tombamento');
+  assert.deepEqual(inclinado.bipe, { intervaloMs: BIPE_RAPIDO_MS, frequenciaHz: 660 });
+  assert.equal(inclinado.faixa, 'livre', 'a cor segue a distância; a faixa vermelha avisa a inclinação');
+  const os2 = alertaCabine(estado({ cm: 140, arfagem: 25 }));
+  assert.equal(os2.rotuloAlerta, ROTULO_ALERTA_CABINE);
+  assert.equal(os2.bipe.frequenciaHz, 1180);
+  assert.equal(alertaCabine(estado({ rolagem: -25, fase: 'fim' })).bipe.intervaloMs, null);
+});
+
 const { createRequire } = await import('node:module');
 const require = createRequire(import.meta.url);
 const { createElement } = require('react');

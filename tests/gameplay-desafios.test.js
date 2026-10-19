@@ -32,7 +32,7 @@ test('parou a tempo: alerta a 150 cm, freio 0,5 s depois, parado com alerta aces
     { t: 10_000, cm: 150 }, { t: 10_500, cm: 70, freio: 1 },
     { t: 10_900, cm: 33, kph: 0, freio: 1 },
   ]);
-  assert.deepEqual(r.resultado, { desfecho: 'parou', alertaCm: 150, reacaoS: 0.5, paradaCm: 33, contatoKph: null });
+  assert.deepEqual(r.resultado, { desafio: 'fardo-a-frente', desfecho: 'parou', alertaCm: 150, reacaoS: 0.5, paradaCm: 33, contatoKph: null });
   const texto = textoResultado(r.resultado);
   assert.equal(texto.titulo, 'Parou a tempo');
   assert.deepEqual(texto.linhas, ['O LUCA-AI avisou a 150 cm do fardo', 'Você freou 0,5 s depois do aviso', 'Parou a 33 cm']);
@@ -89,7 +89,7 @@ test('fase fim da Direção encerra e resultado fechado não muda mais', () => {
 
 test('resultado não carrega nome nem dado pessoal', () => {
   const r = rodar([{ t: 1000 }, { t: DESAFIO_FARDO.limiteMs }]);
-  assert.deepEqual(Object.keys(r.resultado).sort(), ['alertaCm', 'contatoKph', 'desfecho', 'paradaCm', 'reacaoS']);
+  assert.deepEqual(Object.keys(r.resultado).sort(), ['alertaCm', 'contatoKph', 'desafio', 'desfecho', 'paradaCm', 'reacaoS']);
 });
 
 const { createRequire } = await import('node:module');
@@ -99,7 +99,7 @@ const { renderToStaticMarkup } = require('react-dom/server');
 const { ResultadoDesafio, AberturaDesafio } = await loadFrontendModule('../../src/components/gameplay/ResultadoDesafio.tsx');
 
 test('tela de resultado: título, três linhas, frase, selo e contagem', () => {
-  const resultado = { desfecho: 'parou', alertaCm: 150, reacaoS: 0.5, paradaCm: 33, contatoKph: null };
+  const resultado = { desafio: 'fardo-a-frente', desfecho: 'parou', alertaCm: 150, reacaoS: 0.5, paradaCm: 33, contatoKph: null };
   const html = renderToStaticMarkup(createElement(ResultadoDesafio, { resultado, restanteS: 7.2 }));
   assert.match(html, /data-desfecho="parou"/);
   assert.match(html, /Parou a tempo/);
@@ -128,4 +128,91 @@ test('DesafioCabine abre na rodada 1, na abertura, com o painel montado', () => 
   assert.match(html, /data-rodada="1"/);
   assert.match(html, /data-desafio="fardo-a-frente"/);
   assert.match(html, /gameplay-painel-cabine/);
+});
+
+const { DESAFIO_PENDENTE, TOMBAMENTO_GRAUS, MOTIVO_FIM } = await loadFrontendModule('../../src/components/gameplay/desafios.ts');
+
+/** Atitude sintética: a Direção ainda não tem encosta; aqui a rolagem vem pronta em cada quadro. */
+const naEncosta = ({ t = 0, x = 0, kph = 6, freio = 0, rolagem = 0, arfagem = 0, fase = 'dirigindo' } = {}) => ({
+  ...estado({ t, kph, freio, fase }),
+  maquina: { x, z: 0, rumoGraus: 0, velocidadeKph: kph, re: false },
+  atitude: { rolagemGraus: rolagem, arfagemGraus: arfagem },
+});
+const rodarPendente = (quadros) => quadros.reduce((r, q) => passoDesafio(r, naEncosta(q), DESAFIO_PENDENTE), RASTRO_VAZIO);
+
+test('pendente lateral fica fora da lista até o terreno ter inclinação', () => {
+  assert.ok(!DESAFIOS.includes(DESAFIO_PENDENTE));
+  assert.equal(DESAFIO_PENDENTE.id, 'pendente-lateral');
+  assert.equal(DESAFIO_PENDENTE.inicio.tetoKph, 6);
+  assert.deepEqual(DESAFIO_PENDENTE.inicio.obstaculos, []);
+  assert.ok(DESAFIO_PENDENTE.limiteMs <= 90_000);
+});
+
+test('pendente: alerta em 20° de rolagem, freio 0,6 s depois, parou e chegou a 24°', () => {
+  const r = rodarPendente([
+    { t: 1000, x: 2, rolagem: -9.5 }, { t: 4000, x: 7, rolagem: -19 },
+    { t: 4500, x: 8, rolagem: -20.4 }, { t: 5100, x: 9, rolagem: -23.6, freio: 1 },
+    { t: 5600, x: 9.5, rolagem: -24.2, kph: 0, freio: 1 },
+  ]);
+  assert.deepEqual(r.resultado, { desafio: 'pendente-lateral', desfecho: 'parou', alertaGraus: 20.4, reacaoS: 0.6, grauMaximo: 24.2 });
+  const texto = textoResultado(r.resultado);
+  assert.equal(texto.titulo, 'Parou a tempo');
+  assert.deepEqual(texto.linhas, ['O LUCA-AI avisou a 20° de inclinação', 'Você freou 0,6 s depois do aviso', 'A máquina chegou a 24°']);
+  assert.equal(MOTIVO_FIM[r.resultado.desfecho], 'desafio-parou');
+});
+
+test('pendente: arfagem também conta e passar de 35° fecha como Tombou', () => {
+  const r = rodarPendente([
+    { t: 1000, x: 2, arfagem: 12 }, { t: 3000, x: 6, arfagem: 21 },
+    { t: 4000, x: 8, rolagem: -33 }, { t: 4300, x: 9, rolagem: -39 },
+  ]);
+  assert.equal(r.resultado.desfecho, 'tombou');
+  assert.equal(r.resultado.alertaGraus, 21);
+  assert.equal(r.resultado.reacaoS, null);
+  assert.equal(r.resultado.grauMaximo, 39);
+  assert.ok(r.resultado.grauMaximo >= TOMBAMENTO_GRAUS);
+  const texto = textoResultado(r.resultado);
+  assert.equal(texto.titulo, 'Tombou');
+  assert.ok(texto.linhas.includes('Você não freou depois do aviso'));
+  assert.equal(MOTIVO_FIM.tombou, 'desafio-tombou');
+});
+
+test('pendente: atravessa 30 m sem alerta', () => {
+  const r = rodarPendente([{ t: 1000, x: 3, rolagem: -8 }, { t: 10_000, x: 18, rolagem: -15 }, { t: 18_000, x: 30, rolagem: -12 }]);
+  assert.deepEqual(r.resultado, { desafio: 'pendente-lateral', desfecho: 'atravessou', alertaGraus: null, reacaoS: null, grauMaximo: 15 });
+  assert.deepEqual(textoResultado(r.resultado).linhas, ['O LUCA-AI não precisou avisar', 'A máquina chegou a 15°']);
+  assert.equal(MOTIVO_FIM.atravessou, 'desafio-atravessou');
+});
+
+test('pendente: parado sem alerta não fecha; tempo esgota com o grau máximo', () => {
+  const parado = rodarPendente([{ t: 1000, x: 2 }, { t: 2000, x: 2, kph: 0, rolagem: -10 }]);
+  assert.equal(parado.resultado, null);
+  const r = rodarPendente([{ t: 1000, x: 2, rolagem: -11.26 }, { t: DESAFIO_PENDENTE.limiteMs, x: 4 }]);
+  assert.equal(r.resultado.desfecho, 'tempo');
+  assert.equal(r.resultado.grauMaximo, 11.3);
+  assert.equal(textoResultado(r.resultado).titulo, 'Tempo esgotado');
+});
+
+test('pendente: evento de inclinação da Direção marca o instante; alerta de obstáculo não conta', () => {
+  let r = rodarPendente([{ t: 1000, x: 2, rolagem: -12 }]);
+  r = eventoDesafio(r, { tipo: 'alerta', ligado: true, tempoMs: 1500 }, naEncosta({ t: 1500 }), DESAFIO_PENDENTE);
+  assert.equal(r.alertaMs, null);
+  r = eventoDesafio(r, { tipo: 'inclinacao', ligado: true, tempoMs: 2210, graus: 20.1 }, naEncosta({ t: 2210, rolagem: -20.1, freio: 1 }), DESAFIO_PENDENTE);
+  assert.equal(r.alertaMs, 2210);
+  assert.equal(r.alertaGraus, 20.1);
+  assert.equal(r.freandoNoAlerta, true);
+  r = passoDesafio(r, naEncosta({ t: 2400, x: 4, rolagem: -21, kph: 0, freio: 1 }), DESAFIO_PENDENTE);
+  assert.equal(r.resultado.desfecho, 'parou');
+  assert.equal(r.resultado.reacaoS, 0);
+  assert.equal(textoResultado(r.resultado).linhas[1], 'Você já estava freando no aviso');
+});
+
+test('fardo ignora o evento de inclinação', () => {
+  const r = eventoDesafio(RASTRO_VAZIO, { tipo: 'inclinacao', ligado: true, tempoMs: 900, graus: 22 }, estado({ t: 900 }));
+  assert.equal(r, RASTRO_VAZIO);
+});
+
+test('resultado do pendente não carrega nome nem dado pessoal', () => {
+  const r = rodarPendente([{ t: 1000, x: 2 }, { t: DESAFIO_PENDENTE.limiteMs }]);
+  assert.deepEqual(Object.keys(r.resultado).sort(), ['alertaGraus', 'desafio', 'desfecho', 'grauMaximo', 'reacaoS']);
 });
