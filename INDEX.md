@@ -32,6 +32,7 @@
 | [`docs/sompo.md`](./docs/sompo.md) | SOMENTE ao mudar telemetria SOMPO, contrato ESP32/Firebase ou o painel do trator. |
 | [`docs/sensor-lab.md`](./docs/sensor-lab.md) | SOMENTE ao mudar o laboratorio 3D do sensor (`/sensor`). |
 | [`docs/stand-tailnet.md`](./docs/stand-tailnet.md) | SOMENTE ao abrir o `/stand` com voz em outra maquina da tailnet (`scripts/stand-tailnet.sh`). |
+| [`docs/stand-voz.md`](./docs/stand-voz.md) | SOMENTE ao mudar a conversa por voz do `/stand` (Scribe, cérebro Claude, TTS, barge-in, tetos de crédito, reserva xai). |
 | [`docs/stand-publico.md`](./docs/stand-publico.md) | SOMENTE ao mudar o que a IA do `/stand` responde ao publico; e a fonte principal de `buscar_no_repo`. |
 | [`docs/adr/`](./docs/adr/) | SOMENTE ao rever uma decisao de arquitetura registrada (ex.: Simulacao dentro do `/stand`). |
 | [`docs/geofencing.md`](./docs/geofencing.md) | SOMENTE ao mexer no módulo isolado de geofencing (`shared/geofencing/`, `server/geofencing/`, `src/geofencing/`): faixas de proximidade, perigos do mapa, radar do simulador agrícola, episódios de faixa do laboratório. Traz o mapa do módulo e a lista dos pontos de contato com o resto. |
