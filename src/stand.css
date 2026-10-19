@@ -119,6 +119,9 @@
   opacity: 0; pointer-events: none; transition: opacity 0.35s, transform 0.35s;
 }
 .stand-barra[data-visivel] { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+/* Vitrine: os vídeos trazem legenda queimada embaixo; a barra desce do topo, logo abaixo do título. */
+.stand[data-modo='vitrine'] .stand-barra { bottom: auto; top: calc(max(16px, 2.6vmin) * 1.3 + 2.8vmin); transform: translate(-50%, -1vmin); }
+.stand[data-modo='vitrine'] .stand-barra[data-visivel] { transform: translate(-50%, 0); }
 .stand-barra button {
   min-width: 14vmin; min-height: 6.4vmin; padding: 0 2.6vmin; border: 0; border-radius: 999px;
   background: transparent; color: rgba(255, 255, 255, 0.78);
