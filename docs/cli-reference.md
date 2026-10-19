@@ -2,7 +2,7 @@
 
 Gerada por `npm run cli:docs` a partir de `cli/catalog.js`. Não editar à mão.
 
-122 comandos; 101 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
+123 comandos; 102 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
 
 IDs são argumentos posicionais. Campos comuns podem ser flags; corpos completos usam `--data @arquivo.json`. Flags prevalecem sobre o corpo; objetos aninhados não são mesclados. Campos string são literais; apenas campos JSON e `--data` interpretam `@arquivo`/`-`.
 
@@ -728,11 +728,19 @@ Nenhum; consulte a descrição para entradas por `--data`.
 
 ### `stand sessao`
 
-Abrir sessão de voz: token efêmero, conexão e configuração da sessão (503 stand_desligado sem credencial).
+Abrir sessão de voz: token efêmero, conexão, configuração e conversa_id no modo em turnos (503 stand_desligado sem credencial ou no teto diário).
 
 `POST /api/stand/sessao`; autenticação: **session**.
 
 Nenhum; consulte a descrição para entradas por `--data`.
+
+### `stand turno`
+
+Um turno da conversa de voz (provedor elevenlabs): pergunta transcrita ou evento; responde NDJSON com frases, áudio PCM16 24 kHz em base64, eventos e fim.
+
+`POST /api/stand/turno`; autenticação: **session**.
+
+`--conversa-id` (string, obrigatório): conversa_id devolvido por stand sessao<br>`--texto` (string): Pergunta transcrita<br>`--evento` (string): saudacao, video_terminou ou fim<br>`--id` (string): ID do vídeo em video_terminou
 
 ### `stand ferramenta`
 
