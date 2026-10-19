@@ -1,7 +1,7 @@
 /**
  * Painel da cabine em textura, para a tela `tela-luca-ai` do console da Visual.
- * Mesma regra do painel HTML (`alertaCabine`): distância na cor da faixa,
- * faixa vermelha de alerta, km/h, inclinação e selo SIMULADO sempre à vista.
+ * Mesma regra do painel HTML (`alertaCabine`), com número dominante, estado curto,
+ * velocidade e selo SIMULADO. O HTML mantém os detalhes e a acessibilidade.
  * Redesenha só quando o que aparece muda, não a cada quadro.
  *
  * Uso na Visual: `const tela = criarTelaPainel()`; `material.map = tela.textura`
@@ -9,7 +9,7 @@
  * no `desmontar()`, `tela.descartar()`. Desligado por padrão: só existe se a Visual chamar.
  */
 import * as THREE from 'three';
-import { alertaCabine, type FaixaCabine } from './alertaCabine';
+import { alertaCabine, rotuloInclinacaoCabine, type FaixaCabine } from './alertaCabine';
 import type { EstadoGameplay } from './estadoGameplay';
 
 export const TELA_LARGURA = 512;
@@ -24,28 +24,30 @@ export const CORES_TELA = {
 /** O que a tela mostra; duas vistas iguais desenham a mesma coisa. */
 export interface VistaTela {
   faixa: FaixaCabine;
-  distanciaTexto: string;
-  rotulo: string;
+  valorTexto: string;
+  estadoTexto: 'LIVRE' | 'ATENÇÃO' | 'FREIE';
   velocidadeTexto: string;
-  rotuloAlerta: string;
-  inclinacaoGraus: number | null;
+  alerta: boolean;
 }
 
 export function vistaTela(estado: EstadoGameplay): VistaTela {
   const painel = alertaCabine(estado);
+  // O rótulo escolhido pela fonte única já resolve os riscos simultâneos.
+  const inclinacaoDominante = painel.inclinacao.ligada
+    && painel.rotuloAlerta === rotuloInclinacaoCabine(painel.inclinacao.graus);
+  const alerta = painel.alerta || painel.faixa === 'perigo';
   return {
-    faixa: painel.faixa,
-    distanciaTexto: painel.distanciaTexto,
-    rotulo: painel.rotulo,
+    faixa: alerta ? 'perigo' : painel.faixa,
+    valorTexto: inclinacaoDominante ? `${painel.inclinacao.graus}°` : painel.distanciaTexto,
+    estadoTexto: alerta ? 'FREIE' : painel.faixa === 'atencao' ? 'ATENÇÃO' : 'LIVRE',
     velocidadeTexto: painel.velocidadeTexto,
-    rotuloAlerta: painel.alerta ? painel.rotuloAlerta : '',
-    inclinacaoGraus: painel.inclinacao.ligada ? painel.inclinacao.graus : null,
+    alerta,
   };
 }
 
 const mesmaVista = (a: VistaTela | null, b: VistaTela) => a !== null
-  && a.faixa === b.faixa && a.distanciaTexto === b.distanciaTexto && a.rotulo === b.rotulo
-  && a.velocidadeTexto === b.velocidadeTexto && a.rotuloAlerta === b.rotuloAlerta && a.inclinacaoGraus === b.inclinacaoGraus;
+  && a.faixa === b.faixa && a.valorTexto === b.valorTexto && a.estadoTexto === b.estadoTexto
+  && a.velocidadeTexto === b.velocidadeTexto && a.alerta === b.alerta;
 
 /** O pedaço do CanvasRenderingContext2D que a tela usa; o teste passa um falso. */
 export type ContextoTela = Pick<CanvasRenderingContext2D,
@@ -64,60 +66,29 @@ export function desenharVista(ctx: ContextoTela, vista: VistaTela, largura = TEL
   ctx.lineWidth = 6 * u;
   ctx.strokeRect(3 * u, 3 * u, largura - 6 * u, altura - 6 * u);
 
-  // Selo SIMULADO no alto à esquerda e marca à direita, sempre.
-  ctx.fillStyle = CORES_TELA.selo;
-  ctx.fillRect(16 * u, 16 * u, 120 * u, 28 * u);
-  ctx.fillStyle = CORES_TELA.seloTexto;
-  ctx.font = `800 ${16 * u}px ${FONTE}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('SIMULADO', 76 * u, 30 * u);
-  ctx.fillStyle = CORES_TELA.rotulo;
-  ctx.font = `700 ${16 * u}px ${FONTE}`;
-  ctx.textAlign = 'right';
-  ctx.fillText('LUCA-AI', largura - 18 * u, 30 * u);
+  // Um único estado curto, sem competir com a medida principal.
+  ctx.fillStyle = vista.alerta ? CORES_TELA.alerta : cor;
+  ctx.fillRect(12 * u, 12 * u, largura - 24 * u, 58 * u);
+  ctx.fillStyle = vista.alerta ? '#ffffff' : CORES_TELA.fundo;
+  ctx.font = `800 ${40 * u}px ${FONTE}`;
+  ctx.fillText(vista.estadoTexto, largura / 2, 41 * u);
 
-  // Faixa vermelha de alerta logo abaixo do selo.
-  let topo = 56 * u;
-  if (vista.rotuloAlerta) {
-    ctx.fillStyle = CORES_TELA.alerta;
-    ctx.fillRect(12 * u, topo, largura - 24 * u, 40 * u);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `800 ${22 * u}px ${FONTE}`;
-    ctx.textAlign = 'center';
-    ctx.fillText(vista.rotuloAlerta, largura / 2, topo + 20 * u);
-    topo += 48 * u;
-  }
-
-  // Distância do sensor frontal, grande, na cor da faixa.
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = CORES_TELA.rotulo;
-  ctx.font = `600 ${15 * u}px ${FONTE}`;
-  ctx.fillText('SENSOR FRONTAL', 24 * u, topo + 22 * u);
   ctx.fillStyle = cor;
-  ctx.font = `800 ${(vista.rotuloAlerta ? 72 : 96) * u}px ${FONTE}`;
-  ctx.fillText(vista.distanciaTexto, 22 * u, topo + (vista.rotuloAlerta ? 94 : 116) * u);
-  ctx.fillStyle = CORES_TELA.texto;
-  ctx.font = `650 ${20 * u}px ${FONTE}`;
-  ctx.fillText(vista.rotulo, 24 * u, altura - 24 * u);
+  ctx.font = `800 ${112 * u}px ${FONTE}`;
+  ctx.fillText(vista.valorTexto, largura / 2, 152 * u);
 
-  // Coluna da direita: velocidade e, se houver risco, inclinação.
-  ctx.textAlign = 'right';
-  ctx.fillStyle = CORES_TELA.rotulo;
-  ctx.font = `600 ${15 * u}px ${FONTE}`;
-  ctx.fillText('VELOCIDADE', largura - 24 * u, topo + 22 * u);
   ctx.fillStyle = CORES_TELA.texto;
+  ctx.font = `800 ${40 * u}px ${FONTE}`;
+  ctx.fillText(vista.velocidadeTexto, largura / 2, 230 * u);
+
+  // Selo permanente, separado da velocidade e do estado.
+  ctx.fillStyle = CORES_TELA.selo;
+  ctx.fillRect(largura / 2 - 100 * u, 268 * u, 200 * u, 40 * u);
+  ctx.fillStyle = CORES_TELA.seloTexto;
   ctx.font = `800 ${30 * u}px ${FONTE}`;
-  ctx.fillText(vista.velocidadeTexto, largura - 24 * u, topo + 56 * u);
-  if (vista.inclinacaoGraus !== null) {
-    ctx.fillStyle = CORES_TELA.rotulo;
-    ctx.font = `600 ${15 * u}px ${FONTE}`;
-    ctx.fillText('INCLINAÇÃO', largura - 24 * u, topo + 86 * u);
-    ctx.fillStyle = CORES_TELA.perigo;
-    ctx.font = `800 ${30 * u}px ${FONTE}`;
-    ctx.fillText(`${vista.inclinacaoGraus}°`, largura - 24 * u, topo + 120 * u);
-  }
+  ctx.fillText('SIMULADO', largura / 2, 288 * u);
 }
 
 export interface TelaPainel {
