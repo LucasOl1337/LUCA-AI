@@ -80,17 +80,31 @@ function comPrazo<T>(promessa: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+/**
+ * Abre o microfone e só depois cria o AudioContext: com a captura já ativa, o
+ * Chrome deixa o contexto nascer `running` sem gesto (permissão do microfone
+ * guardada no perfil do kiosk). Criado antes, nasce `suspended` e a escuta
+ * ficaria esperando um toque, com ou sem `--autoplay-policy` (prova de 19/10).
+ */
 export async function abrirAudio({ prazoWorkletMs = PRAZO_WORKLET_MS } = {}): Promise<AudioStand> {
-  const contexto = new AudioContext({ sampleRate: HZ_STAND, latencyHint: 'interactive' });
+  const microfone = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+  });
+  let contexto: AudioContext;
   try {
+    contexto = new AudioContext({ sampleRate: HZ_STAND, latencyHint: 'interactive' });
+  } catch (erro) {
+    microfone.getTracks().forEach((t) => t.stop());
+    throw erro;
+  }
+  try {
+    // Sobra de suspensão (navegador sem a regra da captura): tenta sem gesto; o toque é a reserva.
+    if (contexto.state === 'suspended') void contexto.resume().catch(() => {});
     const saida = contexto.createGain();
     const analisador = contexto.createAnalyser();
     analisador.fftSize = 1024;
     saida.connect(analisador);
     analisador.connect(contexto.destination);
-    const microfone = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
-    });
     const fonte = contexto.createMediaStreamSource(microfone);
     let aoMicrofone: AoMicrofone = () => {};
     let no: AudioNode;
@@ -139,6 +153,7 @@ export async function abrirAudio({ prazoWorkletMs = PRAZO_WORKLET_MS } = {}): Pr
       },
     };
   } catch (erro) {
+    microfone.getTracks().forEach((t) => t.stop());
     void contexto.close();
     throw erro;
   }

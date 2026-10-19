@@ -278,4 +278,36 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
       await pagina.close();
     }
   });
+
+  it('escuta sem --autoplay-policy: abre e volta a ouvir sem toque, depois de cada conversa', async () => {
+    // Sem a flag do kiosk e sem nenhum gesto: AudioContext criado antes do microfone nasce
+    // `suspended` e a escuta ficaria em `precisa_toque` (achado em produção, 19/10).
+    // Só locator/waitFor aqui: `pagina.evaluate` do Playwright conta como gesto do usuário.
+    modoSessao = 'ok';
+    escutaNoServidor = true;
+    const wav = join(pasta, 'escuta-sem-flag.wav');
+    writeFileSync(wav, wavDeEscuta(5, 1));
+    const semFlag = await navegador.chromium.launch({
+      executablePath: navegador.caminho,
+      // A política real do Chrome sem a flag; o Playwright liga a liberal por padrão.
+      args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${wav}`, '--autoplay-policy=document-user-activation-required'],
+      ignoreDefaultArgs: ['--autoplay-policy=no-user-gesture-required', '--mute-audio'],
+    });
+    try {
+      const pagina = await semFlag.newPage();
+      await pagina.goto(`${base}/stand`);
+      const main = pagina.locator('main.stand');
+      await pagina.locator('main.stand[data-escuta="ouvindo"]').waitFor({ timeout: 15000 });
+      // A voz do wav abre a conversa; o Scribe falso não transcreve e ela fecha sem fala.
+      await pagina.locator('main.stand[data-escuta="conversa"]').waitFor({ timeout: 15000 });
+      await pagina.locator('main.stand[data-sessao="silencio"]').waitFor({ timeout: 12000 });
+      // De volta à escuta (ou à pausa curta de falsos), nunca pedindo toque.
+      await pagina.locator('main.stand[data-escuta="ouvindo"], main.stand[data-escuta="pausada"]').waitFor({ timeout: 4000 });
+      assert.notEqual(await main.getAttribute('data-escuta'), 'precisa_toque');
+      assert.equal(await pagina.getByText('Toca na tela pra começar a conversa').count(), 0);
+    } finally {
+      escutaNoServidor = false;
+      await semFlag.close();
+    }
+  });
 });
