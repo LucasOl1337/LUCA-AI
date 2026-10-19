@@ -6,7 +6,8 @@ import '@/sompo-page.css';
 
 /** Pedaço carregado sob demanda pela Simulação do stand: simulador + CSS do SOMPO, só quando precisa. */
 const TRATOR_DO_STAND = SOMPO_VEHICLE_SEED.find((v) => v.id === 'trator-0001') as SompoVehicle;
-const GameplayKiosk = lazy(() => import('../gameplay/GameplayKiosk'));
+// Gameplay com a cabine da Visual (src/components/gameplay/visual/); o kiosk segue recebendo criarCabine.
+const GameplayKiosk = lazy(() => import('../gameplay/visual/GameplayComCabine'));
 
 export type VarianteSimulacao = 'classica' | 'gameplay';
 
