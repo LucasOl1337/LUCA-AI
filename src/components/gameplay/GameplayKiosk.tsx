@@ -24,6 +24,7 @@ const DESFECHO = getSompoAgriOutcomes(CENARIO)[0].id;
 const MOTOR_PULSO_MS = 240;
 
 type ObstaculoPalco = { x: number; z: number; radius: number };
+export type CriarCameraGameplay = typeof createFirstPersonRig;
 
 /** Mesma referência enquanto o motor não troca a lista: o palco só reposiciona fardos quando ela muda. */
 function obstaculosDoPalco(motor: MotorGameplay) {
@@ -53,7 +54,7 @@ function zumbidoMotor(acelerador: number, velocidadeKph: number) {
  * `criarCabine` é o ponto da Visual: monta sobre a máquina e recebe o ângulo do aro.
  * `modeloUrl` troca o GLB do MAX (ex.: variante com cabine); sem ele, o do catálogo.
  */
-export default function GameplayKiosk({ criarCabine, modeloUrl }: { criarCabine?: CriarCabineGameplay; modeloUrl?: string }) {
+export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = createFirstPersonRig }: { criarCabine?: CriarCabineGameplay; modeloUrl?: string; criarCamera?: CriarCameraGameplay }) {
   const motor = useMemo(() => criarMotorGameplay(), []);
   const raizRef = useRef<HTMLDivElement>(null);
   const palcoRef = useRef<HTMLDivElement>(null);
@@ -94,7 +95,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl }: { criarCabine?
     let pulsoMotor = 0;
     let ultimoDt = 0;
     const ativo = { current: true };
-    const base = createFirstPersonRig(ativo, lookRef);
+    const base = criarCamera(ativo, lookRef);
     const rig: SompoCameraRig = {
       active: () => true,
       update(camera: THREE.PerspectiveCamera, maquina: THREE.Object3D) {
@@ -150,7 +151,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl }: { criarCabine?
       cabine?.desmontar();
       stage?.dispose();
     };
-  }, [motor, modeloUrl]);
+  }, [motor, modeloUrl, criarCamera]);
 
   // Setas dirigem (Q9). Só as setas: as letras do stand (r, n, d, g, f) seguem com a equipe.
   useEffect(() => {

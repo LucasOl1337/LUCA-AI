@@ -1,6 +1,7 @@
 import GameplayKiosk from '../GameplayKiosk';
 import { criarTelaPainel } from '../telaPainel';
 import { CABINE_MAX_URL, criarCabineMax } from './cabineMax';
+import { criarCameraCabineMax } from './cameraCabineMax';
 import './cabineVisual.css';
 
 const criarCabineComTela = () => criarCabineMax({ criarTela: criarTelaPainel });
@@ -13,7 +14,7 @@ const criarCabineComTela = () => criarCabineMax({ criarTela: criarTelaPainel });
 export default function GameplayComCabine() {
   return (
     <div className="gameplay-com-cabine">
-      <GameplayKiosk criarCabine={criarCabineComTela} modeloUrl={CABINE_MAX_URL} />
+      <GameplayKiosk criarCabine={criarCabineComTela} modeloUrl={CABINE_MAX_URL} criarCamera={criarCameraCabineMax} />
     </div>
   );
 }
