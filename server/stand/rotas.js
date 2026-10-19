@@ -103,20 +103,25 @@ export function registerStandRoutes(app, {
   /** Conversas em turnos vivas, por id. Expiram depois do teto da sessão. */
   const conversas = new Map();
   const validadeMs = (LIMITES_STAND.teto_s + 60) * 1000;
-  /** Fecha a conta de STT de uma conversa: minutos de microfone aberto, uma vez. */
-  const cobrarStt = (conversa) => {
+  /**
+   * Fecha a conta de STT de uma conversa, uma vez: minutos de microfone aberto.
+   * Sem 'fim' (aba fechada, queda) estima pelo último turno + o relógio de
+   * silêncio do navegador + 30 s de folga, sempre dentro do teto da sessão.
+   */
+  const cobrarStt = (conversa, { estimado = false } = {}) => {
     if (conversa.sttCobrado) return;
     conversa.sttCobrado = true;
-    const minutos = Math.min(LIMITES_STAND.teto_s, (agora() - conversa.criadaEm) / 1000) / 60;
+    const ultimo = (conversa.ultimoUso ?? conversa.criadaEm) + (LIMITES_STAND.silencio_s + 30) * 1000;
+    const fimMs = estimado ? Math.min(agora(), ultimo) : agora();
+    const minutos = Math.min(LIMITES_STAND.teto_s, Math.max(0, fimMs - conversa.criadaEm) / 1000) / 60;
     teto.somar(minutos * CREDITOS_STT_POR_MINUTO);
   };
-  // Conversa que sumiu sem 'fim' (aba fechada, queda) é cobrada ao ser despejada:
-  // o microfone pode ter ficado aberto até o teto da sessão.
-  const despejar = (id) => {
+  // Conversa que sumiu sem 'fim' é cobrada pela estimativa ao ser despejada.
+  const despejar = (id, { estimado = true } = {}) => {
     const c = conversas.get(id);
     if (!c) return;
     c.turno?.abort();
-    cobrarStt(c);
+    cobrarStt(c, { estimado });
     conversas.delete(id);
   };
   const limparConversas = () => {
@@ -217,7 +222,7 @@ export function registerStandRoutes(app, {
     conversa.turno?.abort();
     conversa.turno = null;
     if (evento === 'fim') {
-      despejar(conversa.id);
+      despejar(conversa.id, { estimado: false });
       return res.json({ ok: true, creditos_dia: teto.resumo() });
     }
     if (agora() - conversa.criadaEm > validadeMs) {

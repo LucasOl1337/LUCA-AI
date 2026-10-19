@@ -18,6 +18,8 @@ test('aviso da equipe só aparece em desligado e erro', () => {
   assert.equal(avisoParaEquipe({ motivo: 'encerrada' }), '');
   assert.match(avisoParaEquipe({ motivo: 'desligado' }), /stand_desligado/);
   assert.match(avisoParaEquipe({ motivo: 'erro', detalhe: 'websocket_falhou' }), /websocket_falhou/);
+  assert.match(avisoParaEquipe({ motivo: 'desligado', detalhe: 'teto_diario' }), /teto diário/);
+  assert.doesNotMatch(chamadaDeInicio(false, { motivo: 'desligado', detalhe: 'teto_diario' }), /teto|crédito/i);
 });
 
 test('vídeos saem do manifesto da M7; o de teste só no modo stub', () => {

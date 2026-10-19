@@ -257,13 +257,19 @@ test('turno novo da mesma conversa aborta o anterior (barge-in)', async (t) => {
   let abortados = 0;
   let chamou;
   const primeiraChamada = new Promise((ok) => { chamou = ok; });
-  const lento = async ({ sinal }) => (async function* () {
-    chamou();
-    yield { texto: 'Começo. ' };
-    await new Promise((ok) => { const r = setTimeout(ok, 300); sinal?.addEventListener('abort', () => { clearTimeout(r); abortados++; ok(); }); });
-    yield { texto: 'Resto.' };
-    yield { fim: true, ferramentas: [] };
-  })();
+  let chamadas = 0;
+  const lento = async ({ sinal }) => {
+    // Só o 1º turno fica preso até ser abortado; o 2º responde direto.
+    const primeiro = ++chamadas === 1;
+    if (primeiro) sinal?.addEventListener('abort', () => { abortados++; }, { once: true });
+    return (async function* () {
+      if (primeiro) chamou();
+      yield { texto: 'Começo. ' };
+      if (primeiro) await new Promise((ok) => { const r = setTimeout(ok, 5000); sinal?.addEventListener('abort', () => { clearTimeout(r); ok(); }); });
+      yield { texto: 'Resto.' };
+      yield { fim: true, ferramentas: [] };
+    })();
+  };
   const pedir = await subir11(t, { chamarModelo: lento });
   const { conversa_id } = await (await pedir('/api/stand/sessao', {})).json();
   const primeiro = pedir('/api/stand/turno', { conversa_id, texto: 'primeira' });
@@ -276,7 +282,7 @@ test('turno novo da mesma conversa aborta o anterior (barge-in)', async (t) => {
   assert.equal(segundo.at(-1).motivo, 'ok');
 });
 
-test('conversa abandonada sem fim é cobrada pelo teto da sessão ao ser despejada', async (t) => {
+test('conversa abandonada sem fim é cobrada pela estimativa (último uso + silêncio + 30 s)', async (t) => {
   const teto = criarTetoDiario({ teto: 100000 });
   let relogio = Date.parse('2026-10-19T15:00:00Z');
   const pedir = await subir11(t, { teto, agora: () => relogio });
@@ -284,6 +290,5 @@ test('conversa abandonada sem fim é cobrada pelo teto da sessão ao ser despeja
   assert.equal(teto.usados(), 0);
   relogio += 60 * 60 * 1000;
   await pedir('/api/stand/status');
-  const minutosTeto = LIMITES_STAND.teto_s / 60;
-  assert.equal(teto.usados(), minutosTeto * 36);
+  assert.equal(teto.usados(), ((LIMITES_STAND.silencio_s + 30) / 60) * 36);
 });

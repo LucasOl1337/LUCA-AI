@@ -1,8 +1,9 @@
 /**
- * Sessão de voz ao vivo do stand (M1). Fala com o provedor configurado no
- * servidor (hoje xAI Grok Voice, WebSocket com eventos no formato da OpenAI
- * Realtime) e publica no barramento os eventos do contrato
- * `shared/stand/eventos.ts`. Nada de áudio passa pelo servidor do LUCA.
+ * Sessão de voz ao vivo do stand (M1) no modo Realtime: provedor xAI Grok
+ * Voice, WebSocket com eventos no formato da OpenAI Realtime. Publica no
+ * barramento os eventos do contrato `shared/stand/eventos.ts`. Nada de áudio
+ * passa pelo servidor do LUCA. O provedor padrão (elevenlabs) usa a
+ * `SessaoTurnos`; `abrirSessaoDeVoz` escolhe pela resposta de `/api/stand/sessao`.
  *
  * Fluxo de um turno: VAD do servidor fecha a fala → transcrição pronta →
  * cancelamos a resposta automática, perguntamos ao roteador de vídeos (M7) e
@@ -21,6 +22,11 @@ export interface SessaoServidor {
 
 export type FimSessao = 'encerrada' | 'silencio' | 'teto' | 'erro' | 'desligado';
 
+/** O que a página precisa de qualquer sessão de voz. */
+export interface SessaoDeVoz {
+  encerrar(motivo?: FimSessao): void;
+}
+
 interface EventoProvedor { type: string; [chave: string]: any }
 
 const HZ = 24000;
@@ -28,7 +34,7 @@ const ROTEAR_MS = 1600;
 
 type DecisaoRoteador = { id: string; decisao: 'tocar' | 'oferecer' } | null;
 
-async function postar<T>(caminho: string, corpo: unknown): Promise<{ status: number; dados: T }> {
+export async function postar<T>(caminho: string, corpo: unknown): Promise<{ status: number; dados: T }> {
   const resposta = await fetch(caminho, {
     method: 'POST',
     credentials: 'same-origin',
@@ -38,7 +44,7 @@ async function postar<T>(caminho: string, corpo: unknown): Promise<{ status: num
   return { status: resposta.status, dados: (await resposta.json().catch(() => ({}))) as T };
 }
 
-export class SessaoVoz {
+export class SessaoVoz implements SessaoDeVoz {
   private ws: WebSocket | null = null;
   private contexto: AudioContext | null = null;
   private microfone: MediaStream | null = null;
@@ -68,18 +74,15 @@ export class SessaoVoz {
 
   constructor(private aoTerminar: (motivo: FimSessao, detalhe?: string) => void = () => {}) {}
 
-  async iniciar(): Promise<void> {
+  async iniciar(dados: SessaoServidor): Promise<void> {
     try {
-      await this.conectar();
+      await this.conectar(dados);
     } catch (erro) {
       this.terminar('erro', erro instanceof Error ? erro.message : 'falha_ao_iniciar');
     }
   }
 
-  private async conectar(): Promise<void> {
-    const { status, dados } = await postar<SessaoServidor & { error?: string; motivo?: string; token?: string }>('/api/stand/sessao', {});
-    if (status === 503) return this.terminar('desligado', dados.motivo || dados.error);
-    if (status !== 200 || !dados.conexao) return this.terminar('erro', dados.error || `HTTP ${status}`);
+  private async conectar(dados: SessaoServidor): Promise<void> {
     this.limites = dados.limites;
 
     this.contexto = new AudioContext({ sampleRate: HZ, latencyHint: 'interactive' });
