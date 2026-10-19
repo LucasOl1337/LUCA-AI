@@ -38,6 +38,15 @@ export function configStand(env = process.env, provedores = PROVEDORES_VOZ) {
   };
 }
 
+/**
+ * Escuta: a Coruja abre a conversa quando alguém fala, sem toque (Lucas,
+ * 19/10). Ligada por padrão no provedor em turnos; `STAND_ESCUTA=0` volta ao toque.
+ */
+export function escutaLigada(env = process.env, config = configStand(env)) {
+  if (!config.provedor?.turnos) return false;
+  return !/^(0|false|nao|não|off)$/i.test(String(env.STAND_ESCUTA ?? '').trim());
+}
+
 /** Conta sessões por conta numa janela deslizante de 1 h, em memória. */
 export function criarGuardaDeSessoes({ teto = LIMITES_STAND.sessoes_por_hora, agora = () => Date.now() } = {}) {
   const porConta = new Map();
@@ -158,6 +167,7 @@ export function registerStandRoutes(app, {
       provedor: config.nome,
       motivo,
       voz: config.voz ?? null,
+      escuta: !motivo && escutaLigada(env, config),
       limites: config.provedor?.turnos ? { ...LIMITES_STAND, ...LIMITES_TURNO } : LIMITES_STAND,
       sessoes_na_hora: guarda.usadas(conta(req)),
       ...(config.provedor?.turnos ? { creditos_dia: teto.resumo() } : {}),

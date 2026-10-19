@@ -8,7 +8,7 @@ type Fim = { motivo: FimSessao; detalhe?: string; em?: number; naAbertura?: bool
 export const PAUSA_APOS_FALHA_MS = 60_000;
 
 /** Resposta de `GET /api/stand/status` que interessa à tela. */
-export interface StatusStand { ligado: boolean; motivo?: string | null }
+export interface StatusStand { ligado: boolean; motivo?: string | null; escuta?: boolean }
 
 export type VozStand = 'carregando' | 'ligada' | 'desligada';
 
@@ -47,9 +47,13 @@ export function chamadaSemVoz(controleConectado: boolean): { titulo: string; sub
     : { titulo: 'Toca aqui pra ver o LUCA\u2011AI em ação', sub: '' };
 }
 
-/** Linha de baixo da chamada, para o público. Nunca mostra erro técnico. */
-export function chamadaDeInicio(ativa: boolean, fim: Fim): string {
-  if (ativa) return 'Ligando o microfone…';
+/**
+ * Linha de baixo da chamada, para o público. Nunca mostra erro técnico.
+ * `escutando`: a escuta está com o microfone aberto (abre a conversa pela voz).
+ */
+export function chamadaDeInicio(ativa: boolean, fim: Fim, escutando = false): string {
+  if (ativa) return escutando ? 'Pode falar, tô ouvindo.' : 'Ligando o microfone…';
+  if (escutando) return 'É só falar que eu escuto.';
   if (fim?.motivo === 'desligado') return 'Ele explica como a IA acompanha o trator no campo.';
   return 'Toca na tela pra começar a conversa.';
 }

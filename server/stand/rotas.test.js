@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { cabecalhosDeSeguranca } from '../cabecalhos-seguranca.js';
 import { credencialXai, provedorXai } from './provedor-xai.js';
-import { configStand, criarGuardaDeSessoes, LIMITES_STAND, registerStandRoutes } from './rotas.js';
+import { configStand, criarGuardaDeSessoes, escutaLigada, LIMITES_STAND, registerStandRoutes } from './rotas.js';
 import { criarTetoDiario } from './teto-diario.js';
 
 const CHAVE = 'xai-teste-nao-real';
@@ -178,6 +178,7 @@ test('elevenlabs é o padrão: sessão devolve token Scribe, conversa e nunca a 
   assert.equal(status.provedor, 'elevenlabs');
   assert.equal(status.ligado, true);
   assert.equal(status.voz, 'Lucas Oliveira');
+  assert.equal(status.escuta, true, 'escuta ligada por padrão com elevenlabs');
   assert.equal(status.limites.respostas, 8);
   const resposta = await pedir('/api/stand/sessao', {});
   const texto = await resposta.text();
@@ -195,6 +196,14 @@ test('elevenlabs é o padrão: sessão devolve token Scribe, conversa e nunca a 
   assert.match(corpo.conversa_id, /^[0-9a-f-]{36}$/);
   assert.deepEqual(corpo.sessao, { modo: 'turnos', entrada_hz: 24000, saida_hz: 24000 });
   assert.equal(pedidos.find((p) => p.url.endsWith('realtime_scribe')).init.headers['xi-api-key'], CHAVE_11);
+});
+
+test('escuta: padrão no provedor em turnos, STAND_ESCUTA=0 desliga, Grok nunca', () => {
+  const onze = { ELEVENLABS_API_KEY: 'k' };
+  assert.equal(escutaLigada(onze), true);
+  for (const valor of ['0', 'false', 'off', 'não']) assert.equal(escutaLigada({ ...onze, STAND_ESCUTA: valor }), false, valor);
+  assert.equal(escutaLigada({ ...onze, STAND_ESCUTA: '1' }), true);
+  assert.equal(escutaLigada({ STAND_VOZ_PROVEDOR: 'xai', XAI_API_KEY: 'k' }), false);
 });
 
 test('turno: NDJSON com frases, PCM par em base64 e fim; voz resolvida pelo nome; créditos contados', async (t) => {

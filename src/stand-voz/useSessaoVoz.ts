@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EstadoStand } from '../../shared/stand/eventos.ts';
 import { assinarEventosCerebro } from './barramento';
 import { abrirSessaoDeVoz } from './abrirSessao';
+import type { Emprestimo } from './sessaoTurnos';
 import type { FimSessao, SessaoDeVoz } from './sessaoVoz';
 
 /**
@@ -17,9 +18,11 @@ export interface FimDeSessao { motivo: FimSessao; detalhe?: string; em: number; 
 export interface UsoSessaoVoz {
   estado: EstadoStand;
   ativa: boolean;
+  /** A sessão atual foi aberta pela escuta (alguém falou), não por toque. */
+  despertada: boolean;
   /** Último motivo de fim: 'desligado' quando o servidor está sem credencial. */
   fim: FimDeSessao | null;
-  iniciar: () => Promise<void>;
+  iniciar: (emprestimo?: Emprestimo) => Promise<void>;
   encerrar: () => void;
 }
 
@@ -31,6 +34,7 @@ export function useSessaoVoz({ prazoConexaoMs = PRAZO_CONEXAO_MS } = {}): UsoSes
   const cancelarAoAbrir = useRef(false);
   const [estado, setEstado] = useState<EstadoStand>('ocioso');
   const [ativa, setAtiva] = useState(false);
+  const [despertada, setDespertada] = useState(false);
   const [fim, setFim] = useState<UsoSessaoVoz['fim']>(null);
 
   useEffect(() => assinarEventosCerebro((evento) => {
@@ -42,12 +46,13 @@ export function useSessaoVoz({ prazoConexaoMs = PRAZO_CONEXAO_MS } = {}): UsoSes
     sessao.current?.encerrar();
   }, []);
 
-  const iniciar = useCallback(async () => {
+  const iniciar = useCallback(async (emprestimo?: Emprestimo) => {
     if (sessao.current || abrindo.current) return;
     abrindo.current = true;
     cancelarAoAbrir.current = false;
     setFim(null);
     setAtiva(true);
+    setDespertada(Boolean(emprestimo && !emprestimo.saudar));
     let terminou = false;
     let aberta: SessaoDeVoz | null = null;
     const aoTerminar = (motivo: FimSessao, detalhe?: string) => {
@@ -69,7 +74,7 @@ export function useSessaoVoz({ prazoConexaoMs = PRAZO_CONEXAO_MS } = {}): UsoSes
       }
     }, prazoConexaoMs);
     try {
-      const nova = await abrirSessaoDeVoz((motivo, detalhe) => aoTerminar(motivo, detalhe));
+      const nova = await abrirSessaoDeVoz((motivo, detalhe) => aoTerminar(motivo, detalhe), emprestimo);
       aberta = nova;
       if (nova && terminou) nova.encerrar();
       if (nova && !terminou) {
@@ -87,5 +92,5 @@ export function useSessaoVoz({ prazoConexaoMs = PRAZO_CONEXAO_MS } = {}): UsoSes
     sessao.current?.encerrar();
   }, []);
 
-  return { estado, ativa, fim, iniciar, encerrar };
+  return { estado, ativa, despertada, fim, iniciar, encerrar };
 }

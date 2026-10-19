@@ -44,6 +44,33 @@ sequenceDiagram
 - **Interrupção (barge-in).** Volume alto no microfone abaixa a voz na hora. Uma transcrição parcial com 2 ou mais palavras de verdade, que não sejam eco da própria fala, corta o áudio e aborta o turno no servidor. Um turno novo da mesma conversa também aborta o anterior.
 - **Eco.** Uma transcrição contida no que o LUCA acabou de falar é descartada (`pareceEco`). Durante o vídeo, o microfone manda silêncio ao Scribe.
 
+## Escuta (conversa sem toque)
+
+Pedido do Lucas em 19/10: o assistente fica ativo por padrão, e a pessoa só fala. Na Coruja, com voz ligada e `escuta:true` no status, `useEscuta` (`src/stand-voz/useEscuta.ts`) mantém o microfone aberto, mas o áudio fica no navegador. Só o volume é medido. Nada vai ao Scribe, e nenhum crédito é gasto, até o despertar.
+
+```mermaid
+stateDiagram-v2
+  [*] --> abrindo: Coruja + voz + escuta
+  abrindo --> precisa_toque: navegador exige gesto
+  abrindo --> ouvindo
+  precisa_toque --> conversa: toque (com saudação)
+  ouvindo --> conversa: voz acima do ruído por 250 ms (sem saudação)
+  ouvindo --> conversa: toque (com saudação)
+  conversa --> ouvindo: sessão fechou (2,5 s de refratário)
+  conversa --> pausada: 2º despertar seguido sem fala
+  pausada --> ouvindo: 10 s, 20 s, 40 s... até 2 min
+  ouvindo --> [*]: saiu da Coruja
+```
+
+- **Despertador** (`criarDespertador` em `src/stand-voz/escuta.ts`): desperta com RMS de pelo menos 3× o piso de ruído e nunca abaixo de 0,03, por 250 ms seguidos. O piso é uma média móvel do ruído. Abaixo do limiar ele anda 2 % por bloco de 50 ms; acima, 0,2 %, então barulho que fica na feira vira fundo. O piso continua aprendendo durante a pausa e entre conversas.
+- **Pré-rolagem.** Os últimos 600 ms (12 blocos) antes do despertar, mais o que chegar até a sessão ficar pronta (teto de 8 s), vão ao Scribe de uma vez. Assim o começo da frase não se perde.
+- **Sem saudação.** Se a sessão foi despertada pela voz, a pessoa já está falando. Por isso não há saudação, e a sessão espera a pergunta. Se em 6 s (`SEM_FALA_MS`) não chegar nenhuma transcrição, a sessão fecha como `silencio`/`sem_fala`. Um despertar falso custa ~4 créditos de STT.
+- **Falsos seguidos.** O primeiro não pausa. Do segundo em diante, a escuta pausa por 10 s, depois 20 s e 40 s, até 2 min (`pausaAposFalsos`). Uma conversa de verdade ou um toque zera a conta. Teto de sessão, sessões por hora e teto diário seguem valendo: o despertar abre sessão pelo mesmo `POST /sessao`.
+- **Um microfone só.** A sessão pega o áudio da escuta emprestado (`Emprestimo` em `sessaoTurnos.ts`) e, ao fechar, não o fecha. A escuta só fecha o microfone ao sair da Coruja. Se a conversa ainda estiver em andamento, ele fecha quando ela acabar. A Grok (`xai`) não usa empréstimo e não tem escuta.
+- **Toque.** Na Atração, o toque continua abrindo a conversa com saudação, no mesmo microfone. No primeiro toque do dia, o navegador também libera o áudio (`precisa_toque`).
+- **Tela.** A Atração mostra "É só falar que eu escuto." com a escuta ouvindo. Sem escuta, mostra "Toca na tela pra começar a conversa.". O estado fica em `data-escuta` no `<main>`.
+- **Desligar.** `STAND_ESCUTA=0` no servidor volta ao toque, sem deploy de front. A página lê o status a cada 60 s.
+
 O CLI tem `stand sessao` e `stand turno` (NDJSON em stdout); veja [`cli-reference.md`](./cli-reference.md).
 
 ## Limites e custo
@@ -69,8 +96,10 @@ O teto diário soma o TTS (caracteres × 0,5 no turbo/flash, × 1 nos outros) e 
 | `STAND_TTS_MODELO` | `eleven_turbo_v2_5` | `eleven_multilingual_v2` soa mais rico, mas o primeiro áudio demora mais (TTFB 1,25 s contra 0,55 s). |
 | `STAND_CEREBRO_MODELO` | `cc/claude-sonnet-5` | Primeiro modelo da cadeia. Aceita `cc/claude-*` ou o Astra. |
 | `STAND_TETO_DIARIO_CREDITOS` | `25000` | Teto diário de créditos ElevenLabs. |
+| `STAND_ESCUTA` | ligada | `0`/`false`/`off` desliga a escuta (conversa só por toque). Só vale no provedor `elevenlabs`. |
 | `ROUTER_API_KEY` | vazio | 9Router Railway (cérebro e embeddings do roteador de vídeo). |
 
 ## Decisões
 
 - [ADR 0002](./adr/0002-claude-no-cerebro-da-voz-do-stand.md): Claude no cérebro da voz do stand, exceção à regra do Astra.
+- [ADR 0003](./adr/0003-escuta-por-volume-no-navegador.md): escuta por volume no navegador, sem palavra de ativação.

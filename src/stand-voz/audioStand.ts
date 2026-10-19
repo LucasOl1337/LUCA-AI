@@ -130,6 +130,8 @@ export async function abrirAudio({ prazoWorkletMs = PRAZO_WORKLET_MS } = {}): Pr
         return () => window.clearInterval(relogio);
       },
       fechar() {
+        // A escuta entrega o áudio à sessão; quem desistir primeiro fecha, e fechar de novo não faz nada.
+        if (contexto.state === 'closed') return;
         aoMicrofone = () => {};
         fonte.disconnect();
         microfone.getTracks().forEach((t) => t.stop());

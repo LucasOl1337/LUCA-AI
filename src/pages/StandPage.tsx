@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type CSSProperties } from 'react';
 import { useAppLocation } from '@/hooks/useAppLocation';
 import { useSessaoVoz } from '@/stand-voz/useSessaoVoz';
+import { useEscuta } from '@/stand-voz/useEscuta';
+import type { Emprestimo } from '@/stand-voz/sessaoTurnos';
 import { VARIANTE_PADRAO, VARIANTES_AVATAR } from '@/components/stand/AvatarLuca';
 import { canalReal, type CanalStand } from '@/components/stand/canal';
 import { criarCanalStub } from '@/components/stand/canalStub';
@@ -33,6 +35,8 @@ const ITENS_VITRINE = montarItens(VIDEOS_VITRINE);
 
 /** Status da voz no servidor: o texto da Atração segue `ligado` + `motivo` (inclusive `teto_diario`). */
 const STATUS_A_CADA_MS = 60_000;
+/** Onde a escuta fica aberta: Coruja e o modo do site (combinado com a Totem-Site). Vitrine e Simulação, não. */
+const MODOS_COM_ESCUTA: readonly string[] = ['coruja', 'site'];
 
 function useStatusStand(ativo: boolean, fimSessao: unknown) {
   const [status, setStatus] = useState<StatusStand | null>(null);
@@ -42,7 +46,7 @@ function useStatusStand(ativo: boolean, fimSessao: unknown) {
     const buscar = () => {
       fetch('/api/stand/status', { credentials: 'same-origin' })
         .then(async (r) => (r.ok ? r.json() : { ligado: false, motivo: `status_http_${r.status}` }))
-        .then((dados) => { if (vivo && dados) setStatus({ ligado: !!dados.ligado, motivo: dados.motivo ?? null }); })
+        .then((dados) => { if (vivo && dados) setStatus({ ligado: !!dados.ligado, motivo: dados.motivo ?? null, escuta: !!dados.escuta }); })
         // Sem status, não promete microfone: o totem segue com Vitrine e Simulação.
         .catch(() => { if (vivo) setStatus({ ligado: false, motivo: 'status_indisponivel' }); });
     };
@@ -70,6 +74,19 @@ export default function StandPage() {
   const voz = useSessaoVoz();
   const status = useStatusStand(!modoStub, voz.fim);
   const vozStand = modoStub ? 'ligada' : vozDoStand(status, voz.fim, agora);
+  const { iniciar: iniciarVoz, encerrar: encerrarVoz } = voz;
+  // Escuta: na Coruja, alguém falando abre a conversa sem toque (Lucas, 19/10).
+  const despertar = useCallback((emprestimo: Emprestimo) => {
+    despacharModo({ tipo: 'atividade' });
+    void iniciarVoz(emprestimo);
+  }, [iniciarVoz]);
+  const escuta = useEscuta({
+    ativa: !modoStub && vozStand === 'ligada' && Boolean(status?.escuta) && MODOS_COM_ESCUTA.includes(modo.modo),
+    emConversa: voz.ativa,
+    fim: voz.fim,
+    despertar,
+  });
+  const escutando = escuta.estado === 'ouvindo' || escuta.estado === 'conversa';
   const motivoVoz = modoStub ? '' : motivoSemVoz(status, voz.fim, agora);
   const nivel = useRef(0);
   const canal = useRef<CanalStand>(canalReal);
@@ -115,11 +132,12 @@ export default function StandPage() {
 
   /** Gesto do público ou da equipe: liga o microfone (precisa de clique ou tecla).
    * `voz.iniciar` já ignora quando há sessão; não ler `voz.ativa` aqui (fica velho no R). */
-  const { iniciar: iniciarVoz, encerrar: encerrarVoz } = voz;
+  const { aoTocar: tocouNaEscuta } = escuta;
   const iniciar = useCallback(() => {
     if (modoStub) demonstrar.current();
-    else void iniciarVoz();
-  }, [modoStub, iniciarVoz]);
+    // Com a escuta aberta, o toque libera o áudio do dia e usa o mesmo microfone.
+    else void iniciarVoz(tocouNaEscuta() ?? undefined);
+  }, [modoStub, iniciarVoz, tocouNaEscuta]);
 
   // Saiu da Coruja: a conversa acaba e a Coruja volta limpa na Atração.
   useEffect(() => {
@@ -214,6 +232,7 @@ export default function StandPage() {
       data-sessao={voz.ativa ? 'ativa' : voz.fim?.motivo ?? 'parada'}
       data-voz-stand={vozStand}
       data-motivo={motivoVoz || undefined}
+      data-escuta={escuta.estado}
       onPointerDown={tocar}
     >
       {modo.modo === 'coruja' && video && (
@@ -226,7 +245,7 @@ export default function StandPage() {
               variante={variante}
               nivel={nivel}
               titulo={semVoz?.titulo}
-              chamada={semVoz ? semVoz.sub : chamadaDeInicio(modoStub ? false : voz.ativa, voz.fim)}
+              chamada={semVoz ? semVoz.sub : chamadaDeInicio(modoStub ? false : voz.ativa, voz.fim, escutando)}
             />
           )}
           {estado.tela === 'conversa' && <Conversa variante={variante} nivel={nivel} voz={estado.voz} legenda={estado.legenda} />}

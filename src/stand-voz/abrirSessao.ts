@@ -3,12 +3,16 @@
  * `conexao.transporte === 'scribe'` (elevenlabs, padrão) vira `SessaoTurnos`;
  * `'websocket'` (xai, reserva) vira a `SessaoVoz` Realtime.
  */
-import { SessaoTurnos, type SessaoServidorTurnos } from './sessaoTurnos';
+import { SessaoTurnos, type Emprestimo, type SessaoServidorTurnos } from './sessaoTurnos';
 import { postar, SessaoVoz, type FimSessao, type SessaoDeVoz, type SessaoServidor } from './sessaoVoz';
 
 type RespostaSessao = (SessaoServidor | SessaoServidorTurnos) & { error?: string; motivo?: string };
 
-export async function abrirSessaoDeVoz(aoTerminar: (motivo: FimSessao, detalhe?: string) => void): Promise<SessaoDeVoz | null> {
+/**
+ * `emprestimo`: microfone já aberto pela escuta. A sessão em turnos o usa sem
+ * saudação (a pessoa já está falando); a Grok (reserva) abre o dela.
+ */
+export async function abrirSessaoDeVoz(aoTerminar: (motivo: FimSessao, detalhe?: string) => void, emprestimo?: Emprestimo): Promise<SessaoDeVoz | null> {
   let resposta: { status: number; dados: RespostaSessao };
   try {
     resposta = await postar<RespostaSessao>('/api/stand/sessao', {});
@@ -21,7 +25,7 @@ export async function abrirSessaoDeVoz(aoTerminar: (motivo: FimSessao, detalhe?:
   if (status !== 200 || !dados.conexao) { aoTerminar('erro', dados.error || `HTTP ${status}`); return null; }
   if (dados.conexao.transporte === 'scribe') {
     const sessao = new SessaoTurnos(aoTerminar);
-    void sessao.iniciar(dados as SessaoServidorTurnos);
+    void sessao.iniciar(dados as SessaoServidorTurnos, emprestimo);
     return sessao;
   }
   const sessao = new SessaoVoz(aoTerminar);

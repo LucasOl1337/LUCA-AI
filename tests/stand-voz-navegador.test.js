@@ -6,7 +6,7 @@
 // (19/10), então o caminho feliz também exercita a captura pelo ScriptProcessor.
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createServer as createTcpServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -29,15 +29,29 @@ async function chromiumDisponivel() {
 
 const navegador = await chromiumDisponivel();
 
+/** WAV mono 16 bits: `silencioS` de silêncio e `vozS` de um tom alto, como alguém falando no microfone. */
+function wavDeEscuta(silencioS, vozS, hz = 24000) {
+  const amostras = new Int16Array(Math.round((silencioS + vozS) * hz));
+  for (let i = Math.round(silencioS * hz); i < amostras.length; i += 1) amostras[i] = Math.round(Math.sin(i / 12) * 9000);
+  const cabecalho = Buffer.alloc(44);
+  cabecalho.write('RIFF', 0); cabecalho.writeUInt32LE(36 + amostras.byteLength, 4); cabecalho.write('WAVE', 8);
+  cabecalho.write('fmt ', 12); cabecalho.writeUInt32LE(16, 16); cabecalho.writeUInt16LE(1, 20); cabecalho.writeUInt16LE(1, 22);
+  cabecalho.writeUInt32LE(hz, 24); cabecalho.writeUInt32LE(hz * 2, 28); cabecalho.writeUInt16LE(2, 32); cabecalho.writeUInt16LE(16, 34);
+  cabecalho.write('data', 36); cabecalho.writeUInt32LE(amostras.byteLength, 40);
+  return Buffer.concat([cabecalho, Buffer.from(amostras.buffer)]);
+}
+
 describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium para o Playwright' }, () => {
   let pasta;
   let servidor;
   let base;
   let browser;
   let tcpMudo;
-  const scribe = { conexoes: 0, audios: 0 };
+  const scribe = { conexoes: 0, audios: 0, rajadas: [] };
   const turnos = [];
   let modoSessao = 'ok';
+  let escutaNoServidor = false;
+  let browserEscuta;
 
   // PCM16 a 24 kHz: 0,3 s de um tom baixo, o bastante para a fila tocar.
   const pcmSaudacao = (() => {
@@ -61,7 +75,7 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
       if (url.pathname === '/api/auth/session') {
         return json(200, { user: { id: 'u1', name: 'Stand', email: 'stand@teste', role: 'user', status: 'active' } });
       }
-      if (url.pathname === '/api/stand/status') return json(200, { ligado: true });
+      if (url.pathname === '/api/stand/status') return json(200, { ligado: true, escuta: escutaNoServidor });
       if (url.pathname === '/api/stand/sessao') {
         if (modoSessao === 'pendurada') return; // nunca responde
         const host = req.headers.host;
@@ -88,8 +102,16 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
       if (!req.url.startsWith('/scribe-falso')) return socket.destroy();
       wss.handleUpgrade(req, socket, head, (ws) => {
         scribe.conexoes += 1;
+        // Pedaços que chegam nos primeiros 100 ms da conexão: a pré-rolagem da escuta vem de uma vez.
+        const rajada = { inicio: 0, pedacos: 0 };
+        scribe.rajadas.push(rajada);
         ws.on('message', (dados) => {
-          try { if (JSON.parse(String(dados)).message_type === 'input_audio_chunk') scribe.audios += 1; } catch { /* ignora */ }
+          try {
+            if (JSON.parse(String(dados)).message_type !== 'input_audio_chunk') return;
+            scribe.audios += 1;
+            rajada.inicio ||= Date.now();
+            if (Date.now() - rajada.inicio < 100) rajada.pedacos += 1;
+          } catch { /* ignora */ }
         });
       });
     });
@@ -99,10 +121,18 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
       executablePath: navegador.caminho,
       args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'],
     });
+    // Microfone da escuta: 2 s de silêncio e 1 s de voz, em laço.
+    const wav = join(pasta, 'escuta.wav');
+    writeFileSync(wav, wavDeEscuta(2, 1));
+    browserEscuta = await navegador.chromium.launch({
+      executablePath: navegador.caminho,
+      args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${wav}`, '--autoplay-policy=no-user-gesture-required'],
+    });
   });
 
   after(async () => {
     await browser?.close();
+    await browserEscuta?.close();
     servidor?.close();
     tcpMudo?.close();
     if (pasta) rmSync(pasta, { recursive: true, force: true });
@@ -154,5 +184,37 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
     assert.equal(await pagina.locator('main.stand').getAttribute('data-motivo'), 'erro:sem_conexao_provedor');
     assert.equal(await pagina.getByText('Ligando o microfone…').count(), 0);
     await pagina.close();
+  });
+
+  it('escuta: voz abre a conversa sem toque, sem saudação, com a pré-rolagem; barulho sem fala pausa', async () => {
+    modoSessao = 'ok';
+    escutaNoServidor = true;
+    const antes = { conexoes: scribe.conexoes, turnos: turnos.length };
+    const pagina = await browserEscuta.newPage();
+    try {
+      await pagina.goto(`${base}/stand`);
+      const main = pagina.locator('main.stand');
+      await pagina.locator('main.stand[data-escuta="ouvindo"]').waitFor({ timeout: 15000 });
+      await pagina.getByText('É só falar que eu escuto.').waitFor({ timeout: 2000 });
+      // Ninguém tocou: a voz do wav desperta a sessão.
+      await pagina.locator('main.stand[data-escuta="conversa"]').waitFor({ timeout: 10000 });
+      assert.equal(await main.getAttribute('data-sessao'), 'ativa');
+      const prazo = Date.now() + 8000;
+      while (scribe.conexoes === antes.conexoes && Date.now() < prazo) await new Promise((ok) => setTimeout(ok, 100));
+      await new Promise((ok) => setTimeout(ok, 500));
+      const rajada = scribe.rajadas.at(-1);
+      // O despertar pede 250 ms acima do limiar: ao menos esses 5 blocos vão juntos.
+      assert.ok(rajada.pedacos >= 5, `pré-rolagem chegou de uma vez ao Scribe (${rajada.pedacos} pedaços em 100 ms)`);
+      assert.equal(turnos.slice(antes.turnos).filter((t) => t.evento === 'saudacao').length, 0, 'despertada pela voz não saúda');
+      // O Scribe falso nunca transcreve: 6 s depois a sessão fecha sem fala e a escuta volta.
+      await pagina.waitForFunction(() => document.querySelector('main.stand')?.dataset.sessao === 'silencio', null, { timeout: 12000 });
+      await pagina.locator('main.stand[data-escuta="ouvindo"]').waitFor({ timeout: 3000 });
+      // 2º despertar sem fala: a escuta pausa em vez de abrir sessão atrás de sessão.
+      await pagina.locator('main.stand[data-escuta="pausada"]').waitFor({ timeout: 25000 });
+      assert.ok(scribe.conexoes - antes.conexoes >= 2);
+    } finally {
+      escutaNoServidor = false;
+      await pagina.close();
+    }
   });
 });

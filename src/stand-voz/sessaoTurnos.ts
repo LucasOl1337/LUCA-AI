@@ -9,6 +9,7 @@
 import type { EstadoStand } from '../../shared/stand/eventos.ts';
 import { abrirAudio, FilaDeVoz, HZ_STAND, type AudioStand } from './audioStand';
 import { assinarEventosPagina, emitirEventoStand } from './barramento';
+import { SEM_FALA_MS } from './escuta';
 import { base64DePcm16, criarDetectorFala } from './protocolo';
 import type { EtapaSessao, FimSessao, SessaoDeVoz, SessaoServidor } from './sessaoVoz';
 import { eventoScribe, interrompeFala, lerNdjson, mensagemAudioScribe, pareceEco, vaiAoCerebro, type LinhaTurno } from './turnos';
@@ -19,6 +20,18 @@ export interface SessaoServidorTurnos extends Omit<SessaoServidor, 'conexao'> {
 }
 
 type EntradaTurno = { texto: string } | { evento: 'saudacao' } | { evento: 'video_terminou'; id: string };
+
+/**
+ * Áudio aberto pela escuta e entregue à sessão no despertar. A sessão não fecha
+ * o empréstimo: ao terminar, solta o microfone e a escuta volta a ouvir.
+ * `drenar` devolve o que foi ouvido antes da sessão ficar pronta (pré-rolagem).
+ */
+export interface Emprestimo {
+  audio: AudioStand;
+  drenar: () => Int16Array[];
+  /** Toque na tela com a escuta aberta: microfone emprestado, mas com saudação. */
+  saudar?: boolean;
+}
 
 // Pedaço de silêncio enviado ao Scribe durante o vídeo: o WebSocket segue vivo
 // e o VAD não transcreve a narração do vídeo.
@@ -53,23 +66,25 @@ export class SessaoTurnos implements SessaoDeVoz {
   private limites = { silencio_s: 20, teto_s: 240 };
   private encerrando = false;
   private terminada = false;
+  private emprestado = false;
 
   constructor(private aoTerminar: (motivo: FimSessao, detalhe?: string) => void = () => {}) {}
 
-  async iniciar(dados: SessaoServidorTurnos): Promise<void> {
+  async iniciar(dados: SessaoServidorTurnos, emprestimo?: Emprestimo): Promise<void> {
     try {
-      await this.conectar(dados);
+      await this.conectar(dados, emprestimo);
     } catch (erro) {
       this.terminar('erro', erro instanceof Error ? erro.message : 'falha_ao_iniciar');
     }
   }
 
-  private async conectar(dados: SessaoServidorTurnos): Promise<void> {
+  private async conectar(dados: SessaoServidorTurnos, emprestimo?: Emprestimo): Promise<void> {
     this.limites = dados.limites;
     this.conversaId = dados.conversa_id;
-    const audio = await abrirAudio();
+    this.emprestado = Boolean(emprestimo);
+    const audio = emprestimo?.audio ?? await abrirAudio();
     this.audio = audio;
-    if (this.terminada) return audio.fechar();
+    if (this.terminada) return this.soltarAudio();
     this.fila = new FilaDeVoz(audio, () => this.aoFilaVazia());
 
     this.etapa = 'provedor';
@@ -86,6 +101,8 @@ export class SessaoTurnos implements SessaoDeVoz {
     ws.onclose = () => this.terminar(this.encerrando ? 'encerrada' : 'erro', 'conexao_fechada');
 
     audio.ouvir((pcm, nivel) => this.aoMicrofone(pcm, nivel));
+    // Despertada pela voz: manda ao Scribe o começo da frase, ouvido enquanto a sessão abria.
+    for (const pcm of emprestimo?.drenar() ?? []) ws.send(mensagemAudioScribe(base64DePcm16(pcm), HZ_STAND));
     this.pararNivel = audio.medirNivel((nivel) => emitirEventoStand({ tipo: 'nivel_audio', valor: this.estado === 'falando' ? nivel : 0 }));
     this.relogioTeto = window.setTimeout(() => this.encerrar('teto'), this.limites.teto_s * 1000);
     this.desligarPagina = assinarEventosPagina((evento) => {
@@ -98,7 +115,12 @@ export class SessaoTurnos implements SessaoDeVoz {
     window.addEventListener('pagehide', this.aoSairDaPagina);
     this.etapa = 'pronta';
     this.mudarEstado('ouvindo');
-    void this.perguntar({ evento: 'saudacao' });
+    if (!emprestimo || emprestimo.saudar) {
+      void this.perguntar({ evento: 'saudacao' });
+      return;
+    }
+    // A pessoa já está falando: sem saudação. Barulho que despertou sem fala de verdade fecha logo.
+    this.relogioSilencio = window.setTimeout(() => this.encerrar('silencio', 'sem_fala'), SEM_FALA_MS);
   }
 
   private aoSairDaPagina = (): void => this.encerrar();
@@ -124,8 +146,7 @@ export class SessaoTurnos implements SessaoDeVoz {
     const ws = this.ws;
     this.ws = null;
     if (ws) { ws.onclose = null; ws.onmessage = null; ws.close(); }
-    this.audio?.fechar();
-    this.audio = null;
+    this.soltarAudio();
     // Fecha a conversa no servidor (conta os minutos de microfone). keepalive
     // deixa o pedido sair mesmo com a aba fechando.
     if (this.conversaId) {
@@ -140,6 +161,17 @@ export class SessaoTurnos implements SessaoDeVoz {
     this.mudarEstado('ocioso');
     emitirEventoStand({ tipo: 'legenda', texto: '' });
     this.aoTerminar(motivo, detalhe);
+  }
+
+  /** Fecha o áudio próprio; o emprestado só deixa de ser ouvido e volta ao volume cheio. */
+  private soltarAudio(): void {
+    const audio = this.audio;
+    this.audio = null;
+    if (!audio) return;
+    if (!this.emprestado) return audio.fechar();
+    audio.ouvir(() => {});
+    audio.saida.gain.cancelScheduledValues(audio.contexto.currentTime);
+    audio.saida.gain.value = 1;
   }
 
   private mudarEstado(valor: EstadoStand): void {

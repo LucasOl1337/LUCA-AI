@@ -78,6 +78,10 @@ _Evitar_: Modo (Modo é Coruja, Vitrine ou Simulação), cena.
 Uma pergunta do público e a resposta falada do LUCA: o Scribe transcreve no navegador, o servidor pensa com Claude e devolve frases com áudio por `POST /api/stand/turno`. Detalhes em `docs/stand-voz.md`.
 _Evitar_: Mensagem, request.
 
+**Escuta**:
+Na Coruja, o microfone aberto esperando alguém falar. Só o volume é medido no navegador, e nada vai à ElevenLabs. Voz perto do microfone desperta uma conversa sem toque e sem saudação. Despertar sem fala de verdade em 6 s é um despertar falso. Desliga com `STAND_ESCUTA=0`. Detalhes em `docs/stand-voz.md`.
+_Evitar_: Wake word, hotword (não há palavra de ativação), modo sempre ouvindo.
+
 **Interrupção**:
 O público fala por cima do LUCA: a voz abaixa na hora e, se a transcrição parcial tiver palavras de verdade que não sejam eco, a fala para e o turno anterior é abortado.
 _Evitar_: Barge-in (só no código e nas docs técnicas), corte.
