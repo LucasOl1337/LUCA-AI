@@ -117,3 +117,15 @@ test('evento de alerta com retrato de um quadro antes: distância vem do próxim
   assert.equal(r.alertaMs, 9_900);
   assert.equal(r.alertaCm, 139);
 });
+
+const { DesafioCabine } = await loadFrontendModule('../../src/components/gameplay/DesafioCabine.tsx');
+
+test('DesafioCabine abre na rodada 1, na abertura, com o painel montado', () => {
+  const retrato = estado({ t: 0, fase: 'pronto', kph: 0 });
+  const canal = { ler: () => retrato, assinar: () => () => {}, aoEvento: () => () => {}, reiniciar() {}, encerrar() {} };
+  const html = renderToStaticMarkup(createElement(DesafioCabine, { canal, som: false }));
+  assert.match(html, /data-etapa="abertura"/);
+  assert.match(html, /data-rodada="1"/);
+  assert.match(html, /data-desafio="fardo-a-frente"/);
+  assert.match(html, /gameplay-painel-cabine/);
+});

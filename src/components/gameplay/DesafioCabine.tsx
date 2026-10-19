@@ -18,13 +18,13 @@ export function DesafioCabine({ canal, desafio = DESAFIO_FARDO, som = true }: { 
   const [etapa, setEtapa] = useState<Etapa>({ tipo: 'abertura' });
   const [agora, setAgora] = useState(() => Date.now());
   const rastro = useRef<RastroDesafio>(RASTRO_VAZIO);
-  const rodada = useRef(0);
+  // Estado, não ref: `data-rodada` precisa sair no mesmo render da abertura nova.
+  const [rodada, setRodada] = useState(1);
 
   // Abertura: posiciona o desafio e some depois de 4 s ou na primeira aceleração.
   useEffect(() => {
     if (etapa.tipo !== 'abertura') return;
     rastro.current = RASTRO_VAZIO;
-    rodada.current += 1;
     canal.reiniciar(desafio.inicio);
     const saida = window.setTimeout(() => setEtapa({ tipo: 'dirigindo' }), ABERTURA_MS);
     const cancelar = canal.assinar(() => { if (canal.ler().fase === 'dirigindo') setEtapa({ tipo: 'dirigindo' }); });
@@ -56,13 +56,13 @@ export function DesafioCabine({ canal, desafio = DESAFIO_FARDO, som = true }: { 
     const relogio = window.setInterval(() => {
       const t = Date.now();
       setAgora(t);
-      if (t >= etapa.ate) setEtapa({ tipo: 'abertura' });
+      if (t >= etapa.ate) { setRodada((n) => n + 1); setEtapa({ tipo: 'abertura' }); }
     }, 250);
     return () => window.clearInterval(relogio);
   }, [etapa]);
 
   return (
-    <div className="gameplay-desafio" data-etapa={etapa.tipo} data-desafio={desafio.id} data-rodada={rodada.current}>
+    <div className="gameplay-desafio" data-etapa={etapa.tipo} data-desafio={desafio.id} data-rodada={rodada}>
       <PainelCabine canal={canal} som={som && etapa.tipo !== 'resultado'} />
       {etapa.tipo === 'abertura' && <AberturaDesafio texto={desafio.abertura} />}
       {etapa.tipo === 'resultado' && <ResultadoDesafio resultado={etapa.resultado} restanteS={(etapa.ate - agora) / 1000} />}
