@@ -131,7 +131,12 @@ O operador dirige com o controle, sem roteiro. Não grava episódio, e o que apa
 _Evitar_: Case livre, desfecho manual.
 
 **Desafio**:
-Um trecho curto da Simulação, de até 90 s, com começo, objetivo e fim, jogado no Modo cabine com teto de 6 km/h (fora dele a Condução livre segue a 12 km/h). Hoje: o fardo à frente (parar antes do fardo com o alerta tocando). O pendente lateral (atravessar 30 m de encosta e frear quando o alerta de inclinação de 20° tocar) já está escrito, mas fica desligado até o terreno ter inclinação. O fardo termina ao parar perto do obstáculo, ao encostar nele ou ao estourar o tempo. O pendente termina ao parar depois do alerta, ao atravessar, ao Tombar ou ao estourar o tempo. Não grava episódio. Lista em `src/components/gameplay/desafios.ts`.
+Um trecho curto da Simulação, de até 90 s, com começo, objetivo e fim, jogado no Modo cabine com teto de 6 km/h (fora dele a Condução livre segue a 12 km/h). Hoje há dois desafios, que se alternam a cada rodada:
+
+- o fardo à frente: parar antes do fardo com o alerta tocando;
+- o pendente lateral: atravessar 30 m da rampa lateral de 22° e frear quando tocar o alerta de inclinação de 20°.
+
+O fardo termina ao parar perto do obstáculo, ao encostar nele ou ao estourar o tempo. O pendente termina ao parar depois do alerta, ao atravessar, ao Tombar ou ao estourar o tempo. Não grava episódio. Lista em `src/components/gameplay/desafios.ts`.
 _Evitar_: Missão, fase, nível.
 
 **Painel da cabine**:

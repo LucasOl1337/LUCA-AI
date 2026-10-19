@@ -17,7 +17,7 @@ const estado = ({ t = 0, fase = 'dirigindo', cm = 400, kph = 6, freio = 0, conta
 const rodar = (quadros, desafio = DESAFIO_FARDO) => quadros.reduce((r, q) => passoDesafio(r, estado(q), desafio), RASTRO_VAZIO);
 
 test('desafio do fardo: 20 m à frente do sensor, teto de 6 km/h, até 60 s de condução', () => {
-  assert.deepEqual(DESAFIOS.map((d) => d.id), ['fardo-a-frente']);
+  assert.deepEqual(DESAFIOS.map((d) => d.id), ['fardo-a-frente', 'pendente-lateral']);
   const [fardo] = DESAFIO_FARDO.inicio.obstaculos;
   // Face do fardo a 20 m do emissor (2,2461 m à frente da origem).
   assert.ok(Math.abs(fardo.x - fardo.raioM - 2.2461 - 20) < 1e-9);
@@ -132,16 +132,16 @@ test('DesafioCabine abre na rodada 1, na abertura, com o painel montado', () => 
 
 const { DESAFIO_PENDENTE, TOMBAMENTO_GRAUS, MOTIVO_FIM } = await loadFrontendModule('../../src/components/gameplay/desafios.ts');
 
-/** Atitude sintética: a Direção ainda não tem encosta; aqui a rolagem vem pronta em cada quadro. */
+/** Atitude sintética, para isolar o desafio do chão; x conta a partir da partida do pendente. A rampa real fica em gameplay-pendente-rampa.test.js. */
 const naEncosta = ({ t = 0, x = 0, kph = 6, freio = 0, rolagem = 0, arfagem = 0, fase = 'dirigindo' } = {}) => ({
   ...estado({ t, kph, freio, fase }),
-  maquina: { x, z: 0, rumoGraus: 0, velocidadeKph: kph, re: false },
+  maquina: { x: DESAFIO_PENDENTE.inicio.x + x, z: DESAFIO_PENDENTE.inicio.z, rumoGraus: 0, velocidadeKph: kph, re: false },
   atitude: { rolagemGraus: rolagem, arfagemGraus: arfagem },
 });
 const rodarPendente = (quadros) => quadros.reduce((r, q) => passoDesafio(r, naEncosta(q), DESAFIO_PENDENTE), RASTRO_VAZIO);
 
-test('pendente lateral fica fora da lista até o terreno ter inclinação', () => {
-  assert.ok(!DESAFIOS.includes(DESAFIO_PENDENTE));
+test('pendente lateral: teto de 6 km/h, sem obstáculo, até 60 s', () => {
+  assert.ok(DESAFIOS.some((d) => d.id === DESAFIO_PENDENTE.id));
   assert.equal(DESAFIO_PENDENTE.id, 'pendente-lateral');
   assert.equal(DESAFIO_PENDENTE.inicio.tetoKph, 6);
   assert.deepEqual(DESAFIO_PENDENTE.inicio.obstaculos, []);

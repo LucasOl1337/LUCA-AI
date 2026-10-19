@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ABERTURA_MS, DESAFIO_FARDO, MOTIVO_FIM, RASTRO_VAZIO, RESULTADO_MS,
-  eventoDesafio, passoDesafio, type Desafio, type ResultadoDesafio as Resultado, type RastroDesafio,
+  ABERTURA_MS, MOTIVO_FIM, RASTRO_VAZIO, RESULTADO_MS,
+  desafioDaRodada, eventoDesafio, passoDesafio, type Desafio, type ResultadoDesafio as Resultado, type RastroDesafio,
 } from './desafios';
 import type { CanalGameplay } from './estadoGameplay';
 import { PainelCabine } from './PainelCabine';
@@ -12,14 +12,16 @@ type Etapa = { tipo: 'abertura' } | { tipo: 'dirigindo' } | { tipo: 'resultado';
 /**
  * Desafio na cabine: monta o mundo pelo `reiniciar`, mostra a abertura por
  * 4 s, acompanha o estado da Direção e, no fim, encerra e mostra o Resultado
- * do desafio por 10 s antes de recomeçar. Não grava nada.
+ * do desafio por 10 s antes de recomeçar. Não grava nada. Sem `desafio`
+ * fixo, as rodadas alternam pela lista `DESAFIOS` (fardo, pendente, fardo…).
  */
-export function DesafioCabine({ canal, desafio = DESAFIO_FARDO, som = true }: { canal: CanalGameplay; desafio?: Desafio; som?: boolean }) {
+export function DesafioCabine({ canal, desafio: fixo, som = true }: { canal: CanalGameplay; desafio?: Desafio; som?: boolean }) {
   const [etapa, setEtapa] = useState<Etapa>({ tipo: 'abertura' });
   const [agora, setAgora] = useState(() => Date.now());
   const rastro = useRef<RastroDesafio>(RASTRO_VAZIO);
   // Estado, não ref: `data-rodada` precisa sair no mesmo render da abertura nova.
   const [rodada, setRodada] = useState(1);
+  const desafio = fixo ?? desafioDaRodada(rodada);
 
   // Abertura: posiciona o desafio e some depois de 4 s ou na primeira aceleração.
   useEffect(() => {

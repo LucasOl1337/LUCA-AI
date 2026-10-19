@@ -10,6 +10,7 @@ import {
   type EventoGameplay,
   type InicioGameplay,
 } from './estadoGameplay';
+import { RAMPA_LINHA_Z } from './rampaLateral';
 
 /** Emissor do HC-SR04 à frente da origem da máquina (FREE_DRIVE.sensorAheadM). */
 const SENSOR_A_FRENTE_M = 2.2461;
@@ -63,21 +64,30 @@ export const DESAFIO_FARDO: Desafio = {
 };
 
 /**
- * Pendente lateral: atravessar 30 m de encosta de lado, sem obstáculo. Fica
- * fora de `DESAFIOS` até o terreno da Direção (item 3) dar atitude de verdade:
- * a pose de partida aqui é provisória e muda quando a encosta existir no palco.
+ * Pendente lateral na rampa de 22° da Direção (`rampaLateral.ts`): parte na
+ * linha da face, antes da subida (x = 0), rumo +X, com o lado esquerdo para
+ * cima. A rolagem passa de 20° perto de x = 17 e chega a 22° no trecho pleno;
+ * 30 m depois da partida (x = 30, ainda no pleno)
+ * atravessou. A rampa não passa de 22°, então Tombou só aparece com um
+ * terreno mais íngreme.
  */
 export const DESAFIO_PENDENTE: Desafio = {
   id: 'pendente-lateral',
   titulo: 'Pendente lateral',
   abertura: 'Atravesse a encosta. Se o LUCA-AI avisar inclinação, freie.',
-  inicio: { x: 0, z: 0, rumoGraus: 0, obstaculos: [], tetoKph: GAMEPLAY_TETO_DESAFIO_KPH },
+  inicio: { x: 0, z: RAMPA_LINHA_Z, rumoGraus: 0, obstaculos: [], tetoKph: GAMEPLAY_TETO_DESAFIO_KPH },
   limiteMs: 60_000,
   atravessarM: 30,
 };
 
-/** Desafios ligados no totem. O pendente lateral entra depois do terreno (item 3). */
-export const DESAFIOS: readonly Desafio[] = [DESAFIO_FARDO];
+/** Desafios ligados no totem, na ordem em que as rodadas se alternam. */
+export const DESAFIOS: readonly Desafio[] = [DESAFIO_FARDO, DESAFIO_PENDENTE];
+
+/** Desafio da rodada (1, 2, 3…): fardo, pendente, fardo… */
+export function desafioDaRodada(rodada: number): Desafio {
+  const n = Math.max(1, Math.floor(Number.isFinite(rodada) ? rodada : 1));
+  return DESAFIOS[(n - 1) % DESAFIOS.length];
+}
 
 export interface ResultadoFardo {
   desafio: 'fardo-a-frente';
