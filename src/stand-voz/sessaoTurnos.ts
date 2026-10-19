@@ -19,7 +19,7 @@ export interface SessaoServidorTurnos extends Omit<SessaoServidor, 'conexao'> {
   conversa_id: string;
 }
 
-type EntradaTurno = { texto: string } | { evento: 'saudacao' } | { evento: 'video_terminou'; id: string };
+type EntradaTurno = { texto: string } | { evento: 'saudacao' } | { evento: 'video_terminou'; id: string } | { evento: 'acao_falhou' };
 
 /**
  * Áudio aberto pela escuta e entregue à sessão no despertar. A sessão não fecha
@@ -67,6 +67,10 @@ export class SessaoTurnos implements SessaoDeVoz {
   private encerrando = false;
   private terminada = false;
   private emprestado = false;
+  /** Último retrato da tela (Ação do site); vai uma vez, junto da próxima pergunta. */
+  private tela = '';
+  /** Falha chegou com o LUCA falando: a fala pronta entra quando a fila esvaziar. */
+  private falhaPendente = false;
 
   constructor(private aoTerminar: (motivo: FimSessao, detalhe?: string) => void = () => {}) {}
 
@@ -110,6 +114,14 @@ export class SessaoTurnos implements SessaoDeVoz {
       if (evento.tipo === 'video_terminou') {
         this.videoTocando = false;
         void this.perguntar({ evento: 'video_terminou', id: evento.id });
+      }
+      // Guardar a tela não mexe no estado da sessão.
+      if (evento.tipo === 'tela') this.tela = evento.texto;
+      // Falha na tela vira fala pronta na hora; antes da 1ª palavra (despertar
+      // discreto, sessão ainda ociosa) não dispara nada.
+      if (evento.tipo === 'acao_falhou' && this.estado !== 'ocioso' && !this.videoTocando) {
+        if (this.turno || this.fila?.tocando) this.falhaPendente = true;
+        else void this.perguntar({ evento: 'acao_falhou' });
       }
     });
     window.addEventListener('pagehide', this.aoSairDaPagina);
@@ -270,6 +282,11 @@ export class SessaoTurnos implements SessaoDeVoz {
     this.fimDaFala = performance.now();
     this.restaurarVoz();
     if (this.turno || this.videoTocando || this.terminada) return;
+    if (this.falhaPendente) {
+      this.falhaPendente = false;
+      void this.perguntar({ evento: 'acao_falhou' });
+      return;
+    }
     this.mudarEstado('ouvindo');
     this.armarSilencio();
   }
@@ -287,12 +304,16 @@ export class SessaoTurnos implements SessaoDeVoz {
     this.falado = '';
     let fraseAudio = '';
     let fimTurno: Extract<LinhaTurno, { t: 'fim' }> | null = null;
+    // Pergunta nova leva a falha na linha Tela; a fala pronta não vem mais.
+    if ('texto' in entrada) this.falhaPendente = false;
+    const tela = 'texto' in entrada ? this.tela : '';
+    if (tela) this.tela = '';
     try {
       const resposta = await fetch('/api/stand/turno', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversa_id: this.conversaId, ...entrada }),
+        body: JSON.stringify({ conversa_id: this.conversaId, ...entrada, ...(tela ? { tela } : {}) }),
         signal: controle.signal,
       });
       if (resposta.status === 503) {

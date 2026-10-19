@@ -740,7 +740,7 @@ Um turno da conversa de voz (provedor elevenlabs): pergunta transcrita ou evento
 
 `POST /api/stand/turno`; autenticação: **session**.
 
-`--conversa-id` (string, obrigatório): conversa_id devolvido por stand sessao<br>`--texto` (string): Pergunta transcrita<br>`--evento` (string): saudacao, video_terminou ou fim<br>`--id` (string): ID do vídeo em video_terminou
+`--conversa-id` (string, obrigatório): conversa_id devolvido por stand sessao<br>`--texto` (string): Pergunta transcrita<br>`--tela` (string): O que a página do site mostra (dado, até 300 caracteres, só neste turno)<br>`--evento` (string): saudacao, video_terminou, acao_falhou ou fim<br>`--id` (string): ID do vídeo em video_terminou
 
 ### `stand ferramenta`
 

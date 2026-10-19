@@ -37,20 +37,33 @@ export interface DepsPlano {
   despacharModo(entrada: Extract<EntradaModo, { tipo: 'abrir_pagina' } | { tipo: 'voltar_coruja' }>): void;
   /** Espera o Executor do iframe responder no caminho certo. */
   aguardarExecutor(caminho: string): Promise<boolean>;
-  enviarAcaoSite(acao: string, args: Record<string, unknown>): Promise<{ ok: boolean; mensagem: string }>;
+  enviarAcaoSite(acao: string, args: Record<string, unknown>): Promise<{ ok: boolean; mensagem: string; retrato?: string }>;
+}
+
+export interface ResultadoPlano { ok: boolean; mensagem: string; retrato?: string }
+
+/**
+ * Linha `Tela:` que volta ao cérebro: o que a ação fez e o que a página mostra.
+ * Uma linha só, até 200 caracteres (o servidor corta de novo, em 300).
+ */
+export function linhaDaTela(r: ResultadoPlano): string {
+  const feito = r.ok ? r.mensagem : `a ação falhou: ${r.mensagem}`;
+  const linha = [feito, r.retrato && `Mostra: ${r.retrato}`].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  return linha.length > 200 ? `${linha.slice(0, 199).trimEnd()}…` : linha;
 }
 
 /**
  * Executa o plano na ordem. Página que não carrega volta pra Coruja; controle
  * que falha deixa a página na tela e devolve a mensagem para o aviso da equipe.
  */
-export async function executarPlano(plano: PlanoStand, deps: DepsPlano): Promise<{ ok: boolean; mensagem: string }> {
+export async function executarPlano(plano: PlanoStand, deps: DepsPlano): Promise<ResultadoPlano> {
   if (!plano.ok) return { ok: false, mensagem: plano.motivo };
   let mensagem = '';
+  let retrato: string | undefined;
   for (const passo of plano.passos) {
     if (passo.tipo === 'modo') {
       deps.despacharModo(passo.entrada);
-      mensagem = passo.entrada.tipo === 'voltar_coruja' ? 'Voltei pra coruja.' : 'Página aberta.';
+      mensagem = passo.entrada.tipo === 'voltar_coruja' ? 'Voltei pra coruja, sem página do site na tela.' : `Abri a página ${passo.entrada.pagina}.`;
       continue;
     }
     if (!(await deps.aguardarExecutor(passo.caminho))) {
@@ -60,6 +73,7 @@ export async function executarPlano(plano: PlanoStand, deps: DepsPlano): Promise
     const resultado = await deps.enviarAcaoSite(passo.acao, passo.args);
     if (!resultado.ok) return resultado;
     mensagem = resultado.mensagem;
+    retrato = resultado.retrato;
   }
-  return { ok: true, mensagem };
+  return retrato ? { ok: true, mensagem, retrato } : { ok: true, mensagem };
 }

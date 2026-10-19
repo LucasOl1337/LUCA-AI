@@ -28,7 +28,11 @@ export type EventoCerebro =
 export type EventoPagina =
   | { tipo: 'video_terminou'; id: string }
   | { tipo: 'reiniciar' }
-  | { tipo: 'encerrar' };
+  | { tipo: 'encerrar' }
+  /** O que a tela fez e mostra depois de uma Ação do site; vai como `Tela:` na próxima pergunta. */
+  | { tipo: 'tela'; texto: string }
+  /** A Ação do site falhou na tela: a coruja diz isso na hora, com fala pronta. */
+  | { tipo: 'acao_falhou' };
 
 export type EventoStand = EventoCerebro | EventoPagina;
 
@@ -61,7 +65,8 @@ export function ehEventoCerebro(valor: unknown): valor is EventoCerebro {
 export function ehEventoPagina(valor: unknown): valor is EventoPagina {
   if (!objeto(valor)) return false;
   if (valor.tipo === 'video_terminou') return textoNaoVazio(valor.id);
-  return valor.tipo === 'reiniciar' || valor.tipo === 'encerrar';
+  if (valor.tipo === 'tela') return typeof valor.texto === 'string';
+  return valor.tipo === 'reiniciar' || valor.tipo === 'encerrar' || valor.tipo === 'acao_falhou';
 }
 
 export function ehEventoStand(valor: unknown): valor is EventoStand {

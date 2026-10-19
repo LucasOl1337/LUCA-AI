@@ -15,7 +15,7 @@ import { descreverPulos, disponiveis, montarItens } from '@/components/stand/vit
 import { TelaLab, TelaTrator, useTelasDoApp } from '@/components/stand/TelasDoApp';
 import { enviarAcaoSite } from '@/components/stand/executor/ponte';
 import { aguardarExecutor } from '@/components/stand/executor/prontidao';
-import { executarPlano, planejarAcao } from '@/components/stand/site/acaoDoStand';
+import { executarPlano, linhaDaTela, planejarAcao } from '@/components/stand/site/acaoDoStand';
 import { SiteStand } from '@/components/stand/site/SiteStand';
 import { avisoDeSaida, barraVisivel, modoInicial, modosDisponiveis, reduzirModo, type EntradaModo, type EstadoModo } from '@/components/stand/modoStand';
 import type { AcaoNavegacao } from '@/components/stand/navegacaoPad';
@@ -126,9 +126,12 @@ export default function StandPage() {
         // Totem-Site Q4: abrir_pagina/voltar_coruja trocam o modo; controles vão ao Executor do iframe.
         const plano = planejarAcao(evento.acao, evento.args, { modo: modoAtual.current, pagina: paginaAtual.current });
         void executarPlano(plano, { despacharModo, aguardarExecutor, enviarAcaoSite }).then((r) => {
+          // O cérebro fica sabendo do que a tela fez e mostra (linha `Tela:` na próxima pergunta).
+          canal.current.enviar({ tipo: 'tela', texto: linhaDaTela(r) });
           if (r.ok) return;
           console.warn('[stand] ação no site falhou:', r.mensagem);
           setFalhaSite(r.mensagem);
+          canal.current.enviar({ tipo: 'acao_falhou' });
         });
       }
       else despachar(evento);

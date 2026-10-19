@@ -15,6 +15,7 @@ import { destacar, mostrarRotulo } from './cursor';
 import { FalhaAcao, criarPassos } from './passos';
 import { EMBUTIDO_NO_STAND } from './embutido';
 import { responderPing } from './prontidao';
+import { leitorDoDocumento, retratoDaPagina } from './retrato';
 import './executor.css';
 
 const STAND_LIGADO = EMBUTIDO_NO_STAND;
@@ -43,7 +44,9 @@ function StandExecutor() {
     let vivo = true;
 
     const responder = (resultado: Omit<AcaoSiteResultado, 'tipo'>) => {
-      if (vivo) canal.postMessage({ tipo: 'acao_site_resultado', ...resultado } satisfies AcaoSiteResultado);
+      if (!vivo) return;
+      const retrato = retratoDaPagina(window.location.pathname, leitorDoDocumento(document));
+      canal.postMessage({ tipo: 'acao_site_resultado', ...resultado, retrato } satisfies AcaoSiteResultado);
     };
 
     canal.onmessage = (mensagem) => {

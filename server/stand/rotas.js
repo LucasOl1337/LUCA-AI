@@ -8,7 +8,7 @@
 //   pergunta transcrita vem a `POST /api/stand/turno`, que responde em NDJSON
 //   com frases, áudio da voz do Lucas e eventos (cerebro.js).
 // - `xai`: Grok Voice Realtime, conversa inteira no navegador (reserva).
-import { executarTurno, FALAS, LIMITES_TURNO, criarChamadaDeModelo, novaConversa } from './cerebro.js';
+import { executarTurno, FALAS, LIMITES_TURNO, criarChamadaDeModelo, limparTela, novaConversa } from './cerebro.js';
 import { FERRAMENTAS_STAND, executarFerramentaStand, videoPublicado } from './ferramentas.js';
 import { buscarNoRepo, montarPromptBase } from './conhecimento.js';
 import { provedorXai } from './provedor-xai.js';
@@ -222,12 +222,13 @@ export function registerStandRoutes(app, {
     }
   });
 
-  // Um turno da conversa (provedor em turnos). Corpo: {conversa_id, texto} ou
-  // {conversa_id, evento: 'saudacao' | 'video_terminou' | 'fim', id?}.
+  // Um turno da conversa (provedor em turnos). Corpo: {conversa_id, texto, tela?} ou
+  // {conversa_id, evento: 'saudacao' | 'video_terminou' | 'acao_falhou' | 'fim', id?}.
+  // `tela` (retrato da página do site) é dado do navegador: cerebro.js limpa e rotula.
   // Resposta NDJSON, uma linha por item: {t:'frase'|'audio'|'evento'|'aviso'|'fim', ...}.
   // Um turno novo da mesma conversa aborta o anterior (barge-in).
   app.post('/api/stand/turno', async (req, res) => {
-    const { conversa_id: id, texto, evento, id: idVideo } = req.body || {};
+    const { conversa_id: id, texto, evento, id: idVideo, tela } = req.body || {};
     const conversa = conversas.get(String(id || ''));
     if (!conversa || conversa.conta !== conta(req)) return res.status(404).json({ ok: false, error: 'conversa_desconhecida' });
     const config = configStand(env, provedores);
@@ -247,7 +248,9 @@ export function registerStandRoutes(app, {
     if (teto.estourou()) return res.status(503).json({ ok: false, error: 'stand_desligado', motivo: 'teto_diario' });
     const entrada = evento === 'saudacao' ? { evento }
       : evento === 'video_terminou' ? { evento, id: String(idVideo || '').slice(0, 80) }
-        : { texto: String(texto || '').trim().slice(0, 500) };
+        // Falha na tela: fala pronta; não conta pergunta nem conversa.
+        : evento === 'acao_falhou' ? { evento }
+          : { texto: String(texto || '').trim().slice(0, 500), tela: limparTela(tela) };
     if (!entrada.evento && !entrada.texto) return res.status(400).json({ ok: false, error: 'texto_vazio' });
     if (entrada.texto) {
       conversa.perguntas = (conversa.perguntas ?? 0) + 1;

@@ -80,3 +80,50 @@ test('Executor só liga dentro de um frame do /stand', () => {
   assert.equal(dentroDoStand(deFora), false);
   assert.equal(dentroDoStand(undefined), false);
 });
+
+const { retratoDaPagina, limparLinha, RETRATO_MAX } = await loadFrontendModule('../../src/components/stand/executor/retrato.ts');
+const { linhaDaTela } = await loadFrontendModule('../../src/components/stand/site/acaoDoStand.ts');
+
+const leitor = (textos = {}, atributos = {}) => ({
+  texto: (s) => textos[s] ?? null,
+  atributo: (s, n) => atributos[`${s}|${n}`] ?? null,
+});
+
+test('retrato: sonolência, sensor e laboratório dizem o que a tela mostra, em uma linha', () => {
+  assert.equal(
+    retratoDaPagina('/sonolencia', leitor({}, { '.drowsiness-page|data-state': 'idle', '.drowsiness-sensitivity select|value': 'high' })),
+    'Página sonolência. webcam desligada. sensibilidade alta',
+  );
+  assert.equal(
+    retratoDaPagina('/sonolencia', leitor({ '.drowsiness-panel .drowsiness-message': 'Nenhuma webcam\nencontrada.' }, { '.drowsiness-page|data-state': 'error' })),
+    'Página sonolência. webcam com erro. Nenhuma webcam encontrada.',
+  );
+  assert.equal(
+    retratoDaPagina('/sensor', leitor({
+      '.sensor-choice[aria-label="Veículo da bancada"] button[aria-pressed="true"]': 'Trator MAX',
+      '.sensor-essay-select select option:checked': 'Curva',
+      '.sensor-operation-slider span': 'Velocidade 40 km/h',
+      '.sensor-operation-views button[aria-pressed="true"]': 'Bancada',
+    })),
+    'Página laboratório do sensor. Trator MAX. ensaio Curva. Velocidade 40 km/h. rodando. vista Bancada',
+  );
+  assert.equal(retratoDaPagina('/laboratorio', leitor()), 'Página laboratório. demonstração fechada');
+  assert.equal(retratoDaPagina('/admin', leitor({ h1: 'segredo' })), '', 'fora das páginas públicas: nada');
+});
+
+test('retrato e linha da Tela: no máximo 200 caracteres, sem quebra de linha', () => {
+  const longo = retratoDaPagina('/sompo', leitor({ '[data-stand-alvo^="aba-"][aria-pressed="true"] strong': 'a\n'.repeat(300) }));
+  assert.ok(longo.length <= RETRATO_MAX && !longo.includes('\n'));
+  assert.equal(limparLinha('  x \n y  '), 'x y');
+  assert.equal(linhaDaTela({ ok: true, mensagem: 'Sensibilidade alta.', retrato: 'Página sonolência. webcam desligada. sensibilidade alta' }),
+    'Sensibilidade alta. Mostra: Página sonolência. webcam desligada. sensibilidade alta');
+  assert.equal(linhaDaTela({ ok: false, mensagem: 'Desligue a câmera antes de mudar a sensibilidade.' }),
+    'a ação falhou: Desligue a câmera antes de mudar a sensibilidade.');
+  assert.ok(linhaDaTela({ ok: true, mensagem: 'm'.repeat(150), retrato: 'r'.repeat(200) }).length <= 200);
+});
+
+test('executarPlano devolve o retrato do Executor', async () => {
+  const plano = planejarAcao('sonolencia_sensibilidade', { nivel: 'alta' }, { modo: 'site', pagina: 'sonolencia' });
+  const r = await executarPlano(plano, { despacharModo: () => {}, aguardarExecutor: async () => true, enviarAcaoSite: async () => ({ ok: true, mensagem: 'Sensibilidade alta.', retrato: 'Página sonolência' }) });
+  assert.deepEqual(r, { ok: true, mensagem: 'Sensibilidade alta.', retrato: 'Página sonolência' });
+});
