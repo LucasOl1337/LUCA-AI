@@ -12,6 +12,7 @@ import {
 } from './estadoGameplay';
 import { COMANDO_PARADO, passoVolante, type ComandoVolante } from './volante';
 import { TRATOR, criarTrator, leituraSensor, passoTrator, type EstadoTrator } from './fisicaTrator';
+import { atitudeNoChao, type ChaoGameplay } from './rampaLateral';
 
 /** Começo da condução livre: no meio do talhão, rumo +X, sem obstáculo. */
 export const INICIO_LIVRE: Required<InicioGameplay> = Object.freeze({ x: 0, z: 0, rumoGraus: 0, obstaculos: Object.freeze([]), tetoKph: GAMEPLAY_TETO_LIVRE_KPH });
@@ -23,8 +24,8 @@ const FOLGA_AVISO_MS = 4;
 const PARTIDA = 0.05;
 
 export interface MotorGameplay extends CanalGameplay {
-  /** Um quadro da física. `desejado` já vem de `comandoDesejado` (pad + setas). */
-  quadro(dt: number, desejado: ComandoVolante): EstadoGameplay;
+  /** Um quadro da física. `desejado` já vem de `comandoDesejado` (pad + setas); `chao` é o `ground` do palco (sem ele, atitude 0). */
+  quadro(dt: number, desejado: ComandoVolante, chao?: ChaoGameplay): EstadoGameplay;
   /** Obstáculos em vigor (mesma referência até o próximo `reiniciar`): o palco usa para desenhar os fardos. */
   obstaculos(): readonly ObstaculoGameplay[];
   /** Estado interno do trator (rumo em rad, guinada), para a pose do palco. */
@@ -43,6 +44,7 @@ export function criarMotorGameplay(agora: () => number = () => performance.now()
   let tempoMs = 0;
   let alerta = false, contato = false, inclinado = false;
   let ultimoAviso = -Infinity;
+  let atitude = { rolagemGraus: 0, arfagemGraus: 0 };
   const assinantes = new Set<() => void>();
   const ouvintes = new Set<(evento: EventoGameplay) => void>();
 
@@ -60,7 +62,7 @@ export function criarMotorGameplay(agora: () => number = () => performance.now()
       },
       comandos: { esterco: arredondar(comando.esterco, 3), acelerador: arredondar(comando.acelerador, 3), freio: arredondar(comando.freio, 3) },
       sensor,
-      atitude: { rolagemGraus: 0, arfagemGraus: 0 },
+      atitude,
       contato: trator.contato,
       tetoKph: inicio.tetoKph,
     };
@@ -83,6 +85,7 @@ export function criarMotorGameplay(agora: () => number = () => performance.now()
     comando = COMANDO_PARADO;
     fase = 'pronto'; tempoMs = 0;
     alerta = contato = inclinado = false;
+    atitude = { rolagemGraus: 0, arfagemGraus: 0 };
     retrato = montarRetrato();
     avisar();
   }
@@ -95,7 +98,7 @@ export function criarMotorGameplay(agora: () => number = () => performance.now()
     emitir({ tipo: 'fim', tempoMs: retrato.tempoMs, motivo });
   }
 
-  function quadro(dt: number, desejado: ComandoVolante) {
+  function quadro(dt: number, desejado: ComandoVolante, chao?: ChaoGameplay) {
     const segundos = Math.max(0, Math.min(0.1, Number.isFinite(dt) ? dt : 0));
     // No fim o trator só freia até parar (sem engatar ré): o resultado fica na tela sem o jogador sair andando.
     const pedido = fase === 'fim' ? { esterco: 0, acelerador: 0, freio: trator.velocidade > 0.05 ? 1 : 0 } : desejado;
@@ -104,6 +107,10 @@ export function criarMotorGameplay(agora: () => number = () => performance.now()
     if (fase === 'dirigindo') tempoMs += segundos * 1000;
     const antes = trator;
     trator = passoTrator(trator, comando, segundos, { obstaculos: inicio.obstaculos, tetoKph: inicio.tetoKph });
+    if (chao) {
+      const a = atitudeNoChao(chao, trator.x, trator.z, trator.rumo);
+      atitude = { rolagemGraus: arredondar(a.rolagemGraus, 1), arfagemGraus: arredondar(a.arfagemGraus, 1) };
+    }
     // 1) retrato novo; 2) bordas com o retrato já atual; 3) aviso aos assinantes.
     retrato = montarRetrato();
     const eventos: EventoGameplay[] = [];

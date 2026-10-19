@@ -127,7 +127,7 @@ function createUltrasonicBeam(origin: readonly [number, number, number]) {
  * real em forma fechada: separado do loop do caminhão para não arriscar o
  * fluxo rural. Desmontado e remontado a cada troca de cenário/desfecho.
  */
-export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig, adaptiveQuality = false, obstaclesRef, assetUrl, qualityProfile = PERFIL_PADRAO }: {
+export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig, adaptiveQuality = false, obstaclesRef, assetUrl, qualityProfile = PERFIL_PADRAO, terrainRelief }: {
   mount: HTMLElement;
   scenarioId: SompoAgriScenarioId;
   outcomeId: string;
@@ -154,6 +154,8 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   assetUrl?: string;
   /** Degraus e limiares da qualidade automática; o padrão é o do totem clássico. */
   qualityProfile?: PerfilQualidade;
+  /** Relevo somado ao do ambiente (gameplay: rampa lateral). O `ground` do drive já o inclui. */
+  terrainRelief?: (x: number, z: number) => number;
 }): SompoAgriStageApi | null {
   const scenario = getSompoAgriScenario(scenarioId);
   const operation = scenario.environmentId === 'geofence-operacao';
@@ -192,7 +194,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   scene.add(worldRoot);
   const night = scenario.environmentId === 'row-crop-field-night';
   const budget = sompoRenderBudget();
-  const field = createSompoAgriScene(worldRoot, scenario.environmentId, budget.compact, scenario.equipmentId);
+  const field = createSompoAgriScene(worldRoot, scenario.environmentId, budget.compact, scenario.equipmentId, terrainRelief);
   const atmosphere = createSompoAtmosphere(scene, renderer, field.sun);
   const post = createSompoPostProcessing(renderer, scene, camera);
   // Qualidade automática (só no totem): o medidor de 1 s alimenta o regulador.

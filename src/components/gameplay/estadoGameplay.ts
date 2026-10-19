@@ -30,7 +30,7 @@ export interface EstadoGameplay {
   comandos: { esterco: number; acelerador: number; freio: number };
   /** HC-SR04 frontal: 2..400 cm; sem eco, 400 e `eco` false. `alerta` = distância <= 150 cm. */
   sensor: { distanciaCm: number; eco: boolean; alerta: boolean };
-  /** Atitude da máquina. 0 no item 2; vem do terreno no item 3. */
+  /** Atitude da máquina pelo chão sob as rodas (rampaLateral.ts), 0,1°. Rolagem + = lado direito para baixo; arfagem + = nariz para cima. */
   atitude: { rolagemGraus: number; arfagemGraus: number };
   /** Encostou no obstáculo pela frente. */
   contato: boolean;

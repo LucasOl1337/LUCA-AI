@@ -15,6 +15,7 @@ export const TRATOR = Object.freeze({
   arrasto: 0.5, // m/s² rolando sem pedal
   estercoMaxRad: 0.48, // limite visual do rig (sompoSteeringAngle)
   entreEixosM: 2.6625, // SOMPO_AGRI_RIG_LAYOUT['max-tractor']
+  bitolaM: 2.087, // eixo traseiro: 2 × z 1.0435 do mesmo layout
   /** Emissor do HC-SR04 à frente da origem da máquina. */
   sensorFrenteM: 2.2461,
   cercaM: 90,

@@ -11,6 +11,7 @@ import { applyDeadZone, type GamepadLike } from '../sompo/gamepadMapping';
 import { firstStandardPad, rumble } from '../sompo/gamepadLoop';
 import { DesafioCabine } from './DesafioCabine';
 import { criarMotorGameplay, vibracaoDoEvento, type MotorGameplay } from './motorGameplay';
+import { relevoRampaLateral } from './rampaLateral';
 import { anguloAroRad, bordaReiniciar, comandoDesejado, setaDaTecla, SETAS_SOLTAS, type SetasVolante } from './volante';
 import type { CabineGameplay, CriarCabineGameplay } from './cabineGameplay';
 import type { ObstaculoGameplay } from './estadoGameplay';
@@ -104,7 +105,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl }: { criarCabine?
         cabine?.quadro({ estado: motor.ler(), anguloAroRad: anguloAroRad(motor.comando().esterco), dt: ultimoDt });
       },
       // O laço único: pad e setas → volante → física → retrato → eventos, dentro do rAF do palco.
-      drive(dt): SompoDrivePose {
+      drive(dt, cena): SompoDrivePose {
         ultimoDt = dt;
         const pad = firstStandardPad() as GamepadLike | null;
         const borda = bordaReiniciar(pad, reiniciarSegurado);
@@ -112,7 +113,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl }: { criarCabine?
         if (borda.reiniciar) setRodada((n) => n + 1);
         const olhar = pad ? { yaw: 0 - applyDeadZone(pad.axes[2] ?? 0), pitch: 0 - applyDeadZone(pad.axes[3] ?? 0) } : { yaw: 0, pitch: 0 };
         lookRef.current = stepLook(lookRef.current, olhar, dt, { recenter: !!pad });
-        const estado = motor.quadro(dt, comandoDesejado(pad, setasRef.current));
+        const estado = motor.quadro(dt, comandoDesejado(pad, setasRef.current), cena.ground);
         const agora = performance.now();
         if (agora >= pulsoMotor && agora >= zumbidoPausaAteRef.current) { pulsoMotor = agora + MOTOR_PULSO_MS; zumbidoMotor(estado.comandos.acelerador, estado.maquina.velocidadeKph); }
         const trator = motor.trator();
@@ -143,6 +144,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl }: { criarCabine?
       qualityProfile: PERFIL_GAMEPLAY,
       obstaclesRef: obstaculosDoPalco(motor),
       assetUrl: modeloUrl,
+      terrainRelief: relevoRampaLateral,
     });
     return () => {
       cabine?.desmontar();

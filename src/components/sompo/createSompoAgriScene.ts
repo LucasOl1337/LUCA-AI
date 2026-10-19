@@ -655,8 +655,13 @@ function createRuts() {
 // Boca do escapamento do Trator MAX (provenance: tubo em +Z, curva pra frente no topo).
 const MAX_EXHAUST = [0.1, 3.04, 0.82] as const;
 
-export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAgriEnvironmentId, compact = false, equipmentId: SompoAgriEquipmentId = 'harvester') {
-  const definition = SOMPO_AGRI_ENVIRONMENTS[environmentId] || SOMPO_AGRI_ENVIRONMENTS['row-crop-field'];
+export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAgriEnvironmentId, compact = false, equipmentId: SompoAgriEquipmentId = 'harvester', extraRelief?: (x: number, z: number) => number) {
+  const base = SOMPO_AGRI_ENVIRONMENTS[environmentId] || SOMPO_AGRI_ENVIRONMENTS['row-crop-field'];
+  const baseRelief = (base as { relief?: (x: number, z: number) => number }).relief;
+  // Relevo extra (rampa do Gameplay): somado ao do ambiente; sem ele, o talhão é o de sempre.
+  const definition = extraRelief
+    ? { ...base, relief: baseRelief ? (x: number, z: number) => baseRelief(x, z) + extraRelief(x, z) : extraRelief }
+    : base;
   const root = new THREE.Group();
   root.name = `sompo-agri-environment-${environmentId}`;
   const terrain = createTerrain(definition);
