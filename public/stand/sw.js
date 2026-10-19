@@ -4,6 +4,7 @@ const PREFIX = 'luca-stand-';
 const CACHE = PREFIX + CONFIG.version;
 const SHELL = new Set(CONFIG.shell);
 const VIDEOS = new Set(CONFIG.videos);
+let disabled = false;
 
 function valid(response, pathname) {
   if (response.status !== 200) return false;
@@ -16,6 +17,7 @@ function valid(response, pathname) {
 }
 
 async function disable() {
+  disabled = true;
   await self.registration.unregister();
   await Promise.all((await caches.keys()).filter((key) => key.startsWith(PREFIX)).map((key) => caches.delete(key)));
 }
@@ -77,10 +79,10 @@ async function videoResponse(request, cached) {
 async function serve(request, pathname) {
   const navigation = request.mode === 'navigate';
   if (navigation && await removed()) return fetch(request);
-  const cache = await caches.open(CACHE);
+  if (disabled) return fetch(request);
   const key = navigation ? '/stand/' : pathname;
   if (VIDEOS.has(key)) {
-    const cached = await cache.match(key);
+    const cached = await caches.match(key, { cacheName: CACHE });
     return cached ? videoResponse(request, cached) : fetch(request);
   }
   try {
@@ -88,7 +90,7 @@ async function serve(request, pathname) {
     if (!valid(response, key)) throw new Error('Invalid shell response');
     return response;
   } catch (error) {
-    const cached = await cache.match(key);
+    const cached = await caches.match(key, { cacheName: CACHE });
     if (cached) return cached;
     throw error;
   }
@@ -97,6 +99,7 @@ async function serve(request, pathname) {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
+  if (disabled) return;
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
   // Explicit allowlist: no API, WS, other app page, auth payload or arbitrary asset.
   const navigation = request.mode === 'navigate' && /^\/stand\/?$/.test(url.pathname);

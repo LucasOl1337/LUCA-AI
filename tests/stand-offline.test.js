@@ -17,6 +17,7 @@ function worker() {
   const caches = {
     async keys() { return [...stores.keys()]; },
     async delete(key) { return stores.delete(key); },
+    async match(url, { cacheName }) { return stores.get(cacheName)?.get(url)?.clone(); },
     async open(key) {
       if (!stores.has(key)) stores.set(key, new Map());
       return {
@@ -85,6 +86,7 @@ test('kill-switch por 404 ou HTML desregistra e apaga cache sem afetar outros ap
     w.setNetwork(async () => new Response('removed', { status, headers: { 'content-type': 'text/html' } }));
     await w.fetch('/stand/', { mode: 'navigate' });
     assert.equal(w.unregistered, true);
+    assert.equal(w.fetch('/assets/app.js'), undefined);
     assert.deepEqual([...w.stores.keys()], ['other-app']);
   }
 });
@@ -93,4 +95,18 @@ test('instalação rejeita JS servido como fallback HTML', async () => {
   const w = worker();
   w.setNetwork(async () => new Response('SPA fallback', { headers: { 'content-type': 'text/html' } }));
   await assert.rejects(w.lifecycle('install'), /Invalid offline shell/);
+});
+
+test('provider preserva /stand/ para permanecer dentro do escopo, inclusive na navegação SPA', async () => {
+  const provider = await readFile(new URL('../src/hooks/useAppLocation.tsx', import.meta.url), 'utf8');
+  assert.match(provider, /window\.location\.pathname === '\/stand\/'/);
+  assert.match(provider, /next\.page === 'stand'[^]*formatted\.replace\(/);
+});
+
+test('pedido atendido pelo worker antigo não recria cache removido pelo novo activate', async () => {
+  const w = worker();
+  await w.lifecycle('install');
+  w.stores.delete('luca-stand-release-a');
+  await w.fetch('/assets/app.js');
+  assert.equal(w.stores.has('luca-stand-release-a'), false);
 });

@@ -17,8 +17,8 @@ interface AppLocationContextValue {
 const AppLocationContext = createContext<AppLocationContextValue | null>(null);
 
 function currentHref() {
-  const path = window.location.pathname === '/'
-    ? '/'
+  const path = window.location.pathname === '/' || window.location.pathname === '/stand/'
+    ? window.location.pathname
     : window.location.pathname.replace(/\/+$/, '') || '/';
   return `${path}${window.location.search}`;
 }
@@ -41,7 +41,10 @@ export function AppLocationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const apply = useCallback((next: AppLocation, history: HistoryMode) => {
-    const nextHref = formatAppUrl(next);
+    const formatted = formatAppUrl(next);
+    const nextHref = next.kind === 'app' && next.page === 'stand'
+      ? formatted.replace(/^\/stand(?=\?|$)/, '/stand/')
+      : formatted;
     // Camera permission belongs only to the /sonolencia document. Crossing
     // this boundary must fetch the corresponding Permissions-Policy header.
     if ((locationRef.current.page === 'sonolencia') !== (next.page === 'sonolencia')) {
