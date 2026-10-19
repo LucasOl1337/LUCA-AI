@@ -118,6 +118,18 @@ _Evitar_: Simulador em primeira pessoa (quando se refere só à câmera).
 O operador dirige com o controle, sem roteiro. Não grava episódio, e o que aparece na tela é rotulado SIMULADO.
 _Evitar_: Case livre, desfecho manual.
 
+**Desafio**:
+Um trecho curto da Simulação, de até 90 s, com começo, objetivo e fim, jogado no Modo cabine com teto de 6 km/h (fora dele a Condução livre segue a 12 km/h). Hoje: o fardo à frente (parar antes do fardo com o alerta tocando); o pendente lateral entra quando o terreno tiver inclinação. Termina ao parar perto do obstáculo, ao encostar nele ou ao estourar o tempo. Não grava episódio. Lista em `src/components/gameplay/desafios.ts`.
+_Evitar_: Missão, fase, nível.
+
+**Painel da cabine**:
+O que o operador vê do sistema LUCA-AI dentro da cabine durante a Simulação: distância do sensor frontal na cor da faixa (verde a partir de 200 cm, amarelo abaixo, vermelho até 100 cm ou com alerta), a faixa vermelha "Obstáculo a 1,5 m · freie" no alto do para-brisa quando o alerta de 150 cm acende, o bipe e o selo SIMULADO sempre visível. A regra de cor é a mesma do `/sompo` (`physicalRiskBands` em `shared/sompo-physical-interactions.js`); a tradução do estado em cor, rótulo e bipe está em `src/components/gameplay/alertaCabine.ts`.
+_Evitar_: HUD (só no código antigo `firstPersonHud`), dashboard.
+
+**Resultado do desafio**:
+A tela de 10 s no fim de um Desafio: distância em que o alerta acendeu, tempo de reação (do alerta ao primeiro freio) e quanto sobrou até o obstáculo, mais uma frase (parou a tempo ou Reação atrasada). Sem ranking, sem nome e sem gravar nada.
+_Evitar_: Placar, score (o score 0–100 do `/sompo` mede outra coisa).
+
 **Veredito da bancada**:
 O que a bancada de agentes devolve sobre um episódio gravado: o que aconteceu, a severidade para a seguradora e o que fazer agora. É um parecer de agentes de IA, citado só pelo que a sessão mostra.
 _Evitar_: Classificação, laudo, decisão da seguradora.
