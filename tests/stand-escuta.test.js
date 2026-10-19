@@ -62,13 +62,14 @@ test('chamada da Atração com a escuta aberta convida a falar', () => {
 
 test('abertura automática não pede toque; bloqueio de autoplay pede', () => {
   assert.equal(chamadaDeInicio(false, null, 'abrindo'), 'Ligando o microfone…');
+  assert.equal(chamadaDeInicio(false, null, 'ajuda_microfone'), 'Permita o microfone pra conversar com o LUCA.');
   assert.equal(chamadaDeInicio(false, null, 'precisa_toque'), 'Toca na tela pra começar a conversa.');
 });
 
 test('linha fixa do rodapé: só com o microfone aberto e fora da Conversa', () => {
   const linha = 'O LUCA só ouve quando você fala com ele.';
   for (const estado of ['ouvindo', 'pausada', 'conversa']) assert.equal(linhaDaEscuta(estado, 'atracao'), linha, estado);
-  for (const estado of ['desligada', 'abrindo', 'precisa_toque', 'erro']) assert.equal(linhaDaEscuta(estado, 'atracao'), '', estado);
+  for (const estado of ['desligada', 'abrindo', 'ajuda_microfone', 'precisa_toque', 'erro']) assert.equal(linhaDaEscuta(estado, 'atracao'), '', estado);
   assert.equal(linhaDaEscuta('conversa', 'conversa'), '');
   assert.equal(linhaDaEscuta('ouvindo', 'video'), '');
 });

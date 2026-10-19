@@ -61,6 +61,7 @@ export function chamadaSemVoz(controleConectado: boolean): { titulo: string; sub
  * O estado distingue a abertura automática do bloqueio que exige toque.
  */
 export function chamadaDeInicio(ativa: boolean, fim: Fim, escuta: EstadoEscuta = 'desligada'): string {
+  if (escuta === 'ajuda_microfone') return 'Permita o microfone pra conversar com o LUCA.';
   if (escuta === 'abrindo') return 'Ligando o microfone…';
   const escutando = escuta === 'ouvindo' || escuta === 'conversa';
   if (ativa) return escutando ? 'Pode falar, tô ouvindo.' : 'Ligando o microfone…';

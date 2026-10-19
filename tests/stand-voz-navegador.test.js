@@ -279,6 +279,58 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
     }
   });
 
+  it('permissão pendente: ajuda aos 10 s, Vitrine disponível e resposta tardia volta a ouvir', async () => {
+    escutaNoServidor = true;
+    const pagina = await browser.newPage();
+    try {
+      await pagina.addInitScript(() => {
+        const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        navigator.mediaDevices.getUserMedia = (opcoes) => new Promise((resolve, reject) => {
+          window.__permitirMicrofone = () => original(opcoes).then(resolve, reject);
+        });
+      });
+      await pagina.goto(`${base}/stand`);
+      await pagina.locator('main.stand[data-escuta="abrindo"]').waitFor({ timeout: 15000 });
+      const inicio = Date.now();
+      await pagina.getByText('Ligando o microfone…').waitFor();
+      await pagina.getByText('Permita o microfone pra conversar com o LUCA.').waitFor({ timeout: 12000 });
+      assert.ok(Date.now() - inicio >= 9500, 'não mostrou ajuda antes dos 10 s');
+      assert.equal(await pagina.locator('main.stand').getAttribute('data-escuta'), 'ajuda_microfone');
+      await pagina.evaluate(() => {
+        const botao = [...document.querySelectorAll('.stand-barra button')].find((b) => b.textContent.includes('Vitrine'));
+        botao.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      });
+      await pagina.locator('main.stand[data-modo="vitrine"][data-escuta="ajuda_microfone"]').waitFor();
+      await pagina.evaluate(() => { window.__permitirMicrofone(); });
+      await pagina.locator('main.stand[data-modo="vitrine"][data-escuta="ouvindo"]').waitFor({ timeout: 8000 });
+      assert.equal(await pagina.getByText('Permita o microfone pra conversar com o LUCA.').count(), 0);
+    } finally {
+      escutaNoServidor = false;
+      await pagina.close();
+    }
+  });
+
+  it('permissão rápida: a ajuda não aparece depois de 10 s', async () => {
+    escutaNoServidor = true;
+    const pagina = await browser.newPage();
+    try {
+      await pagina.addInitScript(() => {
+        window.__viuAjuda = false;
+        new MutationObserver(() => {
+          if (document.querySelector('main.stand')?.dataset.escuta === 'ajuda_microfone') window.__viuAjuda = true;
+        }).observe(document, { subtree: true, attributes: true, childList: true });
+      });
+      await pagina.goto(`${base}/stand`);
+      await pagina.locator('main.stand[data-escuta="ouvindo"]').waitFor({ timeout: 15000 });
+      await pagina.waitForTimeout(10500);
+      assert.equal(await pagina.evaluate(() => window.__viuAjuda), false);
+      assert.equal(await pagina.getByText('Permita o microfone pra conversar com o LUCA.').count(), 0);
+    } finally {
+      escutaNoServidor = false;
+      await pagina.close();
+    }
+  });
+
   it('escuta sem --autoplay-policy: abre e volta a ouvir sem toque, depois de cada conversa', async () => {
     // Sem a flag do kiosk e sem nenhum gesto: AudioContext criado antes do microfone nasce
     // `suspended` e a escuta ficaria em `precisa_toque` (achado em produção, 19/10).

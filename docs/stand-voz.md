@@ -72,6 +72,7 @@ stateDiagram-v2
 - **Um microfone só.** A sessão pega o áudio da escuta emprestado (`Emprestimo` em `sessaoTurnos.ts`) e, ao fechar, não o fecha. A escuta só fecha o microfone ao ir para a Simulação ou sair do stand. Se a conversa ainda estiver em andamento, ele fecha quando ela acabar. A Grok (`xai`) não usa empréstimo e não tem escuta.
 - **Toque.** Na Atração, o toque continua abrindo a conversa com saudação, no mesmo microfone. No primeiro toque do dia, o navegador também libera o áudio (`precisa_toque`).
 - **Tela.** A Atração mostra "É só falar que eu escuto." com a escuta ouvindo. Sem escuta, mostra "Toca na tela pra começar a conversa.". O estado fica em `data-escuta` no `<main>`.
+- **Permissão pendente.** Ao abrir, mostra "Ligando o microfone…". Após 10 s sem resposta, `ajuda_microfone` mostra "Permita o microfone pra conversar com o LUCA.". A Vitrine continua disponível. A ajuda não cancela nem repete o pedido: quando a permissão chega, a escuta volta a `ouvindo` sozinha. Isso não muda a reserva de autoplay (`precisa_toque`).
 - **Desligar.** `STAND_ESCUTA=0` no servidor volta ao toque, sem deploy de front. A página lê o status a cada 60 s.
 - **Contagem do dia.** O navegador manda `origem:'escuta'` ou `'toque'` no `POST /sessao`. O `creditos_dia` do status traz `despertares` (sessões abertas pela escuta), `falsos` (despertares fechados sem pergunta) e `conversas` (sessões com ao menos uma pergunta, de qualquer origem). A contagem fica no mesmo arquivo do teto e zera com ele. Falsos/despertares alto pede calibrar o microfone.
 

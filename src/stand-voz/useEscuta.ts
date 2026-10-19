@@ -8,13 +8,15 @@ import type { FimDeSessao } from './useSessaoVoz';
 const REFRATARIO_MS = 2500;
 /** Teto do áudio guardado entre o despertar e a sessão pronta (8 s, o prazo de conexão). */
 const MAX_BLOCOS_GUARDADOS = 160;
+/** Ajuda local enquanto o navegador aguarda a permissão, sem refazer o pedido. */
+const AJUDA_MICROFONE_MS = 10_000;
 
 /**
  * `ouvindo`: microfone aberto, esperando alguém falar.
  * `precisa_toque`: o navegador não liberou o áudio sem gesto (1º toque do dia).
  * `conversa`: a sessão está com o microfone.
  */
-export type EstadoEscuta = 'desligada' | 'abrindo' | 'precisa_toque' | 'ouvindo' | 'pausada' | 'conversa' | 'erro';
+export type EstadoEscuta = 'desligada' | 'abrindo' | 'ajuda_microfone' | 'precisa_toque' | 'ouvindo' | 'pausada' | 'conversa' | 'erro';
 
 export interface UsoEscuta {
   estado: EstadoEscuta;
@@ -94,7 +96,11 @@ export function useEscuta({ ativa, emConversa, fim, despertar }: Opcoes): UsoEsc
     }
     let vivo = true;
     setEstado('abrindo');
+    const ajuda = window.setTimeout(() => {
+      if (vivo && !conversaRef.current) setEstado('ajuda_microfone');
+    }, AJUDA_MICROFONE_MS);
     abrirAudio().then((a) => {
+      window.clearTimeout(ajuda);
       if (!vivo) return a.fechar();
       audio.current = a;
       despertador.current = criarDespertador();
@@ -103,10 +109,12 @@ export function useEscuta({ ativa, emConversa, fim, despertar }: Opcoes): UsoEsc
       a.contexto.addEventListener('statechange', atualizar);
       atualizar();
     }).catch((erro) => {
+      window.clearTimeout(ajuda);
       console.warn('[stand] escuta sem microfone:', erro instanceof Error ? erro.message : erro);
       if (vivo) setEstado('erro');
     });
     return () => {
+      window.clearTimeout(ajuda);
       vivo = false;
       // Com conversa em andamento, quem fecha o microfone é o fim da sessão.
       const a = audio.current;
