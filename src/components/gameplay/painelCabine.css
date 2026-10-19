@@ -27,11 +27,13 @@
   box-shadow: 0 0 34px color-mix(in srgb, var(--gp-cor) 30%, transparent);
   transition: border-color .15s, box-shadow .15s;
 }
-.gameplay-painel-selo {
+.gameplay-painel .gameplay-painel-selo, .gameplay-painel-selo {
+  text-transform: none;
   position: absolute; top: -12px; left: 18px; padding: 3px 10px; border-radius: 999px;
   background: #e8c96a; color: #1d1a0d; font-size: 12px; font-weight: 800; letter-spacing: .12em;
 }
-.gameplay-painel-marca {
+.gameplay-painel .gameplay-painel-marca {
+  text-transform: none;
   position: absolute; top: -11px; right: 18px; padding: 2px 9px; border-radius: 999px;
   background: #07110e; color: #9fc9ad; font-size: 11px; font-weight: 700; letter-spacing: .14em;
   border: 1px solid #ffffff22;
@@ -47,4 +49,25 @@
 .gameplay-painel-lado strong { font-size: clamp(22px, 3.6vh, 42px); font-weight: 750; }
 .gameplay-painel-lado [data-alerta='true'] strong { color: var(--gp-perigo); }
 
+/* No resultado a faixa de alerta já cumpriu o papel e não disputa o cartão. */
+.gameplay-desafio[data-etapa='resultado'] .gameplay-painel-alerta { display: none; }
+
 @media (prefers-reduced-motion: reduce) { .gameplay-painel-alerta { animation: none; } }
+
+/* Abertura e Resultado do desafio: cartão central, sem placar. */
+.gameplay-resultado, .gameplay-abertura {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -55%); z-index: 5;
+  min-width: min(620px, 86vw); padding: 4vh 3.4vw 3vh; border-radius: 22px;
+  background: #07110ef2; color: #edf3ed; text-align: center; pointer-events: none;
+  border: 2px solid #4fbf7a99; box-shadow: 0 20px 60px #000a;
+}
+.gameplay-resultado[data-desfecho='encostou'] { border-color: #e5483bb3; }
+.gameplay-resultado[data-desfecho='tempo'] { border-color: #f2c14e99; }
+.gameplay-resultado .gameplay-painel-selo, .gameplay-abertura .gameplay-painel-selo { left: 50%; transform: translateX(-50%); }
+.gameplay-resultado h2 { margin: 0 0 2vh; font-size: clamp(30px, 5.4vh, 64px); font-weight: 800; }
+.gameplay-resultado[data-desfecho='parou'] h2 { color: #4fbf7a; }
+.gameplay-resultado[data-desfecho='encostou'] h2 { color: #ff6a5c; }
+.gameplay-resultado ul { display: grid; gap: 1.2vh; margin: 0; padding: 0; list-style: none; font-size: clamp(18px, 3vh, 34px); font-weight: 650; font-variant-numeric: tabular-nums; }
+.gameplay-resultado p { margin: 2.6vh 0 0; font-size: clamp(16px, 2.4vh, 26px); color: #c9dccf; }
+.gameplay-resultado small { display: block; margin-top: 1.6vh; color: #8fa897; font-size: clamp(12px, 1.6vh, 16px); }
+.gameplay-abertura p { margin: 0; font-size: clamp(22px, 4vh, 46px); font-weight: 750; }
