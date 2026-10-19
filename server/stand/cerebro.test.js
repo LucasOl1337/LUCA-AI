@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CortadorDeFrases, executarTurno, FALAS, ferramentasDeChat, LIMITES_TURNO, lerSseDeChat, novaConversa, textoFalavel } from './cerebro.js';
+import { CortadorDeFrases, executarTurno, FALAS, ferramentasDeChat, INSTRUCAO_VOZ, LIMITES_TURNO, lerSseDeChat, novaConversa, textoFalavel } from './cerebro.js';
 
 const MODELOS = ['cc/claude-sonnet-5', 'cc/claude-haiku-4-5-20251001', 'cx/gpt-6-astra-high'];
 
@@ -118,6 +118,29 @@ test('reserva: Sonnet cai, Haiku responde; todos caem, sai a fala pronta e a res
   assert.deepEqual(queda.linhas.filter((l) => l.t === 'frase').map((l) => l.texto), [FALAS.falha]);
   assert.equal(queda.conversa.respostas, 0);
   assert.deepEqual(queda.conversa.historico, []);
+});
+
+test('teto de três frases: a quarta não vai ao TTS e o histórico guarda só o que foi ouvido', async () => {
+  const { sintetizadas, conversa, resultado } = await rodar({
+    roteiros: [[{ texto: 'Um. Dois. Três. ' }, { texto: 'Quer ver o vídeo?' }, { fim: true, ferramentas: [] }]],
+  });
+  assert.deepEqual(sintetizadas.map((s) => s.texto), ['Um.', 'Dois.', 'Três.']);
+  assert.equal(conversa.historico.at(-1).content, 'Um. Dois. Três.');
+  assert.equal(resultado.metricas.frases_cortadas, true);
+});
+
+test('documentação da pergunta vai junto só no turno corrente; o histórico guarda a pergunta crua', async () => {
+  const conversa = novaConversa({ conta: 'demo' });
+  const buscas = [];
+  const buscar = (texto) => { buscas.push(texto); return [{ secao: 'Offline', trecho: 'O sensor precisa de rede.' }]; };
+  const primeiro = await rodar({ conversa, entrada: { texto: 'Funciona sem internet?' }, deps: { buscar }, roteiros: [[{ texto: 'Não.' }, { fim: true, ferramentas: [] }]] });
+  assert.deepEqual(buscas, ['Funciona sem internet?']);
+  const enviada = primeiro.chamadas[0].mensagens.at(-1).content;
+  assert.match(enviada, /^Funciona sem internet\?\n\nDocumentação \(buscar_no_repo já rodou com a pergunta\):\n\[Offline\] O sensor precisa de rede\.\n\nRoteador: nenhum vídeo/);
+  assert.equal(conversa.historico[0].content, 'Funciona sem internet?\n\nRoteador: nenhum vídeo; responda ao vivo.');
+  const segundo = await rodar({ conversa, entrada: { texto: 'E o preço?' }, deps: { buscar: () => [] }, roteiros: [[{ texto: 'Não sei.' }, { fim: true, ferramentas: [] }]] });
+  assert.ok(segundo.chamadas[0].mensagens.every((m) => !String(m.content).includes('Documentação')));
+  assert.match(INSTRUCAO_VOZ, /três frases/);
 });
 
 test('ferramenta: busca no repo e segunda rodada com o resultado; vídeo encerra o turno depois da fala', async () => {

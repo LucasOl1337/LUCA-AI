@@ -36,9 +36,11 @@ sequenceDiagram
 ```
 
 - **Ouvido.** `server/stand/provedor-elevenlabs.js` pede o token (`POST /v1/single-use-token/realtime_scribe`) e monta a URL com `scribe_v2_realtime`, `language_code=por`, `commit_strategy=vad`, `vad_silence_threshold_secs=0.6` e `audio_format=pcm_24000`. Com o VAD padrão, a transcrição fecha ~1,7 s depois do fim da fala; com 0,6 s, ~0,7 s (medido em 19/10). `turn_prediction` não existe no realtime. A chave nunca chega ao navegador.
-- **Cérebro.** `server/stand/cerebro.js` (`executarTurno`): roteador de vídeo com prazo de 1,5 s, depois a cadeia de modelos com 7 s para o primeiro token. Se todos caem, sai a fala pronta de falha. Até 3 rodadas de ferramenta (`buscar_no_repo`, `pesquisar_web`, `tocar_video`, ações do site). O histórico da conversa vive na memória do Express.
+- **Cérebro.** `server/stand/cerebro.js` (`executarTurno`): roteador de vídeo com prazo de 1,5 s e a busca local na documentação do repo (3 trechos de até 500 caracteres) que entra só na mensagem do turno corrente. Depois vem a cadeia de modelos, com 7 s para o primeiro token. Se todos caem, sai a fala pronta de falha. Até 3 rodadas de ferramenta (`buscar_no_repo`, `pesquisar_web`, `tocar_video`, ações do site). O histórico da conversa vive na memória do Express e guarda só a pergunta e o que foi falado.
+- **Tamanho da resposta.** O prompt pede no máximo três frases, e o código corta na quarta (`LIMITES_TURNO.frases`, `metricas.frases_cortadas`). Medido em 19/10 com 7 perguntas da feira: Sonnet 5 deu 1º áudio em p50 ~2,3 s (meta ≤ 3,5 s) e acertou todas. O Haiku 4.5 inventou números em 2 das 7 e não serve de primeiro modelo.
 - **Voz.** O texto vira frases (`CortadorDeFrases`). Cada frase vai ao TTS em fila, com `previous_text` para manter a entonação. O áudio volta como PCM16 a 24 kHz em base64, no NDJSON. Saudação, falha e despedida são falas prontas, guardadas em cache por voz e modelo.
 - **Navegador.** `src/stand-voz/sessaoTurnos.ts` toca as frases em sequência. A legenda aparece quando a frase começa a soar. `tocar_video` espera a fala que anuncia o vídeo terminar. `abrirSessaoDeVoz` escolhe entre `SessaoTurnos` e a `SessaoVoz` (xai) por `conexao.transporte`.
+- **Abertura.** `abrirAudio` (`src/stand-voz/audioStand.ts`) lê o microfone por `AudioWorklet`. Se `addModule` não resolver em 2,5 s, cai para `ScriptProcessor` com a mesma reamostragem (`Bloqueador`). Em 19/10, `addModule` ficou pendente para sempre sob Playwright e a tela travou em "Ligando o microfone…". Do toque até a sessão pronta há 8 s (`PRAZO_CONEXAO_MS` em `useSessaoVoz.ts`). Passou disso, ou se o microfone ou o WebSocket falhar na abertura, a página fica 60 s no modo sem voz (`PAUSA_APOS_FALHA_MS`) e mostra o motivo em `data-motivo` no `<main>`, por exemplo `erro:sem_conexao_provedor`. `tests/stand-voz-navegador.test.js` cobre isso num Chromium real, com Scribe e turno falsos.
 - **Interrupção (barge-in).** Volume alto no microfone abaixa a voz na hora. Uma transcrição parcial com 2 ou mais palavras de verdade, que não sejam eco da própria fala, corta o áudio e aborta o turno no servidor. Um turno novo da mesma conversa também aborta o anterior.
 - **Eco.** Uma transcrição contida no que o LUCA acabou de falar é descartada (`pareceEco`). Durante o vídeo, o microfone manda silêncio ao Scribe.
 
@@ -50,6 +52,7 @@ O CLI tem `stand sessao` e `stand turno` (NDJSON em stdout); veja [`cli-referenc
 | --- | --- | --- |
 | Silêncio, teto de sessão, sessões por hora | 20 s, 240 s, 30 | `LIMITES_STAND` em `server/stand/rotas.js` |
 | Respostas por conversa | 8 (a 9ª pergunta ouve a despedida e a sessão fecha) | `LIMITES_TURNO` em `server/stand/cerebro.js` |
+| Frases por resposta | 3 (a 4ª é cortada) | idem |
 | Tokens por resposta | 300 | idem |
 | Caracteres de TTS por conversa | 2.000 (passou disso, a resposta sai só em legenda) | idem |
 | Créditos ElevenLabs por dia | 25.000 (`STAND_TETO_DIARIO_CREDITOS`) | `server/stand/teto-diario.js` |

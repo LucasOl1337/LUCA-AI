@@ -9,7 +9,7 @@ import { FERRAMENTAS_STAND } from './ferramentas.js';
 
 // Q5 do grill: por sessão, 8 respostas, 300 tokens por resposta e 2.000
 // caracteres de TTS. Os 240 s e os 20 s de silêncio continuam em LIMITES_STAND.
-export const LIMITES_TURNO = Object.freeze({ respostas: 8, tokens: 300, caracteres_tts: 2000 });
+export const LIMITES_TURNO = Object.freeze({ respostas: 8, tokens: 300, caracteres_tts: 2000, frases: 3 });
 export const ESPERA_PRIMEIRO_TOKEN_MS = 7000;
 export const ROTEAR_MS = 1500;
 const RODADAS_DE_FERRAMENTA = 3;
@@ -21,9 +21,22 @@ export const FALAS = Object.freeze({
 });
 
 export const INSTRUCAO_VOZ = [
-  'Sua resposta vira voz na hora: escreva só o que vai ser falado, em frases curtas e completas.',
+  'Sua resposta vira voz na hora: escreva só o que vai ser falado, em frases curtas e completas. No máximo três frases no total, contando qualquer pergunta ou convite no fim; prefira duas frases e um convite curto só quando ajudar.',
   'Nada de markdown, listas, emojis, links ou símbolos; números por extenso quando forem poucos.',
+  'Comece sempre falando: responda direto quando o texto acima ou a documentação anexada à pergunta já têm a resposta, e só chame buscar_no_repo ou pesquisar_web se faltar um detalhe, dizendo antes uma frase curta como "Deixa eu conferir isso."',
 ].join(' ');
+
+/**
+ * Trechos da documentação anexados à pergunta antes do modelo, para ele
+ * responder já sem uma rodada de buscar_no_repo (medido em 19/10: a rodada
+ * extra custava ~3 s de silêncio e o 1º token caiu de 2,3 s para 1,3 s).
+ */
+export function documentacaoDaPergunta(texto, buscar) {
+  let trechos = [];
+  try { trechos = buscar(texto) || []; } catch { trechos = []; }
+  if (!trechos.length) return '';
+  return `\n\nDocumentação (buscar_no_repo já rodou com a pergunta):\n${trechos.map((t) => `[${t.secao}] ${t.trecho}`).join('\n')}`;
+}
 
 /** Ferramentas do stand no formato de chat completions (o Realtime usa outro). */
 export function ferramentasDeChat(ferramentas = FERRAMENTAS_STAND) {
@@ -183,9 +196,11 @@ function criarFilaDeFala({ conversa, sintetizar, emitir, aoCobrarTts, sinal, mar
   const faladas = [];
   return {
     faladas,
+    /** Teto de frases por turno: a instrução sozinha não segurou (19/10, 4 a 5 frases). */
     falar(fraseCrua) {
       const frase = textoFalavel(fraseCrua);
-      if (!frase) return;
+      if (!frase) return false;
+      if (faladas.length >= LIMITES_TURNO.frases) return false;
       faladas.push(frase);
       corrente = corrente.then(async () => {
         if (abortado(sinal)) return;
@@ -208,6 +223,7 @@ function criarFilaDeFala({ conversa, sintetizar, emitir, aoCobrarTts, sinal, mar
         }
         anterior = `${anterior} ${frase}`.slice(-300);
       });
+      return true;
     },
     terminou: () => corrente,
   };
@@ -224,6 +240,7 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
     sintetizar,
     falaPronta,
     rotear = async () => null,
+    buscar = () => [],
     executarFerramenta,
     instrucoes = () => '',
     modelos = cadeiaCerebroStand(),
@@ -258,6 +275,7 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
   }
 
   let conteudo;
+  let documentacao = '';
   if (entrada.evento === 'video_terminou') {
     conteudo = `Roteador: o vídeo ${entrada.id} terminou. Pergunte, em uma frase, se ficou alguma dúvida.`;
   } else {
@@ -277,11 +295,17 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
       ? `Roteador: decisao=${decisao.decisao} id=${decisao.id}.`
       : 'Roteador: nenhum vídeo; responda ao vivo.';
     metricas.roteador = decisao && !conversa.videosTocados.has(decisao.id) ? decisao : null;
+    documentacao = documentacaoDaPergunta(texto, buscar);
     conteudo = `${texto}\n\n${nota}`;
   }
   const tamanhoAntes = conversa.historico.length;
   conversa.respostas += 1;
   conversa.historico.push({ role: 'user', content: conteudo });
+  // A documentação vale só para este turno: o histórico guarda a pergunta crua.
+  const indicePergunta = conversa.historico.length - 1;
+  const comDocumentacao = (historico) => (documentacao
+    ? historico.map((m, i) => (i === indicePergunta ? { ...m, content: conteudo.replace(/\n\nRoteador:/, `${documentacao}\n\nRoteador:`) } : m))
+    : historico);
 
   const fala = criarFilaDeFala({ conversa, sintetizar, emitir, aoCobrarTts, sinal, marcar });
   const ferramentasChat = ferramentasDeChat();
@@ -289,7 +313,7 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
   let videoComecou = false;
 
   for (let rodada = 0; rodada < RODADAS_DE_FERRAMENTA && !videoComecou; rodada++) {
-    const mensagens = [{ role: 'system', content: `${instrucoes()}\n\n${INSTRUCAO_VOZ}` }, ...conversa.historico];
+    const mensagens = [{ role: 'system', content: `${instrucoes()}\n\n${INSTRUCAO_VOZ}` }, ...comDocumentacao(conversa.historico)];
     let resultado = null;
     for (const modelo of (falouAlgo ? [metricas.modelo] : modelos)) {
       if (abortado(sinal)) break;
@@ -318,6 +342,8 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
 
     const cortador = new CortadorDeFrases();
     let textoDaRodada = '';
+    const faladasAntes = fala.faladas.length;
+    let cortou = false;
     let fim = null;
     let passo = resultado.primeiro;
     try {
@@ -328,8 +354,8 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
           textoDaRodada += evento.texto;
           for (const frase of cortador.adicionar(evento.texto)) {
             marcar('primeira_frase');
-            fala.falar(frase);
-            falouAlgo = true;
+            if (fala.falar(frase)) falouAlgo = true;
+            else cortou = true;
           }
         }
         if (evento.fim) fim = evento;
@@ -339,7 +365,16 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
     } catch (erro) {
       if (!abortado(sinal)) metricas.tentativas.push({ modelo: metricas.modelo, erro: String(erro?.message || erro).slice(0, 80) });
     }
-    for (const frase of cortador.terminar()) { marcar('primeira_frase'); fala.falar(frase); falouAlgo = true; }
+    for (const frase of cortador.terminar()) {
+      marcar('primeira_frase');
+      if (fala.falar(frase)) falouAlgo = true;
+      else cortou = true;
+    }
+    // Passou do teto de frases: o histórico guarda só o que o visitante ouviu.
+    if (cortou) {
+      textoDaRodada = fala.faladas.slice(faladasAntes).join(' ');
+      metricas.frases_cortadas = true;
+    }
 
     const chamadas = abortado(sinal) ? [] : fim?.ferramentas || [];
     // Interrompido ou sem ferramenta: fica no histórico só o texto que saiu.

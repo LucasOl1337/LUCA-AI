@@ -10,7 +10,7 @@
 // - `xai`: Grok Voice Realtime, conversa inteira no navegador (reserva).
 import { executarTurno, FALAS, LIMITES_TURNO, criarChamadaDeModelo, novaConversa } from './cerebro.js';
 import { FERRAMENTAS_STAND, executarFerramentaStand, videoPublicado } from './ferramentas.js';
-import { montarPromptBase } from './conhecimento.js';
+import { buscarNoRepo, montarPromptBase } from './conhecimento.js';
 import { provedorXai } from './provedor-xai.js';
 import { CREDITOS_STT_POR_MINUTO, fatorCreditosTts, modeloTtsStand, provedorElevenlabs, resolverVoz, sintetizarElevenlabs } from './provedor-elevenlabs.js';
 import { arquivoPadrao, criarTetoDiario, tetoDiarioDoEnv } from './teto-diario.js';
@@ -258,6 +258,7 @@ export function registerStandRoutes(app, {
           sintetizar,
           falaPronta: falasProntas(config, sintetizar),
           rotear,
+          buscar: (texto) => buscarNoRepo(texto, { limite: 3, maxChars: 500 }),
           executarFerramenta: (nome, args) => executarFerramenta(nome, args),
           instrucoes,
           aoCobrarTts: (caracteres) => teto.somar(caracteres * fatorCreditosTts(modeloTts)),
