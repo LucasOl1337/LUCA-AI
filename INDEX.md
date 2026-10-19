@@ -33,6 +33,7 @@
 | [`docs/sensor-lab.md`](./docs/sensor-lab.md) | SOMENTE ao mudar o laboratorio 3D do sensor (`/sensor`). |
 | [`docs/stand-tailnet.md`](./docs/stand-tailnet.md) | SOMENTE ao abrir o `/stand` com voz em outra maquina da tailnet (`scripts/stand-tailnet.sh`). |
 | [`docs/stand-publico.md`](./docs/stand-publico.md) | SOMENTE ao mudar o que a IA do `/stand` responde ao publico; e a fonte principal de `buscar_no_repo`. |
+| [`docs/adr/`](./docs/adr/) | SOMENTE ao rever uma decisao de arquitetura registrada (ex.: Simulacao dentro do `/stand`). |
 | [`docs/geofencing.md`](./docs/geofencing.md) | SOMENTE ao mexer no módulo isolado de geofencing (`shared/geofencing/`, `server/geofencing/`, `src/geofencing/`): faixas de proximidade, perigos do mapa, radar do simulador agrícola, episódios de faixa do laboratório. Traz o mapa do módulo e a lista dos pontos de contato com o resto. |
 | [`docs/yume-personas/`](./docs/yume-personas/) | SOMENTE ao criar no Yume a definicao oficial de uma persona (o LUCA nao escreve no Yume). |
 | `server/deliberations/README.md` | SOMENTE ao mudar o contrato de deliberacao para harnesses. |

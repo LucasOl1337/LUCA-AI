@@ -91,6 +91,8 @@ interface SompoTruckSimulatorProps {
   onScenarioSelect?: (scenarioId: string, outcomeId: string) => void;
   /** Veículo do cadastro em uso: decide o modelo 3D e quais cases aparecem. */
   vehicle?: SompoVehicle | null;
+  /** Totem do stand: só o palco 3D, aberto na cabine; sem cabeçalho, barra nem painel lateral. */
+  kiosk?: boolean;
 }
 
 type EpisodeRunState =
@@ -330,6 +332,7 @@ export default function SompoTruckSimulator({
   requestedOutcome = '',
   onScenarioSelect,
   vehicle = null,
+  kiosk = false,
 }: SompoTruckSimulatorProps) {
   const isFirebase = source === 'firebase';
   const maxMode = vehicle?.modelo3d === 'trator-max';
@@ -990,6 +993,11 @@ export default function SompoTruckSimulator({
   }
   const padConnected = useStandGamepad({ enabled: standMode, lookRef, driveRef, onAction: handleStandPad });
 
+  // No totem a Simulação abre na cabine assim que o case do MAX monta; ✕ ainda alterna.
+  useEffect(() => {
+    if (kiosk && cabinAvailable) setCabin(true);
+  }, [kiosk, cabinAvailable]);
+
   // R2 ou L2 na cabine, fora de episódio, assume a máquina; o painel e a vibração seguem a pose livre.
   useEffect(() => {
     if (!cabin || !cabinAvailable || episodeActive) return undefined;
@@ -1193,14 +1201,14 @@ export default function SompoTruckSimulator({
 
   return (
     <section
-      className={`sompo-simulator${isFirebase ? ' sompo-simulator-live' : ''}${studioOpen ? ' is-studio' : ''}`}
+      className={`sompo-simulator${isFirebase ? ' sompo-simulator-live' : ''}${studioOpen ? ' is-studio' : ''}${kiosk ? ' is-kiosk' : ''}`}
       aria-labelledby="sompo-simulator-title"
       data-sompo-simulator
       data-sompo-simulator-source={source}
       data-sompo-model={modelStatus}
       data-sompo-asset={modelAsset ?? undefined}
     >
-      <header className="sompo-simulator-head">
+      <header className="sompo-simulator-head" hidden={kiosk}>
         <div>
           <span><BoxIcon /> {isFirebase ? 'Gêmeo digital' : 'Laboratório virtual'}</span>
           <h2 id="sompo-simulator-title">
@@ -1224,7 +1232,7 @@ export default function SompoTruckSimulator({
         </div>
       </header>
 
-      {!isFirebase && <div className="sompo-simulator-toolbar">
+      {!isFirebase && !kiosk && <div className="sompo-simulator-toolbar">
         <div className="sompo-simulator-modes"><button type="button" aria-pressed={!studioOpen && !mapOpen} disabled={episodeActive} onClick={() => { setStudioOpen(false); setMapOpen(false); }}><Truck />Simulador</button>{agriRun && preview.geofence && <button type="button" aria-pressed={mapOpen} disabled={episodeActive} data-sompo-map-toggle onClick={() => { setStudioOpen(false); setMapOpen(true); }}><MapIcon />Mapa do talhão</button>}<button type="button" aria-pressed={studioOpen} disabled={episodeActive} onClick={() => { setMapOpen(false); setStudioOpen(true); }}><SlidersHorizontal />Oficina 3D</button></div>
         <div className="sompo-simulator-playback">
           <button type="button" disabled={episodeActive} aria-label={playing ? 'Pausar simulação' : 'Reproduzir simulação'} onClick={() => { playback.current.setPlaying(!playing, performance.now(), startedAtRef.current); setPlaying(!playing); }}>{playing ? <Pause /> : <Play />}</button>
@@ -1345,7 +1353,7 @@ export default function SompoTruckSimulator({
           </p>
         </div>
 
-        {isFirebase ? (
+        {kiosk ? null : isFirebase ? (
           <div>
           <PhysicalTwinPanel twin={physicalTwin} />
           <LiveReadings
