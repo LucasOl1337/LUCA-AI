@@ -40,7 +40,9 @@ export function DesafioCabine({ canal, desafio: fixo, som = true }: { canal: Can
       if (!rastro.current.resultado) return;
       const { resultado } = rastro.current;
       canal.encerrar(MOTIVO_FIM[resultado.desfecho]);
-      setEtapa({ tipo: 'resultado', resultado, ate: Date.now() + RESULTADO_MS });
+      const t = Date.now();
+      setAgora(t);
+      setEtapa({ tipo: 'resultado', resultado, ate: t + RESULTADO_MS });
     };
     const semMudanca = canal.assinar(() => {
       rastro.current = passoDesafio(rastro.current, canal.ler(), desafio);
