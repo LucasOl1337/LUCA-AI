@@ -51,7 +51,7 @@ Um item da Vitrine que mostra o app de verdade, só lendo: o replay do Laborató
 _Evitar_: Iframe, demo do app, print.
 
 **Simulação**:
-O Modo do stand com o simulador do Trator MAX em tela cheia, sem cabeçalho nem painel, jogado no controle. Nunca entra sozinho; sem uso por 90 s avisa e volta para Coruja. Não grava nada no servidor: □ △ ○ tocam o cenário sem abrir episódio (`sompoTelemetryWriter` devolve `null` no kiosk). Não é a página `/sompo`.
+O Modo do stand com o simulador do Trator MAX em tela cheia, sem cabeçalho nem painel, jogado no controle. Nunca entra sozinho; sem uso por 90 s avisa e volta para Coruja. Não grava nada no servidor: □ △ ○ tocam o cenário sem abrir episódio (`sompoTelemetryWriter` devolve `null` no kiosk e também no `/sompo` aberto pelo modo Site dentro do `/stand`). Não é a página `/sompo`.
 _Evitar_: Simulador (para o modo), jogo.
 
 **Qualidade automática**:

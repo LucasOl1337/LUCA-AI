@@ -10,7 +10,10 @@ const kiosk = await readFile(new URL('../src/components/stand/SimuladorKiosk.tsx
 
 test('kiosk não recebe porta de escrita; /sompo recebe as quatro escritas', () => {
   assert.equal(sompoTelemetryWriter({ kiosk: true }), null);
-  const writer = sompoTelemetryWriter({ kiosk: false });
+  // Modo Site: /sompo dentro do iframe do /stand também é o totem.
+  assert.equal(sompoTelemetryWriter({ kiosk: false, embutido: true }), null);
+  assert.equal(sompoTelemetryWriter({ kiosk: true, embutido: false }), null);
+  const writer = sompoTelemetryWriter({ kiosk: false, embutido: false });
   for (const metodo of ['postSompoTelemetrySimulation', 'postSompoTelemetryEpisodeStart', 'postSompoTelemetryEpisodeFinish', 'postSompoTelemetryEpisodeFrames']) {
     assert.equal(typeof writer[metodo], 'function', metodo);
   }
