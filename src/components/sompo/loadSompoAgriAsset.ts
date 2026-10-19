@@ -28,13 +28,22 @@ function disposeObject(root: THREE.Object3D) {
 }
 
 /**
+ * GLB da máquina: o do catálogo, salvo gancho explícito (o gameplay troca o MAX
+ * pela variante com cabine). O manifesto `.textures.json` acompanha a mesma URL.
+ */
+export function urlDoAssetAgri(equipmentId: SompoAgriEquipmentId, assetUrl?: string) {
+  return assetUrl || SOMPO_AGRI_EQUIPMENT[equipmentId].assetUrl;
+}
+
+/**
  * Carrega máquinas agrícolas sob a CSP de produção. Reconstruções restauram
  * seus atlas externos; modelos procedurais usam o mesmo contrato com manifesto
  * vazio e materiais PBR nativos do GLB.
  */
-export async function loadSompoAgriAsset(equipmentId: SompoAgriEquipmentId, signal: AbortSignal) {
+export async function loadSompoAgriAsset(equipmentId: SompoAgriEquipmentId, signal: AbortSignal, assetUrl?: string) {
   const equipment = SOMPO_AGRI_EQUIPMENT[equipmentId];
-  const response = await fetch(equipment.assetUrl, { signal });
+  const url = urlDoAssetAgri(equipmentId, assetUrl);
+  const response = await fetch(url, { signal });
   if (!response.ok) throw new Error(`Sompo ${equipmentId} asset: HTTP ${response.status}`);
   const gltf = await useSompoExternalTextures(new GLTFLoader()).parseAsync(
     await response.arrayBuffer(),
@@ -45,7 +54,7 @@ export async function loadSompoAgriAsset(equipmentId: SompoAgriEquipmentId, sign
     return null;
   }
   try {
-    await restoreSompoTextures(gltf, equipment.assetUrl, signal);
+    await restoreSompoTextures(gltf, url, signal);
   } catch (error) {
     disposeObject(gltf.scene);
     throw error;

@@ -127,7 +127,7 @@ function createUltrasonicBeam(origin: readonly [number, number, number]) {
  * real em forma fechada: separado do loop do caminhão para não arriscar o
  * fluxo rural. Desmontado e remontado a cada troca de cenário/desfecho.
  */
-export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig, adaptiveQuality = false, obstaclesRef }: {
+export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig, adaptiveQuality = false, obstaclesRef, assetUrl }: {
   mount: HTMLElement;
   scenarioId: SompoAgriScenarioId;
   outcomeId: string;
@@ -150,6 +150,8 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
    * fardo fixo do case. Lido a cada quadro; trocar a lista reposiciona os fardos.
    */
   obstaclesRef?: { current: readonly { x: number; z: number; radius: number }[] };
+  /** GLB da máquina no lugar do catálogo (gameplay: MAX com cabine). Sem ele, a URL de sempre. */
+  assetUrl?: string;
 }): SompoAgriStageApi | null {
   const scenario = getSompoAgriScenario(scenarioId);
   const operation = scenario.environmentId === 'geofence-operacao';
@@ -365,7 +367,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   let rig: ReturnType<typeof rigSompoAgriAsset> | null = null;
   const abort = new AbortController();
   onModelStatus('loading', null);
-  void loadSompoAgriAsset(scenario.equipmentId, abort.signal).then((loaded) => {
+  void loadSompoAgriAsset(scenario.equipmentId, abort.signal, assetUrl).then((loaded) => {
     if (disposed || !loaded) { if (loaded) disposeSompoAgriAsset(loaded); return; }
     rig = rigSompoAgriAsset(loaded, scenario.equipmentId);
     model = rig.root;

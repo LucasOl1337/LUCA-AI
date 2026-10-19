@@ -49,8 +49,9 @@ function zumbidoMotor(acelerador: number, velocidadeKph: number) {
  * com o DualSense como volante, num laço só (o rAF do palco). Não escreve
  * nada no servidor; □ △ ○ ficam livres, Options reinicia o desafio.
  * `criarCabine` é o ponto da Visual: monta sobre a máquina e recebe o ângulo do aro.
+ * `modeloUrl` troca o GLB do MAX (ex.: variante com cabine); sem ele, o do catálogo.
  */
-export default function GameplayKiosk({ criarCabine }: { criarCabine?: CriarCabineGameplay }) {
+export default function GameplayKiosk({ criarCabine, modeloUrl }: { criarCabine?: CriarCabineGameplay; modeloUrl?: string }) {
   const motor = useMemo(() => criarMotorGameplay(), []);
   const raizRef = useRef<HTMLDivElement>(null);
   const palcoRef = useRef<HTMLDivElement>(null);
@@ -139,12 +140,13 @@ export default function GameplayKiosk({ criarCabine }: { criarCabine?: CriarCabi
       cameraRig: rig,
       adaptiveQuality: true,
       obstaclesRef: obstaculosDoPalco(motor),
+      assetUrl: modeloUrl,
     });
     return () => {
       cabine?.desmontar();
       stage?.dispose();
     };
-  }, [motor]);
+  }, [motor, modeloUrl]);
 
   // Setas dirigem (Q9). Só as setas: as letras do stand (r, n, d, g, f) seguem com a equipe.
   useEffect(() => {
