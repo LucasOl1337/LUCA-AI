@@ -1,0 +1,50 @@
+/* Painel da cabine do gameplay: faixa de baixo no centro e faixa de alerta no alto do para-brisa. */
+.gameplay-painel {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  --gp-livre: #4fbf7a; --gp-atencao: #f2c14e; --gp-perigo: #e5483b;
+  --gp-cor: var(--gp-livre);
+  font-variant-numeric: tabular-nums;
+}
+.gameplay-painel[data-faixa='atencao'] { --gp-cor: var(--gp-atencao); }
+.gameplay-painel[data-faixa='perigo'] { --gp-cor: var(--gp-perigo); }
+
+.gameplay-painel-alerta {
+  position: absolute; top: 4.5vh; left: 50%; transform: translateX(-50%);
+  padding: 1.1vh 3.2vw; border-radius: 12px; background: #c4291ff0; color: #fff;
+  font-size: clamp(20px, 3.4vh, 40px); font-weight: 800; letter-spacing: .01em; white-space: nowrap;
+  box-shadow: 0 0 0 3px #ffffff3a, 0 10px 40px #b3261e88;
+  animation: gameplay-pisca .4s steps(2, jump-none) infinite alternate;
+}
+.gameplay-painel-alerta[hidden] { display: none; }
+@keyframes gameplay-pisca { from { opacity: 1; } to { opacity: .72; } }
+
+.gameplay-painel-cabine {
+  position: absolute; bottom: 3.5vh; left: 50%; transform: translateX(-50%);
+  display: grid; grid-template-columns: auto auto; align-items: center; gap: 0 2.4vw;
+  min-width: min(560px, 80vw); padding: 1.6vh 2.4vw 1.4vh;
+  border-radius: 18px; background: #07110ee6; color: #edf3ed;
+  border: 2px solid color-mix(in srgb, var(--gp-cor) 70%, transparent);
+  box-shadow: 0 0 34px color-mix(in srgb, var(--gp-cor) 30%, transparent);
+  transition: border-color .15s, box-shadow .15s;
+}
+.gameplay-painel-selo {
+  position: absolute; top: -12px; left: 18px; padding: 3px 10px; border-radius: 999px;
+  background: #e8c96a; color: #1d1a0d; font-size: 12px; font-weight: 800; letter-spacing: .12em;
+}
+.gameplay-painel-marca {
+  position: absolute; top: -11px; right: 18px; padding: 2px 9px; border-radius: 999px;
+  background: #07110e; color: #9fc9ad; font-size: 11px; font-weight: 700; letter-spacing: .14em;
+  border: 1px solid #ffffff22;
+}
+.gameplay-painel-distancia { display: grid; gap: 2px; }
+.gameplay-painel-cabine span { font-size: clamp(11px, 1.4vh, 15px); color: #b9cdbf; text-transform: uppercase; letter-spacing: .08em; }
+.gameplay-painel-distancia strong {
+  font-size: clamp(44px, 8vh, 96px); line-height: 1; font-weight: 800; color: var(--gp-cor);
+}
+.gameplay-painel-distancia small { font-size: clamp(14px, 2vh, 22px); font-weight: 650; color: #edf3ed; }
+.gameplay-painel-lado { display: grid; gap: 1vh; justify-items: end; text-align: right; }
+.gameplay-painel-lado > div { display: grid; }
+.gameplay-painel-lado strong { font-size: clamp(22px, 3.6vh, 42px); font-weight: 750; }
+.gameplay-painel-lado [data-alerta='true'] strong { color: var(--gp-perigo); }
+
+@media (prefers-reduced-motion: reduce) { .gameplay-painel-alerta { animation: none; } }

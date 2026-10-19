@@ -66,3 +66,31 @@ test('inclinação liga a partir de 20° na rolagem ou arfagem', () => {
   assert.equal(alertaCabine(estado({ rolagem: -20 })).inclinacao.ligada, true);
   assert.equal(alertaCabine(estado({ arfagem: 22 })).inclinacao.ligada, true);
 });
+
+const { createRequire } = await import('node:module');
+const require = createRequire(import.meta.url);
+const { createElement } = require('react');
+const { renderToStaticMarkup } = require('react-dom/server');
+const { PainelCabine, PainelCabineVista } = await loadFrontendModule('../../src/components/gameplay/PainelCabine.tsx');
+
+test('painel mostra distância, cor e selo SIMULADO; faixa vermelha só com alerta', () => {
+  const longe = estado({ cm: 180 });
+  const html = renderToStaticMarkup(createElement(PainelCabineVista, { painel: alertaCabine(longe), estado: longe }));
+  assert.match(html, /data-faixa="atencao"/);
+  assert.match(html, /SIMULADO/);
+  assert.match(html, /1,8 m/);
+  assert.match(html, /role="alert" hidden=""/);
+  const perto = estado({ cm: 140 });
+  const alerta = renderToStaticMarkup(createElement(PainelCabineVista, { painel: alertaCabine(perto), estado: perto }));
+  assert.match(alerta, /data-alerta="true"/);
+  assert.match(alerta, /Obstáculo a 1,5 m · freie/);
+  assert.doesNotMatch(alerta, /role="alert" hidden/);
+});
+
+test('PainelCabine lê o canal da Direção e renderiza sem áudio no servidor', () => {
+  const atual = estado({ cm: 90 });
+  const canal = { ler: () => atual, assinar: () => () => {}, aoEvento: () => () => {}, reiniciar() {}, encerrar() {} };
+  const html = renderToStaticMarkup(createElement(PainelCabine, { canal }));
+  assert.match(html, /data-faixa="perigo"/);
+  assert.match(html, /0,9 m/);
+});

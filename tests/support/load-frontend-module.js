@@ -11,6 +11,8 @@ export async function loadFrontendModule(path) {
     platform: 'node',
     format: 'cjs',
     packages: 'external',
+    // Folha de estilo não muda comportamento; o Vite cuida dela no build.
+    loader: { '.css': 'empty' },
   });
   const module = { exports: {} };
   new Function('require', 'module', 'exports', result.outputFiles[0].text)(
