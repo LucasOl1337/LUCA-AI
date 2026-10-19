@@ -1,0 +1,77 @@
+/**
+ * Tradução do EstadoGameplay no que o Painel da cabine mostra e toca.
+ * Puro: o painel chama com o retrato de `ler()` e só desenha o resultado.
+ *
+ * Duas regras com papéis diferentes (grill r1, Operador Q1):
+ * - a cor vem das faixas do `/sompo` (`physicalRiskBands`): amarelo abaixo de
+ *   200 cm, vermelho até 100 cm ou com o flag de alerta;
+ * - o alerta (faixa vermelha e bipe rápido) é o flag do ESP32 a 150 cm,
+ *   que a física da Direção já entrega em `sensor.alerta`.
+ */
+import { physicalRiskBands } from '../../../shared/sompo-physical-interactions.js';
+import type { EstadoGameplay } from './estadoGameplay';
+
+export type FaixaCabine = 'livre' | 'atencao' | 'perigo';
+
+/** Cadência do bipe: `null` mudo, `0` tom contínuo, senão um bipe a cada `intervaloMs`. */
+export interface BipeCabine { intervaloMs: number | null; frequenciaHz: number }
+
+export interface AlertaCabine {
+  faixa: FaixaCabine;
+  /** "2,4 m", ou "+4 m" sem eco. */
+  distanciaTexto: string;
+  /** Faixa vermelha no alto do para-brisa. */
+  alerta: boolean;
+  /** Texto da faixa vermelha; vazio sem alerta. */
+  rotuloAlerta: string;
+  /** Linha curta abaixo da distância. */
+  rotulo: string;
+  velocidadeTexto: string;
+  /** Rolagem ou arfagem a partir de 20° (item 3: vem do terreno). */
+  inclinacao: { ligada: boolean; graus: number };
+  bipe: BipeCabine;
+}
+
+export const ROTULO_ALERTA_CABINE = 'Obstáculo a 1,5 m · freie';
+export const BIPE_LENTO_MS = 600;
+export const BIPE_RAPIDO_MS = 200;
+
+const MUDO: BipeCabine = { intervaloMs: null, frequenciaHz: 0 };
+
+const metros = (cm: number) => `${(cm / 100).toFixed(1).replace('.', ',')} m`;
+
+export function alertaCabine(estado: EstadoGameplay): AlertaCabine {
+  const { sensor, atitude, maquina, contato, fase } = estado;
+  const faixas = physicalRiskBands({
+    distance: sensor.eco ? sensor.distanciaCm : null,
+    pitch: atitude.arfagemGraus,
+    roll: atitude.rolagemGraus,
+    collisionFlag: sensor.alerta || contato,
+  });
+  const faixa: FaixaCabine = faixas.proximityLevel === 'danger' ? 'perigo'
+    : faixas.proximityLevel === 'attention' ? 'atencao' : 'livre';
+  const perto = faixas.distance !== null && faixas.distance <= 100;
+
+  let bipe: BipeCabine = MUDO;
+  if (fase === 'dirigindo') {
+    if (contato || perto) bipe = { intervaloMs: 0, frequenciaHz: 1320 };
+    else if (sensor.alerta) bipe = { intervaloMs: BIPE_RAPIDO_MS, frequenciaHz: 1180 };
+    else if (faixa === 'atencao') bipe = { intervaloMs: BIPE_LENTO_MS, frequenciaHz: 880 };
+  }
+
+  const rotulo = contato ? 'Contato com o obstáculo'
+    : sensor.alerta ? 'Alerta de colisão'
+      : faixa === 'atencao' ? 'Obstáculo à frente'
+        : sensor.eco ? 'Caminho livre' : 'Sem obstáculo no alcance';
+
+  return {
+    faixa,
+    distanciaTexto: sensor.eco ? metros(sensor.distanciaCm) : '+4 m',
+    alerta: sensor.alerta,
+    rotuloAlerta: sensor.alerta ? ROTULO_ALERTA_CABINE : '',
+    rotulo,
+    velocidadeTexto: `${Math.round(maquina.velocidadeKph)} km/h${maquina.re ? ' · ré' : ''}`,
+    inclinacao: { ligada: faixas.inclination, graus: Math.round(faixas.angle) },
+    bipe,
+  };
+}
