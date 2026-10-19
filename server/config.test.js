@@ -17,6 +17,7 @@ import {
   sanitize9RouterModel,
   sanitizeImageGenerationModel,
   VISUAL_PERSONA_SLUG,
+  cadeiaCerebroStand,
 } from './config.js';
 
 const EXPECTED_ROUTE_IDS = ['cx/gpt-6-astra-high'];
@@ -71,4 +72,14 @@ test('catalogo de imagem e separado do chat e aceita aliases', () => {
   assert.equal(assertAllowedImageGenerationModel('xai/grok-imagine-image-quality'), 'xai/grok-imagine-image-quality');
   assert.equal(isAllowed9RouterModel('xai/grok-imagine-image'), false);
   assert.equal(VISUAL_PERSONA_SLUG, 'especialista-visual');
+});
+
+test('so o cerebro do stand escapa do Astra: Claude pela rota cc/, reservas Haiku e Astra', () => {
+  assert.deepEqual(cadeiaCerebroStand({}), ['cc/claude-sonnet-5', 'cc/claude-haiku-4-5-20251001', 'cx/gpt-6-astra-high']);
+  assert.deepEqual(cadeiaCerebroStand({ STAND_CEREBRO_MODELO: 'cc/claude-haiku-4-5-20251001' }), ['cc/claude-haiku-4-5-20251001', 'cx/gpt-6-astra-high']);
+  assert.equal(cadeiaCerebroStand({ STAND_CEREBRO_MODELO: 'kimi/k3' })[0], 'cc/claude-sonnet-5');
+  // O resto do produto continua preso ao Astra, mesmo pedindo Claude.
+  assert.equal(sanitize9RouterModel('cc/claude-sonnet-5'), 'cx/gpt-6-astra-high');
+  assert.equal(isAllowed9RouterModel('cc/claude-sonnet-5'), false);
+  assert.deepEqual(NINE_ROUTER_ROUTE_IDS, EXPECTED_ROUTE_IDS);
 });

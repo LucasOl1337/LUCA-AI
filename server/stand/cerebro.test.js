@@ -1,0 +1,181 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { CortadorDeFrases, executarTurno, FALAS, ferramentasDeChat, LIMITES_TURNO, lerSseDeChat, novaConversa, textoFalavel } from './cerebro.js';
+
+const MODELOS = ['cc/claude-sonnet-5', 'cc/claude-haiku-4-5-20251001', 'cx/gpt-6-astra-high'];
+
+/** Modelo falso: cada chamada consome o próximo roteiro da lista. */
+function modeloFalso(roteiros) {
+  const chamadas = [];
+  const chamarModelo = async (pedido) => {
+    chamadas.push(pedido);
+    const roteiro = roteiros.shift();
+    if (roteiro instanceof Error) throw roteiro;
+    return (async function* () {
+      for (const passo of roteiro) {
+        if (passo.esperar) await new Promise((ok) => setTimeout(ok, passo.esperar));
+        else yield passo;
+      }
+    })();
+  };
+  return { chamarModelo, chamadas };
+}
+
+const sintetizarFalso = (registro = []) => async function* ({ texto, anterior }) {
+  registro.push({ texto, anterior });
+  yield Buffer.from([1, 0, 2, 0]);
+};
+
+async function rodar({ roteiros, entrada = { texto: 'o que é o LUCA?' }, conversa = novaConversa({ conta: 'demo' }), deps = {}, sinal }) {
+  const linhas = [];
+  const sintetizadas = [];
+  const modelo = modeloFalso(roteiros);
+  const cobrado = [];
+  const resultado = await executarTurno({
+    conversa,
+    entrada,
+    emitir: (l) => linhas.push(l),
+    sinal,
+    deps: {
+      chamarModelo: modelo.chamarModelo,
+      sintetizar: sintetizarFalso(sintetizadas),
+      falaPronta: async function* (chave) { yield Buffer.from(chave); },
+      executarFerramenta: async (nome) => (nome === 'tocar_video' ? { ok: true, evento: { tipo: 'tocar_video', id: 'pipeline-completo' } } : { ok: true, resultados: ['trecho'] }),
+      instrucoes: () => 'prompt-base',
+      modelos: MODELOS,
+      aoCobrarTts: (n) => cobrado.push(n),
+      ...deps,
+    },
+  });
+  return { linhas, sintetizadas, chamadas: modelo.chamadas, resultado, conversa, cobrado };
+}
+
+test('cortador solta frase no ponto e a primeira longa na vírgula', () => {
+  const c = new CortadorDeFrases();
+  assert.deepEqual(c.adicionar('O LUCA mede o trator'), []);
+  assert.deepEqual(c.adicionar('. Ele avisa antes'), ['O LUCA mede o trator.']);
+  assert.deepEqual(c.adicionar(' do tombamento! E'), ['Ele avisa antes do tombamento!']);
+  assert.deepEqual(c.terminar(), ['E']);
+  const longa = new CortadorDeFrases();
+  const texto = 'Um sensor no trator mede inclinação, aceleração, distância de obstáculo e temperatura, e manda tudo';
+  assert.deepEqual(longa.adicionar(texto), ['Um sensor no trator mede inclinação, aceleração, distância de obstáculo e temperatura,']);
+  assert.deepEqual(new CortadorDeFrases().adicionar('Valor de 3.5 mil'), []);
+});
+
+test('texto falável tira markdown e links', () => {
+  assert.equal(textoFalavel('**Sim**, veja https://x.com e _isso_'), 'Sim, veja e isso');
+  assert.equal(textoFalavel('- item um\n- item dois'), 'item um item dois');
+});
+
+test('ferramentas do stand no formato de chat completions', () => {
+  const ferramentas = ferramentasDeChat();
+  assert.ok(ferramentas.every((f) => f.type === 'function' && f.function.name && f.function.parameters));
+  assert.ok(ferramentas.some((f) => f.function.name === 'tocar_video'));
+});
+
+test('SSE do 9Router: texto em deltas e tool_calls fatiados por índice', async () => {
+  const sse = [
+    'data: {"choices":[{"delta":{"content":"Olá"}}]}\n',
+    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"buscar_no_repo","arguments":"{\\"cons"}}]}}]}\n\nda',
+    'ta: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"ulta\\":\\"score\\"}"}}]},"finish_reason":"tool_calls"}]}\n',
+    'data: [DONE]\n',
+  ].map((s) => new TextEncoder().encode(s));
+  const eventos = [];
+  for await (const e of lerSseDeChat(sse)) eventos.push(e);
+  assert.deepEqual(eventos[0], { texto: 'Olá' });
+  const fim = eventos.at(-1);
+  assert.equal(fim.motivo, 'tool_calls');
+  assert.deepEqual(fim.ferramentas, [{ id: 'c1', type: 'function', function: { name: 'buscar_no_repo', arguments: '{"consulta":"score"}' } }]);
+});
+
+test('turno: Sonnet responde, frases vão ao TTS em ordem com o contexto anterior', async () => {
+  const { linhas, sintetizadas, chamadas, resultado, conversa, cobrado } = await rodar({
+    roteiros: [[{ texto: 'O LUCA mede o trator. ' }, { texto: 'E avisa a seguradora.' }, { fim: true, ferramentas: [] }]],
+  });
+  assert.equal(chamadas[0].modelo, 'cc/claude-sonnet-5');
+  assert.equal(chamadas[0].maxTokens, LIMITES_TURNO.tokens);
+  assert.match(chamadas[0].mensagens[0].content, /^prompt-base/);
+  assert.match(chamadas[0].mensagens.at(-1).content, /Roteador: nenhum vídeo/);
+  assert.deepEqual(sintetizadas.map((s) => s.texto), ['O LUCA mede o trator.', 'E avisa a seguradora.']);
+  assert.equal(sintetizadas[1].anterior.trim(), 'O LUCA mede o trator.');
+  assert.deepEqual(linhas.filter((l) => l.t === 'frase').map((l) => l.texto), ['O LUCA mede o trator.', 'E avisa a seguradora.']);
+  assert.equal(linhas.filter((l) => l.t === 'audio').length, 2);
+  assert.equal(linhas.at(-1).t, 'fim');
+  assert.equal(resultado.motivo, 'ok');
+  assert.equal(resultado.metricas.modelo, 'cc/claude-sonnet-5');
+  assert.ok(Number.isFinite(resultado.metricas.primeiro_audio_ms));
+  assert.deepEqual(cobrado, [21, 21]);
+  assert.equal(conversa.respostas, 1);
+  assert.deepEqual(conversa.historico.map((m) => m.role), ['user', 'assistant']);
+});
+
+test('reserva: Sonnet cai, Haiku responde; todos caem, sai a fala pronta e a resposta não conta', async () => {
+  const reserva = await rodar({ roteiros: [new Error('9router_503'), [{ texto: 'Oi.' }, { fim: true, ferramentas: [] }]] });
+  assert.equal(reserva.resultado.metricas.modelo, 'cc/claude-haiku-4-5-20251001');
+  assert.equal(reserva.resultado.metricas.tentativas[0].modelo, 'cc/claude-sonnet-5');
+  const queda = await rodar({ roteiros: [new Error('a'), new Error('b'), new Error('c')] });
+  assert.equal(queda.resultado.motivo, 'falha');
+  assert.deepEqual(queda.linhas.filter((l) => l.t === 'frase').map((l) => l.texto), [FALAS.falha]);
+  assert.equal(queda.conversa.respostas, 0);
+  assert.deepEqual(queda.conversa.historico, []);
+});
+
+test('ferramenta: busca no repo e segunda rodada com o resultado; vídeo encerra o turno depois da fala', async () => {
+  const busca = await rodar({
+    roteiros: [
+      [{ fim: true, ferramentas: [{ id: 'c1', type: 'function', function: { name: 'buscar_no_repo', arguments: '{"consulta":"score"}' } }] }],
+      [{ texto: 'O score vai de zero a cem.' }, { fim: true, ferramentas: [] }],
+    ],
+  });
+  assert.equal(busca.chamadas.length, 2);
+  assert.deepEqual(busca.conversa.historico.map((m) => m.role), ['user', 'assistant', 'tool', 'assistant']);
+  assert.equal(busca.conversa.historico[2].tool_call_id, 'c1');
+
+  const video = await rodar({
+    entrada: { texto: 'como funciona o fluxo?' },
+    deps: { rotear: async () => ({ id: 'pipeline-completo', decisao: 'tocar' }) },
+    roteiros: [[{ texto: 'Vou te mostrar o caminho do dado.' }, { fim: true, ferramentas: [{ id: 'v1', type: 'function', function: { name: 'tocar_video', arguments: '{"id":"pipeline-completo"}' } }] }]],
+  });
+  assert.match(video.chamadas[0].mensagens.at(-1).content, /decisao=tocar id=pipeline-completo/);
+  const tipos = video.linhas.map((l) => l.t);
+  assert.ok(tipos.indexOf('evento') > tipos.lastIndexOf('audio'), 'o vídeo só começa depois do áudio da fala');
+  assert.equal(video.resultado.motivo, 'video');
+  assert.equal(video.chamadas.length, 1);
+  assert.ok(video.conversa.videosTocados.has('pipeline-completo'));
+  assert.equal(video.conversa.historico.at(-1).role, 'assistant');
+});
+
+test('tetos da conversa: 8 respostas e 2.000 caracteres de TTS', async () => {
+  const conversa = novaConversa({ conta: 'demo' });
+  conversa.respostas = LIMITES_TURNO.respostas;
+  const cheio = await rodar({ conversa, roteiros: [] });
+  assert.equal(cheio.resultado.motivo, 'teto_respostas');
+  assert.equal(cheio.chamadas.length, 0);
+
+  const gasta = novaConversa({ conta: 'demo' });
+  gasta.caracteresTts = LIMITES_TURNO.caracteres_tts - 5;
+  const semVoz = await rodar({ conversa: gasta, roteiros: [[{ texto: 'Uma frase longa demais.' }, { fim: true, ferramentas: [] }]] });
+  assert.equal(semVoz.sintetizadas.length, 0);
+  assert.ok(semVoz.linhas.some((l) => l.aviso === 'teto_caracteres_tts'));
+});
+
+test('interrupção (barge-in) para a fala e deixa o histórico pronto para a próxima pergunta', async () => {
+  const controle = new AbortController();
+  const conversa = novaConversa({ conta: 'demo' });
+  const corrida = rodar({ conversa, sinal: controle.signal, roteiros: [[{ texto: 'Primeira frase. ' }, { esperar: 30 }, { texto: 'Segunda frase.' }, { fim: true, ferramentas: [] }]] });
+  setTimeout(() => controle.abort(), 10);
+  const { resultado, linhas, sintetizadas } = await corrida;
+  assert.equal(resultado.motivo, 'interrompido');
+  assert.ok(!linhas.some((l) => l.t === 'fim'));
+  assert.ok(!sintetizadas.some((s) => s.texto === 'Segunda frase.'));
+  assert.equal(conversa.historico.at(-1).role, 'assistant');
+});
+
+test('saudação e fim de vídeo', async () => {
+  const saudacao = await rodar({ entrada: { evento: 'saudacao' }, roteiros: [] });
+  assert.equal(saudacao.resultado.motivo, 'saudacao');
+  assert.equal(saudacao.conversa.historico[0].content, FALAS.saudacao);
+  assert.equal(saudacao.conversa.respostas, 0);
+  const fimVideo = await rodar({ entrada: { evento: 'video_terminou', id: 'pipeline-completo' }, roteiros: [[{ texto: 'Ficou alguma dúvida?' }, { fim: true, ferramentas: [] }]] });
+  assert.match(fimVideo.chamadas[0].mensagens.at(-1).content, /vídeo pipeline-completo terminou/);
+});
