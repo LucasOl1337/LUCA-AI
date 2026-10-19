@@ -748,7 +748,7 @@ Executar uma ferramenta da IA do stand.
 
 `POST /api/stand/ferramenta`; autenticação: **session**.
 
-`--nome` (string, obrigatório): buscar_no_repo, pesquisar_web, tocar_video ou uma ação do site (abrir_aba, rodar_cenario...)<br>`--args` (json): Argumentos JSON da ferramenta
+`--nome` (string, obrigatório): buscar_no_repo, pesquisar_web, tocar_video ou uma ação do site (abrir_pagina, voltar_coruja, sensor_rodar_ensaio...)<br>`--args` (json): Argumentos JSON da ferramenta
 
 ### `stand rotear`
 

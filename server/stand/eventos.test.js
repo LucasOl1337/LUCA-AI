@@ -7,14 +7,14 @@ test('eventos do cérebro válidos passam', () => {
   assert.equal(ehEventoCerebro({ tipo: 'nivel_audio', valor: 0.42 }), true);
   assert.equal(ehEventoCerebro({ tipo: 'legenda', texto: 'O dado sai do sensor do trator.' }), true);
   assert.equal(ehEventoCerebro({ tipo: 'tocar_video', id: 'pipeline-completo' }), true);
-  assert.equal(ehEventoCerebro({ tipo: 'acao_site', acao: 'abrir_aba', args: { aba: 'telemetria' } }), true);
+  assert.equal(ehEventoCerebro({ tipo: 'acao_site', acao: 'abrir_pagina', args: { pagina: 'sensor' } }), true);
 });
 
 test('eventos do cérebro inválidos são recusados', () => {
   assert.equal(ehEventoCerebro({ tipo: 'estado', valor: 'dormindo' }), false);
   assert.equal(ehEventoCerebro({ tipo: 'nivel_audio', valor: 1.5 }), false);
   assert.equal(ehEventoCerebro({ tipo: 'tocar_video', id: '  ' }), false);
-  assert.equal(ehEventoCerebro({ tipo: 'acao_site', acao: 'abrir_aba', args: ['telemetria'] }), false);
+  assert.equal(ehEventoCerebro({ tipo: 'acao_site', acao: 'abrir_pagina', args: ['sensor'] }), false);
   assert.equal(ehEventoCerebro(null), false);
   assert.equal(ehEventoCerebro({ tipo: 'encerrar' }), false);
 });

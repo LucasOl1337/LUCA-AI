@@ -93,7 +93,7 @@ test('teto de sessões por hora por conta, janela deslizante', async (t) => {
 
 test('ferramenta executa as válidas e recusa desconhecida com 400', async (t) => {
   const pedir = await subir(t);
-  const ok = await pedir('/api/stand/ferramenta', { nome: 'abrir_aba', args: { aba: 'telemetria' } });
+  const ok = await pedir('/api/stand/ferramenta', { nome: 'abrir_pagina', args: { pagina: 'sensor' } });
   assert.equal(ok.status, 200);
   assert.equal((await ok.json()).evento.tipo, 'acao_site');
   assert.equal((await pedir('/api/stand/ferramenta', { nome: 'shell', args: {} })).status, 400);
@@ -114,7 +114,7 @@ test('rotear descarta vídeo cujo mp4 ainda não foi publicado', async (t) => {
 
 test('microfone, api.x.ai e api.elevenlabs.io só liberados em /stand', () => {
   const stand = cabecalhosDeSeguranca('/stand');
-  assert.equal(stand['Permissions-Policy'], 'camera=(), microphone=(self), geolocation=()');
+  assert.equal(stand['Permissions-Policy'], 'camera=(self), microphone=(self), geolocation=()', '/stand mantém o microfone e delega a câmera ao iframe da sonolência');
   assert.match(stand['Content-Security-Policy'], /connect-src 'self' ws: wss: https:\/\/api\.x\.ai wss:\/\/api\.x\.ai wss:\/\/api\.elevenlabs\.io;/);
   for (const caminho of ['/', '/api/stand/sessao', '/stand/outra', '/standx']) {
     const h = cabecalhosDeSeguranca(caminho);
@@ -122,6 +122,20 @@ test('microfone, api.x.ai e api.elevenlabs.io só liberados em /stand', () => {
     assert.doesNotMatch(h['Content-Security-Policy'], /x\.ai|openai|elevenlabs/, caminho);
   }
   assert.equal(cabecalhosDeSeguranca('/sonolencia')['Permissions-Policy'], 'camera=(self), microphone=(), geolocation=()');
+  // Totem-Site Q2: as 6 páginas públicas aceitam moldura só do próprio site; o resto segue DENY.
+  for (const caminho of ['/', '/luca-ai', '/sompo', '/laboratorio', '/sensor', '/sonolencia', '/sensor/']) {
+    const h = cabecalhosDeSeguranca(caminho);
+    assert.equal(h['X-Frame-Options'], 'SAMEORIGIN', caminho);
+    assert.match(h['Content-Security-Policy'], /frame-ancestors 'self';/, caminho);
+  }
+  for (const caminho of ['/admin', '/personas', '/configuracao', '/stand', '/api/lab/cases', '/api/admin/users', '/sensorx', '/sompo/x', '/assets/index.js']) {
+    const h = cabecalhosDeSeguranca(caminho);
+    assert.equal(h['X-Frame-Options'], 'DENY', caminho);
+    assert.match(h['Content-Security-Policy'], /frame-ancestors 'none';/, caminho);
+  }
+  for (const caminho of ['/', '/sensor', '/sonolencia', '/admin']) {
+    assert.doesNotMatch(cabecalhosDeSeguranca(caminho)['Content-Security-Policy'], /frame-ancestors [^;]*(https?:|\*)/, `${caminho}: nenhuma origem de fora emoldura`);
+  }
   assert.match(cabecalhosDeSeguranca('/assets/drowsiness-worker-ab1.js')['Content-Security-Policy'], /wasm-unsafe-eval/);
   assert.equal(provedorXai.nome, 'xai');
 });

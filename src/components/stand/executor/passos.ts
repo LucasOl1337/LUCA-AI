@@ -2,6 +2,7 @@
  * Cada Ação do site vira passos visíveis: achar o Alvo, levar o cursor até ele,
  * destacar e clicar (ou escolher, em <select>). Sem Alvo no prazo, a ação
  * falha com mensagem; não há atalho por rota (decisão Q7 da M3).
+ * Roda dentro do iframe do `/stand`: a página certa já foi aberta por ele.
  */
 import { VEICULO_STAND, type ValidacaoAcaoSite } from '../../../../shared/stand/acoes-site.ts';
 import { getStandScenario } from '../../sompo/standScenarios';
@@ -62,11 +63,9 @@ export function criarPassos(els: CursorElementos) {
     await esperar(300);
   }
 
-  /** Leva a tela ao painel SOMPO pelo menu lateral, se estiver em outra página. */
+  /** O `/stand` abre o SOMPO no iframe antes de mandar a ação (o frame não tem menu). */
   async function garantirSompo() {
-    if (window.location.pathname === '/sompo') return;
-    await clicar('[data-stand-alvo="menu-sompo"]', 'o menu SOMPO');
-    await aguardar(() => window.location.pathname === '/sompo', 4000, 'O painel SOMPO não abriu.');
+    await garantirPagina('/sompo', 'SOMPO');
   }
 
   async function abrirAba(aba: string) {
@@ -110,28 +109,180 @@ export function criarPassos(els: CursorElementos) {
     await clicar('button[aria-label="Reiniciar cenário"]', 'o botão de reiniciar o cenário');
   }
 
-  async function gravarEpisodio() {
-    narrar('Gravando o episódio');
-    await clicar('[data-sompo-episode-run]', 'o botão Gravar episódio (abra um cenário roteirizado na Telemetria)');
-    const fim = await aguardar(() => achar('[data-sompo-episode-done]') || achar('[data-sompo-episode-error]'), 60000, 'O episódio não terminou em 60 s.');
-    if (fim.hasAttribute('data-sompo-episode-error')) throw new FalhaAcao(fim.textContent?.trim() || 'O episódio falhou.');
+  /** Clica o botão de `container` cujo texto bate; espera ele aparecer (página lazy). */
+  async function clicarTexto(container: string, texto: RegExp, oQue: string, prazoMs = 6000) {
+    const alvo = await aguardar(() => {
+      const raiz = achar(container);
+      const botao = raiz && Array.from(raiz.querySelectorAll('button')).find((b) => texto.test(b.textContent?.trim() ?? '') && visivel(b));
+      return botao && !botao.disabled ? botao : null;
+    }, prazoMs, `Não encontrei ${oQue} na tela.`);
+    await apontar(els, alvo);
+    await pulsar(els);
+    alvo.click();
+    await esperar(250);
   }
 
-  async function analisarNaBancada() {
-    narrar('Enviando para a bancada de agentes');
-    if (!achar('[data-sompo-telemetry-run]')) await abrirAba('telemetria');
-    await clicar('[data-sompo-telemetry-run]', 'o botão Analisar na bancada', 10000);
-    await aguardar(() => window.location.pathname === '/luca-ai', 15000, 'A bancada não abriu.');
+  async function garantirPagina(caminho: string, nome: string) {
+    await aguardar(() => window.location.pathname === caminho, 4000, `A página ${nome} não está aberta.`);
+  }
+
+  // ── Sensor ────────────────────────────────────────────────────────────────
+  const SENSOR = '.sensor-operation-controls';
+
+  async function sensorVeiculo(veiculo: string) {
+    await garantirPagina('/sensor', 'do sensor');
+    narrar(veiculo === 'trator' ? 'Trocando para o Trator MAX' : 'Trocando para o caminhão');
+    await clicarTexto('.sensor-choice[aria-label="Veículo da bancada"]', veiculo === 'trator' ? /^Trator MAX$/ : /^Caminhão$/, 'o botão do veículo', 15000);
+  }
+
+  async function sensorEnsaio(ensaio: string) {
+    await garantirPagina('/sensor', 'do sensor');
+    narrar('Escolhendo o ensaio');
+    await escolher(`${SENSOR} .sensor-essay-select select`, ensaio, 'o seletor de ensaio', 15000);
+    const pausado = achar(`${SENSOR} button[aria-label="Continuar"]`);
+    if (pausado) await clicar(`${SENSOR} button[aria-label="Continuar"]`, 'o botão Continuar');
+    await clicar(`${SENSOR} button[aria-label="Reiniciar ensaio"]`, 'o botão Repetir');
+  }
+
+  async function sensorAjustar(nivel: string) {
+    await garantirPagina('/sensor', 'do sensor');
+    const alvo = await aguardar(() => achar(`${SENSOR} input[type="range"]`) as HTMLInputElement | null, 15000, 'Não encontrei o controle do ensaio na tela.');
+    narrar(`Ajustando ${alvo.getAttribute('aria-label') ?? 'o ensaio'}`);
+    await apontar(els, alvo);
+    await pulsar(els);
+    const padrao = alvo.dataset.padrao;
+    const valor = nivel === 'minimo' ? alvo.min : nivel === 'maximo' ? alvo.max : padrao;
+    if (valor == null) throw new FalhaAcao('Este ensaio não informa o valor padrão.');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    setter?.call(alvo, valor);
+    alvo.dispatchEvent(new Event('input', { bubbles: true }));
+    await esperar(300);
+    return `${alvo.getAttribute('aria-label')} em ${alvo.closest('label')?.querySelector('b')?.textContent?.trim() ?? valor}.`;
+  }
+
+  async function sensorPausa(pausar: boolean) {
+    await garantirPagina('/sensor', 'do sensor');
+    const rotulo = pausar ? 'Pausar' : 'Continuar';
+    if (!achar(`${SENSOR} button[aria-label="${rotulo}"]`)) return;
+    narrar(pausar ? 'Pausando o ensaio' : 'Continuando o ensaio');
+    await clicar(`${SENSOR} button[aria-label="${rotulo}"]`, `o botão ${rotulo}`, 15000);
+  }
+
+  const ROTULO_VISTA: Record<string, string> = { bancada: 'Bancada', veiculo: 'Veículo', chip: 'Chip', massa: 'Massa', dedos: 'Dedos' };
+
+  async function sensorVista(vista: string) {
+    await garantirPagina('/sensor', 'do sensor');
+    const rotulo = ROTULO_VISTA[vista];
+    const vistas = '.sensor-operation-views';
+    await aguardar(() => achar(vistas), 15000, 'Não encontrei as vistas da câmera.');
+    const tem = () => Array.from(document.querySelectorAll(`${vistas} button`)).some((b) => b.textContent?.trim() === rotulo);
+    const dentro = () => achar('.sensor-mems-section button[aria-expanded="true"]');
+    // Chip, Massa e Dedos só aparecem em "Por dentro do sensor"; Bancada e Veículo existem nos dois.
+    if (!tem() && !dentro()) {
+      narrar('Abrindo o sensor por dentro');
+      await clicarTexto('.sensor-mems-section', /^Por dentro do sensor$/, 'o botão Por dentro do sensor');
+      await aguardar(() => tem(), 4000, `A vista ${rotulo} não apareceu.`);
+    }
+    narrar(`Vista: ${rotulo}`);
+    await clicarTexto(vistas, new RegExp(`^${rotulo}$`), `a vista ${rotulo}`);
+  }
+
+  // ── Sonolência ────────────────────────────────────────────────────────────
+  const SONO = '.drowsiness-panel';
+
+  async function sonoLigar() {
+    await garantirPagina('/sonolencia', 'de sonolência');
+    const estado = () => document.querySelector('.drowsiness-page')?.getAttribute('data-state');
+    if (estado() === 'running') return 'A câmera já está ligada.';
+    narrar('Ligando a webcam');
+    await clicarTexto(SONO, /Ativar webcam/, 'o botão Ativar webcam', 10000);
+    const fim = await aguardar(() => {
+      const atual = estado();
+      return atual === 'running' || atual === 'error' ? atual : null;
+    }, 30000, 'A câmera não respondeu em 30 s.');
+    if (fim === 'error') throw new FalhaAcao(achar(`${SONO} .drowsiness-message`)?.textContent?.trim() || 'A câmera não abriu.');
+    return 'Webcam ligada: feche os olhos por 1 segundo para ouvir o alerta.';
+  }
+
+  async function sonoDesligar() {
+    await garantirPagina('/sonolencia', 'de sonolência');
+    if (!achar(`${SONO} .drowsiness-stop`)) return;
+    narrar('Desligando a webcam');
+    await clicar(`${SONO} .drowsiness-stop`, 'o botão Parar monitor');
+  }
+
+  async function sonoSom() {
+    await garantirPagina('/sonolencia', 'de sonolência');
+    if (achar(`${SONO} .drowsiness-stop`)) throw new FalhaAcao('O teste de som só funciona com a câmera desligada.');
+    narrar('Tocando o alerta');
+    await clicarTexto(`${SONO} .drowsiness-actions`, /Testar som/, 'o botão Testar som', 10000);
+  }
+
+  const SENSIBILIDADE: Record<string, string> = { baixa: 'low', normal: 'normal', alta: 'high' };
+
+  async function sonoSensibilidade(nivel: string) {
+    await garantirPagina('/sonolencia', 'de sonolência');
+    if (achar(`${SONO} .drowsiness-stop`)) throw new FalhaAcao('Desligue a câmera antes de mudar a sensibilidade.');
+    narrar(`Sensibilidade ${nivel}`);
+    await escolher(`${SONO} .drowsiness-sensitivity select`, SENSIBILIDADE[nivel], 'o seletor de sensibilidade', 10000);
+  }
+
+  // ── Laboratório (só a demonstração local; exemplos gravam e ficam fora, Q8) ──
+  async function labDemonstracao() {
+    await garantirPagina('/laboratorio', 'do laboratório');
+    narrar('Abrindo a demonstração na fazenda');
+    const inicio = '.lab-demo-start';
+    const biblioteca = 'button.lab-demo-library';
+    await aguardar(() => achar(`${inicio} button`) || achar(biblioteca) || achar('.lab-demo-badge'), 15000, 'A demonstração da fazenda não está disponível nesta instalação.');
+    if (achar('.lab-demo-badge')) return 'A demonstração já está aberta.';
+    if (achar(`${inicio} button`)) await clicar(`${inicio} button`, 'o botão Ver caminhão em movimento', 15000);
+    else await clicar(biblioteca, 'o botão Caminhão na fazenda', 15000);
+    await aguardar(() => achar('.lab-demo-badge'), 8000, 'A demonstração não abriu.');
+    return 'Demonstração da fazenda rodando.';
+  }
+
+  async function labPausa(pausar: boolean) {
+    await garantirPagina('/laboratorio', 'do laboratório');
+    const rotulo = pausar ? 'Pausar reprodução' : 'Reproduzir operação';
+    if (!achar('.lab-play')) throw new FalhaAcao('Abra a demonstração primeiro.');
+    if (!achar(`.lab-play[aria-label="${rotulo}"]`)) return;
+    narrar(pausar ? 'Pausando o replay' : 'Continuando o replay');
+    await clicar(`.lab-play[aria-label="${rotulo}"]`, 'o botão de reprodução');
+  }
+
+  const ROTULO_CAMERA_LAB: Record<string, string> = { acompanhar: 'Acompanhar', superior: 'Superior', livre: 'Livre' };
+
+  async function labCamera(modo: string) {
+    await garantirPagina('/laboratorio', 'do laboratório');
+    narrar(`Câmera: ${ROTULO_CAMERA_LAB[modo]}`);
+    await clicarTexto('.lab-camera-control', new RegExp(`^${ROTULO_CAMERA_LAB[modo]}$`), `a câmera ${ROTULO_CAMERA_LAB[modo]} (acompanhar pede a demonstração aberta)`, 10000);
   }
 
   return async function executar(acao: Extract<ValidacaoAcaoSite, { ok: true }>): Promise<string> {
+    const a = acao.args;
     switch (acao.acao) {
-      case 'abrir_aba': await abrirAba(acao.args.aba); return `Abri ${ROTULO_ABA[acao.args.aba]}.`;
-      case 'voltar_inicio': await voltarInicio(); return 'Voltei ao início do SOMPO.';
-      case 'abrir_caso': await abrirCaso(acao.args.id); return 'Abri o caso.';
-      case 'rodar_cenario': await rodarCenario(acao.args.id); return `Cenário rodando: ${getStandScenario(acao.args.id)?.rotulo}.`;
-      case 'gravar_episodio': await gravarEpisodio(); return 'Episódio gravado.';
-      case 'analisar_na_bancada': await analisarNaBancada(); return 'A bancada de agentes abriu com a telemetria.';
+      case 'sensor_escolher_veiculo': await sensorVeiculo(a.veiculo); return a.veiculo === 'trator' ? 'Trator MAX na bancada.' : 'Caminhão na bancada.';
+      case 'sensor_rodar_ensaio': await sensorEnsaio(a.ensaio); return `Ensaio ${a.ensaio} rodando.`;
+      case 'sensor_ajustar': return sensorAjustar(a.nivel);
+      case 'sensor_pausar': await sensorPausa(true); return 'Ensaio pausado.';
+      case 'sensor_continuar': await sensorPausa(false); return 'Ensaio rodando.';
+      case 'sensor_mostrar_vista': await sensorVista(a.vista); return `Vista ${ROTULO_VISTA[a.vista]}.`;
+      case 'sonolencia_ligar_camera': return sonoLigar();
+      case 'sonolencia_desligar_camera': await sonoDesligar(); return 'Webcam desligada.';
+      case 'sonolencia_testar_som': await sonoSom(); return 'Alerta tocando.';
+      case 'sonolencia_sensibilidade': await sonoSensibilidade(a.nivel); return `Sensibilidade ${a.nivel}.`;
+      case 'laboratorio_ver_demonstracao': return labDemonstracao();
+      case 'laboratorio_pausar': await labPausa(true); return 'Replay pausado.';
+      case 'laboratorio_continuar': await labPausa(false); return 'Replay rodando.';
+      case 'laboratorio_camera': await labCamera(a.modo); return `Câmera ${ROTULO_CAMERA_LAB[a.modo]}.`;
+      case 'sompo_abrir_aba': await abrirAba(a.aba); return `Abri ${ROTULO_ABA[a.aba]}.`;
+      case 'sompo_voltar_inicio': await voltarInicio(); return 'Voltei ao início do SOMPO.';
+      case 'sompo_abrir_caso': await abrirCaso(a.id); return 'Abri o caso.';
+      case 'sompo_rodar_cenario': await rodarCenario(a.id); return `Cenário rodando: ${getStandScenario(a.id)?.rotulo}.`;
+      // Trocar de página é do `/stand` (iframe); aqui dentro não há o que clicar.
+      case 'abrir_pagina':
+      case 'voltar_coruja':
+        throw new FalhaAcao('Essa ação é da tela do stand, não da página.');
     }
   };
 }

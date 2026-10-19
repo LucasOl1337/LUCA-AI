@@ -214,3 +214,14 @@
 .stand-simulacao .is-kiosk .sompo-simulator-stage { height: 100%; min-height: 0; aspect-ratio: auto; border-radius: 0; }
 /* Cenários no meio da borda direita: embaixo ficam os botões de câmera e a barra de modos. */
 .stand-simulacao .is-kiosk .sompo-fp-scenarios { bottom: auto; top: 50%; transform: translateY(-50%); }
+
+/* Site (Totem-Site Q6): a página ocupa a área segura; a coruja fica pequena no canto inferior direito. */
+.stand-site { position: absolute; inset: var(--stand-margem); display: grid; grid-template-columns: minmax(0, 1fr) 22vmin; gap: 1.6vmin; }
+.stand-site-pagina { min-width: 0; min-height: 0; border-radius: 1.4vmin; overflow: hidden; background: #04070b; border: 0.25vmin solid rgba(100, 210, 255, 0.25); }
+.stand-site-frame { display: block; width: 100%; height: 100%; border: 0; background: #04070b; }
+.stand-site-coruja { align-self: end; display: flex; flex-direction: column; align-items: center; gap: 1vmin; min-width: 0; }
+.stand-avatar-site { width: 100%; height: auto; max-height: 20vh; }
+.stand-site-coruja .stand-indicador { font-size: clamp(12px, 1.8vmin, 28px); }
+.stand-site-legenda { margin: 0; text-align: center; font-size: clamp(13px, 2vmin, 30px); line-height: 1.2; font-weight: 700; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.stand-site-selo { margin: 0; padding: 0.5vmin 1.2vmin; border-radius: 999px; border: 0.2vmin solid rgba(100, 210, 255, 0.55); background: rgba(10, 132, 255, 0.16); font-size: clamp(11px, 1.5vmin, 22px); font-weight: 700; color: #cfefff; }
+.stand-aviso-site { position: absolute; left: 0; bottom: 0; margin: 0; max-width: 60%; }

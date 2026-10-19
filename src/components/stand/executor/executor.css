@@ -65,3 +65,7 @@
   content: 'IA operando o site · ';
   color: #f5b82e;
 }
+
+/* Página dentro do iframe do /stand: ocupa o frame inteiro, sem o shell do app. */
+.stand-embutido { position: fixed; inset: 0; overflow: auto; background: var(--l-void, #04070b); }
+.stand-embutido > * { min-height: 100%; }

@@ -1,8 +1,8 @@
 /**
- * Executor do stand: só existe numa janela do app aberta com `?stand=1`
- * (a flag fica no sessionStorage, porque o endereço do app descarta query
- * desconhecida). Escuta o BroadcastChannel do stand, valida de novo cada Ação
- * do site, executa uma por vez e devolve o resultado pelo mesmo canal.
+ * Executor do stand: só existe numa página do site aberta dentro do iframe do
+ * `/stand` (grill Totem-Site r1, Q3). Escuta o BroadcastChannel do stand,
+ * valida de novo cada Ação do site, executa uma por vez e devolve o resultado
+ * pelo mesmo canal. Fora do frame (inclusive na janela de cima) não liga.
  */
 import { useEffect, useRef } from 'react';
 import {
@@ -13,24 +13,11 @@ import {
 } from '../../../../shared/stand/acoes-site.ts';
 import { destacar, mostrarRotulo } from './cursor';
 import { FalhaAcao, criarPassos } from './passos';
+import { EMBUTIDO_NO_STAND } from './embutido';
+import { responderPing } from './prontidao';
 import './executor.css';
 
-const CHAVE_FLAG = 'luca-stand-executor';
-
-function lerFlag(): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    const flag = new URLSearchParams(window.location.search).get('stand');
-    if (flag === '1') window.sessionStorage.setItem(CHAVE_FLAG, '1');
-    if (flag === '0') window.sessionStorage.removeItem(CHAVE_FLAG);
-    return window.sessionStorage.getItem(CHAVE_FLAG) === '1';
-  } catch {
-    return false;
-  }
-}
-
-// Lido na carga do módulo, antes de o endereço do app limpar a query.
-const STAND_LIGADO = lerFlag();
+const STAND_LIGADO = EMBUTIDO_NO_STAND;
 
 function ehEvento(valor: unknown): valor is AcaoSiteEvento {
   if (typeof valor !== 'object' || valor === null) return false;
@@ -61,6 +48,7 @@ function StandExecutor() {
 
     canal.onmessage = (mensagem) => {
       const evento = mensagem.data;
+      if (responderPing(canal, evento, window.location.pathname)) return;
       if (!ehEvento(evento)) return;
       fila = fila.then(async () => {
         const validado = validarAcaoSite(evento.acao, evento.args);

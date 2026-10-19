@@ -36,8 +36,8 @@ test('acao_site da página chega ao executor (M3) e o resultado volta pelo id', 
   executor.onmessage = ({ data }) => {
     if (data.tipo === 'acao_site') executor.postMessage({ tipo: 'acao_site_resultado', id: data.id, ok: true, mensagem: `fiz ${data.acao}` });
   };
-  const resultado = await enviarAcaoSite('abrir_aba', { aba: 'telemetria' });
+  const resultado = await enviarAcaoSite('sensor_pausar', {});
   executor.close();
   assert.equal(resultado.ok, true);
-  assert.equal(resultado.mensagem, 'fiz abrir_aba');
+  assert.equal(resultado.mensagem, 'fiz sensor_pausar');
 });

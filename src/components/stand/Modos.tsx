@@ -71,10 +71,10 @@ export const SimulacaoStand = memo(function SimulacaoStand() {
   );
 });
 
-export function BarraModos({ modo, visivel, aoEscolher }: { modo: Modo; visivel: boolean; aoEscolher(modo: Modo): void }) {
+export function BarraModos({ modo, modos = MODOS, visivel, aoEscolher }: { modo: Modo; modos?: readonly Modo[]; visivel: boolean; aoEscolher(modo: Modo): void }) {
   return (
     <nav className="stand-barra" aria-label="Modo do stand" data-visivel={visivel || undefined}>
-      {MODOS.map((m) => (
+      {modos.map((m) => (
         <button
           key={m}
           type="button"

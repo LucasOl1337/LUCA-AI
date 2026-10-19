@@ -2,9 +2,12 @@
  * Ações do site (dono: M3). Lista fechada do que a IA do stand pode pedir para
  * o Executor do stand fazer no app, como uma pessoa clicando.
  *
- * Fluxo: o cérebro (M1) chama a ferramenta → emite `acao_site` → a página do
- * stand repassa no BroadcastChannel `CANAL_STAND` → o executor, aberto noutra
- * janela do app com `?stand=1`, valida de novo, clica e devolve o resultado.
+ * Fluxo: o cérebro (M1) chama a ferramenta → emite `acao_site` → o `/stand`
+ * executa `abrir_pagina`/`voltar_coruja` (iframe da página, mapa fechado) e
+ * repassa os controles `<pagina>_<verbo>` no BroadcastChannel `CANAL_STAND` →
+ * o Executor, dentro do iframe (`?stand=1`), valida de novo, clica e devolve.
+ * Nada aqui grava: episódio, bancada de agentes e exemplos do Laboratório
+ * ficam fora do totem (grill Totem-Site r1, Q8).
  *
  * Só sintaxe apagável (tipos + funções puras): o Node importa direto, sem build.
  */
@@ -19,13 +22,42 @@ export const VEICULO_STAND = 'trator-0001';
 export const ABAS_SITE = ['telemetria', 'casos', 'safra', 'veiculos'] as const;
 export type AbaSite = (typeof ABAS_SITE)[number];
 
+/**
+ * Páginas que o totem pode mostrar (grill Totem-Site r1, Q4/Q7). O `/stand`
+ * abre o caminho deste mapa num iframe; o modelo nunca manda URL.
+ */
+export const PAGINAS_SITE = Object.freeze({
+  inicio: '/',
+  luca_ai: '/luca-ai',
+  sompo: '/sompo',
+  laboratorio: '/laboratorio',
+  sensor: '/sensor',
+  sonolencia: '/sonolencia',
+} as const);
+export type PaginaSite = keyof typeof PAGINAS_SITE;
+export const IDS_PAGINAS = Object.keys(PAGINAS_SITE) as PaginaSite[];
+
 export type NomeAcaoSite =
-  | 'abrir_aba'
-  | 'voltar_inicio'
-  | 'abrir_caso'
-  | 'rodar_cenario'
-  | 'gravar_episodio'
-  | 'analisar_na_bancada';
+  | 'abrir_pagina'
+  | 'voltar_coruja'
+  | 'sensor_escolher_veiculo'
+  | 'sensor_rodar_ensaio'
+  | 'sensor_ajustar'
+  | 'sensor_pausar'
+  | 'sensor_continuar'
+  | 'sensor_mostrar_vista'
+  | 'sonolencia_ligar_camera'
+  | 'sonolencia_desligar_camera'
+  | 'sonolencia_testar_som'
+  | 'sonolencia_sensibilidade'
+  | 'laboratorio_ver_demonstracao'
+  | 'laboratorio_pausar'
+  | 'laboratorio_continuar'
+  | 'laboratorio_camera'
+  | 'sompo_abrir_aba'
+  | 'sompo_voltar_inicio'
+  | 'sompo_abrir_caso'
+  | 'sompo_rodar_cenario';
 
 export interface ArgAcaoSite {
   descricao: string;
@@ -36,13 +68,88 @@ export interface AcaoSiteDef {
   nome: NomeAcaoSite;
   descricao: string;
   args: Readonly<Record<string, ArgAcaoSite>>;
+  /** Página onde o controle vive; o `/stand` abre ela antes. `null` = a própria tela do stand. */
+  pagina: PaginaSite | null;
 }
 
 const listar = (pares: readonly (readonly [string, string])[]) => pares.map(([id, nome]) => `${id} = ${nome}`).join('; ');
+const SO_LEITURA = 'Só mostra; nada é gravado.';
 
-export const ACOES_SITE: readonly AcaoSiteDef[] = Object.freeze([
+export const ACOES_SITE: readonly AcaoSiteDef[] = Object.freeze(([
   {
-    nome: 'abrir_aba',
+    nome: 'abrir_pagina',
+    pagina: null,
+    descricao: 'Abre uma página do site no monitor do stand; a coruja fica pequena no canto e continua conversando. Diga em uma frase o que a página mostra.',
+    args: {
+      pagina: {
+        descricao: 'inicio = apresentação do LUCA-AI; luca_ai = bancada de agentes (só olhar); sompo = painel SOMPO; laboratorio = laboratório 3D da fazenda; sensor = laboratório do sensor (caminhão e trator em ensaios); sonolencia = monitor de sonolência pela webcam.',
+        valores: IDS_PAGINAS,
+      },
+    },
+  },
+  {
+    nome: 'voltar_coruja',
+    pagina: null,
+    descricao: 'Fecha a página do site e volta a coruja para a tela cheia. Use quando a pessoa pedir pra voltar ou terminar a demonstração.',
+    args: {},
+  },
+  {
+    nome: 'sensor_escolher_veiculo',
+    pagina: 'sensor',
+    descricao: `No laboratório do sensor, troca o veículo da bancada 3D. ${SO_LEITURA}`,
+    args: { veiculo: { descricao: 'caminhao = caminhão; trator = Trator MAX.', valores: ['caminhao', 'trator'] } },
+  },
+  {
+    nome: 'sensor_rodar_ensaio',
+    pagina: 'sensor',
+    descricao: `No laboratório do sensor, escolhe um ensaio e roda desde o começo; as leituras de inclinação e aceleração mudam na tela. ${SO_LEITURA}`,
+    args: { ensaio: { descricao: 'encosta = inclinação lateral; curva = curva (de talhão, no trator); frenada = frenada (parada diante de obstáculo, no trator); buraco = buraco ou solo irregular.', valores: ['encosta', 'curva', 'frenada', 'buraco'] } },
+  },
+  {
+    nome: 'sensor_ajustar',
+    pagina: 'sensor',
+    descricao: `No laboratório do sensor, leva o parâmetro do ensaio atual (inclinação, velocidade, desaceleração ou profundidade) ao mínimo, ao padrão ou ao máximo. ${SO_LEITURA}`,
+    args: { nivel: { descricao: 'minimo, padrao ou maximo do controle deslizante do ensaio.', valores: ['minimo', 'padrao', 'maximo'] } },
+  },
+  { nome: 'sensor_pausar', pagina: 'sensor', descricao: 'Pausa o ensaio do laboratório do sensor.', args: {} },
+  { nome: 'sensor_continuar', pagina: 'sensor', descricao: 'Continua o ensaio pausado do laboratório do sensor.', args: {} },
+  {
+    nome: 'sensor_mostrar_vista',
+    pagina: 'sensor',
+    descricao: `No laboratório do sensor, muda a câmera 3D. chip, massa e dedos abrem "Por dentro do sensor" e mostram o acelerômetro MEMS por dentro. ${SO_LEITURA}`,
+    args: { vista: { descricao: 'bancada = bancada inteira; veiculo = o veículo; chip = o chip do sensor; massa = a massa de prova; dedos = os dedos capacitivos.', valores: ['bancada', 'veiculo', 'chip', 'massa', 'dedos'] } },
+  },
+  {
+    nome: 'sonolencia_ligar_camera',
+    pagina: 'sonolencia',
+    descricao: 'Liga a webcam do totem no monitor de sonolência: a pessoa fecha os olhos por 1 segundo e o alerta toca. A imagem é processada no próprio computador e não é gravada nem enviada. Se a câmera faltar, a ação devolve o erro: diga que a demonstração precisa da webcam e use sonolencia_testar_som.',
+    args: {},
+  },
+  { nome: 'sonolencia_desligar_camera', pagina: 'sonolencia', descricao: 'Desliga a webcam do monitor de sonolência.', args: {} },
+  { nome: 'sonolencia_testar_som', pagina: 'sonolencia', descricao: 'Toca o som de alerta do monitor de sonolência, para a pessoa ouvir como é (só com a câmera desligada).', args: {} },
+  {
+    nome: 'sonolencia_sensibilidade',
+    pagina: 'sonolencia',
+    descricao: 'Muda a sensibilidade do detector de olhos fechados (só com a câmera desligada).',
+    args: { nivel: { descricao: 'baixa, normal ou alta.', valores: ['baixa', 'normal', 'alta'] } },
+  },
+  {
+    nome: 'laboratorio_ver_demonstracao',
+    pagina: 'laboratorio',
+    descricao: `No laboratório 3D, abre a demonstração do caminhão em movimento na fazenda (percurso sintético sobre área real). ${SO_LEITURA}`,
+    args: {},
+  },
+  { nome: 'laboratorio_pausar', pagina: 'laboratorio', descricao: 'Pausa o replay do laboratório 3D.', args: {} },
+  { nome: 'laboratorio_continuar', pagina: 'laboratorio', descricao: 'Continua o replay do laboratório 3D.', args: {} },
+  {
+    nome: 'laboratorio_camera',
+    pagina: 'laboratorio',
+    descricao: 'Muda a câmera do laboratório 3D (acompanhar só com a demonstração aberta).',
+    args: { modo: { descricao: 'acompanhar = segue a máquina; superior = vista de cima; livre = câmera livre.', valores: ['acompanhar', 'superior', 'livre'] } },
+  },
+  {
+    nome: 'sompo_abrir_aba',
+    pagina: 'sompo',
     descricao: 'Abre uma área do painel SOMPO na tela, clicando como uma pessoa.',
     args: {
       aba: {
@@ -52,13 +159,15 @@ export const ACOES_SITE: readonly AcaoSiteDef[] = Object.freeze([
     },
   },
   {
-    nome: 'voltar_inicio',
+    nome: 'sompo_voltar_inicio',
+    pagina: 'sompo',
     descricao: 'Volta para a tela de boas-vindas do painel SOMPO.',
     args: {},
   },
   {
-    nome: 'abrir_caso',
-    descricao: 'Abre um dos casos agrícolas de exemplo (dados didáticos, não são sinistros reais).',
+    nome: 'sompo_abrir_caso',
+    pagina: 'sompo',
+    descricao: 'Abre um dos casos agrícolas de exemplo do painel SOMPO (dados didáticos, não são sinistros reais).',
     args: {
       id: {
         descricao: listar(SOMPO_EXAMPLE_CASES.map((item) => [item.id, item.title] as const)),
@@ -67,8 +176,9 @@ export const ACOES_SITE: readonly AcaoSiteDef[] = Object.freeze([
     },
   },
   {
-    nome: 'rodar_cenario',
-    descricao: 'Coloca o trator no simulador 3D e roda um cenário de risco do stand (dados simulados).',
+    nome: 'sompo_rodar_cenario',
+    pagina: 'sompo',
+    descricao: 'No painel SOMPO, coloca o trator no simulador 3D e roda um cenário de risco do stand (dados simulados).',
     args: {
       id: {
         descricao: listar(STAND_SCENARIOS.map((item) => [item.id, item.rotulo] as const)),
@@ -76,17 +186,14 @@ export const ACOES_SITE: readonly AcaoSiteDef[] = Object.freeze([
       },
     },
   },
-  {
-    nome: 'gravar_episodio',
-    descricao: 'Grava o cenário que está na tela como episódio de telemetria (leva uns 20 segundos).',
-    args: {},
-  },
-  {
-    nome: 'analisar_na_bancada',
-    descricao: 'Envia a telemetria da tela para a bancada de agentes analisar. Sai do painel e abre a bancada.',
-    args: {},
-  },
-].map((item) => Object.freeze(item as AcaoSiteDef)));
+] as AcaoSiteDef[]).map((item) => Object.freeze(item)));
+
+/** Ações que o próprio `/stand` executa (trocam a tela); o resto vai ao Executor dentro do iframe. */
+export const ACOES_DO_STAND: readonly NomeAcaoSite[] = ['abrir_pagina', 'voltar_coruja'];
+
+export function paginaDaAcao(acao: string): PaginaSite | null {
+  return ACOES_SITE.find((item) => item.nome === acao)?.pagina ?? null;
+}
 
 export type ValidacaoAcaoSite =
   | { ok: true; acao: NomeAcaoSite; args: Record<string, string> }

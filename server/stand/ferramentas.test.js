@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { executarFerramentaStand, FERRAMENTAS_STAND, videoPublicado } from './ferramentas.js';
+import { ACOES_SITE } from '../../shared/stand/acoes-site.ts';
 
 const manifesto = [
   { id: 'pipeline-completo', titulo: 'O caminho do dado', arquivo: '/stand/videos/pipeline-completo.mp4' },
@@ -21,8 +22,10 @@ function raizComVideo(t) {
 test('tools no formato Realtime: as três do cérebro mais uma por ação do site (M3)', () => {
   assert.deepEqual(FERRAMENTAS_STAND.map((f) => f.name), [
     'buscar_no_repo', 'pesquisar_web', 'tocar_video',
-    'abrir_aba', 'voltar_inicio', 'abrir_caso', 'rodar_cenario', 'gravar_episodio', 'analisar_na_bancada',
+    ...ACOES_SITE.map((a) => a.nome),
   ]);
+  assert.ok(FERRAMENTAS_STAND.some((f) => f.name === 'abrir_pagina'));
+  assert.ok(!FERRAMENTAS_STAND.some((f) => f.name === 'gravar_episodio' || f.name === 'analisar_na_bancada'), 'o totem não grava nem dispara a bancada (Q8)');
   for (const f of FERRAMENTAS_STAND) {
     assert.equal(f.type, 'function');
     assert.equal(f.parameters.type, 'object');
@@ -59,15 +62,16 @@ test('tocar_video com o manifesto real da M7 conhece pipeline-completo', async (
 });
 
 test('ações do site passam pelo validador da M3 e viram evento acao_site', async () => {
-  const ok = await executarFerramentaStand('abrir_aba', { aba: 'telemetria' });
-  assert.deepEqual(ok.evento, { tipo: 'acao_site', acao: 'abrir_aba', args: { aba: 'telemetria' } });
-  const cenario = await executarFerramentaStand('rodar_cenario', { id: 'stand-inclinacao' });
-  assert.deepEqual(cenario.evento, { tipo: 'acao_site', acao: 'rodar_cenario', args: { id: 'stand-inclinacao' } });
-  assert.deepEqual((await executarFerramentaStand('voltar_inicio', {})).evento.args, {});
-  const ruim = await executarFerramentaStand('abrir_aba', { aba: 'admin' });
+  const ok = await executarFerramentaStand('abrir_pagina', { pagina: 'sonolencia' });
+  assert.deepEqual(ok.evento, { tipo: 'acao_site', acao: 'abrir_pagina', args: { pagina: 'sonolencia' } });
+  const cenario = await executarFerramentaStand('sompo_rodar_cenario', { id: 'stand-inclinacao' });
+  assert.deepEqual(cenario.evento, { tipo: 'acao_site', acao: 'sompo_rodar_cenario', args: { id: 'stand-inclinacao' } });
+  assert.deepEqual((await executarFerramentaStand('voltar_coruja', {})).evento.args, {});
+  const ruim = await executarFerramentaStand('abrir_pagina', { pagina: 'admin' });
   assert.equal(ruim.erro, 'acao_invalida');
-  assert.match(ruim.mensagem, /Opções: telemetria/);
-  assert.equal((await executarFerramentaStand('acao_site', { acao: 'abrir_aba' })).erro, 'ferramenta_desconhecida');
+  assert.match(ruim.mensagem, /Opções: inicio, luca_ai/);
+  assert.equal((await executarFerramentaStand('gravar_episodio', {})).erro, 'ferramenta_desconhecida');
+  assert.equal((await executarFerramentaStand('acao_site', { acao: 'abrir_pagina' })).erro, 'ferramenta_desconhecida');
 });
 
 test('pesquisar_web usa web_search/fetch_url do agent-tools e propaga falha', async () => {

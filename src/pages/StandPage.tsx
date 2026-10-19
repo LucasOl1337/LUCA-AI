@@ -14,7 +14,10 @@ import { VIDEOS_VITRINE, videoDoStand } from '@/components/stand/videosStand';
 import { descreverPulos, disponiveis, montarItens } from '@/components/stand/vitrineStand';
 import { TelaLab, TelaTrator, useTelasDoApp } from '@/components/stand/TelasDoApp';
 import { enviarAcaoSite } from '@/components/stand/executor/ponte';
-import { avisoDeSaida, barraVisivel, modoInicial, reduzirModo, type EntradaModo, type EstadoModo } from '@/components/stand/modoStand';
+import { aguardarExecutor } from '@/components/stand/executor/prontidao';
+import { executarPlano, planejarAcao } from '@/components/stand/site/acaoDoStand';
+import { SiteStand } from '@/components/stand/site/SiteStand';
+import { avisoDeSaida, barraVisivel, modoInicial, modosDisponiveis, reduzirModo, type EntradaModo, type EstadoModo } from '@/components/stand/modoStand';
 import type { AcaoNavegacao } from '@/components/stand/navegacaoPad';
 import { usePadStand } from '@/components/stand/usePadStand';
 import { AvisoSaida, BarraModos, DicaControle, preCarregarSimulador, SimulacaoStand, VitrineStand } from '@/components/stand/Modos';
@@ -97,6 +100,12 @@ export default function StandPage() {
   corujaOcupada.current = estado.tela !== 'atracao' || voz.ativa;
   const modoAtual = useRef(modo.modo);
   modoAtual.current = modo.modo;
+  const paginaAtual = useRef(modo.pagina);
+  paginaAtual.current = modo.pagina;
+  const falando = useRef(false);
+  falando.current = estado.voz === 'pensando' || estado.voz === 'falando';
+  /** Falha de ação no site: só a equipe vê (canto da tela), some sozinha. */
+  const [falhaSite, setFalhaSite] = useState('');
 
   const sair = useCallback(() => navigate({ page: 'inicio' }, 'push'), [navigate]);
 
@@ -109,8 +118,13 @@ export default function StandPage() {
     const cancelar = atual.assinar((evento) => {
       if (evento.tipo === 'nivel_audio') nivel.current = evento.valor;
       else if (evento.tipo === 'acao_site') {
-        // Executor do stand (M3) noutra janela; a falha fica no console da equipe.
-        void enviarAcaoSite(evento.acao, evento.args ?? {}).then((r) => { if (!r.ok) console.warn('[stand] ação no site falhou:', r.mensagem); });
+        // Totem-Site Q4: abrir_pagina/voltar_coruja trocam o modo; controles vão ao Executor do iframe.
+        const plano = planejarAcao(evento.acao, evento.args, { modo: modoAtual.current, pagina: paginaAtual.current });
+        void executarPlano(plano, { despacharModo, aguardarExecutor, enviarAcaoSite }).then((r) => {
+          if (r.ok) return;
+          console.warn('[stand] ação no site falhou:', r.mensagem);
+          setFalhaSite(r.mensagem);
+        });
       }
       else despachar(evento);
       // Voz em andamento é gente na frente do totem.
@@ -118,7 +132,7 @@ export default function StandPage() {
     });
     const relogio = window.setInterval(() => {
       despachar({ tipo: 'relogio' });
-      despacharModo({ tipo: 'relogio', corujaOcupada: corujaOcupada.current });
+      despacharModo({ tipo: 'relogio', corujaOcupada: corujaOcupada.current, falando: falando.current });
       setAgora(Date.now());
     }, 500);
     return () => { cancelar(); window.clearInterval(relogio); stub?.parar(); };
@@ -140,8 +154,9 @@ export default function StandPage() {
   }, [modoStub, iniciarVoz, tocouNaEscuta]);
 
   // Saiu da Coruja: a conversa acaba e a Coruja volta limpa na Atração.
+  // No Site a coruja segue ouvindo e narra a página (contrato com a Totem-Voz).
   useEffect(() => {
-    if (modo.modo === 'coruja') return;
+    if (modo.modo === 'coruja' || modo.modo === 'site') return;
     nivel.current = 0;
     despachar({ tipo: 'encerrar' });
     canal.current.enviar({ tipo: 'encerrar' });
@@ -158,6 +173,11 @@ export default function StandPage() {
     despacharModo(acao);
   }, [vozStand, estado.tela, iniciar]);
   const mexeuNoPad = useCallback(() => despacharModo({ tipo: 'atividade' }), []);
+  useEffect(() => {
+    if (!falhaSite) return undefined;
+    const timer = window.setTimeout(() => setFalhaSite(''), 8000);
+    return () => window.clearTimeout(timer);
+  }, [falhaSite]);
   const { conectado: controleConectado, desconhecido: controleDesconhecido } = usePadStand({ modo: modo.modo, aoAgir: agirNoPad, aoMexer: mexeuNoPad });
   const avisoControle = avisoDeControle(controleDesconhecido);
 
@@ -257,11 +277,15 @@ export default function StandPage() {
         <VitrineStand item={itemVitrine} pausado={modo.pausado} aoTerminar={terminarVitrine} telaApp={telaApp} pulos={descreverPulos(telas.prontidao)} />
       )}
       {modo.modo === 'simulacao' && <SimulacaoStand />}
+      {modo.modo === 'site' && modo.pagina && (
+        <SiteStand pagina={modo.pagina} variante={variante} nivel={nivel} voz={estado.voz} legenda={estado.legenda} aoMexer={mexeuNoPad} />
+      )}
       <div className="stand-seguro stand-camada">
         {controleConectado && <DicaControle modo={modo.modo} />}
         {segundosParaSair !== null && <AvisoSaida segundos={segundosParaSair} />}
         {avisoControle && <p className="stand-aviso-equipe stand-aviso-controle">{avisoControle}</p>}
-        <BarraModos modo={modo.modo} visivel={barraVisivel(modo, agora)} aoEscolher={(m) => { despacharModo({ tipo: 'atividade', toque: true }); despacharModo({ tipo: 'ir', modo: m }); }} />
+        {falhaSite && <p className="stand-aviso-equipe stand-aviso-site" role="status">ação no site: {falhaSite}</p>}
+        <BarraModos modo={modo.modo} modos={modosDisponiveis(modo)} visivel={barraVisivel(modo, agora)} aoEscolher={(m) => { despacharModo({ tipo: 'atividade', toque: true }); despacharModo({ tipo: 'ir', modo: m }); }} />
       </div>
     </main>
   );

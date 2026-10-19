@@ -8,6 +8,7 @@ import SompoPage from '@/pages/SompoPage';
 import LaboratorioPage from '@/pages/LaboratorioPage';
 import AdminPage from '@/pages/AdminPage';
 import StandExecutorHost from '@/components/stand/executor/StandExecutorHost';
+import { EMBUTIDO_NO_STAND } from '@/components/stand/executor/embutido';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppLocation } from '@/hooks/useAppLocation';
 import { ChatLibraryProvider, useChatLibrary } from '@/hooks/useChatLibrary';
@@ -61,6 +62,16 @@ export default function App() {
         <Suspense fallback={<div className="stand-carregando" role="status">Abrindo o stand…</div>}>
           <StandPage />
         </Suspense>
+      </ChatLibraryProvider>
+    );
+  }
+
+  // Página dentro do iframe do /stand (Totem-Site Q3): só a página e o Executor, sem menu nem chat.
+  if (EMBUTIDO_NO_STAND) {
+    return (
+      <ChatLibraryProvider>
+        <div className="stand-embutido">{renderPage()}</div>
+        <StandExecutorHost />
       </ChatLibraryProvider>
     );
   }
