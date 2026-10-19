@@ -19,7 +19,7 @@ export function cabecalhosDeSeguranca(caminho) {
       : 'camera=(), microphone=(), geolocation=()';
   const moldura = EMOLDURAVEL.test(caminho);
   return {
-    'Content-Security-Policy': `default-src 'self'; base-uri 'self'; connect-src ${conexoes}; frame-ancestors ${moldura ? "'self'" : "'none'"}; form-action 'self'; img-src 'self' data: blob: https:; media-src 'self' blob:; object-src 'none'; script-src ${script}; style-src 'self' 'unsafe-inline'`,
+    'Content-Security-Policy': `default-src 'self'; base-uri 'self'; connect-src ${conexoes}; frame-ancestors ${moldura ? "'self'" : "'none'"}; form-action 'self'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob:; object-src 'none'; script-src ${script}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': moldura ? 'SAMEORIGIN' : 'DENY',
