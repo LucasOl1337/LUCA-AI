@@ -36,7 +36,7 @@ export function entradaSemLogin(acao: AcaoNavegacao, modo: Modo): EntradaModo | 
   return acao;
 }
 
-export default function StandSemLogin() {
+export default function StandSemLogin({ offline = false }: { offline?: boolean }) {
   const { location } = useAppLocation();
   const [entrando, setEntrando] = useState(false);
   const margem = location.margem ? Number(location.margem) : MARGEM_PADRAO;
@@ -96,6 +96,7 @@ export default function StandSemLogin() {
       data-voz-stand="desligada"
       data-motivo="sem_login"
       data-sem-login
+      data-offline={offline || undefined}
       onPointerDown={tocar}
     >
       {modo.modo === 'coruja' && (
@@ -109,7 +110,7 @@ export default function StandSemLogin() {
       <div className="stand-seguro stand-camada">
         {conectado && <DicaControle modo={modo.modo} />}
         {/* Só na Coruja: na Vitrine o canto de cima é do selo queimado no vídeo. O repouso volta à Coruja a cada volta. */}
-        {modo.modo === 'coruja' && <p className="stand-aviso-equipe stand-aviso-sem-login" role="status">{AVISO_SEM_LOGIN}</p>}
+        {modo.modo === 'coruja' && <p className="stand-aviso-equipe stand-aviso-sem-login" role="status">{offline ? 'sem rede · vídeos salvos neste aparelho · a conversa volta quando reconectar' : AVISO_SEM_LOGIN}</p>}
         <BarraModos modo={modo.modo} modos={MODOS_SEM_LOGIN} visivel={barraVisivel} aoEscolher={(m) => { despachar({ tipo: 'atividade', toque: true }); despachar({ tipo: 'ir', modo: m }); }} />
       </div>
     </main>

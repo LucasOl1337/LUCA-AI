@@ -150,6 +150,10 @@ _Evitar_: Placar, score (o score 0–100 do `/sompo` mede outra coisa).
 O que a bancada de agentes devolve sobre um episódio gravado: o que aconteceu, a severidade para a seguradora e o que fazer agora. É um parecer de agentes de IA, citado só pelo que a sessão mostra.
 _Evitar_: Classificação, laudo, decisão da seguradora.
 
+**Vitrine offline**:
+Coruja sem voz e os três vídeos públicos salvos no próprio navegador, depois de uma abertura online do `/stand/`. Só a casca estática e os vídeos entram no cache versionado pelo commit. API, voz, Site e Simulação ficam de fora. A conversa volta sozinha quando o servidor responde novamente e a sessão continua válida.
+_Evitar_: App offline, voz offline, sessão em cache.
+
 ## Pessoas do seguro rural
 
 **Segurado**:

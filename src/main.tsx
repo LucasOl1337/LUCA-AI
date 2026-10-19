@@ -10,6 +10,7 @@ import AuthPage from './pages/AuthPage';
 import PublicReadingPage from './pages/PublicReadingPage';
 import EstadosProofPage from './pages/EstadosProofPage';
 import './index.css';
+import { useStandOffline } from './components/stand/useStandOffline';
 
 /** /stand sem sessão: Coruja sem voz e Vitrine local no lugar do login (ADR 0001). */
 const StandSemLogin = lazy(() => import('./components/stand/StandSemLogin'));
@@ -27,6 +28,8 @@ function publicReadingToken() {
 function AuthenticatedApp() {
   const { loading, user } = useAuth();
   const { location, navigate } = useAppLocation();
+  const stand = location.kind === 'app' && location.page === 'stand';
+  const offline = useStandOffline(stand);
 
   useEffect(() => {
     if (!user || location.kind !== 'auth') return;
@@ -34,6 +37,7 @@ function AuthenticatedApp() {
   }, [location.kind, navigate, user]);
 
   const showSplash = useDeferredFlag(loading);
+  if (offline) return <Suspense fallback={<div className="auth-loading auth-loading-quiet" aria-busy="true" />}><StandSemLogin offline /></Suspense>;
   if (loading && !showSplash) return <div className="auth-loading auth-loading-quiet" aria-busy="true" aria-label="Inicializando" />;
   if (loading) return <div className="auth-loading"><img src="/icon-192.png" alt="LUCA" /><span>Inicializando ambiente seguro…</span></div>;
   if (!user && location.kind === 'app' && location.page === 'stand') {

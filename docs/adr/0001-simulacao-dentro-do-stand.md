@@ -31,3 +31,11 @@ O código do simulador é carregado sob demanda, e `preCarregarSimulador` adiant
 - O pacote do `/stand` passa a depender do Three.js. O carregamento sob demanda mantém Coruja e Vitrine leves, mas a primeira entrada na Simulação pode levar alguns segundos num aparelho fraco.
 - Sem sessão, os modos que leem a API não têm o que mostrar. O `/stand` sem login (401) abre `StandSemLogin` no lugar da tela de login: só Coruja sem voz e Vitrine com os vídeos públicos, sem Simulação, Site nem Telas do app, e um aviso para a equipe (Shift+Q entra ali mesmo). Assim o público nunca vê um formulário de senha (`tests/stand-sem-login.test.js`).
 - Para tirar a Simulação do `/stand`, basta trocar o modo por um link. O que dá trabalho desfazer são os ajustes presos à prop `kiosk` no simulador.
+
+## Queda de rede no totem
+
+Depois de uma abertura online, `/stand/` instala um service worker com escopo apenas nessa rota. O build injeta o commit da release e a lista de JS/CSS públicos. A casca usa a rede primeiro e só usa o cache se a rede falhar ou devolver HTML no lugar de um asset. Os três vídeos públicos usam cache primeiro e aceitam Range para tocar e buscar trechos offline. São 48.761.384 bytes de vídeo, mais cerca de 3,3 MB de JS/CSS e a imagem da Coruja. O cache pode ser removido pelo navegador ou falhar por falta de espaço. Não há promessa de primeiro acesso offline.
+
+Sem rede, inclusive com sessão viva, a tela troca para Coruja sem voz e Vitrine local. Não monta Simulação, Site, Telas do app ou voz. O teste GET `/api/health` a cada 5 s detecta a volta e recarrega a página, que consulta a sessão real. Nenhum payload de API, cookie, resposta de voz ou WebSocket entra no cache.
+
+O novo worker apaga caches antigos deste stand no activate. A remoção de `/stand/sw.js` no deploy desregistra o worker e remove seus caches no próximo load online. Tanto 404 quanto HTML do fallback SPA são tratados como remoção. O worker não tem escopo sobre outras páginas. Para publicar, sempre gerar um build com o commit final antes de empacotar. Testes em `tests/stand-offline.test.js`.
