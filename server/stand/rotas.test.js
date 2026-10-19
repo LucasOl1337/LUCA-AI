@@ -220,6 +220,29 @@ test('escuta: padrão no provedor em turnos, STAND_ESCUTA=0 desliga, Grok nunca'
   assert.equal(escutaLigada({ STAND_VOZ_PROVEDOR: 'xai', XAI_API_KEY: 'k' }), false);
 });
 
+test('contagem do dia: despertar sem pergunta é falso; toque ou despertar com pergunta é conversa', async (t) => {
+  const teto = criarTetoDiario({ teto: 100_000 });
+  const pedir = await subir11(t, { teto });
+  const abrir = async (origem) => (await (await pedir('/api/stand/sessao', origem ? { origem } : {})).json()).conversa_id;
+  const fechar = (id) => pedir('/api/stand/turno', { conversa_id: id, evento: 'fim' });
+  const perguntar = async (id) => (await pedir('/api/stand/turno', { conversa_id: id, texto: 'O que é o LUCA?' })).text();
+
+  await fechar(await abrir('escuta'));
+  const comFala = await abrir('escuta');
+  await perguntar(comFala);
+  await perguntar(comFala);
+  await fechar(comFala);
+  const toque = await abrir();
+  await pedir('/api/stand/turno', { conversa_id: toque, evento: 'saudacao' }).then((r) => r.text());
+  await fechar(toque);
+  await fechar(await abrir('qualquer-coisa'));
+
+  const dia = (await (await pedir('/api/stand/status')).json()).creditos_dia;
+  assert.equal(dia.despertares, 2);
+  assert.equal(dia.falsos, 1, 'só o despertar sem pergunta; toque sem pergunta não é falso');
+  assert.equal(dia.conversas, 1, 'uma por sessão, não por pergunta');
+});
+
 test('turno: NDJSON com frases, PCM par em base64 e fim; voz resolvida pelo nome; créditos contados', async (t) => {
   const pedidos = [];
   const teto = criarTetoDiario({ teto: 1000 });

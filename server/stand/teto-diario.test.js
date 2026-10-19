@@ -23,7 +23,24 @@ test('teto soma, estoura e zera no dia seguinte de Brasília', () => {
   assert.equal(teto.usados(), 100);
   agora = Date.parse('2026-10-20T03:00:01Z');
   assert.equal(teto.estourou(), false);
-  assert.deepEqual(teto.resumo(), { dia: '2026-10-20', usados: 0, teto: 100 });
+  assert.deepEqual(teto.resumo(), { dia: '2026-10-20', usados: 0, teto: 100, despertares: 0, falsos: 0, conversas: 0 });
+});
+
+test('contagem do dia: despertares, falsos e conversas sobrevivem a restart e zeram no dia seguinte', (t) => {
+  const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'stand-contagem-'));
+  t.after(() => fs.rmSync(pasta, { recursive: true, force: true }));
+  const arquivo = path.join(pasta, 'creditos-dia.json');
+  const agora = () => Date.parse('2026-10-19T15:00:00Z');
+  const teto = criarTetoDiario({ teto: 1000, arquivo, agora });
+  teto.contar('despertares');
+  teto.contar('despertares');
+  teto.contar('falsos');
+  teto.contar('conversas');
+  teto.contar('qualquer');
+  const lido = criarTetoDiario({ teto: 1000, arquivo, agora }).resumo();
+  assert.deepEqual(lido, { dia: '2026-10-19', usados: 0, teto: 1000, despertares: 2, falsos: 1, conversas: 1 });
+  const amanha = criarTetoDiario({ teto: 1000, arquivo, agora: () => Date.parse('2026-10-20T12:00:00Z') }).resumo();
+  assert.equal(amanha.despertares, 0);
 });
 
 test('contador sobrevive a restart pelo arquivo e ignora dia velho', (t) => {

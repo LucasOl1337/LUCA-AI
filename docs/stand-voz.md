@@ -65,11 +65,13 @@ stateDiagram-v2
 - **Despertador** (`criarDespertador` em `src/stand-voz/escuta.ts`): desperta com RMS de pelo menos 3× o piso de ruído e nunca abaixo de 0,03, por 250 ms seguidos. O piso é uma média móvel do ruído. Abaixo do limiar ele anda 2 % por bloco de 50 ms; acima, 0,2 %, então barulho que fica na feira vira fundo. O piso continua aprendendo durante a pausa e entre conversas.
 - **Pré-rolagem.** Os últimos 600 ms (12 blocos) antes do despertar, mais o que chegar até a sessão ficar pronta (teto de 8 s), vão ao Scribe de uma vez. Assim o começo da frase não se perde.
 - **Sem saudação.** Se a sessão foi despertada pela voz, a pessoa já está falando. Por isso não há saudação, e a sessão espera a pergunta. Se em 6 s (`SEM_FALA_MS`) não chegar nenhuma transcrição, a sessão fecha como `silencio`/`sem_fala`. Um despertar falso custa ~4 créditos de STT.
+- **Despertar discreto.** Enquanto não chega palavra transcrita, a sessão fica em `ocioso` e a Atração continua na tela. A Conversa só abre com a primeira transcrição que vai ao cérebro, então um despertar falso não pisca a tela. `data-escuta` já vira `conversa` no despertar.
 - **Falsos seguidos.** O primeiro não pausa. Do segundo em diante, a escuta pausa por 10 s, depois 20 s e 40 s, até 2 min (`pausaAposFalsos`). Uma conversa de verdade ou um toque zera a conta. Teto de sessão, sessões por hora e teto diário seguem valendo: o despertar abre sessão pelo mesmo `POST /sessao`.
 - **Um microfone só.** A sessão pega o áudio da escuta emprestado (`Emprestimo` em `sessaoTurnos.ts`) e, ao fechar, não o fecha. A escuta só fecha o microfone ao sair da Coruja. Se a conversa ainda estiver em andamento, ele fecha quando ela acabar. A Grok (`xai`) não usa empréstimo e não tem escuta.
 - **Toque.** Na Atração, o toque continua abrindo a conversa com saudação, no mesmo microfone. No primeiro toque do dia, o navegador também libera o áudio (`precisa_toque`).
 - **Tela.** A Atração mostra "É só falar que eu escuto." com a escuta ouvindo. Sem escuta, mostra "Toca na tela pra começar a conversa.". O estado fica em `data-escuta` no `<main>`.
 - **Desligar.** `STAND_ESCUTA=0` no servidor volta ao toque, sem deploy de front. A página lê o status a cada 60 s.
+- **Contagem do dia.** O navegador manda `origem:'escuta'` ou `'toque'` no `POST /sessao`. O `creditos_dia` do status traz `despertares` (sessões abertas pela escuta), `falsos` (despertares fechados sem pergunta) e `conversas` (sessões com ao menos uma pergunta, de qualquer origem). A contagem fica no mesmo arquivo do teto e zera com ele. Falsos/despertares alto pede calibrar o microfone.
 
 O CLI tem `stand sessao` e `stand turno` (NDJSON em stdout); veja [`cli-reference.md`](./cli-reference.md).
 

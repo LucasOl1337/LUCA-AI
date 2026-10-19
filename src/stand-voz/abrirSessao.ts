@@ -15,7 +15,8 @@ type RespostaSessao = (SessaoServidor | SessaoServidorTurnos) & { error?: string
 export async function abrirSessaoDeVoz(aoTerminar: (motivo: FimSessao, detalhe?: string) => void, emprestimo?: Emprestimo): Promise<SessaoDeVoz | null> {
   let resposta: { status: number; dados: RespostaSessao };
   try {
-    resposta = await postar<RespostaSessao>('/api/stand/sessao', {});
+    // A origem só entra na contagem do dia no servidor (despertares e falsos).
+    resposta = await postar<RespostaSessao>('/api/stand/sessao', { origem: emprestimo && !emprestimo.saudar ? 'escuta' : 'toque' });
   } catch {
     aoTerminar('erro', 'servidor_indisponivel');
     return null;

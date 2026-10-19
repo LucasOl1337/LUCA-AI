@@ -131,6 +131,7 @@ export function registerStandRoutes(app, {
     if (!c) return;
     c.turno?.abort();
     cobrarStt(c, { estimado });
+    if (c.origem === 'escuta' && !c.perguntas) teto.contar('falsos');
     conversas.delete(id);
   };
   const limparConversas = () => {
@@ -206,6 +207,10 @@ export function registerStandRoutes(app, {
       };
       if (config.provedor.turnos) {
         const conversa = novaConversa({ conta: conta(req), agora: agora() });
+        // Origem só para a contagem do dia: Despertar da Escuta ou toque.
+        conversa.origem = req.body?.origem === 'escuta' ? 'escuta' : 'toque';
+        conversa.perguntas = 0;
+        if (conversa.origem === 'escuta') teto.contar('despertares');
         conversas.set(conversa.id, conversa);
         corpo.conversa_id = conversa.id;
         corpo.limites = { ...LIMITES_STAND, ...LIMITES_TURNO };
@@ -244,6 +249,10 @@ export function registerStandRoutes(app, {
       : evento === 'video_terminou' ? { evento, id: String(idVideo || '').slice(0, 80) }
         : { texto: String(texto || '').trim().slice(0, 500) };
     if (!entrada.evento && !entrada.texto) return res.status(400).json({ ok: false, error: 'texto_vazio' });
+    if (entrada.texto) {
+      conversa.perguntas = (conversa.perguntas ?? 0) + 1;
+      if (conversa.perguntas === 1) teto.contar('conversas');
+    }
 
     const controle = new AbortController();
     conversa.turno = controle;

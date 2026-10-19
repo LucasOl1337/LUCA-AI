@@ -7,6 +7,14 @@ import path from 'node:path';
 
 export const TETO_DIARIO_PADRAO = 25_000;
 
+/**
+ * Contagem do dia, sem áudio nem texto (r4 Q3): `despertares` são sessões
+ * abertas pela Escuta, `falsos` os despertares que fecharam sem pergunta, e
+ * `conversas` as sessões com ao menos uma pergunta, viesse de toque ou de voz.
+ */
+export const CONTAGENS = Object.freeze(['despertares', 'falsos', 'conversas']);
+const contagemZerada = () => Object.fromEntries(CONTAGENS.map((nome) => [nome, 0]));
+
 /** Data YYYY-MM-DD em Brasília. */
 export function diaBrasilia(ms = Date.now()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(ms);
@@ -22,17 +30,21 @@ export function arquivoPadrao(env = process.env) {
 }
 
 export function criarTetoDiario({ teto = TETO_DIARIO_PADRAO, arquivo = null, agora = () => Date.now() } = {}) {
-  let estado = { dia: diaBrasilia(agora()), creditos: 0 };
+  let estado = { dia: diaBrasilia(agora()), creditos: 0, contagem: contagemZerada() };
   if (arquivo) {
     try {
       const salvo = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
-      if (typeof salvo?.dia === 'string' && Number.isFinite(salvo.creditos)) estado = { dia: salvo.dia, creditos: salvo.creditos };
+      if (typeof salvo?.dia === 'string' && Number.isFinite(salvo.creditos)) {
+        const contagem = contagemZerada();
+        for (const nome of CONTAGENS) if (Number.isFinite(salvo.contagem?.[nome])) contagem[nome] = salvo.contagem[nome];
+        estado = { dia: salvo.dia, creditos: salvo.creditos, contagem };
+      }
     } catch { /* sem arquivo ou ilegível: começa do zero */ }
   }
 
   function atual() {
     const hoje = diaBrasilia(agora());
-    if (estado.dia !== hoje) estado = { dia: hoje, creditos: 0 };
+    if (estado.dia !== hoje) estado = { dia: hoje, creditos: 0, contagem: contagemZerada() };
     return estado;
   }
 
@@ -61,6 +73,11 @@ export function criarTetoDiario({ teto = TETO_DIARIO_PADRAO, arquivo = null, ago
       salvar();
       return hoje.creditos;
     },
-    resumo: () => ({ dia: atual().dia, usados: Math.round(estado.creditos), teto }),
+    contar(nome) {
+      if (!CONTAGENS.includes(nome)) return;
+      atual().contagem[nome] += 1;
+      salvar();
+    },
+    resumo: () => ({ dia: atual().dia, usados: Math.round(estado.creditos), teto, ...estado.contagem }),
   };
 }
