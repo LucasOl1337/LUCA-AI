@@ -11,9 +11,11 @@
 #   STAND_HTTPS=8444          porta HTTPS na tailnet (8443, 8096 e / já são de outros serviços no PC lol)
 #   STAND_DADOS=~/.local/state/luca-stand   LUCA_DATA_DIR isolado (contas e banco locais do stand)
 #   STAND_SEM_BUILD=1         reaproveita o dist/ atual
-#   XAI_API_KEY | XAI_OAUTH_AUTH_FILE   credencial da voz, só no env (padrão: ~/.grok/auth.json se existir)
-#   ROUTER_BASE_URL + ROUTER_API_KEY    9Router dos embeddings do roteador de vídeo
-#                             (padrão: STAND_ROTEADOR=hostinger pelo comando `rotas`, se existir)
+#   ELEVENLABS_API_KEY        voz padrão (Scribe + TTS), só no env
+#                             (padrão: chaveiro `secret-tool lookup servico elevenlabs usuario tts-agentes`)
+#   STAND_VOZ_PROVEDOR=xai    volta para a Grok Voice; usa XAI_API_KEY | XAI_OAUTH_AUTH_FILE (~/.grok/auth.json)
+#   ROUTER_API_KEY            chave do 9Router Railway (cérebro e embeddings; a URL é fixa em server/config.js)
+#                             (padrão: STAND_ROTEADOR=railway pelo comando `rotas`, se existir)
 set -euo pipefail
 
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -57,16 +59,24 @@ subir() {
       echo "porta $PORTA ocupada por outro processo; escolha outra com STAND_PORTA=" >&2
       exit 1
     fi
-    if [[ -z "${XAI_API_KEY:-}" && -z "${XAI_OAUTH_AUTH_FILE:-}" && -f "$HOME/.grok/auth.json" ]]; then
-      export XAI_OAUTH_AUTH_FILE="$HOME/.grok/auth.json"
+    if [[ "${STAND_VOZ_PROVEDOR:-elevenlabs}" == xai ]]; then
+      if [[ -z "${XAI_API_KEY:-}" && -z "${XAI_OAUTH_AUTH_FILE:-}" && -f "$HOME/.grok/auth.json" ]]; then
+        export XAI_OAUTH_AUTH_FILE="$HOME/.grok/auth.json"
+      fi
+      [[ -z "${XAI_API_KEY:-}" && -z "${XAI_OAUTH_AUTH_FILE:-}" ]] && echo "aviso: sem XAI_API_KEY/XAI_OAUTH_AUTH_FILE, o stand abre mas fica sem voz" >&2
+    else
+      if [[ -z "${ELEVENLABS_API_KEY:-}" ]] && command -v secret-tool >/dev/null; then
+        ELEVENLABS_API_KEY="$(secret-tool lookup servico elevenlabs usuario tts-agentes 2>/dev/null || true)"
+        [[ -n "$ELEVENLABS_API_KEY" ]] && export ELEVENLABS_API_KEY
+      fi
+      [[ -z "${ELEVENLABS_API_KEY:-}" ]] && echo "aviso: sem ELEVENLABS_API_KEY, o stand abre mas fica sem voz" >&2
     fi
-    [[ -z "${XAI_API_KEY:-}" && -z "${XAI_OAUTH_AUTH_FILE:-}" ]] && echo "aviso: sem XAI_API_KEY/XAI_OAUTH_AUTH_FILE, o stand abre mas fica sem voz" >&2
-    if [[ -z "${ROUTER_BASE_URL:-}" ]] && command -v rotas >/dev/null; then
-      local roteador="${STAND_ROTEADOR:-hostinger}"
-      ROUTER_BASE_URL="$(node -e 'const j=require(process.argv[1]);process.stdout.write(j.routers?.[process.argv[2]]?.base_url||"")' "$HOME/.config/rotas/routers.json" "$roteador" 2>/dev/null || true)"
-      [[ -n "$ROUTER_BASE_URL" ]] && export ROUTER_BASE_URL && export ROUTER_API_KEY="${ROUTER_API_KEY:-$(rotas chave "$roteador" 2>/dev/null || true)}"
+    # A URL do 9Router é fixa no Railway (server/config.js); só a chave vem do ambiente.
+    if [[ -z "${ROUTER_API_KEY:-}" ]] && command -v rotas >/dev/null; then
+      ROUTER_API_KEY="$(rotas chave "${STAND_ROTEADOR:-railway}" 2>/dev/null || true)"
+      [[ -n "$ROUTER_API_KEY" ]] && export ROUTER_API_KEY
     fi
-    [[ -z "${ROUTER_BASE_URL:-}" ]] && echo "aviso: sem ROUTER_BASE_URL, o roteador de vídeo fica sem embeddings e a IA responde ao vivo" >&2
+    [[ -z "${ROUTER_API_KEY:-}" ]] && echo "aviso: sem ROUTER_API_KEY, o cérebro cai na fala de falha e o roteador de vídeo fica sem embeddings" >&2
     HOST=127.0.0.1 PORT="$PORTA" LUCA_DATA_DIR="$DADOS" LUCA_SOMPO_OFFLINE="${LUCA_SOMPO_OFFLINE:-true}" \
       nohup node server/index.js >"$LOG" 2>&1 &
     echo $! >"$PIDFILE"

@@ -74,7 +74,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   const interval = numberOption(options.interval, 'interval', 1000, 100, 60000);
   numberOption(options['wait-timeout'], 'wait-timeout', 1800000);
   numberOption(options.timeout, 'timeout', command.timeout || 30000);
-  if (command.binary && !options.output && !options['dry-run']) throw new CliError('output_required', 'Este comando baixa um arquivo. Use --output caminho ou --output -.');
+  if (command.binary && !command.textStream && !options.output && !options['dry-run']) throw new CliError('output_required', 'Este comando baixa um arquivo. Use --output caminho ou --output -.');
   if (options.data && (command.method === 'GET' || command.upload || command.csvImport || command.name.startsWith('profile '))) throw new CliError('unsupported_option', '--data não se aplica a este comando.');
   const input = createInput();
   const data = options.data === undefined ? undefined : objectBody(await input.json(options.data));

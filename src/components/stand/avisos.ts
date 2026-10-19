@@ -38,6 +38,7 @@ export function chamadaDeInicio(ativa: boolean, fim: Fim): string {
 export function avisoParaEquipe(fim: Fim, status: StatusStand | null = null): string {
   if (status && !status.ligado && fim?.motivo !== 'desligado') return `voz desligada no servidor (${status.motivo || 'stand_desligado'})`;
   if (!fim) return '';
+  if (fim.motivo === 'desligado' && fim.detalhe === 'teto_diario') return 'voz pausada: teto diário de créditos atingido · volta à meia-noite';
   if (fim.motivo === 'desligado') return `voz desligada no servidor (${fim.detalhe || 'stand_desligado'})`;
   if (fim.motivo === 'erro') return `voz caiu: ${fim.detalhe || 'erro'} · espaço tenta de novo`;
   return '';

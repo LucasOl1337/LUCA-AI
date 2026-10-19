@@ -1,0 +1,327 @@
+/**
+ * Sessão de voz em turnos do stand (provedor elevenlabs). O ouvido é o Scribe
+ * Realtime da ElevenLabs, ligado direto do navegador com token de uso único.
+ * Cérebro e voz ficam no servidor: cada pergunta fechada vira um POST em
+ * `/api/stand/turno`, que devolve NDJSON com frases, áudio PCM16 a 24 kHz e
+ * eventos (vídeo, ação no site). Publica no barramento os mesmos eventos do
+ * contrato `shared/stand/eventos.ts` que a sessão Realtime da xAI.
+ */
+import type { EstadoStand } from '../../shared/stand/eventos.ts';
+import { abrirAudio, FilaDeVoz, HZ_STAND, type AudioStand } from './audioStand';
+import { assinarEventosPagina, emitirEventoStand } from './barramento';
+import { base64DePcm16, criarDetectorFala } from './protocolo';
+import type { FimSessao, SessaoServidor } from './sessaoVoz';
+import { eventoScribe, interrompeFala, lerNdjson, mensagemAudioScribe, pareceEco, vaiAoCerebro, type LinhaTurno } from './turnos';
+
+export interface SessaoServidorTurnos extends Omit<SessaoServidor, 'conexao'> {
+  conexao: { transporte: 'scribe'; url: string };
+  conversa_id: string;
+}
+
+type EntradaTurno = { texto: string } | { evento: 'saudacao' } | { evento: 'video_terminou'; id: string };
+
+// Pedaço de silêncio enviado ao Scribe durante o vídeo: o WebSocket segue vivo
+// e o VAD não transcreve a narração do vídeo.
+const SILENCIO_50MS = base64DePcm16(new Int16Array(HZ_STAND / 20));
+// Barge-in em dois tempos: volume alto no microfone abaixa a voz na hora; só a
+// transcrição parcial com palavras de verdade corta. Ruído de feira não mata a resposta.
+const VOLUME_ABAIXADO = 0.25;
+const ESPERA_CONFIRMAR_MS = 1200;
+// Depois da fala, o eco ainda pode chegar transcrito por este tempo.
+const CAUDA_ECO_MS = 2500;
+
+export class SessaoTurnos {
+  private ws: WebSocket | null = null;
+  private audio: AudioStand | null = null;
+  private fila: FilaDeVoz | null = null;
+  private estado: EstadoStand = 'ocioso';
+  private conversaId = '';
+  private turno: AbortController | null = null;
+  private detector = criarDetectorFala();
+  /** O que o LUCA falou no turno atual e no anterior, para descartar o próprio eco. */
+  private falado = '';
+  private faladoAnterior = '';
+  private fimDaFala = 0;
+  private relogioVolume = 0;
+  private legendas: number[] = [];
+  private videoTocando = false;
+  private relogioSilencio = 0;
+  private relogioTeto = 0;
+  private pararNivel: (() => void) | null = null;
+  private desligarPagina: (() => void) | null = null;
+  private limites = { silencio_s: 20, teto_s: 240 };
+  private encerrando = false;
+  private terminada = false;
+
+  constructor(private aoTerminar: (motivo: FimSessao, detalhe?: string) => void = () => {}) {}
+
+  async iniciar(dados: SessaoServidorTurnos): Promise<void> {
+    try {
+      await this.conectar(dados);
+    } catch (erro) {
+      this.terminar('erro', erro instanceof Error ? erro.message : 'falha_ao_iniciar');
+    }
+  }
+
+  private async conectar(dados: SessaoServidorTurnos): Promise<void> {
+    this.limites = dados.limites;
+    this.conversaId = dados.conversa_id;
+    const audio = await abrirAudio();
+    this.audio = audio;
+    if (this.terminada) return audio.fechar();
+    this.fila = new FilaDeVoz(audio, () => this.aoFilaVazia());
+
+    const ws = new WebSocket(dados.conexao.url);
+    this.ws = ws;
+    await new Promise<void>((ok, falha) => {
+      ws.onopen = () => ok();
+      ws.onerror = () => falha(new Error('scribe_falhou'));
+    });
+    if (this.terminada) return;
+    ws.onmessage = (ev) => {
+      try { this.aoScribe(JSON.parse(String(ev.data))); } catch { /* mensagem quebrada */ }
+    };
+    ws.onclose = () => this.terminar(this.encerrando ? 'encerrada' : 'erro', 'conexao_fechada');
+
+    audio.captura.port.onmessage = (ev: MessageEvent<{ pcm: Int16Array; rms: number }>) => this.aoMicrofone(ev.data.pcm, ev.data.rms);
+    this.pararNivel = audio.medirNivel((nivel) => emitirEventoStand({ tipo: 'nivel_audio', valor: this.estado === 'falando' ? nivel : 0 }));
+    this.relogioTeto = window.setTimeout(() => this.encerrar('teto'), this.limites.teto_s * 1000);
+    this.desligarPagina = assinarEventosPagina((evento) => {
+      if (evento.tipo === 'encerrar' || evento.tipo === 'reiniciar') this.encerrar();
+      if (evento.tipo === 'video_terminou') {
+        this.videoTocando = false;
+        void this.perguntar({ evento: 'video_terminou', id: evento.id });
+      }
+    });
+    window.addEventListener('pagehide', this.aoSairDaPagina);
+    this.mudarEstado('ouvindo');
+    void this.perguntar({ evento: 'saudacao' });
+  }
+
+  private aoSairDaPagina = (): void => this.encerrar();
+
+  encerrar(motivo: FimSessao = 'encerrada'): void {
+    this.encerrando = true;
+    this.terminar(motivo);
+  }
+
+  private terminar(motivo: FimSessao, detalhe?: string): void {
+    if (this.terminada) return;
+    this.terminada = true;
+    window.clearTimeout(this.relogioSilencio);
+    window.clearTimeout(this.relogioTeto);
+    window.clearTimeout(this.relogioVolume);
+    this.limparLegendas();
+    window.removeEventListener('pagehide', this.aoSairDaPagina);
+    this.pararNivel?.();
+    this.desligarPagina?.();
+    this.turno?.abort();
+    this.turno = null;
+    this.fila?.cortar();
+    const ws = this.ws;
+    this.ws = null;
+    if (ws) { ws.onclose = null; ws.onmessage = null; ws.close(); }
+    this.audio?.fechar();
+    this.audio = null;
+    // Fecha a conversa no servidor (conta os minutos de microfone). keepalive
+    // deixa o pedido sair mesmo com a aba fechando.
+    if (this.conversaId) {
+      void fetch('/api/stand/turno', {
+        method: 'POST',
+        credentials: 'same-origin',
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversa_id: this.conversaId, evento: 'fim' }),
+      }).catch(() => {});
+    }
+    this.mudarEstado('ocioso');
+    emitirEventoStand({ tipo: 'legenda', texto: '' });
+    this.aoTerminar(motivo, detalhe);
+  }
+
+  private mudarEstado(valor: EstadoStand): void {
+    if (this.estado === valor) return;
+    this.estado = valor;
+    emitirEventoStand({ tipo: 'estado', valor });
+  }
+
+  private armarSilencio(): void {
+    window.clearTimeout(this.relogioSilencio);
+    this.relogioSilencio = window.setTimeout(() => this.encerrar('silencio'), this.limites.silencio_s * 1000);
+  }
+
+  private aoMicrofone(pcm: Int16Array, nivel: number): void {
+    if (this.ws?.readyState !== WebSocket.OPEN) return;
+    if (this.videoTocando) {
+      this.ws.send(mensagemAudioScribe(SILENCIO_50MS, HZ_STAND));
+      return;
+    }
+    this.ws.send(mensagemAudioScribe(base64DePcm16(pcm), HZ_STAND));
+    if (this.estado === 'falando' && this.detector.alimentar(nivel, 50)) this.abaixarVoz();
+    if (this.estado !== 'falando') this.detector.zerar();
+  }
+
+  /** 1º tempo do barge-in: voz baixa até a transcrição confirmar (ou não) a interrupção. */
+  private abaixarVoz(): void {
+    if (!this.audio || this.relogioVolume) return;
+    this.audio.saida.gain.setTargetAtTime(VOLUME_ABAIXADO, this.audio.contexto.currentTime, 0.03);
+    this.relogioVolume = window.setTimeout(() => this.restaurarVoz(), ESPERA_CONFIRMAR_MS);
+  }
+
+  private restaurarVoz(): void {
+    window.clearTimeout(this.relogioVolume);
+    this.relogioVolume = 0;
+    if (this.audio) this.audio.saida.gain.setTargetAtTime(1, this.audio.contexto.currentTime, 0.05);
+  }
+
+  private textoFalado(): string {
+    return `${this.faladoAnterior} ${this.falado}`;
+  }
+
+  private emFalaOuCauda(): boolean {
+    return this.estado === 'falando' || Boolean(this.fila?.tocando) || performance.now() - this.fimDaFala < CAUDA_ECO_MS;
+  }
+
+  private aoScribe(mensagem: { message_type?: string; text?: string; error?: string }): void {
+    const evento = eventoScribe(mensagem);
+    if (evento.tipo === 'erro') {
+      console.warn('[stand] erro do Scribe:', evento.codigo);
+      if (evento.fatal) this.terminar('erro', evento.codigo);
+      return;
+    }
+    if (evento.tipo === 'outro' || this.videoTocando || !evento.texto) return;
+    const durante = this.emFalaOuCauda();
+    if (pareceEco(evento.texto, this.textoFalado(), { durante })) return;
+    if (evento.tipo === 'parcial') {
+      if (this.estado === 'falando' || this.fila?.tocando) {
+        // 2º tempo do barge-in: palavras de verdade por cima da fala.
+        if (interrompeFala(evento.texto, this.textoFalado())) this.interromper();
+        return;
+      }
+      if (!vaiAoCerebro(evento.texto)) return;
+      this.armarSilencio();
+      emitirEventoStand({ tipo: 'legenda', texto: evento.texto });
+      return;
+    }
+    if (!vaiAoCerebro(evento.texto)) return;
+    emitirEventoStand({ tipo: 'legenda', texto: evento.texto });
+    void this.perguntar({ texto: evento.texto });
+  }
+
+  private interromper(): void {
+    this.turno?.abort();
+    this.turno = null;
+    this.cortarFala();
+    this.mudarEstado('ouvindo');
+    this.armarSilencio();
+  }
+
+  private cortarFala(): void {
+    this.fila?.cortar();
+    this.limparLegendas();
+    this.restaurarVoz();
+    this.fimDaFala = performance.now();
+  }
+
+  private limparLegendas(): void {
+    this.legendas.forEach((r) => window.clearTimeout(r));
+    this.legendas = [];
+  }
+
+  private aoFilaVazia(): void {
+    this.fimDaFala = performance.now();
+    this.restaurarVoz();
+    if (this.turno || this.videoTocando || this.terminada) return;
+    this.mudarEstado('ouvindo');
+    this.armarSilencio();
+  }
+
+  /** Um turno: pergunta (ou evento) ao servidor e toca o que voltar, na ordem. */
+  private async perguntar(entrada: EntradaTurno): Promise<void> {
+    if (this.terminada) return;
+    this.turno?.abort();
+    this.cortarFala();
+    const controle = new AbortController();
+    this.turno = controle;
+    window.clearTimeout(this.relogioSilencio);
+    if ('texto' in entrada) this.mudarEstado('pensando');
+    if (this.falado) this.faladoAnterior = this.falado;
+    this.falado = '';
+    let fraseAudio = '';
+    let fimTurno: Extract<LinhaTurno, { t: 'fim' }> | null = null;
+    try {
+      const resposta = await fetch('/api/stand/turno', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversa_id: this.conversaId, ...entrada }),
+        signal: controle.signal,
+      });
+      if (resposta.status === 503) {
+        const dados = await resposta.json().catch(() => ({})) as { motivo?: string };
+        return this.terminar('desligado', dados.motivo || 'stand_desligado');
+      }
+      if (resposta.status === 404 || resposta.status === 410) return this.terminar('erro', 'conversa_expirada');
+      if (!resposta.ok || !resposta.body) throw new Error(`turno_http_${resposta.status}`);
+      for await (const linha of lerNdjson(resposta.body)) {
+        if (controle.signal.aborted) return;
+        fraseAudio = await this.aoLinha(linha, controle, fraseAudio);
+        if (linha.t === 'fim') fimTurno = linha;
+      }
+    } catch (erro) {
+      if (controle.signal.aborted) return;
+      console.warn('[stand] turno falhou:', erro instanceof Error ? erro.message : erro);
+    } finally {
+      if (this.turno === controle) this.turno = null;
+    }
+    if (controle.signal.aborted || this.terminada) return;
+    if (fimTurno?.motivo === 'teto_respostas') {
+      await this.fila?.terminou();
+      return this.encerrar('teto');
+    }
+    if (!this.fila?.tocando) this.aoFilaVazia();
+  }
+
+  /**
+   * Trata uma linha do turno. Devolve a frase cuja legenda ainda espera o 1º
+   * pedaço de áudio dela (a legenda aparece quando a frase começa a soar).
+   */
+  private async aoLinha(linha: LinhaTurno, controle: AbortController, legendaPendente: string): Promise<string> {
+    switch (linha.t) {
+      case 'frase':
+        this.falado = `${this.falado} ${linha.texto}`.trim();
+        return linha.texto;
+      case 'audio': {
+        const inicio = this.fila?.tocar(linha.pcm);
+        if (inicio == null || !this.fila) return legendaPendente;
+        this.mudarEstado('falando');
+        if (legendaPendente) {
+          const texto = legendaPendente;
+          this.legendas.push(window.setTimeout(() => emitirEventoStand({ tipo: 'legenda', texto }), this.fila.msAte(inicio)));
+        }
+        return '';
+      }
+      case 'evento': {
+        const evento = linha.evento;
+        if (evento.tipo === 'tocar_video' && evento.id) {
+          // A fala que anuncia o vídeo termina antes de ele entrar.
+          await this.fila?.terminou();
+          if (controle.signal.aborted) return '';
+          this.videoTocando = true;
+          window.clearTimeout(this.relogioSilencio);
+          this.mudarEstado('ouvindo');
+          emitirEventoStand({ tipo: 'tocar_video', id: evento.id });
+        }
+        if (evento.tipo === 'acao_site' && evento.acao) emitirEventoStand({ tipo: 'acao_site', acao: evento.acao, args: evento.args ?? {} });
+        break;
+      }
+      case 'aviso':
+        console.warn('[stand] aviso do turno:', linha.aviso, linha.detalhe ?? '');
+        break;
+      case 'fim':
+        if (linha.metricas) console.info('[stand] turno', linha.motivo, linha.metricas);
+        break;
+    }
+    return legendaPendente;
+  }
+}

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EstadoStand } from '../../shared/stand/eventos.ts';
 import { assinarEventosCerebro } from './barramento';
-import { SessaoVoz, type FimSessao } from './sessaoVoz';
+import { abrirSessaoDeVoz } from './abrirSessao';
+import type { FimSessao, SessaoDeVoz } from './sessaoVoz';
 
 export interface UsoSessaoVoz {
   estado: EstadoStand;
@@ -14,7 +15,10 @@ export interface UsoSessaoVoz {
 
 /** Hook para a página do stand (M2): liga e desliga a conversa por voz. */
 export function useSessaoVoz(): UsoSessaoVoz {
-  const sessao = useRef<SessaoVoz | null>(null);
+  const sessao = useRef<SessaoDeVoz | null>(null);
+  const abrindo = useRef(false);
+  /** Pedido de encerrar (ou desmontagem) chegou enquanto a sessão abria. */
+  const cancelarAoAbrir = useRef(false);
   const [estado, setEstado] = useState<EstadoStand>('ocioso');
   const [ativa, setAtiva] = useState(false);
   const [fim, setFim] = useState<UsoSessaoVoz['fim']>(null);
@@ -23,22 +27,39 @@ export function useSessaoVoz(): UsoSessaoVoz {
     if (evento.tipo === 'estado') setEstado(evento.valor);
   }), []);
 
-  useEffect(() => () => sessao.current?.encerrar(), []);
-
-  const iniciar = useCallback(async () => {
-    if (sessao.current) return;
-    setFim(null);
-    setAtiva(true);
-    const nova = new SessaoVoz((motivo, detalhe) => {
-      if (sessao.current === nova) sessao.current = null;
-      setAtiva(false);
-      setFim({ motivo, detalhe });
-    });
-    sessao.current = nova;
-    await nova.iniciar();
+  useEffect(() => () => {
+    cancelarAoAbrir.current = true;
+    sessao.current?.encerrar();
   }, []);
 
-  const encerrar = useCallback(() => sessao.current?.encerrar(), []);
+  const iniciar = useCallback(async () => {
+    if (sessao.current || abrindo.current) return;
+    abrindo.current = true;
+    cancelarAoAbrir.current = false;
+    setFim(null);
+    setAtiva(true);
+    let terminou = false;
+    const aoTerminar = (motivo: FimSessao, detalhe?: string) => {
+      terminou = true;
+      sessao.current = null;
+      setAtiva(false);
+      setFim({ motivo, detalhe });
+    };
+    try {
+      const nova = await abrirSessaoDeVoz(aoTerminar);
+      if (nova && !terminou) {
+        sessao.current = nova;
+        if (cancelarAoAbrir.current) nova.encerrar();
+      }
+    } finally {
+      abrindo.current = false;
+    }
+  }, []);
+
+  const encerrar = useCallback(() => {
+    if (abrindo.current) cancelarAoAbrir.current = true;
+    sessao.current?.encerrar();
+  }, []);
 
   return { estado, ativa, fim, iniciar, encerrar };
 }

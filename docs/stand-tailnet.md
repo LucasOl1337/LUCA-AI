@@ -24,8 +24,9 @@ scripts/stand-tailnet.sh desligar   # tira o serve da 8444 e para o runtime
 | `STAND_HTTPS` | `8444` | Porta HTTPS na tailnet. |
 | `STAND_DADOS` | `~/.local/state/luca-stand` | `LUCA_DATA_DIR` do stand: contas, banco, `runtime.log` e `runtime.pid`. |
 | `STAND_SEM_BUILD` | vazio | `1` reaproveita o `dist/` atual. |
-| `XAI_API_KEY` ou `XAI_OAUTH_AUTH_FILE` | `~/.grok/auth.json`, se existir | Credencial da voz (xAI). Fica só no ambiente do processo. Sem ela o stand abre, mas fica sem voz. |
-| `ROUTER_BASE_URL` e `ROUTER_API_KEY` | 9Router `STAND_ROTEADOR` (padrão `hostinger`) lido pelo comando `rotas` | Embeddings do roteador de vídeo. Sem eles a IA ainda conversa, mas não escolhe Vídeo do stand pela pergunta. |
+| `ELEVENLABS_API_KEY` | chaveiro: `secret-tool lookup servico elevenlabs usuario tts-agentes` | Ouvido e voz (ElevenLabs). Fica só no ambiente do processo. Sem ela o stand abre, mas fica sem voz. |
+| `ROUTER_API_KEY` | chave do 9Router `STAND_ROTEADOR` (padrão `railway`) lida pelo comando `rotas` | Cérebro (Claude) e embeddings do roteador de vídeo. A URL é fixa no Railway em `server/config.js`. Sem a chave a voz só diz a fala de falha. |
+| `STAND_VOZ_PROVEDOR=xai` | não definido | Volta para a Grok Voice; aí vale `XAI_API_KEY` ou `XAI_OAUTH_AUTH_FILE` (padrão `~/.grok/auth.json`). |
 
 No PC `lol`, as portas HTTPS 443, 8096 e 8443 do `tailscale serve` já são de outros serviços. O script recusa uma porta que já aponta para outro destino e, no `desligar`, só mexe na porta dele.
 
@@ -47,5 +48,5 @@ Qualquer máquina logada na tailnet do Lucas abre a URL acima. Celular Android: 
 ## Limites
 
 - O runtime não reinicia sozinho no boot. Para deixar fixo, rode `subir` de novo depois de reiniciar o PC.
-- Os limites da voz são os da M1: sessão encerra após 20 s de silêncio, teto de 240 s e 30 sessões por hora (`GET /api/stand/status`).
+- Os limites da voz estão em [`stand-voz.md`](./stand-voz.md): 20 s de silêncio, 240 s por sessão, 30 sessões por hora, 8 respostas por conversa e o teto diário de créditos (`GET /api/stand/status`).
 - A IA responde ao público com `docs/stand-publico.md` e a lista branca de `server/stand/conhecimento.js`. Não lê código, deploy nem `.env`.

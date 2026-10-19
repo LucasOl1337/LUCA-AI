@@ -87,6 +87,21 @@ export function assertAllowed9RouterModel(value) {
   return PRODUCT_TEXT_MODEL;
 }
 
+// Exceção única à fixação em Astra (decisão do Lucas, 19/10, docs/stand-voz.md):
+// o cérebro de voz do stand fala com Claude pela mesma rota `cc/` do Railway,
+// porque a 1ª frase do Astra (3,6–5,8 s) não cabe numa conversa falada. Só
+// `server/stand/cerebro.js` usa esta cadeia; o resto do produto segue Astra.
+export const STAND_CEREBRO_PADRAO = 'cc/claude-sonnet-5';
+export const STAND_CEREBRO_RESERVAS = Object.freeze(['cc/claude-haiku-4-5-20251001', PRODUCT_TEXT_MODEL]);
+const ROTA_CEREBRO_STAND = /^cc\/claude-[a-z0-9.-]+$/;
+
+/** Ordem de tentativa do cérebro do stand: escolhido → Haiku → Astra, sem repetir. */
+export function cadeiaCerebroStand(env = process.env) {
+  const pedido = String(env.STAND_CEREBRO_MODELO || '').trim();
+  const primeiro = ROTA_CEREBRO_STAND.test(pedido) || pedido === PRODUCT_TEXT_MODEL ? pedido : STAND_CEREBRO_PADRAO;
+  return [...new Set([primeiro, ...STAND_CEREBRO_RESERVAS])];
+}
+
 export const ROUTER_MODEL = sanitize9RouterModel(process.env.ROUTER_MODEL, DEFAULT_ROUTER_MODEL);
 export const MISSION_TRANSFORMER_MODEL = sanitize9RouterModel(process.env.MISSION_TRANSFORMER_MODEL, DEFAULT_SPECIALIST_MODEL);
 export const DESIGNER_MODEL = sanitize9RouterModel(process.env.DESIGNER_MODEL, DEFAULT_SPECIALIST_MODEL);
