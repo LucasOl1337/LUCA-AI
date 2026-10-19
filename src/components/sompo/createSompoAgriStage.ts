@@ -127,7 +127,7 @@ function createUltrasonicBeam(origin: readonly [number, number, number]) {
  * real em forma fechada: separado do loop do caminhão para não arriscar o
  * fluxo rural. Desmontado e remontado a cada troca de cenário/desfecho.
  */
-export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig, adaptiveQuality = false }: {
+export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig, adaptiveQuality = false, obstaclesRef }: {
   mount: HTMLElement;
   scenarioId: SompoAgriScenarioId;
   outcomeId: string;
@@ -145,6 +145,11 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   cameraRig?: SompoCameraRig;
   /** Totem: desce pixel ratio, pós e sombras quando o FPS cai (qualidadeAdaptativa). */
   adaptiveQuality?: boolean;
+  /**
+   * Gameplay: obstáculos de quem dirige (centro no chão e raio), no lugar do
+   * fardo fixo do case. Lido a cada quadro; trocar a lista reposiciona os fardos.
+   */
+  obstaclesRef?: { current: readonly { x: number; z: number; radius: number }[] };
 }): SompoAgriStageApi | null {
   const scenario = getSompoAgriScenario(scenarioId);
   const operation = scenario.environmentId === 'geofence-operacao';
@@ -311,12 +316,28 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   // Aqui a régua é métrica (cm/100), e o obstáculo é fixo no mundo.
   const sensorBeam = max ? createUltrasonicBeam(SOMPO_AGRI_RIG_LAYOUT['max-tractor'].sensor) : null;
   if (sensorBeam) machine.add(sensorBeam.group);
-  const obstacle = max && scenario.obstacle?.kind === 'hay-bale' && !physical ? createHayBale() : null;
+  const obstacle = max && scenario.obstacle?.kind === 'hay-bale' && !physical && !obstaclesRef ? createHayBale() : null;
   if (obstacle && scenario.obstacle) {
     const nearX = startX + SOMPO_AGRI_RIG_LAYOUT['max-tractor'].sensor[0] + scenario.obstacle.startGapM;
     obstacle.position.set(nearX + HAY_BALE_RADIUS, field.groundHeight(nearX + HAY_BALE_RADIUS, 0), 0);
     worldRoot.add(obstacle);
   }
+  // Fardos do gameplay: um por obstáculo, reaproveitados quando a lista muda.
+  const driveBales: THREE.Group[] = [];
+  let driveObstacles: readonly { x: number; z: number; radius: number }[] | null = null;
+  const syncDriveObstacles = () => {
+    const list = obstaclesRef?.current;
+    if (!list || list === driveObstacles) return;
+    driveObstacles = list;
+    while (driveBales.length < list.length) { const bale = createHayBale(); driveBales.push(bale); worldRoot.add(bale); }
+    driveBales.forEach((bale, index) => {
+      const item = list[index];
+      bale.visible = !!item;
+      if (!item) return;
+      bale.scale.setScalar(item.radius / HAY_BALE_RADIUS);
+      bale.position.set(item.x, field.groundHeight(item.x, item.z), item.z);
+    });
+  };
   beacon.position.set(beaconX, beaconTop, beaconZ);
   machine.add(beacon);
   // Giroflex de verdade varre o campo: um feixe estreito girando no topo.
@@ -404,14 +425,17 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
       ? { ...physicalBase, distance: Number.isFinite(snapshot.readings.distance) ? Number(snapshot.readings.distance) : NaN, collisionRisk: !!snapshot.risks.collision }
       : getSompoAgriFrame(scenarioId, elapsed, outcomeId);
     // Condução livre (cabine do stand): o controle substitui o roteiro na pose, rodas e sensor.
+    syncDriveObstacles();
     const drive = physical ? null : cameraRig?.drive?.(frameDelta, {
       from: { x: machine.position.x, z: machine.position.z, heading: machine.rotation.y },
-      obstacles: obstacle ? [{ x: obstacle.position.x, z: obstacle.position.z, radius: HAY_BALE_RADIUS }] : [],
+      obstacles: driveObstacles ? [...driveObstacles] : obstacle ? [{ x: obstacle.position.x, z: obstacle.position.z, radius: HAY_BALE_RADIUS }] : [],
+      ground: field.groundHeight,
     }) ?? null;
     const frame = drive ? {
       ...scripted, speedKph: drive.speedKph, wheelSpeedKph: drive.speedKph, direction: drive.direction, yawRate: drive.yawRateDeg,
-      yaw: THREE.MathUtils.radToDeg(drive.heading), roll: 0, pitch: 0, lateral: 0, vertical: 0, sink: 0, roughness: 0, shudder: 0,
+      yaw: THREE.MathUtils.radToDeg(drive.heading), roll: drive.rollDeg ?? 0, pitch: drive.pitchDeg ?? 0, lateral: 0, vertical: 0, sink: 0, roughness: 0, shudder: 0,
       distance: drive.distanceCm, collisionRisk: drive.collision, brakeLights: drive.braking ? 1 : 0,
+      ...(drive.beacon === undefined ? {} : { beacon: drive.beacon }),
     } : scripted;
     path.sample(reduceMotion.matches || physical ? 0 : elapsed, pathPoint);
     const x = drive ? drive.x : startX + pathPoint.x;

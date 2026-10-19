@@ -1,0 +1,6 @@
+/* Gameplay da Simulação: palco em tela cheia, painel e desafio da Operador por cima. */
+.gameplay-kiosk { position: absolute; inset: 0; overflow: hidden; background: #07100c; user-select: none; }
+.gameplay-kiosk-palco { position: absolute; inset: 0; cursor: grab; touch-action: none; }
+.gameplay-kiosk-palco:active { cursor: grabbing; }
+.gameplay-kiosk-palco canvas { display: block; width: 100%; height: 100%; }
+.gameplay-kiosk .gameplay-desafio { position: absolute; inset: 0; pointer-events: none; }

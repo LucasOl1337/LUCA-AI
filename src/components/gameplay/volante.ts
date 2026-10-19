@@ -16,6 +16,23 @@ export const VOLANTE = Object.freeze({
   corteGatilho: 0.04,
 });
 
+/**
+ * Razão aro/esterço: esterço ±1 (batente das rodas, 0,48 rad) = aro ±1 volta.
+ * Trator de direção hidrostática passa de 2 voltas batente a batente; aqui fica
+ * em 2 para o giro ler bem no totem sem o aro parecer solto.
+ */
+export const ARO_RAD_POR_ESTERCO = 2 * Math.PI;
+
+/**
+ * Ângulo do nó `rig-volante` (Visual) para o esterço atual, em rad no eixo da
+ * coluna. Positivo = horário visto do banco (esterço à direita). Use o
+ * `comandos.esterco` do retrato, que já passou pela taxa do volante.
+ */
+export function anguloAroRad(esterco: number) {
+  const valor = Math.max(-1, Math.min(1, Number.isFinite(esterco) ? esterco : 0)) * ARO_RAD_POR_ESTERCO;
+  return valor === 0 ? 0 : valor;
+}
+
 /** Índices do layout standard que o gameplay lê. PS (16), L1 (4) e R1 (5) são do /stand. */
 export const BOTAO_REINICIAR = 9; // Options
 const R2 = 7, L2 = 6;

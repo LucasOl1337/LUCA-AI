@@ -14,12 +14,21 @@ export interface SompoCameraRig {
   active(): boolean;
   update(camera: THREE.PerspectiveCamera, machine: THREE.Object3D): void;
   /** Condução livre: pose da máquina neste quadro, ou null para seguir o roteiro. */
-  drive?(dt: number, scene: { from: { x: number; z: number; heading: number }; obstacles: { x: number; z: number; radius: number }[] }): SompoDrivePose | null;
+  drive?(dt: number, scene: {
+    from: { x: number; z: number; heading: number };
+    obstacles: { x: number; z: number; radius: number }[];
+    /** Altura do chão do talhão em (x, z), para a física pegar atitude do terreno (Gameplay, item 3). */
+    ground?: (x: number, z: number) => number;
+  }): SompoDrivePose | null;
 }
 export interface SompoDrivePose {
   x: number; z: number; heading: number; travel: number;
   speedKph: number; direction: 1 | -1; yawRateDeg: number;
   distanceCm: number; collision: boolean; braking: boolean;
+  /** Atitude em graus; sem eles a Condução livre fica nivelada, como antes. */
+  rollDeg?: number; pitchDeg?: number;
+  /** Giroflex 0..1; sem ele, segue o roteiro do case. */
+  beacon?: number;
 }
 
 /** A bounded rendering budget, shared by both stages; selected at mount. */
