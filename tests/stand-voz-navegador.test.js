@@ -74,6 +74,7 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
     servidor = createServer(async (req, res) => {
       const url = new URL(req.url, 'http://x');
       const json = (status, corpo) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(corpo)); };
+      if (url.pathname === '/api/health') return json(200, { ok: true });
       if (url.pathname === '/api/auth/session') {
         return json(200, { user: { id: 'u1', name: 'Stand', email: 'stand@teste', role: 'user', status: 'active' } });
       }
