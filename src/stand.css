@@ -137,6 +137,8 @@
   pointer-events: none !important;
 }
 .stand-dica kbd { font: inherit; font-weight: 800; padding: 0.1vmin 0.9vmin; border-radius: 0.6vmin; background: rgba(255, 255, 255, 0.14); color: #fff; }
+/* Na Simulação o canto de cima à esquerda é dos selos do simulador (ESP32 virtual, SIMULADO); a dica vai pro centro do topo. */
+.stand[data-modo='simulacao'] .stand-dica { left: 50%; transform: translateX(-50%); white-space: nowrap; }
 
 .stand-aviso-saida {
   position: absolute; left: 50%; top: 40%; transform: translateX(-50%); margin: 0; max-width: 90%;
