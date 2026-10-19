@@ -114,12 +114,14 @@ export class SessaoTurnos implements SessaoDeVoz {
     });
     window.addEventListener('pagehide', this.aoSairDaPagina);
     this.etapa = 'pronta';
-    this.mudarEstado('ouvindo');
     if (!emprestimo || emprestimo.saudar) {
+      this.mudarEstado('ouvindo');
       void this.perguntar({ evento: 'saudacao' });
       return;
     }
-    // A pessoa já está falando: sem saudação. Barulho que despertou sem fala de verdade fecha logo.
+    // Despertar: a pessoa já está falando, então sem saudação. O estado fica
+    // ocioso (a Atração continua na tela) até chegar palavra de verdade; barulho
+    // que despertou sem fala fecha em SEM_FALA_MS sem a tela piscar.
     this.relogioSilencio = window.setTimeout(() => this.encerrar('silencio', 'sem_fala'), SEM_FALA_MS);
   }
 
@@ -234,6 +236,7 @@ export class SessaoTurnos implements SessaoDeVoz {
         return;
       }
       if (!vaiAoCerebro(evento.texto)) return;
+      this.mudarEstado('ouvindo');
       this.armarSilencio();
       emitirEventoStand({ tipo: 'legenda', texto: evento.texto });
       return;

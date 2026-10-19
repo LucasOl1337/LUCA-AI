@@ -52,6 +52,8 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
   let modoSessao = 'ok';
   let escutaNoServidor = false;
   let browserEscuta;
+  /** Quando definido, o Scribe falso devolve esta transcrição parcial depois de 40 pedaços de áudio. */
+  let parcialDoScribe = '';
 
   // PCM16 a 24 kHz: 0,3 s de um tom baixo, o bastante para a fila tocar.
   const pcmSaudacao = (() => {
@@ -105,12 +107,15 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
         // Pedaços que chegam nos primeiros 100 ms da conexão: a pré-rolagem da escuta vem de uma vez.
         const rajada = { inicio: 0, pedacos: 0 };
         scribe.rajadas.push(rajada);
+        let pedacos = 0;
         ws.on('message', (dados) => {
           try {
             if (JSON.parse(String(dados)).message_type !== 'input_audio_chunk') return;
             scribe.audios += 1;
             rajada.inicio ||= Date.now();
             if (Date.now() - rajada.inicio < 100) rajada.pedacos += 1;
+            pedacos += 1;
+            if (parcialDoScribe && pedacos === 40) ws.send(JSON.stringify({ message_type: 'partial_transcript', text: parcialDoScribe }));
           } catch { /* ignora */ }
         });
       });
@@ -205,6 +210,7 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
       const prazo = Date.now() + 8000;
       while (scribe.conexoes === antes.conexoes && Date.now() < prazo) await new Promise((ok) => setTimeout(ok, 100));
       await new Promise((ok) => setTimeout(ok, 500));
+      assert.equal(await main.getAttribute('data-tela'), 'atracao', 'Despertar sem palavra não tira a Atração da tela');
       const rajada = scribe.rajadas.at(-1);
       // O despertar pede 250 ms acima do limiar: ao menos esses 5 blocos vão juntos.
       assert.ok(rajada.pedacos >= 5, `pré-rolagem chegou de uma vez ao Scribe (${rajada.pedacos} pedaços em 100 ms)`);
@@ -217,6 +223,23 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
       assert.ok(scribe.conexoes - antes.conexoes >= 2);
     } finally {
       escutaNoServidor = false;
+      await pagina.close();
+    }
+  });
+
+  it('escuta: a Conversa só abre quando o Scribe devolve palavra de verdade', async () => {
+    modoSessao = 'ok';
+    escutaNoServidor = true;
+    parcialDoScribe = 'o que é o luca';
+    const pagina = await browserEscuta.newPage();
+    try {
+      await pagina.goto(`${base}/stand`);
+      await pagina.locator('main.stand[data-escuta="conversa"]').waitFor({ timeout: 20000 });
+      await pagina.locator('main.stand[data-tela="conversa"]').waitFor({ timeout: 8000 });
+      await pagina.getByText('o que é o luca').waitFor({ timeout: 3000 });
+    } finally {
+      escutaNoServidor = false;
+      parcialDoScribe = '';
       await pagina.close();
     }
   });
