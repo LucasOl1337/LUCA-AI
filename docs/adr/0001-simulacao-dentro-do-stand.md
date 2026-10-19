@@ -1,0 +1,30 @@
+# 0001 · Simulação dentro do stand
+
+19/10/2026 · aceita
+
+## Contexto
+
+O totem precisa mostrar três coisas no mesmo monitor: a coruja que conversa, os vídeos do projeto e o simulador do Trator MAX jogado com o DualSense. O simulador já existia dentro de `/sompo`, uma página de mouse com cabeçalho, abas, painel de telemetria e botões que gravam episódios ou abrem a bancada. Havia duas saídas:
+
+- navegar de `/stand` para `/sompo` e voltar;
+- montar o simulador direto dentro de `/stand`.
+
+Navegar para `/sompo` levaria para o totem a interface de mouse, os botões que escrevem e uma recarga de página a cada troca. Também tiraria do `/stand` o controle do repouso e do DualSense.
+
+## Decisão
+
+A Simulação é um Modo do stand, ao lado da Coruja e da Vitrine, e roda dentro de `/stand`. `src/components/stand/SimuladorKiosk.tsx` monta `SompoTruckSimulator` com `kiosk`. Nesse modo o simulador:
+
+- some com o cabeçalho e a barra de ferramentas;
+- abre na cabine;
+- liga a qualidade automática;
+- mostra o relógio do ESP32 virtual como Tempo do ensaio.
+
+O código do simulador é carregado sob demanda, e `preCarregarSimulador` adianta o carregamento quando a página está ociosa. O `/stand` cuida da troca de modo (L1/R1, PS, toque) e da saída depois de 90 s sem uso (`modoStand.ts`). Fora do kiosk, `/sompo` não muda.
+
+## Consequências
+
+- Toda mudança no `SompoTruckSimulator` aparece nos dois lugares. O que vale só para o totem fica atrás da prop `kiosk`.
+- O totem nunca chega a `/sompo` nem aos botões dele que escrevem. As Telas do app da Vitrine seguem a mesma regra: componentes só de leitura em `src/components/stand/`, sem iframe nem navegação.
+- O pacote do `/stand` passa a depender do Three.js. O carregamento sob demanda mantém Coruja e Vitrine leves, mas a primeira entrada na Simulação pode levar alguns segundos num aparelho fraco.
+- Para tirar a Simulação do `/stand`, basta trocar o modo por um link. O que dá trabalho desfazer são os ajustes presos à prop `kiosk` no simulador.
