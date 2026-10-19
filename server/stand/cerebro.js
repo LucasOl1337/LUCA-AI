@@ -132,7 +132,14 @@ export async function* lerSseDeChat(corpo) {
   yield {
     fim: true,
     motivo,
-    ferramentas: ferramentas.filter((f) => f?.function?.name).map((f, i) => ({ ...f, id: f.id || `chamada_${i + 1}` })),
+    // Ferramenta sem argumento (voltar_coruja, sensor_pausar) chega com
+    // `arguments: ""`; devolvido assim no histórico, o turno seguinte leva 400
+    // ("tool_use.input: Input should be an object"). Vazio vira "{}".
+    ferramentas: ferramentas.filter((f) => f?.function?.name).map((f, i) => ({
+      ...f,
+      id: f.id || `chamada_${i + 1}`,
+      function: { ...f.function, arguments: f.function.arguments.trim() || '{}' },
+    })),
   };
 }
 

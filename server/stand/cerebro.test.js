@@ -88,6 +88,16 @@ test('SSE do 9Router: texto em deltas e tool_calls fatiados por índice', async 
   assert.deepEqual(fim.ferramentas, [{ id: 'c1', type: 'function', function: { name: 'buscar_no_repo', arguments: '{"consulta":"score"}' } }]);
 });
 
+test('SSE: ferramenta sem argumento sai com "{}" (o histórico com "" levava 400 no turno seguinte)', async () => {
+  const sse = [
+    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"voltar_coruja","arguments":""}}]},"finish_reason":"tool_calls"}]}\n',
+    'data: [DONE]\n',
+  ].map((s) => new TextEncoder().encode(s));
+  const eventos = [];
+  for await (const e of lerSseDeChat(sse)) eventos.push(e);
+  assert.deepEqual(eventos.at(-1).ferramentas, [{ id: 'c1', type: 'function', function: { name: 'voltar_coruja', arguments: '{}' } }]);
+});
+
 test('turno: Sonnet responde, frases vão ao TTS em ordem com o contexto anterior', async () => {
   const { linhas, sintetizadas, chamadas, resultado, conversa, cobrado } = await rodar({
     roteiros: [[{ texto: 'O LUCA mede o trator. ' }, { texto: 'E avisa a seguradora.' }, { fim: true, ferramentas: [] }]],

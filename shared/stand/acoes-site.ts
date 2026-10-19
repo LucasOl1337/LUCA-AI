@@ -130,7 +130,7 @@ export const ACOES_SITE: readonly AcaoSiteDef[] = Object.freeze(([
   {
     nome: 'sonolencia_sensibilidade',
     pagina: 'sonolencia',
-    descricao: 'Muda a sensibilidade do detector de olhos fechados (só com a câmera desligada).',
+    descricao: 'Muda a sensibilidade do detector de olhos fechados (só com a câmera desligada). Alta conta o olho como fechado mesmo meio fechado; baixa só quando bem fechado. O tempo de 1 segundo não muda: não diga que o alerta fica mais rápido.',
     args: { nivel: { descricao: 'baixa, normal ou alta.', valores: ['baixa', 'normal', 'alta'] } },
   },
   {
