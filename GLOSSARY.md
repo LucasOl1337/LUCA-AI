@@ -79,8 +79,12 @@ Uma pergunta do público e a resposta falada do LUCA: o Scribe transcreve no nav
 _Evitar_: Mensagem, request.
 
 **Escuta**:
-Na Coruja, o microfone aberto esperando alguém falar. Só o volume é medido no navegador, e nada vai à ElevenLabs. Voz perto do microfone desperta uma conversa sem toque e sem saudação. Despertar sem fala de verdade em 6 s é um despertar falso. Desliga com `STAND_ESCUTA=0`. Detalhes em `docs/stand-voz.md`.
+Na Coruja, o microfone aberto esperando alguém falar. Só o volume é medido no aparelho, e nada sai dele até um Despertar. A equipe pode desligar a Escuta, e aí a conversa volta a abrir só por toque.
 _Evitar_: Wake word, hotword (não há palavra de ativação), modo sempre ouvindo.
+
+**Despertar**:
+A Escuta ouve voz perto do microfone e abre uma conversa sem toque e sem saudação, porque a pessoa já está falando. Um Despertar falso é o que abre a conversa e não ouve fala de verdade em 6 s: a conversa fecha, e falsos seguidos pausam a Escuta por um tempo.
+_Evitar_: Ativação, gatilho.
 
 **Interrupção**:
 O público fala por cima do LUCA: a voz abaixa na hora e, se a transcrição parcial tiver palavras de verdade que não sejam eco, a fala para e o turno anterior é abortado.
