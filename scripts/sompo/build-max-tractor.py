@@ -27,6 +27,13 @@ bpy.ops.object.delete(use_global=False)
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 NOMINAL_LENGTH = 4.5
+# Variante do Gameplay (cabine em primeira pessoa): sem painel, assento e volante
+# antigos, com o volante novo num no proprio (rig-volante). Sem a variavel, o
+# script segue o caminho do /sompo e grava public/models/sompo/max-tractor.glb.
+VARIANT = os.environ.get('MAX_TRACTOR_VARIANT', '').strip()
+if VARIANT not in ('', 'cabine'):
+    raise SystemExit(f'MAX_TRACTOR_VARIANT desconhecida: {VARIANT!r} (use cabine ou deixe vazia)')
+CABIN = VARIANT == 'cabine'
 
 
 def xyz(point):
@@ -75,7 +82,7 @@ TINTS = (blue, black, grey, exhaust, silver, pcb, lamp, amber, red, orange, whit
 parts = bpy.data.objects.new('max-trator-procedural', None)
 bpy.context.collection.objects.link(parts)
 rig_parts = {}
-for key in ('body', 'wheel-0--1', 'wheel-0-1', 'wheel-1--1', 'wheel-1-1', 'hitch'):
+for key in ('body', 'wheel-0--1', 'wheel-0-1', 'wheel-1--1', 'wheel-1-1', 'hitch') + (('volante',) if CABIN else ()):
     group = bpy.data.objects.new(f'rig-{key}', None)
     bpy.context.collection.objects.link(group)
     group.parent = parts
@@ -355,7 +362,8 @@ for z, mat in wires:
 
 # ---------------------------------------------------------------- cabine aberta
 box('piso-cabine', (-0.58, 1.38, 0), (1.56, 0.08, 1.28), black, 0.02)
-box('painel-instrumentos', (0.05, 2.06, 0), (0.24, 0.10, 1.16), black, 0.02)
+if not CABIN:
+    box('painel-instrumentos', (0.05, 2.06, 0), (0.24, 0.10, 1.16), black, 0.02)
 for side in (-1, 1):
     rod('coluna-dianteira', (0.16, 1.40, side * 0.62), (0.10, 2.97, side * 0.60), 0.065, black, 10)
     rod('coluna-traseira', (-1.30, 1.40, side * 0.62), (-1.26, 2.97, side * 0.60), 0.065, black, 10)
@@ -372,15 +380,37 @@ rod('travessa-teto-frente', (0.10, 2.93, -0.60), (0.10, 2.93, 0.60), 0.05, black
 rod('travessa-teto-tras', (-1.26, 2.93, -0.60), (-1.26, 2.93, 0.60), 0.05, black, 8)
 box('parede-traseira-cabine', (-1.29, 1.70, 0), (0.05, 0.60, 1.20), black, 0.012)
 
-box('assento', (-0.75, 1.62, 0), (0.42, 0.12, 0.44), black, 0.04, 3)
-box('pedestal-assento', (-0.75, 1.48, 0), (0.20, 0.18, 0.20), black, 0.01)
-box('encosto', (-0.96, 1.90, 0), (0.10, 0.48, 0.44), black, 0.04, 3)
-rod('coluna-volante', (0.02, 1.98, 0), (-0.17, 2.10, 0), 0.025, black, 10)
-torus('volante', (-0.18, 2.12, 0), 0.16, 0.022, black, 28, 8, rotation=(0, -0.53, 0))
-steer_u = (math.cos(0.53), math.sin(0.53), 0)  # no plano do volante inclinado
-for angle in (math.pi / 2, math.pi * 7 / 6, math.pi * 11 / 6):
-    rod('raio-volante', (-0.18, 2.12, 0), (-0.18 + 0.15 * math.cos(angle) * steer_u[0],
-        2.12 + 0.15 * math.cos(angle) * steer_u[1], 0.15 * math.sin(angle)), 0.012, black, 6)
+# Volante: centro e eixo valem para as duas variantes (inclinado 0,53 rad).
+STEER_CENTER = (-0.18, 2.12, 0.0)
+STEER_TILT = 0.53
+steer_u = (math.cos(STEER_TILT), math.sin(STEER_TILT), 0)  # no plano do volante, para a frente e para cima
+steer_n = (-math.sin(STEER_TILT), math.cos(STEER_TILT), 0)  # eixo de giro, apontando para o operador
+if not CABIN:
+    box('assento', (-0.75, 1.62, 0), (0.42, 0.12, 0.44), black, 0.04, 3)
+    box('pedestal-assento', (-0.75, 1.48, 0), (0.20, 0.18, 0.20), black, 0.01)
+    box('encosto', (-0.96, 1.90, 0), (0.10, 0.48, 0.44), black, 0.04, 3)
+    rod('coluna-volante', (0.02, 1.98, 0), (-0.17, 2.10, 0), 0.025, black, 10)
+    torus('volante', (-0.18, 2.12, 0), 0.16, 0.022, black, 28, 8, rotation=(0, -0.53, 0))
+    for angle in (math.pi / 2, math.pi * 7 / 6, math.pi * 11 / 6):
+        rod('raio-volante', (-0.18, 2.12, 0), (-0.18 + 0.15 * math.cos(angle) * steer_u[0],
+            2.12 + 0.15 * math.cos(angle) * steer_u[1], 0.15 * math.sin(angle)), 0.012, black, 6)
+else:
+    # Cabine do Gameplay: banco e painel entram pelo carregador (Tripo/overlay).
+    # A coluna fixa desce pelo eixo do volante ate entrar no capo; aro, raios,
+    # cubo e manopla giram juntos no rig-volante, em torno de steer_n.
+    c, n, u, w = Vector(STEER_CENTER), Vector(steer_n), Vector(steer_u), Vector((0, 0, 1))
+    rod('coluna-volante', tuple(c - n * 0.80), tuple(c - n * 0.02), 0.032, black, 14)
+    rod('capa-coluna', tuple(c - n * 0.80), tuple(c - n * 0.42), 0.055, black, 16)
+    torus('volante-aro', STEER_CENTER, 0.19, 0.024, black, 56, 12, rotation=(0, -STEER_TILT, 0), rig='volante')
+    rod('volante-cubo', tuple(c - n * 0.03), tuple(c + n * 0.035), 0.05, black, 20, rig='volante')
+    # Tres raios em T: laterais e o de baixo, que aponta para o operador.
+    for radial in (w, -w, -u):
+        tangent = n.cross(radial).normalized()
+        oriented_box('volante-raio', tuple(c + radial * 0.115 + n * 0.012), (tuple(radial), tuple(n), tuple(tangent)),
+                     (0.085, 0.009, 0.022), black, 0.004, rig='volante')
+    # Manopla no aro: deixa o giro legivel de dentro da cabine.
+    knob = c + (u * math.cos(math.radians(60)) + w * math.sin(math.radians(60))) * 0.19
+    rod('volante-manopla', tuple(knob), tuple(knob + n * 0.07), 0.016, black, 10, rig='volante')
 
 # Teto cinza com beiral, alça e recorte escuro (foto 01).
 box('teto', (-0.58, 2.99, 0), (1.84, 0.10, 1.56), grey, 0.035, 3)
@@ -534,7 +564,9 @@ for obj in meshes:
         colors.data[vertex.index].color = (
             base[0] * ao * (1 - dirt * .08), base[1] * ao * (1 - dirt * .14), base[2] * ao * (1 - dirt * .24), 1)
 
-out = os.path.abspath(os.environ.get('MAX_TRACTOR_OUT', os.path.join(ROOT, 'public/models/sompo/max-tractor.glb')))
+default_out = 'public/models/gameplay/max-tractor-cabine.glb' if CABIN else 'public/models/sompo/max-tractor.glb'
+out = os.path.abspath(os.environ.get('MAX_TRACTOR_OUT', os.path.join(ROOT, default_out)))
+os.makedirs(os.path.dirname(out), exist_ok=True)
 bpy.ops.export_scene.gltf(
     filepath=out,
     export_format='GLB',
@@ -553,7 +585,8 @@ triangles = sum(document['accessors'][p['indices']]['count'] // 3 for p in primi
 mins = [min(document['accessors'][p['attributes']['POSITION']]['min'][i] for p in primitives) for i in range(3)]
 maxs = [max(document['accessors'][p['attributes']['POSITION']]['max'][i] for p in primitives) for i in range(3)]
 size = [round(b - a, 4) for a, b in zip(mins, maxs)]
-reference_dir = os.path.join(ROOT, 'missoes', 'trator-referencias')
+# As fotos não vão para o git; num worktree, MAX_TRACTOR_REFERENCES aponta a pasta do checkout que as tem.
+reference_dir = os.environ.get('MAX_TRACTOR_REFERENCES') or os.path.join(ROOT, 'missoes', 'trator-referencias')
 references = []
 for name in sorted(os.listdir(reference_dir)) if os.path.isdir(reference_dir) else []:
     if name.endswith('.jpg'):
@@ -621,6 +654,27 @@ provenance = {
     'sha256': hashlib.sha256(payload).hexdigest(),
     'bytes': len(payload),
 }
+if CABIN:
+    center = sim(STEER_CENTER)
+    tip = sim(tuple(Vector(STEER_CENTER) + Vector(steer_n)))
+    axis = Vector([b - a for a, b in zip(center, tip)]).normalized()
+    provenance.update({
+        'variant': 'cabine',
+        'variantOf': 'max-tractor.glb',
+        'variantNote': 'Gameplay em primeira pessoa: sem painel-instrumentos, assento/encosto e volante antigos; '
+                       'volante novo no no rig-volante--*, que gira em torno de rig.steeringWheel.axis. '
+                       'Banco e console entram pelo carregador do Gameplay.',
+        'reproducibleCommand': 'MAX_TRACTOR_VARIANT=cabine blender -b --factory-startup --python scripts/sompo/build-max-tractor.py',
+        'license': 'GAMEPLAY-ASSET-LICENSE.txt',
+    })
+    provenance['rig']['steeringWheel'] = {
+        'node': 'rig-volante', 'center': center, 'axis': [round(v, 4) for v in axis],
+        'rimRadius': round(0.19 * scale, 4), 'axisPointsTo': 'operador (para cima e para tras)',
+    }
+    provenance['geometry']['parts'] = [
+        'open cab: four black pillars, floor and low side walls, grey roof with handle; no seat, no dash bar',
+        'steering column fixed to the body; rim, three T spokes, hub and spinner knob in rig-volante',
+    ] + [part for part in provenance['geometry']['parts'] if not part.startswith('open cab')]
 with open(out.replace('.glb', '.provenance.json'), 'w') as handle:
     json.dump(provenance, handle, indent=2, ensure_ascii=False)
     handle.write('\n')
@@ -631,3 +685,4 @@ print('MAX_TRACTOR_EXPORTED', out, len(payload), 'triangles', triangles, 'primit
       'materials', len(document.get('materials', [])), 'size', size,
       'loaderScale', round(min(4.5 / size[0], 3.2 / size[1], 2.7 / size[2]), 5))
 print('MAX_TRACTOR_RIG', json.dumps(provenance['rig']))
+print('MAX_TRACTOR_NODES', json.dumps(sorted(node.get('name', '') for node in document['nodes'])))

@@ -1,0 +1,17 @@
+Gameplay assets (simulação em primeira pessoa do Trator MAX)
+============================================================
+
+Files covered:
+- max-tractor-cabine.glb (original procedural geometry and PBR materials of the
+  MAX TRATOR toy, authored for LUCA-AI by scripts/sompo/build-max-tractor.py
+  with MAX_TRACTOR_VARIANT=cabine)
+
+It is the same toy model as ../sompo/max-tractor.glb (see
+SOMPO-AGRI-ASSET-LICENSE.txt there), with the old dashboard bar, seat and
+steering wheel removed and a new procedural steering wheel in its own node
+(rig-volante). It references the owner's own photos of the toy in
+missoes/trator-referencias, used only for proportion, colour and part
+placement. No photo, image texture or downloaded geometry is embedded.
+
+Each .provenance.json records the construction method, measured triangle
+count, output hash, steering-wheel pivot and known limits.
