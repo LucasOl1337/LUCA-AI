@@ -10,7 +10,7 @@ import type { EstadoStand } from '../../shared/stand/eventos.ts';
 import { abrirAudio, FilaDeVoz, HZ_STAND, type AudioStand } from './audioStand';
 import { assinarEventosPagina, emitirEventoStand } from './barramento';
 import { base64DePcm16, criarDetectorFala } from './protocolo';
-import type { FimSessao, SessaoServidor } from './sessaoVoz';
+import type { EtapaSessao, FimSessao, SessaoDeVoz, SessaoServidor } from './sessaoVoz';
 import { eventoScribe, interrompeFala, lerNdjson, mensagemAudioScribe, pareceEco, vaiAoCerebro, type LinhaTurno } from './turnos';
 
 export interface SessaoServidorTurnos extends Omit<SessaoServidor, 'conexao'> {
@@ -30,7 +30,8 @@ const ESPERA_CONFIRMAR_MS = 1200;
 // Depois da fala, o eco ainda pode chegar transcrito por este tempo.
 const CAUDA_ECO_MS = 2500;
 
-export class SessaoTurnos {
+export class SessaoTurnos implements SessaoDeVoz {
+  etapa: EtapaSessao = 'audio';
   private ws: WebSocket | null = null;
   private audio: AudioStand | null = null;
   private fila: FilaDeVoz | null = null;
@@ -71,6 +72,7 @@ export class SessaoTurnos {
     if (this.terminada) return audio.fechar();
     this.fila = new FilaDeVoz(audio, () => this.aoFilaVazia());
 
+    this.etapa = 'provedor';
     const ws = new WebSocket(dados.conexao.url);
     this.ws = ws;
     await new Promise<void>((ok, falha) => {
@@ -83,7 +85,7 @@ export class SessaoTurnos {
     };
     ws.onclose = () => this.terminar(this.encerrando ? 'encerrada' : 'erro', 'conexao_fechada');
 
-    audio.captura.port.onmessage = (ev: MessageEvent<{ pcm: Int16Array; rms: number }>) => this.aoMicrofone(ev.data.pcm, ev.data.rms);
+    audio.ouvir((pcm, nivel) => this.aoMicrofone(pcm, nivel));
     this.pararNivel = audio.medirNivel((nivel) => emitirEventoStand({ tipo: 'nivel_audio', valor: this.estado === 'falando' ? nivel : 0 }));
     this.relogioTeto = window.setTimeout(() => this.encerrar('teto'), this.limites.teto_s * 1000);
     this.desligarPagina = assinarEventosPagina((evento) => {
@@ -94,15 +96,16 @@ export class SessaoTurnos {
       }
     });
     window.addEventListener('pagehide', this.aoSairDaPagina);
+    this.etapa = 'pronta';
     this.mudarEstado('ouvindo');
     void this.perguntar({ evento: 'saudacao' });
   }
 
   private aoSairDaPagina = (): void => this.encerrar();
 
-  encerrar(motivo: FimSessao = 'encerrada'): void {
+  encerrar(motivo: FimSessao = 'encerrada', detalhe?: string): void {
     this.encerrando = true;
-    this.terminar(motivo);
+    this.terminar(motivo, detalhe);
   }
 
   private terminar(motivo: FimSessao, detalhe?: string): void {

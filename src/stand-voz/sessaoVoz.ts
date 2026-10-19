@@ -10,8 +10,9 @@
  * pedimos a resposta com a decisão dele numa nota de sistema.
  */
 import type { EstadoStand } from '../../shared/stand/eventos.ts';
+import { abrirAudio, type AudioStand } from './audioStand';
 import { assinarEventosPagina, emitirEventoStand } from './barramento';
-import { criarDetectorFala, floatDeBase64Pcm16, LegendaCorrente, nivelNormalizado, rms, base64DePcm16 } from './protocolo';
+import { criarDetectorFala, floatDeBase64Pcm16, LegendaCorrente, base64DePcm16 } from './protocolo';
 
 export interface SessaoServidor {
   provedor: string;
@@ -24,8 +25,12 @@ export type FimSessao = 'encerrada' | 'silencio' | 'teto' | 'erro' | 'desligado'
 
 /** O que a página precisa de qualquer sessão de voz. */
 export interface SessaoDeVoz {
-  encerrar(motivo?: FimSessao): void;
+  encerrar(motivo?: FimSessao, detalhe?: string): void;
+  /** Onde a abertura está: `audio` (microfone), `provedor` (WebSocket) ou `pronta`. */
+  readonly etapa: EtapaSessao;
 }
+
+export type EtapaSessao = 'audio' | 'provedor' | 'pronta';
 
 interface EventoProvedor { type: string; [chave: string]: any }
 
@@ -46,9 +51,8 @@ export async function postar<T>(caminho: string, corpo: unknown): Promise<{ stat
 
 export class SessaoVoz implements SessaoDeVoz {
   private ws: WebSocket | null = null;
+  private audio: AudioStand | null = null;
   private contexto: AudioContext | null = null;
-  private microfone: MediaStream | null = null;
-  private captura: AudioWorkletNode | null = null;
   private saida: GainNode | null = null;
   private fontes = new Set<AudioBufferSourceNode>();
   private proximoInicio = 0;
@@ -65,12 +69,14 @@ export class SessaoVoz implements SessaoDeVoz {
   private videosTocados = new Set<string>();
   /** Vídeo na tela: o microfone não vai ao provedor, senão o VAD responde à narração do vídeo. */
   private videoTocando = false;
-  private relogioNivel = 0;
+  private pararNivel: (() => void) | null = null;
   private relogioSilencio = 0;
   private relogioTeto = 0;
   private desligarPagina: (() => void) | null = null;
   private limites = { silencio_s: 20, teto_s: 240 };
   private encerrando = false;
+  private terminada = false;
+  etapa: EtapaSessao = 'audio';
 
   constructor(private aoTerminar: (motivo: FimSessao, detalhe?: string) => void = () => {}) {}
 
@@ -85,35 +91,27 @@ export class SessaoVoz implements SessaoDeVoz {
   private async conectar(dados: SessaoServidor): Promise<void> {
     this.limites = dados.limites;
 
-    this.contexto = new AudioContext({ sampleRate: HZ, latencyHint: 'interactive' });
-    this.saida = this.contexto.createGain();
-    const analisador = this.contexto.createAnalyser();
-    analisador.fftSize = 1024;
-    this.saida.connect(analisador);
-    analisador.connect(this.contexto.destination);
-    this.microfone = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
-    });
-    await this.contexto.audioWorklet.addModule('/stand-voz/captura-pcm.worklet.js');
-    this.captura = new AudioWorkletNode(this.contexto, 'captura-pcm');
-    this.contexto.createMediaStreamSource(this.microfone).connect(this.captura);
+    const audio = await abrirAudio();
+    // Encerrada (prazo de conexão ou pedido) enquanto o microfone abria.
+    if (this.encerrando || this.terminada) return audio.fechar();
+    this.audio = audio;
+    this.contexto = audio.contexto;
+    this.saida = audio.saida;
 
+    this.etapa = 'provedor';
     const ws = new WebSocket(dados.conexao.url, dados.conexao.protocolos);
     this.ws = ws;
     await new Promise<void>((ok, falha) => {
       ws.onopen = () => ok();
       ws.onerror = () => falha(new Error('websocket_falhou'));
     });
+    if (this.terminada) return;
     ws.onmessage = (ev) => this.aoEvento(JSON.parse(String(ev.data)) as EventoProvedor);
     ws.onclose = () => this.terminar(this.encerrando ? 'encerrada' : 'erro', 'conexao_fechada');
     this.enviar({ type: 'session.update', session: dados.sessao });
 
-    this.captura.port.onmessage = (ev: MessageEvent<{ pcm: Int16Array; rms: number }>) => this.aoMicrofone(ev.data.pcm, ev.data.rms);
-    const amostras = new Float32Array(analisador.fftSize);
-    this.relogioNivel = window.setInterval(() => {
-      analisador.getFloatTimeDomainData(amostras);
-      emitirEventoStand({ tipo: 'nivel_audio', valor: this.estado === 'falando' ? nivelNormalizado(rms(amostras)) : 0 });
-    }, 33);
+    audio.ouvir((pcm, nivel) => this.aoMicrofone(pcm, nivel));
+    this.pararNivel = audio.medirNivel((nivel) => emitirEventoStand({ tipo: 'nivel_audio', valor: this.estado === 'falando' ? nivel : 0 }));
     this.relogioTeto = window.setTimeout(() => this.encerrar('teto'), this.limites.teto_s * 1000);
     this.armarSilencio();
     this.desligarPagina = assinarEventosPagina((evento) => {
@@ -126,17 +124,20 @@ export class SessaoVoz implements SessaoDeVoz {
       }
       if (evento.tipo === 'reiniciar') this.encerrar();
     });
+    this.etapa = 'pronta';
     this.mudarEstado('ouvindo');
   }
 
-  encerrar(motivo: FimSessao = 'encerrada'): void {
+  encerrar(motivo: FimSessao = 'encerrada', detalhe?: string): void {
     this.encerrando = true;
-    this.terminar(motivo);
+    this.terminar(motivo, detalhe);
   }
 
   private terminar(motivo: FimSessao, detalhe?: string): void {
-    if (this.estado === 'ocioso' && !this.ws && motivo !== 'desligado' && motivo !== 'erro') return;
-    window.clearInterval(this.relogioNivel);
+    if (this.terminada) return;
+    this.terminada = true;
+    this.pararNivel?.();
+    this.pararNivel = null;
     window.clearTimeout(this.relogioSilencio);
     window.clearTimeout(this.relogioTeto);
     this.desligarPagina?.();
@@ -145,9 +146,8 @@ export class SessaoVoz implements SessaoDeVoz {
     const ws = this.ws;
     this.ws = null;
     if (ws) { ws.onclose = null; ws.close(); }
-    this.microfone?.getTracks().forEach((t) => t.stop());
-    this.microfone = null;
-    void this.contexto?.close();
+    this.audio?.fechar();
+    this.audio = null;
     this.contexto = null;
     this.mudarEstado('ocioso');
     emitirEventoStand({ tipo: 'legenda', texto: '' });

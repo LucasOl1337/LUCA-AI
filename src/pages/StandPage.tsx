@@ -7,7 +7,7 @@ import { criarCanalStub } from '@/components/stand/canalStub';
 import { reduzirTela, telaInicial, type EntradaTela, type EstadoTela } from '@/components/stand/telaStand';
 import { Atracao, Conversa, PlayerVideo } from '@/components/stand/Telas';
 import { tratarTecla, type AtalhosStand } from '@/components/stand/atalhos';
-import { avisoDeControle, avisoParaEquipe, chamadaDeInicio, chamadaSemVoz, vozDoStand, type StatusStand } from '@/components/stand/avisos';
+import { avisoDeControle, avisoParaEquipe, chamadaDeInicio, chamadaSemVoz, motivoSemVoz, vozDoStand, type StatusStand } from '@/components/stand/avisos';
 import { VIDEOS_VITRINE, videoDoStand } from '@/components/stand/videosStand';
 import { descreverPulos, disponiveis, montarItens } from '@/components/stand/vitrineStand';
 import { TelaLab, TelaTrator, useTelasDoApp } from '@/components/stand/TelasDoApp';
@@ -69,7 +69,8 @@ export default function StandPage() {
   const [agora, setAgora] = useState(() => Date.now());
   const voz = useSessaoVoz();
   const status = useStatusStand(!modoStub, voz.fim);
-  const vozStand = modoStub ? 'ligada' : vozDoStand(status, voz.fim);
+  const vozStand = modoStub ? 'ligada' : vozDoStand(status, voz.fim, agora);
+  const motivoVoz = modoStub ? '' : motivoSemVoz(status, voz.fim, agora);
   const nivel = useRef(0);
   const canal = useRef<CanalStand>(canalReal);
   const demonstrar = useRef<() => void>(() => undefined);
@@ -212,6 +213,7 @@ export default function StandPage() {
       data-tela={estado.tela}
       data-sessao={voz.ativa ? 'ativa' : voz.fim?.motivo ?? 'parada'}
       data-voz-stand={vozStand}
+      data-motivo={motivoVoz || undefined}
       onPointerDown={tocar}
     >
       {modo.modo === 'coruja' && video && (

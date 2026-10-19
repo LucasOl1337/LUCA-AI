@@ -6,7 +6,7 @@ const {
   reduzirModo, modoInicial, avisoDeSaida, barraVisivel, REPOUSO_MS, SIMULACAO_PARADA_MS, BARRA_MS,
 } = await loadFrontendModule('../../src/components/stand/modoStand.ts');
 const { lerNavegacao } = await loadFrontendModule('../../src/components/stand/navegacaoPad.ts');
-const { avisoDeControle, chamadaSemVoz, vozDoStand } = await loadFrontendModule('../../src/components/stand/avisos.ts');
+const { avisoDeControle, chamadaSemVoz, motivoSemVoz, PAUSA_APOS_FALHA_MS, vozDoStand } = await loadFrontendModule('../../src/components/stand/avisos.ts');
 
 const VIDEOS = 3;
 const passo = (estado, entrada, agora) => reduzirModo(estado, entrada, agora, VIDEOS);
@@ -123,6 +123,18 @@ test('voz do stand segue /api/stand/status e a última sessão', () => {
   assert.equal(vozDoStand({ ligado: false, motivo: 'teto_diario' }, null), 'desligada');
   assert.equal(vozDoStand({ ligado: true }, { motivo: 'desligado', detalhe: 'teto_diario' }), 'desligada');
   assert.equal(vozDoStand({ ligado: true }, { motivo: 'erro' }), 'ligada');
+});
+
+test('voz que cai na abertura (prazo, worklet, WebSocket) vira modo sem voz por 1 min e volta', () => {
+  const fim = { motivo: 'erro', detalhe: 'sem_conexao_provedor', em: 1000, naAbertura: true };
+  assert.equal(vozDoStand({ ligado: true }, fim, 1000 + PAUSA_APOS_FALHA_MS - 1), 'desligada');
+  assert.equal(motivoSemVoz({ ligado: true }, fim, 2000), 'erro:sem_conexao_provedor');
+  assert.equal(vozDoStand({ ligado: true }, fim, 1000 + PAUSA_APOS_FALHA_MS), 'ligada');
+  assert.equal(motivoSemVoz({ ligado: true }, fim, 1000 + PAUSA_APOS_FALHA_MS), '');
+  // Erro no meio da conversa (já pronta) não tira a voz: o próximo toque tenta de novo.
+  assert.equal(vozDoStand({ ligado: true }, { ...fim, naAbertura: false }, 2000), 'ligada');
+  assert.equal(motivoSemVoz({ ligado: false, motivo: 'teto_diario' }, null), 'teto_diario');
+  assert.equal(motivoSemVoz({ ligado: true }, { motivo: 'desligado', detalhe: 'sem_credencial' }), 'desligado:sem_credencial');
 });
 
 test('textos sem voz não prometem microfone e mudam com o controle conectado', () => {
