@@ -25,6 +25,24 @@ test('/stand?stub=1 liga o modo de teste e só aceita 1', () => {
   assert.equal(formatAppUrl({ page: 'sompo', stub: '1' }), '/sompo');
 });
 
+test('/stand?simulacao=gameplay sobrevive à URL canônica; outro valor ou outra página some', () => {
+  assert.equal(formatAppUrl(parseAppLocation('/stand?simulacao=gameplay')), '/stand?simulacao=gameplay');
+  assert.equal(formatAppUrl(parseAppLocation('/stand?simulacao=classica')), '/stand');
+  assert.equal(formatAppUrl({ page: 'sompo', simulacao: 'gameplay' }), '/sompo');
+});
+
+test('URL canônica: só simulacao=gameplay passa a sobreviver; o resto segue apagado como antes', () => {
+  const canonica = (href) => formatAppUrl(parseAppLocation(href));
+  assert.equal(canonica('/stand'), '/stand');
+  assert.equal(canonica('/stand?foo=1'), '/stand');
+  assert.equal(canonica('/stand?simulacao=x'), '/stand');
+  assert.equal(canonica('/stand?simulacao=gameplay&foo=1'), '/stand?simulacao=gameplay');
+  assert.equal(canonica('/stand?variante=coruja&stub=1&simulacao=gameplay'), '/stand?variante=coruja&stub=1&simulacao=gameplay');
+  assert.equal(canonica('/sompo'), '/sompo');
+  assert.equal(canonica('/sompo?simulacao=gameplay'), '/sompo');
+  assert.equal(canonica('/?simulacao=gameplay'), canonica('/'));
+});
+
 test('margem e variante não vazam para outras páginas', () => {
   assert.equal(formatAppUrl({ page: 'sompo', margem: '8', variante: 'robo' }), '/sompo');
 });

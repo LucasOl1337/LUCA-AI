@@ -103,6 +103,7 @@ const EMPTY_QUERY = Object.freeze({
   margem: '',
   variante: '',
   stub: '',
+  simulacao: '',
 });
 
 export function emptyAppLocation() {
@@ -172,6 +173,8 @@ function parseQuery(search) {
     variante: STAND_VARIANTES.includes(readParam(search, 'variante')) ? readParam(search, 'variante') : '',
     // /stand?stub=1: fala de teste local no lugar do cérebro de voz.
     stub: readParam(search, 'stub') === '1' ? '1' : '',
+    // /stand?simulacao=gameplay: Simulação em direção livre (src/components/gameplay); qualquer outro valor é a clássica.
+    simulacao: readParam(search, 'simulacao') === 'gameplay' ? 'gameplay' : '',
   };
 }
 
@@ -239,6 +242,7 @@ export function formatAppUrl(location) {
     setIfPresent(params, 'margem', parseMargem(String(loc.margem || '')));
     if (STAND_VARIANTES.includes(loc.variante)) params.set('variante', loc.variante);
     if (loc.stub === '1') params.set('stub', '1');
+    if (loc.simulacao === 'gameplay') params.set('simulacao', 'gameplay');
   }
 
   if (page === 'personas') {

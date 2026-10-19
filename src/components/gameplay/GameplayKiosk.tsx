@@ -79,6 +79,8 @@ export default function GameplayKiosk({ criarCabine }: { criarCabine?: CriarCabi
     raiz.dataset.velocidadeKph = estado.maquina.velocidadeKph.toFixed(1);
     raiz.dataset.alerta = String(estado.sensor.alerta);
     raiz.dataset.contato = String(estado.contato);
+    raiz.dataset.rumoGraus = estado.maquina.rumoGraus.toFixed(1);
+    raiz.dataset.esterco = estado.comandos.esterco.toFixed(2);
   }), [motor]);
 
   useEffect(() => {

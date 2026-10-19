@@ -71,7 +71,8 @@ export function passoTrator(estado: EstadoTrator, comando: ComandoVolante, dt: n
   const vRe = -TRATOR.reKph / 3.6;
   let v = estado.velocidade;
   if (v > 0.05 || (acelerador > 0 && v >= -0.05)) {
-    v += (acelerador * TRATOR.aceleracao - freio * TRATOR.frenagem - TRATOR.arrasto) * segundos;
+    // Arrasto só rolando sem pedal (TRATOR.arrasto): com ele junto do acelerador, meio R2 não tirava o trator do lugar.
+    v += (acelerador * TRATOR.aceleracao - freio * TRATOR.frenagem - (acelerador > 0 ? 0 : TRATOR.arrasto)) * segundos;
     // Acima do teto (o desafio baixou para 6 km/h): desacelera no ritmo do freio, sem teleporte.
     v = limitar(v, 0, Math.max(vMax, estado.velocidade - TRATOR.frenagem * segundos));
   } else if (freio > 0.2 && acelerador === 0) {
