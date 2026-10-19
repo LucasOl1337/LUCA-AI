@@ -1,0 +1,51 @@
+{
+  "asset": "cabine-console.glb",
+  "generatedBy": "Tripo Studio (studio.tripo3d.ai), texto -> 3D com textura PBR detalhada, pela conta do dono",
+  "createdAt": "2026-10-19",
+  "tripoProject": "241a1da3-eda5-44c4-a306-1d0aedabb09d",
+  "tripoUrl": "https://studio.tripo3d.ai/workspace/generate/241a1da3-eda5-44c4-a306-1d0aedabb09d",
+  "prompt": "Tractor cab dashboard console: a compact molded dark grey plastic instrument housing with an angled top face holding one round analog gauge on each side and a flat blank rectangular screen in the centre, a few small rocker switches and a key slot below, satin rugged agricultural plastic, realistic PBR game prop, no logos, no text, no steering wheel, no base",
+  "tripoExport": {
+    "faces": 15000,
+    "textureResolution": 2048,
+    "format": "glb",
+    "sourceSha256": "fe849df1bdcc38e7fdf1d79a6242e176d178069068392f44c420bae12fd27927",
+    "sourceBytes": 1367464,
+    "sourceTriangles": 13602
+  },
+  "packaging": {
+    "tool": "Blender 5.2.0 LTS, scripts/gameplay/package-tripo-props.py",
+    "decimate": {
+      "type": "COLLAPSE",
+      "ratio": 0.6617,
+      "delimit": [
+        "SEAM",
+        "UV"
+      ]
+    },
+    "atlas": 1024,
+    "jpegQuality": 82
+  },
+  "triangles": 8999,
+  "boundsM": {
+    "min": [
+      -0.4902503490447998,
+      -0.00020763208158314228,
+      -0.3916034400463104
+    ],
+    "max": [
+      0.4902620315551758,
+      0.90185546875,
+      0.39146867394447327
+    ]
+  },
+  "axes": {
+    "up": "+Y",
+    "front": "+Z (encaixe e escala no carregador da cabine)"
+  },
+  "externalManifest": "cabine-console.textures.json",
+  "license": "GAMEPLAY-ASSET-LICENSE.txt",
+  "reproducibleCommand": "blender -b --factory-startup --python scripts/gameplay/package-tripo-props.py -- .sompo-preview/gv/tripo public/models/gameplay",
+  "sha256": "2ec483c77239a630df87cd604fc8adc4d79237e74239727aa5f290a7c947ee76",
+  "bytes": 403692
+}

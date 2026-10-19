@@ -1,0 +1,9 @@
+/* Com a cabine 3D, o volante fica no centro de baixo da vista de frente: o painel
+   HTML sai de cima dele e vai para o canto de baixo à esquerda, menor. */
+.gameplay-com-cabine { position: absolute; inset: 0; }
+.gameplay-com-cabine .gameplay-painel-cabine {
+  left: 2.4vw; bottom: 3vh; transform: none;
+  min-width: min(400px, 34vw); padding: 1.2vh 1.8vw 1vh;
+}
+.gameplay-com-cabine .gameplay-painel-distancia strong { font-size: clamp(34px, 6vh, 72px); }
+.gameplay-com-cabine .gameplay-painel-lado strong { font-size: clamp(18px, 2.8vh, 32px); }

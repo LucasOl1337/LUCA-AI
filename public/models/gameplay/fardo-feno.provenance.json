@@ -1,0 +1,51 @@
+{
+  "asset": "fardo-feno.glb",
+  "generatedBy": "Tripo Studio (studio.tripo3d.ai), texto -> 3D com textura PBR detalhada, pela conta do dono",
+  "createdAt": "2026-10-19",
+  "tripoProject": "fcc7384e-d85b-439d-b464-a082e76e3b4f",
+  "tripoUrl": "https://studio.tripo3d.ai/workspace/generate/fcc7384e-d85b-439d-b464-a082e76e3b4f",
+  "prompt": "Round hay bale lying on its side, tightly rolled dry golden straw with visible spiral layers on the flat faces and loose strands on the surface, wrapped with a few thin net twine lines, realistic PBR game prop, no ground, no base",
+  "tripoExport": {
+    "faces": 12000,
+    "textureResolution": 1024,
+    "format": "glb",
+    "sourceSha256": "42c07a98aa42d14f89cbb631bd146d9b16f22576826d17689846ec17a5e96a33",
+    "sourceBytes": 1570992,
+    "sourceTriangles": 10676
+  },
+  "packaging": {
+    "tool": "Blender 5.2.0 LTS, scripts/gameplay/package-tripo-props.py",
+    "decimate": {
+      "type": "COLLAPSE",
+      "ratio": 0.8898,
+      "delimit": [
+        "SEAM",
+        "UV"
+      ]
+    },
+    "atlas": 512,
+    "jpegQuality": 82
+  },
+  "triangles": 9500,
+  "boundsM": {
+    "min": [
+      -0.44882211089134216,
+      0,
+      -0.4917908310890198
+    ],
+    "max": [
+      0.44882211089134216,
+      0.87841796875,
+      0.4917908310890198
+    ]
+  },
+  "axes": {
+    "up": "+Y",
+    "front": "+Z (encaixe e escala no carregador da cabine)"
+  },
+  "externalManifest": "fardo-feno.textures.json",
+  "license": "GAMEPLAY-ASSET-LICENSE.txt",
+  "reproducibleCommand": "blender -b --factory-startup --python scripts/gameplay/package-tripo-props.py -- .sompo-preview/gv/tripo public/models/gameplay",
+  "sha256": "ee2622912391956bba896521d39a1589f9d63908664d56ba4523a7c6e2ed99e1",
+  "bytes": 551904
+}

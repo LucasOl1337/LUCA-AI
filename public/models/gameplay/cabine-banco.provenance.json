@@ -1,0 +1,51 @@
+{
+  "asset": "cabine-banco.glb",
+  "generatedBy": "Tripo Studio (studio.tripo3d.ai), texto -> 3D com textura PBR detalhada, pela conta do dono",
+  "createdAt": "2026-10-19",
+  "tripoProject": "7a95bf12-780b-4b8f-976b-c11711f3f758",
+  "tripoUrl": "https://studio.tripo3d.ai/workspace/generate/7a95bf12-780b-4b8f-976b-c11711f3f758",
+  "prompt": "Tractor operator seat: padded black vinyl suspension seat with a tall backrest, short armrests on both sides and a black steel suspension base, slightly worn, realistic PBR game prop, no logos, no text, no base, no ground",
+  "tripoExport": {
+    "faces": 15000,
+    "textureResolution": 2048,
+    "format": "glb",
+    "sourceSha256": "ab502959ebe6f6b97959ffeb8cd1b047ad3842707fd7cc1b47d2895f910d149e",
+    "sourceBytes": 1728540,
+    "sourceTriangles": 13980
+  },
+  "packaging": {
+    "tool": "Blender 5.2.0 LTS, scripts/gameplay/package-tripo-props.py",
+    "decimate": {
+      "type": "COLLAPSE",
+      "ratio": 0.5722,
+      "delimit": [
+        "SEAM",
+        "UV"
+      ]
+    },
+    "atlas": 1024,
+    "jpegQuality": 82
+  },
+  "triangles": 7999,
+  "boundsM": {
+    "min": [
+      -0.36401453614234924,
+      -0.00021472283697221428,
+      -0.36285400390625
+    ],
+    "max": [
+      0.3644867241382599,
+      0.9798080921173096,
+      0.36285400390625
+    ]
+  },
+  "axes": {
+    "up": "+Y",
+    "front": "+Z (encaixe e escala no carregador da cabine)"
+  },
+  "externalManifest": "cabine-banco.textures.json",
+  "license": "GAMEPLAY-ASSET-LICENSE.txt",
+  "reproducibleCommand": "blender -b --factory-startup --python scripts/gameplay/package-tripo-props.py -- .sompo-preview/gv/tripo public/models/gameplay",
+  "sha256": "0471cfb30f8d407e01a9e09a4db2f2e49bd3f4d3c056b83a863afd5fbe59aafd",
+  "bytes": 428504
+}
