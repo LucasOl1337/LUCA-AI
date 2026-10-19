@@ -102,7 +102,6 @@ export default function StandPage() {
     fim: voz.fim,
     despertar,
   });
-  const escutando = escuta.estado === 'ouvindo' || escuta.estado === 'conversa';
   const motivoVoz = modoStub ? '' : motivoSemVoz(status, voz.fim, agora);
   const nivel = useRef(0);
   const canal = useRef<CanalStand>(canalReal);
@@ -285,7 +284,7 @@ export default function StandPage() {
               variante={variante}
               nivel={nivel}
               titulo={semVoz?.titulo}
-              chamada={semVoz ? semVoz.sub : chamadaDeInicio(modoStub ? false : voz.ativa, voz.fim, escutando)}
+              chamada={semVoz ? semVoz.sub : chamadaDeInicio(modoStub ? false : voz.ativa, voz.fim, escuta.estado)}
             />
           )}
           {estado.tela === 'conversa' && <Conversa variante={variante} nivel={nivel} voz={estado.voz} legenda={estado.legenda} />}

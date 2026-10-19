@@ -54,10 +54,15 @@ test('constantes: pré-rolagem de 600 ms e 6 s para provar fala', () => {
 });
 
 test('chamada da Atração com a escuta aberta convida a falar', () => {
-  assert.equal(chamadaDeInicio(false, null, true), 'É só falar que eu escuto.');
-  assert.equal(chamadaDeInicio(true, null, true), 'Pode falar, tô ouvindo.');
+  assert.equal(chamadaDeInicio(false, null, 'ouvindo'), 'É só falar que eu escuto.');
+  assert.equal(chamadaDeInicio(true, null, 'conversa'), 'Pode falar, tô ouvindo.');
   assert.equal(chamadaDeInicio(false, null), 'Toca na tela pra começar a conversa.');
   assert.equal(chamadaDeInicio(true, null), 'Ligando o microfone…');
+});
+
+test('abertura automática não pede toque; bloqueio de autoplay pede', () => {
+  assert.equal(chamadaDeInicio(false, null, 'abrindo'), 'Ligando o microfone…');
+  assert.equal(chamadaDeInicio(false, null, 'precisa_toque'), 'Toca na tela pra começar a conversa.');
 });
 
 test('linha fixa do rodapé: só com o microfone aberto e fora da Conversa', () => {

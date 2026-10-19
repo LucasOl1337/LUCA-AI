@@ -1,4 +1,5 @@
 import type { FimSessao } from '../../stand-voz/sessaoVoz';
+import type { EstadoEscuta } from '../../stand-voz/useEscuta';
 
 /** Textos da Atração conforme o estado da sessão de voz (M1). Funções puras. */
 
@@ -57,9 +58,11 @@ export function chamadaSemVoz(controleConectado: boolean): { titulo: string; sub
 
 /**
  * Linha de baixo da chamada, para o público. Nunca mostra erro técnico.
- * `escutando`: a escuta está com o microfone aberto (abre a conversa pela voz).
+ * O estado distingue a abertura automática do bloqueio que exige toque.
  */
-export function chamadaDeInicio(ativa: boolean, fim: Fim, escutando = false): string {
+export function chamadaDeInicio(ativa: boolean, fim: Fim, escuta: EstadoEscuta = 'desligada'): string {
+  if (escuta === 'abrindo') return 'Ligando o microfone…';
+  const escutando = escuta === 'ouvindo' || escuta === 'conversa';
   if (ativa) return escutando ? 'Pode falar, tô ouvindo.' : 'Ligando o microfone…';
   if (escutando) return 'É só falar que eu escuto.';
   if (fim?.motivo === 'desligado') return 'Ele explica como a IA acompanha o trator no campo.';
