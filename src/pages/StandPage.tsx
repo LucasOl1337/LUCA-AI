@@ -9,7 +9,7 @@ import { criarCanalStub } from '@/components/stand/canalStub';
 import { reduzirTela, telaInicial, type EntradaTela, type EstadoTela } from '@/components/stand/telaStand';
 import { Atracao, Conversa, PlayerVideo } from '@/components/stand/Telas';
 import { tratarTecla, type AtalhosStand } from '@/components/stand/atalhos';
-import { avisoDeControle, avisoParaEquipe, chamadaDeInicio, chamadaSemVoz, escutaNoStand, motivoSemVoz, vozDoStand, type StatusStand } from '@/components/stand/avisos';
+import { avisoDeControle, avisoParaEquipe, chamadaDeInicio, chamadaSemVoz, escutaNoStand, linhaDaEscuta, motivoSemVoz, vozDoStand, type StatusStand } from '@/components/stand/avisos';
 import { VIDEOS_VITRINE, videoDoStand } from '@/components/stand/videosStand';
 import { descreverPulos, disponiveis, montarItens } from '@/components/stand/vitrineStand';
 import { TelaLab, TelaTrator, useTelasDoApp } from '@/components/stand/TelasDoApp';
@@ -38,8 +38,11 @@ const ITENS_VITRINE = montarItens(VIDEOS_VITRINE);
 
 /** Status da voz no servidor: o texto da Atração segue `ligado` + `motivo` (inclusive `teto_diario`). */
 const STATUS_A_CADA_MS = 60_000;
-/** Onde a escuta fica aberta: Coruja e o modo do site (combinado com a Totem-Site). Vitrine e Simulação, não. */
-const MODOS_COM_ESCUTA: readonly string[] = ['coruja', 'site'];
+/**
+ * Onde a escuta fica aberta: Coruja, Vitrine (r5 Q1, vídeo mudo) e o modo do site (Totem-Site).
+ * Simulação não: é jogada no controle, com barulho de jogo e de gente em volta.
+ */
+const MODOS_COM_ESCUTA: readonly string[] = ['coruja', 'vitrine', 'site'];
 
 function useStatusStand(ativo: boolean, fimSessao: unknown) {
   const [status, setStatus] = useState<StatusStand | null>(null);
@@ -131,6 +134,8 @@ export default function StandPage() {
       else despachar(evento);
       // Voz em andamento é gente na frente do totem.
       if (evento.tipo === 'estado' && evento.valor !== 'ocioso') despacharModo({ tipo: 'atividade' });
+      // Despertar na Vitrine é discreto: o vídeo segue até a 1ª palavra, e aí a Coruja assume já na Conversa.
+      if (evento.tipo === 'estado' && evento.valor !== 'ocioso' && modoAtual.current === 'vitrine') despacharModo({ tipo: 'ir', modo: 'coruja' });
     });
     const relogio = window.setInterval(() => {
       despachar({ tipo: 'relogio' });
@@ -230,6 +235,8 @@ export default function StandPage() {
   const aviso = modoStub ? 'modo de teste (?stub=1): fala gravada, sem microfone' : avisoParaEquipe(voz.fim, status);
   const semVoz = vozStand !== 'ligada' ? chamadaSemVoz(controleConectado) : null;
   const segundosParaSair = avisoDeSaida(modo, agora);
+  // Vitrine e Site não têm Atração: lá a tela de voz conta como Atração enquanto ninguém conversa.
+  const linhaEscuta = linhaDaEscuta(escuta.estado, modo.modo === 'coruja' ? estado.tela : voz.estado === 'ocioso' ? 'atracao' : 'conversa');
   // `volta` remonta a Tela do app quando o mesmo item se repete (zera o relógio dela).
   const [volta, setVolta] = useState(0);
   const terminarVitrine = useCallback(() => { setVolta((v) => v + 1); despacharModo({ tipo: 'video_terminou' }); }, []);
@@ -287,6 +294,7 @@ export default function StandPage() {
         {segundosParaSair !== null && <AvisoSaida segundos={segundosParaSair} />}
         {avisoControle && <p className="stand-aviso-equipe stand-aviso-controle">{avisoControle}</p>}
         {falhaSite && <p className="stand-aviso-equipe stand-aviso-site" role="status">ação no site: {falhaSite}</p>}
+        {linhaEscuta && !barraVisivel(modo, agora) && <p className="stand-linha-escuta">{linhaEscuta}</p>}
         <BarraModos modo={modo.modo} modos={modosDisponiveis(modo)} visivel={barraVisivel(modo, agora)} aoEscolher={(m) => { despacharModo({ tipo: 'atividade', toque: true }); despacharModo({ tipo: 'ir', modo: m }); }} />
       </div>
     </main>

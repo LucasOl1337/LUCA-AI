@@ -79,11 +79,11 @@ Uma pergunta do público e a resposta falada do LUCA: o Scribe transcreve no nav
 _Evitar_: Mensagem, request.
 
 **Escuta**:
-Na Coruja, o microfone aberto esperando alguém falar. Só o volume é medido no aparelho, e nada sai dele até um Despertar. A equipe pode desligar a Escuta, e aí a conversa volta a abrir só por toque.
+Na Coruja, na Vitrine e no Site, o microfone aberto esperando alguém falar. Só o volume é medido no aparelho, e nada sai dele até um Despertar. Na Simulação fica fechada. A equipe pode desligar a Escuta, e aí a conversa volta a abrir só por toque.
 _Evitar_: Wake word, hotword (não há palavra de ativação), modo sempre ouvindo.
 
 **Despertar**:
-A Escuta ouve voz perto do microfone e abre uma conversa sem toque e sem saudação, porque a pessoa já está falando. Um Despertar falso é o que abre a conversa e não ouve fala de verdade em 6 s: a conversa fecha, e falsos seguidos pausam a Escuta por um tempo.
+A Escuta ouve voz perto do microfone e abre uma conversa sem toque e sem saudação, porque a pessoa já está falando. A tela só muda quando a primeira palavra é entendida: aí a Coruja aparece na Conversa, venha de onde vier. Um Despertar falso é o que abre a conversa e não ouve fala de verdade em 6 s: a conversa fecha sem a tela mudar, e falsos seguidos pausam a Escuta por um tempo.
 _Evitar_: Ativação, gatilho.
 
 **Interrupção**:

@@ -140,6 +140,15 @@
 /* Na Simulação o canto de cima à esquerda é dos selos do simulador (ESP32 virtual, SIMULADO); a dica vai pro centro do topo. */
 .stand[data-modo='simulacao'] .stand-dica { left: 50%; transform: translateX(-50%); white-space: nowrap; }
 
+/* Linha fixa da Escuta: no rodapé; na Vitrine sobe para baixo do título (a legenda queimada ocupa o rodapé). */
+.stand-linha-escuta {
+  position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); margin: 0; white-space: nowrap;
+  padding: 0.5vmin 1.8vmin; border-radius: 999px; background: rgba(9, 12, 17, 0.6);
+  font: 500 clamp(12px, 1.8vmin, 28px) 'Stand Outfit', system-ui, sans-serif; color: rgba(255, 255, 255, 0.7);
+  pointer-events: none !important;
+}
+.stand[data-modo='vitrine'] .stand-linha-escuta { bottom: auto; top: calc(var(--stand-margem) + clamp(34px, 5.4vmin, 84px)); }
+
 .stand-aviso-saida {
   position: absolute; left: 50%; top: 40%; transform: translateX(-50%); margin: 0; max-width: 90%;
   padding: 2vmin 3.6vmin; border-radius: 2vmin; background: rgba(9, 12, 17, 0.88); border: 0.3vmin solid rgba(255, 159, 10, 0.7);

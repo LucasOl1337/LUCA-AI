@@ -66,6 +66,18 @@ export function chamadaDeInicio(ativa: boolean, fim: Fim, escutando = false): st
   return 'Toca na tela pra começar a conversa.';
 }
 
+/** Estados da Escuta com o microfone aberto (o público precisa saber). */
+const ESCUTA_ABERTA = ['ouvindo', 'pausada', 'conversa'];
+
+/**
+ * Linha fixa do rodapé (r4 Q4): com a Escuta aberta, avisa que o LUCA só ouve quem fala com ele.
+ * Some quando há conversa na tela, para não disputar com a legenda.
+ */
+export function linhaDaEscuta(estadoEscuta: string, tela: string): string {
+  if (!ESCUTA_ABERTA.includes(estadoEscuta) || tela !== 'atracao') return '';
+  return 'O LUCA só ouve quando você fala com ele.';
+}
+
 /** Aviso pequeno no rodapé, para a equipe do stand. Vazio quando não há o que avisar. */
 export function avisoParaEquipe(fim: Fim, status: StatusStand | null = null): string {
   if (status && !status.ligado && fim?.motivo !== 'desligado') return `voz desligada no servidor (${status.motivo || 'stand_desligado'})`;

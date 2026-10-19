@@ -3,7 +3,7 @@ import test from 'node:test';
 import { loadFrontendModule } from './support/load-frontend-module.js';
 
 const { criarDespertador, pausaAposFalsos, PRE_ROLAGEM_BLOCOS, SEM_FALA_MS } = await loadFrontendModule('../../src/stand-voz/escuta.ts');
-const { chamadaDeInicio } = await loadFrontendModule('../../src/components/stand/avisos.ts');
+const { chamadaDeInicio, linhaDaEscuta } = await loadFrontendModule('../../src/components/stand/avisos.ts');
 
 /** Alimenta `blocos` blocos de 50 ms no mesmo nível; devolve quantas vezes despertou. */
 function alimentar(despertador, nivel, blocos) {
@@ -58,4 +58,12 @@ test('chamada da Atração com a escuta aberta convida a falar', () => {
   assert.equal(chamadaDeInicio(true, null, true), 'Pode falar, tô ouvindo.');
   assert.equal(chamadaDeInicio(false, null), 'Toca na tela pra começar a conversa.');
   assert.equal(chamadaDeInicio(true, null), 'Ligando o microfone…');
+});
+
+test('linha fixa do rodapé: só com o microfone aberto e fora da Conversa', () => {
+  const linha = 'O LUCA só ouve quando você fala com ele.';
+  for (const estado of ['ouvindo', 'pausada', 'conversa']) assert.equal(linhaDaEscuta(estado, 'atracao'), linha, estado);
+  for (const estado of ['desligada', 'abrindo', 'precisa_toque', 'erro']) assert.equal(linhaDaEscuta(estado, 'atracao'), '', estado);
+  assert.equal(linhaDaEscuta('conversa', 'conversa'), '');
+  assert.equal(linhaDaEscuta('ouvindo', 'video'), '');
 });

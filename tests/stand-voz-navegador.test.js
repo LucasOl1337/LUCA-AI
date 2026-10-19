@@ -243,4 +243,39 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
       await pagina.close();
     }
   });
+
+  it('escuta na Vitrine: despertar falso não corta o vídeo; palavra leva à Coruja na Conversa', async () => {
+    modoSessao = 'ok';
+    escutaNoServidor = true;
+    const antes = scribe.conexoes;
+    const pagina = await browserEscuta.newPage();
+    try {
+      await pagina.goto(`${base}/stand`);
+      const main = pagina.locator('main.stand');
+      await pagina.locator('main.stand[data-escuta="ouvindo"]').waitFor({ timeout: 15000 });
+      // Botão da barra direto: não passa pelo toque da Atração (que abriria a conversa).
+      await pagina.evaluate(() => {
+        const botao = [...document.querySelectorAll('.stand-barra button')].find((b) => b.textContent.includes('Vitrine'));
+        botao.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      });
+      await pagina.locator('main.stand[data-modo="vitrine"][data-escuta="ouvindo"]').waitFor({ timeout: 5000 });
+      // Barra apagada (5 s): a linha fixa aparece.
+      await pagina.locator('.stand-linha-escuta', { hasText: 'O LUCA só ouve quando você fala com ele.' }).waitFor({ timeout: 8000 });
+      // 1º despertar sem palavra: a sessão abre e fecha sem tirar a Vitrine.
+      await pagina.locator('main.stand[data-escuta="conversa"]').waitFor({ timeout: 15000 });
+      assert.equal(await main.getAttribute('data-modo'), 'vitrine', 'despertar sem palavra não corta a Vitrine');
+      await pagina.waitForFunction(() => document.querySelector('main.stand')?.dataset.sessao === 'silencio', null, { timeout: 12000 });
+      assert.equal(await main.getAttribute('data-modo'), 'vitrine');
+      assert.ok(scribe.conexoes > antes);
+      // 2º despertar com palavra: a Coruja assume já na Conversa, com a pergunta na legenda.
+      parcialDoScribe = 'como o trator avisa';
+      await pagina.locator('main.stand[data-modo="coruja"][data-tela="conversa"]').waitFor({ timeout: 20000 });
+      await pagina.getByText('como o trator avisa').waitFor({ timeout: 3000 });
+      assert.equal(await pagina.locator('.stand-linha-escuta').count(), 0, 'a linha some na Conversa');
+    } finally {
+      escutaNoServidor = false;
+      parcialDoScribe = '';
+      await pagina.close();
+    }
+  });
 });
