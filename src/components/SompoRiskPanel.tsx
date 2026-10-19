@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { apiGet, apiPost } from '@/lib/api';
 import type { SompoTelemetrySnapshot } from '@/lib/types';
 import { assessSompoRisk, type SompoRiskContext, type SompoRiskAssessment } from '../../shared/sompo-risk.js';
+import { EMBUTIDO_NO_STAND } from '@/components/stand/executor/embutido';
 
 interface Evidence { id: string; createdAt: string; assessment: SompoRiskAssessment; snapshot: SompoTelemetrySnapshot; coverage: string; }
-interface Props { telemetry: SompoTelemetrySnapshot | null; context: SompoRiskContext; onContext: (context: SompoRiskContext) => void; }
+/** `embutido`: /sompo dentro do iframe do /stand (modo Site). O visitante toca a tela, então não há registro (ADR 0001). */
+interface Props { telemetry: SompoTelemetrySnapshot | null; context: SompoRiskContext; onContext: (context: SompoRiskContext) => void; embutido?: boolean; }
 
-export default function SompoRiskPanel({ telemetry, context, onContext }: Props) {
+export default function SompoRiskPanel({ telemetry, context, onContext, embutido = EMBUTIDO_NO_STAND }: Props) {
   const risk = assessSompoRisk(telemetry, context);
   const [saved, setSaved] = useState<Evidence[]>([]);
   const [busy, setBusy] = useState(false);
@@ -25,7 +27,7 @@ export default function SompoRiskPanel({ telemetry, context, onContext }: Props)
   }, [tractor, source, reload]);
 
   async function save() {
-    if (!telemetry || busy) return;
+    if (embutido || !telemetry || busy) return;
     setBusy(true); setMessage('');
     const r = telemetry.readings;
     try {
@@ -62,7 +64,9 @@ export default function SompoRiskPanel({ telemetry, context, onContext }: Props)
     </div>
     {risk.factors.length > 0 && <details className="sompo-risk-details" open><summary>Por que este score? Operacional 60% + ambiental 40%</summary><div className="sompo-risk-table-wrap"><table><thead><tr><th>Fator / entrada</th><th>Pontos</th><th>Peso</th><th>Contribuição</th></tr></thead><tbody>{risk.factors.map(f => <tr key={f.label}><td>{f.label}<small>{f.value}</small></td><td>{f.points}</td><td>{f.weight * 100}%</td><td>+{f.contribution}</td></tr>)}</tbody></table></div></details>}
     <p className="sompo-risk-limit">{risk.version} · {risk.limitation} Faixas acadêmicas: baixo &lt;45, médio 45–74,99, alto ≥75.</p>
-    <div className="sompo-risk-save"><button type="button" onClick={() => void save()} disabled={busy || risk.score === null}>{busy ? 'Registrando…' : 'Registrar avaliação'}</button><span role="status">{message || 'Salva um retrato auditável, sem alterar o equipamento.'}</span></div>
+    {embutido
+      ? <div className="sompo-risk-save" data-sompo-risk-somente-leitura><span role="status">Demonstração no totem: a avaliação não é registrada.</span></div>
+      : <div className="sompo-risk-save"><button type="button" onClick={() => void save()} disabled={busy || risk.score === null}>{busy ? 'Registrando…' : 'Registrar avaliação'}</button><span role="status">{message || 'Salva um retrato auditável, sem alterar o equipamento.'}</span></div>}
     <details className="sompo-risk-details"><summary>Avaliações registradas · {saved.length}</summary>
       {historyError ? <p role="alert">{historyError} <button type="button" onClick={() => setReload(n => n + 1)}>Tentar recuperar</button></p> : !saved.length ? <p>Nenhuma avaliação registrada para esta origem e equipamento na sua conta.</p> : <ul className="sompo-assessment-list">{saved.map(item => <li key={item.id}><div><strong>{item.assessment.score}/100 · {item.assessment.level}</strong><small>{new Date(item.createdAt).toLocaleString('pt-BR')} · {item.snapshot.source.kind === 'simulation' ? 'Simulação' : 'Firebase'} · {item.assessment.version}</small></div><button type="button" onClick={() => download(item)}>Baixar evidência</button></li>)}</ul>}
     </details>
