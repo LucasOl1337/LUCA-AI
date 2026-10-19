@@ -14,6 +14,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { restoreSompoTextures, useSompoExternalTextures } from '../../sompo/restoreSompoTextures';
 import type { CabineGameplay, CriarCabineGameplay, QuadroCabine } from '../cabineGameplay';
 import type { EstadoGameplay } from '../estadoGameplay';
+import { criarCampoVisual } from './campoVisual';
 
 export const CABINE_MAX_URL = '/models/gameplay/max-tractor-cabine.glb';
 export const PROPS_CABINE_URL = Object.freeze({
@@ -141,6 +142,7 @@ export function criarCabineMax(opcoes: OpcoesCabineMax = {}): CabineGameplay {
   let pivo: THREE.Group | null = null;
   let volantes: VolanteMovido[] = [];
   let tela: TelaCabine | null = null;
+  let campo: ReturnType<typeof criarCampoVisual> | null = null;
   const extras: THREE.Object3D[] = [];
   const fardos = new Map<THREE.Object3D, FardoVestido>();
   const eixo = new THREE.Vector3();
@@ -215,6 +217,7 @@ export function criarCabineMax(opcoes: OpcoesCabineMax = {}): CabineGameplay {
     sombras(banco, false);
     corpo.add(banco);
     extras.push(banco);
+    if (maquina.parent) campo = criarCampoVisual(maquina.parent, assets.fardo);
   }
 
   /** Veste cada fardo novo do palco com o do Tripo, na mesma escala do procedural. */
@@ -259,6 +262,8 @@ export function criarCabineMax(opcoes: OpcoesCabineMax = {}): CabineGameplay {
     },
     desmontar() {
       abort.abort();
+      campo?.descartar();
+      campo = null;
       for (const { mesh, pai, posicao, sombra } of volantes) {
         pai.add(mesh);
         mesh.position.copy(posicao);
