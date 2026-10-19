@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { TOUR_STAND } from '../../shared/stand/acoes-site.ts';
 import { CortadorDeFrases, executarTurno, FALAS, ferramentasDeChat, INSTRUCAO_VOZ, LIMITES_TURNO, lerSseDeChat, limparTela, novaConversa, TELA_MAX, textoFalavel } from './cerebro.js';
 
 const MODELOS = ['cc/claude-sonnet-5', 'cc/claude-haiku-4-5-20251001', 'cx/gpt-6-astra-high'];
@@ -245,4 +246,54 @@ test('limparTela: só string, sem controle, até 300', () => {
   assert.equal(limparTela({ a: 1 }), '');
   assert.equal(limparTela(' a\r\n\tb\u2028c '), 'a b c');
   assert.equal(limparTela('y'.repeat(500)).length, TELA_MAX);
+});
+
+const chamadaTour = (extra = []) => [{ fim: true, ferramentas: [{ id: 't1', type: 'function', function: { name: 'tour_iniciar', arguments: '{}' } }, ...extra] }];
+
+test('tour_iniciar: roteiro com falas prontas e ações depois da fala, sem segunda rodada de modelo', async () => {
+  const conversa = novaConversa({ conta: 'demo' });
+  const { linhas, chamadas, resultado, sintetizadas } = await rodar({ conversa, entrada: { texto: 'me mostra tudo' }, roteiros: [chamadaTour()] });
+  assert.equal(chamadas.length, 1, 'o modelo só escolhe o tour');
+  assert.equal(resultado.motivo, 'tour');
+  assert.equal(sintetizadas.length, 0, 'falas do tour são prontas (cache), não TTS por turno');
+  const roteiro = linhas.filter((l) => l.t === 'frase' || l.t === 'evento')
+    .map((l) => (l.t === 'frase' ? l.texto : `${l.evento.acao}:${JSON.stringify(l.evento.args)}`));
+  assert.deepEqual(roteiro, TOUR_STAND.map((p) => ('fala' in p ? p.texto : `${p.acao}:${JSON.stringify(p.args)}`)));
+  assert.ok(linhas.filter((l) => l.t === 'evento').every((l) => l.evento.tipo === 'acao_site' && l.evento.apos_fala === true));
+  assert.equal(conversa.respostas, 1, 'o tour conta uma resposta só');
+  assert.deepEqual(conversa.historico.map((m) => m.role), ['user', 'assistant', 'tool', 'assistant']);
+  assert.match(conversa.historico[2].content, /concluído/);
+  assert.equal(conversa.historico[3].content, TOUR_STAND.filter((p) => 'fala' in p).map((p) => p.texto).join(' '));
+});
+
+test('tour_iniciar: barge-in para o roteiro no passo em que estava e o histórico guarda só o que foi ouvido', async () => {
+  const controle = new AbortController();
+  const conversa = novaConversa({ conta: 'demo' });
+  let falas = 0;
+  const falaPronta = async function* (chave) {
+    if (chave.startsWith('tour_') && ++falas === 2) controle.abort();
+    yield Buffer.from(chave);
+  };
+  const { linhas, resultado } = await rodar({ conversa, sinal: controle.signal, entrada: { texto: 'o que tem aqui?' }, roteiros: [chamadaTour()], deps: { falaPronta } });
+  assert.equal(resultado.motivo, 'interrompido');
+  assert.deepEqual(linhas.filter((l) => l.t === 'evento').map((l) => l.evento.acao), ['abrir_pagina'], 'nenhuma ação depois da interrupção');
+  assert.ok(!linhas.some((l) => l.t === 'frase' && l.texto === TOUR_STAND.at(-1).texto));
+  assert.match(conversa.historico.find((m) => m.role === 'tool').content, /interrompido/);
+  assert.equal(conversa.historico.at(-1).role, 'assistant');
+  assert.equal(conversa.historico.at(-1).content, TOUR_STAND[0].texto);
+});
+
+test('tour_iniciar: outra ferramenta na mesma rodada não roda; toda tool_call tem resposta', async () => {
+  const conversa = novaConversa({ conta: 'demo' });
+  const extra = { id: 'x2', type: 'function', function: { name: 'abrir_pagina', arguments: '{"pagina":"sompo"}' } };
+  const { linhas } = await rodar({ conversa, entrada: { texto: 'me mostra' }, roteiros: [chamadaTour([extra])] });
+  assert.ok(!linhas.some((l) => l.t === 'evento' && l.evento.args?.pagina === 'sompo'));
+  const respostas = conversa.historico.filter((m) => m.role === 'tool').map((m) => m.tool_call_id);
+  assert.deepEqual(respostas, ['t1', 'x2']);
+  const iTools = conversa.historico.findIndex((m) => m.role === 'tool');
+  assert.deepEqual(conversa.historico.slice(iTools).map((m) => m.role), ['tool', 'tool', 'assistant'], 'assistant só depois de todos os tool');
+});
+
+test('FALAS traz as falas do tour (cacheadas como as outras falas prontas)', () => {
+  for (const passo of TOUR_STAND.filter((p) => 'fala' in p)) assert.equal(FALAS[passo.fala], passo.texto);
 });

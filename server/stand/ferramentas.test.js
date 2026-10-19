@@ -95,3 +95,10 @@ test('buscar_no_repo responde a pergunta do aceite; ferramenta desconhecida é r
   assert.equal((await executarFerramentaStand('buscar_no_repo', { consulta: '  ' })).erro, 'consulta_vazia');
   assert.equal((await executarFerramentaStand('apagar_banco', {})).erro, 'ferramenta_desconhecida');
 });
+
+test('tour_iniciar não vira acao_site no caminho Realtime (o tour é do cérebro em turnos)', async () => {
+  const r = await executarFerramentaStand('tour_iniciar', {});
+  assert.equal(r.ok, false);
+  assert.equal(r.erro, 'tour_indisponivel');
+  assert.equal(r.evento, undefined);
+});

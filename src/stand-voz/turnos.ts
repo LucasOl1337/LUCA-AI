@@ -8,7 +8,7 @@
 export type LinhaTurno =
   | { t: 'frase'; texto: string }
   | { t: 'audio'; pcm: string }
-  | { t: 'evento'; evento: { tipo: string; id?: string; acao?: string; args?: Record<string, unknown> } }
+  | { t: 'evento'; evento: { tipo: string; id?: string; acao?: string; args?: Record<string, unknown>; apos_fala?: boolean } }
   | { t: 'aviso'; aviso: string; detalhe?: string }
   | { t: 'fim'; motivo: string; respostas?: number; metricas?: Record<string, unknown> };
 

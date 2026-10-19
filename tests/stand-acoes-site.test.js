@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-import { ACOES_DO_STAND, ACOES_SITE, IDS_PAGINAS, PAGINAS_SITE, ferramentasAcaoSite, paginaDaAcao, validarAcaoSite } from '../shared/stand/acoes-site.ts';
+import { ACOES_DO_STAND, ACOES_SITE, IDS_PAGINAS, PAGINAS_SITE, TOUR_STAND, ferramentasAcaoSite, paginaDaAcao, validarAcaoSite } from '../shared/stand/acoes-site.ts';
 
 test('lista fechada: abrir_pagina, voltar_coruja e os controles <pagina>_<verbo> (Totem-Site Q7)', () => {
   assert.deepEqual(ACOES_SITE.map((item) => item.nome), [
@@ -10,8 +10,9 @@ test('lista fechada: abrir_pagina, voltar_coruja e os controles <pagina>_<verbo>
     'sonolencia_ligar_camera', 'sonolencia_desligar_camera', 'sonolencia_testar_som', 'sonolencia_sensibilidade',
     'laboratorio_ver_demonstracao', 'laboratorio_pausar', 'laboratorio_continuar', 'laboratorio_camera',
     'sompo_abrir_aba', 'sompo_voltar_inicio', 'sompo_abrir_caso', 'sompo_rodar_cenario',
+    'tour_iniciar',
   ]);
-  assert.deepEqual(ACOES_DO_STAND, ['abrir_pagina', 'voltar_coruja']);
+  assert.deepEqual(ACOES_DO_STAND, ['abrir_pagina', 'voltar_coruja', 'tour_iniciar']);
   for (const def of ACOES_SITE) {
     if (ACOES_DO_STAND.includes(def.nome)) assert.equal(def.pagina, null, def.nome);
     else assert.ok(def.nome.startsWith(`${def.pagina}_`), `${def.nome} pertence a ${def.pagina}`);
@@ -93,4 +94,20 @@ test('descrições não prometem número que a tela não garante (regente, Q7)',
   for (const def of ACOES_SITE) {
     assert.doesNotMatch(def.descricao, /\d+\s*(km\/h|°|graus|g\b|cm)/, def.nome);
   }
+});
+
+test('tour_iniciar: roteiro fixo coruja → sonolência → sensor na curva → coruja, só ações válidas que mostram, < 60 s de fala', () => {
+  assert.deepEqual(validarAcaoSite('tour_iniciar', {}), { ok: true, acao: 'tour_iniciar', args: {} });
+  assert.equal(validarAcaoSite('tour_iniciar', { pagina: 'sensor' }).ok, false);
+  const acoes = TOUR_STAND.filter((p) => 'acao' in p);
+  assert.deepEqual(acoes.map((p) => p.acao), ['abrir_pagina', 'sensor_escolher_veiculo', 'sensor_rodar_ensaio', 'voltar_coruja']);
+  assert.deepEqual(acoes[0].args, { pagina: 'sonolencia' });
+  assert.deepEqual(acoes[2].args, { ensaio: 'curva' });
+  for (const passo of acoes) assert.equal(validarAcaoSite(passo.acao, passo.args).ok, true, passo.acao);
+  assert.ok(!acoes.some((p) => p.acao === 'sonolencia_ligar_camera'), 'o tour não liga a câmera');
+  const falas = TOUR_STAND.filter((p) => 'fala' in p);
+  assert.equal(new Set(falas.map((p) => p.fala)).size, falas.length, 'chaves de fala únicas');
+  assert.ok('fala' in TOUR_STAND[0] && 'fala' in TOUR_STAND.at(-1), 'abre e fecha falando');
+  // ~15 caracteres por segundo na voz do stand: 900 caracteres ≈ 60 s.
+  assert.ok(falas.reduce((n, p) => n + p.texto.length, 0) < 900);
 });

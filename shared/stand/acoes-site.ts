@@ -57,7 +57,8 @@ export type NomeAcaoSite =
   | 'sompo_abrir_aba'
   | 'sompo_voltar_inicio'
   | 'sompo_abrir_caso'
-  | 'sompo_rodar_cenario';
+  | 'sompo_rodar_cenario'
+  | 'tour_iniciar';
 
 export interface ArgAcaoSite {
   descricao: string;
@@ -186,10 +187,42 @@ export const ACOES_SITE: readonly AcaoSiteDef[] = Object.freeze(([
       },
     },
   },
+  {
+    nome: 'tour_iniciar',
+    pagina: null,
+    descricao: 'Tour guiado de menos de um minuto, com falas prontas: monitor de sonolência, laboratório do sensor com o Trator MAX na curva e volta pra coruja. Use quando a pessoa pedir pra ver tudo ("me mostra tudo", "o que tem aqui?") ou não souber o que perguntar. Não fale antes de chamar: o tour já se apresenta. A pessoa pode interromper falando.',
+    args: {},
+  },
 ] as AcaoSiteDef[]).map((item) => Object.freeze(item)));
 
-/** Ações que o próprio `/stand` executa (trocam a tela); o resto vai ao Executor dentro do iframe. */
-export const ACOES_DO_STAND: readonly NomeAcaoSite[] = ['abrir_pagina', 'voltar_coruja'];
+/**
+ * Ações que o próprio `/stand` executa (trocam a tela); o resto vai ao Executor
+ * dentro do iframe. `tour_iniciar` roda no cérebro (falas prontas + ações do
+ * `TOUR_STAND`); o `/stand` só recebe as ações do roteiro.
+ */
+export const ACOES_DO_STAND: readonly NomeAcaoSite[] = ['abrir_pagina', 'voltar_coruja', 'tour_iniciar'];
+
+export type PassoTour =
+  | { fala: `tour_${number}`; texto: string }
+  | { acao: Exclude<NomeAcaoSite, 'tour_iniciar'>; args: Record<string, string> };
+
+/**
+ * Roteiro fixo do tour (proposta Totem-Site item 2): coruja → sonolência →
+ * sensor com o trator na curva → coruja. Cada ação entra quando a fala anterior
+ * termina de soar; tudo só mostra (sem câmera ligada, gravação nem bancada).
+ * ~600 caracteres de fala: menos de 60 s na voz do stand.
+ */
+export const TOUR_STAND: readonly PassoTour[] = Object.freeze(([
+  { fala: 'tour_1', texto: 'Bora lá, vou te mostrar o LUCA em menos de um minuto. Primeiro, o monitor de sonolência.' },
+  { acao: 'abrir_pagina', args: { pagina: 'sonolencia' } },
+  { fala: 'tour_2', texto: 'Ele usa a webcam pra perceber quando o operador fecha os olhos por um segundo, e aí toca um alerta. Tudo roda aqui no computador, nada é gravado.' },
+  { acao: 'sensor_escolher_veiculo', args: { veiculo: 'trator' } },
+  { fala: 'tour_3', texto: 'Agora o laboratório do sensor, com o Trator MAX na bancada.' },
+  { acao: 'sensor_rodar_ensaio', args: { ensaio: 'curva' } },
+  { fala: 'tour_4', texto: 'Olha a curva de talhão: o sensor mede a inclinação e a força lateral que podem tombar a máquina, e é isso que alimenta o risco da operação.' },
+  { acao: 'voltar_coruja', args: {} },
+  { fala: 'tour_5', texto: 'Esse foi o tour. Pode me perguntar qualquer coisa sobre o que você viu.' },
+] as PassoTour[]).map((passo) => Object.freeze(passo)));
 
 export function paginaDaAcao(acao: string): PaginaSite | null {
   return ACOES_SITE.find((item) => item.nome === acao)?.pagina ?? null;

@@ -6,6 +6,7 @@
 import { randomUUID } from 'node:crypto';
 import { cadeiaCerebroStand, ROUTER_API_KEY, ROUTER_BASE_URL } from '../config.js';
 import { FERRAMENTAS_STAND } from './ferramentas.js';
+import { TOUR_STAND } from '../../shared/stand/acoes-site.ts';
 
 // Q5 do grill: por sessão, 8 respostas, 300 tokens por resposta e 2.000
 // caracteres de TTS. Os 240 s e os 20 s de silêncio continuam em LIMITES_STAND.
@@ -19,6 +20,7 @@ export const FALAS = Object.freeze({
   falha: 'Tive um problema pra pensar agora. Pode perguntar de novo?',
   teto_respostas: 'Foi ótimo conversar! Pra continuar, chama alguém da equipe do stand.',
   acao_falhou: 'Não consegui fazer isso na tela agora.',
+  ...Object.fromEntries(TOUR_STAND.filter((passo) => 'fala' in passo).map((passo) => [passo.fala, passo.texto])),
 });
 
 /** Teto do retrato da tela vindo do navegador (o Executor manda até 200). */
@@ -339,8 +341,30 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
   const ferramentasChat = ferramentasDeChat();
   let falouAlgo = false;
   let videoComecou = false;
+  let tourFeito = false;
+  let tourDito = '';
 
-  for (let rodada = 0; rodada < RODADAS_DE_FERRAMENTA && !videoComecou; rodada++) {
+  /**
+   * Tour (`tour_iniciar`): roteiro fixo com falas prontas, sem modelo. Cada ação
+   * vai com `apos_fala` (o navegador espera a fala anterior soar); barge-in
+   * aborta o turno e o tour para no passo em que estava.
+   */
+  const tocarTour = async () => {
+    await fala.terminou();
+    const ditas = [];
+    for (const passo of TOUR_STAND) {
+      if (abortado(sinal)) break;
+      if ('fala' in passo) {
+        await tocarPronta(passo.fala).catch(() => {});
+        if (!abortado(sinal)) ditas.push(passo.texto);
+      } else {
+        emitir({ t: 'evento', evento: { tipo: 'acao_site', acao: passo.acao, args: passo.args, apos_fala: true } });
+      }
+    }
+    return { completo: !abortado(sinal), ditas };
+  };
+
+  for (let rodada = 0; rodada < RODADAS_DE_FERRAMENTA && !videoComecou && !tourFeito; rodada++) {
     const mensagens = [{ role: 'system', content: `${instrucoes()}\n\n${INSTRUCAO_VOZ}` }, ...comDocumentacao(conversa.historico)];
     let resultado = null;
     for (const modelo of (falouAlgo ? [metricas.modelo] : modelos)) {
@@ -412,6 +436,20 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
     if (!chamadas.length) break;
 
     for (const chamada of chamadas) {
+      // Tour: o resto das chamadas da rodada é ignorado (o roteiro manda na tela).
+      if (tourFeito) {
+        conversa.historico.push({ role: 'tool', tool_call_id: chamada.id, content: JSON.stringify({ ok: false, erro: 'tour_em_andamento' }) });
+        continue;
+      }
+      if (chamada.function.name === 'tour_iniciar') {
+        tourFeito = true;
+        const tour = await tocarTour();
+        conversa.historico.push({ role: 'tool', tool_call_id: chamada.id, content: JSON.stringify({ ok: true, tour: tour.completo ? 'concluído' : 'interrompido' }) });
+        // O que o visitante ouviu entra depois de todos os resultados de ferramenta.
+        tourDito = tour.ditas.join(' ');
+        metricas.ferramentas = [...(metricas.ferramentas || []), 'tour_iniciar'];
+        continue;
+      }
       let args = {};
       try { args = JSON.parse(chamada.function.arguments || '{}'); } catch { /* argumento quebrado vira objeto vazio */ }
       const saida = await executarFerramenta(chamada.function.name, args).catch(() => ({ ok: false, erro: 'ferramenta_falhou' }));
@@ -428,6 +466,7 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
       conversa.historico.push({ role: 'tool', tool_call_id: chamada.id, content: JSON.stringify(saida).slice(0, 4000) });
       metricas.ferramentas = [...(metricas.ferramentas || []), chamada.function.name];
     }
+    if (tourDito) conversa.historico.push({ role: 'assistant', content: tourDito });
   }
 
   await fala.terminou();
@@ -437,5 +476,5 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
     conversa.historico.push({ role: 'assistant', content: '…' });
   }
   if (abortado(sinal)) return { motivo: 'interrompido', metricas };
-  return encerrarTurno(videoComecou ? 'video' : 'ok', { fala: fala.faladas.join(' ') });
+  return encerrarTurno(videoComecou ? 'video' : tourFeito ? 'tour' : 'ok', { fala: fala.faladas.join(' ') });
 }

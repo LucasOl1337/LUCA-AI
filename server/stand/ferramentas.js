@@ -116,6 +116,8 @@ export async function executarFerramentaStand(nome, args = {}, deps = {}) {
   }
 
   // Ação do site (M3): valida aqui e a página/executor valida de novo.
+  // O tour roda no cérebro em turnos (falas prontas); o Realtime não tem.
+  if (ferramenta === 'tour_iniciar') return { ...erro(ferramenta, 'tour_indisponivel'), mensagem: 'O tour guiado só roda na voz em turnos; mostre as páginas uma a uma.' };
   if (ACOES.has(ferramenta)) {
     const validacao = validarAcaoSite(ferramenta, entrada);
     if (!validacao.ok) return { ...erro(ferramenta, 'acao_invalida'), mensagem: validacao.motivo };

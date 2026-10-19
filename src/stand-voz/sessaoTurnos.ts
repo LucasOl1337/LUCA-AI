@@ -374,7 +374,14 @@ export class SessaoTurnos implements SessaoDeVoz {
           this.mudarEstado('ouvindo');
           emitirEventoStand({ tipo: 'tocar_video', id: evento.id });
         }
-        if (evento.tipo === 'acao_site' && evento.acao) emitirEventoStand({ tipo: 'acao_site', acao: evento.acao, args: evento.args ?? {} });
+        if (evento.tipo === 'acao_site' && evento.acao) {
+          // Tour: a ação entra quando a fala que a anuncia termina de soar.
+          if (evento.apos_fala) {
+            await this.fila?.terminou();
+            if (controle.signal.aborted) return '';
+          }
+          emitirEventoStand({ tipo: 'acao_site', acao: evento.acao, args: evento.args ?? {} });
+        }
         break;
       }
       case 'aviso':

@@ -127,3 +127,9 @@ test('executarPlano devolve o retrato do Executor', async () => {
   const r = await executarPlano(plano, { despacharModo: () => {}, aguardarExecutor: async () => true, enviarAcaoSite: async () => ({ ok: true, mensagem: 'Sensibilidade alta.', retrato: 'Página sonolência' }) });
   assert.deepEqual(r, { ok: true, mensagem: 'Sensibilidade alta.', retrato: 'Página sonolência' });
 });
+
+test('plano: tour_iniciar solto não vai ao Executor (o cérebro manda o roteiro passo a passo)', () => {
+  const r = planejarAcao('tour_iniciar', {}, { modo: 'coruja', pagina: null });
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /tour/);
+});

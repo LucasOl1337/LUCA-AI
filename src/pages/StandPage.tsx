@@ -118,6 +118,7 @@ export default function StandPage() {
   falando.current = estado.voz === 'pensando' || estado.voz === 'falando';
   /** Falha de ação no site: só a equipe vê (canto da tela), some sozinha. */
   const [falhaSite, setFalhaSite] = useState('');
+  const filaAcoes = useRef<Promise<void>>(Promise.resolve());
 
   const sair = useCallback(() => navigate({ page: 'inicio' }, 'push'), [navigate]);
 
@@ -131,15 +132,18 @@ export default function StandPage() {
       if (evento.tipo === 'nivel_audio') nivel.current = evento.valor;
       else if (evento.tipo === 'acao_site') {
         // Totem-Site Q4: abrir_pagina/voltar_coruja trocam o modo; controles vão ao Executor do iframe.
-        const plano = planejarAcao(evento.acao, evento.args, { modo: modoAtual.current, pagina: paginaAtual.current });
-        void executarPlano(plano, { despacharModo, aguardarExecutor, enviarAcaoSite }).then((r) => {
+        // Uma ação por vez (o tour manda várias seguidas): o plano é feito quando a anterior termina.
+        filaAcoes.current = filaAcoes.current.then(() => {
+          const plano = planejarAcao(evento.acao, evento.args, { modo: modoAtual.current, pagina: paginaAtual.current });
+          return executarPlano(plano, { despacharModo, aguardarExecutor, enviarAcaoSite });
+        }).then((r) => {
           // O cérebro fica sabendo do que a tela fez e mostra (linha `Tela:` na próxima pergunta).
           canal.current.enviar({ tipo: 'tela', texto: linhaDaTela(r) });
           if (r.ok) return;
           console.warn('[stand] ação no site falhou:', r.mensagem);
           setFalhaSite(r.mensagem);
           canal.current.enviar({ tipo: 'acao_falhou' });
-        });
+        }).catch((erro) => console.warn('[stand] ação no site quebrou:', erro));
       }
       else despachar(evento);
       // Voz em andamento é gente na frente do totem.
