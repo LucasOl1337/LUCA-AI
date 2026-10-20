@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 import ts from 'typescript';
 import * as THREE from 'three';
@@ -13,6 +14,22 @@ function compiled(file) {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
   }).outputText).toString('base64')}`;
 }
+
+test('Astra shipped skin matches its provenance and retains the Brazilian cab-over contract', () => {
+  const root = new URL('../public/models/sompo/', import.meta.url);
+  const provenance = JSON.parse(readFileSync(new URL('astra-sompo-truck.provenance.json', root), 'utf8'));
+  assert.equal(provenance.asset, 'astra-sompo-truck.glb');
+  const bytes = readFileSync(new URL(provenance.asset, root));
+  assert.equal(createHash('sha256').update(bytes).digest('hex'), provenance.sha256,
+    'a legacy truck must not silently replace the approved skin');
+  assert.match(provenance.geometry, /Brazilian cab-over 6x2/);
+  assert.match(provenance.runtime, /Wheel pivots, suspension, road contact/);
+  assert.match(provenance.runtime, /X=4\.62/);
+  for (const path of provenance.textures) {
+    assert.ok(path.startsWith('/sompo/gen/'), 'runtime textures are local');
+    assert.ok(readFileSync(new URL(`../public${path}`, import.meta.url)).length > 100);
+  }
+});
 
 test('Blender skin fits the existing rig and preserves spinning wheels and sensor aperture', async () => {
   const bytes = readFileSync(new URL('../public/models/sompo/astra-sompo-truck.glb', import.meta.url));
