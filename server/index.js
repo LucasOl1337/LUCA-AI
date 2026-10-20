@@ -4365,14 +4365,14 @@ app.use('/datasets', express.static(path.resolve(process.cwd(), 'datasets')));
 
 if (fs.existsSync(indexPath)) {
   app.use(precompressedModels(distPath));
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, { redirect: false }));
   app.get('*splat', (_req, res) => {
-    res.sendFile(indexPath);
+    res.sendFile('index.html', { root: distPath });
   });
 } else if (fs.existsSync(v2IndexPath)) {
-  app.use(express.static(v2DesignPath));
+  app.use(express.static(v2DesignPath, { redirect: false }));
   app.get('*splat', (_req, res) => {
-    res.sendFile(v2IndexPath);
+    res.sendFile('index.html', { root: v2DesignPath });
   });
 }
 
