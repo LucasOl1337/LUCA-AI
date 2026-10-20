@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { eventoScribe, interrompeFala, lerNdjson, mensagemAudioScribe, pareceEco, vaiAoCerebro } from '../../src/stand-voz/turnos.ts';
+import { TOUR_STAND } from '../../shared/stand/acoes-site.ts';
 
 const pedacos = (...textos) => (async function* () { for (const t of textos) yield new TextEncoder().encode(t); })();
 
@@ -44,4 +45,13 @@ test('eco: a voz do LUCA voltando pelo microfone não vira pergunta nem interrup
   assert.equal(interrompeFala('o trator', falado), false);
   assert.equal(interrompeFala('espera aí', falado), true);
   assert.equal(interrompeFala('hã', falado), false);
+});
+
+test('eco do tour: "o que é o sensor?" após a narração é pergunta, não palavras soltas do roteiro', () => {
+  const falado = TOUR_STAND.filter((passo) => 'texto' in passo).map((passo) => passo.texto).join(' ');
+  assert.equal(pareceEco('o que é o sensor?', falado, { durante: true }), false);
+  assert.equal(pareceEco('o que é o sensor?', falado), false);
+  assert.equal(interrompeFala('o que é o sensor?', falado), true);
+  assert.equal(pareceEco('o sensor mede a inclinação', falado, { durante: true }), true);
+  assert.equal(pareceEco('Pode me perguntar qualquer coisa sobre o que você viu.', falado), true);
 });

@@ -83,16 +83,23 @@ const palavras = (texto: string): string[] => texto
 /**
  * Transcrição que é só a voz do LUCA voltando pelo microfone (o cancelamento
  * de eco do navegador falha em caixa de som alta). Fora da fala: 3+ palavras e
- * 80% delas no que ele acabou de falar. Durante a fala (ou logo depois),
- * qualquer trecho todo contido no que ele falou também é eco.
+ * um trecho consecutivo de pelo menos 80% delas na narração. Durante a fala
+ * (ou logo depois), um trecho curto idêntico também é eco. Palavras espalhadas
+ * pelo roteiro não bastam: "o que é o sensor?" é uma pergunta nova.
  */
 export function pareceEco(texto: string, falado: string, { durante = false } = {}): boolean {
   const ouvidas = palavras(texto);
   if (!ouvidas.length || !falado) return false;
-  const ditas = new Set(palavras(falado));
-  const iguais = ouvidas.filter((p) => ditas.has(p)).length;
-  if (durante && iguais === ouvidas.length) return true;
-  return ouvidas.length >= 3 && iguais / ouvidas.length >= 0.8;
+  const palavrasDitas = palavras(falado);
+  const ditas = ` ${palavrasDitas.join(' ')} `;
+  if (durante && ouvidas.length < 3 && ouvidas.every((p) => palavrasDitas.includes(p))) return true;
+  if (durante && ditas.includes(` ${ouvidas.join(' ')} `)) return true;
+  if (ouvidas.length < 3) return false;
+  const minimo = Math.ceil(ouvidas.length * 0.8);
+  for (let inicio = 0; inicio <= ouvidas.length - minimo; inicio++) {
+    if (ditas.includes(` ${ouvidas.slice(inicio, inicio + minimo).join(' ')} `)) return true;
+  }
+  return false;
 }
 
 /** Parcial que interrompe a fala do LUCA: 2+ palavras de verdade que não são eco. */
