@@ -80,15 +80,15 @@ export function desenharVista(ctx: ContextoTela, vista: VistaTela, largura = TEL
   ctx.fillText(vista.valorTexto, largura / 2, 152 * u);
 
   ctx.fillStyle = CORES_TELA.texto;
-  ctx.font = `800 ${40 * u}px ${FONTE}`;
-  ctx.fillText(vista.velocidadeTexto, largura / 2, 230 * u);
+  ctx.font = `800 ${56 * u}px ${FONTE}`;
+  ctx.fillText(vista.velocidadeTexto, largura / 2, 222 * u);
 
   // Selo permanente, separado da velocidade e do estado.
   ctx.fillStyle = CORES_TELA.selo;
-  ctx.fillRect(largura / 2 - 100 * u, 268 * u, 200 * u, 40 * u);
+  ctx.fillRect(largura / 2 - 150 * u, 260 * u, 300 * u, 52 * u);
   ctx.fillStyle = CORES_TELA.seloTexto;
-  ctx.font = `800 ${30 * u}px ${FONTE}`;
-  ctx.fillText('SIMULADO', largura / 2, 288 * u);
+  ctx.font = `800 ${44 * u}px ${FONTE}`;
+  ctx.fillText('SIMULADO', largura / 2, 286 * u);
 }
 
 export interface TelaPainel {

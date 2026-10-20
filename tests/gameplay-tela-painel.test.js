@@ -42,8 +42,9 @@ test('tela mantém 512x320 e só quatro textos: estado, número, velocidade e se
   assert.equal(TELA_ALTURA, 320);
   const { textos, retangulos } = desenhar(estado());
   assert.deepEqual(textos.map(t => t.texto), ['LIVRE', '+4 m', '6 km/h', 'SIMULADO']);
-  assert.deepEqual(textos.map(t => Number(t.font.match(/ (\d+)px/)[1])), [40, 112, 40, 30]);
-  assert.deepEqual(textos.map(t => [t.x, t.y]), [[256, 41], [256, 152], [256, 230], [256, 288]]);
+  assert.deepEqual(textos.map(t => Number(t.font.match(/ (\d+)px/)[1])), [40, 112, 56, 44]);
+  assert.deepEqual(textos.map(t => [t.x, t.y]), [[256, 41], [256, 152], [256, 222], [256, 286]]);
+  assert.ok(retangulos.some(r => r.cor === CORES_TELA.selo && r.w === 300 && r.h === 52));
   assert.ok(retangulos.some(r => r.contorno === CORES_TELA.livre));
   assert.ok(!retangulos.some(r => r.cor === CORES_TELA.alerta));
 });
