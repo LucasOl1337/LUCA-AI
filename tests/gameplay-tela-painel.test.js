@@ -43,10 +43,24 @@ test('tela mantém 512x320 e só quatro textos: estado, número, velocidade e se
   const { textos, retangulos } = desenhar(estado());
   assert.deepEqual(textos.map(t => t.texto), ['LIVRE', '+4 m', '6 km/h', 'SIMULADO']);
   assert.deepEqual(textos.map(t => Number(t.font.match(/ (\d+)px/)[1])), [40, 112, 56, 44]);
-  assert.deepEqual(textos.map(t => [t.x, t.y]), [[256, 41], [256, 152], [256, 222], [256, 286]]);
+  assert.deepEqual(textos.map(t => [t.x, t.y]), [[256, 41], [256, 133], [256, 226], [256, 286]]);
   assert.ok(retangulos.some(r => r.cor === CORES_TELA.selo && r.w === 300 && r.h === 52));
   assert.ok(retangulos.some(r => r.contorno === CORES_TELA.livre));
   assert.ok(!retangulos.some(r => r.cor === CORES_TELA.alerta));
+});
+
+test('distância, velocidade e selo têm caixas verticais separadas com respiro', () => {
+  const { textos, retangulos } = desenhar(estado({ cm: 120 }));
+  const caixa = (texto) => {
+    const tamanho = Number(texto.font.match(/ (\d+)px/)[1]);
+    return { topo: texto.y - tamanho / 2, base: texto.y + tamanho / 2 };
+  };
+  const distancia = caixa(textos[1]);
+  const velocidade = caixa(textos[2]);
+  const selo = retangulos.find(r => r.cor === CORES_TELA.selo);
+  assert.ok(distancia.base + 8 <= velocidade.topo, 'ao menos 8px entre distância e velocidade');
+  assert.ok(velocidade.base + 6 <= selo.y, 'ao menos 6px entre velocidade e selo');
+  assert.ok(selo.y + selo.h < TELA_ALTURA, 'selo inteiro dentro da textura');
 });
 
 test('atenção a 180 cm mantém distância e cor da fonte única, sem frase longa', () => {

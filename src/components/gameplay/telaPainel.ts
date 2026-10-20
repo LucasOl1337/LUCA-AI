@@ -77,11 +77,11 @@ export function desenharVista(ctx: ContextoTela, vista: VistaTela, largura = TEL
 
   ctx.fillStyle = cor;
   ctx.font = `800 ${112 * u}px ${FONTE}`;
-  ctx.fillText(vista.valorTexto, largura / 2, 152 * u);
+  ctx.fillText(vista.valorTexto, largura / 2, 133 * u);
 
   ctx.fillStyle = CORES_TELA.texto;
   ctx.font = `800 ${56 * u}px ${FONTE}`;
-  ctx.fillText(vista.velocidadeTexto, largura / 2, 222 * u);
+  ctx.fillText(vista.velocidadeTexto, largura / 2, 226 * u);
 
   // Selo permanente, separado da velocidade e do estado.
   ctx.fillStyle = CORES_TELA.selo;
