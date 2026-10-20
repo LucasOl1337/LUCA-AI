@@ -91,6 +91,22 @@ test('kill-switch por 404 ou HTML desregistra e apaga cache sem afetar outros ap
   }
 });
 
+test('sentinela consulta /stand/sw.js, nunca o /sw.js da raiz que vira fallback SPA', async () => {
+  const w = worker();
+  await w.lifecycle('install');
+  const pedidos = [];
+  w.setNetwork(async (url) => {
+    const caminho = typeof url === 'string' ? url : new URL(url.url).pathname;
+    pedidos.push(caminho);
+    return new Response('worker vigente', { headers: { 'content-type': 'application/javascript' } });
+  });
+  await w.fetch('/stand/', { mode: 'navigate' });
+  assert.ok(pedidos.includes('/stand/sw.js'));
+  assert.equal(pedidos.includes('/sw.js'), false);
+  assert.equal(w.unregistered, false);
+  assert.ok(w.stores.has('luca-stand-release-a'));
+});
+
 test('instalação rejeita JS servido como fallback HTML', async () => {
   const w = worker();
   w.setNetwork(async () => new Response('SPA fallback', { headers: { 'content-type': 'text/html' } }));
