@@ -6,6 +6,8 @@ import {
   ChevronRight,
   Cpu,
   FlaskConical,
+  Gamepad2,
+  Monitor,
   Eye,
   Home,
   LogOut,
@@ -20,7 +22,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useDeferredFlag } from '@/hooks/useDeferredFlag';
 import SidebarSessionsRail from '@/components/SidebarSessionsRail';
 
-export type PageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'laboratorio' | 'sensor' | 'sonolencia' | 'admin' | 'stand';
+export type PageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'laboratorio' | 'sensor' | 'sonolencia' | 'admin' | 'stand' | 'totem' | 'gameplay';
 
 interface LayoutProps {
   activePage: PageId;
@@ -38,6 +40,8 @@ interface NavItem {
 const navItems: NavItem[] = [
   { id: 'inicio', label: 'Início', icon: Home, hint: 'visão geral do LUCA-AI' },
   { id: 'luca-ai', label: 'LUCA-AI', icon: BrainCircuit, hint: 'bancada isolada com equipe de personas' },
+  { id: 'totem', label: 'Totem', icon: Monitor, hint: 'coruja, vitrine e simulação em tela cheia' },
+  { id: 'gameplay', label: 'Gameplay', icon: Gamepad2, hint: 'dirigir o Trator MAX em primeira pessoa' },
   { id: 'sompo', label: 'SOMPO', icon: Wheat, hint: 'casos de exemplo agrícolas e rurais' },
   { id: 'laboratorio', label: 'Laboratório', icon: FlaskConical, hint: 'replay de incidentes a partir de arquivos' },
   { id: 'sensor', label: 'Sensor', icon: Cpu, hint: 'o chip do ESP32 por dentro, em 3D' },

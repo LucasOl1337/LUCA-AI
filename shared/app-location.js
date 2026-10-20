@@ -15,6 +15,8 @@ export const APP_PAGES = Object.freeze([
   'sensor',
   'admin',
   'stand',
+  'totem',
+  'gameplay',
 ]);
 
 export const PAGE_PATHS = Object.freeze({
@@ -28,6 +30,8 @@ export const PAGE_PATHS = Object.freeze({
   sensor: '/sensor',
   admin: '/admin',
   stand: '/stand',
+  totem: '/totem',
+  gameplay: '/gameplay',
 });
 
 // 'principais' e 'ativadas' ficam só por compatibilidade com links antigos.

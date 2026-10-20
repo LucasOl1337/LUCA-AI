@@ -43,6 +43,36 @@ test('valor padrão some; filtro e busca aparecem com nome de gente', () => {
   assert.equal(parsed.filtro, 'ativadas');
 });
 
+test('Totem e Gameplay têm deep links próprios sem parâmetros ocultos', () => {
+  for (const page of ['totem', 'gameplay']) {
+    assert.equal(formatAppUrl({ page }), `/${page}`);
+    assert.equal(parseAppLocation(`/${page}/`).page, page);
+    assert.equal(formatAppUrl(parseAppLocation(`/${page}`)), `/${page}`);
+    const next = mergeAppLocation(parseAppLocation('/stand?simulacao=gameplay&stub=1'), { page });
+    assert.equal(next.stub, '');
+    assert.equal(next.simulacao, '');
+    assert.equal(formatAppUrl(next), `/${page}`);
+  }
+  assert.equal(parseAppLocation('/stand?simulacao=gameplay').page, 'stand');
+  assert.equal(parseAppLocation('/stand?simulacao=gameplay').simulacao, 'gameplay');
+});
+
+test('menu e App integram Totem e Gameplay sem restringir a admin nem substituir por clássico', () => {
+  const layout = readFileSync(new URL('../src/components/Layout.tsx', import.meta.url), 'utf8');
+  const gameplay = readFileSync(new URL('../src/pages/GameplayPage.tsx', import.meta.url), 'utf8');
+  const totem = readFileSync(new URL('../src/pages/TotemPage.tsx', import.meta.url), 'utf8');
+  assert.match(layout, /id: 'totem', label: 'Totem'/);
+  assert.match(layout, /id: 'gameplay', label: 'Gameplay'/);
+  assert.match(app, /case 'totem':[\s\S]*?<TotemPage/);
+  assert.match(app, /case 'gameplay':[\s\S]*?<GameplayPage/);
+  assert.match(app, /const ADMIN_PAGES: PageId\[\] = \['personas', 'configuracao', 'admin'\]/);
+  assert.match(totem, /navigate\(\{ page: 'stand' \}, 'push'\)/);
+  assert.match(gameplay, /import\('@\/components\/gameplay\/visual\/GameplayComCabine'\)/);
+  assert.match(gameplay, /playing &&/);
+  assert.match(gameplay, /role="alert"/);
+  assert.doesNotMatch(gameplay, /GameplayOuClassico|SompoTruckSimulator/);
+});
+
 test('SOMPO, admin, configuração e bancada serializam só o que não é default', () => {
   assert.equal(formatAppUrl({ page: 'sompo' }), '/sompo');
   assert.equal(
