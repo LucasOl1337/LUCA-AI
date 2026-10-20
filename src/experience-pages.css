@@ -1,0 +1,14 @@
+.experience-page { width: min(100%, 1440px); margin: 0 auto; padding: clamp(20px, 3vw, 48px); color: #e8edf3; }
+.experience-page header { margin-bottom: 24px; max-width: 900px; }
+.experience-page h1 { font-size: clamp(30px, 4vw, 48px); font-weight: 650; margin: 0 0 12px; }
+.experience-page h2 { font-size: 20px; font-weight: 600; margin: 0 0 12px; }
+.experience-page p { line-height: 1.65; color: #bfcbd8; margin: 0 0 12px; }
+.experience-page .experience-eyebrow { color: #53d4ff; font-size: 12px; text-transform: uppercase; letter-spacing: .12em; }
+.experience-card { border: 1px solid #ffffff20; border-radius: 18px; padding: 24px; background: #101923; margin-bottom: 20px; }
+.experience-primary, .experience-secondary { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 12px 20px; border-radius: 12px; font-weight: 650; cursor: pointer; margin-top: 8px; }
+.experience-primary { background: #0768c5; color: white; }
+.experience-secondary { background: #243345; color: white; }
+.experience-primary:focus-visible, .experience-secondary:focus-visible { outline: 3px solid #53d4ff; outline-offset: 3px; }
+.experience-game-viewport { position: relative; width: 100%; height: clamp(420px, 68vh, 900px); overflow: hidden; border: 1px solid #ffffff20; border-radius: 18px; background: #07100c; margin-bottom: 20px; }
+.experience-game-status { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 28px; text-align: center; }
+.experience-note { font-size: 14px; }
