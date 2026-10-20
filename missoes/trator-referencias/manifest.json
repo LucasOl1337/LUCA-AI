@@ -1,0 +1,76 @@
+{
+  "origem": "Anexos do Lucas no WhatsApp",
+  "quantidade": 14,
+  "arquivos": [
+    {
+      "arquivo": "01-b202b5aa702a.jpg",
+      "bytes": 153112,
+      "sha256": "24cb3751d7aafbf9ad68cd2021ef145cf75915cfb4974d7d13b93be32d0a0c87"
+    },
+    {
+      "arquivo": "02-eab87590d92b.jpg",
+      "bytes": 140754,
+      "sha256": "55227eecdeb9fd0a0b32ea27d46196632d828cf4c691399193fad8c1ca0ae4d7"
+    },
+    {
+      "arquivo": "03-62ae79a2ac90.jpg",
+      "bytes": 120098,
+      "sha256": "8dae42464537880695bcea4688f275a5a3bdeac9a05060acf692e4d6ac1266f4"
+    },
+    {
+      "arquivo": "04-d14684310270.jpg",
+      "bytes": 131877,
+      "sha256": "5f2419f1de84c511e4def99d188fd42b088f0f559a2a7c8fbbeb2f39de8468f3"
+    },
+    {
+      "arquivo": "05-5a5eda300820.jpg",
+      "bytes": 122145,
+      "sha256": "43425fec6738497eec8cb18e0eed5275c0988affeb4ef82f6eda5d7200a48681"
+    },
+    {
+      "arquivo": "06-32f46673f65c.jpg",
+      "bytes": 118405,
+      "sha256": "5cf56e61b297b565eb310b61a4a094a28887dd3a91f64e5e874ebfc9da16b17e"
+    },
+    {
+      "arquivo": "07-b4ae44024889.jpg",
+      "bytes": 140285,
+      "sha256": "2022136cb167f9bb3c43a9f7bbe6099fbc5f94ecfd367277b164d394b217dfe9"
+    },
+    {
+      "arquivo": "08-cb71208bf583.jpg",
+      "bytes": 124395,
+      "sha256": "588313bb6ba085a7f4b4679cc921200e0501a417bb465196965ad557d939b527"
+    },
+    {
+      "arquivo": "09-0975ccc4ca13.jpg",
+      "bytes": 145436,
+      "sha256": "bc8ea288c7ff9bf25ffc3fa2142c206af1f16f72c1b493a874a4717c3d44b320"
+    },
+    {
+      "arquivo": "10-6125781d015f.jpg",
+      "bytes": 137171,
+      "sha256": "0c8606c362d8a468be6c2dd97e6106fc4137fd667de85dcf234f91d9f51bf1b5"
+    },
+    {
+      "arquivo": "11-ee16a91e3f63.jpg",
+      "bytes": 133665,
+      "sha256": "e5fbf428ca8cb3ada5493d7718f53abe2bf0ed9aee625ffd23d1eaa18bd7426d"
+    },
+    {
+      "arquivo": "12-817a14cbd0a6.jpg",
+      "bytes": 147871,
+      "sha256": "12bfa58e730e442c17e540f64d59839be9b20295add023b23c9dd2825ca237c8"
+    },
+    {
+      "arquivo": "13-ac79ed44fe84.jpg",
+      "bytes": 144217,
+      "sha256": "99125af085f47f56d480b3c751d497cfd6d9897d4c1f33481877ad5cfb2fd68f"
+    },
+    {
+      "arquivo": "14-55e22ad95560.jpg",
+      "bytes": 131962,
+      "sha256": "17e3ddd35c2072eb22edf381459b67f6fa37d42c2e6c924065a7a1cd84d71f65"
+    }
+  ]
+}

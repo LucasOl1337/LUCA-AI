@@ -30,6 +30,7 @@
 | [`docs/operacao.md`](./docs/operacao.md) | SOMENTE ao instalar, executar, testar, diagnosticar estado local ou preparar release. |
 | [`docs/integracoes.md`](./docs/integracoes.md) | SOMENTE ao mudar roteador LLM, Kamui, personas Yume, anexos ou a publicacao pela VM. |
 | [`docs/sompo.md`](./docs/sompo.md) | SOMENTE ao mudar telemetria SOMPO, contrato ESP32/Firebase ou o painel do trator. |
+| [`docs/cadastro-veiculos-trator-especificacao.md`](./docs/cadastro-veiculos-trator-especificacao.md) | SOMENTE ao conferir o pedido original do cadastro e as fotos usadas na provenance do MAX TRATOR. |
 | [`docs/sensor-lab.md`](./docs/sensor-lab.md) | SOMENTE ao mudar o laboratorio 3D do sensor (`/sensor`). |
 | [`docs/stand-tailnet.md`](./docs/stand-tailnet.md) | SOMENTE ao abrir o `/stand` com voz em outra maquina da tailnet (`scripts/stand-tailnet.sh`). |
 | [`docs/stand-voz.md`](./docs/stand-voz.md) | SOMENTE ao mudar a conversa por voz do `/stand` (Scribe, cérebro Claude, TTS, barge-in, tetos de crédito, reserva xai). |
