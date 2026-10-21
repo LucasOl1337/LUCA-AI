@@ -106,3 +106,16 @@ test('totem com a aba oculta: selo "Jogo pausado no totem", mapa mantido', () =>
   assert.match(h, /Jogo pausado no totem/);
   assert.match(h, /gameplay-mapa/);
 });
+
+// Webcam de sonolência no totem (/gameplay?webcam=1): card do motorista e faixa no tablet.
+test('sem webcam no totem: nenhum card de motorista; com alarme: card aceso e faixa de sonolência', () => {
+  const sem = html({ estado: estado(), recebidoEm: 9_500 });
+  assert.doesNotMatch(sem, /Motorista · webcam|data-motorista/);
+  const aberto = html({ estado: estado(), recebidoEm: 9_500, sono: { status: 'open', closedMs: 0 } });
+  assert.match(aberto, /data-motorista="open"[^>]*><span>Motorista · webcam<\/span><strong>Olhos abertos<\/strong><\/article>/);
+  assert.match(aberto, /class="operador-alerta" role="alert" hidden=""/);
+  const dormindo = html({ estado: estado(), recebidoEm: 9_500, sono: { status: 'alarm', closedMs: 1400 } });
+  assert.match(dormindo, /data-motorista="alarm" data-alerta="true"/);
+  assert.match(dormindo, /<strong>Sonolência<\/strong><small>Olhos fechados há 1,4 s<\/small>/);
+  assert.match(dormindo, /class="operador-alerta" role="alert">Atenção: sinais de sono</);
+});
