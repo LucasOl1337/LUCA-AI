@@ -15,26 +15,40 @@ export default function OperadorPage() {
   const retrato = useRetratoAoVivo();
   const [agora, setAgora] = useState(() => Date.now());
   const [som, setSom] = useState(false);
+  const visivel = useDocumentoVisivel();
+  // O relógio só serve ao "sem sinal há N s": 1 s basta e para com a aba oculta.
   useEffect(() => {
-    const relogio = window.setInterval(() => setAgora(Date.now()), 500);
+    if (!visivel) return;
+    setAgora(Date.now());
+    const relogio = window.setInterval(() => setAgora(Date.now()), 1000);
     return () => window.clearInterval(relogio);
-  }, []);
+  }, [visivel]);
   const vivo = sinalAoVivo(retrato, agora).nivel === 'ao-vivo';
   // Mudo por padrão: o som é do totem; o tablet só bipa se o operador pedir.
   useBipeCabine(som && vivo && retrato ? alertaCabine(retrato.estado).bipe : null);
-  return <OperadorVista retrato={retrato} agora={agora} som={som} aoTrocarSom={() => setSom(!som)} />;
+  return <OperadorVista retrato={retrato} agora={agora} som={som} oculto={!visivel} aoTrocarSom={() => setSom(!som)} />;
+}
+
+function useDocumentoVisivel() {
+  const [visivel, setVisivel] = useState(() => typeof document === 'undefined' || !document.hidden);
+  useEffect(() => {
+    const trocar = () => setVisivel(!document.hidden);
+    document.addEventListener('visibilitychange', trocar);
+    return () => document.removeEventListener('visibilitychange', trocar);
+  }, []);
+  return visivel;
 }
 
 const FASE = { pronto: 'Parado · esperando R2', dirigindo: 'Dirigindo', fim: 'Desafio encerrado' } as const;
 const relogio = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
 
 /** Só desenho: serve ao teste SSR e ao print. */
-export function OperadorVista({ retrato, agora, som, aoTrocarSom }: { retrato: RetratoAoVivo | null; agora: number; som: boolean; aoTrocarSom?: () => void }) {
+export function OperadorVista({ retrato, agora, som, oculto = false, aoTrocarSom }: { retrato: RetratoAoVivo | null; agora: number; som: boolean; oculto?: boolean; aoTrocarSom?: () => void }) {
   const sinal = sinalAoVivo(retrato, agora);
   const selo = sinal.nivel === 'ao-vivo' ? 'Ao vivo' : sinal.nivel === 'sem-sinal' ? `Sem sinal há ${sinal.segundos} s` : 'Aguardando o totem';
   const painel = retrato ? alertaCabine(retrato.estado) : null;
   return (
-    <section className="operador" data-sinal={sinal.nivel} aria-labelledby="operador-titulo">
+    <section className="operador" data-sinal={sinal.nivel} data-oculto={oculto || undefined} aria-labelledby="operador-titulo">
       <header className="operador-topo">
         <div>
           <p className="operador-olho">Painel do operador · Trator MAX</p>

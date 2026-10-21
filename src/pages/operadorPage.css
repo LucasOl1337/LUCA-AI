@@ -14,10 +14,10 @@
 }
 .operador-sinal::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: #6b7a72; }
 .operador[data-sinal='ao-vivo'] .operador-sinal { border-color: var(--gp-livre); }
-.operador[data-sinal='ao-vivo'] .operador-sinal::before { background: var(--gp-livre); animation: operador-pulso 1s ease-in-out infinite alternate; }
+/* Ponto fixo, sem pulso infinito: com o /gameplay no mesmo navegador o pulso derrubava o FPS (luca-coruja item 4). */
+.operador[data-sinal='ao-vivo'] .operador-sinal::before { background: var(--gp-livre); }
 .operador[data-sinal='sem-sinal'] .operador-sinal { border-color: var(--gp-atencao); color: #ffd98a; }
 .operador[data-sinal='sem-sinal'] .operador-sinal::before { background: var(--gp-atencao); }
-@keyframes operador-pulso { to { opacity: .35; } }
 .operador-simulado { color: #ffd98a; letter-spacing: .08em; }
 .operador-som { color: #e8edf3; cursor: pointer; }
 .operador-som[aria-pressed='true'] { border-color: #53d4ff; }
@@ -29,13 +29,15 @@
 
 /* Paisagem: mapa à esquerda ocupando a altura, cards à direita. */
 .operador-corpo { flex: 1; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(280px, 1fr); gap: clamp(12px, 2vw, 24px); align-items: start; }
-.operador[data-sinal='sem-sinal'] .operador-corpo { opacity: .55; filter: grayscale(.6); }
-.operador-mapa { display: flex; justify-content: center; }
+/* Só opacidade (sem filter): esmaecer não obriga a repintar a área inteira por filtro. */
+.operador[data-sinal='sem-sinal'] .operador-corpo { opacity: .5; }
+/* Contenção: o retrato a 4 Hz só repinta dentro de cada caixa, sem layout da página. */
+.operador-mapa { display: flex; justify-content: center; contain: layout paint; }
 /* O minimapa da cabine vira o mapa principal: sai do canto e cresce. */
 .operador .gameplay-mapa { position: static; width: min(100%, calc(100vh - 170px)); padding: 12px 12px 10px; border-width: 3px; }
 .operador .gameplay-mapa figcaption { font-size: clamp(14px, 2vh, 20px); }
 .operador-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.operador-card { padding: 14px 16px; border-radius: 14px; background: #0f1d18; border: 2px solid #ffffff1c; display: grid; gap: 4px; min-width: 0; }
+.operador-card { padding: 14px 16px; border-radius: 14px; background: #0f1d18; border: 2px solid #ffffff1c; display: grid; gap: 4px; min-width: 0; contain: layout paint; }
 .operador-card span { font-size: 13px; color: #9fb5a8; text-transform: uppercase; letter-spacing: .06em; }
 .operador-card strong { font-size: clamp(22px, 3vh, 32px); font-weight: 800; overflow-wrap: anywhere; }
 .operador-card small { font-size: 14px; color: #b9cdbf; }
@@ -46,9 +48,13 @@
 .operador-alerta {
   grid-column: 1 / -1; padding: 12px 16px; border-radius: 12px; background: #c4291ff0; color: #fff;
   font-size: clamp(18px, 2.6vh, 26px); font-weight: 800; text-align: center;
-  animation: gameplay-pisca .4s steps(2, jump-none) infinite alternate;
+  contain: layout paint;
+  /* Entrada curta (3 piscadas) ao aparecer, em vez de piscar sem parar. */
+  animation: operador-entra .3s ease-out 3 alternate both;
 }
+@keyframes operador-entra { from { opacity: .55; transform: scale(.98); } to { opacity: 1; transform: none; } }
 .operador-alerta[hidden] { display: none; }
+.operador[data-oculto] * { animation-play-state: paused !important; }
 
 /* Retrato (tablet em pé): mapa em cima com a largura toda, cards embaixo. */
 @media (orientation: portrait) {
@@ -57,5 +63,5 @@
   .operador .gameplay-mapa { width: min(100%, 46vh); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .operador-alerta, .operador[data-sinal='ao-vivo'] .operador-sinal::before { animation: none; }
+  .operador-alerta { animation: none; }
 }
