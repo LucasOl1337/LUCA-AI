@@ -21,6 +21,7 @@ import { createSompoEnvironmentAssets } from './createSompoEnvironmentAssets';
 import { createSompoAtmosphere } from './createSompoAtmosphere';
 import { createSompoPostProcessing } from './createSompoPostProcessing';
 import { createSompoRenderMeter } from './sompoStage';
+import { soltarLutCompartilhada } from './soltarLutCompartilhada';
 import { PERFIL_PADRAO, criarPortaoDeAquecimento, pixelRatioDoDegrau, qualidadeInicial, regularQualidade, type PerfilQualidade } from './qualidadeAdaptativa';
 import { exportSompoModel } from './refineSompoTruck';
 import { SOMPO_STUDIO_DEFAULT, type SompoStudioConfig, type SompoRenderStats } from './sompoStudioConfig';
@@ -602,6 +603,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     recenterHeading() { /* sem rumo integrado no palco agrícola */ },
     dispose() {
       disposed = true;
+      soltarLutCompartilhada(renderer, scene);
       pasture.dispose();
       post.dispose();
       atmosphere.dispose();

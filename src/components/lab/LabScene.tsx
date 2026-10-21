@@ -11,6 +11,7 @@ import { bandGrid } from '../../../shared/geofencing/index.js';
 import { hazardsOf, bandColor, innermostEpisodeAt, episodeColor, ROUTE_COLOR, slopeZones, SLOPE_ZONE_COLORS, machineRollLimit } from '../../geofencing/lab/labBands';
 import { createCropField } from './createCropField';
 import { loadLabHarvester } from './loadLabHarvester';
+import { soltarLutCompartilhada } from '../sompo/soltarLutCompartilhada';
 
 export type LabCameraMode = 'free' | 'top' | 'follow';
 
@@ -643,6 +644,7 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
 
     return () => {
       disposed = true;
+      soltarLutCompartilhada(renderer, scene);
       cancelAnimationFrame(animationFrame);
       observer.disconnect();
       renderer.domElement.removeEventListener('pointerdown', down);
