@@ -99,3 +99,36 @@ test('feira checar segue o GLB da coruja com hash que o chunk do stand pede; rel
   assert.equal(inteira.presente, true);
   assert.equal(inteira.cacheControl, 'public, max-age=31536000, immutable');
 });
+
+test('feira checar segue os GLBs do gameplay com hash pelo mapa do palco e exige a URL antiga ainda servida', async t => {
+  const glb = Buffer.from('glTF'.repeat(64));
+  const estado = { hash: false, fixo: true };
+  const server = createServer((req, res) => {
+    const js = corpo => { res.setHeader('content-type', 'text/javascript'); res.end(corpo); };
+    if (req.url === '/api/health') return res.end(JSON.stringify({ ok: true, version: '9.9.9' }));
+    if (req.url === '/assets/index-abc123.js') return js('"assets/GameplayPage-g1.js"');
+    if (req.url === '/assets/GameplayPage-g1.js') return js('import"./GameplayComCabine-c1.js"');
+    if (req.url === '/assets/GameplayComCabine-c1.js') return js('import"./restoreSompoTextures-r1.js"');
+    if (req.url === '/assets/restoreSompoTextures-r1.js') return js('const M={"/models/gameplay/max-tractor-cabine.glb":"/assets/max-tractor-cabine-XpBAIuWb.glb","/models/gameplay/cabine-banco.glb":"/assets/cabine-banco-BHHPsw-N.glb"}');
+    const glbOk = (estado.fixo && req.url.startsWith('/models/gameplay/')) || (estado.hash && req.url.startsWith('/assets/') && req.url.endsWith('.glb'));
+    if (glbOk) { res.writeHead(200, { 'content-type': 'model/gltf-binary', 'cache-control': req.url.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'public, max-age=0' }); return res.end(glb); }
+    res.writeHead(200, { 'content-type': 'text/html', 'permissions-policy': 'microphone=(self)' });
+    res.end('<!doctype html><script type="module" src="/assets/index-abc123.js"></script>');
+  }).listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  const directory = await temporary(t);
+  const url = `http://127.0.0.1:${server.address().port}`;
+  const env = { LUCA_CLI_CONFIG: path.join(directory, 'cli.json') };
+  const gameplay = async () => (await cli(['feira', 'checar', '--url', url], { env })).json.checks.filter(c => c.id.startsWith('gameplay '));
+
+  const metade = await gameplay();
+  assert.deepEqual(metade.map(c => c.caminho).sort(), ['/assets/cabine-banco-BHHPsw-N.glb', '/assets/max-tractor-cabine-XpBAIuWb.glb'], 'confere o nome que o palco pede');
+  assert.ok(metade.every(c => !c.ok && /gameplay pede/.test(c.motivo)), 'mapa aponta para GLB que não está no servidor: release pela metade');
+  estado.hash = true;
+  const inteira = await gameplay();
+  assert.ok(inteira.every(c => c.ok && c.cacheControl === 'public, max-age=31536000, immutable' && c.nomeFixo.presente));
+  estado.fixo = false;
+  const semAntiga = await gameplay();
+  assert.ok(semAntiga.every(c => !c.ok && /URL antiga/.test(c.motivo)), 'nome fixo some: aba da release anterior quebra');
+});

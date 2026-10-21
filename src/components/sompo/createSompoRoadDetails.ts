@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { restoreSompoTextures, useSompoExternalTextures } from './restoreSompoTextures';
 import { disposeSompoObject } from './sompoStage';
 import { sompoTerrainHeight, sompoVegetationDensity, sompoIsCornX, SOMPO_WORLD_PERIOD } from './createSompoTerrain';
+import { urlPublica } from './urlsPublicas';
 
 const rand = (i: number) => { const n = Math.sin(i * 127.1 + 21.7) * 43758.5453; return n - Math.floor(n); };
 
@@ -456,7 +457,7 @@ export function createSompoRoadDetails(parent: THREE.Group, camera?: THREE.Camer
   // Near plants have independently curved leaves in 3D. Reuse each geometry
   // across the field; distant plants retain the lightweight photographic cutout.
   if (typeof document !== 'undefined' && typeof document.createElementNS === 'function') {
-    void fetch('/models/sompo/maize-curved.glb', { signal: assetAbort.signal })
+    void fetch(urlPublica('/models/sompo/maize-curved.glb'), { signal: assetAbort.signal })
       .then(async response => {
         if (!response.ok) throw new Error(`Maize HTTP ${response.status}`);
         const gltf = await useSompoExternalTextures(new GLTFLoader()).parseAsync(await response.arrayBuffer(), '/models/sompo/');

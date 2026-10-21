@@ -3,11 +3,13 @@
 // release errada; o tamanho vem de uma sonda, não de um número fixo.
 export const PAGINAS_DA_FEIRA = Object.freeze({ stand: ['/stand/', 'StandPage'], gameplay: ['/gameplay', 'GameplayPage'], operador: ['/operador', 'OperadorPage'], totem: ['/totem', 'TotemPage'] });
 export const CORUJA_GLB = '/stand/avatar/coruja-3d/coruja-3d.glb';
+// GLB da cabine do gameplay pelo nome fixo: a URL antiga segue servida (release anterior).
+export const CABINE_GLB = '/models/gameplay/max-tractor-cabine.glb';
 // O plano lista o nome fixo; na checagem vale o nome com hash achado no chunk do stand.
 const SONDA = '/assets/feira-checar-sonda-inexistente.js';
 
 export function planoDaFeira(origem) {
-  return [`${origem}/api/health`, `${origem}/api/state`, `${origem}${SONDA}`, `${origem}/`, ...Object.values(PAGINAS_DA_FEIRA).map(([caminho]) => `${origem}${caminho}`), `${origem}${CORUJA_GLB}`];
+  return [`${origem}/api/health`, `${origem}/api/state`, `${origem}${SONDA}`, `${origem}/`, ...Object.values(PAGINAS_DA_FEIRA).map(([caminho]) => `${origem}${caminho}`), `${origem}${CORUJA_GLB}`, `${origem}${CABINE_GLB}`];
 }
 
 export async function checarFeira(origem, { timeout = 15000 } = {}) {
@@ -56,6 +58,10 @@ export async function checarFeira(origem, { timeout = 15000 } = {}) {
   // GLB da coruja com hash (`?url` do Vite): o nome está num chunk do stand.
   let corujaComHash = null;
   const procuraCoruja = codigo => { corujaComHash ??= (codigo || '').match(/\/assets\/coruja-3d-[\w-]+\.glb/)?.[0] ?? null; };
+  // GLBs do gameplay com hash: o mapa `/models/gameplay/x.glb` → `/assets/x-<hash>.glb` está num chunk do palco.
+  const gameplayComHash = new Map();
+  const procuraMapa = codigo => { for (const m of (codigo || '').matchAll(/"(\/models\/gameplay\/[\w.-]+\.glb)":"(\/assets\/[\w.-]+\.glb)"/g)) gameplayComHash.set(m[1], m[2]); };
+  const imports = codigo => [...new Set([...(codigo || '').matchAll(/["'(]\.\/([\w.-]+\.(?:js|css))["')]/g)].map(m => m[1]))];
   for (const [pagina, [caminho, chunk]] of Object.entries(PAGINAS_DA_FEIRA)) {
     await tenta(`pagina ${pagina}`, async () => {
       const r = await pega(caminho);
@@ -71,11 +77,20 @@ export async function checarFeira(origem, { timeout = 15000 } = {}) {
     const codigo = await asset(`/assets/${nome}`);
     procuraCoruja(codigo);
     for (const css of new Set(entrada.match(new RegExp(`assets/${chunk}-[\\w-]+\\.css`, 'g')) || [])) await asset(`/${css}`);
-    // Um nível de imports diretos do chunk: pega release pela metade.
-    for (const dep of new Set([...(codigo || '').matchAll(/["'(]\.\/([\w.-]+\.(?:js|css))["')]/g)].map(m => m[1]))) {
-      if (vistos.has(dep) || dep === indice.slice(8)) continue;
-      vistos.add(dep);
-      procuraCoruja(await asset(`/assets/${dep}`));
+    // Dois níveis de imports do chunk: pega release pela metade e acha o mapa do palco
+    // (GameplayPage → GameplayComCabine → restoreSompoTextures).
+    let fila = imports(codigo);
+    for (let nivel = 0; nivel < 2 && fila.length; nivel++) {
+      const proxima = [];
+      for (const dep of fila) {
+        if (vistos.has(dep) || dep === indice.slice(8)) continue;
+        vistos.add(dep);
+        const dependencia = await asset(`/assets/${dep}`);
+        procuraCoruja(dependencia);
+        procuraMapa(dependencia);
+        proxima.push(...imports(dependencia));
+      }
+      fila = proxima;
     }
   }
   await tenta('coruja-3d.glb', async () => {
@@ -87,6 +102,24 @@ export async function checarFeira(origem, { timeout = 15000 } = {}) {
     const aviso = ausente && !corujaComHash;
     anota('coruja-3d.glb', glb || aviso, { status: r.status, caminho, bytes: r.corpo.length, presente: glb, cacheControl: r.headers.get('cache-control'), ...(aviso ? { aviso: 'GLB ausente; o stand usa a Coruja A' } : {}), ...(ausente && corujaComHash ? { motivo: 'o stand pede este GLB e ele não está no servidor' } : {}) });
   });
+  // Cada GLB do gameplay: o nome com hash que o palco pede (falha se faltar) e o nome
+  // fixo, que segue servido para a release anterior. Release sem o mapa: só o fixo.
+  const glbsDoGameplay = gameplayComHash.size ? [...gameplayComHash] : [[CABINE_GLB, null]];
+  for (const [fixo, comHash] of glbsDoGameplay) {
+    const id = `gameplay ${fixo.split('/').pop()}`;
+    await tenta(id, async () => {
+      const ehGlb = r => r.status === 200 && r.corpo.subarray(0, 4).toString() === 'glTF';
+      const antigo = await pega(fixo);
+      const novo = comHash ? await pega(comHash) : null;
+      const ok = ehGlb(antigo) && (!novo || ehGlb(novo));
+      anota(id, ok, {
+        caminho: comHash || fixo, status: (novo || antigo).status, cacheControl: (novo || antigo).headers.get('cache-control'),
+        nomeFixo: { status: antigo.status, presente: ehGlb(antigo) },
+        ...(novo && !ehGlb(novo) ? { motivo: 'o gameplay pede este GLB e ele não está no servidor' } : {}),
+        ...(!ehGlb(antigo) ? { motivo: 'URL antiga sem hash sumiu: aba da release anterior quebra' } : {}),
+      });
+    });
+  }
   const falhas = checks.filter(c => !c.ok).map(c => c.id);
   return { ok: falhas.length === 0, url: origem, versao, verificadoEm: new Date().toISOString(), falhas, checks };
 }

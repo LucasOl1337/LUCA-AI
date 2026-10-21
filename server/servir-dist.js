@@ -13,10 +13,11 @@ import { precompressedModels } from './precompressed-models.js';
 //   aponta para os chunks novos.
 // - O resto (GLB, imagens, vídeos sem hash no nome) fica no padrão do Express.
 //   GLB importado com `?url` (coruja 3D) sai em /assets/ com hash e entra no imutável.
+//   GLB, textura, HDR e manifesto do palco 3D (scripts/urls-publicas-plugin.mjs) também.
 export const CACHE_IMUTAVEL = 'public, max-age=31536000, immutable';
 export const CACHE_REVALIDAR = 'no-cache';
 
-const COM_HASH = /^assets\/[^/]+-[A-Za-z0-9_-]{8}\.(?:js|css|woff2?|ttf|png|jpe?g|svg|webp|avif|gif|wasm|glb)$/;
+const COM_HASH = /^assets\/[^/]+-[A-Za-z0-9_-]{8}\.(?:js|css|woff2?|ttf|png|jpe?g|svg|webp|avif|gif|wasm|glb|hdr|json)$/;
 const REVALIDAR = /(?:^|\/)(?:index\.html|sw\.js)$/;
 
 /** Cache-Control de um arquivo do dist (caminho relativo, com `/`), ou null para o padrão. */

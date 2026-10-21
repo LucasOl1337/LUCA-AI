@@ -21,7 +21,8 @@ const urlDoVite = {
 
 // Bundle the actual TS/TSX dependency graph, keeping React shared with the renderer.
 // No application hooks, components, or theme values are replaced.
-export async function loadFrontendModule(path) {
+// `define` simula constantes que o Vite injeta no build (ex.: o mapa de URLs com hash).
+export async function loadFrontendModule(path, { define } = {}) {
   const result = await build({
     entryPoints: [new URL(path, import.meta.url).pathname],
     bundle: true,
@@ -34,6 +35,7 @@ export async function loadFrontendModule(path) {
     plugins: [urlDoVite],
     // `new Worker(new URL(..., import.meta.url))` é do Vite; no teste o worker é injetado.
     logOverride: { 'empty-import-meta': 'silent' },
+    ...(define ? { define } : {}),
   });
   const module = { exports: {} };
   new Function('require', 'module', 'exports', result.outputFiles[0].text)(

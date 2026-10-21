@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { restoreSompoTextures, useSompoExternalTextures } from './restoreSompoTextures';
 import { sompoTerrainHeight, sompoLakeDistance, SOMPO_WORLD_PERIOD } from './createSompoTerrain';
 import { sompoRenderBudget } from './sompoStage';
+import { urlPublica } from './urlsPublicas';
 
 const random = (i: number) => { const n = Math.sin(i * 127.1 + 311.7) * 43758.5453; return n - Math.floor(n); };
 /** Deterministic per-plant tint: no two neighbours share the same crown or tuft. */
@@ -87,7 +88,7 @@ export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Ca
     const url = `/models/sompo/${spec.asset}.glb`;
     let model: THREE.Group | undefined;
     try {
-      const response = await fetch(url, { signal: abort.signal });
+      const response = await fetch(urlPublica(url), { signal: abort.signal });
       if (!response.ok) throw new Error(`${spec.asset}: HTTP ${response.status}`);
       const gltf = await useSompoExternalTextures(new GLTFLoader()).parseAsync(await response.arrayBuffer(), '/models/sompo/');
       model = gltf.scene;

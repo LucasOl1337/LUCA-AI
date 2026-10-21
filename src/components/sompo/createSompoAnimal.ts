@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { restoreSompoTextures, useSompoExternalTextures } from './restoreSompoTextures';
 import { getSompoAnimalPose } from '../../../shared/sompo-scenario-effects.js';
+import { urlPublica } from './urlsPublicas';
 
 /** Locally generated Nelore, image → Hunyuan3D-2.1. Exact source/settings ship beside the GLB. */
 export function createSompoAnimal(parent: THREE.Group) {
@@ -35,7 +36,7 @@ export function createSompoAnimal(parent: THREE.Group) {
 
   function ensureLoaded() {
     if (ready) return ready;
-    ready = fetch('/models/sompo/generated-nelore.glb', { signal: abort.signal }).then(async (response) => {
+    ready = fetch(urlPublica('/models/sompo/generated-nelore.glb'), { signal: abort.signal }).then(async (response) => {
       if (!response.ok) throw new Error(`Nelore HTTP ${response.status}`);
       const gltf = await useSompoExternalTextures(new GLTFLoader()).parseAsync(await response.arrayBuffer(), '/models/sompo/');
       try { await restoreSompoTextures(gltf, '/models/sompo/generated-nelore.glb', abort.signal); }
