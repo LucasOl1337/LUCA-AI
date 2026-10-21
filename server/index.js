@@ -141,7 +141,7 @@ import { buildPublicStateSnapshot } from '../shared/state-payload.js';
 import { runOperationalPreflight } from '../shared/preflight.js';
 import { reviewResearcherContribution } from './agent-quality.js';
 import { buildEndpointCatalog } from './endpoint-catalog.js';
-import { precompressedModels } from './precompressed-models.js';
+import { servirDist } from './servir-dist.js';
 import { buildToolCatalog } from './tool-catalog.js';
 import { buildCatalogAudit } from './catalog-audit.js';
 import { appendEvent, eventFlows, eventSummary, listEvents } from './event-log.js';
@@ -219,8 +219,12 @@ import {
 import { registerSompoRiskRoutes } from './sompo-risk.js';
 import { registerLabCaseRoutes } from './lab-cases.js';
 import { registerSompoVehicleRoutes } from './sompo-vehicles.js';
+import { lerMaxPorConta, recusarAcimaDoLimite } from './ws-limites.js';
+import { ligarPulso, lerPulsoMs, marcarVivo } from './ws-pulso.js';
 import { registerStandRoutes } from './stand/rotas.js';
 import { cabecalhosDeSeguranca } from './cabecalhos-seguranca.js';
+import { conexaoDaMesmaOrigem, criarGameplayAoVivo, RETRATO_MAX_BYTES } from './gameplay-ao-vivo.js';
+import { fecharSocketsDasSessoes, VARREDURA_EXPIRADAS_MS } from './ws-sessao.js';
 
 const app = express();
 const personaRunJobs = createPersonaRunJobStore();
@@ -264,7 +268,9 @@ const PERSONA_ROSTER_SYNC_INTERVAL_MS = Math.max(
 app.disable('x-powered-by');
 app.set('trust proxy', 'loopback');
 app.use((req, res, next) => {
-  for (const [nome, valor] of Object.entries(cabecalhosDeSeguranca(req.path))) res.setHeader(nome, valor);
+  const inicioBusca = req.originalUrl.indexOf('?');
+  const busca = inicioBusca < 0 ? '' : req.originalUrl.slice(inicioBusca);
+  for (const [nome, valor] of Object.entries(cabecalhosDeSeguranca(req.path, busca))) res.setHeader(nome, valor);
   if (req.path.startsWith('/api/')) {
     res.setHeader('Cache-Control', 'no-store');
   }
@@ -389,9 +395,12 @@ authService.registerAdminRoutes(app, {
 });
 
 const httpServer = createServer(app);
+const WS_MAX_POR_CONTA = lerMaxPorConta(process.env.LUCA_WS_MAX_POR_CONTA);
 const wss = new WebSocketServer({
   server: httpServer,
   path: '/ws',
+  // O cliente só manda o retrato do gameplay (≤2 KB); frame maior derruba a conexão antes do parse.
+  maxPayload: RETRATO_MAX_BYTES * 2,
   verifyClient(info, done) {
     const session = authService.sessionFromRequest(info.req, { touch: true });
     if (!session) {
@@ -399,15 +408,18 @@ const wss = new WebSocketServer({
       return;
     }
     info.req.auth = session;
-    authService.store.recordUsage(session.user.id, {
-      method: 'WS',
-      path: '/ws',
-      statusCode: 101,
-      websocket: true,
-    });
+    // O uso (websocketCount + gravação do auth-store) só conta depois do teto,
+    // na 'connection': recusa 1013 em laço não escreve em disco.
     done(true);
   },
 });
+// Heartbeat: socket meio-aberto cai em até 2 intervalos e libera a vaga do teto (ws-pulso.js).
+ligarPulso(wss, lerPulsoMs(process.env.LUCA_WS_PULSO_MS));
+const gameplayAoVivo = criarGameplayAoVivo();
+// Sessão revogada ou expirada fecha os sockets dela (4401); as outras sessões da conta seguem.
+authService.store.aoEncerrarSessoes((ids) => fecharSocketsDasSessoes(wss.clients, ids));
+const varreduraDeSessoes = setInterval(() => authService.store.encerrarExpiradas(), VARREDURA_EXPIRADAS_MS);
+varreduraDeSessoes.unref?.();
 
 let supervisorTimer = null;
 let heartbeatProcess = null;
@@ -4364,11 +4376,7 @@ app.use('/icons', express.static(path.resolve(process.cwd(), 'public', 'icons'))
 app.use('/datasets', express.static(path.resolve(process.cwd(), 'datasets')));
 
 if (fs.existsSync(indexPath)) {
-  app.use(precompressedModels(distPath));
-  app.use(express.static(distPath, { redirect: false }));
-  app.get('*splat', (_req, res) => {
-    res.sendFile('index.html', { root: distPath });
-  });
+  servirDist(app, distPath);
 } else if (fs.existsSync(v2IndexPath)) {
   app.use(express.static(v2DesignPath, { redirect: false }));
   app.get('*splat', (_req, res) => {
@@ -4379,11 +4387,25 @@ if (fs.existsSync(indexPath)) {
 wss.on('connection', (socket, req) => {
   const userId = req?.auth?.user?.id || null;
   socket.userId = userId;
+  // Frame acima do maxPayload (ou quadro inválido): o `ws` fecha com 1009/1002 e
+  // emite 'error' aqui; sem ouvinte, a exceção derrubava o processo inteiro.
+  socket.on('error', () => {});
+  marcarVivo(socket);
   if (!userId) {
     socket.close(1008, 'workspace_user_required');
     return;
   }
+  // Sessão que abriu o socket: logout/expiração dela fecha este socket (ws-sessao.js).
+  socket.sessionId = req?.auth?.session?.id || null;
   ensureWorkspace(userId);
+  // Teto por conta (LUCA_WS_MAX_POR_CONTA, padrão 8): o excedente fecha com 1013 antes do `state`.
+  if (recusarAcimaDoLimite(socket, wss.clients, WS_MAX_POR_CONTA)) return;
+  authService.store.recordUsage(userId, {
+    method: 'WS',
+    path: '/ws',
+    statusCode: 101,
+    websocket: true,
+  });
   runWithWorkspaceUser(userId, () => {
     socket.send(JSON.stringify({ kind: 'state', state: publicStateSnapshot() }));
   });
@@ -4392,6 +4414,12 @@ wss.on('connection', (socket, req) => {
       socket.send(JSON.stringify({ kind: 'sompo.telemetry', telemetry }));
     }
   }).catch(() => {});
+  // Totem → tablet do operador (inventário #3): só `gameplay:retrato`, só para a mesma conta.
+  socket.mesmaOrigem = conexaoDaMesmaOrigem(req?.headers);
+  gameplayAoVivo.aoConectar(socket);
+  socket.on('message', (dados, isBinary) => {
+    gameplayAoVivo.receber(socket, dados, { isBinary, clientes: wss.clients });
+  });
 });
 
 httpServer.listen(PORT, HOST, () => {

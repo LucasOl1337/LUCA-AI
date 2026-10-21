@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
+// HDR e texturas de superfície saem pelo nome com hash (LoadingManager do three).
+import './urlsPublicas';
 
 // Poly Haven CC0 assets, downloaded locally. Exact sources/credits: public/environments/sompo/LICENSE.txt.
 const ASSET_ROOT = '/environments/sompo/';

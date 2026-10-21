@@ -3,7 +3,11 @@
 // Prova que o toque abre o microfone, o áudio chega ao Scribe e a saudação toca,
 // e que, sem conexão, a página cai no modo sem voz em vez de ficar presa em
 // "Ligando o microfone…". Sob Playwright o `audioWorklet.addModule` não resolve
-// (19/10), então o caminho feliz também exercita a captura pelo ScriptProcessor.
+// sozinho: o Playwright anexa os alvos com `waitForDebuggerOnStart` e o alvo
+// `worklet` fica pausado esperando um debugger que nunca o solta (21/10). Sem
+// cliente CDP o módulo carrega em ~5 ms. Os testes que não chamam
+// `soltarWorklets` exercitam a reserva pelo ScriptProcessor; os que chamam,
+// o caminho do worklet, que é o do totem.
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -30,6 +34,21 @@ async function chromiumDisponivel() {
 
 const navegador = await chromiumDisponivel();
 
+/**
+ * Solta o worklet que o auto-attach do Playwright deixa pausado: anexa só os
+ * alvos `worklet` desta página e manda `runIfWaitingForDebugger`. Fica anexado
+ * (morre com a página): desanexar fazia o worklet seguinte às vezes não
+ * responder (21/10, 1 em 3). Chamar antes do `goto`.
+ */
+async function soltarWorklets(pagina) {
+  const cdp = await pagina.context().newCDPSession(pagina);
+  cdp.on('Target.attachedToTarget', ({ sessionId }) => {
+    const message = JSON.stringify({ id: 1, method: 'Runtime.runIfWaitingForDebugger' });
+    cdp.send('Target.sendMessageToTarget', { sessionId, message }).catch(() => { /* página fechou */ });
+  });
+  await cdp.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: true, flatten: false, filter: [{ type: 'worklet' }] });
+}
+
 /** WAV mono 16 bits: `silencioS` de silêncio e `vozS` de um tom alto, como alguém falando no microfone. */
 function wavDeEscuta(silencioS, vozS, hz = 24000) {
   const amostras = new Int16Array(Math.round((silencioS + vozS) * hz));
@@ -48,7 +67,8 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
   let base;
   let browser;
   let tcpMudo;
-  const scribe = { conexoes: 0, audios: 0, rajadas: [] };
+  /** `formatos`: taxa e bytes de PCM de cada `input_audio_chunk` que chega. */
+  const scribe = { conexoes: 0, audios: 0, rajadas: [], formatos: [] };
   const turnos = [];
   let modoSessao = 'ok';
   let escutaNoServidor = false;
@@ -114,8 +134,10 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
         let pedacos = 0;
         ws.on('message', (dados) => {
           try {
-            if (JSON.parse(String(dados)).message_type !== 'input_audio_chunk') return;
+            const mensagem = JSON.parse(String(dados));
+            if (mensagem.message_type !== 'input_audio_chunk') return;
             scribe.audios += 1;
+            scribe.formatos.push({ hz: mensagem.sample_rate, bytes: Buffer.from(mensagem.audio_base_64, 'base64').length });
             rajada.inicio ||= Date.now();
             if (Date.now() - rajada.inicio < 100) rajada.pedacos += 1;
             pedacos += 1;
@@ -147,10 +169,11 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
     if (pasta) rmSync(pasta, { recursive: true, force: true });
   });
 
-  async function abrirStand() {
+  async function abrirStand({ worklet = false } = {}) {
     const pagina = await browser.newPage();
     const avisos = [];
     pagina.on('console', (m) => avisos.push(m.text()));
+    if (worklet) await soltarWorklets(pagina);
     await pagina.goto(`${base}/stand`);
     await pagina.locator('main.stand[data-voz-stand="ligada"]').waitFor({ timeout: 15000 });
     await pagina.locator('main.stand').click({ position: { x: 40, y: 40 } });
@@ -172,6 +195,31 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
     assert.equal(await pagina.locator('main.stand').getAttribute('data-sessao'), 'ativa');
     assert.ok(!avisos.some((a) => /turno falhou/.test(a)), avisos.join('\n'));
     await pagina.close();
+  });
+
+  it('captura pelo worklet (o caminho do totem): sem reserva, mesmo formato do ScriptProcessor', async () => {
+    modoSessao = 'ok';
+    // Referência: o caminho da reserva, como o Playwright deixa sem ajuda.
+    const formatosDaReserva = [...scribe.formatos];
+    assert.ok(formatosDaReserva.length >= 5, 'o teste anterior mandou áudio pelo ScriptProcessor');
+    const conexoesAntes = scribe.conexoes;
+    const pedacosAntes = scribe.formatos.length;
+    const { pagina, avisos } = await abrirStand({ worklet: true });
+    try {
+      await pagina.waitForFunction(() => document.querySelector('main.stand')?.dataset.sessao === 'ativa');
+      const prazo = Date.now() + 12000;
+      while (scribe.formatos.length - pedacosAntes < 20 && Date.now() < prazo) await new Promise((ok) => setTimeout(ok, 100));
+      assert.equal(scribe.conexoes, conexoesAntes + 1);
+      assert.ok(!avisos.some((a) => /worklet do microfone falhou/.test(a)), `caiu na reserva:\n${avisos.join('\n')}`);
+      const doWorklet = scribe.formatos.slice(pedacosAntes);
+      assert.ok(doWorklet.length >= 20, `áudio do worklet chegou ao Scribe (${doWorklet.length} pedaços)`);
+      // Mesmo contrato nos dois caminhos: PCM16 a 24 kHz em blocos de 50 ms (1200 amostras).
+      const formato = (lista) => [...new Set(lista.map((f) => `${f.hz} Hz, ${f.bytes} B`))];
+      assert.deepEqual(formato(doWorklet), ['24000 Hz, 2400 B']);
+      assert.deepEqual(formato(formatosDaReserva), ['24000 Hz, 2400 B']);
+    } finally {
+      await pagina.close();
+    }
   });
 
   it('sessão que não responde cai no modo sem voz em até 8 s', async () => {
@@ -254,6 +302,8 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
     const antes = scribe.conexoes;
     const pagina = await browserEscuta.newPage();
     try {
+      // Relógio falso correndo em tempo real, para o teste poder adiantar a barra (abaixo).
+      await pagina.clock.install();
       await pagina.goto(`${base}/stand`);
       const main = pagina.locator('main.stand');
       await pagina.locator('main.stand[data-escuta="ouvindo"]').waitFor({ timeout: 15000 });
@@ -263,8 +313,11 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
         botao.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
       });
       await pagina.locator('main.stand[data-modo="vitrine"][data-escuta="ouvindo"]').waitFor({ timeout: 5000 });
-      // Barra apagada (5 s): a linha fixa aparece.
-      await pagina.locator('.stand-linha-escuta', { hasText: 'O LUCA só ouve quando você fala com ele.' }).waitFor({ timeout: 8000 });
+      // Barra apagada (5 s): a linha fixa aparece. O relógio da página pula os 5 s da barra;
+      // esperar em tempo real disputava com o despertar do WAV (5 s de silêncio desde a
+      // abertura do microfone): sob carga a voz chegava antes e a linha some na conversa.
+      await pagina.clock.fastForward(5_500);
+      await pagina.locator('.stand-linha-escuta', { hasText: 'O LUCA só ouve quando você fala com ele.' }).waitFor({ timeout: 3000 });
       // 1º despertar sem palavra: a sessão abre e fecha sem tirar a Vitrine.
       await pagina.locator('main.stand[data-escuta="conversa"]').waitFor({ timeout: 15000 });
       assert.equal(await main.getAttribute('data-modo'), 'vitrine', 'despertar sem palavra não corta a Vitrine');
@@ -293,13 +346,26 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
           window.__permitirMicrofone = () => original(opcoes).then(resolve, reject);
         });
       });
+      // Relógio da página parado: os 10 s contam do setTimeout do app, não de quando o teste
+      // percebe o "abrindo" (sob carga essa percepção atrasava mais de 0,5 s e a ajuda saía
+      // "cedo" no relógio do teste). A montagem anda em passos de 100 ms (o Suspense do React
+      // usa timer), então ao ver "abrindo" o prazo da ajuda já correu entre 0 e 100 ms.
+      await pagina.clock.install();
+      await pagina.clock.pauseAt(Date.now() + 1000);
       await pagina.goto(`${base}/stand`);
-      await pagina.locator('main.stand[data-escuta="abrindo"]').waitFor({ timeout: 15000 });
-      const inicio = Date.now();
+      const abrindo = pagina.locator('main.stand[data-escuta="abrindo"]');
+      const limite = Date.now() + 15000;
+      while (Date.now() < limite && await abrindo.count() === 0) { await pagina.clock.runFor(100); await pagina.waitForTimeout(20); }
+      await abrindo.waitFor({ timeout: 1000 });
       await pagina.getByText('Ligando o microfone…').waitFor();
-      await pagina.getByText('Permita o microfone pra conversar com o LUCA.').waitFor({ timeout: 12000 });
-      assert.ok(Date.now() - inicio >= 9500, 'não mostrou ajuda antes dos 10 s');
+      await pagina.clock.runFor(9_800);
+      assert.equal(await pagina.locator('main.stand').getAttribute('data-escuta'), 'abrindo', 'não mostrou ajuda antes dos 10 s');
+      assert.equal(await pagina.getByText('Permita o microfone pra conversar com o LUCA.').count(), 0);
+      await pagina.clock.runFor(200);
+      await pagina.getByText('Permita o microfone pra conversar com o LUCA.').waitFor({ timeout: 3000 });
       assert.equal(await pagina.locator('main.stand').getAttribute('data-escuta'), 'ajuda_microfone');
+      // Daqui em diante o relógio volta a correr: o prazo do worklet (2,5 s) precisa passar sozinho.
+      await pagina.clock.resume();
       await pagina.evaluate(() => {
         const botao = [...document.querySelectorAll('.stand-barra button')].find((b) => b.textContent.includes('Vitrine'));
         botao.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));

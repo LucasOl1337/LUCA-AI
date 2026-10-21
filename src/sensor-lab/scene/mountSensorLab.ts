@@ -19,6 +19,8 @@ import { createMotionRig } from './motionRig';
 import { createPostChain } from './post';
 import { BENCH, createRoom, STAGE, SUN_DIRECTION } from './room';
 import { createScope } from './scope';
+import { soltarLutCompartilhada } from '../../components/sompo/soltarLutCompartilhada';
+import { soltarOrbit } from '../../components/sompo/soltarOrbit';
 
 export type SensorView = 'bancada' | 'caminhao' | 'chip' | 'massa' | 'dedos';
 export type SensorLabEvent = { kind: 'atencao' | 'risco' | 'tombou' | 'frenada' | 'impacto'; reading: SensorReading };
@@ -616,6 +618,7 @@ export function mountSensorLab(container: HTMLElement, options: SensorLabOptions
     restart() { simTime = 0; scope.reset(); },
     dispose() {
       disposed = true;
+      soltarLutCompartilhada(renderer, scene);
       cancelAnimationFrame(raf);
       resizeObserver.disconnect();
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
@@ -623,7 +626,7 @@ export function mountSensorLab(container: HTMLElement, options: SensorLabOptions
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
       renderer.domElement.removeEventListener('pointercancel', onPointerUp);
       renderer.domElement.removeEventListener('dblclick', onDoubleClick);
-      controls.dispose();
+      soltarOrbit(controls);
       labels.dispose();
       hint.remove();
       rig.dispose();
@@ -636,6 +639,7 @@ export function mountSensorLab(container: HTMLElement, options: SensorLabOptions
       post.dispose();
       environment.dispose();
       renderer.dispose();
+      renderer.forceContextLoss();
       renderer.domElement.remove();
       if (debugTarget.__sensorLab) delete debugTarget.__sensorLab;
     },

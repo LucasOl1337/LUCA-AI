@@ -4,3 +4,5 @@
 .gameplay-kiosk-palco:active { cursor: grabbing; }
 .gameplay-kiosk-palco canvas { display: block; width: 100%; height: 100%; }
 .gameplay-kiosk .gameplay-desafio { position: absolute; inset: 0; pointer-events: none; }
+/* Selo de FPS (/gameplay?fps=1): canto superior esquerdo, sobre o teto da cabine, longe do painel e do mapa, sem pegar clique. */
+.gameplay-selo-fps { position: absolute; left: 10px; top: 10px; z-index: 6; display: flex; gap: 10px; padding: 4px 9px; border-radius: 8px; background: #000000a6; color: #d9f2e3; font: 600 12px/1.4 ui-monospace, monospace; pointer-events: none; }

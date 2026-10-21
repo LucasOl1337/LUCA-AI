@@ -1,36 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { Camera, CameraOff, Eye, ShieldCheck, Square, Volume2 } from 'lucide-react';
 import { DrowsinessAlarm } from './alarm';
-import { describeCameraStream, formatCameraQuality, openPreferredCamera } from './camera.js';
-import { CLOSED_DURATION_MS, SENSITIVITY_THRESHOLDS, createEyeMonitor, normalizeEyeClosure, type EyeReading, type EyeSample } from './eye-state.js';
+import { formatCameraQuality } from './camera.js';
+import { CLOSED_DURATION_MS, SENSITIVITY_THRESHOLDS, normalizeEyeClosure, type EyeReading, type EyeSample } from './eye-state.js';
+import { criarMonitorSonolencia, EMPTY_READING, faltaNoNavegador, mensagemErroCamera, type MonitorSonolencia } from './monitor';
 import './sonolencia.css';
 
 type Phase = 'idle' | 'starting' | 'running' | 'error';
 type Sensitivity = keyof typeof SENSITIVITY_THRESHOLDS;
-type Session = {
-  disposed: boolean; alarm?: DrowsinessAlarm; stream?: MediaStream; worker?: Worker;
-  tick?: number; timeout?: number; rejectInit?: () => void;
-};
-const EMPTY: EyeReading = { status: 'unknown', closedMs: 0, alarm: false };
+/** Sessão da página: o laço câmera → detector mora em `monitor.ts` (o mesmo do /gameplay?webcam=1). */
+type Session = { disposed: boolean; alarm?: DrowsinessAlarm; monitor?: MonitorSonolencia; timeout?: number };
+const EMPTY: EyeReading = EMPTY_READING;
 const STATUS = { unknown: 'Posicione seu rosto', open: 'Olhos abertos', closed: 'Olhos fechados', alarm: 'Alerta de sonolência' };
 const CLOSED_DURATION_SECONDS = CLOSED_DURATION_MS / 1000;
 
 function release(session: Session) {
   session.disposed = true;
-  clearInterval(session.tick);
   clearTimeout(session.timeout);
-  session.rejectInit?.();
-  session.worker?.terminate();
-  session.stream?.getTracks().forEach(track => track.stop());
+  session.monitor?.parar();
   session.alarm?.close();
-}
-
-function cameraError(error: unknown) {
-  const name = error instanceof Error ? error.name : '';
-  if (name === 'NotAllowedError' || name === 'SecurityError') return 'A câmera foi bloqueada. Permita a webcam nas configurações deste site e tente novamente.';
-  if (name === 'NotFoundError') return 'Nenhuma webcam encontrada. Conecte uma câmera e tente novamente.';
-  if (name === 'NotReadableError' || name === 'AbortError') return 'Não foi possível abrir a webcam. Feche outros aplicativos que usam a câmera e tente novamente.';
-  return error instanceof Error ? error.message : 'Não foi possível iniciar o monitor. Tente novamente.';
 }
 
 export default function SonolenciaPage() {
@@ -97,12 +85,8 @@ export default function SonolenciaPage() {
 
   async function start() {
     if (current.current) return;
-    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
-      stop('A webcam precisa de HTTPS e de um navegador compatível, como Chrome ou Edge atualizado.', true); return;
-    }
-    if (!window.Worker || !window.createImageBitmap || !window.OffscreenCanvas) {
-      stop('Este navegador não oferece os recursos necessários. Abra no Chrome ou Edge atualizado.', true); return;
-    }
+    const falta = faltaNoNavegador();
+    if (falta) { stop(falta, true); return; }
     if (testSound.current) { release(testSound.current); testSound.current = null; setSoundTesting(false); }
     const session: Session = { disposed: false };
     current.current = session;
@@ -111,70 +95,22 @@ export default function SonolenciaPage() {
       session.alarm = new DrowsinessAlarm();
       await session.alarm.unlock();
       if (session.disposed) return;
-      const stream = await openPreferredCamera(navigator.mediaDevices);
-      if (session.disposed) { stream.getTracks().forEach(track => track.stop()); return; }
-      session.stream = stream;
-      const cameraQuality = describeCameraStream(stream);
-      for (const track of stream.getVideoTracks()) {
-        track.addEventListener('ended', () => { if (!session.disposed) stop('A webcam foi desconectada. Reconecte e ative o monitor novamente.', true); });
-        track.addEventListener('mute', () => { if (!session.disposed) stop('A webcam deixou de enviar imagens. Ative o monitor novamente.', true); });
-      }
-      const element = video.current!;
-      element.srcObject = stream;
-      await element.play();
-      if (session.disposed) return;
-      setMessage('Preparando detector de olhos. Na primeira vez, isso pode levar alguns segundos…');
-      const worker = new Worker(new URL('./drowsiness-worker.ts', import.meta.url));
-      session.worker = worker;
-      await new Promise<void>((resolve, reject) => {
-        session.rejectInit = () => reject(new Error('Inicialização cancelada.'));
-        session.timeout = window.setTimeout(() => reject(new Error('O detector demorou a carregar. Confira sua conexão e tente novamente.')), 45000);
-        worker.onerror = () => reject(new Error('Não foi possível carregar o detector. Atualize a página e tente novamente.'));
-        worker.onmessage = ({ data }) => {
-          if (data.type === 'ready') resolve();
-          else if (data.type === 'error') reject(new Error('O detector não iniciou neste navegador. Tente no Chrome ou Edge atualizado.'));
-        };
-        worker.postMessage({ type: 'init' });
+      const alarm = session.alarm;
+      session.monitor = criarMonitorSonolencia({
+        video: video.current!,
+        limiar: SENSITIVITY_THRESHOLDS[sensitivity],
+        aoEtapa: () => setMessage('Preparando detector de olhos. Na primeira vez, isso pode levar alguns segundos…'),
+        verificar: () => (alarm.available ? null : 'O áudio foi interrompido. Ative o monitor novamente para rearmar o alarme.'),
+        aoLer: (next, sample) => {
+          setReading(next); setScores(sample);
+          if (next.alarm) alarm.start(); else alarm.stop();
+        },
+        aoFalhar: (mensagem) => { if (!session.disposed) stop(mensagem, true); },
       });
-      clearTimeout(session.timeout); session.rejectInit = undefined;
-      if (session.disposed) return;
-      const monitor = createEyeMonitor(SENSITIVITY_THRESHOLDS[sensitivity]);
-      let inFlight = false;
-      let lastVideoTime = -1;
-      let lastResultAt = performance.now();
-      worker.onerror = () => { if (!session.disposed) stop('O detector foi interrompido. Ative o monitor novamente.', true); };
-      worker.onmessage = ({ data }) => {
-        if (session.disposed) return;
-        if (data.type === 'error') { stop('Não foi possível analisar a imagem da webcam. Tente novamente.', true); return; }
-        if (data.type !== 'result') return;
-        inFlight = false;
-        const now = performance.now();
-        lastResultAt = now;
-        // A delayed inference cannot prove that the eyes remained closed.
-        const fresh = now - data.at <= 500;
-        const sample: EyeSample = fresh ? data.sample : null;
-        const next = monitor.update(sample, data.at);
-        setReading(next); setScores(sample);
-        if (next.alarm) session.alarm!.start(); else session.alarm!.stop();
-      };
+      const cameraQuality = await session.monitor.iniciar();
+      if (session.disposed || !cameraQuality) return;
       setPhase('running'); setMessage(`${formatCameraQuality(cameraQuality)} Mantenha seu rosto de frente para a câmera, com boa iluminação.`);
-      session.tick = window.setInterval(async () => {
-        if (session.disposed) return;
-        if (!session.alarm!.available) { stop('O áudio foi interrompido. Ative o monitor novamente para rearmar o alarme.', true); return; }
-        const now = performance.now();
-        if (now - lastResultAt > 500) {
-          monitor.reset(); session.alarm!.stop(); setReading(EMPTY); setScores(null);
-        }
-        if (now - lastResultAt > 8000) { stop('A análise da câmera parou de responder. Ative o monitor novamente.', true); return; }
-        if (inFlight || element.readyState < 2 || element.currentTime === lastVideoTime) return;
-        inFlight = true; lastVideoTime = element.currentTime;
-        try {
-          const bitmap = await createImageBitmap(element);
-          if (session.disposed) { bitmap.close(); return; }
-          worker.postMessage({ type: 'frame', bitmap, at: now }, [bitmap]);
-        } catch { if (!session.disposed) stop('Não foi possível ler a webcam. Ative o monitor novamente.', true); }
-      }, 100);
-    } catch (error) { if (!session.disposed) stop(cameraError(error), true); }
+    } catch (error) { if (!session.disposed) stop(mensagemErroCamera(error), true); }
   }
 
   const active = phase === 'running' || phase === 'starting';

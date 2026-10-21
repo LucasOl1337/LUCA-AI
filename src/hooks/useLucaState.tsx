@@ -15,6 +15,9 @@ import type {
   TemporaryDashboard,
   WsPayload,
 } from '@/lib/types';
+import { aoVivo, TIPO_RETRATO } from '@/lib/gameplayAoVivo';
+import { criarReligador, ligarCicloDaPagina, WS_CODIGO_LIMITE } from '@/lib/religaWs';
+import { sessaoRecusada } from '@/lib/sessaoRecusada';
 
 const fallbackDatabase: DatabaseState = {
   source: { name: 'database indisponivel', topic: 'LUCA-AI' },
@@ -350,7 +353,6 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let socket: WebSocket | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let pollTimer: ReturnType<typeof setTimeout> | null = null;
     let closed = false;
 
@@ -369,25 +371,35 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
       }, delay);
     }
 
+    // Sem servidor agora: o religador tenta de novo; antes desistia e só um F5 trazia o /ws de volta.
+    const religador = criarReligador(connect);
+
     async function connect() {
       const hasBackend = await refresh();
-      if (!hasBackend || closed) return;
+      if (closed) return true;
+      if (!hasBackend) return false;
+      // A página escondeu durante o refresh: não abre; o `pageshow` retoma.
+      if (religador.pausado()) return false;
       socket = new WebSocket(wsUrl());
+      const aberto = socket;
 
       socket.addEventListener('open', () => {
         setBackendReady(true);
         setConnectionState('online');
-        if (reconnectTimer) {
-          clearTimeout(reconnectTimer);
-          reconnectTimer = null;
-        }
+        aoVivo.ligar((texto) => { if (aberto.readyState === WebSocket.OPEN) aberto.send(texto); });
       });
 
-      socket.addEventListener('close', () => {
+      socket.addEventListener('close', (evento) => {
+        aoVivo.ligar(null);
         setBackendReady(false);
         setConnectionState('offline');
         setSompoTelemetry(current => current ? { ...current, freshness: 'stale', connection: { ...current.connection, state: 'reconnecting' } } : null);
-        if (!closed) reconnectTimer = setTimeout(connect, 3000);
+        // 4401 = sessão encerrada no servidor: o AuthProvider revalida e leva ao login.
+        // O religador segue: se outra aba já trocou o cookie por um válido, o /ws volta.
+        sessaoRecusada.avisarFechamentoWs(evento.code);
+        // 1013 = teto de sockets da conta: religa com backoff em vez de bater a cada 3 s.
+        if (evento.code === WS_CODIGO_LIMITE) religador.recusado();
+        if (!closed) religador.agendar();
       });
 
       socket.addEventListener('error', () => {
@@ -399,16 +411,22 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
       socket.addEventListener('message', (message) => {
         try {
           const payload = JSON.parse(message.data) as WsPayload;
-          if (payload.kind === 'state') syncState(payload.state);
+          if (payload.kind === 'state') { religador.aceito(); syncState(payload.state); }
           if (payload.kind === 'event') applyBackendEvent(payload.event);
           if (payload.kind === 'sompo.telemetry') setSompoTelemetry(payload.telemetry);
+          if (payload.kind === TIPO_RETRATO) aoVivo.receber(payload.estado, payload.idadeMs, payload.oculto === true, payload.sono ?? null);
         } catch {
           // Payload invalido nao deve derrubar a interface.
         }
       });
+      return true;
     }
 
-    void connect();
+    void religador.tentar();
+    // Sair da página (inclusive para o back/forward cache) devolve a vaga do teto por conta já.
+    const soltarCicloDaPagina = typeof window !== 'undefined'
+      ? ligarCicloDaPagina(window, religador, () => { if (socket && socket.readyState <= WebSocket.OPEN) socket.close(1000, 'pagehide'); })
+      : () => {};
     if (typeof document !== 'undefined') {
       pageVisibleRef.current = document.visibilityState !== 'hidden';
       const onVisibilityChange = () => {
@@ -434,8 +452,9 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
         document.removeEventListener('visibilitychange', onVisibilityChange);
         window.removeEventListener('focus', onAttention);
         window.removeEventListener('pageshow', onAttention);
+        soltarCicloDaPagina();
+        religador.parar();
         if (socket) socket.close();
-        if (reconnectTimer) clearTimeout(reconnectTimer);
         if (pollTimer) clearTimeout(pollTimer);
         if (eventRefreshTimerRef.current) clearTimeout(eventRefreshTimerRef.current);
         clearCloudRefreshTimers();
@@ -446,8 +465,9 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       closed = true;
+      soltarCicloDaPagina();
+      religador.parar();
       if (socket) socket.close();
-      if (reconnectTimer) clearTimeout(reconnectTimer);
       if (pollTimer) clearTimeout(pollTimer);
       if (eventRefreshTimerRef.current) clearTimeout(eventRefreshTimerRef.current);
       clearCloudRefreshTimers();

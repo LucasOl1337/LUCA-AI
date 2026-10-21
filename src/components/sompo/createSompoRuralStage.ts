@@ -20,6 +20,8 @@ import { SOMPO_STUDIO_DEFAULT, type SompoStudioConfig, type SompoRenderStats } f
 import { createPhysicalTwinEffects } from './createPhysicalTwinEffects';
 import type { PhysicalTwin } from './usePhysicalTwin';
 import { sompoOverviewOffset, SOMPO_OVERVIEW_TARGET } from './fitSompoOverview';
+import { soltarLutCompartilhada } from './soltarLutCompartilhada';
+import { soltarOrbit } from './soltarOrbit';
 
 function dampAngle(current: number, target: number, factor: number) {
   const shortestTurn = Math.atan2(Math.sin(target - current), Math.cos(target - current));
@@ -152,7 +154,8 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     const roadScene = createSompoRoadScene(scene, renderer, camera, { onHdri: (kind, tex) => atmosphere.setSkyTexture(kind, tex) });
     const meter = createSompoRenderMeter(renderer, onStats);
     const postProcessing = createSompoPostProcessing(renderer, scene, camera);
-    if (location.hostname === '127.0.0.1') Object.assign(window, { __sompoDebug: { scene, camera, renderer, postProcessing } });
+    const debug = { scene, camera, renderer, postProcessing };
+    if (location.hostname === '127.0.0.1') Object.assign(window, { __sompoDebug: debug });
     const frontArrow = new THREE.ArrowHelper(
       new THREE.Vector3(1, 0, 0),
       new THREE.Vector3(1.4, 0.06, -2.25),
@@ -687,6 +690,9 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
     frameId = window.requestAnimationFrame(render);
 
     return { ...api, dispose() {
+      soltarLutCompartilhada(renderer, scene);
+      const w = window as { __sompoDebug?: unknown };
+      if (w.__sompoDebug === debug) delete w.__sompoDebug;
       assetAbort.abort();
       modular?.dispose();
       atmosphere.dispose();
@@ -695,7 +701,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       window.cancelAnimationFrame(frameId);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       resizeObserver.disconnect();
-      orbit.dispose();
+      soltarOrbit(orbit);
       disposeSompoObject(scene);
       postProcessing.dispose();
       environment.dispose();

@@ -26,6 +26,7 @@ import type {
   YumePersonaSummary,
 } from './types';
 import { buildApiErrorMessage, requestJson } from './requestTimeout';
+import { sessaoRecusada } from './sessaoRecusada';
 import {
   PersonaRunWatchError,
   startAndWatchPersonaTeamRun,
@@ -59,7 +60,8 @@ export async function fetchState(): Promise<LucaState | null> {
     return await requestJson(apiUrl('/api/state'), {
       timeoutMs: STATE_REQUEST_TIMEOUT_MS,
     }) as LucaState;
-  } catch {
+  } catch (error) {
+    sessaoRecusada.avisar(Number((error as { status?: number } | null)?.status) || 0);
     return null;
   }
 }

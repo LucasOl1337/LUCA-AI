@@ -10,11 +10,13 @@ import { nudgeLook, stepLook, type LookState } from '../sompo/firstPersonLook';
 import { applyDeadZone, type GamepadLike } from '../sompo/gamepadMapping';
 import { firstStandardPad, rumble } from '../sompo/gamepadLoop';
 import { DesafioCabine } from './DesafioCabine';
+import SeloFps from './SeloFps';
 import { criarMotorGameplay, vibracaoDoEvento, type MotorGameplay } from './motorGameplay';
 import { relevoRampaLateral } from './rampaLateral';
 import { anguloAroRad, bordaReiniciar, comandoDesejado, setaDaTecla, SETAS_SOLTAS, type SetasVolante } from './volante';
 import type { CabineGameplay, CriarCabineGameplay } from './cabineGameplay';
 import type { ObstaculoGameplay } from './estadoGameplay';
+import { aoVivo } from '@/lib/gameplayAoVivo';
 import './gameplayKiosk.css';
 
 /** Palco do case do fardo: talhão diurno, Trator MAX, sem roteiro (quem move é o motor). */
@@ -53,8 +55,9 @@ function zumbidoMotor(acelerador: number, velocidadeKph: number) {
  * nada no servidor; □ △ ○ ficam livres, Options reinicia o desafio.
  * `criarCabine` é o ponto da Visual: monta sobre a máquina e recebe o ângulo do aro.
  * `modeloUrl` troca o GLB do MAX (ex.: variante com cabine); sem ele, o do catálogo.
+ * `seloFps` (/gameplay?fps=1) mostra o selo de FPS no canto; sem ele nada é montado.
  */
-export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = createFirstPersonRig }: { criarCabine?: CriarCabineGameplay; modeloUrl?: string; criarCamera?: CriarCameraGameplay }) {
+export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = createFirstPersonRig, seloFps = false }: { criarCabine?: CriarCabineGameplay; modeloUrl?: string; criarCamera?: CriarCameraGameplay; seloFps?: boolean }) {
   const motor = useMemo(() => criarMotorGameplay(), []);
   const raizRef = useRef<HTMLDivElement>(null);
   const palcoRef = useRef<HTMLDivElement>(null);
@@ -85,7 +88,16 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
     raiz.dataset.contato = String(estado.contato);
     raiz.dataset.rumoGraus = estado.maquina.rumoGraus.toFixed(1);
     raiz.dataset.esterco = estado.comandos.esterco.toFixed(2);
+    // Tablet do operador (inventário #3): sem sessão (StandSemLogin) não há /ws e isto não faz nada.
+    aoVivo.enviar(estado);
   }), [motor]);
+
+  // Aba oculta (ensaio da feira, C3): o rAF para; o tablet troca "ao vivo" congelado por "jogo pausado".
+  useEffect(() => {
+    const trocar = () => aoVivo.marcarOculto(document.hidden);
+    document.addEventListener('visibilitychange', trocar);
+    return () => { document.removeEventListener('visibilitychange', trocar); aoVivo.esquecer(); };
+  }, []);
 
   useEffect(() => {
     const mount = palcoRef.current;
@@ -189,6 +201,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
         }}
       />
       <DesafioCabine key={rodada} canal={motor} />
+      {seloFps && <SeloFps palcoRef={palcoRef} />}
     </div>
   );
 }

@@ -47,11 +47,7 @@ for key in ('ROUTER_API_KEY', 'KAMUI_INTERNAL_API_TOKEN'):
     if not existing.get(key, '').strip().strip('\"\''):
         raise SystemExit(f'required service setting missing: {key}')
 values = {
-    'ROUTER_BASE_URL': 'https://9router-production-056a.up.railway.app/v1',
-    'ROUTER_MODEL': 'cx/gpt-6-astra-high',
-    'MISSION_TRANSFORMER_MODEL': 'cx/gpt-6-astra-high',
-    'DESIGNER_MODEL': 'cx/gpt-6-astra-high',
-    'MAESTRO_MODEL': 'cx/gpt-6-astra-high',
+    'LUCA_CAMERA_ENABLED': 'false',
 }
 lines = [line for line in p.read_text().splitlines() if line.split('=', 1)[0] not in values]
 p.write_text('\n'.join(lines + [f'{k}={v}' for k, v in values.items()]) + '\n')

@@ -7,8 +7,8 @@ import zlib from 'node:zlib';
 import express from 'express';
 import { precompressedModels } from './precompressed-models.js';
 
-async function serve() {
-  const root = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'luca-br-'));
+async function serve(pai = process.env.TMPDIR || os.tmpdir()) {
+  const root = fs.mkdtempSync(path.join(pai, 'luca-br-'));
   fs.mkdirSync(path.join(root, 'models'));
   const glb = Buffer.from('glTF'.repeat(4096));
   fs.writeFileSync(path.join(root, 'models', 'tree.glb'), glb);
@@ -25,7 +25,7 @@ async function serve() {
       const chunks = []; res.on('data', c => chunks.push(c)); res.on('end', () => resolve({ res, body: Buffer.concat(chunks) }));
     }).on('error', reject));
   });
-  return { glb, get, close: () => { server.close(); fs.rmSync(root, { recursive: true, force: true }); } };
+  return { root, glb, get, close: () => { server.close(); fs.rmSync(root, { recursive: true, force: true }); } };
 }
 
 test('precompressed GLB is served with Brotli only to clients that accept it', async () => {
@@ -55,4 +55,52 @@ test('precompressed lookup never leaves the served root', async () => {
     const bad = await get('/models/%E0%A4%A.glb', 'br');
     assert.notEqual(bad.res.headers['content-encoding'], 'br');
   } finally { close(); }
+});
+
+// Antes desta prova a suíte falhava só para quem tinha TMPDIR dentro de pasta com
+// ponto (~/.jcode/scratch): o send recusava o caminho absoluto como dotfile (404).
+test('dist dentro de pasta com ponto (~/.algo/dist) ainda serve o .br', async () => {
+  const pai = fs.mkdtempSync(path.join(os.tmpdir(), 'luca-br-ponto-'));
+  const comPonto = path.join(pai, '.oculta');
+  fs.mkdirSync(comPonto);
+  const { glb, get, close } = await serve(comPonto);
+  try {
+    const br = await get('/models/tree.glb', 'br');
+    assert.equal(br.res.statusCode, 200);
+    assert.equal(br.res.headers['content-encoding'], 'br');
+    assert.deepEqual(zlib.brotliDecompressSync(br.body), glb);
+  } finally { close(); fs.rmSync(pai, { recursive: true, force: true }); }
+});
+
+test('se o .br não pode ser enviado, o original sai sem Content-Encoding: br', async () => {
+  const { root, glb, get, close } = await serve();
+  try {
+    // Existe, mas não é arquivo: o sendFile falha e o middleware cai no estático.
+    fs.mkdirSync(path.join(root, 'models', 'plain.glb.br'));
+    const res = await get('/models/plain.glb', 'br');
+    assert.equal(res.res.statusCode, 200);
+    assert.equal(res.res.headers['content-encoding'], undefined);
+    assert.deepEqual(res.body, glb);
+  } finally { close(); }
+});
+
+test('precompress-models comprime o GLB do avatar do stand, fora de models/ (coruja 3D, 1,6 MB → ~1 MB)', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const root = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'luca-br-dist-'));
+  try {
+    const glb = Buffer.from('glTF'.repeat(8192));
+    const textura = (await import('node:crypto')).randomBytes(32768);
+    for (const rel of ['models/arvore.glb', 'stand/avatar/coruja-3d/coruja-3d.glb']) {
+      fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+      fs.writeFileSync(path.join(root, rel), glb);
+    }
+    fs.writeFileSync(path.join(root, 'stand/avatar/textura.glb'), textura);
+    const script = new URL('../scripts/precompress-models.mjs', import.meta.url).pathname;
+    const run = spawnSync(process.execPath, [script, root], { encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stderr);
+    for (const rel of ['models/arvore.glb', 'stand/avatar/coruja-3d/coruja-3d.glb']) {
+      assert.deepEqual(zlib.brotliDecompressSync(fs.readFileSync(path.join(root, `${rel}.br`))), glb, rel);
+    }
+    assert.equal(fs.existsSync(path.join(root, 'stand/avatar/textura.glb.br')), false, 'quem encolhe menos de 10% fica sem .br');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });

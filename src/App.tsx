@@ -20,6 +20,7 @@ const SensorLabPage = lazy(() => import('@/sensor-lab/SensorLabPage'));
 const StandPage = lazy(() => import('@/pages/StandPage'));
 const TotemPage = lazy(() => import('@/pages/TotemPage'));
 const GameplayPage = lazy(() => import('@/pages/GameplayPage'));
+const OperadorPage = lazy(() => import('@/pages/OperadorPage'));
 
 export default function App() {
   const { user } = useAuth();
@@ -55,6 +56,7 @@ export default function App() {
       case 'admin':       return <AdminPage />;
       case 'totem':       return <Suspense fallback={<p role="status" className="p-8">Abrindo Totem…</p>}><TotemPage /></Suspense>;
       case 'gameplay':    return <Suspense fallback={<p role="status" className="p-8">Abrindo Gameplay…</p>}><GameplayPage /></Suspense>;
+      case 'operador':    return <Suspense fallback={<p role="status" className="p-8">Abrindo o painel do operador…</p>}><OperadorPage /></Suspense>;
       case 'stand':       return null;
     }
   };
@@ -68,6 +70,11 @@ export default function App() {
         </Suspense>
       </ChatLibraryProvider>
     );
+  }
+
+  // /gameplay?quiosque=1: totem da feira só com a cabine, sem sidebar nem dock (F5 volta jogando).
+  if (authorizedPage === 'gameplay' && location.quiosque === '1') {
+    return <Suspense fallback={<div className="stand-carregando" role="status">Abrindo o Gameplay…</div>}><GameplayPage /></Suspense>;
   }
 
   // Página dentro do iframe do /stand (Totem-Site Q3): só a página e o Executor, sem menu nem chat.

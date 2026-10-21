@@ -1,0 +1,33 @@
+/* Webcam de sonolência na cabine (/gameplay?webcam=1): canto de cima à direita.
+ * Faixa de alerta no alto ao centro, painel embaixo à esquerda e mapa embaixo à
+ * direita: o canto de cima à direita é o único livre na vista de frente. */
+.gameplay-webcam {
+  position: absolute; top: 2.4vh; right: 1.6vw; z-index: 6; width: clamp(150px, 15vw, 240px);
+  display: grid; gap: 6px; padding: 6px 6px 8px; border-radius: 14px;
+  background: #07110ee6; border: 2px solid #ffffff22; color: #edf3ed;
+  font-size: clamp(11px, 1.4vh, 14px); font-variant-numeric: tabular-nums;
+  transition: border-color .15s, box-shadow .15s;
+}
+.gameplay-webcam-quadro { position: relative; aspect-ratio: 16 / 9; border-radius: 9px; overflow: hidden; background: #0b1712; }
+/* Espelhada como a /sonolencia: quem se vê na tela pisca do mesmo lado. */
+.gameplay-webcam video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.gameplay-webcam-aviso { position: absolute; inset: 0; margin: 0; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; color: #b9cdbf; font-size: .9em; line-height: 1.35; }
+.gameplay-webcam-linha { display: flex; align-items: center; gap: 7px; padding: 0 4px; }
+.gameplay-webcam-linha strong { font-weight: 700; }
+.gameplay-webcam-linha small { margin-left: auto; color: #b9cdbf; }
+.gameplay-webcam-ponto { width: 8px; height: 8px; border-radius: 50%; background: #738297; flex: none; }
+.gameplay-webcam progress { width: 100%; height: 5px; border: 0; border-radius: 4px; overflow: hidden; accent-color: #f2c14e; background: #263443; }
+.gameplay-webcam progress::-webkit-progress-bar { background: #263443; }
+.gameplay-webcam progress::-webkit-progress-value { background: #f2c14e; }
+.gameplay-webcam button {
+  pointer-events: auto; margin: 0 4px; min-height: 32px; border-radius: 8px; border: 1px solid #ffffff33;
+  background: #1c2a24; color: #edf3ed; font: inherit; font-weight: 700; cursor: pointer;
+}
+.gameplay-webcam[data-sono='open'] .gameplay-webcam-ponto { background: #4fbf7a; }
+.gameplay-webcam[data-sono='closed'] { border-color: #f2c14e; }
+.gameplay-webcam[data-sono='closed'] .gameplay-webcam-ponto { background: #f2c14e; }
+.gameplay-webcam[data-sono='alarm'] { border-color: #e5483b; box-shadow: 0 0 26px #e5483b88; }
+.gameplay-webcam[data-sono='alarm'] .gameplay-webcam-ponto { background: #e5483b; }
+.gameplay-webcam[data-sono='alarm'] strong { color: #ff8a80; }
+.gameplay-webcam[data-sono='alarm'] progress::-webkit-progress-value { background: #e5483b; }
+.gameplay-webcam[data-fase='erro'] { border-color: #e5483b99; }

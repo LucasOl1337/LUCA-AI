@@ -3,6 +3,7 @@ import { splitGeneratedTruckParts } from './splitGeneratedTruckParts';
 import { restoreSompoTextures, useSompoExternalTextures } from './restoreSompoTextures';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SOMPO_TRUCK_FRONT_X, SOMPO_TRUCK_HALF_SIZE, type SompoTruckModel } from './createSompoTruckModel';
+import { urlPublica } from './urlsPublicas';
 
 // Main model: local image → Hunyuan3D-2.1 reconstruction, with generated PBR textures.
 // Exact inputs, parameters and limitations: public/models/sompo/generated-rural-truck.provenance.json.
@@ -173,7 +174,7 @@ let preloadedBufferPromise: Promise<ArrayBuffer> | null = null;
 export function preloadSompoTruckAsset(): Promise<ArrayBuffer> | null {
   if (typeof fetch === 'undefined') return null;
   if (!preloadedBufferPromise) {
-    preloadedBufferPromise = fetch(SOMPO_TRUCK_ASSET_URL)
+    preloadedBufferPromise = fetch(urlPublica(SOMPO_TRUCK_ASSET_URL))
       .then((response) => {
         if (!response.ok) throw new Error(`Truck asset preload: HTTP ${response.status}`);
         return response.arrayBuffer();
@@ -193,12 +194,12 @@ async function readTruckAsset(url: string, signal: AbortSignal) {
       const preloaded = await preloadedBufferPromise;
       arrayBuffer = preloaded.slice(0);
     } catch {
-      const response = await fetch(url, { signal });
+      const response = await fetch(urlPublica(url), { signal });
       if (!response.ok) throw new Error(`Truck asset: HTTP ${response.status}`);
       arrayBuffer = await response.arrayBuffer();
     }
   } else {
-    const response = await fetch(url, { signal });
+    const response = await fetch(urlPublica(url), { signal });
     if (!response.ok) throw new Error(`Truck asset: HTTP ${response.status}`);
     arrayBuffer = await response.arrayBuffer();
   }

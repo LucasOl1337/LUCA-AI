@@ -49,10 +49,27 @@
 .gameplay-painel-lado strong { font-size: clamp(22px, 3.6vh, 42px); font-weight: 750; }
 .gameplay-painel-lado [data-alerta='true'] strong { color: var(--gp-perigo); }
 
-/* No resultado a faixa de alerta já cumpriu o papel e não disputa o cartão. */
-.gameplay-desafio[data-etapa='resultado'] .gameplay-painel-alerta { display: none; }
+/* Bordas vermelhas de "dano": centro livre para dirigir, vermelho só nas bordas. */
+.gameplay-painel-vinheta {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background: radial-gradient(ellipse 78% 72% at 50% 50%, transparent 50%, #e5483b66 74%, #b3110ce0 100%);
+  transition: opacity .12s;
+}
+.gameplay-painel-vinheta[data-nivel='alerta'] { animation: gameplay-dano .5s ease-in-out infinite alternate; }
+.gameplay-painel-vinheta[data-nivel='critica'] {
+  background: radial-gradient(ellipse 72% 66% at 50% 50%, transparent 45%, #e5483b80 72%, #c00d06ee 100%);
+  animation: gameplay-dano .25s ease-in-out infinite alternate;
+}
+@keyframes gameplay-dano { from { opacity: .45; } to { opacity: 1; } }
 
-@media (prefers-reduced-motion: reduce) { .gameplay-painel-alerta { animation: none; } }
+/* No resultado a faixa de alerta já cumpriu o papel e não disputa o cartão. */
+.gameplay-desafio[data-etapa='resultado'] .gameplay-painel-alerta,
+.gameplay-desafio[data-etapa='resultado'] .gameplay-painel-vinheta { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .gameplay-painel-alerta { animation: none; }
+  .gameplay-painel-vinheta[data-nivel='alerta'], .gameplay-painel-vinheta[data-nivel='critica'] { animation: none; opacity: .8; }
+}
 
 /* Abertura e Resultado do desafio: cartão central, sem placar. */
 .gameplay-resultado, .gameplay-abertura {
@@ -71,3 +88,6 @@
 .gameplay-resultado p { margin: 2.6vh 0 0; font-size: clamp(16px, 2.4vh, 26px); color: #c9dccf; }
 .gameplay-resultado small { display: block; margin-top: 1.6vh; color: #8fa897; font-size: clamp(12px, 1.6vh, 16px); }
 .gameplay-abertura p { margin: 0; font-size: clamp(22px, 4vh, 46px); font-weight: 750; }
+
+/* O minimapa do talhão tem CSS próprio (mapaTalhao.css), importado pelo MapaTalhao. */
+.gameplay-desafio[data-etapa='resultado'] .gameplay-mapa { display: none; }

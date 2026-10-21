@@ -1,0 +1,74 @@
+{
+  "asset": "coruja-3d.glb",
+  "generatedBy": "Tripo Studio (studio.tripo3d.ai), imagem -> 3D (H3.1, PBR) e Auto Rig \"Other\" (avian), pela conta do dono",
+  "createdAt": "2026-10-21",
+  "reference": "Imagem frontal de corpo inteiro gerada por cx/gpt-5.6-sol-image (9Router) a partir de public/stand/avatar/coruja-a/coruja-a-1024.png, para manter a identidade da Coruja A",
+  "tripoProject": "f66f3bb8-0f29-4aa1-89a8-15564f97ac2b",
+  "tripoUrl": "https://studio.tripo3d.ai/workspace/generate/f66f3bb8-0f29-4aa1-89a8-15564f97ac2b",
+  "tripoOperations": {
+    "generate": "be17927f-e461-403c-9033-824fb1141468",
+    "autoRig": "3756a343-ec50-45d7-bd60-b396e7c5350a"
+  },
+  "tripoCredits": 75,
+  "tripoExport": {
+    "faces": 30000,
+    "format": "glb (meshopt + quantização, decodificado com gltf-transform dequantize)",
+    "sourceSha256": "69f3b94a6438ad474d9d7ef2bf9a90b2f9cb3569bbd42c74fcbc742cb59e6f02",
+    "sourceBytes": 11227456,
+    "sourceTriangles": 29196,
+    "joints": 60
+  },
+  "packaging": {
+    "tool": "Blender 5.2.0 LTS, scripts/stand/package-coruja-3d.py",
+    "decimate": {
+      "type": "COLLAPSE",
+      "ratio": 4.543793632202729e+30,
+      "delimit": [
+        "SEAM",
+        "UV"
+      ]
+    },
+    "atlas": 1024,
+    "jpegQuality": 84,
+    "emissive": "frisos azul-claros da cor base (visor, fones, microfone), 512 px",
+    "rosto": "malha CorujaRosto (100% tripo::Head_2) com morph targets piscar e bico_abre e interior da boca no material coruja-3d-boca (sem textura), e bico_abre na malha principal (só o bico de cima dobra para cima), scripts/stand/coruja3d_rosto.py"
+  },
+  "morphTargets": {
+    "Coruja": [
+      "bico_abre"
+    ],
+    "CorujaRosto": [
+      "piscar",
+      "bico_abre"
+    ]
+  },
+  "animations": {
+    "aceno": 78,
+    "falando": 120,
+    "ocioso": 180,
+    "ouvindo": 120,
+    "pensando": 150
+  },
+  "fps": 30,
+  "triangles": 20468,
+  "boundsM": {
+    "min": [
+      -0.2892150282859802,
+      -5.8906152844429016e-08,
+      -0.4914973974227905
+    ],
+    "max": [
+      0.2892151474952698,
+      0.9710081815719604,
+      0.4918997585773468
+    ]
+  },
+  "axes": {
+    "up": "+Y",
+    "front": "+X (o componente gira -90° em Y para olhar a câmera)"
+  },
+  "externalManifest": "coruja-3d.textures.json",
+  "reproducibleCommand": "gltf-transform dequantize RIG_TRIPO.glb rig-decoded.glb && blender -b --factory-startup --python scripts/stand/package-coruja-3d.py -- rig-decoded.glb public/stand/avatar/coruja-3d",
+  "sha256": "a731b8815ff07e0ab74f1b9a01124f9b6c2c8f2783355bca026977a2c6d11917",
+  "bytes": 1676780
+}

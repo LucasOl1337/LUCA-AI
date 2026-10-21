@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { GLTF, GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { urlPublica } from './urlsPublicas';
 
 type TextureInfo = { index: number; texCoord?: number };
 type MaterialDefinition = {
@@ -26,7 +27,7 @@ export function useSompoExternalTextures(loader: GLTFLoader) {
  * Never infer bindings from material.map: it can already be missing after the failure.
  */
 export async function restoreSompoTextures(gltf: GLTF, assetUrl: string, signal: AbortSignal) {
-  const response = await fetch(assetUrl.replace(/\.glb(?:\?.*)?$/, '.textures.json'), { signal });
+  const response = await fetch(urlPublica(assetUrl.replace(/\.glb(?:\?.*)?$/, '.textures.json')), { signal });
   if (!response.ok) throw new Error(`Sompo texture manifest: HTTP ${response.status}`);
   const manifest: { images: string[]; alphaMaps?: Record<string, string> } = await response.json();
   const base = assetUrl.slice(0, assetUrl.lastIndexOf('/') + 1);

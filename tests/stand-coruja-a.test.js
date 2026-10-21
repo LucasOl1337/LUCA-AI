@@ -14,7 +14,7 @@ const semSorte = () => 0.5;
 
 test('coruja A é a padrão e as antigas seguem por ?variante=', () => {
   assert.equal(VARIANTE_PADRAO, 'coruja-a');
-  assert.deepEqual([...VARIANTES_AVATAR], ['coruja-a', 'coruja', 'operario', 'robo']);
+  assert.deepEqual([...VARIANTES_AVATAR], ['coruja-a', 'coruja-3d', 'coruja', 'operario', 'robo']);
   const svg = renderToStaticMarkup(createElement(AvatarLuca, { parado: true }));
   assert.match(svg, /data-variante="coruja-a"/);
   assert.match(svg, /href="\/stand\/avatar\/coruja-a\/coruja-a\.webp"/);
