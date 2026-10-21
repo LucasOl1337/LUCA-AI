@@ -345,5 +345,10 @@
   .stand-menu { width: 100%; }
   .stand-menu-lista { grid-template-columns: 1fr 1fr; }
 }
+/* A webcam da coruja fica no canto esquerdo, logo acima da barra permanente: a assinatura
+   desvia dela para não ter o começo coberto ("LUCA-AI · demonstração"). */
+@media (min-aspect-ratio: 4 / 5) {
+  .stand[data-modo='coruja'] .stand-marca { padding-left: clamp(170px, 17vw, 300px); text-align: right; }
+}
 /* No modo Site o retorno fica na coluna da coruja (fora da página emoldurada). */
 .stand[data-modo='site'] .stand-status-acao { top: var(--stand-margem); bottom: auto; left: auto; right: var(--stand-margem); transform: none; box-sizing: border-box; width: 22vmin; max-width: none; font-size: clamp(12px, 1.7vmin, 26px); }
