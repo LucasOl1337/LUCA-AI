@@ -1,6 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { alertaCabine, type AlertaCabine, type BipeCabine } from './alertaCabine';
 import type { CanalGameplay, EstadoGameplay } from './estadoGameplay';
+import { MapaTalhao } from './MapaTalhao';
 import './painelCabine.css';
 
 /**
@@ -39,6 +40,7 @@ export function PainelCabineVista({ painel, estado }: { painel: AlertaCabine; es
         </div>
         <span className="gameplay-painel-marca">LUCA-AI</span>
       </section>
+      <MapaTalhao estado={estado} geofence={painel.geofence} />
     </div>
   );
 }
