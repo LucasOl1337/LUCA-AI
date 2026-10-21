@@ -64,6 +64,6 @@
   },
   "externalManifest": "coruja-3d.textures.json",
   "reproducibleCommand": "gltf-transform dequantize RIG_TRIPO.glb rig-decoded.glb && blender -b --factory-startup --python scripts/stand/package-coruja-3d.py -- rig-decoded.glb public/stand/avatar/coruja-3d",
-  "sha256": "23dba422597eee4c8139685da12fd8f61a10f7a87ff2f68c806e61544217123c",
-  "bytes": 1623692
+  "sha256": "b72c05061e73c7416a43504e8d154be6d0872b2a55315728c0a67044230c44eb",
+  "bytes": 1623720
 }

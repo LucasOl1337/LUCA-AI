@@ -14,7 +14,7 @@ malha pequena à parte (`CorujaRosto`) com o mesmo material e a mesma skin,
   (projetar o UV ponto a ponto puxava trechos de outras ilhas). Em repouso
   ela fica comprimida numa faixa fina 0,8 mm atrás da superfície, escondida.
 - `bico_abre`: uma mandíbula inferior (cunha) que em repouso fica dentro do
-  bico superior e gira 32° para baixo numa dobradiça atrás. O topo é escuro
+  bico superior e gira 45° para baixo numa dobradiça atrás. O topo é escuro
   (interior da boca), o resto tem o azul do bico.
 
 Coordenadas do Blender: frente +X, cima +Z, asa direita em -Y. Contornos dos
@@ -39,8 +39,10 @@ CONTORNO_OLHO = [
 ]
 LINHAS_PELE = (0.0, 0.2, 0.4, 0.6, 0.8, 0.9)  # fração do topo até a base
 FRENTE_M, ATRAS_M, PASSO_REPOUSO_M, BOJO_M = 0.0012, 0.0008, 0.0003, 0.0030
-DOBRADICA_X, PONTA_X, MEIA_LARGURA = 0.189, 0.226, 0.015
-ABERTURA_GRAUS = 32.0
+DOBRADICA_X, PONTA_X, MEIA_LARGURA = 0.189, 0.232, 0.015
+# O gancho do bico de cima desce até z≈0,634 em x≈0,235: com menos de ~40° a
+# mandíbula fica escondida atrás dele na vista de frente do totem.
+ABERTURA_GRAUS = 45.0
 JANELA_PX = 4  # meia janela (px) para medir o quanto o texel é liso
 
 
@@ -176,7 +178,7 @@ def _mandibula(cons, sup, uv_bico, uv_escuro):
         for v in vs:
             y = v * MEIA_LARGURA * (1 - 0.6 * u * u)
             zb = sup.de_baixo(x, y).z + 0.0012
-            espessura = 0.0035 * (1 - 0.6 * u)
+            espessura = 0.008 * (1 - 0.6 * u)  # cresce para dentro do bico de cima (cabe: ele tem 7–20 cm de altura ali)
             pb, pt = Vector((x, y, zb)), Vector((x, y, zb + espessura))
             lf.append(cons.vertice(pb, bico_abre=giro @ pb))
             lt.append(cons.vertice(pt, bico_abre=giro @ pt))
