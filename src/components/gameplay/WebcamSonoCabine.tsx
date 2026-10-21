@@ -38,7 +38,10 @@ export default function WebcamSonoCabine() {
     setFase('abrindo'); setErro('');
     const atual = criarMonitorSonolencia({
       video: video.current,
-      // Frame de 640 px para o worker: a cabine 3D já disputa a CPU do totem.
+      // Frame de 640 px para o worker. Medido (scripts/gameplay-webcam-custo.mjs, 21/10):
+      // ~3 ms/s de JS na thread principal (≈0,02 ms por quadro a 165 fps), 10
+      // classificações/s, ~14 ms por inferência no worker. 320 px poupou só ~2 ms
+      // por inferência e encolhe o rosto de quem senta longe da câmera; ficou 640.
       larguraAnalise: 640,
       aoLer: (leitura) => { if (monitor.current === atual) sonoCabine.definir({ status: leitura.status, closedMs: leitura.closedMs }); },
       aoFalhar: (mensagem) => {
