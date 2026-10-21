@@ -15,3 +15,21 @@ placement. No photo, image texture or downloaded geometry is embedded.
 
 Each .provenance.json records the construction method, measured triangle
 count, output hash, steering-wheel pivot and known limits.
+
+Tripo Studio props
+------------------
+- cabine-console.glb, cabine-banco.glb, fardo-feno.glb, cabine-volante.glb and
+  cabine-teto.glb, with their -basecolor/-normal/-metallicroughness.jpg
+  textures, were generated from text prompts in Tripo Studio
+  (studio.tripo3d.ai) with the owner's paid subscription, which grants
+  commercial use of the generated models. They were decimated and their atlases
+  reduced by scripts/gameplay/package-tripo-props.py. Each .provenance.json
+  records the Tripo project, prompt, source hash and packaging.
+
+Poly Haven texture
+------------------
+- cabine-detalhe-couro.jpg packs the OpenGL normal (R, G) and roughness (B) of
+  "Fabric Leather 02" by Rob Tuytel, Poly Haven
+  (https://polyhaven.com/a/fabric_leather_02), 1k JPG, licensed CC0 1.0
+  (public domain). Used as a triplanar detail map on the cabin plastics in
+  src/components/gameplay/visual/materialCabine.ts.

@@ -1,0 +1,55 @@
+{
+  "asset": "cabine-volante.glb",
+  "generatedBy": "Tripo Studio (studio.tripo3d.ai), texto -> 3D com textura PBR detalhada, pela conta do dono",
+  "createdAt": "2026-10-21",
+  "tripoProject": "77b91aba-e09f-4a00-a6cd-44839b797bb7",
+  "tripoUrl": "https://studio.tripo3d.ai/workspace/generate/77b91aba-e09f-4a00-a6cd-44839b797bb7",
+  "prompt": "Tractor steering wheel only: round black three-spoke steering wheel with a thick textured rubber grip rim, a dark grey centre hub cap and a small black spinner knob on the rim, realistic PBR game prop, no logos, no text, no steering column, no base",
+  "tripoExport": {
+    "faces": 15000,
+    "textureResolution": 2048,
+    "format": "glb",
+    "sourceSha256": "a47757d1baa52b18486df44db8810b2b94a3d78701cb9c72eac9c78591da76a7",
+    "sourceBytes": 2064812,
+    "sourceTriangles": 14714
+  },
+  "packaging": {
+    "tool": "Blender 5.2.0 LTS, scripts/gameplay/package-tripo-props.py",
+    "decimate": {
+      "type": "COLLAPSE",
+      "ratio": 0.4757,
+      "delimit": [
+        "SEAM",
+        "UV"
+      ]
+    },
+    "atlas": 1024,
+    "jpegQuality": 82
+  },
+  "triangles": 7000,
+  "boundsM": {
+    "min": [
+      -0.531463623046875,
+      -0.3547751307487488,
+      -0.5203427672386169
+    ],
+    "max": [
+      0.5209734439849854,
+      0.07836811244487762,
+      0.5212433338165283
+    ]
+  },
+  "axes": {
+    "axis": "+Y (eixo da coluna, face do aro para o operador)",
+    "spokeDown": "-Z",
+    "origin": "centro do aro",
+    "rimRadiusM": 0.4651,
+    "rimOuterRadiusM": 0.5301,
+    "spokeDownAlignedRad": 0.611
+  },
+  "externalManifest": "cabine-volante.textures.json",
+  "license": "GAMEPLAY-ASSET-LICENSE.txt",
+  "reproducibleCommand": "blender -b --factory-startup --python scripts/gameplay/package-tripo-props.py -- .sompo-preview/gv2/tripo public/models/gameplay",
+  "sha256": "fc988ef02a861e131b427af40025a96ff6325993f013c6b196068522ffe0a26a",
+  "bytes": 368548
+}
