@@ -234,3 +234,117 @@ describe('ensaio da feira de ponta a ponta', { skip: navegador ? false : 'sem Ch
     assert.equal(await tablet.locator('.operador').count(), 0, 'o painel com o usuário antigo saiu da tela');
   });
 });
+
+// Cenários do /ws posteriores ao #48, cada um com o PR que protege:
+//   f) #38 (4991cc2): Sair numa aba fecha o /ws da sessão com 4401 e a outra aba vai ao login
+//      sem esperar o poll do /api/state (bloqueado aqui, para não confundir com o C6 do b).
+//   g) #43 (b0a7eba): com LUCA_WS_MAX_POR_CONTA=1, a segunda tela da conta é recusada (1013)
+//      e não martela: no máximo 1 tentativa a cada 3 s.
+//   h) #47 (2ee3df5): com o back/forward cache ligado, a aba A sai da página e a vaga volta:
+//      a aba B da mesma conta entra ao vivo.
+describe('ensaio da feira: sessão e teto do /ws', { skip: navegador ? false : 'sem Chromium para o Playwright' }, () => {
+  let browser;
+  let direto;
+  let comTeto;
+  const limpezas = [];
+  const ctx = { after: (fn) => limpezas.push(fn) };
+
+  async function pagina(base, cookie) {
+    const c = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const [n, v] = cookie.split('=');
+    await c.addCookies([{ name: n, value: v, url: base }]);
+    return c;
+  }
+  /** Conta os /ws que a página abre e quantos o servidor aceitou (receberam o `state`). */
+  function vigiarWs(page) {
+    const r = { abertos: [], aceitos: 0 };
+    page.on('websocket', (ws) => {
+      if (!ws.url().endsWith('/ws')) return;
+      r.abertos.push(Date.now());
+      let aceito = false;
+      ws.on('framereceived', ({ payload }) => {
+        if (!aceito && String(payload).startsWith('{"kind":"state"')) { aceito = true; r.aceitos += 1; }
+      });
+    });
+    return r;
+  }
+  async function conta(base, email) {
+    await entrar(base, 'register', { name: email, email, password: SENHA });
+    return entrar(base, 'login', { email, password: SENHA });
+  }
+
+  before(async () => {
+    const pasta = await temporary(ctx);
+    const dist = join(pasta, 'dist');
+    await buildSemWebgl(dist);
+    direto = await borda(ctx, dist, await runtime(ctx, join(pasta, 'a')));
+    comTeto = await borda(ctx, dist, await runtime(ctx, join(pasta, 'b'), { LUCA_WS_MAX_POR_CONTA: '1' }));
+    // Sem o --disable-back-forward-cache do Playwright: o h) precisa do bfcache de verdade.
+    browser = await navegador.chromium.launch({ executablePath: navegador.caminho, ignoreDefaultArgs: ['--disable-back-forward-cache'] });
+  });
+
+  after(async () => {
+    await browser?.close();
+    for (const fn of limpezas.reverse()) await fn();
+  });
+
+  it('f) Sair numa aba: a outra aba do /operador vai ao login pelo 4401 em até 3 s (#38)', async () => {
+    const c = await pagina(direto, await conta(direto, 'sair@feira-e2e.test'));
+    const [a, b] = [await c.newPage(), await c.newPage()];
+    const wsB = vigiarWs(b);
+    await a.goto(`${direto}/operador`);
+    await b.goto(`${direto}/operador`);
+    await a.locator('.operador').waitFor({ timeout: 10_000 });
+    await b.locator('.operador').waitFor({ timeout: 10_000 });
+    for (let i = 0; i < 50 && wsB.aceitos === 0; i++) await new Promise((r) => setTimeout(r, 100));
+    assert.equal(wsB.aceitos, 1, 'a aba B está com o /ws aberto');
+    // O poll do /api/state da aba B não responde mais: só o 4401 do /ws pode levá-la ao login.
+    await b.route('**/api/state', (rota) => rota.abort());
+    const t0 = Date.now();
+    await a.getByRole('button', { name: 'Sair da conta' }).click();
+    await b.waitForSelector('input[type=password]', { timeout: 3_000 })
+      .catch(() => assert.fail('a outra aba não foi ao login em 3 s depois do Sair'));
+    console.log(`# f) outra aba no login ${Date.now() - t0} ms depois do Sair`);
+    await c.close();
+  });
+
+  it('g) teto 1 por conta: a segunda tela é recusada (1013) e tenta no máximo 1 vez a cada 3 s (#43)', async () => {
+    const c = await pagina(comTeto, await conta(comTeto, 'teto@feira-e2e.test'));
+    const [a, b] = [await c.newPage(), await c.newPage()];
+    const wsA = vigiarWs(a);
+    const wsB = vigiarWs(b);
+    await a.goto(`${comTeto}/operador`);
+    for (let i = 0; i < 100 && wsA.aceitos === 0; i++) await new Promise((r) => setTimeout(r, 100));
+    assert.equal(wsA.aceitos, 1, 'a primeira tela entrou');
+    await b.goto(`${comTeto}/operador`);
+    await b.locator('.operador').waitFor({ timeout: 10_000 });
+    const t0 = Date.now();
+    await new Promise((r) => setTimeout(r, 9_000));
+    const janela = (Date.now() - t0) / 1000;
+    assert.equal(wsB.aceitos, 0, 'a segunda tela da conta não pode entrar com o teto 1');
+    assert.ok(wsB.abertos.length >= 1, 'a segunda tela tentou');
+    // Tentativas dentro da janela: a primeira (ao abrir) + no máximo 1 a cada 3 s.
+    const naJanela = wsB.abertos.filter((t) => t >= t0).length;
+    assert.ok(naJanela <= Math.ceil(janela / 3), `martelou: ${naJanela} tentativas em ${janela.toFixed(1)} s`);
+    console.log(`# g) segunda tela: ${wsB.abertos.length} tentativas no total, ${naJanela} em ${janela.toFixed(1)} s, 0 aceitas`);
+    await c.close();
+  });
+
+  it('h) teto 1: a aba A sai da página e a aba B entra ao vivo (#47)', async () => {
+    const c = await pagina(comTeto, await conta(comTeto, 'vaga@feira-e2e.test'));
+    const [a, b] = [await c.newPage(), await c.newPage()];
+    const wsA = vigiarWs(a);
+    const wsB = vigiarWs(b);
+    await a.goto(`${comTeto}/operador`);
+    for (let i = 0; i < 100 && wsA.aceitos === 0; i++) await new Promise((r) => setTimeout(r, 100));
+    assert.equal(wsA.aceitos, 1, 'a aba A entrou');
+    // Navega para fora (mesma origem, documento sem /ws): sem o #47 a página vai pro bfcache com o socket aberto.
+    await a.goto(`${comTeto}/api/health`);
+    const t0 = Date.now();
+    await b.goto(`${comTeto}/operador`);
+    for (let i = 0; i < 80 && wsB.aceitos === 0; i++) await new Promise((r) => setTimeout(r, 100));
+    assert.equal(wsB.aceitos, 1, `a aba B não entrou em 8 s depois de a aba A sair (${wsB.abertos.length} tentativas recusadas)`);
+    console.log(`# h) aba B ao vivo ${Date.now() - t0} ms depois de a aba A sair (${wsB.abertos.length} tentativa(s))`);
+    await c.close();
+  });
+});
