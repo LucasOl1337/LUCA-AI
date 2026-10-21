@@ -89,20 +89,5 @@
 .gameplay-resultado small { display: block; margin-top: 1.6vh; color: #8fa897; font-size: clamp(12px, 1.6vh, 16px); }
 .gameplay-abertura p { margin: 0; font-size: clamp(22px, 4vh, 46px); font-weight: 750; }
 
-/* Minimapa do talhão (geofence): canto de baixo à direita, fora do volante e do painel. */
-.gameplay-mapa {
-  position: absolute; right: 2.4vw; bottom: 3vh; margin: 0; width: clamp(150px, 17vh, 230px);
-  padding: 8px 8px 6px; border-radius: 14px; background: #07110ee0; border: 2px solid #ffffff22;
-  display: grid; gap: 4px; transition: border-color .15s;
-}
-.gameplay-mapa svg { display: block; width: 100%; height: auto; }
-.gameplay-mapa figcaption { font-size: clamp(11px, 1.4vh, 15px); font-weight: 700; color: #b9cdbf; text-align: center; white-space: nowrap; }
-.gameplay-mapa-talhao { fill: #2f5a2b; stroke: #9fc9ad66; stroke-width: 1; }
-.gameplay-mapa-encosta { fill: #8a6d3b88; }
-.gameplay-mapa-zona { fill: #e5483b55; stroke: #e5483b; stroke-width: 1.2; stroke-dasharray: 3 2; }
-.gameplay-mapa-zona[data-ativa='true'] { fill: #e5483baa; }
-.gameplay-mapa-maquina path { fill: #f6f3e8; stroke: #07110e; stroke-width: .8; }
-.gameplay-mapa[data-geofence='rumo'] { border-color: var(--gp-atencao); }
-.gameplay-mapa[data-geofence='dentro'] { border-color: var(--gp-perigo); }
-.gameplay-mapa[data-geofence='dentro'] figcaption { color: #ff6a5c; }
+/* O minimapa do talhão tem CSS próprio (mapaTalhao.css), importado pelo MapaTalhao. */
 .gameplay-desafio[data-etapa='resultado'] .gameplay-mapa { display: none; }

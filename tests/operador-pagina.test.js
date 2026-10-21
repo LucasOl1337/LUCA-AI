@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -48,15 +50,49 @@ test('retrato velho: sem sinal há N s, mantendo o último mapa', () => {
   assert.match(h, /gameplay-mapa/);
 });
 
+/**
+ * Todo CSS que a página do operador carrega: segue os imports locais (`@/`, `./`)
+ * a partir do OperadorPage.tsx, inclusive os de componentes importados, porque o
+ * Vite junta o CSS de toda a árvore no chunk da página. `import type` não conta.
+ */
+function cssDoOperador() {
+  const src = fileURLToPath(new URL('../src/', import.meta.url));
+  const vistos = new Set();
+  const css = new Map();
+  const resolver = (de, alvo) => {
+    const base = alvo.startsWith('@/') ? path.join(src, alvo.slice(2)) : path.resolve(path.dirname(de), alvo);
+    for (const c of [base, `${base}.ts`, `${base}.tsx`, path.join(base, 'index.ts')]) if (existsSync(c) && statSync(c).isFile()) return c;
+    return null;
+  };
+  const visitar = (arquivo) => {
+    if (vistos.has(arquivo)) return;
+    vistos.add(arquivo);
+    const fonte = readFileSync(arquivo, 'utf8');
+    for (const [, tipo, alvo] of fonte.matchAll(/^import\s+(type\s+)?(?:[^'"]*?\sfrom\s+)?['"]([^'"]+)['"]/gm)) {
+      if (tipo || !(alvo.startsWith('@/') || alvo.startsWith('.'))) continue;
+      const destino = resolver(arquivo, alvo);
+      assert.ok(destino, `import não resolvido: ${alvo} em ${arquivo}`);
+      if (destino.endsWith('.css')) css.set(path.relative(src, destino), readFileSync(destino, 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''));
+      else if (/\.tsx?$/.test(destino)) visitar(destino);
+    }
+  };
+  visitar(path.join(src, 'pages/OperadorPage.tsx'));
+  return css;
+}
+
 // Com o /gameplay no mesmo navegador, animação infinita aqui derrubou o jogo de 42 para 23 fps.
-test('CSS do operador: nada infinito, keyframes só com opacity/transform, sem filter', () => {
-  const css = readFileSync(new URL('../src/pages/operadorPage.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-  assert.doesNotMatch(css, /infinite/);
-  assert.doesNotMatch(css, /filter\s*:/);
-  for (const [, corpo] of css.matchAll(/@keyframes[^{]+\{((?:[^{}]*\{[^}]*\})*)\s*\}/g)) {
-    for (const [, prop] of corpo.matchAll(/([a-z-]+)\s*:/g)) assert.ok(['opacity', 'transform'].includes(prop), `keyframe anima ${prop}`);
+test('CSS do operador (todos os imports): nada infinito, keyframes só com opacity/transform, sem filter', () => {
+  const todos = cssDoOperador();
+  assert.ok(todos.has('pages/operadorPage.css'), `achou: ${[...todos.keys()]}`);
+  assert.ok(todos.size >= 2, `o mapa traz o próprio CSS; achou: ${[...todos.keys()]}`);
+  for (const [nome, css] of todos) {
+    assert.doesNotMatch(css, /infinite/, nome);
+    assert.doesNotMatch(css, /filter\s*:/, nome);
+    for (const [, corpo] of css.matchAll(/@keyframes[^{]+\{((?:[^{}]*\{[^}]*\})*)\s*\}/g)) {
+      for (const [, prop] of corpo.matchAll(/([a-z-]+)\s*:/g)) assert.ok(['opacity', 'transform'].includes(prop), `${nome}: keyframe anima ${prop}`);
+    }
   }
-  assert.match(css, /\.operador\[data-oculto\] \* \{ animation-play-state: paused/);
+  assert.match(todos.get('pages/operadorPage.css'), /\.operador\[data-oculto\] \* \{ animation-play-state: paused/);
 });
 
 test('aba oculta: marca data-oculto para pausar as animações', () => {

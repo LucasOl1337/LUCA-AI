@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { alertaCabine } from '@/components/gameplay/alertaCabine';
 import { MapaTalhao } from '@/components/gameplay/MapaTalhao';
-import { useBipeCabine } from '@/components/gameplay/PainelCabine';
+import { useBipeCabine } from '@/components/gameplay/bipeCabine';
 import { sinalAoVivo, useRetratoAoVivo, type RetratoAoVivo } from '@/lib/gameplayAoVivo';
-import '@/components/gameplay/painelCabine.css';
 import './operadorPage.css';
 
 /**
