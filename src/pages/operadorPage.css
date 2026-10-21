@@ -18,6 +18,9 @@
 .operador[data-sinal='ao-vivo'] .operador-sinal::before { background: var(--gp-livre); }
 .operador[data-sinal='sem-sinal'] .operador-sinal { border-color: var(--gp-atencao); color: #ffd98a; }
 .operador[data-sinal='sem-sinal'] .operador-sinal::before { background: var(--gp-atencao); }
+/* Aba do totem oculta: azul neutro, não é falha de rede. */
+.operador[data-sinal='pausado'] .operador-sinal { border-color: #53d4ff; color: #bfeaff; }
+.operador[data-sinal='pausado'] .operador-sinal::before { background: #53d4ff; }
 .operador-simulado { color: #ffd98a; letter-spacing: .08em; }
 .operador-som { color: #e8edf3; cursor: pointer; }
 .operador-som[aria-pressed='true'] { border-color: #53d4ff; }
@@ -31,6 +34,7 @@
 .operador-corpo { flex: 1; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(280px, 1fr); gap: clamp(12px, 2vw, 24px); align-items: start; }
 /* Só opacidade (sem filter): esmaecer não obriga a repintar a área inteira por filtro. */
 .operador[data-sinal='sem-sinal'] .operador-corpo { opacity: .5; }
+.operador[data-sinal='pausado'] .operador-corpo { opacity: .6; }
 /* Contenção: o retrato a 4 Hz só repinta dentro de cada caixa, sem layout da página. */
 .operador-mapa { display: flex; justify-content: center; contain: layout paint; }
 /* O minimapa da cabine vira o mapa principal: sai do canto e cresce. */
