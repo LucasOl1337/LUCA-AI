@@ -1,12 +1,12 @@
 /* Minimapa do talhão (geofence): canto de baixo à direita, fora do volante e do painel.
  * Arquivo próprio para o operador (tablet) carregar só o mapa, sem as animações da cabine. */
 .gameplay-mapa {
-  position: absolute; right: 2.4vw; bottom: 3vh; margin: 0; width: clamp(150px, 17vh, 230px);
+  position: absolute; right: 2.4cqw; bottom: 3cqh; margin: 0; width: clamp(150px, 17cqh, 230px);
   padding: 8px 8px 6px; border-radius: 14px; background: #07110ee0; border: 2px solid #ffffff22;
   display: grid; gap: 4px; transition: border-color .15s;
 }
 .gameplay-mapa svg { display: block; width: 100%; height: auto; }
-.gameplay-mapa figcaption { font-size: clamp(11px, 1.4vh, 15px); font-weight: 700; color: #b9cdbf; text-align: center; white-space: nowrap; }
+.gameplay-mapa figcaption { font-size: clamp(11px, 1.4cqh, 15px); font-weight: 700; color: #b9cdbf; text-align: center; white-space: nowrap; }
 .gameplay-mapa-talhao { fill: #2f5a2b; stroke: #9fc9ad66; stroke-width: 1; }
 .gameplay-mapa-encosta { fill: #8a6d3b88; }
 .gameplay-mapa-zona { fill: #e5483b55; stroke: #e5483b; stroke-width: 1.2; stroke-dasharray: 3 2; }
