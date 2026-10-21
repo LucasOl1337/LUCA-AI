@@ -219,11 +219,11 @@ import {
 import { registerSompoRiskRoutes } from './sompo-risk.js';
 import { registerLabCaseRoutes } from './lab-cases.js';
 import { registerSompoVehicleRoutes } from './sompo-vehicles.js';
+import { lerMaxPorConta, recusarAcimaDoLimite } from './ws-limites.js';
 import { registerStandRoutes } from './stand/rotas.js';
 import { cabecalhosDeSeguranca } from './cabecalhos-seguranca.js';
 import { conexaoDaMesmaOrigem, criarGameplayAoVivo, RETRATO_MAX_BYTES } from './gameplay-ao-vivo.js';
 import { fecharSocketsDasSessoes, VARREDURA_EXPIRADAS_MS } from './ws-sessao.js';
-import { lerMaxPorConta, recusarAcimaDoLimite } from './ws-limites.js';
 
 const app = express();
 const personaRunJobs = createPersonaRunJobStore();
@@ -392,6 +392,7 @@ authService.registerAdminRoutes(app, {
 });
 
 const httpServer = createServer(app);
+const WS_MAX_POR_CONTA = lerMaxPorConta(process.env.LUCA_WS_MAX_POR_CONTA);
 const wss = new WebSocketServer({
   server: httpServer,
   path: '/ws',
@@ -418,7 +419,6 @@ const gameplayAoVivo = criarGameplayAoVivo();
 authService.store.aoEncerrarSessoes((ids) => fecharSocketsDasSessoes(wss.clients, ids));
 const varreduraDeSessoes = setInterval(() => authService.store.encerrarExpiradas(), VARREDURA_EXPIRADAS_MS);
 varreduraDeSessoes.unref?.();
-const WS_MAX_POR_CONTA = lerMaxPorConta(process.env.LUCA_WS_MAX_POR_CONTA);
 
 let supervisorTimer = null;
 let heartbeatProcess = null;
@@ -4396,9 +4396,9 @@ wss.on('connection', (socket, req) => {
   }
   // Sessão que abriu o socket: logout/expiração dela fecha este socket (ws-sessao.js).
   socket.sessionId = req?.auth?.session?.id || null;
+  ensureWorkspace(userId);
   // Teto por conta (LUCA_WS_MAX_POR_CONTA, padrão 8): o excedente fecha com 1013 antes do `state`.
   if (recusarAcimaDoLimite(socket, wss.clients, WS_MAX_POR_CONTA)) return;
-  ensureWorkspace(userId);
   runWithWorkspaceUser(userId, () => {
     socket.send(JSON.stringify({ kind: 'state', state: publicStateSnapshot() }));
   });
