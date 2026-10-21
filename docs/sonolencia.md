@@ -41,4 +41,8 @@ node scripts/sonolencia-browser-check.mjs
 
 O teste de navegador só aceita localhost e cria conta descartável no estado local. Carrega o modelo/WASM real sob a CSP de produção, confirma que o modo negociado da webcam é exibido; em seguida injeta observações controladas para testar o instante do alarme e seus pulsos Web Audio, reabertura, perda de rosto, worker travado, permissão negada, cancelamento assíncrono, saída da aba, troca de políticas por navegação e layout mobile. Capturas em `output/sonolencia/` (ignoradas pelo Git).
 
+### Custo dentro do `/gameplay?webcam=1`
+
+`scripts/gameplay-webcam-custo.mjs` compara `/gameplay?quiosque=1` com e sem `&webcam=1` (trace CDP de 10 s) e mede a latência do alerta com um y4m que alterna olhos abertos/fechados e tem um marcador no canto. Abre WebGL: rodar pela fila pesada da bancada. Medição de 21/10 (frame de 640 px, 10 classificações/s): JS do monitor na thread principal ~3 ms por segundo (≈0,02 ms por quadro do jogo), inferência no worker ~14 ms (≈280 ms de CPU por segundo, fora da thread do jogo), fps igual nas duas variantes. O alerta acende ~1,2 s depois de o vídeo fechar os olhos: ~0,15 s até a primeira leitura "fechado" (ritmo de 100 ms + inferência) e 1 s exigido pelo `CLOSED_DURATION_MS`.
+
 Publicação segue `docs/operacao.md`: build limpo, commit/push, `npm run stage:release`, upload dos tarballs e `install-vm.sh` na **sennin-kvm**. Além de `/api/health`, verificar os cabeçalhos de `/sonolencia` e `/sompo`, MIME/tamanho do worker e `sonolencia-assets/face_landmarker.task` (3.758.596 bytes), para descartar fallback SPA.
