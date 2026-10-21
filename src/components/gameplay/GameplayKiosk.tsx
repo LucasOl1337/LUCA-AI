@@ -15,6 +15,7 @@ import { relevoRampaLateral } from './rampaLateral';
 import { anguloAroRad, bordaReiniciar, comandoDesejado, setaDaTecla, SETAS_SOLTAS, type SetasVolante } from './volante';
 import type { CabineGameplay, CriarCabineGameplay } from './cabineGameplay';
 import type { ObstaculoGameplay } from './estadoGameplay';
+import { aoVivo } from '@/lib/gameplayAoVivo';
 import './gameplayKiosk.css';
 
 /** Palco do case do fardo: talhão diurno, Trator MAX, sem roteiro (quem move é o motor). */
@@ -85,6 +86,8 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
     raiz.dataset.contato = String(estado.contato);
     raiz.dataset.rumoGraus = estado.maquina.rumoGraus.toFixed(1);
     raiz.dataset.esterco = estado.comandos.esterco.toFixed(2);
+    // Tablet do operador (inventário #3): sem sessão (StandSemLogin) não há /ws e isto não faz nada.
+    aoVivo.enviar(estado);
   }), [motor]);
 
   useEffect(() => {

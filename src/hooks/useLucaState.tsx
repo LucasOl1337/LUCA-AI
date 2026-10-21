@@ -15,6 +15,7 @@ import type {
   TemporaryDashboard,
   WsPayload,
 } from '@/lib/types';
+import { aoVivo, TIPO_RETRATO } from '@/lib/gameplayAoVivo';
 
 const fallbackDatabase: DatabaseState = {
   source: { name: 'database indisponivel', topic: 'LUCA-AI' },
@@ -373,10 +374,12 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
       const hasBackend = await refresh();
       if (!hasBackend || closed) return;
       socket = new WebSocket(wsUrl());
+      const aberto = socket;
 
       socket.addEventListener('open', () => {
         setBackendReady(true);
         setConnectionState('online');
+        aoVivo.ligar((texto) => { if (aberto.readyState === WebSocket.OPEN) aberto.send(texto); });
         if (reconnectTimer) {
           clearTimeout(reconnectTimer);
           reconnectTimer = null;
@@ -384,6 +387,7 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
       });
 
       socket.addEventListener('close', () => {
+        aoVivo.ligar(null);
         setBackendReady(false);
         setConnectionState('offline');
         setSompoTelemetry(current => current ? { ...current, freshness: 'stale', connection: { ...current.connection, state: 'reconnecting' } } : null);
@@ -402,6 +406,7 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
           if (payload.kind === 'state') syncState(payload.state);
           if (payload.kind === 'event') applyBackendEvent(payload.event);
           if (payload.kind === 'sompo.telemetry') setSompoTelemetry(payload.telemetry);
+          if (payload.kind === TIPO_RETRATO) aoVivo.receber(payload.estado, payload.idadeMs);
         } catch {
           // Payload invalido nao deve derrubar a interface.
         }
