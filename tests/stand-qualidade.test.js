@@ -6,6 +6,7 @@ const {
   DEGRAUS, FPS_MINIMO, FPS_FOLGADO, SEGUNDOS_PARA_DESCER, SEGUNDOS_PARA_SUBIR, SEGUNDOS_DE_PROVA, VETO_MS,
   qualidadeInicial, regularQualidade, pixelRatioDoDegrau,
   PERFIL_PADRAO, PERFIL_GAMEPLAY, QUADRO_MAXIMO_GAMEPLAY_MS,
+  criarPortaoDeAquecimento, LEITURAS_DE_AQUECIMENTO,
 } = await loadFrontendModule('../../src/components/sompo/qualidadeAdaptativa.ts');
 
 /** Aplica uma sequência de FPS, um por segundo, a partir de `desde`. */
@@ -121,4 +122,36 @@ test('qualidade gameplay: com folga (≥ 57 fps por 10 s) volta ao degrau com p�
   assert.equal(rodarPerfil(e, vezes(60, SEGUNDOS_PARA_SUBIR), g, 3000 + VETO_MS).degrau, 0);
   // Piso do gameplay: pixel ratio 0,5 sem pós nem sombra.
   assert.deepEqual(g.degraus.at(-1), { pixelRatio: 0.5, pos: false, sombras: false });
+});
+
+test('qualidade gameplay: FPS da carga do modelo não vira linha de base da prova (bancada 21/10)', () => {
+  const g = PERFIL_GAMEPLAY;
+  // Leituras de 1 s do /gameplay em 1080p na bancada: carga (12, 10, 35), depois 39 com pós e sombra e 41 sem.
+  const carga = [12, 10, 35];
+  const fpsDoDegrau = (e) => (e.degrau === 0 ? 39 : 41);
+  const simular = (portao) => {
+    let e = qualidadeInicial(g.degrauInicial, g);
+    for (let s = 0; s < 20; s += 1) {
+      if (s === 1) portao?.abrir(); // modelo entra na cena logo depois da 1ª leitura
+      const fps = s < carga.length ? carga[s] : fpsDoDegrau(e);
+      if (portao && !portao.passa()) continue;
+      e = regularQualidade(e, fps, s * 1000, g);
+    }
+    return e;
+  };
+  // Sem portão: média lenta (12+10+35)/3 = 19 faz 41 parecer ganho de 115 % e o degrau sem pós fica.
+  assert.equal(simular(null).degrau, 1);
+  // Com portão: a prova compara 39 com 41 (+5 %), desfaz e trava com pós e sombra.
+  const comPortao = simular(criarPortaoDeAquecimento());
+  assert.deepEqual([comPortao.degrau, comPortao.travado], [0, true]);
+});
+
+test('qualidade: portão de aquecimento fica fechado até abrir e descarta as leituras de aquecimento', () => {
+  const portao = criarPortaoDeAquecimento();
+  assert.deepEqual([portao.passa(), portao.passa(), portao.passa()], [false, false, false]);
+  portao.abrir();
+  assert.deepEqual(Array.from({ length: LEITURAS_DE_AQUECIMENTO + 2 }, () => portao.passa()),
+    [...Array(LEITURAS_DE_AQUECIMENTO).fill(false), true, true]);
+  portao.abrir(); // abrir de novo (fallback depois do glTF) não reinicia a contagem
+  assert.equal(portao.passa(), true);
 });
