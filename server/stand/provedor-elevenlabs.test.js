@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { credencialElevenlabs, fatorCreditosTts, modeloTtsStand, provedorElevenlabs, resolverVoz, sintetizarElevenlabs } from './provedor-elevenlabs.js';
+import { VOZES_STAND, chaveVozStand, verificarVoz, vozDaChave, credencialElevenlabs, fatorCreditosTts, modeloTtsStand, provedorElevenlabs, resolverVoz, sintetizarElevenlabs } from './provedor-elevenlabs.js';
 
 const respostaEmPedacos = (pedacos) => new Response(new ReadableStream({
   start(c) { for (const p of pedacos) c.enqueue(new Uint8Array(p)); c.close(); },
@@ -47,4 +47,30 @@ test('token Scribe de uso único; recusa vira ok:false com status', async () => 
   assert.equal(ok.token, 't');
   const recusa = await provedorElevenlabs.pedirToken({ chave: 'k', fetchImpl: async () => new Response('{}', { status: 401 }) });
   assert.deepEqual({ ok: recusa.ok, status: recusa.status }, { ok: false, status: 401 });
+});
+
+test('lista branca de vozes do Totem: chave conhecida passa, o resto vira lucas', () => {
+  assert.deepEqual(Object.keys(VOZES_STAND), ['lucas', 'andrea']);
+  assert.equal(chaveVozStand('andrea'), 'andrea');
+  assert.equal(chaveVozStand(' Andrea '), 'andrea');
+  for (const outro of [undefined, null, '', 'HOfBIVLhom4mc9WvXfyH', 'constructor', '__proto__', 'toString', 7]) assert.equal(chaveVozStand(outro), 'lucas', String(outro));
+  assert.equal(vozDaChave('lucas', 'Lucas Oliveira'), 'Lucas Oliveira');
+  assert.equal(vozDaChave('lucas', 'Outro Nome'), 'Outro Nome', 'lucas segue LUCA_STAND_VOZ');
+  assert.equal(vozDaChave('andrea'), 'HOfBIVLhom4mc9WvXfyH');
+  assert.equal(vozDaChave('qualquer', 'Lucas Oliveira'), 'Lucas Oliveira');
+});
+
+test('verificarVoz: voice_id por GET /v1/voices, com cache de 10 min; erro de rede é indisponível', async () => {
+  const urls = [];
+  let status = 404;
+  const fetchImpl = async (url) => { urls.push(String(url)); return new Response('{}', { status }); };
+  const cache = new Map();
+  assert.equal(await verificarVoz({ chave: 'k', voz: 'HOfBIVLhom4mc9WvXfyH', fetchImpl, cache, agora: 0 }), false);
+  assert.equal(urls[0], 'https://api.elevenlabs.io/v1/voices/HOfBIVLhom4mc9WvXfyH');
+  status = 200;
+  assert.equal(await verificarVoz({ chave: 'k', voz: 'HOfBIVLhom4mc9WvXfyH', fetchImpl, cache, agora: 60_000 }), false, 'ainda no cache');
+  assert.equal(await verificarVoz({ chave: 'k', voz: 'HOfBIVLhom4mc9WvXfyH', fetchImpl, cache, agora: 11 * 60_000 }), true, 'cache venceu');
+  assert.equal(urls.length, 2);
+  const cai = async () => { throw new TypeError('fetch failed'); };
+  assert.equal(await verificarVoz({ chave: 'k', voz: 'AbCdEfGhIjKlMnOpQrSt', fetchImpl: cai, cache: new Map() }), false);
 });

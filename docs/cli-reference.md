@@ -720,7 +720,7 @@ Nenhum; consulte a descrição para entradas por `--data`.
 
 ### `stand status`
 
-Estado do cérebro de voz do stand: provedor, ligado ou motivo, escuta, limites, sessões na hora e o dia (créditos, despertares, falsos, conversas).
+Estado do cérebro de voz do stand: provedor, ligado ou motivo, escuta, limites, sessões na hora, o dia (créditos, despertares, falsos, conversas) e as vozes do seletor do Totem.
 
 `GET /api/stand/status`; autenticação: **session**.
 
@@ -732,7 +732,7 @@ Abrir sessão de voz: token efêmero, conexão, configuração e conversa_id no 
 
 `POST /api/stand/sessao`; autenticação: **session**.
 
-`--origem` (string): toque (padrão) ou escuta; só entra na contagem do dia
+`--origem` (string): toque (padrão) ou escuta; só entra na contagem do dia<br>`--voz` (string): lucas (padrão) ou andrea; fora da lista branca vira lucas, voz fora da conta volta com voz_aviso
 
 ### `stand turno`
 
