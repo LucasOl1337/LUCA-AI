@@ -112,6 +112,7 @@ const EMPTY_QUERY = Object.freeze({
   stub: '',
   simulacao: '',
   quiosque: '',
+  fps: '',
 });
 
 export function emptyAppLocation() {
@@ -185,6 +186,8 @@ function parseQuery(search) {
     simulacao: readParam(search, 'simulacao') === 'gameplay' ? 'gameplay' : '',
     // /gameplay?quiosque=1: abre direto na cabine, sem landing nem menu (F5 no totem volta jogando).
     quiosque: readParam(search, 'quiosque') === '1' ? '1' : '',
+    // /gameplay?fps=1: selo de FPS no canto para medir no totem real (pergunta 6).
+    fps: readParam(search, 'fps') === '1' ? '1' : '',
   };
 }
 
@@ -248,6 +251,7 @@ export function formatAppUrl(location) {
 
   if (page === 'sensor' && loc.veiculo === 'trator') params.set('veiculo', 'trator');
   if (page === 'gameplay' && loc.quiosque === '1') params.set('quiosque', '1');
+  if (page === 'gameplay' && loc.fps === '1') params.set('fps', '1');
 
   if (page === 'stand') {
     setIfPresent(params, 'margem', parseMargem(String(loc.margem || '')));

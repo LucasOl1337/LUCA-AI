@@ -26,6 +26,10 @@ A página `https://luca-ai.com.br/totem` tem os dois botões: **Abrir Totem** (c
 
 Atalho de equipe: **Shift+Q** sai do jogo em tela cheia e, na coruja sem login, abre a tela de entrar.
 
+Para medir no totem: abra `https://luca-ai.com.br/gameplay?quiosque=1&fps=1`, dirija 30 s, tire foto do selo no canto de cima, à esquerda, e mande no grupo.
+O selo mostra a média de FPS dos últimos 5 s, o mínimo, o degrau de qualidade (0 é o melhor) e a resolução da tela do jogo.
+Se a média passar de 50, está ok. Para o público, volte ao endereço sem `&fps=1`.
+
 ## Se der problema
 
 ### A internet caiu
