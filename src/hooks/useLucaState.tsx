@@ -16,7 +16,7 @@ import type {
   WsPayload,
 } from '@/lib/types';
 import { aoVivo, TIPO_RETRATO } from '@/lib/gameplayAoVivo';
-import { criarReligador } from '@/lib/religaWs';
+import { criarReligador, ligarCicloDaPagina } from '@/lib/religaWs';
 import { sessaoRecusada } from '@/lib/sessaoRecusada';
 
 const fallbackDatabase: DatabaseState = {
@@ -378,6 +378,8 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
       const hasBackend = await refresh();
       if (closed) return true;
       if (!hasBackend) return false;
+      // A página escondeu durante o refresh: não abre; o `pageshow` retoma.
+      if (religador.pausado()) return false;
       socket = new WebSocket(wsUrl());
       const aberto = socket;
 
@@ -419,6 +421,10 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
     }
 
     void religador.tentar();
+    // Sair da página (inclusive para o back/forward cache) devolve a vaga do teto por conta já.
+    const soltarCicloDaPagina = typeof window !== 'undefined'
+      ? ligarCicloDaPagina(window, religador, () => { if (socket && socket.readyState <= WebSocket.OPEN) socket.close(1000, 'pagehide'); })
+      : () => {};
     if (typeof document !== 'undefined') {
       pageVisibleRef.current = document.visibilityState !== 'hidden';
       const onVisibilityChange = () => {
@@ -444,6 +450,7 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
         document.removeEventListener('visibilitychange', onVisibilityChange);
         window.removeEventListener('focus', onAttention);
         window.removeEventListener('pageshow', onAttention);
+        soltarCicloDaPagina();
         religador.parar();
         if (socket) socket.close();
         if (pollTimer) clearTimeout(pollTimer);
@@ -456,6 +463,7 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       closed = true;
+      soltarCicloDaPagina();
       religador.parar();
       if (socket) socket.close();
       if (pollTimer) clearTimeout(pollTimer);
