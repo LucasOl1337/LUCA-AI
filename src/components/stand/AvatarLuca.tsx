@@ -5,15 +5,15 @@ import AvatarCorujaA from './AvatarCorujaA';
 import AvatarCoruja3D from './AvatarCoruja3D';
 
 /**
- * Avatar LUCA. Padrão: a coruja A (arte aprovada animada em camadas, em
- * `AvatarCorujaA`). A coruja 3D (`?variante=coruja-3d`, em avaliação) e as três
- * variações vetoriais antigas seguem por `?variante=`.
+ * Avatar LUCA. Padrão: a coruja 3D (`AvatarCoruja3D`, three.js; sem WebGL cai
+ * na coruja A). A coruja A (arte animada em camadas, `?variante=coruja-a`) e as
+ * três variações vetoriais antigas seguem por `?variante=`.
  * Sem defs/ids nas vetoriais: várias cópias convivem e o SVG exporta limpo.
  */
 
 export type VarianteAvatar = 'coruja-a' | 'coruja-3d' | 'coruja' | 'operario' | 'robo';
 export const VARIANTES_AVATAR: readonly VarianteAvatar[] = ['coruja-a', 'coruja-3d', 'coruja', 'operario', 'robo'];
-export const VARIANTE_PADRAO: VarianteAvatar = 'coruja-a';
+export const VARIANTE_PADRAO: VarianteAvatar = 'coruja-3d';
 
 const COR = {
   navy: '#0a84ff', ceu: '#64d2ff', verde: '#43d18a', fundo: '#0b1624', corpo: '#14263f',

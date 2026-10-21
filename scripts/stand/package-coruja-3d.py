@@ -57,6 +57,7 @@ ATLAS_NORMAL = 2048
 ATLAS_MR = 1024
 ATLAS_EMISSIVO = 512
 QUALIDADE_JPEG = 86
+FOSCO_BRANCO = 0.62  # rugosidade mínima do branco (penas e casco)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import coruja3d_rosto as rosto_mod  # noqa: E402
@@ -195,6 +196,20 @@ rosto_mod.apagar_olhos_pintados(mesh, n_base.image, n_normal.image)
 h = w = ATLAS
 base_px = np.array(n_base.image.pixels[:], np.float32).reshape(h, w, 4)[..., :3]
 
+# Penas e casco brancos sem cara de plástico: o Tripo deixa trechos brancos com
+# rugosidade ~0,2 e metal até ~0,5, que no three.js viram reflexo cromado. Onde a
+# cor base é branca (pouca saturação, clara), metal ~0 e rugosidade mínima.
+# Os frisos e placas azuis mantêm o brilho.
+mr = np.array(n_mr.image.pixels[:], np.float32).reshape(ATLAS_MR, ATLAS_MR, 4)
+passo = ATLAS // ATLAS_MR
+cor = base_px.reshape(ATLAS_MR, passo, ATLAS_MR, passo, 3).mean((1, 3))
+claro, escuro = cor.max(-1), cor.min(-1)
+branco = ((claro - escuro) / np.maximum(claro, 1e-4) < 0.18) & (claro > 0.5)
+mr[..., 1] = np.where(branco, np.maximum(mr[..., 1], FOSCO_BRANCO), mr[..., 1])
+mr[..., 2] = np.where(branco, np.minimum(mr[..., 2], 0.04), mr[..., 2])
+n_mr.image.pixels[:] = mr.ravel()
+print('FOSCO', round(float(branco.mean()), 3))
+
 nt.links.new(n_base.outputs['Color'], bsdf.inputs['Base Color'])
 sep = nt.nodes.new('ShaderNodeSeparateColor')
 nt.links.new(n_mr.outputs['Color'], sep.inputs['Color'])
@@ -308,64 +323,68 @@ def acao(nome, quadros, chaves, ciclo=True):
     print('ACAO', nome, quadros)
 
 
-# Ocioso: respira, olha em volta devagar, asas acompanham o fôlego. 6 s.
+# Repouso frontal: a coruja olha para quem está na frente do totem. Guinada e
+# inclinação de cabeça nos clipes ficam em poucos graus; o olhar de lado é um
+# gesto curto e raro, somado no three.js (`cabecaViva`), que volta ao centro.
+
+# Ocioso: respira (tronco e asas) e a cabeça só balança de leve. 6 s.
 acao('ocioso', 180, {
     0.0: {'tronco': [], 'pescoco': [], 'cabeca': [], 'asaD': asa('D', 0), 'asaE': asa('E', 0)},
-    1.5: {'tronco': [(Y, 2.5)], 'pescoco': [(Z, 14)], 'cabeca': [(Y, 3)], 'asaD': asa('D', 4), 'asaE': asa('E', 4)},
-    3.0: {'tronco': [], 'pescoco': [(Z, 2)], 'cabeca': [], 'asaD': asa('D', 0), 'asaE': asa('E', 0)},
-    4.5: {'tronco': [(Y, 2.5)], 'pescoco': [(Z, -12)], 'cabeca': [(Y, -2)], 'asaD': asa('D', 4), 'asaE': asa('E', 4)},
+    1.5: {'tronco': [(Y, 2.0)], 'pescoco': [(Z, 2.0)], 'cabeca': [(Y, 1.5)], 'asaD': asa('D', 4), 'asaE': asa('E', 4)},
+    3.0: {'tronco': [], 'pescoco': [(Z, 0.5)], 'cabeca': [], 'asaD': asa('D', 0), 'asaE': asa('E', 0)},
+    4.5: {'tronco': [(Y, 2.0)], 'pescoco': [(Z, -1.5)], 'cabeca': [(Y, 1.0)], 'asaD': asa('D', 4), 'asaE': asa('E', 4)},
     6.0: {'tronco': [], 'pescoco': [], 'cabeca': [], 'asaD': asa('D', 0), 'asaE': asa('E', 0)},
 })
 
-# Ouvindo: inclina a cabeça de lado (coruja curiosa), tronco à frente, asas atentas. 4 s.
+# Ouvindo: tronco um pouco à frente, cabeça atenta e de frente, asas atentas. 4 s.
 acao('ouvindo', 120, {
-    0.0: {'tronco': [(Y, 5)], 'pescoco': [(X, 16)], 'cabeca': [(Y, 4)], 'asaD': asa('D', 7), 'asaE': asa('E', 7)},
-    1.0: {'tronco': [(Y, 6)], 'pescoco': [(X, 20), (Z, 4)], 'cabeca': [(Y, 6)], 'asaD': asa('D', 9), 'asaE': asa('E', 6)},
-    2.0: {'tronco': [(Y, 5)], 'pescoco': [(X, 15)], 'cabeca': [(Y, 3)], 'asaD': asa('D', 7), 'asaE': asa('E', 8)},
-    3.0: {'tronco': [(Y, 6)], 'pescoco': [(X, 19), (Z, -3)], 'cabeca': [(Y, 5)], 'asaD': asa('D', 8), 'asaE': asa('E', 7)},
-    4.0: {'tronco': [(Y, 5)], 'pescoco': [(X, 16)], 'cabeca': [(Y, 4)], 'asaD': asa('D', 7), 'asaE': asa('E', 7)},
+    0.0: {'tronco': [(Y, 4)], 'pescoco': [], 'cabeca': [(Y, 2)], 'asaD': asa('D', 6), 'asaE': asa('E', 6)},
+    1.0: {'tronco': [(Y, 5)], 'pescoco': [(X, 2)], 'cabeca': [(Y, 3)], 'asaD': asa('D', 7), 'asaE': asa('E', 6)},
+    2.0: {'tronco': [(Y, 4)], 'pescoco': [], 'cabeca': [(Y, 2)], 'asaD': asa('D', 6), 'asaE': asa('E', 7)},
+    3.0: {'tronco': [(Y, 5)], 'pescoco': [(X, -2)], 'cabeca': [(Y, 3)], 'asaD': asa('D', 7), 'asaE': asa('E', 6)},
+    4.0: {'tronco': [(Y, 4)], 'pescoco': [], 'cabeca': [(Y, 2)], 'asaD': asa('D', 6), 'asaE': asa('E', 6)},
 })
 
-# Pensando: olha para cima e de lado com asas recolhidas, balança devagar. 5 s.
+# Pensando: ergue um pouco a cabeça (olha para cima), asas recolhidas, balança devagar. 5 s.
 # (Asa no "queixo" atravessa o peito com este rig; testado e descartado.)
 acao('pensando', 150, {
-    0.0: {'tronco': [(Y, -2)], 'pescoco': [(X, -10), (Z, 10)], 'cabeca': [(Y, -9)], 'asaD': asa('D', -3, 6), 'asaE': asa('E', -3, 6)},
-    1.25: {'tronco': [(Y, -3)], 'pescoco': [(X, -12), (Z, 16)], 'cabeca': [(Y, -12)], 'asaD': asa('D', -4, 6), 'asaE': asa('E', -4, 6)},
-    2.5: {'tronco': [(Y, -2)], 'pescoco': [(X, -8), (Z, 6)], 'cabeca': [(Y, -8)], 'asaD': asa('D', -3, 6), 'asaE': asa('E', -3, 6)},
-    3.75: {'tronco': [(Y, -3)], 'pescoco': [(X, -11), (Z, 14)], 'cabeca': [(Y, -11)], 'asaD': asa('D', -4, 6), 'asaE': asa('E', -4, 6)},
-    5.0: {'tronco': [(Y, -2)], 'pescoco': [(X, -10), (Z, 10)], 'cabeca': [(Y, -9)], 'asaD': asa('D', -3, 6), 'asaE': asa('E', -3, 6)},
+    0.0: {'tronco': [(Y, -1.5)], 'pescoco': [(X, -3), (Z, 2)], 'cabeca': [(Y, -6)], 'asaD': asa('D', -3, 6), 'asaE': asa('E', -3, 6)},
+    1.25: {'tronco': [(Y, -2)], 'pescoco': [(X, -4), (Z, 3)], 'cabeca': [(Y, -7)], 'asaD': asa('D', -4, 6), 'asaE': asa('E', -4, 6)},
+    2.5: {'tronco': [(Y, -1.5)], 'pescoco': [(X, -2), (Z, 1)], 'cabeca': [(Y, -5)], 'asaD': asa('D', -3, 6), 'asaE': asa('E', -3, 6)},
+    3.75: {'tronco': [(Y, -2)], 'pescoco': [(X, -4), (Z, 3)], 'cabeca': [(Y, -7)], 'asaD': asa('D', -4, 6), 'asaE': asa('E', -4, 6)},
+    5.0: {'tronco': [(Y, -1.5)], 'pescoco': [(X, -3), (Z, 2)], 'cabeca': [(Y, -6)], 'asaD': asa('D', -3, 6), 'asaE': asa('E', -3, 6)},
 })
 
 # Falando: gesticula alternando as asas, acena com a cabeça e balança o tronco. 4 s.
 acao('falando', 120, {
-    0.0: {'tronco': [], 'pescoco': [], 'cabeca': [(Y, 4)], 'asaD': asa('D', 6, 8), 'antD': [], 'asaE': asa('E', 6, 8), 'antE': []},
-    0.5: {'tronco': [(Z, 4)], 'pescoco': [(Z, -6)], 'cabeca': [(Y, -3)], 'asaD': asa('D', 10, 10), 'antD': [], 'asaE': asa('E', 28, 30), 'antE': [(Y, -25)]},
-    1.0: {'tronco': [(Z, 2)], 'pescoco': [(Z, -4)], 'cabeca': [(Y, 6)], 'asaD': asa('D', 8, 8), 'antD': [], 'asaE': asa('E', 14, 18), 'antE': [(Y, -10)]},
-    1.5: {'tronco': [], 'pescoco': [(X, 6)], 'cabeca': [(Y, -2)], 'asaD': asa('D', 6, 8), 'antD': [], 'asaE': asa('E', 6, 8), 'antE': []},
-    2.0: {'tronco': [], 'pescoco': [], 'cabeca': [(Y, 5)], 'asaD': asa('D', 6, 8), 'antD': [], 'asaE': asa('E', 6, 8), 'antE': []},
-    2.5: {'tronco': [(Z, -4)], 'pescoco': [(Z, 6)], 'cabeca': [(Y, -3)], 'asaD': asa('D', 28, 30), 'antD': [(Y, -25)], 'asaE': asa('E', 10, 10), 'antE': []},
-    3.0: {'tronco': [(Z, -2)], 'pescoco': [(Z, 4)], 'cabeca': [(Y, 6)], 'asaD': asa('D', 14, 18), 'antD': [(Y, -10)], 'asaE': asa('E', 8, 8), 'antE': []},
-    3.5: {'tronco': [], 'pescoco': [(X, -6)], 'cabeca': [(Y, -2)], 'asaD': asa('D', 6, 8), 'antD': [], 'asaE': asa('E', 6, 8), 'antE': []},
-    4.0: {'tronco': [], 'pescoco': [], 'cabeca': [(Y, 4)], 'asaD': asa('D', 6, 8), 'antD': [], 'asaE': asa('E', 6, 8), 'antE': []},
+    0.0: {'tronco': [], 'pescoco': [], 'cabeca': [(Y, 3)], 'asaD': asa('D', 6, 8), 'antD': [], 'asaE': asa('E', 6, 8), 'antE': []},
+    0.5: {'tronco': [(Z, 3)], 'pescoco': [(Z, -2)], 'cabeca': [(Y, -2)], 'asaD': asa('D', 10, 10), 'antD': [], 'asaE': asa('E', 28, 30), 'antE': [(Y, -25)]},
+    1.0: {'tronco': [(Z, 1.5)], 'pescoco': [(Z, -1)], 'cabeca': [(Y, 4)], 'asaD': asa('D', 8, 8), 'antD': [], 'asaE': asa('E', 14, 18), 'antE': [(Y, -10)]},
+    1.5: {'tronco': [], 'pescoco': [(X, 2)], 'cabeca': [(Y, -1)], 'asaD': asa('D', 6, 8), 'antD': [], 'asaE': asa('E', 6, 8), 'antE': []},
+    2.0: {'tronco': [], 'pescoco': [], 'cabeca': [(Y, 3)], 'asaD': asa('D', 6, 8), 'antD': [], 'asaE': asa('E', 6, 8), 'antE': []},
+    2.5: {'tronco': [(Z, -3)], 'pescoco': [(Z, 2)], 'cabeca': [(Y, -2)], 'asaD': asa('D', 28, 30), 'antD': [(Y, -25)], 'asaE': asa('E', 10, 10), 'antE': []},
+    3.0: {'tronco': [(Z, -1.5)], 'pescoco': [(Z, 1)], 'cabeca': [(Y, 4)], 'asaD': asa('D', 14, 18), 'antD': [(Y, -10)], 'asaE': asa('E', 8, 8), 'antE': []},
+    3.5: {'tronco': [], 'pescoco': [(X, -2)], 'cabeca': [(Y, -1)], 'asaD': asa('D', 6, 8), 'antD': [], 'asaE': asa('E', 6, 8), 'antE': []},
+    4.0: {'tronco': [], 'pescoco': [], 'cabeca': [(Y, 3)], 'asaD': asa('D', 6, 8), 'antD': [], 'asaE': asa('E', 6, 8), 'antE': []},
 }, ciclo=True)
 
 # Aceno: levanta a asa direita e balança o antebraço três vezes. 2,6 s, uma vez.
 aceno = {0.0: {'pescoco': [], 'asaD': asa('D', 0), 'antD': []}}
-aceno[0.45] = {'pescoco': [(X, 8)], 'asaD': asa('D', 105, 10), 'antD': [(X, -20)]}
+aceno[0.45] = {'pescoco': [(X, 4)], 'asaD': asa('D', 105, 10), 'antD': [(X, -20)]}
 for i, t in enumerate((0.7, 0.95, 1.2, 1.45, 1.7, 1.95)):
-    aceno[t] = {'pescoco': [(X, 8 + (2 if i % 2 else -2))], 'asaD': asa('D', 105, 10), 'antD': [(X, 25 if i % 2 == 0 else -20)]}
+    aceno[t] = {'pescoco': [(X, 4 + (1 if i % 2 else -1))], 'asaD': asa('D', 105, 10), 'antD': [(X, 25 if i % 2 == 0 else -20)]}
 aceno[2.6] = {'pescoco': [], 'asaD': asa('D', 0), 'antD': []}
 acao('aceno', 78, aceno, ciclo=False)
 
 
-# Feliz: duas batidas rápidas das asas, cabeça inclina de um lado para o outro. 2 s, uma vez.
+# Feliz: duas batidas rápidas das asas, cabeça balança de leve de um lado para o outro. 2 s, uma vez.
 acao('feliz', 60, {
     0.0: {'tronco': [], 'pescoco': [], 'cabeca': [], 'asaD': asa('D', 0), 'asaE': asa('E', 0)},
-    0.25: {'tronco': [(Y, -3)], 'pescoco': [(X, 12)], 'cabeca': [(Y, -6)], 'asaD': asa('D', 26, 6), 'asaE': asa('E', 26, 6)},
-    0.5: {'tronco': [(Y, -1)], 'pescoco': [(X, 10)], 'cabeca': [(Y, -4)], 'asaD': asa('D', 6), 'asaE': asa('E', 6)},
-    0.75: {'tronco': [(Y, -3)], 'pescoco': [(X, -10)], 'cabeca': [(Y, -6)], 'asaD': asa('D', 26, 6), 'asaE': asa('E', 26, 6)},
-    1.0: {'tronco': [(Y, -1)], 'pescoco': [(X, -8)], 'cabeca': [(Y, -3)], 'asaD': asa('D', 5), 'asaE': asa('E', 5)},
-    1.45: {'tronco': [], 'pescoco': [(X, 4)], 'cabeca': [(Y, -2)], 'asaD': asa('D', 2), 'asaE': asa('E', 2)},
+    0.25: {'tronco': [(Y, -3)], 'pescoco': [(X, 5)], 'cabeca': [(Y, -6)], 'asaD': asa('D', 26, 6), 'asaE': asa('E', 26, 6)},
+    0.5: {'tronco': [(Y, -1)], 'pescoco': [(X, 4)], 'cabeca': [(Y, -4)], 'asaD': asa('D', 6), 'asaE': asa('E', 6)},
+    0.75: {'tronco': [(Y, -3)], 'pescoco': [(X, -5)], 'cabeca': [(Y, -6)], 'asaD': asa('D', 26, 6), 'asaE': asa('E', 26, 6)},
+    1.0: {'tronco': [(Y, -1)], 'pescoco': [(X, -4)], 'cabeca': [(Y, -3)], 'asaD': asa('D', 5), 'asaE': asa('E', 5)},
+    1.45: {'tronco': [], 'pescoco': [(X, 2)], 'cabeca': [(Y, -2)], 'asaD': asa('D', 2), 'asaE': asa('E', 2)},
     2.0: {'tronco': [], 'pescoco': [], 'cabeca': [], 'asaD': asa('D', 0), 'asaE': asa('E', 0)},
 }, ciclo=False)
 
@@ -528,7 +547,8 @@ proveniencia = {
         'tool': f'Blender {bpy.app.version_string}, scripts/stand/package-coruja-3d.py',
         'decimate': {'type': 'COLLAPSE', 'triangles': TRIS, 'delimit': 'UV', 'ratio': round(RAZAO, 4)},
         'uv': 'UVs originais do Tripo Studio (decimação com delimit UV)',
-        'textures': 'mapas do Tripo reduzidos; olhos pintados apagados por preenchimento Laplace',
+        'textures': 'mapas do Tripo reduzidos; olhos pintados apagados por preenchimento Laplace; '
+                    f'branco fosco (rugosidade >= {FOSCO_BRANCO}, metal <= 0,04)',
         'atlas': {'basecolor': ATLAS, 'normal': ATLAS_NORMAL, 'metallicroughness': ATLAS_MR, 'emissive': ATLAS_EMISSIVO},
         'jpegQuality': QUALIDADE_JPEG,
         'images': 'fora do GLB (images[].uri), mesmos arquivos do manifesto externo',
