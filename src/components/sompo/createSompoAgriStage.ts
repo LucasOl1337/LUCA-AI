@@ -21,7 +21,7 @@ import { createSompoEnvironmentAssets } from './createSompoEnvironmentAssets';
 import { createSompoAtmosphere } from './createSompoAtmosphere';
 import { createSompoPostProcessing } from './createSompoPostProcessing';
 import { createSompoRenderMeter } from './sompoStage';
-import { PERFIL_PADRAO, pixelRatioDoDegrau, qualidadeInicial, regularQualidade, type PerfilQualidade } from './qualidadeAdaptativa';
+import { PERFIL_PADRAO, criarPortaoDeAquecimento, pixelRatioDoDegrau, qualidadeInicial, regularQualidade, type PerfilQualidade } from './qualidadeAdaptativa';
 import { exportSompoModel } from './refineSompoTruck';
 import { SOMPO_STUDIO_DEFAULT, type SompoStudioConfig, type SompoRenderStats } from './sompoStudioConfig';
 import { sensorReadingToPose, type SompoAxisCalibration } from './sensorPose.js';
@@ -213,9 +213,11 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     }
     mount.dataset.qualidade = String(qualidade.degrau);
   };
+  // O regulador só começa a julgar com o modelo na cena e depois do aquecimento.
+  const aquecimento = criarPortaoDeAquecimento();
   const meter = createSompoRenderMeter(renderer, (stats) => {
     onStats?.(stats);
-    if (!adaptiveQuality) return;
+    if (!adaptiveQuality || !aquecimento.passa()) return;
     const anterior = qualidade.degrau;
     qualidade = regularQualidade(qualidade, stats.fps, performance.now(), qualityProfile);
     if (qualidade.degrau !== anterior) aplicarDegrau();
@@ -377,12 +379,14 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     rig = rigSompoAgriAsset(loaded, scenario.equipmentId);
     model = rig.root;
     machine.add(model);
+    aquecimento.abrir();
     onModelStatus('gltf', SOMPO_AGRI_EQUIPMENT[scenario.equipmentId].label);
   }).catch(() => {
     if (disposed) return;
     rig = rigSompoAgriAsset(fallbackMachine(scenario.equipmentId), scenario.equipmentId);
     model = rig.root;
     machine.add(model);
+    aquecimento.abrir();
     onModelStatus('fallback', null);
   });
 
