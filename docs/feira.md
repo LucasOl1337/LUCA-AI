@@ -26,9 +26,18 @@ A página `https://luca-ai.com.br/totem` tem os dois botões: **Abrir Totem** (c
 
 Atalho de equipe: **Shift+Q** sai do jogo em tela cheia e, na coruja sem login, abre a tela de entrar.
 
-Para medir no totem: abra `https://luca-ai.com.br/gameplay?quiosque=1&fps=1`, dirija 30 s, tire foto do selo no canto de cima, à esquerda, e mande no grupo.
-O selo mostra a média de FPS dos últimos 5 s, o mínimo, o degrau de qualidade (0 é o melhor) e a resolução da tela do jogo.
-Se a média passar de 50, está ok. Para o público, volte ao endereço sem `&fps=1`.
+### Medir se o jogo está liso (antes de abrir, uma vez)
+
+1. No totem, abra `https://luca-ai.com.br/gameplay?quiosque=1&fps=1`. É o mesmo jogo, só que com um selo pequeno no canto de cima, à esquerda.
+2. Dirija o trator por 30 s. No primeiro segundo o selo mostra `… fps`. É normal.
+3. Tire uma foto do selo e mande no grupo. Ele aparece assim: `52 fps  mín 47  degrau 0/3  1920×1080`.
+   - **fps:** a média dos últimos 5 s. Acima de 50 está ok.
+   - **mín:** o pior momento desses 5 s.
+   - **degrau:** a qualidade da imagem. 0/3 é a melhor. Se subir, o jogo baixou a qualidade sozinho para não travar.
+   - **o último número:** o tamanho da imagem do jogo.
+4. Para o público, abra de novo `https://luca-ai.com.br/gameplay?quiosque=1`, sem `&fps=1`.
+
+O selo só aparece na tela do totem. O tablet do operador não muda.
 
 ## Se der problema
 
