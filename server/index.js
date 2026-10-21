@@ -408,12 +408,8 @@ const wss = new WebSocketServer({
       return;
     }
     info.req.auth = session;
-    authService.store.recordUsage(session.user.id, {
-      method: 'WS',
-      path: '/ws',
-      statusCode: 101,
-      websocket: true,
-    });
+    // O uso (websocketCount + gravação do auth-store) só conta depois do teto,
+    // na 'connection': recusa 1013 em laço não escreve em disco.
     done(true);
   },
 });
@@ -4404,6 +4400,12 @@ wss.on('connection', (socket, req) => {
   ensureWorkspace(userId);
   // Teto por conta (LUCA_WS_MAX_POR_CONTA, padrão 8): o excedente fecha com 1013 antes do `state`.
   if (recusarAcimaDoLimite(socket, wss.clients, WS_MAX_POR_CONTA)) return;
+  authService.store.recordUsage(userId, {
+    method: 'WS',
+    path: '/ws',
+    statusCode: 101,
+    websocket: true,
+  });
   runWithWorkspaceUser(userId, () => {
     socket.send(JSON.stringify({ kind: 'state', state: publicStateSnapshot() }));
   });

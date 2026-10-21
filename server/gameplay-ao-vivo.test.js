@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  conexaoDaMesmaOrigem, criarGameplayAoVivo, normalizarRetrato, normalizarSono, RETRATO_MAX_BYTES, RETRATO_INTERVALO_MIN_MS, TIPO_RETRATO,
+  conexaoDaMesmaOrigem, criarGameplayAoVivo, normalizarRetrato, normalizarSono, PAUSADO_MAX_MS, RETRATO_MAX_BYTES, RETRATO_INTERVALO_MIN_MS, RETRATO_RECENTE_MS, TIPO_RETRATO,
 } from './gameplay-ao-vivo.js';
 
 const retratoValido = (o = {}) => ({
@@ -101,6 +101,30 @@ test('tablet que conecta depois recebe o último retrato da própria conta, se r
   const tarde = socket('A');
   ao.aoConectar(tarde);
   assert.equal(tarde.recebidas.length, 0);
+});
+
+// A7(c): totem pausado há mais de 60 s; o tablet que entra depois vê "Jogo pausado", não "Aguardando o totem".
+test('tablet que conecta depois recebe o retrato oculto até PAUSADO_MAX_MS; retrato normal segue com 60 s', () => {
+  let t = 10_000;
+  const ao = criarGameplayAoVivo({ agora: () => t });
+  ao.receber(socket('A'), JSON.stringify({ kind: TIPO_RETRATO, estado: retratoValido(), oculto: true }));
+  t += RETRATO_RECENTE_MS + 1000;
+  const tablet = socket('A');
+  ao.aoConectar(tablet);
+  assert.equal(tablet.recebidas.length, 1, 'pausado há 61 s ainda chega ao tablet novo');
+  assert.equal(tablet.recebidas[0].oculto, true);
+  assert.equal(tablet.recebidas[0].idadeMs, RETRATO_RECENTE_MS + 1000);
+  t = 10_000 + PAUSADO_MAX_MS + 1;
+  const muitoTarde = socket('A');
+  ao.aoConectar(muitoTarde);
+  assert.equal(muitoTarde.recebidas.length, 0, 'passou de PAUSADO_MAX_MS: o tablet já trataria como sem sinal');
+  // Retrato visível continua valendo só 60 s.
+  const totem = socket('B');
+  ao.receber(totem, JSON.stringify({ kind: TIPO_RETRATO, estado: retratoValido() }));
+  t += RETRATO_RECENTE_MS + 1000;
+  const tabletB = socket('B');
+  ao.aoConectar(tabletB);
+  assert.equal(tabletB.recebidas.length, 0);
 });
 
 // Webcam de sonolência no /gameplay?webcam=1 (opção do CP3): só status e tempo, nunca imagem.
