@@ -31,12 +31,17 @@
     "atlas": 1024,
     "jpegQuality": 84,
     "emissive": "frisos azul-claros da cor base (visor, fones, microfone), 512 px",
-    "rosto": "malha CorujaRosto (100% tripo::Head_2) com morph targets piscar e bico_abre, scripts/stand/coruja3d_rosto.py"
+    "rosto": "malha CorujaRosto (100% tripo::Head_2) com morph targets piscar e bico_abre, e bico_abre na malha principal (só o bico de cima sobe), scripts/stand/coruja3d_rosto.py"
   },
-  "morphTargets": [
-    "piscar",
-    "bico_abre"
-  ],
+  "morphTargets": {
+    "Coruja": [
+      "bico_abre"
+    ],
+    "CorujaRosto": [
+      "piscar",
+      "bico_abre"
+    ]
+  },
   "animations": {
     "aceno": 78,
     "falando": 120,
@@ -64,6 +69,6 @@
   },
   "externalManifest": "coruja-3d.textures.json",
   "reproducibleCommand": "gltf-transform dequantize RIG_TRIPO.glb rig-decoded.glb && blender -b --factory-startup --python scripts/stand/package-coruja-3d.py -- rig-decoded.glb public/stand/avatar/coruja-3d",
-  "sha256": "b72c05061e73c7416a43504e8d154be6d0872b2a55315728c0a67044230c44eb",
-  "bytes": 1623720
+  "sha256": "281b219b4eae2598fbf9fbce29861ca7b39c134a67d53e4ec26175ea94eb8d50",
+  "bytes": 1674732
 }

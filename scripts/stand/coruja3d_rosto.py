@@ -15,7 +15,11 @@ malha pequena à parte (`CorujaRosto`) com o mesmo material e a mesma skin,
   ela fica comprimida numa faixa fina 0,8 mm atrás da superfície, escondida.
 - `bico_abre`: uma mandíbula inferior (cunha) que em repouso fica dentro do
   bico superior e gira 45° para baixo numa dobradiça atrás. O topo é escuro
-  (interior da boca), o resto tem o azul do bico.
+  (interior da boca), o resto tem o azul do bico. A mesma chave existe na
+  malha principal (`abrir_bico_superior`): só os ~47 vértices do bico de cima
+  (azul escuro na textura) sobem 10° pela base, um giro rígido que não estica
+  a textura do bico. As penas ficam paradas e, com influência 0, a malha é a
+  do #16 byte a byte.
 
 Coordenadas do Blender: frente +X, cima +Z, asa direita em -Y. Contornos dos
 olhos medidos por raycast na textura do GLB do #16 (simétricos em |y|).
@@ -43,6 +47,11 @@ DOBRADICA_X, PONTA_X, MEIA_LARGURA = 0.189, 0.232, 0.015
 # O gancho do bico de cima desce até z≈0,634 em x≈0,235: com menos de ~40° a
 # mandíbula fica escondida atrás dele na vista de frente do totem.
 ABERTURA_GRAUS = 45.0
+# Bico de cima (malha principal): caixa (x mínimo, |y| máximo, z mínimo, z máximo)
+# onde procurar o azul escuro do bico, e a dobradiça na base de cima, atrás.
+CAIXA_BICO = (0.165, 0.05, 0.60, 0.745)
+DOBRADICA_SUPERIOR = (0.198, 0.0, 0.728)
+SUBIDA_GRAUS = 10.0
 JANELA_PX = 4  # meia janela (px) para medir o quanto o texel é liso
 
 
@@ -195,6 +204,42 @@ def _mandibula(cons, sup, uv_bico, uv_escuro):
     cons.grade([anel_t, anel_f], [[uv_bico] * len(borda)] * 2)
 
 
+def _azul_escuro(cor):
+    return cor[2] - cor[0] > 0.28 and cor[0] < 0.42
+
+
+def abrir_bico_superior(malha, sup):
+    """Shape key `bico_abre` na malha principal: o bico de cima sobe pela base.
+
+    Só os vértices do bico (mais da metade dos cantos no azul escuro da
+    textura, numa caixa em volta dele) giram; penas vizinhas ficam paradas.
+    Peso 1 nos vértices do bico e 0 no resto: com influência 0 a malha é a
+    mesma do #16. Devolve quantos vértices se movem.
+    """
+    me = malha.data
+    h, w, _ = sup.base.shape
+    uv = me.uv_layers.active.data
+    cantos = {}
+    for loop in me.loops:
+        u, v = uv[loop.index].uv
+        cor = sup.base[min(int(v % 1 * h), h - 1), min(int(u % 1 * w), w - 1)]
+        cantos.setdefault(loop.vertex_index, []).append(_azul_escuro(cor))
+    x0, ay, z0, z1 = CAIXA_BICO
+    bico = [i for i, p in enumerate(sup.vs)
+            if p.x > x0 and abs(p.y) < ay and z0 < p.z < z1 and np.mean(cantos.get(i, [False])) > 0.5]
+    if not bico:
+        raise RuntimeError('bico superior não encontrado na textura')
+    giro = (Matrix.Translation(DOBRADICA_SUPERIOR) @ Matrix.Rotation(-math.radians(SUBIDA_GRAUS), 4, 'Y')
+            @ Matrix.Translation(-Vector(DOBRADICA_SUPERIOR)))
+    if not me.shape_keys:
+        malha.shape_key_add(name='Basis')
+    chave = malha.shape_key_add(name='bico_abre', from_mix=False)
+    inv = sup.mw.inverted()
+    for i in bico:
+        chave.data[i].co = inv @ (giro @ sup.vs[i])
+    return len(bico)
+
+
 def adicionar_rosto(malha, arm):
     sup = Superficie(malha)
     sup.textura_base(malha)
@@ -232,5 +277,7 @@ def adicionar_rosto(malha, arm):
         chave = rosto.shape_key_add(name=nome, from_mix=False)
         for i, p in enumerate(pontos):
             chave.data[i].co = inv @ p
-    print(f'ROSTO {len(cons.base)} vértices, {len(cons.faces)} faces, chaves {list(cons.chaves)}')
+    n_bico = abrir_bico_superior(malha, sup)
+    print(f'ROSTO {len(cons.base)} vértices, {len(cons.faces)} faces, chaves {list(cons.chaves)}; '
+          f'bico de cima: {n_bico} vértices na malha principal')
     return rosto

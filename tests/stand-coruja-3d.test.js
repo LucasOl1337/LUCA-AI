@@ -62,7 +62,7 @@ test('manifesto de texturas externas cobre cada imagem do GLB e os arquivos exis
   assert.match(manifesto.images[json.textures[material.pbrMetallicRoughness.baseColorTexture.index].source], /basecolor/);
   assert.match(manifesto.images[json.textures[material.normalTexture.index].source], /normal/);
   assert.ok(!(json.extensionsUsed || []).includes('EXT_meshopt_compression'), 'sem decoder extra no cliente');
-  assert.ok(glb.length < 2_500_000, `GLB de ${glb.length} bytes`);
+  assert.ok(glb.length < 2_000_000, `GLB de ${glb.length} bytes`);
 });
 
 test('proveniência aponta o GLB publicado', () => {
@@ -83,13 +83,20 @@ test('brilho segue o áudio na fala e fica estável fora dela', () => {
   assert.ok(Math.max(...ouvindo) - Math.min(...ouvindo) < 0.2, 'ouvindo fica aceso e firme');
 });
 
-test('GLB traz o rosto: morphs piscar e bico_abre numa malha 100% na cabeça, malha principal sem morph', () => {
+test('GLB traz o rosto: morphs piscar e bico_abre numa malha 100% na cabeça; na principal, só o bico de cima', () => {
   const rosto = json.meshes.find((m) => (m.extras?.targetNames || []).includes(rig.MORPH_PISCAR));
   assert.ok(rosto, 'malha com morph targets');
   assert.deepEqual(rosto.extras.targetNames, [rig.MORPH_PISCAR, rig.MORPH_BICO]);
   for (const p of rosto.primitives) assert.equal(p.targets.length, 2);
   const principal = json.meshes.find((m) => m !== rosto);
-  assert.ok(principal.primitives.every((p) => !p.targets), 'malha da coruja intocada');
+  assert.deepEqual(principal.extras?.targetNames, [rig.MORPH_BICO], 'malha da coruja só com o bico de cima');
+  for (const p of principal.primitives) {
+    assert.equal(p.targets.length, 1);
+    // Esparso e pequeno: só os vértices do bico se movem, penas vizinhas ficam paradas.
+    const alvo = json.accessors[p.targets[0].POSITION];
+    assert.ok(alvo.sparse && alvo.sparse.count > 10 && alvo.sparse.count < 120, `bico com ${alvo.sparse?.count} vértices`);
+    assert.ok(Math.max(...alvo.max.map(Math.abs), ...alvo.min.map(Math.abs)) < 0.03, 'desloca menos de 3 cm');
+  }
   const no = json.nodes.find((n) => n.mesh === json.meshes.indexOf(rosto));
   assert.equal(no.skin, 0, 'mesma skin da coruja');
   // Todos os vértices num osso só (o da cabeça), com peso 1.
