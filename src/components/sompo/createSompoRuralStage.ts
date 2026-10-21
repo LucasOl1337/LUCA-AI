@@ -21,6 +21,7 @@ import { createPhysicalTwinEffects } from './createPhysicalTwinEffects';
 import type { PhysicalTwin } from './usePhysicalTwin';
 import { sompoOverviewOffset, SOMPO_OVERVIEW_TARGET } from './fitSompoOverview';
 import { soltarLutCompartilhada } from './soltarLutCompartilhada';
+import { soltarOrbit } from './soltarOrbit';
 
 function dampAngle(current: number, target: number, factor: number) {
   const shortestTurn = Math.atan2(Math.sin(target - current), Math.cos(target - current));
@@ -700,7 +701,7 @@ export function mountSompoRuralStage({ mount, isFirebase, controlsRef, previewRe
       window.cancelAnimationFrame(frameId);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       resizeObserver.disconnect();
-      orbit.dispose();
+      soltarOrbit(orbit);
       disposeSompoObject(scene);
       postProcessing.dispose();
       environment.dispose();
