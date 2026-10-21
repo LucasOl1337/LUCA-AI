@@ -19,6 +19,7 @@ import { createMotionRig } from './motionRig';
 import { createPostChain } from './post';
 import { BENCH, createRoom, STAGE, SUN_DIRECTION } from './room';
 import { createScope } from './scope';
+import { soltarLutCompartilhada } from '../../components/sompo/soltarLutCompartilhada';
 
 export type SensorView = 'bancada' | 'caminhao' | 'chip' | 'massa' | 'dedos';
 export type SensorLabEvent = { kind: 'atencao' | 'risco' | 'tombou' | 'frenada' | 'impacto'; reading: SensorReading };
@@ -616,6 +617,7 @@ export function mountSensorLab(container: HTMLElement, options: SensorLabOptions
     restart() { simTime = 0; scope.reset(); },
     dispose() {
       disposed = true;
+      soltarLutCompartilhada(renderer, scene);
       cancelAnimationFrame(raf);
       resizeObserver.disconnect();
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);

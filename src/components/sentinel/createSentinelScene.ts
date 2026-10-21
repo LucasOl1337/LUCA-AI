@@ -6,6 +6,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { soltarLutCompartilhada } from '../sompo/soltarLutCompartilhada';
 
 export interface SentinelScene { turn: (angle: number) => void; reset: () => void; zoom: (factor: number) => void; dispose: () => void }
 const MODEL = '/models/luca/sentinel-63714d75.glb';
@@ -119,6 +120,7 @@ export function createSentinelScene(canvas: HTMLCanvasElement, onReady: () => vo
     dispose() {
       if (disposed) return;
       disposed = true;
+      soltarLutCompartilhada(renderer, scene);
       abort.abort();
       orbit.removeEventListener('change', render);
       orbit.dispose();
