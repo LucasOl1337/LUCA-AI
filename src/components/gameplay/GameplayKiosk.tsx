@@ -90,6 +90,13 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
     aoVivo.enviar(estado);
   }), [motor]);
 
+  // Aba oculta (ensaio da feira, C3): o rAF para; o tablet troca "ao vivo" congelado por "jogo pausado".
+  useEffect(() => {
+    const trocar = () => aoVivo.marcarOculto(document.hidden);
+    document.addEventListener('visibilitychange', trocar);
+    return () => { document.removeEventListener('visibilitychange', trocar); aoVivo.esquecer(); };
+  }, []);
+
   useEffect(() => {
     const mount = palcoRef.current;
     if (!mount) return undefined;
