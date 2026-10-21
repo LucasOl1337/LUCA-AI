@@ -139,6 +139,12 @@
 .stand-dica kbd { font: inherit; font-weight: 800; padding: 0.1vmin 0.9vmin; border-radius: 0.6vmin; background: rgba(255, 255, 255, 0.14); color: #fff; }
 /* Na Simulação o canto de cima à esquerda é dos selos do simulador (ESP32 virtual, SIMULADO); a dica vai pro centro do topo. */
 .stand[data-modo='simulacao'] .stand-dica { left: 50%; transform: translateX(-50%); white-space: nowrap; }
+/* No gameplay o centro do topo é da faixa de alerta ("Obstáculo a 1,5 m · freie"); a dica vai pro canto direito pra não cobrir o aviso. */
+.stand[data-modo='simulacao']:has([data-gameplay]) .stand-dica { left: auto; right: 0; transform: none; }
+/* Em pé não sobra canto ao lado da faixa: a dica desce pra baixo dela. */
+@media (orientation: portrait) {
+  .stand[data-modo='simulacao']:has([data-gameplay]) .stand-dica { right: auto; left: 50%; top: 10vh; transform: translateX(-50%); }
+}
 
 /* Linha fixa da Escuta: no rodapé; na Vitrine sobe para baixo do título (a legenda queimada ocupa o rodapé). */
 .stand-linha-escuta {
