@@ -123,6 +123,13 @@ export class SessaoVoz implements SessaoDeVoz {
         this.notaDeSistema(`O vídeo ${evento.id} terminou. Pergunte, em uma frase, se ficou alguma dúvida.`, true);
       }
       if (evento.tipo === 'reiniciar') this.encerrar();
+      // Pergunta do menu (toque ou texto): entra como fala do visitante.
+      if (evento.tipo === 'pergunta_texto' && !this.videoTocando) {
+        emitirEventoStand({ tipo: 'legenda', texto: evento.texto });
+        this.enviar({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: evento.texto }] } });
+        this.respostaNossa = true;
+        this.enviar({ type: 'response.create' });
+      }
     });
     this.etapa = 'pronta';
     this.mudarEstado('ouvindo');

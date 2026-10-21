@@ -64,14 +64,12 @@ test('pausa só vale na Vitrine e se desfaz quando a pessoa vai embora', () => {
   assert.equal(passo(modoInicial(0), { tipo: 'pausar' }, 0).pausado, false);
 });
 
-test('barra de modos some 5 s depois do último toque; controle não acende a barra', () => {
+test('barra de modos é permanente: visível na abertura e muito depois do último toque (grill r1, Q6)', () => {
   const e = modoInicial(0);
-  assert.equal(barraVisivel(e, 0), false, 'abre sem barra');
+  assert.equal(barraVisivel(e, 0), true, 'abre com a barra');
   const tocado = passo(e, { tipo: 'atividade', toque: true }, 1000);
-  assert.equal(barraVisivel(tocado, 1000 + BARRA_MS - 1), true);
-  assert.equal(barraVisivel(tocado, 1000 + BARRA_MS), false);
-  assert.equal(barraVisivel(passo(e, { tipo: 'atividade' }, 9000), 9001), false);
-  assert.equal(barraVisivel(passo(e, { tipo: 'atividade', toque: true }, 9000), 9001), true);
+  assert.equal(barraVisivel(tocado, 1000 + BARRA_MS + 60_000), true);
+  assert.equal(barraVisivel(passo(e, { tipo: 'atividade' }, 9000), 9001), true);
 });
 
 function pad(botoes = [], eixos = [0, 0, 0, 0], mapping = 'standard') {

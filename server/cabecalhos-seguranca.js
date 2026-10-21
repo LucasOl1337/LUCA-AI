@@ -11,7 +11,7 @@ const STAND = /^\/stand\/?$/;
 const SONOLENCIA = /^\/sonolencia\/?$/;
 const GAMEPLAY = /^\/gameplay\/?$/;
 const WORKER_VISAO = /^\/assets\/drowsiness-worker-[\w-]+\.js$/;
-const EMOLDURAVEL = /^\/(?:|luca-ai|sompo|laboratorio|sensor|sonolencia)\/?$/;
+const EMOLDURAVEL = /^\/(?:|luca-ai|sompo|laboratorio|sensor|sonolencia|gameplay|operador)\/?$/;
 
 /** `busca` é a query crua (`?webcam=1` ou `webcam=1`); só o /gameplay a consulta. */
 export function usaCamera(caminho, busca = '') {

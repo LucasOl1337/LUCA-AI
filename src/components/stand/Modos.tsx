@@ -89,6 +89,7 @@ export function BarraModos({ modo, modos = MODOS, visivel, aoEscolher, atalhos =
         <button
           key={m}
           type="button"
+          data-modo={m}
           aria-pressed={m === modo}
           tabIndex={visivel ? 0 : -1}
           onPointerDown={(evento) => { evento.stopPropagation(); aoEscolher(m); }}

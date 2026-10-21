@@ -75,7 +75,8 @@ export default function StandSemLogin({ offline = false }: { offline?: boolean }
   const { conectado } = usePadStand({ modo: modo.modo, aoAgir: agirNoPad, aoMexer: mexeuNoPad });
   const chamada = chamadaSemVoz(conectado);
   const nivel = useRef(0);
-  const barraVisivel = agora < modo.barraAte;
+  // Barra permanente (grill Totem interativo r1, Q6): o primeiro toque já troca o modo.
+  const barraVisivel = true;
 
   // Login só quando a equipe pede (AuthPage); ao entrar, o main.tsx troca para o StandPage em /stand.
   if (entrando) return <AuthPage />;

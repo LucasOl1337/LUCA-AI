@@ -147,6 +147,11 @@ export function avisoDeSaida(estado: EstadoModo, agora: number): number | null {
   return Math.ceil(resta / 1000);
 }
 
-export function barraVisivel(estado: EstadoModo, agora: number): boolean {
-  return agora < estado.barraAte;
+/**
+ * A barra de modos fica sempre na tela (grill Totem interativo r1, Q6): o
+ * primeiro toque já executa, não só revela a barra. `barraAte` segue marcando
+ * o último toque (destaque visual), sem esconder nada.
+ */
+export function barraVisivel(_estado: EstadoModo, _agora: number): boolean {
+  return true;
 }
