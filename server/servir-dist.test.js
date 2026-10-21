@@ -120,3 +120,37 @@ test('GLB com hash do Vite em assets/ (coruja 3D pelo ?url) é imutável, cru e 
   assert.match(sumiu.headers.get('content-type'), /text\/html/);
   assert.equal(sumiu.headers.get('cache-control'), CACHE_REVALIDAR, 'GLB de release velha nunca vira imutável no fallback');
 });
+
+test('palco 3D com hash em assets/ (GLB, JPG, HDR, manifesto) é imutável, inclusive o .br; o nome fixo antigo segue servido', async t => {
+  const zlib = await import('node:zlib');
+  const root = dist(t);
+  const glb = Buffer.from('glTF'.repeat(4096));
+  escreve(root, {
+    'index.html': '<html></html>',
+    'assets/max-tractor-cabine-XpBAIuWb.glb': glb,
+    'assets/max-tractor-cabine-XpBAIuWb.glb.br': zlib.brotliCompressSync(glb),
+    'assets/cabine-banco-basecolor-c2XTo2iX.jpg': 'jpg',
+    'assets/kloofendal_48d_partly_cloudy_puresky_2k-AbCdEf12.hdr': 'hdr',
+    'assets/cabine-banco.textures-W3_T4qpd.json': '{"images":[]}',
+    'models/gameplay/max-tractor-cabine.glb': glb,
+    'models/gameplay/cabine-banco.textures.json': '{"images":[]}',
+  });
+  const get = await servidor(t, root);
+  const br = await get('/assets/max-tractor-cabine-XpBAIuWb.glb', { 'accept-encoding': 'br' });
+  assert.equal(br.headers.get('content-encoding'), 'br');
+  assert.equal(br.headers.get('cache-control'), CACHE_IMUTAVEL);
+  for (const caminho of ['/assets/cabine-banco-basecolor-c2XTo2iX.jpg', '/assets/kloofendal_48d_partly_cloudy_puresky_2k-AbCdEf12.hdr', '/assets/cabine-banco.textures-W3_T4qpd.json']) {
+    const r = await get(caminho);
+    assert.equal(r.status, 200, caminho);
+    assert.equal(r.headers.get('cache-control'), CACHE_IMUTAVEL, caminho);
+  }
+  // Aba aberta da release anterior ainda pede o nome fixo: 200 com o corpo real, revalidando.
+  const antigo = await get('/models/gameplay/max-tractor-cabine.glb');
+  assert.equal(antigo.status, 200);
+  assert.match(antigo.headers.get('content-type'), /model\/gltf-binary/);
+  assert.equal(antigo.headers.get('cache-control'), 'public, max-age=0');
+  assert.equal((await get('/models/gameplay/cabine-banco.textures.json')).headers.get('cache-control'), 'public, max-age=0');
+  // JSON fora de assets/ ou sem hash nunca vira imutável.
+  assert.equal(cacheDoArquivo('models/gameplay/cabine-banco.textures.json'), null);
+  assert.equal(cacheDoArquivo('assets/manifest.json'), null);
+});

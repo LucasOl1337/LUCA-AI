@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { restoreSompoTextures, useSompoExternalTextures } from './restoreSompoTextures';
 import { sompoLakeDistance } from './createSompoTerrain';
+import { urlPublica } from './urlsPublicas';
 
 // Locally reconstructed botanical references, 18k triangles/species with PBR atlases.
 // Inputs, generation settings and hashes are in public/models/sompo/*.provenance.json.
@@ -82,7 +83,7 @@ export function createSompoVegetation(parent: THREE.Group, camera: THREE.Camera,
       lod.addLevel(near, 0); lod.addLevel(far, 32, 0.1);
       root.add(lod);
     }
-    const loading = fetch(url, { signal: abort.signal }).then(async (response) => {
+    const loading = fetch(urlPublica(url), { signal: abort.signal }).then(async (response) => {
       if (!response.ok) throw new Error(`Tree HTTP ${response.status}`);
       const gltf = await useSompoExternalTextures(new GLTFLoader()).parseAsync(await response.arrayBuffer(), '/models/sompo/');
       try { await restoreSompoTextures(gltf, url, abort.signal); }

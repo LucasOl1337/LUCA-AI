@@ -15,8 +15,11 @@ const modelUrl = moduleUrl(modelSource);
 const partsSource = readFileSync(new URL('../src/components/sompo/splitGeneratedTruckParts.ts', import.meta.url), 'utf8')
   .replace("'three'", JSON.stringify(import.meta.resolve('three')));
 const partsUrl = moduleUrl(partsSource);
-const texturesUrl = moduleUrl(readFileSync(new URL('../src/components/sompo/restoreSompoTextures.ts', import.meta.url), 'utf8')
+const urlsPublicasUrl = moduleUrl(readFileSync(new URL('../src/components/sompo/urlsPublicas.ts', import.meta.url), 'utf8')
   .replace("'three'", JSON.stringify(import.meta.resolve('three'))));
+const texturesUrl = moduleUrl(readFileSync(new URL('../src/components/sompo/restoreSompoTextures.ts', import.meta.url), 'utf8')
+  .replace("'three'", JSON.stringify(import.meta.resolve('three')))
+  .replace("'./urlsPublicas'", JSON.stringify(urlsPublicasUrl)));
 const terrainUrl = moduleUrl(readFileSync(new URL('../src/components/sompo/createSompoTerrain.ts', import.meta.url), 'utf8')
   .replace("'three'", JSON.stringify(import.meta.resolve('three'))));
 const assetSource = readFileSync(new URL('../src/components/sompo/loadSompoTruckAsset.ts', import.meta.url), 'utf8')
@@ -24,7 +27,8 @@ const assetSource = readFileSync(new URL('../src/components/sompo/loadSompoTruck
   .replace("'three/addons/loaders/GLTFLoader.js'", JSON.stringify(import.meta.resolve('three/addons/loaders/GLTFLoader.js')))
   .replace("'./createSompoTruckModel'", JSON.stringify(modelUrl))
   .replace("'./splitGeneratedTruckParts'", JSON.stringify(partsUrl))
-  .replace("'./restoreSompoTextures'", JSON.stringify(texturesUrl));
+  .replace("'./restoreSompoTextures'", JSON.stringify(texturesUrl))
+  .replace("'./urlsPublicas'", JSON.stringify(urlsPublicasUrl));
 const assetBytes = readFileSync(new URL('../public/models/sompo/tesla-semi.glb', import.meta.url));
 const generatedBytes = readFileSync(new URL('../public/models/sompo/generated-rural-truck.glb', import.meta.url));
 
@@ -145,7 +149,8 @@ test('GLBs reais recuperam texturas sem ImageBitmap, preservam sensores/rodas e 
       .replace("'three'", JSON.stringify(import.meta.resolve('three')))
       .replace("'three/addons/loaders/GLTFLoader.js'", JSON.stringify(import.meta.resolve('three/addons/loaders/GLTFLoader.js')))
       .replace("'./restoreSompoTextures'", JSON.stringify(texturesUrl))
-      .replace("'../../../shared/sompo-scenario-effects.js'", JSON.stringify(new URL('../shared/sompo-scenario-effects.js', import.meta.url).href)));
+      .replace("'../../../shared/sompo-scenario-effects.js'", JSON.stringify(new URL('../shared/sompo-scenario-effects.js', import.meta.url).href))
+      .replace("'./urlsPublicas'", JSON.stringify(urlsPublicasUrl)));
     const { createSompoAnimal } = await import(animalUrl);
     const pasture = new THREE.Group(); const cattle = createSompoAnimal(pasture);
     await cattle.ready; assert.equal(cattle.asset, 'GeneratedNelore');
@@ -163,7 +168,8 @@ test('GLBs reais recuperam texturas sem ImageBitmap, preservam sensores/rodas e 
       .replace("'three'", JSON.stringify(import.meta.resolve('three')))
       .replace("'three/addons/loaders/GLTFLoader.js'", JSON.stringify(import.meta.resolve('three/addons/loaders/GLTFLoader.js')))
       .replace("'./createSompoTerrain'", JSON.stringify(terrainUrl))
-      .replace("'./restoreSompoTextures'", JSON.stringify(texturesUrl)));
+      .replace("'./restoreSompoTextures'", JSON.stringify(texturesUrl))
+      .replace("'./urlsPublicas'", JSON.stringify(urlsPublicasUrl)));
     const { createSompoVegetation } = await import(vegetationUrl);
     const landscape = new THREE.Group(); const camera = new THREE.PerspectiveCamera();
     const vegetation = createSompoVegetation(landscape, camera);

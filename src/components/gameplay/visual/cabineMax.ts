@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { restoreSompoTextures, useSompoExternalTextures } from '../../sompo/restoreSompoTextures';
+import { urlPublica } from '../../sompo/urlsPublicas';
 import type { CabineGameplay, CriarCabineGameplay, QuadroCabine } from '../cabineGameplay';
 import type { EstadoGameplay } from '../estadoGameplay';
 import { criarCampoVisual } from './campoVisual';
@@ -68,7 +69,7 @@ export const ENCAIXE_CABINE = Object.freeze({
 });
 
 export async function carregarPropTripo(url: string, signal: AbortSignal) {
-  const resposta = await fetch(url, { signal });
+  const resposta = await fetch(urlPublica(url), { signal });
   if (!resposta.ok) throw new Error(`Prop ${url}: HTTP ${resposta.status}`);
   const gltf = await useSompoExternalTextures(new GLTFLoader()).parseAsync(await resposta.arrayBuffer(), '/models/gameplay/');
   await restoreSompoTextures(gltf, url, signal);
@@ -77,7 +78,7 @@ export async function carregarPropTripo(url: string, signal: AbortSignal) {
 
 async function carregarAssetsPadrao(signal: AbortSignal): Promise<AssetsCabine> {
   const [provenance, console, banco, fardo] = await Promise.all([
-    fetch(CABINE_MAX_URL.replace(/\.glb$/, '.provenance.json'), { signal }).then((r) => { if (!r.ok) throw new Error(`Cabine MAX provenance: HTTP ${r.status}`); return r.json(); }),
+    fetch(urlPublica(CABINE_MAX_URL.replace(/\.glb$/, '.provenance.json')), { signal }).then((r) => { if (!r.ok) throw new Error(`Cabine MAX provenance: HTTP ${r.status}`); return r.json(); }),
     carregarPropTripo(PROPS_CABINE_URL.console, signal),
     carregarPropTripo(PROPS_CABINE_URL.banco, signal),
     carregarPropTripo(PROPS_CABINE_URL.fardo, signal),

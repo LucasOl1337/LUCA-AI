@@ -5,6 +5,7 @@ import {
   type SompoAgriEquipmentId,
 } from '../../../shared/sompo-agri-scenarios.js';
 import { restoreSompoTextures, useSompoExternalTextures } from './restoreSompoTextures';
+import { urlPublica } from './urlsPublicas';
 
 function disposeObject(root: THREE.Object3D) {
   const geometries = new Set<THREE.BufferGeometry>();
@@ -43,7 +44,7 @@ export function urlDoAssetAgri(equipmentId: SompoAgriEquipmentId, assetUrl?: str
 export async function loadSompoAgriAsset(equipmentId: SompoAgriEquipmentId, signal: AbortSignal, assetUrl?: string) {
   const equipment = SOMPO_AGRI_EQUIPMENT[equipmentId];
   const url = urlDoAssetAgri(equipmentId, assetUrl);
-  const response = await fetch(url, { signal });
+  const response = await fetch(urlPublica(url), { signal });
   if (!response.ok) throw new Error(`Sompo ${equipmentId} asset: HTTP ${response.status}`);
   const gltf = await useSompoExternalTextures(new GLTFLoader()).parseAsync(
     await response.arrayBuffer(),

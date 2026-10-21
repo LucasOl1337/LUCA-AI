@@ -96,15 +96,19 @@ for (const name of ['generated-agri-tractor', 'generated-agri-harvester', 'max-t
 
 test('loader agrícola recupera PBR externo e ajusta os dois modelos ao chão', async () => {
   const THREE = await import('three');
+  const urlsPublicasUrl = moduleUrl(readFileSync(new URL('../src/components/sompo/urlsPublicas.ts', import.meta.url), 'utf8')
+    .replace("'three'", JSON.stringify(import.meta.resolve('three'))));
   const textureSource = readFileSync(new URL('../src/components/sompo/restoreSompoTextures.ts', import.meta.url), 'utf8')
-    .replace("'three'", JSON.stringify(import.meta.resolve('three')));
+    .replace("'three'", JSON.stringify(import.meta.resolve('three')))
+    .replace("'./urlsPublicas'", JSON.stringify(urlsPublicasUrl));
   const textureUrl = moduleUrl(textureSource);
   const catalogUrl = new URL('../shared/sompo-agri-scenarios.js', import.meta.url).href;
   const loaderSource = readFileSync(new URL('../src/components/sompo/loadSompoAgriAsset.ts', import.meta.url), 'utf8')
     .replace("'three'", JSON.stringify(import.meta.resolve('three')))
     .replace("'three/addons/loaders/GLTFLoader.js'", JSON.stringify(import.meta.resolve('three/addons/loaders/GLTFLoader.js')))
     .replace("'../../../shared/sompo-agri-scenarios.js'", JSON.stringify(catalogUrl))
-    .replace("'./restoreSompoTextures'", JSON.stringify(textureUrl));
+    .replace("'./restoreSompoTextures'", JSON.stringify(textureUrl))
+    .replace("'./urlsPublicas'", JSON.stringify(urlsPublicasUrl));
   const { disposeSompoAgriAsset, loadSompoAgriAsset } = await import(moduleUrl(loaderSource));
   const compiled = await build({ entryPoints: [new URL('../src/components/sompo/rigSompoAgriAsset.ts', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'esm', plugins: [{ name: 'shared-three', setup(build) {
     build.onResolve({ filter: /^three(?:\/|$)/ }, args => ({ path: import.meta.resolve(args.path), external: true }));
