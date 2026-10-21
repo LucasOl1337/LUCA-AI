@@ -20,11 +20,11 @@ class GameplayBoundary extends Component<{ children: ReactNode }, { failed: bool
   }
 }
 
-function Cabine() {
+function Cabine({ seloFps = false }: { seloFps?: boolean }) {
   return (
     <GameplayBoundary>
       <Suspense fallback={<p className="experience-game-status" role="status">Carregando a cabine do Trator MAX…</p>}>
-        <GameplayComCabine />
+        <GameplayComCabine seloFps={seloFps} />
       </Suspense>
     </GameplayBoundary>
   );
@@ -34,7 +34,7 @@ function Cabine() {
  * /gameplay?quiosque=1 (ensaio da feira, item 7): tela inteira, sem landing nem
  * menu, para F5 no totem voltar jogando sem ninguém tocar. Shift+Q volta à landing.
  */
-export function GameplayQuiosque({ aoSair }: { aoSair: () => void }) {
+export function GameplayQuiosque({ aoSair, seloFps = false }: { aoSair: () => void; seloFps?: boolean }) {
   useEffect(() => {
     const tecla = (evento: KeyboardEvent) => {
       if (evento.shiftKey && evento.key.toLowerCase() === 'q' && !evento.ctrlKey && !evento.metaKey && !evento.altKey) aoSair();
@@ -44,7 +44,7 @@ export function GameplayQuiosque({ aoSair }: { aoSair: () => void }) {
   }, [aoSair]);
   return (
     <div className="experience-game-quiosque" data-quiosque="true" aria-label="Cabine jogável do Trator MAX">
-      <Cabine />
+      <Cabine seloFps={seloFps} />
     </div>
   );
 }
@@ -53,7 +53,9 @@ export default function GameplayPage() {
   const { location, navigate } = useAppLocation();
   const [playing, setPlaying] = useState(false);
   const sairDoQuiosque = useCallback(() => navigate({ quiosque: '' }, 'push'), [navigate]);
-  if (location.quiosque === '1') return <GameplayQuiosque aoSair={sairDoQuiosque} />;
+  // /gameplay?fps=1 (pergunta 6): selo de FPS no canto, sozinho ou com ?quiosque=1.
+  const seloFps = location.fps === '1';
+  if (location.quiosque === '1') return <GameplayQuiosque aoSair={sairDoQuiosque} seloFps={seloFps} />;
   return (
     <section className="experience-page" aria-labelledby="gameplay-title">
       <header>
@@ -73,7 +75,7 @@ export default function GameplayPage() {
       </div>
       {playing && (
         <div className="experience-game-viewport" aria-label="Cabine jogável do Trator MAX">
-          <Cabine />
+          <Cabine seloFps={seloFps} />
         </div>
       )}
       <p className="experience-note">Disponível para teste. Áudio, vibração, desempenho e legibilidade no equipamento final ainda dependem de validação no aparelho.</p>
