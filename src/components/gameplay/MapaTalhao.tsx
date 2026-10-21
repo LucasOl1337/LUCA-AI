@@ -1,5 +1,6 @@
 import { ENCOSTA_TALHAO, TALHAO, ZONAS_TALHAO, type GeofenceTalhao } from './geofenceTalhao';
 import type { EstadoGameplay } from './estadoGameplay';
+import './mapaTalhao.css';
 
 /**
  * Minimapa do talhão no canto de baixo à direita: zonas de risco, encosta e a
