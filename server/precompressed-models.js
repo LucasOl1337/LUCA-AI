@@ -18,6 +18,14 @@ export function precompressedModels(root) {
     if (!file.startsWith(base + path.sep) || !fs.existsSync(`${file}.br`)) return next();
     res.setHeader('Content-Encoding', 'br');
     res.setHeader('Content-Type', 'model/gltf-binary');
-    res.sendFile(`${file}.br`, (error) => { if (error && !res.headersSent) next(); });
+    // `root` limita a regra de dotfile do `send` ao trecho servido: sem ele, um dist
+    // dentro de pasta com ponto (~/.algo/...) dava 404 aqui. Na falha, o original
+    // segue sem o cabeçalho br; antes ele saía cru rotulado como Brotli.
+    res.sendFile(`${path.relative(base, file)}.br`, { root: base }, (error) => {
+      if (!error || res.headersSent) return;
+      res.removeHeader('Content-Encoding');
+      res.removeHeader('Content-Type');
+      next();
+    });
   };
 }
