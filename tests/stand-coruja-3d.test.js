@@ -49,13 +49,20 @@ test('cada estado de voz tem um clipe no GLB, mais o aceno de entrada', () => {
     assert.ok(clipes.includes(rig.CLIPE_POR_VOZ[voz]), `clipe ${voz}`);
   }
   assert.ok(clipes.includes(rig.CLIPE_ENTRADA));
+  assert.ok(clipes.includes(rig.CLIPE_FELIZ), 'feliz depois da fala');
   assert.ok(json.nodes.some((n) => sanear(n.name) === rig.OSSO_PESCOCO), 'osso do pescoço existe com o nome saneado');
+  assert.ok(json.nodes.some((n) => sanear(n.name) === rig.OSSO_CABECA), 'osso da cabeça existe com o nome saneado');
 });
 
 test('manifesto de texturas externas cobre cada imagem do GLB e os arquivos existem', () => {
   const manifesto = JSON.parse(readFileSync(new URL('coruja-3d.textures.json', pasta), 'utf8'));
   assert.equal(manifesto.images.length, json.images.length);
   for (const arquivo of manifesto.images) assert.ok(existsSync(new URL(arquivo, pasta)), arquivo);
+  // Imagens fora do GLB (uri ao lado): o binário só leva geometria, pesos e clipes.
+  json.images.forEach((imagem, i) => {
+    assert.equal(imagem.bufferView, undefined, `imagem ${i} embutida`);
+    assert.equal(imagem.uri, manifesto.images[i]);
+  });
   const material = json.materials[0];
   assert.ok(material.emissiveTexture, 'emissivo do visor e frisos');
   assert.match(manifesto.images[json.textures[material.emissiveTexture.index].source], /emissive/);
@@ -83,44 +90,75 @@ test('brilho segue o áudio na fala e fica estável fora dela', () => {
   assert.ok(Math.max(...ouvindo) - Math.min(...ouvindo) < 0.2, 'ouvindo fica aceso e firme');
 });
 
-test('GLB traz o rosto: morphs piscar e bico_abre numa malha 100% na cabeça; na principal, só o bico de cima', () => {
-  const rosto = json.meshes.find((m) => (m.extras?.targetNames || []).includes(rig.MORPH_PISCAR));
-  assert.ok(rosto, 'malha com morph targets');
-  assert.deepEqual(rosto.extras.targetNames, [rig.MORPH_PISCAR, rig.MORPH_BICO]);
-  for (const p of rosto.primitives) assert.equal(p.targets.length, 2);
-  const principal = json.meshes.find((m) => m !== rosto);
+/** Lê os pesos (float ou byte normalizado) e as juntas de um primitivo. */
+function pesosEJuntas(prim) {
+  const bin = glb.subarray(28 + glb.readUInt32LE(12));
+  const ler = (acc, Tipo, tam) => {
+    const vista = json.bufferViews[acc.bufferView];
+    const inicio = bin.byteOffset + (vista.byteOffset || 0) + (acc.byteOffset || 0);
+    return new Tipo(bin.buffer.slice(inicio, inicio + acc.count * 4 * tam));
+  };
+  const pa = json.accessors[prim.attributes.WEIGHTS_0];
+  const ja = json.accessors[prim.attributes.JOINTS_0];
+  const pesos = pa.componentType === 5126 ? ler(pa, Float32Array, 4) : Float32Array.from(ler(pa, Uint8Array, 1), (v) => v / 255);
+  const juntas = ja.componentType === 5121 ? ler(ja, Uint8Array, 1) : ler(ja, Uint16Array, 2);
+  return { pesos, juntas, count: pa.count, acc: pa };
+}
+
+function soCabeca(prim, nome) {
+  const { pesos, juntas, count, acc } = pesosEJuntas(prim);
+  assert.equal(acc.componentType, 5126, `${nome}: peso inteiro em float`);
+  const ossos = new Set();
+  for (let i = 0; i < count; i += 1) {
+    assert.ok(Math.abs(pesos[i * 4] - 1) < 1e-4, `${nome}: vértice ${i} com peso ${pesos[i * 4]}`);
+    ossos.add(json.skins[0].joints[juntas[i * 4]]);
+  }
+  assert.deepEqual([...ossos].map((n) => sanear(json.nodes[n].name)), ['tripoHead_2'], nome);
+}
+
+test('GLB traz o rosto: bico_abre na principal (bico de cima) e no rosto (boca + bico de baixo), 100% na cabeça', () => {
+  const porNome = Object.fromEntries(json.meshes.map((m) => [m.name, m]));
+  const principal = porNome.Coruja;
+  const rosto = porNome.CorujaRosto;
+  assert.ok(principal && rosto, 'malhas Coruja e CorujaRosto');
   assert.deepEqual(principal.extras?.targetNames, [rig.MORPH_BICO], 'malha da coruja só com o bico de cima');
+  assert.deepEqual(rosto.extras?.targetNames, [rig.MORPH_BICO]);
+  assert.ok(!json.meshes.some((m) => (m.extras?.targetNames || []).includes('piscar')), 'piscada é da tela dos olhos, não morph');
   for (const p of principal.primitives) {
     assert.equal(p.targets.length, 1);
     // Esparso e pequeno: só os vértices do bico se movem, penas vizinhas ficam paradas.
     const alvo = json.accessors[p.targets[0].POSITION];
     assert.ok(alvo.sparse && alvo.sparse.count > 10 && alvo.sparse.count < 120, `bico com ${alvo.sparse?.count} vértices`);
-    assert.ok(Math.max(...alvo.max.map(Math.abs), ...alvo.min.map(Math.abs)) < 0.03, 'desloca menos de 3 cm');
+    assert.ok(Math.max(...alvo.max.map(Math.abs), ...alvo.min.map(Math.abs)) < 0.05, 'desloca menos de 5 cm (bico sobe 20°)');
   }
   // Interior da boca: material próprio quase preto, sem textura (fora do manifesto externo).
   const materiais = rosto.primitives.map((p) => json.materials[p.material]);
-  const boca = materiais.find((m) => !m.pbrMetallicRoughness?.baseColorTexture);
+  const boca = materiais.find((m) => m.name === 'coruja-3d-boca');
   assert.ok(boca, 'rosto com o material escuro da boca');
   assert.ok(Math.max(...boca.pbrMetallicRoughness.baseColorFactor.slice(0, 3)) < 0.1, 'boca quase preta');
-  assert.ok(!boca.emissiveTexture && !boca.normalTexture);
+  assert.ok(!boca.emissiveTexture && !boca.normalTexture && !boca.pbrMetallicRoughness.baseColorTexture);
   const no = json.nodes.find((n) => n.mesh === json.meshes.indexOf(rosto));
   assert.equal(no.skin, 0, 'mesma skin da coruja');
-  // Todos os vértices num osso só (o da cabeça), com peso 1.
-  const pesosAcc = json.accessors[rosto.primitives[0].attributes.WEIGHTS_0];
-  const juntasAcc = json.accessors[rosto.primitives[0].attributes.JOINTS_0];
-  const bin = glb.subarray(28 + glb.readUInt32LE(12));
-  const vista = (acc) => json.bufferViews[acc.bufferView];
-  const offset = (acc) => (vista(acc).byteOffset || 0) + (acc.byteOffset || 0);
-  assert.equal(pesosAcc.componentType, 5126);
-  const pesos = new Float32Array(bin.buffer, bin.byteOffset + offset(pesosAcc), pesosAcc.count * 4);
-  const tamJunta = juntasAcc.componentType === 5121 ? 1 : 2;
-  const juntas = new (tamJunta === 1 ? Uint8Array : Uint16Array)(bin.buffer.slice(bin.byteOffset + offset(juntasAcc), bin.byteOffset + offset(juntasAcc) + juntasAcc.count * 4 * tamJunta));
-  const ossos = new Set();
-  for (let i = 0; i < pesosAcc.count; i += 1) {
-    assert.ok(Math.abs(pesos[i * 4] - 1) < 1e-4, `vértice ${i} com peso ${pesos[i * 4]}`);
-    ossos.add(json.skins[0].joints[juntas[i * 4]]);
+  for (const p of rosto.primitives) soCabeca(p, 'rosto');
+});
+
+test('GLB traz a tela dos olhos no visor: malha CorujaOlhos sem textura, presa à cabeça', () => {
+  const olhos = json.meshes.find((m) => m.name === rig.MALHA_OLHOS);
+  assert.ok(olhos, 'malha da tela');
+  assert.equal(olhos.primitives.length, 1);
+  const p = olhos.primitives[0];
+  assert.ok(!p.targets, 'sem morph: a textura em canvas desenha piscada e olhar');
+  assert.ok(p.attributes.TEXCOORD_0 !== undefined, 'UV plano por olho');
+  const mat = json.materials[p.material];
+  assert.ok(!mat.pbrMetallicRoughness?.baseColorTexture, 'textura vem do canvas no cliente');
+  assert.equal(json.nodes.find((n) => n.mesh === json.meshes.indexOf(olhos)).skin, 0);
+  soCabeca(p, 'olhos');
+  // Malha principal: pesos de 4 ossos somando 1 (byte normalizado ou float).
+  const { pesos, count } = pesosEJuntas(json.meshes.find((m) => m.name === 'Coruja').primitives[0]);
+  for (let i = 0; i < count; i += 97) {
+    const soma = pesos[i * 4] + pesos[i * 4 + 1] + pesos[i * 4 + 2] + pesos[i * 4 + 3];
+    assert.ok(Math.abs(soma - 1) < 1e-3, `vértice ${i} soma ${soma}`);
   }
-  assert.deepEqual([...ossos].map((n) => sanear(json.nodes[n].name)), ['tripoHead_2']);
 });
 
 function relogioRosto(sorteios = [0.5]) {

@@ -22,10 +22,16 @@ export const CLIPE_POR_VOZ: Readonly<Record<EstadoVoz, string>> = Object.freeze(
   ocioso: 'ocioso', ouvindo: 'ouvindo', pensando: 'pensando', falando: 'falando',
 });
 export const CLIPE_ENTRADA = 'aceno';
+/** Toca uma vez quando a fala termina e a coruja volta ao ocioso. */
+export const CLIPE_FELIZ = 'feliz';
+/** Malha da tela dos olhos no visor (textura em canvas, ver `coruja3dOlhos.ts`). */
+export const MALHA_OLHOS = 'CorujaOlhos';
 export const CROSSFADE_S = 0.35;
 
 /** Osso do pescoço (rig avian do Tripo) que soma o aceno de cabeça da fala por cima do clipe. */
 export const OSSO_PESCOCO = 'tripoHead_1';
+/** Osso da cabeça: segue o olhar e balança de leve por cima do clipe. */
+export const OSSO_CABECA = 'tripoHead_2';
 /** Inclinação máxima extra da cabeça com o áudio no máximo, em radianos. */
 export const ACENO_FALA_RAD = 0.14;
 
@@ -69,12 +75,11 @@ export function brilhoCoruja3D(m: MemoriaBrilho, voz: EstadoVoz, nivelAudio: num
 }
 
 /**
- * Rosto: a malha `CorujaRosto` do GLB tem dois morph targets (ver
- * `scripts/stand/coruja3d_rosto.py`). `piscar` 0 = olho aberto, 1 = fechado;
- * `bico_abre` 0 = fechado, 1 = aberto (mandíbula 45° para baixo, bico de cima 12°
- * para cima, interior escuro entre os dois).
+ * Bico: morph `bico_abre` na malha principal (bico de cima sobe 20° na
+ * dobradiça) e em `CorujaRosto` (boca escura e bico de baixo), ver
+ * `scripts/stand/coruja3d_rosto.py`. 0 = fechado, 1 = aberto. A piscada não é
+ * morph: `rostoCoruja3D().piscar` vai para a tela dos olhos.
  */
-export const MORPH_PISCAR = 'piscar';
 export const MORPH_BICO = 'bico_abre';
 /**
  * A fala de teste fica em ~0,4 de nível suavizado (p90 0,65): sem ganho o bico
@@ -83,8 +88,8 @@ export const MORPH_BICO = 'bico_abre';
 export const GANHO_BICO = 1.6;
 export const PISCADA_MS = 120;
 export const PISCADA_INTERVALO_MS = Object.freeze({ min: 2000, max: 6000 });
-/** Pensando: pálpebra meio caída, como o olho 0,62 aberto da Coruja A. */
-export const PALPEBRA_PENSANDO = 0.38;
+/** Pensando: pálpebra só um pouco baixa; mais que isso, a tela dos olhos lê como sono ou tristeza (juiz cego, 21/10). */
+export const PALPEBRA_PENSANDO = 0.12;
 
 export interface MemoriaRosto {
   /** Quando a próxima piscada começa (ms, relógio do rAF). */
@@ -145,4 +150,38 @@ export function rostoCoruja3D(
 /** Aceno de cabeça extra na fala (rad), a partir do nível suavizado em `MemoriaBrilho`. */
 export function acenoFala(m: MemoriaBrilho, voz: EstadoVoz): number {
   return voz === 'falando' ? m.nivel * ACENO_FALA_RAD : 0;
+}
+
+export interface MemoriaCabeca { guinada: number; arfagem: number; rolagem: number; anterior: number }
+
+export function novaMemoriaCabeca(): MemoriaCabeca {
+  return { guinada: 0, arfagem: 0, rolagem: 0, anterior: -1 };
+}
+
+/** Pensando inclina a cabeça de lado (curiosa); ouvindo, um pouco. Radianos. */
+const ROLAGEM_ESTADO: Readonly<Record<EstadoVoz, number>> = { ocioso: 0, ouvindo: 0.06, pensando: 0.13, falando: 0 };
+
+/**
+ * Micro-movimento da cabeça por cima do clipe (radianos, eixos da cena: guinada
+ * em Y, arfagem em X, rolagem em Z). A cabeça segue o olhar com atraso de mola
+ * (meia-vida ~200 ms), mais um balanço lento de duas senoides.
+ */
+export function cabecaViva(
+  m: MemoriaCabeca,
+  olhar: { x: number; y: number },
+  voz: EstadoVoz,
+  agoraMs: number,
+): { guinada: number; arfagem: number; rolagem: number } {
+  const dt = m.anterior < 0 ? 16 : Math.min(100, Math.max(0, agoraMs - m.anterior));
+  m.anterior = agoraMs;
+  const k = 1 - Math.pow(0.5, dt / 200);
+  const t = agoraMs / 1000;
+  m.guinada += (olhar.x * 0.17 - m.guinada) * k;
+  m.arfagem += (-olhar.y * 0.1 - m.arfagem) * k;
+  m.rolagem += (ROLAGEM_ESTADO[voz] - m.rolagem) * (1 - Math.pow(0.5, dt / 350));
+  return {
+    guinada: m.guinada + Math.sin(t * 0.53) * 0.025 + Math.sin(t * 1.31) * 0.01,
+    arfagem: m.arfagem + Math.sin(t * 0.71 + 1.3) * 0.015,
+    rolagem: m.rolagem + Math.sin(t * 0.37 + 0.6) * 0.012,
+  };
 }

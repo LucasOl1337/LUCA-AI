@@ -5,9 +5,10 @@ import { restoreSompoTextures, useSompoExternalTextures } from '../sompo/restore
 import { soltarLutCompartilhada } from '../sompo/soltarLutCompartilhada';
 import type { EstadoVoz } from './canal';
 import {
-  CLIPE_ENTRADA, CLIPE_POR_VOZ, CORUJA_3D_PUBLICO, CORUJA_3D_URL, CROSSFADE_S, ENQUADRAMENTO, MORPH_BICO, MORPH_PISCAR, OSSO_PESCOCO,
-  acenoFala, brilhoCoruja3D, novaMemoriaRosto, rostoCoruja3D, type MemoriaBrilho,
+  CLIPE_ENTRADA, CLIPE_FELIZ, CLIPE_POR_VOZ, CORUJA_3D_PUBLICO, CORUJA_3D_URL, CROSSFADE_S, ENQUADRAMENTO, MALHA_OLHOS, MORPH_BICO,
+  OSSO_CABECA, OSSO_PESCOCO, acenoFala, brilhoCoruja3D, cabecaViva, novaMemoriaCabeca, novaMemoriaRosto, rostoCoruja3D, type MemoriaBrilho,
 } from './coruja3dRig';
+import { OLHOS_CANVAS, desenharOlhos, novaMemoriaOlhos, olhosCoruja3D } from './coruja3dOlhos';
 
 /**
  * Cena three.js da Coruja 3D. Fica num módulo próprio, importado sob demanda
@@ -27,8 +28,11 @@ interface Opcoes {
   aoQuadro?(voz: EstadoVoz, fala: number, agoraMs: number): void;
 }
 
-/** Índices dos morph targets do rosto numa malha; ausentes ficam -1 (GLB sem rosto segue sem ele). */
-interface Rosto { influencias: number[]; piscar: number; bico: number }
+/** Morph `bico_abre` numa malha (bico de cima na malha principal, boca e bico de baixo no rosto). */
+interface Rosto { influencias: number[]; bico: number; malha: THREE.Mesh; soAberto: boolean }
+
+/** Abaixo disso a boca recolhida fica escondida: recolhida, ela vaza como riscos sob a ponta do bico. */
+const BICO_VISIVEL = 0.02;
 
 function acharRosto(raiz: THREE.Object3D): Rosto[] {
   const rostos: Rosto[] = [];
@@ -36,10 +40,31 @@ function acharRosto(raiz: THREE.Object3D): Rosto[] {
     const malha = no as THREE.Mesh;
     const nomes = malha.isMesh ? malha.morphTargetDictionary : undefined;
     if (!nomes || !malha.morphTargetInfluences) return;
-    const r = { influencias: malha.morphTargetInfluences, piscar: nomes[MORPH_PISCAR] ?? -1, bico: nomes[MORPH_BICO] ?? -1 };
-    if (r.piscar >= 0 || r.bico >= 0) rostos.push(r);
+    const bico = nomes[MORPH_BICO] ?? -1;
+    const soAberto = [malha.name, malha.parent?.name].some((n) => n?.startsWith('CorujaRosto'));
+    if (bico >= 0) rostos.push({ influencias: malha.morphTargetInfluences, bico, malha, soAberto });
   });
   return rostos;
+}
+
+/**
+ * Tela dos olhos: canvas 2D como textura da malha `CorujaOlhos`. Transparente
+ * fora do olho; emissivo fraco, como uma tela atrás do vidro do visor.
+ */
+function criarTelaOlhos() {
+  const canvas = document.createElement('canvas');
+  canvas.width = OLHOS_CANVAS.largura;
+  canvas.height = OLHOS_CANVAS.altura;
+  const ctx = canvas.getContext('2d');
+  const textura = new THREE.CanvasTexture(canvas);
+  textura.flipY = false; // UV do glTF: v=0 no topo da imagem
+  textura.colorSpace = THREE.SRGBColorSpace;
+  textura.anisotropy = 4;
+  const material = new THREE.MeshStandardMaterial({
+    map: textura, emissiveMap: textura, emissive: 0xffffff, emissiveIntensity: 0.32,
+    transparent: true, depthWrite: false, roughness: 0.18, metalness: 0,
+  });
+  return { ctx, textura, material };
 }
 
 function liberar(raiz: THREE.Object3D) {
@@ -88,6 +113,11 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
   const relogio = new THREE.Timer();
   const memoria: MemoriaBrilho = { nivel: 0 };
   const memoriaRosto = novaMemoriaRosto(performance.now());
+  const memoriaOlhos = novaMemoriaOlhos(performance.now());
+  const memoriaCabeca = novaMemoriaCabeca();
+  /** Tela dos olhos: nasce com o modelo (só se o GLB tiver a malha). */
+  let tela: ReturnType<typeof criarTelaOlhos> | null = null;
+  let ultimoDesenho = '';
   const movimentoReduzido = window.matchMedia?.('(prefers-reduced-motion: reduce)');
   let rostos: Rosto[] = [];
   let entrada: THREE.AnimationAction | null = null;
@@ -97,12 +127,34 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
   let atual: THREE.AnimationAction | null = null;
   let vozAtual: EstadoVoz | null = null;
   let pescoco: THREE.Object3D | null = null;
+  let cabeca: THREE.Object3D | null = null;
+  const repouso = new Map<THREE.Object3D, THREE.Quaternion>();
+  /** Clipe de uma vez em curso (aceno de entrada ou feliz depois da fala). */
+  let umaVez: THREE.AnimationAction | null = null;
   const emissivos: THREE.MeshStandardMaterial[] = [];
   let quadro = 0;
   let encerrado = false;
   const qPai = new THREE.Quaternion();
   const qAceno = new THREE.Quaternion();
   const eixo = new THREE.Vector3();
+
+  /** Gira o osso por cima do clipe em torno de um eixo do mundo (x, y ou z da cena). */
+  function somarRotacao(osso: THREE.Object3D, x: number, y: number, z: number, angulo: number) {
+    if (!osso.parent || Math.abs(angulo) < 0.0002) return;
+    osso.parent.updateWorldMatrix(true, false);
+    const paiInv = osso.parent.getWorldQuaternion(qPai).invert();
+    eixo.set(x, y, z).applyQuaternion(paiInv);
+    osso.quaternion.premultiply(qAceno.setFromAxisAngle(eixo, angulo));
+  }
+
+  function tocarUmaVez(acao: THREE.AnimationAction) {
+    acao.reset().setLoop(THREE.LoopOnce, 1);
+    acao.clampWhenFinished = true;
+    acao.setEffectiveWeight(1).play();
+    if (atual && atual !== acao) atual.crossFadeTo(acao, CROSSFADE_S, false);
+    atual = acao;
+    umaVez = acao;
+  }
 
   function enquadrar() {
     // Dentro do foreignObject o tamanho CSS é o da arte (1024); vale o tamanho na tela.
@@ -124,7 +176,15 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
 
   function trocarEstado(proxima: EstadoVoz) {
     if (proxima === vozAtual || !mixer) return;
+    const anterior = vozAtual;
     vozAtual = proxima;
+    // Fim da fala: um feliz curto (asas e cabeça) antes de voltar ao ocioso.
+    const feliz = acoes.get(CLIPE_FELIZ);
+    if (anterior === 'falando' && proxima === 'ocioso' && feliz && !(movimentoReduzido?.matches ?? false)) {
+      tocarUmaVez(feliz);
+      return;
+    }
+    umaVez = null;
     const acao = acoes.get(CLIPE_POR_VOZ[proxima]);
     if (!acao || acao === atual) return;
     acao.reset().setEffectiveWeight(1).play();
@@ -136,28 +196,41 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
     relogio.update(agora);
     const dt = Math.min(relogio.getDelta(), 0.1);
     trocarEstado(voz());
+    // Ossos com soma procedural voltam ao repouso antes do mixer (clipe que não os
+    // anima não deixa a soma acumular de um quadro para o outro).
+    for (const [osso, q] of repouso) osso.quaternion.copy(q);
     mixer?.update(dt);
     const v = vozAtual ?? 'ocioso';
     const brilho = brilhoCoruja3D(memoria, v, nivel.current, agora);
     for (const m of emissivos) m.emissiveIntensity = brilho;
-    const rosto = rostoCoruja3D(memoriaRosto, v, nivel.current, agora, {
-      acenando: entrada !== null && atual === entrada && entrada.isRunning(),
-      movimentoReduzido: movimentoReduzido?.matches ?? false,
-    });
+    const reduzido = movimentoReduzido?.matches ?? false;
+    const acenando = entrada !== null && umaVez === entrada && entrada.isRunning();
+    const rosto = rostoCoruja3D(memoriaRosto, v, nivel.current, agora, { acenando, movimentoReduzido: reduzido });
     for (const r of rostos) {
-      if (r.piscar >= 0) r.influencias[r.piscar] = rosto.piscar;
-      if (r.bico >= 0) r.influencias[r.bico] = rosto.bico;
+      r.influencias[r.bico] = rosto.bico;
+      if (r.soAberto) r.malha.visible = rosto.bico > BICO_VISIVEL;
     }
-    const aceno = acenoFala(memoria, v);
-    if (pescoco?.parent && aceno > 0.0005) {
-      // Soma o aceno por cima do clipe: eixo lateral do mundo (X) levado ao espaço do pai do osso.
-      pescoco.parent.updateWorldMatrix(true, false);
-      const paiInv = pescoco.parent.getWorldQuaternion(qPai).invert();
-      eixo.set(1, 0, 0).applyQuaternion(paiInv);
-      pescoco.quaternion.premultiply(qAceno.setFromAxisAngle(eixo, aceno));
+    const olhos = olhosCoruja3D(memoriaOlhos, v, rosto.piscar, agora, { feliz: acenando, movimentoReduzido: reduzido });
+    pintarOlhos(olhos);
+    // Aceno da fala no pescoço (eixo lateral da cena) e a cabeça seguindo o olhar.
+    if (pescoco) somarRotacao(pescoco, 1, 0, 0, acenoFala(memoria, v));
+    if (cabeca && !reduzido) {
+      const c = cabecaViva(memoriaCabeca, olhos, v, agora);
+      somarRotacao(cabeca, 0, 1, 0, c.guinada);
+      somarRotacao(cabeca, 1, 0, 0, c.arfagem);
+      somarRotacao(cabeca, 0, 0, 1, c.rolagem);
     }
     renderer.render(cena, camera);
     aoQuadro?.(v, memoria.nivel, agora);
+  }
+
+  function pintarOlhos(olhos: ReturnType<typeof olhosCoruja3D>) {
+    if (!tela?.ctx) return;
+    const chave = [olhos.abertura, olhos.x, olhos.y, olhos.feliz, olhos.pupila].map((n) => n.toFixed(3)).join();
+    if (chave === ultimoDesenho) return;
+    ultimoDesenho = chave;
+    desenharOlhos(tela.ctx, olhos);
+    tela.textura.needsUpdate = true;
   }
 
   function laco(agora: number) {
@@ -194,6 +267,13 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
       if (malha.isMesh) {
         malha.frustumCulled = false; // a pele animada sai do bounding box de repouso
         // O rosto tem dois materiais (o da coruja e o interior escuro da boca).
+        if (malha.name === MALHA_OLHOS || malha.parent?.name === MALHA_OLHOS) {
+          (malha.material as THREE.Material).dispose();
+          tela ??= criarTelaOlhos();
+          malha.material = tela.material;
+          malha.renderOrder = 2;
+          return;
+        }
         for (const m of (Array.isArray(malha.material) ? malha.material : [malha.material]) as THREE.MeshStandardMaterial[]) {
           // O mesh do Tripo tem frestas de subpixel entre as penas; com face única o fundo
           // vaza por elas em pontinhos escuros. Dupla face tapa com o interior claro.
@@ -203,7 +283,10 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
       }
     });
     pescoco = modelo.getObjectByName(OSSO_PESCOCO) ?? null;
+    cabeca = modelo.getObjectByName(OSSO_CABECA) ?? null;
+    for (const osso of [pescoco, cabeca]) if (osso) repouso.set(osso, osso.quaternion.clone());
     rostos = acharRosto(modelo);
+    for (const r of rostos) if (r.soAberto) r.malha.visible = false;
     cena.add(modelo);
     mixer = new THREE.AnimationMixer(modelo);
     acoes = new Map(gltf.animations.map((clipe) => [clipe.name, mixer!.clipAction(clipe)]));
@@ -213,6 +296,7 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
       acoes.get(CLIPE_POR_VOZ.ocioso)!.play();
       mixer.update(0);
       for (const m of emissivos) m.emissiveIntensity = 0.55;
+      pintarOlhos(olhosCoruja3D(memoriaOlhos, 'ocioso', 0, performance.now(), { movimentoReduzido: true }));
       renderer.render(cena, camera);
       aoPronto();
       return;
@@ -220,19 +304,19 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
     // Entrada: acena uma vez (só ocioso) e cai no clipe do estado; se a voz mudar
     // no meio, `trocarEstado` faz o crossfade e o fim do aceno não mexe em nada.
     entrada = acoes.get(CLIPE_ENTRADA) ?? null;
+    // Fim de um clipe de uma vez (aceno ou feliz): volta ao clipe do estado em vigor.
+    mixer.addEventListener('finished', (e) => {
+      if (e.action !== umaVez || atual !== umaVez) return;
+      umaVez = null;
+      const ocioso = acoes.get(CLIPE_POR_VOZ[voz()])!;
+      ocioso.reset().setEffectiveWeight(1).play();
+      atual!.crossFadeTo(ocioso, CROSSFADE_S, false);
+      atual = ocioso;
+      vozAtual = voz();
+    });
     if (entrada && voz() === 'ocioso') {
-      const aceno = entrada;
-      aceno.setLoop(THREE.LoopOnce, 1).clampWhenFinished = true;
-      aceno.play();
-      atual = aceno;
       vozAtual = 'ocioso';
-      mixer.addEventListener('finished', function aoAcabar(e) {
-        if (e.action !== aceno) return;
-        mixer?.removeEventListener('finished', aoAcabar);
-        if (atual !== aceno) return;
-        vozAtual = null;
-        trocarEstado(voz());
-      });
+      tocarUmaVez(entrada);
     } else {
       trocarEstado(voz());
     }
@@ -252,6 +336,8 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
       mixer?.stopAllAction();
       relogio.dispose();
       if (modelo) liberar(modelo);
+      tela?.material.dispose();
+      tela?.textura.dispose();
       ambiente.dispose();
       renderer.dispose();
       renderer.forceContextLoss();
