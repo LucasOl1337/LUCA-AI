@@ -23,6 +23,10 @@ import type { AcaoNavegacao } from '@/components/stand/navegacaoPad';
 import { usePadStand } from '@/components/stand/usePadStand';
 import { AvisoSaida, BarraModos, preCarregarSimulador, SimulacaoStand, VitrineStand } from '@/components/stand/Modos';
 import { PainelComandos } from '@/components/stand/PainelComandos';
+import { MenuTotem, type EstadoItem } from '@/components/stand/MenuTotem';
+import type { ItemCatalogo } from '../../shared/stand/catalogo.ts';
+import { TOUR_STAND } from '../../shared/stand/acoes-site.ts';
+import type { ResultadoPlano } from '@/components/stand/site/acaoDoStand';
 import { SeloCamera, useCameraTotem, WebcamCoruja } from '@/components/stand/CameraTotem';
 import '@/stand.css';
 
@@ -123,6 +127,34 @@ export default function StandPage() {
   /** Falha de ação no site: só a equipe vê (canto da tela), some sozinha. */
   const [falhaSite, setFalhaSite] = useState('');
   const filaAcoes = useRef<Promise<void>>(Promise.resolve());
+  /** Menu fixo (grill Totem interativo r1): grupo aberto, item em execução e o retorno. */
+  const [menu, setMenu] = useState<{ aberto: boolean; grupo: string | null }>({ aberto: false, grupo: null });
+  const [statusMenu, setStatusMenu] = useState<EstadoItem | null>(null);
+  const perguntaPendente = useRef<string | null>(null);
+  const tourVez = useRef(0);
+
+  /**
+   * Uma Ação do site, venha da voz ou do menu: o mesmo planner, a mesma fila
+   * (uma por vez) e a mesma linha `Tela:` para o cérebro.
+   */
+  const rodarAcao = useCallback((acao: string, args: Record<string, unknown>): Promise<ResultadoPlano> => {
+    const feito = filaAcoes.current.then(() => {
+      const plano = planejarAcao(acao, args, { modo: modoAtual.current, pagina: paginaAtual.current });
+      return executarPlano(plano, { despacharModo, aguardarExecutor, enviarAcaoSite });
+    }).then((r) => {
+      canal.current.enviar({ tipo: 'tela', texto: linhaDaTela(r) });
+      if (!r.ok) {
+        console.warn('[stand] ação no site falhou:', r.mensagem);
+        canal.current.enviar({ tipo: 'acao_falhou' });
+      }
+      return r;
+    }, (erro) => {
+      console.warn('[stand] ação no site quebrou:', erro);
+      return { ok: false, mensagem: 'A ação quebrou na tela.' } as ResultadoPlano;
+    });
+    filaAcoes.current = feito.then(() => undefined);
+    return feito;
+  }, []);
 
   const sair = useCallback(() => navigate({ page: 'inicio' }, 'push'), [navigate]);
 
@@ -137,17 +169,8 @@ export default function StandPage() {
       else if (evento.tipo === 'acao_site') {
         // Totem-Site Q4: abrir_pagina/voltar_coruja trocam o modo; controles vão ao Executor do iframe.
         // Uma ação por vez (o tour manda várias seguidas): o plano é feito quando a anterior termina.
-        filaAcoes.current = filaAcoes.current.then(() => {
-          const plano = planejarAcao(evento.acao, evento.args, { modo: modoAtual.current, pagina: paginaAtual.current });
-          return executarPlano(plano, { despacharModo, aguardarExecutor, enviarAcaoSite });
-        }).then((r) => {
-          // O cérebro fica sabendo do que a tela fez e mostra (linha `Tela:` na próxima pergunta).
-          canal.current.enviar({ tipo: 'tela', texto: linhaDaTela(r) });
-          if (r.ok) return;
-          console.warn('[stand] ação no site falhou:', r.mensagem);
-          setFalhaSite(r.mensagem);
-          canal.current.enviar({ tipo: 'acao_falhou' });
-        }).catch((erro) => console.warn('[stand] ação no site quebrou:', erro));
+        // O cérebro fica sabendo do que a tela fez e mostra (linha `Tela:` na próxima pergunta).
+        void rodarAcao(evento.acao, evento.args).then((r) => { if (!r.ok) setFalhaSite(r.mensagem); });
       }
       else despachar(evento);
       // Voz em andamento é gente na frente do totem.
@@ -161,7 +184,7 @@ export default function StandPage() {
       setAgora(Date.now());
     }, 500);
     return () => { cancelar(); window.clearInterval(relogio); stub?.parar(); };
-  }, [modoStub]);
+  }, [modoStub, rodarAcao]);
 
   // Baixa o simulador (Three.js) em segundo plano, pra Simulação abrir sem espera.
   useEffect(() => {
@@ -199,6 +222,71 @@ export default function StandPage() {
     despacharModo(acao);
   }, [vozStand, estado.tela, iniciar]);
   const mexeuNoPad = useCallback(() => despacharModo({ tipo: 'atividade' }), []);
+
+  // ── Menu fixo: toque e texto chegam à mesma ação que a voz (grill r1, Q1/Q2/Q5) ──
+  const abrirMenu = useCallback((grupo: string | null = null) => {
+    despacharModo({ tipo: 'atividade', toque: true });
+    setMenu({ aberto: true, grupo });
+  }, []);
+  const fecharMenu = useCallback(() => setMenu({ aberto: false, grupo: null }), []);
+  /** Pergunta do menu: com conversa pronta vai direto; sem, abre a conversa e manda quando ela estiver ouvindo. */
+  const perguntar = useCallback((texto: string) => {
+    if (modoAtual.current !== 'coruja' && modoAtual.current !== 'site') despacharModo({ tipo: 'voltar_coruja' });
+    setStatusMenu({ item: 'pergunta', fase: 'ok', mensagem: `perguntei ao LUCA: “${texto}”` });
+    fecharMenu();
+    // A sessão só ouve a página depois de abrir microfone e conexão (sai de `ocioso`): antes disso, fica pendente.
+    if (modoStub || (voz.ativa && voz.estado !== 'ocioso')) { canal.current.enviar({ tipo: 'pergunta_texto', texto }); return; }
+    perguntaPendente.current = texto;
+    iniciar();
+  }, [modoStub, voz.ativa, voz.estado, iniciar, fecharMenu]);
+  useEffect(() => {
+    const texto = perguntaPendente.current;
+    if (!texto) return;
+    if (!voz.ativa && voz.fim) { perguntaPendente.current = null; setStatusMenu({ item: 'pergunta', fase: 'falha', mensagem: 'o assistente não abriu a conversa agora.' }); return; }
+    if (!voz.ativa || voz.estado === 'ocioso') return;
+    perguntaPendente.current = null;
+    canal.current.enviar({ tipo: 'pergunta_texto', texto });
+  }, [voz.ativa, voz.estado, voz.fim]);
+  /** Tour pelo menu: o roteiro fixo `TOUR_STAND`, com as falas na tela (funciona sem voz). */
+  const rodarTour = useCallback(async () => {
+    const vez = ++tourVez.current;
+    fecharMenu();
+    for (const passo of TOUR_STAND) {
+      if (tourVez.current !== vez) return;
+      if ('fala' in passo) {
+        setStatusMenu({ item: 'tour', fase: 'executando', mensagem: passo.texto });
+        await new Promise((ok) => window.setTimeout(ok, Math.max(3000, passo.texto.length * 60)));
+        continue;
+      }
+      const r = await rodarAcao(passo.acao, passo.args);
+      if (!r.ok) { setStatusMenu({ item: 'tour', fase: 'falha', mensagem: r.mensagem }); return; }
+    }
+    setStatusMenu({ item: 'tour', fase: 'ok', mensagem: 'tour terminado.' });
+  }, [rodarAcao, fecharMenu]);
+  const executarItem = useCallback((item: ItemCatalogo) => {
+    despacharModo({ tipo: 'atividade', toque: true });
+    tourVez.current += 1;
+    const alvo = item.alvo;
+    if (alvo.tipo === 'tour') { void rodarTour(); return; }
+    if (alvo.tipo === 'pergunta') { perguntar(alvo.texto); return; }
+    if (alvo.tipo === 'video') {
+      if (modoAtual.current !== 'coruja') despacharModo({ tipo: 'voltar_coruja' });
+      despachar({ tipo: 'tocar_video', id: alvo.id });
+      setStatusMenu({ item: item.id, fase: 'ok', mensagem: `tocando “${item.rotulo}”.` });
+      fecharMenu();
+      return;
+    }
+    setStatusMenu({ item: item.id, fase: 'executando', mensagem: '' });
+    void rodarAcao(alvo.acao, alvo.args).then((r) => {
+      setStatusMenu({ item: item.id, fase: r.ok ? 'ok' : 'falha', mensagem: r.mensagem });
+      if (r.ok) fecharMenu();
+    });
+  }, [rodarAcao, rodarTour, perguntar, fecharMenu]);
+  useEffect(() => {
+    if (!statusMenu || statusMenu.fase === 'executando' || menu.aberto) return undefined;
+    const timer = window.setTimeout(() => setStatusMenu(null), 9000);
+    return () => window.clearTimeout(timer);
+  }, [statusMenu, menu.aberto]);
   useEffect(() => {
     if (!falhaSite) return undefined;
     const timer = window.setTimeout(() => setFalhaSite(''), 8000);
@@ -248,8 +336,15 @@ export default function StandPage() {
   }, [sair, terminarVideo, iniciar, encerrarVoz]);
 
   const video = estado.tela === 'video' ? videoDoStand(estado.videoId, modoStub) : undefined;
-  // Painel "Experimente pedir" ao lado da coruja: só com voz (sem voz os pedidos não funcionam).
-  const painelComandos = estado.tela !== 'video' && (modoStub || vozStand === 'ligada');
+  // Painel do catálogo ao lado da coruja: sempre tocável; com voz mostra também o pedido falado.
+  const painelComandos = estado.tela !== 'video';
+  const comVoz = modoStub || vozStand === 'ligada';
+  const semVozMotivo = comVoz ? null : 'Perguntas precisam do assistente ligado; agora ele está desligado.';
+  const indisponivel = (item: ItemCatalogo): string | null => {
+    if (item.requer?.includes('voz') && !comVoz) return 'precisa do assistente de voz, desligado agora';
+    if (item.requer?.includes('webcam') && webcam.camera.fase === 'erro') return 'precisa da webcam, que não abriu neste totem';
+    return null;
+  };
   const videoAusente = estado.tela === 'video' && !video;
   useEffect(() => { if (videoAusente) terminarVideo(); }, [videoAusente, terminarVideo]);
 
@@ -302,7 +397,7 @@ export default function StandPage() {
             />
           )}
           {estado.tela === 'conversa' && <Conversa variante={variante} nivel={nivel} voz={estado.voz} legenda={estado.legenda} />}
-          {painelComandos && <PainelComandos />}
+          {painelComandos && <PainelComandos voz={comVoz} aoEscolher={(id) => abrirMenu(id)} />}
           <p className="stand-selo" aria-label="Assistente de IA">Assistente de IA</p>
           <WebcamCoruja presenca={webcam.presenca} />
           {aviso && estado.tela === 'atracao' && <p className="stand-aviso-equipe">{aviso}</p>}
@@ -320,13 +415,34 @@ export default function StandPage() {
         {segundosParaSair !== null && <AvisoSaida segundos={segundosParaSair} />}
         {avisoControle && <p className="stand-aviso-equipe stand-aviso-controle">{avisoControle}</p>}
         {falhaSite && <p className="stand-aviso-equipe stand-aviso-site" role="status">ação no site: {falhaSite}</p>}
-        {linhaEscuta && !barraVisivel(modo, agora) && <p className="stand-linha-escuta">{linhaEscuta}</p>}
+        <MenuTotem
+          aberto={menu.aberto}
+          grupo={menu.grupo}
+          status={statusMenu}
+          indisponivel={indisponivel}
+          motivoSemTexto={semVozMotivo}
+          aoAbrirGrupo={(grupo) => abrirMenu(grupo)}
+          aoFechar={fecharMenu}
+          aoExecutar={executarItem}
+          aoPerguntar={perguntar}
+        />
+        {statusMenu && !menu.aberto && (
+          <p className="stand-status-acao" role="status" data-fase={statusMenu.fase}>
+            {statusMenu.fase === 'executando' ? (statusMenu.mensagem || 'Fazendo…') : statusMenu.fase === 'ok' ? `Feito: ${statusMenu.mensagem}` : `Não deu: ${statusMenu.mensagem}`}
+          </p>
+        )}
+        {linhaEscuta && <p className="stand-linha-escuta">{linhaEscuta}</p>}
         <BarraModos
           modo={modo.modo}
           modos={modosDisponiveis(modo)}
           visivel={barraVisivel(modo, agora)}
           aoEscolher={(m) => { despacharModo({ tipo: 'atividade', toque: true }); despacharModo({ tipo: 'ir', modo: m }); }}
           atalhos={[{
+            id: 'menu',
+            rotulo: 'Menu',
+            ativo: menu.aberto,
+            aoEscolher: () => (menu.aberto ? fecharMenu() : abrirMenu(null)),
+          }, {
             // Sonolência como função do Totem: a /sonolencia inteira no modo Site, com a mesma webcam.
             id: 'sonolencia',
             rotulo: 'Sonolência',

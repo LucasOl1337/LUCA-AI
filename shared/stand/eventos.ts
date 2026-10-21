@@ -32,7 +32,9 @@ export type EventoPagina =
   /** O que a tela fez e mostra depois de uma Ação do site; vai como `Tela:` na próxima pergunta. */
   | { tipo: 'tela'; texto: string }
   /** A Ação do site falhou na tela: a coruja diz isso na hora, com fala pronta. */
-  | { tipo: 'acao_falhou' };
+  | { tipo: 'acao_falhou' }
+  /** Pergunta tocada ou escrita no menu do Totem: vale como fala do visitante (até 500 caracteres). */
+  | { tipo: 'pergunta_texto'; texto: string };
 
 export type EventoStand = EventoCerebro | EventoPagina;
 
@@ -66,6 +68,7 @@ export function ehEventoPagina(valor: unknown): valor is EventoPagina {
   if (!objeto(valor)) return false;
   if (valor.tipo === 'video_terminou') return textoNaoVazio(valor.id);
   if (valor.tipo === 'tela') return typeof valor.texto === 'string';
+  if (valor.tipo === 'pergunta_texto') return textoNaoVazio(valor.texto) && valor.texto.length <= 500;
   return valor.tipo === 'reiniciar' || valor.tipo === 'encerrar' || valor.tipo === 'acao_falhou';
 }
 

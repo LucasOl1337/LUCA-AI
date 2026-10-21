@@ -28,10 +28,10 @@ test('o totem não grava nem gasta: sem episódio, bancada nem exemplo do Labora
   assert.ok(!nomes.some((n) => n.startsWith('luca_ai_') || n.startsWith('inicio_')), 'LUCA-AI e Início só abrem, sem controle');
 });
 
-test('o mapa de páginas só leva às 6 públicas: nada de admin, personas, configuração nem /api', () => {
-  assert.deepEqual(IDS_PAGINAS, ['inicio', 'luca_ai', 'sompo', 'laboratorio', 'sensor', 'sonolencia']);
+test('o mapa de páginas só leva às 8 públicas: nada de admin, personas, configuração nem /api', () => {
+  assert.deepEqual(IDS_PAGINAS, ['inicio', 'luca_ai', 'sompo', 'laboratorio', 'sensor', 'sonolencia', 'gameplay', 'operador']);
   for (const caminho of Object.values(PAGINAS_SITE)) {
-    assert.match(caminho, /^\/(?:|luca-ai|sompo|laboratorio|sensor|sonolencia)$/, caminho);
+    assert.match(caminho, /^\/(?:|luca-ai|sompo|laboratorio|sensor|sonolencia|gameplay|operador)$/, caminho);
   }
   for (const pagina of ['admin', 'personas', 'configuracao', 'stand', '/admin', 'https://evil.example', '../admin']) {
     assert.equal(validarAcaoSite('abrir_pagina', { pagina }).ok, false, pagina);

@@ -197,6 +197,26 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
     await pagina.close();
   });
 
+  it('menu do Totem: pergunta pronta tocada vira turno de texto na mesma conversa (grill r1, Q5)', async () => {
+    modoSessao = 'ok';
+    const { pagina } = await abrirStand();
+    try {
+      // Toca a pergunta logo que a conversa começa a abrir: ela espera a sessão ficar pronta, não se perde.
+      await pagina.waitForFunction(() => document.querySelector('main.stand')?.dataset.sessao === 'ativa');
+      await pagina.locator('.stand-barra button[data-atalho="menu"]').click();
+      await pagina.locator('.stand-menu-item-grupo[data-grupo="perguntar"]').click();
+      const antes = turnos.length;
+      await pagina.locator('.stand-menu-item[data-item="pergunta-2"]').click();
+      const prazo = Date.now() + 8000;
+      while (!turnos.slice(antes).some((t) => t.texto) && Date.now() < prazo) await new Promise((ok) => setTimeout(ok, 100));
+      const turno = turnos.slice(antes).find((t) => t.texto);
+      assert.equal(turno?.texto, 'O que a seguradora ganha com isso?');
+      assert.equal(turno?.conversa_id, 'c-teste');
+    } finally {
+      await pagina.close();
+    }
+  });
+
   it('captura pelo worklet (o caminho do totem): sem reserva, mesmo formato do ScriptProcessor', async () => {
     modoSessao = 'ok';
     // Referência: o caminho da reserva, como o Playwright deixa sem ajuda.

@@ -118,6 +118,11 @@ export class SessaoTurnos implements SessaoDeVoz {
       }
       // Guardar a tela não mexe no estado da sessão.
       if (evento.tipo === 'tela') this.tela = evento.texto;
+      // Pergunta do menu (toque ou texto): mesmo turno que a fala transcrita.
+      if (evento.tipo === 'pergunta_texto' && !this.videoTocando) {
+        emitirEventoStand({ tipo: 'legenda', texto: evento.texto });
+        void this.perguntar({ texto: evento.texto });
+      }
       // Falha na tela vira fala pronta na hora; antes da 1ª palavra (despertar
       // discreto, sessão ainda ociosa) não dispara nada.
       if (evento.tipo === 'acao_falhou' && this.estado !== 'ocioso' && !this.videoTocando) {
