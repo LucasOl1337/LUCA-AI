@@ -26,6 +26,23 @@ export const ENQUADRAMENTO = Object.freeze({ alvoY: 0.71, altura: 0.76, largura:
 
 export interface MemoriaBrilho { nivel: number }
 
+/** Mesma caixa do SVG da Coruja A, para halo e ondas caírem no mesmo lugar. */
+export const CAIXA_A = Object.freeze({ x: -90, y: -60, largura: 1204, altura: 1104, cx: 512, cy: 430 });
+export const ONDAS = 3;
+const ONDA_MS = 1500;
+const BRILHO_BASE: Readonly<Record<EstadoVoz, number>> = { ocioso: 0.18, ouvindo: 0.55, pensando: 0.4, falando: 0.35 };
+
+/** Halo e ondas da Coruja A (mesmas fórmulas): só a fala acende as ondas. `fala` é o nível suavizado 0..1. */
+export function haloCoruja3D(voz: EstadoVoz, fala: number, agoraMs: number) {
+  return {
+    halo: 0.25 + BRILHO_BASE[voz] * 0.35 + fala * 0.5,
+    ondas: Array.from({ length: ONDAS }, (_, i) => {
+      const fase = ((agoraMs / ONDA_MS) + i / ONDAS) % 1;
+      return { r: 400 + fase * 140, opacidade: fala * (1 - fase) * 0.9 };
+    }),
+  };
+}
+
 /**
  * Intensidade do emissivo (visor, fones, microfone, frisos) por quadro.
  * Falando: segue o áudio suavizado (sobe rápido, desce devagar). Ouvindo:

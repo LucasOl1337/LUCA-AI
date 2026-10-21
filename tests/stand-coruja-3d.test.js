@@ -23,12 +23,23 @@ test('coruja-3d entra como variante opcional; a padrão segue coruja A', () => {
   assert.ok(VARIANTES_AVATAR.includes('coruja-3d'));
 });
 
-test('no servidor a coruja 3D sai como canvas marcado, sem quebrar o SSR', () => {
+test('no servidor a coruja 3D sai na moldura da Coruja A (halo, ondas, canvas com degradê)', () => {
   const html = renderToStaticMarkup(createElement(AvatarLuca, { variante: 'coruja-3d', voz: 'falando', parado: true }));
-  assert.match(html, /^<canvas/);
+  assert.match(html, /^<svg[^>]*viewBox="-90 -60 1204 1104"/);
   assert.match(html, /data-variante="coruja-3d"/);
   assert.match(html, /data-voz="falando"/);
   assert.match(html, /aria-label="Avatar LUCA"/);
+  assert.equal((html.match(/data-c3="onda"/g) || []).length, 3);
+  assert.match(html, /<mask id="[^"]*busto-m"/);
+  assert.match(html, /<mask id="[^"]*lados-m"/);
+  assert.match(html, /<g mask="url\(#[^)]*lados-m\)"><g mask="url\(#[^)]*busto-m\)"><foreignObject[^>]*width="1024"[^>]*><canvas/);
+});
+
+test('halo e ondas seguem as fórmulas da Coruja A: ondas só com fala', () => {
+  assert.ok(rig.haloCoruja3D('ocioso', 0, 700).ondas.every((o) => o.opacidade === 0));
+  const fala = rig.haloCoruja3D('falando', 1, 0);
+  assert.ok(fala.halo > 0.8);
+  assert.deepEqual(fala.ondas.map((o) => Math.round(o.r)), [400, 447, 493]);
 });
 
 test('cada estado de voz tem um clipe no GLB, mais o aceno de entrada', () => {

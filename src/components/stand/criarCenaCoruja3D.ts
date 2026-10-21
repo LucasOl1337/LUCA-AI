@@ -22,6 +22,8 @@ interface Opcoes {
   parado: boolean;
   aoPronto(): void;
   aoFalhar(erro: unknown): void;
+  /** Por quadro, depois do render: voz em vigor e nível de fala suavizado (0..1), para o halo. */
+  aoQuadro?(voz: EstadoVoz, fala: number, agoraMs: number): void;
 }
 
 function liberar(raiz: THREE.Object3D) {
@@ -40,9 +42,10 @@ function liberar(raiz: THREE.Object3D) {
   texturas.forEach((t) => t.dispose());
 }
 
-export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalhar }: Opcoes): CenaCoruja3D {
+export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalhar, aoQuadro }: Opcoes): CenaCoruja3D {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  // Penas finas serrilham em tela 1x: desenha a pelo menos 1,5x (teto 2x) e o navegador reduz.
+  renderer.setPixelRatio(Math.min(Math.max(window.devicePixelRatio || 1, 1.5), 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
@@ -82,8 +85,10 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
   const eixo = new THREE.Vector3();
 
   function enquadrar() {
-    const largura = canvas.clientWidth || 1;
-    const altura = canvas.clientHeight || 1;
+    // Dentro do foreignObject o tamanho CSS é o da arte (1024); vale o tamanho na tela.
+    const caixa = canvas.getBoundingClientRect();
+    const largura = Math.max(1, Math.round(caixa.width));
+    const altura = Math.max(1, Math.round(caixa.height));
     const aspecto = largura / altura;
     renderer.setSize(largura, altura, false);
     camera.aspect = aspecto;
@@ -124,6 +129,7 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
       pescoco.quaternion.premultiply(qAceno.setFromAxisAngle(eixo, aceno));
     }
     renderer.render(cena, camera);
+    aoQuadro?.(v, memoria.nivel, agora);
   }
 
   function laco(agora: number) {
@@ -133,7 +139,7 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
   }
 
   const observador = new ResizeObserver(() => { enquadrar(); if (parado && modelo) renderer.render(cena, camera); });
-  observador.observe(canvas);
+  observador.observe(canvas.closest('svg') ?? canvas);
   enquadrar();
 
   (async () => {
@@ -150,6 +156,9 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
       if (malha.isMesh) {
         malha.frustumCulled = false; // a pele animada sai do bounding box de repouso
         const m = malha.material as THREE.MeshStandardMaterial;
+        // O mesh do Tripo tem frestas de subpixel entre as penas; com face única o fundo
+        // vaza por elas em pontinhos escuros. Dupla face tapa com o interior claro.
+        m.side = THREE.DoubleSide;
         if (m.emissiveMap) { m.emissive.set(0xffffff); emissivos.push(m); }
       }
     });
