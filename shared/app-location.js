@@ -78,7 +78,8 @@ export const PRODUTO_VALUE = Object.freeze({
 });
 
 export const GRAVIDADE_VALUES = Object.freeze(['critica', 'alta', 'media', 'baixa']);
-export const STAND_VARIANTES = Object.freeze(['coruja', 'operario', 'robo']);
+// Mesma lista de `VARIANTES_AVATAR` (AvatarLuca.tsx); o teste stand-rota confere as duas.
+export const STAND_VARIANTES = Object.freeze(['coruja-a', 'coruja-3d', 'coruja', 'operario', 'robo']);
 
 /** Margem segura do /stand em % de cada lado (0–20); vazio = padrão da página. */
 function parseMargem(raw) {

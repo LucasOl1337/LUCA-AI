@@ -18,6 +18,15 @@ test('/stand guarda margem e variante válidas e descarta o resto', () => {
   assert.equal(parseAppLocation('/stand?variante=dragao').variante, '');
 });
 
+test('toda variante do avatar passa pela URL do /stand (coruja-3d chegava como coruja-a)', async () => {
+  const { loadFrontendModule } = await import('./support/load-frontend-module.js');
+  const { STAND_VARIANTES } = await import('../shared/app-location.js');
+  const { VARIANTES_AVATAR } = await loadFrontendModule('../../src/components/stand/AvatarLuca.tsx');
+  assert.deepEqual([...STAND_VARIANTES].sort(), [...VARIANTES_AVATAR].sort());
+  assert.equal(parseAppLocation('/stand?variante=coruja-3d').variante, 'coruja-3d');
+  assert.equal(formatAppUrl(parseAppLocation('/stand?variante=coruja-3d&stub=1')), '/stand?variante=coruja-3d&stub=1');
+});
+
 test('/stand?stub=1 liga o modo de teste e só aceita 1', () => {
   assert.equal(parseAppLocation('/stand?stub=1').stub, '1');
   assert.equal(parseAppLocation('/stand?stub=sim').stub, '');

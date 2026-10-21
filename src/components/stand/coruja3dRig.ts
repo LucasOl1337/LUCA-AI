@@ -22,7 +22,7 @@ export const OSSO_PESCOCO = 'tripoHead_1';
 export const ACENO_FALA_RAD = 0.14;
 
 /** Moldura de busto, como a arte da Coruja A: topo dos tufos até o peito (coruja ≈1 m, pés em y=0). */
-export const ENQUADRAMENTO = Object.freeze({ alvoY: 0.71, altura: 0.76, largura: 0.76, fov: 24 });
+export const ENQUADRAMENTO = Object.freeze({ alvoY: 0.72, altura: 0.6, largura: 0.6, fov: 24 });
 
 export interface MemoriaBrilho { nivel: number }
 
