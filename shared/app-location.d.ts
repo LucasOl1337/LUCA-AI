@@ -27,6 +27,7 @@ export interface AppLocation {
     variante: string;
     stub: string;
     simulacao: string;
+    quiosque: string;
   }
 
 export const APP_PAGES: readonly AppPageId[];

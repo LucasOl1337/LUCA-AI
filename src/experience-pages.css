@@ -11,4 +11,6 @@
 .experience-primary:focus-visible, .experience-secondary:focus-visible { outline: 3px solid #53d4ff; outline-offset: 3px; }
 .experience-game-viewport { position: relative; width: 100%; height: clamp(420px, 68vh, 900px); overflow: hidden; border: 1px solid #ffffff20; border-radius: 18px; background: #07100c; margin-bottom: 20px; }
 .experience-game-status { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 28px; text-align: center; }
+.experience-game-quiosque { position: fixed; inset: 0; overflow: hidden; background: #07100c; color: #e8efe9; }
 .experience-note { font-size: 14px; }
+.experience-acoes { display: flex; flex-wrap: wrap; gap: 12px; }
