@@ -32,7 +32,7 @@
       "ratio": 0.1531
     },
     "uv": "UVs originais do Tripo Studio (decimação com delimit UV)",
-    "textures": "mapas do Tripo reduzidos; olhos pintados apagados por preenchimento Laplace",
+    "textures": "mapas do Tripo reduzidos; olhos pintados apagados por preenchimento Laplace; branco fosco (rugosidade >= 0.62, metal <= 0,04)",
     "atlas": {
       "basecolor": 2048,
       "normal": 2048,
@@ -80,6 +80,6 @@
   },
   "externalManifest": "coruja-3d.textures.json",
   "reproducibleCommand": "gltf-transform dequantize RIG_TRIPO.glb rig-decoded.glb && blender -b --factory-startup --python scripts/stand/package-coruja-3d.py -- rig-decoded.glb coruja-tripo-alta.glb public/stand/avatar/coruja-3d",
-  "sha256": "cee54392777b01eb40e61f3125630bef9af61764e69aa6a07bb3c7ac1bb5c9e6",
-  "bytes": 1844388
+  "sha256": "d7ecc0955def318f3884c4e32bfec61d4b16c6be6c09cf938bdf40bb5faa2c3f",
+  "bytes": 1843808
 }

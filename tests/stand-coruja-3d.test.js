@@ -18,8 +18,8 @@ const json = JSON.parse(glb.subarray(20, 20 + glb.readUInt32LE(12)).toString('ut
 // Mesmo saneamento do GLTFLoader (PropertyBinding.sanitizeNodeName).
 const sanear = (nome) => nome.replace(/\s/g, '_').replace(/[[\].:/]/g, '');
 
-test('coruja-3d entra como variante opcional; a padrão segue coruja A', () => {
-  assert.equal(VARIANTE_PADRAO, 'coruja-a');
+test('coruja-3d é a variante padrão; a coruja A segue por ?variante=coruja-a', () => {
+  assert.equal(VARIANTE_PADRAO, 'coruja-3d');
   assert.ok(VARIANTES_AVATAR.includes('coruja-3d'));
 });
 

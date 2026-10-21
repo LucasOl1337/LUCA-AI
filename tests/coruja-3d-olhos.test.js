@@ -30,18 +30,18 @@ test('ouvindo arregala e dilata a pupila; olha para quem fala', () => {
 test('pensando olha para cima e para o lado', () => {
   const m = olhos.novaMemoriaOlhos(0);
   const o = rodar(m, 'pensando', 0, 2000, { sorteio: () => 0.5 });
-  assert.ok(o.x > 0.3 && o.y > 0.3, JSON.stringify(o));
+  assert.ok(o.x > 0.2 && o.x < 0.4 && o.y > 0.3, JSON.stringify(o));
 });
 
 test('sacadas: o olhar troca de alvo de 0,9 a 3,2 s e chega rápido', () => {
   let i = 0;
-  const seq = [1, 1, 0]; // alvo no canto (x=+0,42), depois intervalo mínimo
+  const seq = [1, 1, 0]; // alvo no canto (x=+0,24), depois intervalo mínimo
   const sorteio = () => seq[i++ % seq.length];
   const m = olhos.novaMemoriaOlhos(0);
   rodar(m, 'ocioso', 0, olhos.SACADA_MS.min - 16, { sorteio });
   assert.equal(m.x, 0, 'parado antes da primeira sacada');
   const o = rodar(m, 'ocioso', olhos.SACADA_MS.min, olhos.SACADA_MS.min + 160, { sorteio });
-  assert.ok(o.x > 0.38, `chegou em ~150 ms: ${o.x}`);
+  assert.ok(o.x > 0.22, `chegou em ~150 ms: ${o.x}`);
   assert.ok(m.proximaSacada >= olhos.SACADA_MS.min * 2 && m.proximaSacada <= olhos.SACADA_MS.min + olhos.SACADA_MS.max);
 });
 
@@ -82,12 +82,33 @@ test('desenha os dois olhos no canvas 512x256: aberto, fechado e feliz', () => {
   assert.equal(conta('ellipse'), 2, 'feliz: só o fundo de vidro');
 });
 
-test('cabeça segue o olhar com atraso de mola e inclina pensando', () => {
-  const m = rig.novaMemoriaCabeca();
+test('cabeça fica de frente: segue pouco o olhar e quase não inclina', () => {
+  const m = rig.novaMemoriaCabeca(0, () => 0.5);
   let c;
   for (let t = 0; t <= 60; t += 16) c = rig.cabecaViva(m, { x: 1, y: 0 }, 'ocioso', t);
-  assert.ok(m.guinada > 0.01 && m.guinada < 0.09, `ainda chegando: ${m.guinada}`);
+  assert.ok(m.guinada > 0.002 && m.guinada < 0.04, `ainda chegando: ${m.guinada}`);
   for (let t = 76; t <= 3000; t += 16) c = rig.cabecaViva(m, { x: 1, y: 1 }, 'pensando', t);
-  assert.ok(Math.abs(m.guinada - 0.17) < 0.005 && m.arfagem < -0.09 && m.rolagem > 0.12, JSON.stringify(m));
-  assert.ok(Math.abs(c.guinada - m.guinada) <= 0.036, 'balanço pequeno por cima');
+  assert.ok(Math.abs(m.guinada - rig.SEGUE_OLHAR.guinada) < 0.003 && m.arfagem < -0.03, JSON.stringify(m));
+  assert.ok(m.rolagem > 0.02 && m.rolagem < 0.05, `inclinação pequena pensando: ${m.rolagem}`);
+  assert.ok(Math.abs(c.guinada) < 0.08 && Math.abs(c.rolagem) < 0.05, 'nunca fica de lado por estado');
+});
+
+test('olhada de lado: curta, rara e volta ao centro', () => {
+  const m = rig.novaMemoriaCabeca(0, () => 0); // primeira olhada em 9 s
+  const amostras = [];
+  for (let t = 0; t <= 30000; t += 16) amostras.push([t, rig.cabecaViva(m, { x: 0, y: 0 }, 'ocioso', t, () => 0.9).guinada]);
+  const de = (t0, t1) => amostras.filter(([t]) => t >= t0 && t < t1).map(([, g]) => Math.abs(g));
+  assert.ok(Math.max(...de(0, 8900)) < 0.02, 'antes da olhada: de frente');
+  const pico = Math.max(...de(9000, 10800));
+  assert.ok(pico > 0.1 && pico < 0.18, `olhada até ~9°: ${pico}`);
+  assert.ok(Math.max(...de(11800, 24000)) < 0.02, 'depois volta ao centro e espera de novo');
+  const frontal = amostras.filter(([, g]) => Math.abs(g) < 0.03).length / amostras.length;
+  assert.ok(frontal > 0.85, `de frente na maior parte do tempo: ${frontal}`);
+});
+
+test('olhada não acontece fora do ocioso', () => {
+  const m = rig.novaMemoriaCabeca(0, () => 0);
+  let maior = 0;
+  for (let t = 0; t <= 20000; t += 16) maior = Math.max(maior, Math.abs(rig.cabecaViva(m, { x: 0, y: 0 }, 'ouvindo', t, () => 0.9).guinada));
+  assert.ok(maior < 0.02, `ouvindo de frente: ${maior}`);
 });

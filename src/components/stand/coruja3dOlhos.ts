@@ -16,9 +16,9 @@ const FUNDO = Object.freeze({ rx: 0.0445 * PX_POR_M, ry: 0.04 * PX_POR_M });
 
 /** Para onde o olhar vai por estado (-1..1; x para a direita da tela, y para cima). */
 const OLHAR_ESTADO: Readonly<Record<EstadoVoz, { x: number; y: number; espalho: number }>> = {
-  ocioso: { x: 0, y: 0, espalho: 0.42 },
+  ocioso: { x: 0, y: 0, espalho: 0.24 },
   ouvindo: { x: 0, y: 0.04, espalho: 0.08 },
-  pensando: { x: 0.5, y: 0.5, espalho: 0.14 },
+  pensando: { x: 0.28, y: 0.45, espalho: 0.12 },
   falando: { x: 0, y: 0, espalho: 0.18 },
 };
 /** Abertura e pupila por estado: ouvindo arregala e dilata, pensando estreita de leve (olha para cima, sem cara de sono). */

@@ -12,10 +12,10 @@ const { default: AvatarLuca, VARIANTE_PADRAO, VARIANTES_AVATAR } = await loadFro
 
 const semSorte = () => 0.5;
 
-test('coruja A é a padrão e as antigas seguem por ?variante=', () => {
-  assert.equal(VARIANTE_PADRAO, 'coruja-a');
+test('coruja 3D é a padrão; a coruja A e as antigas seguem por ?variante=', () => {
+  assert.equal(VARIANTE_PADRAO, 'coruja-3d');
   assert.deepEqual([...VARIANTES_AVATAR], ['coruja-a', 'coruja-3d', 'coruja', 'operario', 'robo']);
-  const svg = renderToStaticMarkup(createElement(AvatarLuca, { parado: true }));
+  const svg = renderToStaticMarkup(createElement(AvatarLuca, { variante: 'coruja-a', parado: true }));
   assert.match(svg, /data-variante="coruja-a"/);
   assert.match(svg, /href="\/stand\/avatar\/coruja-a\/coruja-a\.webp"/);
   assert.equal((svg.match(/data-ca="palpebra"/g) || []).length, 2);
@@ -25,7 +25,7 @@ test('coruja A é a padrão e as antigas seguem por ?variante=', () => {
 
 test('duas cópias na mesma página não repetem id', () => {
   const html = renderToStaticMarkup(createElement('div', null,
-    createElement(AvatarLuca, { parado: true }), createElement(AvatarLuca, { parado: true })));
+    createElement(AvatarLuca, { variante: 'coruja-a', parado: true }), createElement(AvatarLuca, { variante: 'coruja-a', parado: true })));
   const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
   assert.ok(ids.length > 10);
   assert.equal(new Set(ids).size, ids.length);

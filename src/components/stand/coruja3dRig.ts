@@ -26,7 +26,8 @@ export const CLIPE_ENTRADA = 'aceno';
 export const CLIPE_FELIZ = 'feliz';
 /** Malha da tela dos olhos no visor (textura em canvas, ver `coruja3dOlhos.ts`). */
 export const MALHA_OLHOS = 'CorujaOlhos';
-export const CROSSFADE_S = 0.35;
+/** Troca de estado: meio segundo, sem salto de pose entre ouvindo, pensando e falando. */
+export const CROSSFADE_S = 0.5;
 
 /** Osso do pescoço (rig avian do Tripo) que soma o aceno de cabeça da fala por cima do clipe. */
 export const OSSO_PESCOCO = 'tripoHead_1';
@@ -152,36 +153,84 @@ export function acenoFala(m: MemoriaBrilho, voz: EstadoVoz): number {
   return voz === 'falando' ? m.nivel * ACENO_FALA_RAD : 0;
 }
 
-export interface MemoriaCabeca { guinada: number; arfagem: number; rolagem: number; anterior: number }
-
-export function novaMemoriaCabeca(): MemoriaCabeca {
-  return { guinada: 0, arfagem: 0, rolagem: 0, anterior: -1 };
+export interface MemoriaCabeca {
+  guinada: number; arfagem: number; rolagem: number; anterior: number;
+  /** Olhada de lado em curso: início (ms), lado (-1 ou 1); `proximaOlhada` em ms. */
+  olhadaInicio: number; olhadaLado: number; proximaOlhada: number;
 }
 
-/** Pensando inclina a cabeça de lado (curiosa); ouvindo, um pouco. Radianos. */
-const ROLAGEM_ESTADO: Readonly<Record<EstadoVoz, number>> = { ocioso: 0, ouvindo: 0.06, pensando: 0.13, falando: 0 };
+export function novaMemoriaCabeca(agoraMs = 0, sorteio: () => number = Math.random): MemoriaCabeca {
+  return {
+    guinada: 0, arfagem: 0, rolagem: 0, anterior: -1,
+    olhadaInicio: -1, olhadaLado: 1, proximaOlhada: agoraMs + intervaloOlhada(sorteio),
+  };
+}
+
+/**
+ * Repouso frontal: a cabeça olha para quem está na frente do totem. A cabeça
+ * acompanha só um pouco das sacadas dos olhos (que já movem a íris) e quase
+ * não inclina por estado; de lado, só a olhada curta e rara abaixo.
+ */
+export const SEGUE_OLHAR = Object.freeze({ guinada: 0.06, arfagem: 0.05 });
+/** Inclinação de cabeça por estado (radianos, rolagem): pequena, só o bastante para ler "curiosa". */
+const ROLAGEM_ESTADO: Readonly<Record<EstadoVoz, number>> = { ocioso: 0, ouvindo: 0.015, pensando: 0.035, falando: 0 };
+/** Olhada de lado no ocioso: a cada 9–16 s vira até ~9° e volta ao centro em 1,6 s. */
+export const OLHADA = Object.freeze({ min: 9000, max: 16000, duracao: 1600, guinada: 0.16, rolagem: 0.04 });
+
+function intervaloOlhada(sorteio: () => number): number {
+  return OLHADA.min + sorteio() * (OLHADA.max - OLHADA.min);
+}
+
+/** 0 → 1 → 0 sem tranco (sobe e desce em cosseno, segura no meio). */
+function sino(t: number): number {
+  if (t <= 0 || t >= 1) return 0;
+  const sobe = 0.3;
+  if (t < sobe) return 0.5 - 0.5 * Math.cos((t / sobe) * Math.PI);
+  if (t > 1 - sobe) return 0.5 - 0.5 * Math.cos(((1 - t) / sobe) * Math.PI);
+  return 1;
+}
 
 /**
  * Micro-movimento da cabeça por cima do clipe (radianos, eixos da cena: guinada
- * em Y, arfagem em X, rolagem em Z). A cabeça segue o olhar com atraso de mola
- * (meia-vida ~200 ms), mais um balanço lento de duas senoides.
+ * em Y, arfagem em X, rolagem em Z). Mola lenta (meia-vida ~260 ms) atrás de
+ * uma fração do olhar, balanço de poucas décimas de grau e, no ocioso, a
+ * olhada curta de lado. Fora do ocioso a olhada em curso some pela mola.
  */
 export function cabecaViva(
   m: MemoriaCabeca,
   olhar: { x: number; y: number },
   voz: EstadoVoz,
   agoraMs: number,
+  sorteio: () => number = Math.random,
 ): { guinada: number; arfagem: number; rolagem: number } {
   const dt = m.anterior < 0 ? 16 : Math.min(100, Math.max(0, agoraMs - m.anterior));
   m.anterior = agoraMs;
-  const k = 1 - Math.pow(0.5, dt / 200);
+  const k = 1 - Math.pow(0.5, dt / 260);
   const t = agoraMs / 1000;
-  m.guinada += (olhar.x * 0.17 - m.guinada) * k;
-  m.arfagem += (-olhar.y * 0.1 - m.arfagem) * k;
-  m.rolagem += (ROLAGEM_ESTADO[voz] - m.rolagem) * (1 - Math.pow(0.5, dt / 350));
+
+  let olhada = 0;
+  if (voz !== 'ocioso') {
+    m.olhadaInicio = -1;
+    if (m.proximaOlhada < agoraMs + OLHADA.min / 2) m.proximaOlhada = agoraMs + OLHADA.min / 2;
+  } else {
+    if (m.olhadaInicio < 0 && agoraMs >= m.proximaOlhada) {
+      m.olhadaInicio = agoraMs;
+      m.olhadaLado = sorteio() < 0.5 ? -1 : 1;
+      m.proximaOlhada = agoraMs + OLHADA.duracao + intervaloOlhada(sorteio);
+    }
+    if (m.olhadaInicio >= 0) {
+      const f = (agoraMs - m.olhadaInicio) / OLHADA.duracao;
+      if (f >= 1) m.olhadaInicio = -1;
+      else olhada = sino(f) * m.olhadaLado;
+    }
+  }
+
+  m.guinada += (olhar.x * SEGUE_OLHAR.guinada + olhada * OLHADA.guinada - m.guinada) * k;
+  m.arfagem += (-olhar.y * SEGUE_OLHAR.arfagem - m.arfagem) * k;
+  m.rolagem += (ROLAGEM_ESTADO[voz] + olhada * OLHADA.rolagem - m.rolagem) * (1 - Math.pow(0.5, dt / 350));
   return {
-    guinada: m.guinada + Math.sin(t * 0.53) * 0.025 + Math.sin(t * 1.31) * 0.01,
-    arfagem: m.arfagem + Math.sin(t * 0.71 + 1.3) * 0.015,
-    rolagem: m.rolagem + Math.sin(t * 0.37 + 0.6) * 0.012,
+    guinada: m.guinada + Math.sin(t * 0.53) * 0.008,
+    arfagem: m.arfagem + Math.sin(t * 0.71 + 1.3) * 0.01,
+    rolagem: m.rolagem + Math.sin(t * 0.37 + 0.6) * 0.005,
   };
 }
