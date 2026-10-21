@@ -5,6 +5,15 @@ import { cabecalhosDeSeguranca } from './cabecalhos-seguranca.js';
 const diretivas = (caminho) => Object.fromEntries(cabecalhosDeSeguranca(caminho)['Content-Security-Policy']
   .split('; ').map((d) => { const [nome, ...valores] = d.split(' '); return [nome, valores]; }));
 
+test('câmera desligada no servidor bloqueia todas as rotas sem cortar o microfone do stand', () => {
+  for (const caminho of ['/gameplay', '/sonolencia', '/stand', '/operador']) {
+    const politica = cabecalhosDeSeguranca(caminho, '?webcam=1', { cameraHabilitada: false })['Permissions-Policy'];
+    assert.ok(politica.includes('camera=()'), caminho);
+    assert.ok(politica.includes(caminho === '/stand' ? 'microphone=(self)' : 'microphone=()'));
+  }
+  assert.ok(cabecalhosDeSeguranca('/gameplay', '?webcam=1', { cameraHabilitada: true })['Permissions-Policy'].includes('camera=(self)'));
+});
+
 test('Google Fonts fica restrito a CSS e fonte, sem liberar scripts externos ou beacon', () => {
   const csp = diretivas('/stand');
   assert.deepEqual(csp['style-src'], ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com']);

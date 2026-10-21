@@ -14,6 +14,17 @@ const retratoValido = (o = {}) => ({
 
 const socket = (userId) => ({ userId, readyState: 1, recebidas: [], send(t) { this.recebidas.push(JSON.parse(t)); } });
 
+test('câmera desligada não repassa nem guarda alerta de sono enviado por cliente antigo', () => {
+  const ao = criarGameplayAoVivo({ cameraHabilitada: false });
+  const totem = socket('A'), tablet = socket('A'), tarde = socket('A');
+  const dados = JSON.stringify({ kind: TIPO_RETRATO, estado: retratoValido(), sono: { status: 'alarm', closedMs: 1500 } });
+  assert.equal(ao.receber(totem, dados, { clientes: [totem, tablet] }), 'repassado');
+  ao.aoConectar(tarde);
+  assert.equal('sono' in tablet.recebidas[0], false);
+  assert.equal('sono' in tarde.recebidas[0], false);
+  assert.deepEqual(tablet.recebidas[0].estado, retratoValido());
+});
+
 test('normalizarRetrato remonta só os campos conhecidos e recusa tipo errado', () => {
   const comExtra = { ...retratoValido(), html: '<script>', maquina: { ...retratoValido().maquina, segredo: 'x' } };
   const limpo = normalizarRetrato(comExtra);

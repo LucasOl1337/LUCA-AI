@@ -18,13 +18,13 @@ export function usaCamera(caminho, busca = '') {
   return GAMEPLAY.test(caminho) && new URLSearchParams(String(busca)).get('webcam') === '1';
 }
 
-export function cabecalhosDeSeguranca(caminho, busca = '') {
+export function cabecalhosDeSeguranca(caminho, busca = '', { cameraHabilitada = process.env.LUCA_CAMERA_ENABLED !== 'false' } = {}) {
   const script = WORKER_VISAO.test(caminho) ? "'self' 'wasm-unsafe-eval'" : "'self'";
   const conexoes = STAND.test(caminho) ? "'self' ws: wss: https://api.x.ai wss://api.x.ai wss://api.elevenlabs.io" : "'self' ws: wss:";
-  const permissoes = usaCamera(caminho, busca)
+  const permissoes = cameraHabilitada && usaCamera(caminho, busca)
     ? 'camera=(self), microphone=(), geolocation=()'
     : STAND.test(caminho)
-      ? 'camera=(self), microphone=(self), geolocation=()'
+      ? `camera=${cameraHabilitada ? '(self)' : '()'}, microphone=(self), geolocation=()`
       : 'camera=(), microphone=(), geolocation=()';
   const moldura = EMOLDURAVEL.test(caminho);
   return {

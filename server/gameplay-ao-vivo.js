@@ -78,7 +78,7 @@ export function normalizarSono(bruto) {
  * Estado do repasse de um servidor. `receber` devolve o motivo para log e
  * teste: 'repassado', ou 'descartado:<motivo>'.
  */
-export function criarGameplayAoVivo({ agora = Date.now } = {}) {
+export function criarGameplayAoVivo({ agora = Date.now, cameraHabilitada = process.env.LUCA_CAMERA_ENABLED !== 'false' } = {}) {
   const ultimos = new Map();
   const ultimoEnvio = new WeakMap();
 
@@ -109,7 +109,7 @@ export function criarGameplayAoVivo({ agora = Date.now } = {}) {
       if (!estado) return 'descartado:formato';
       // `oculto` (opcional): a aba do totem saiu da tela; o tablet mostra "jogo pausado".
       if (mensagem.oculto !== undefined && typeof mensagem.oculto !== 'boolean') return 'descartado:formato';
-      const sono = normalizarSono(mensagem.sono);
+      const sono = cameraHabilitada ? normalizarSono(mensagem.sono) : undefined;
       if (sono === null) return 'descartado:formato';
       const ultimo = { estado, recebidoEm: instante, oculto: mensagem.oculto === true, ...(sono ? { sono } : {}) };
       ultimos.set(userId, ultimo);

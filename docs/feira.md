@@ -16,6 +16,8 @@ Se logo no começo da saída aparecer `"ok": true`, o site está pronto. Se apar
 
 Os dois aparelhos entram com **a mesma conta** do LUCA-AI. Sem isso, o tablet não vê o jogo do totem.
 
+Use no máximo 8 telas ao vivo na mesma conta. A nona espera uma vaga. Cada conta também aceita no máximo 10 sessões de login: entrar num 11º navegador encerra a sessão mais antiga, que pode ser a do totem. Evite novos logins na conta do stand durante a feira e feche abas de operador que não estiver usando.
+
 | Aparelho | Endereço | Para quê |
 | --- | --- | --- |
 | Totem, coruja que conversa | `https://luca-ai.com.br/stand/` | A coruja ouve o público e responde por voz. Quando o navegador pedir o microfone, clique em **Permitir**. |
@@ -40,6 +42,8 @@ Atalho de equipe: **Shift+Q** sai do jogo em tela cheia e, na coruja sem login, 
 O selo só aparece na tela do totem. O tablet do operador não muda.
 
 ### Webcam de sonolência no jogo (só se o Lucas pedir)
+
+A câmera e seus alertas estão desligados no servidor de produção por ordem do Lucas em 21/10. Os passos abaixo só valem em ambiente local de validação ou depois de autorização explícita para reativar `LUCA_CAMERA_ENABLED`. Acrescentar `webcam=1` não ultrapassa esse bloqueio. O microfone da coruja continua disponível. Não há cobrança automática implementada neste release.
 
 1. Ligue a webcam no totem e abra `https://luca-ai.com.br/gameplay?quiosque=1&webcam=1`.
 2. Quando o navegador pedir a câmera, clique em **Permitir**. A imagem da câmera aparece num quadro pequeno no canto de cima, à direita, e não sai do totem.
