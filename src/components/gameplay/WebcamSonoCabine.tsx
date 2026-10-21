@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CLOSED_DURATION_MS } from '@/sonolencia/eye-state.js';
 import { criarMonitorSonolencia, faltaNoNavegador, mensagemErroCamera, type MonitorSonolencia } from '@/sonolencia/monitor';
 import { aoVivo } from '@/lib/gameplayAoVivo';
+import { ligarCicloDaCamera } from './cicloCamera';
 import { ROTULO_SONO, segundosSono, sonoCabine, useSonoCabine } from './sonoCabine';
 import './webcamSonoCabine.css';
 
@@ -65,15 +66,15 @@ export default function WebcamSonoCabine() {
     // Tablet do operador: a leitura vai junto do retrato (só o status, nunca a imagem).
     const semSono = sonoCabine.assinar(() => aoVivo.marcarSono(sonoCabine.ler()));
     void abrir();
-    const trocar = () => {
-      if (document.hidden) { if (monitor.current) { parar(); setFase('pausada'); } }
-      else if (faseRef.current === 'pausada') void abrir();
-    };
-    document.addEventListener('visibilitychange', trocar);
-    window.addEventListener('pagehide', parar);
+    // Aba oculta e pagehide (bfcache incluído) pausam; visível de novo ou pageshow do bfcache reabrem.
+    const soltarCiclo = ligarCicloDaCamera(window, document, {
+      ligada: () => monitor.current !== null,
+      pausada: () => faseRef.current === 'pausada',
+      pausar: () => { parar(); setFase('pausada'); },
+      retomar: () => void abrir(),
+    });
     return () => {
-      document.removeEventListener('visibilitychange', trocar);
-      window.removeEventListener('pagehide', parar);
+      soltarCiclo();
       parar();
       semSono();
       aoVivo.marcarSono(null);
