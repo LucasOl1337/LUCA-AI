@@ -13,6 +13,12 @@ import type { EstadoGameplay } from './estadoGameplay';
 
 export type FaixaCabine = 'livre' | 'atencao' | 'perigo';
 
+/**
+ * Bordas vermelhas da tela, como o "dano" do Call of Duty (pedido do Linz, 20/10):
+ * `alerta` com o flag de 150 cm ou a inclinação, `critica` a até 100 cm ou no contato.
+ */
+export type VinhetaCabine = 'nenhuma' | 'alerta' | 'critica';
+
 /** Cadência do bipe: `null` mudo, `0` tom contínuo, senão um bipe a cada `intervaloMs`. */
 export interface BipeCabine { intervaloMs: number | null; frequenciaHz: number }
 
@@ -30,6 +36,8 @@ export interface AlertaCabine {
   /** Rolagem ou arfagem a partir de 20° (item 3: vem do terreno). */
   inclinacao: { ligada: boolean; graus: number };
   bipe: BipeCabine;
+  /** Só enquanto dirige: no pronto e no resultado a tela fica limpa. */
+  vinheta: VinhetaCabine;
 }
 
 export const ROTULO_ALERTA_CABINE = 'Obstáculo a 1,5 m · freie';
@@ -64,6 +72,10 @@ export function alertaCabine(estado: EstadoGameplay): AlertaCabine {
     else if (faixa === 'atencao') bipe = { intervaloMs: BIPE_LENTO_MS, frequenciaHz: 880 };
   }
 
+  const vinheta: VinhetaCabine = fase !== 'dirigindo' ? 'nenhuma'
+    : contato || perto ? 'critica'
+      : sensor.alerta || faixas.inclination ? 'alerta' : 'nenhuma';
+
   const rotulo = contato ? 'Contato com o obstáculo'
     : sensor.alerta ? 'Alerta de colisão'
       : faixas.inclination ? 'Risco de tombamento'
@@ -80,5 +92,6 @@ export function alertaCabine(estado: EstadoGameplay): AlertaCabine {
     velocidadeTexto: `${Math.round(maquina.velocidadeKph)} km/h${maquina.re ? ' · ré' : ''}`,
     inclinacao: { ligada: faixas.inclination, graus },
     bipe,
+    vinheta,
   };
 }

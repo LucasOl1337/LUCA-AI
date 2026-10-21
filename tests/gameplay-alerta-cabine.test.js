@@ -110,3 +110,19 @@ test('PainelCabine lê o canal da Direção e renderiza sem áudio no servidor',
   assert.match(html, /data-faixa="perigo"/);
   assert.match(html, /0,9 m/);
 });
+
+test('vinheta de dano: alerta a 150 cm e na inclinação, crítica a 100 cm e no contato, só dirigindo', () => {
+  const casos = [[400, 'nenhuma'], [199, 'nenhuma'], [150, 'alerta'], [101, 'alerta'], [100, 'critica'], [2, 'critica']];
+  for (const [cm, nivel] of casos) assert.equal(alertaCabine(estado({ cm })).vinheta, nivel, `${cm} cm`);
+  assert.equal(alertaCabine(estado({ rolagem: 22 })).vinheta, 'alerta');
+  assert.equal(alertaCabine(estado({ cm: 120, contato: true })).vinheta, 'critica');
+  assert.equal(alertaCabine(estado({ cm: 60, fase: 'pronto' })).vinheta, 'nenhuma');
+  assert.equal(alertaCabine(estado({ cm: 60, contato: true, fase: 'fim' })).vinheta, 'nenhuma');
+});
+
+test('painel desenha a vinheta com o nível do alerta', () => {
+  const atual = estado({ cm: 90 });
+  const canal = { ler: () => atual, assinar: () => () => {}, aoEvento: () => () => {}, reiniciar() {}, encerrar() {} };
+  const html = renderToStaticMarkup(createElement(PainelCabine, { canal }));
+  assert.match(html, /class="gameplay-painel-vinheta" data-nivel="critica" aria-hidden="true"/);
+});
