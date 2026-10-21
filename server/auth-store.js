@@ -130,6 +130,9 @@ function publicUser(user) {
 }
 
 export class AuthStore {
+  /** Quem precisa saber quando sessões saem (o /ws fecha os sockets delas). */
+  #ouvintesDeEncerramento = new Set();
+
   constructor(filePath, { adminEmails = [] } = {}) {
     this.filePath = filePath;
     this.adminEmails = new Set(adminEmails.map(normalizeEmail).filter(Boolean));
@@ -245,9 +248,33 @@ export class AuthStore {
 
   #cleanupSessions() {
     const now = Date.now();
-    const before = this.data.sessions.length;
-    this.data.sessions = this.data.sessions.filter((session) => Date.parse(session.expiresAt) > now);
-    return before !== this.data.sessions.length;
+    return this.#removerSessoes((session) => Date.parse(session.expiresAt) <= now);
+  }
+
+  /** Tira as sessões que casam e avisa os ids; devolve se alguma saiu. */
+  #removerSessoes(sai) {
+    const saem = this.data.sessions.filter(sai);
+    if (!saem.length) return false;
+    const ids = new Set(saem.map((session) => session.id));
+    this.data.sessions = this.data.sessions.filter((session) => !ids.has(session.id));
+    for (const ouvinte of [...this.#ouvintesDeEncerramento]) {
+      try { ouvinte(ids); } catch { /* quem ouve não derruba o logout */ }
+    }
+    return true;
+  }
+
+  /**
+   * Avisa (com o Set de ids) toda sessão que deixa de valer: logout, saída do
+   * modo suporte, expiração e o teto de 10 sessões por conta. Devolve o `soltar`.
+   */
+  aoEncerrarSessoes(ouvinte) {
+    this.#ouvintesDeEncerramento.add(ouvinte);
+    return () => { this.#ouvintesDeEncerramento.delete(ouvinte); };
+  }
+
+  /** Varre as expiradas sem esperar um acesso (a limpeza normal só roda quando alguém entra). */
+  encerrarExpiradas() {
+    if (this.#cleanupSessions()) this.#persist();
   }
 
   register({ name, email, password, ip = '', userAgent = '' }) {
@@ -331,7 +358,7 @@ export class AuthStore {
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
     if (ownSessions.length > 10) {
       const keep = new Set(ownSessions.slice(0, 10).map((item) => item.id));
-      this.data.sessions = this.data.sessions.filter((item) => item.userId !== user.id || keep.has(item.id));
+      this.#removerSessoes((item) => item.userId === user.id && !keep.has(item.id));
     }
     if (persist) this.#persist();
     return { token, expiresAt: session.expiresAt, sessionId: session.id, actorAdminId: actor || undefined };
@@ -450,9 +477,7 @@ export class AuthStore {
   logout(token) {
     if (!token) return;
     const tokenHash = hashToken(token);
-    const before = this.data.sessions.length;
-    this.data.sessions = this.data.sessions.filter((session) => session.tokenHash !== tokenHash);
-    if (before !== this.data.sessions.length) this.#persist();
+    if (this.#removerSessoes((session) => session.tokenHash === tokenHash)) this.#persist();
   }
 
   recordUsage(userId, {

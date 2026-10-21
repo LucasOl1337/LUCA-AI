@@ -206,3 +206,26 @@ test('rejeita senha inválida, duplicidade e credenciais incorretas', () => {
   assert.throws(() => store.register({ email: 'X@example.com', password: 'outra-senha-123' }), /email_already_registered/);
   assert.throws(() => store.login({ email: 'x@example.com', password: 'senha-incorreta' }), /invalid_credentials/);
 });
+
+test('aoEncerrarSessoes: logout avisa só o id da sessão que saiu; expiração varrida também avisa', (t) => {
+  const { store } = temporaryStore();
+  store.register({ email: 'conta@example.com', password: 'senha-forte-123' });
+  const a = store.login({ email: 'conta@example.com', password: 'senha-forte-123' });
+  const b = store.login({ email: 'conta@example.com', password: 'senha-forte-123' });
+  const avisos = [];
+  const soltar = store.aoEncerrarSessoes((ids) => avisos.push([...ids]));
+
+  store.logout(a.token);
+  store.logout(a.token); // repetido: nada mais sai, nada mais avisa
+  assert.deepEqual(avisos, [[a.sessionId]]);
+  assert.ok(store.resolveSession(b.token), 'a outra sessão da conta segue valendo');
+
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() + 31 * 24 * 60 * 60 * 1000 });
+  store.encerrarExpiradas();
+  assert.equal(avisos.length, 2);
+  assert.ok(avisos[1].includes(b.sessionId), 'a expirada sai pela varredura, sem esperar um acesso');
+
+  soltar();
+  store.encerrarExpiradas();
+  assert.equal(avisos.length, 2);
+});
