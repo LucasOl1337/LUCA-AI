@@ -39,6 +39,14 @@ Atalho de equipe: **Shift+Q** sai do jogo em tela cheia e, na coruja sem login, 
 
 O selo só aparece na tela do totem. O tablet do operador não muda.
 
+### Webcam de sonolência no jogo (só se o Lucas pedir)
+
+1. Ligue a webcam no totem e abra `https://luca-ai.com.br/gameplay?quiosque=1&webcam=1`.
+2. Quando o navegador pedir a câmera, clique em **Permitir**. A imagem da câmera aparece num quadro pequeno no canto de cima, à direita, e não sai do totem.
+3. Teste: feche os olhos por 2 s. A tela avisa **"Atenção: sinais de sono"** e o tablet do operador mostra o mesmo aviso.
+
+Se o quadro disser "Nenhuma webcam encontrada", confira o cabo da câmera e toque em **Tentar de novo**. O jogo continua normal mesmo sem câmera. Para medir o FPS com a webcam ligada, junte os dois no endereço: `?quiosque=1&webcam=1&fps=1`.
+
 ## Se der problema
 
 ### A internet caiu
