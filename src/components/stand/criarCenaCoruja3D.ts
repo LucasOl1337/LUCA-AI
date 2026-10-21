@@ -66,7 +66,7 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
   pmrem.dispose();
 
   const abortar = new AbortController();
-  const relogio = new THREE.Clock();
+  const relogio = new THREE.Timer();
   const memoria: MemoriaBrilho = { nivel: 0 };
   let modelo: THREE.Object3D | null = null;
   let mixer: THREE.AnimationMixer | null = null;
@@ -108,6 +108,7 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
   }
 
   function desenhar(agora: number) {
+    relogio.update(agora);
     const dt = Math.min(relogio.getDelta(), 0.1);
     trocarEstado(voz());
     mixer?.update(dt);
@@ -184,7 +185,7 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
     } else {
       trocarEstado(voz());
     }
-    relogio.getDelta();
+    relogio.update();
     aoPronto();
     quadro = requestAnimationFrame(laco);
   })().catch((erro) => { if (!encerrado) aoFalhar(erro); });
@@ -196,6 +197,7 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
       cancelAnimationFrame(quadro);
       observador.disconnect();
       mixer?.stopAllAction();
+      relogio.dispose();
       if (modelo) liberar(modelo);
       ambiente.dispose();
       renderer.dispose();

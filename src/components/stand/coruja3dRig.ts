@@ -21,8 +21,8 @@ export const OSSO_PESCOCO = 'tripoHead_1';
 /** Inclinação máxima extra da cabeça com o áudio no máximo, em radianos. */
 export const ACENO_FALA_RAD = 0.14;
 
-/** Moldura: a coruja (≈1 m, pés em y=0) inteira com folga, centro um pouco acima do peito. */
-export const ENQUADRAMENTO = Object.freeze({ alvoY: 0.5, altura: 1.08, largura: 1.12, fov: 24 });
+/** Moldura de busto, como a arte da Coruja A: topo dos tufos até o peito (coruja ≈1 m, pés em y=0). */
+export const ENQUADRAMENTO = Object.freeze({ alvoY: 0.71, altura: 0.76, largura: 0.76, fov: 24 });
 
 export interface MemoriaBrilho { nivel: number }
 
