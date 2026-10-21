@@ -1,4 +1,4 @@
-.experience-page { width: min(100%, 1440px); margin: 0 auto; padding: clamp(20px, 3vw, 48px); color: #e8edf3; }
+.experience-page { width: min(100%, 1440px); height: 100%; overflow-y: auto; margin: 0 auto; padding: clamp(20px, 3vw, 48px); color: #e8edf3; }
 .experience-page header { margin-bottom: 24px; max-width: 900px; }
 .experience-page h1 { font-size: clamp(30px, 4vw, 48px); font-weight: 650; margin: 0 0 12px; }
 .experience-page h2 { font-size: 20px; font-weight: 600; margin: 0 0 12px; }
@@ -9,8 +9,35 @@
 .experience-primary { background: #0768c5; color: white; }
 .experience-secondary { background: #243345; color: white; }
 .experience-primary:focus-visible, .experience-secondary:focus-visible { outline: 3px solid #53d4ff; outline-offset: 3px; }
-.experience-game-viewport { position: relative; width: 100%; height: clamp(420px, 68vh, 900px); overflow: hidden; border: 1px solid #ffffff20; border-radius: 18px; background: #07100c; margin-bottom: 20px; }
+.experience-game-viewport { position: relative; width: 100%; height: clamp(420px, 68vh, 900px); overflow: hidden; border: 1px solid #ffffff20; border-radius: 18px; background: #07100c; margin-bottom: 20px; container-type: size; }
+.experience-game-viewport:fullscreen { border: 0; border-radius: 0; margin: 0; }
 .experience-game-status { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 28px; text-align: center; }
-.experience-game-quiosque { position: fixed; inset: 0; overflow: hidden; background: #07100c; color: #e8efe9; }
+.experience-game-quiosque { position: fixed; inset: 0; overflow: hidden; background: #07100c; color: #e8efe9; container-type: size; }
 .experience-note { font-size: 14px; }
 .experience-acoes { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* /gameplay: a página ocupa a área do app (o workspace não rola sozinho) e, com o jogo
+   aberto, o quadro da cabine fica com toda a altura que sobra. As instruções viram
+   coluna recolhível ao lado (ou acima, em tela estreita) e nunca empurram o jogo pra
+   fora da tela. */
+.gameplay-page { display: flex; flex-direction: column; padding: clamp(14px, 2vw, 36px); }
+.gameplay-page-topo { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 16px; }
+.gameplay-page-corpo { min-height: 0; }
+.gameplay-page[data-jogando] { width: 100%; max-width: none; padding: 10px clamp(10px, 1.2vw, 20px) 12px; }
+.gameplay-page[data-jogando] .gameplay-page-topo { margin-bottom: 10px; max-width: none; }
+.gameplay-page[data-jogando] .experience-eyebrow { margin: 0 0 2px; }
+.gameplay-page[data-jogando] h1 { font-size: clamp(20px, 1.6vw, 26px); margin: 0; }
+.gameplay-page-acoes { gap: 8px; }
+.gameplay-page-acoes > button { min-height: 38px; padding: 8px 14px; margin: 0; }
+.gameplay-page[data-jogando] .gameplay-page-corpo { flex: 1 1 auto; display: flex; gap: 14px; }
+.gameplay-page[data-jogando] .experience-game-viewport { flex: 1 1 auto; height: auto; min-height: 300px; margin: 0; }
+.gameplay-page[data-jogando] .gameplay-como-testar { flex: 0 0 clamp(260px, 22vw, 340px); margin: 0; padding: 18px; overflow-y: auto; }
+.gameplay-page[data-jogando] .gameplay-como-testar h2 { font-size: 17px; }
+.gameplay-page[data-jogando] .gameplay-como-testar p { font-size: 14px; line-height: 1.5; }
+@media (max-width: 1000px) {
+  .gameplay-page[data-jogando] .gameplay-page-corpo { flex-direction: column-reverse; }
+  .gameplay-page[data-jogando] .gameplay-como-testar { flex: 0 1 auto; max-height: 38%; }
+}
+@media (max-height: 560px) and (min-width: 701px) {
+  .gameplay-page[data-jogando] .gameplay-page-topo .experience-eyebrow { display: none; }
+}
