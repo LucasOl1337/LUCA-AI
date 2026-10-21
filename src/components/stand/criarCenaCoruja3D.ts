@@ -114,7 +114,7 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
   const memoria: MemoriaBrilho = { nivel: 0 };
   const memoriaRosto = novaMemoriaRosto(performance.now());
   const memoriaOlhos = novaMemoriaOlhos(performance.now());
-  const memoriaCabeca = novaMemoriaCabeca();
+  const memoriaCabeca = novaMemoriaCabeca(performance.now());
   /** Tela dos olhos: nasce com o modelo (só se o GLB tiver a malha). */
   let tela: ReturnType<typeof criarTelaOlhos> | null = null;
   let ultimoDesenho = '';
