@@ -210,6 +210,12 @@ test('trocar de Permissions-Policy entre páginas carrega o documento (microfone
   assert.equal(exigeNovoDocumento(parseAppLocation('/stand/'), parseAppLocation('/stand/?stub=1')), false);
   assert.equal(exigeNovoDocumento(parseAppLocation('/totem'), parseAppLocation('/gameplay')), false);
   assert.equal(exigeNovoDocumento({ kind: 'auth', page: 'inicio' }, parseAppLocation('/stand/')), true);
+  // Painel do operador (tablet): política padrão, sem microfone nem câmera; troca do gameplay sem recarregar.
+  assert.equal(parseAppLocation('/operador').page, 'operador');
+  assert.equal(formatAppUrl({ page: 'operador' }), '/operador');
+  assert.equal(cabecalhosDeSeguranca('/operador')['Permissions-Policy'], 'camera=(), microphone=(), geolocation=()');
+  assert.equal(exigeNovoDocumento(parseAppLocation('/gameplay'), parseAppLocation('/operador')), false);
+  assert.equal(exigeNovoDocumento(parseAppLocation('/operador'), parseAppLocation('/stand/')), true);
   // Toda dupla de páginas: pushState só quando a política dos cabeçalhos é a mesma.
   for (const de of paginas) {
     for (const para of paginas) {
