@@ -119,3 +119,20 @@ test('sem webcam no totem: nenhum card de motorista; com alarme: card aceso e fa
   assert.match(dormindo, /<strong>Sonolência<\/strong><small>Olhos fechados há 1,4 s<\/small>/);
   assert.match(dormindo, /class="operador-alerta" role="alert">Atenção: sinais de sono</);
 });
+
+// Soak luca-soak item 5 (21/10): o totem sai do /gameplay (rota, pagehide, fechar a aba) com o
+// motorista em alarme; o último retrato fica no servidor ~60 s e o tablet seguia em "sinais de sono".
+test('totem saiu com o alarme de sono: sem sinal (ou pausado) o tablet apaga card e faixa de sono', () => {
+  const ultimo = { estado: estado(), recebidoEm: 5_000, sono: { status: 'alarm', closedMs: 1400 } };
+  const semSinal = html(ultimo, 10_000);
+  assert.match(semSinal, /data-sinal="sem-sinal"/);
+  assert.doesNotMatch(semSinal, /data-motorista/);
+  assert.doesNotMatch(semSinal, /sinais de sono/);
+  assert.match(semSinal, /class="operador-alerta" role="alert" hidden=""/);
+  const pausado = html({ ...ultimo, oculto: true }, 10_000);
+  assert.match(pausado, /data-sinal="pausado"/);
+  assert.doesNotMatch(pausado, /data-motorista|sinais de sono/);
+  // O alerta do próprio trator (sensor) segue valendo no último retrato, como antes.
+  const perto = html({ ...ultimo, estado: estado({ cm: 90 }) }, 10_000);
+  assert.doesNotMatch(perto, /sinais de sono/);
+});
