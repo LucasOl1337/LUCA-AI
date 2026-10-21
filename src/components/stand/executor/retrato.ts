@@ -10,6 +10,8 @@ export const RETRATO_MAX = 200;
 export interface LeitorTela {
   texto(seletor: string): string | null;
   atributo(seletor: string, nome: string): string | null;
+  /** Atributo de todos os elementos visíveis do seletor (opcional). */
+  todos?(seletor: string, nome: string): string[];
 }
 
 /** Uma linha só, sem quebra nem espaço repetido, cortada em `max`. */
@@ -62,8 +64,13 @@ export function retratoDaPagina(caminho: string, ler: LeitorTela): string {
       const aba = ler.texto('[data-stand-alvo^="aba-"][aria-pressed="true"] strong');
       return limparLinha(juntar(['Página SOMPO', aba && `aba ${aba}`]));
     }
-    case '/luca-ai':
-      return 'Página LUCA AI';
+    case '/luca-ai': {
+      // Só os rótulos dos templates prontos (galeria pública da bancada); nada de missão, chat ou persona.
+      const galeria = ler.atributo('[data-luca-preset-gallery]', 'data-luca-preset-gallery');
+      const nomes = ler.todos?.('[data-luca-preset-gallery] button[aria-label^="Aplicar preset "]', 'aria-label')
+        .map((rotulo) => rotulo.replace(/^Aplicar preset /, '')) ?? [];
+      return limparLinha(juntar(['Página LUCA AI', galeria && nomes.length ? `${galeria}: ${nomes.join(', ')}` : null]));
+    }
     case '/':
       return 'Página inicial do site';
     default:
@@ -73,14 +80,15 @@ export function retratoDaPagina(caminho: string, ler: LeitorTela): string {
 
 /** Leitor do documento real: só elementos visíveis contam. */
 export function leitorDoDocumento(doc: Document): LeitorTela {
-  const achar = (seletor: string): Element | null => {
+  const visiveis = (seletor: string): Element[] => {
     try {
-      return Array.from(doc.querySelectorAll(seletor)).find((el) => {
+      return Array.from(doc.querySelectorAll(seletor)).filter((el) => {
         const r = (el as HTMLElement).getBoundingClientRect?.();
         return !r || r.width > 0 || r.height > 0 || el instanceof HTMLOptionElement;
-      }) ?? null;
-    } catch { return null; }
+      });
+    } catch { return []; }
   };
+  const achar = (seletor: string): Element | null => visiveis(seletor)[0] ?? null;
   return {
     texto: (seletor) => {
       const t = achar(seletor)?.textContent?.replace(/\s+/g, ' ').trim();
@@ -92,5 +100,6 @@ export function leitorDoDocumento(doc: Document): LeitorTela {
       if (nome === 'value' && 'value' in el) return String((el as HTMLSelectElement).value);
       return el.getAttribute(nome);
     },
+    todos: (seletor, nome) => visiveis(seletor).map((el) => el.getAttribute(nome)).filter((v): v is string => Boolean(v)),
   };
 }
