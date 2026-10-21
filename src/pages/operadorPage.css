@@ -53,7 +53,8 @@
 /* Retrato (tablet em pé): mapa em cima com a largura toda, cards embaixo. */
 @media (orientation: portrait) {
   .operador-corpo { grid-template-columns: minmax(0, 1fr); }
-  .operador .gameplay-mapa { width: min(100%, 62vh); }
+  /* 46vh deixa os cinco cards visíveis sem rolar num tablet 800x1280. */
+  .operador .gameplay-mapa { width: min(100%, 46vh); }
 }
 @media (prefers-reduced-motion: reduce) {
   .operador-alerta, .operador[data-sinal='ao-vivo'] .operador-sinal::before { animation: none; }
