@@ -194,10 +194,14 @@ describe('ensaio da feira de ponta a ponta', { skip: navegador ? false : 'sem Ch
     await totem.keyboard.up('ArrowUp');
     const t0 = Date.now();
     await totem.reload({ waitUntil: 'commit' });
-    await tablet.waitForFunction(() => document.body.innerText.includes('Parado · esperando R2'), null, { timeout: 8_000, polling: 100 })
-      .catch(() => assert.fail('o tablet não recebeu o jogo novo do totem em 8 s depois do F5'));
-    const volta = await tabletEm('ao-vivo', 1_000);
-    console.log(`# d) tablet com o jogo novo ${Date.now() - t0} ms depois do F5 (ao vivo em +${volta} ms)`);
+    try {
+      await tablet.waitForFunction(() => document.body.innerText.includes('Parado · esperando R2'), null, { timeout: 8_000, polling: 100 })
+        .catch(() => assert.fail('o tablet não recebeu o jogo novo do totem em 8 s depois do F5'));
+      const volta = await tabletEm('ao-vivo', 1_000);
+      console.log(`# d) tablet com o jogo novo ${Date.now() - t0} ms depois do F5 (ao vivo em +${volta} ms)`);
+    } finally {
+      await totemJogando();
+    }
   });
 
   it('b) sessão revogada de fora: /operador vai ao login e /stand ao "sem login" (C6)', async () => {
