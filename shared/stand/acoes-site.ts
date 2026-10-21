@@ -285,9 +285,10 @@ export function ferramentasAcaoSite(formato: 'realtime' | 'chat' = 'realtime') {
 }
 
 /** Página do stand → executor. `id` correlaciona com o resultado. */
-export interface AcaoSiteEvento { tipo: 'acao_site'; id: string; acao: string; args: Record<string, unknown> }
+/** `stand`: id da janela de /stand que pediu (escopo do canal; ausente em versões antigas). */
+export interface AcaoSiteEvento { tipo: 'acao_site'; id: string; acao: string; args: Record<string, unknown>; stand?: string }
 /**
  * Executor → página do stand. `mensagem` é em PT-BR, pronta pra IA falar.
  * `retrato`: o que a página mostra depois da ação (≤200 caracteres, uma linha).
  */
-export interface AcaoSiteResultado { tipo: 'acao_site_resultado'; id: string; ok: boolean; mensagem: string; retrato?: string }
+export interface AcaoSiteResultado { tipo: 'acao_site_resultado'; id: string; ok: boolean; mensagem: string; retrato?: string; stand?: string }
