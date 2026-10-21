@@ -39,6 +39,26 @@ do visitante corta o áudio e descarta as ações ainda não consumidas do turno
 O provedor xAI de reserva recusa esse comando, pois o roteiro depende do fluxo
 de áudio do `SessaoTurnos`.
 
+### Painel "Experimente pedir" e Simulação
+
+Ao lado da coruja (à direita em paisagem, embaixo em retrato), o painel
+`PainelComandos.tsx` mostra os comandos de voz que funcionam, cada um com uma
+frase de exemplo e o que acontece. Ele só aparece quando a voz está ligada (ou
+em `?stub=1`) e some durante o vídeo. A lista vem de `COMANDOS_VOZ` em
+`shared/stand/comandos-voz.ts`, a mesma que `montarPromptBase` põe no prompt do
+cérebro com a ferramenta de cada pedido. `tests/stand-comandos-voz.test.js`
+falha se uma ferramenta do stand ficar sem comando no painel ou se um comando
+apontar para ferramenta que não existe.
+
+"Testar o simulador", "quero jogar", "abre a simulação" e "testar a gameplay"
+abrem a Simulação. Pedidos curtos assim (`comandoDireto`) não passam pelo modelo:
+o servidor fala a frase pronta `FALAS.simulacao` e manda `abrir_simulacao` com
+`apos_fala:true`. A conversa por voz termina quando a Simulação abre. Perguntas
+sobre o simulador ("como funciona o simulador?") seguem para o modelo, que
+também tem a ferramenta `abrir_simulacao`. Antes de 21/10 não havia ação que
+levasse ao modo Simulação: o modelo abria a aba de telemetria do painel SOMPO ou
+só respondia.
+
 ```mermaid
 sequenceDiagram
   participant N as Navegador

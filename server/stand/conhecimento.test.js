@@ -42,7 +42,8 @@ test('prompt-base fala com investidor, marca simulação e traz as user stories'
   assert.match(prompt, /simulado/);
   assert.match(prompt, /O segurado diz uma coisa\. A telemetria mostra outra\./);
   assert.match(prompt, /tocar_video/);
-  assert.ok(prompt.length < 6000, `prompt longo demais: ${prompt.length}`);
+  // 7000 desde 21/10: o painel de comandos ao lado da coruja entrou no prompt (~650 caracteres).
+  assert.ok(prompt.length < 7000, `prompt longo demais: ${prompt.length}`);
 });
 
 test('prompt-base só anuncia vídeos com mp4 publicado', () => {
