@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { alertaCabine } from '@/components/gameplay/alertaCabine';
 import { MapaTalhao } from '@/components/gameplay/MapaTalhao';
 import { useBipeCabine } from '@/components/gameplay/bipeCabine';
+import { ROTULO_SONO, segundosSono } from '@/components/gameplay/sonoCabine';
 import { sinalAoVivo, useRetratoAoVivo, type RetratoAoVivo } from '@/lib/gameplayAoVivo';
 import './operadorPage.css';
 
@@ -24,7 +25,7 @@ export default function OperadorPage() {
   }, [visivel]);
   const vivo = sinalAoVivo(retrato, agora).nivel === 'ao-vivo';
   // Mudo por padrão: o som é do totem; o tablet só bipa se o operador pedir.
-  useBipeCabine(som && vivo && retrato ? alertaCabine(retrato.estado).bipe : null);
+  useBipeCabine(som && vivo && retrato ? alertaCabine(retrato.estado, retrato.sono ?? null).bipe : null);
   return <OperadorVista retrato={retrato} agora={agora} som={som} oculto={!visivel} aoTrocarSom={() => setSom(!som)} />;
 }
 
@@ -47,7 +48,8 @@ export function OperadorVista({ retrato, agora, som, oculto = false, aoTrocarSom
   const selo = sinal.nivel === 'ao-vivo' ? 'Ao vivo'
     : sinal.nivel === 'pausado' ? 'Jogo pausado no totem'
     : sinal.nivel === 'sem-sinal' ? `Sem sinal há ${sinal.segundos} s` : 'Aguardando o totem';
-  const painel = retrato ? alertaCabine(retrato.estado) : null;
+  // `sono` só chega com a webcam da cabine ligada no totem (/gameplay?webcam=1).
+  const painel = retrato ? alertaCabine(retrato.estado, retrato.sono ?? null) : null;
   return (
     <section className="operador" data-sinal={sinal.nivel} data-oculto={oculto || undefined} aria-labelledby="operador-titulo">
       <header className="operador-topo">
@@ -81,6 +83,13 @@ export function OperadorVista({ retrato, agora, som, oculto = false, aoTrocarSom
             <article className="operador-card" data-alerta={painel.geofence.nivel !== 'fora'}>
               <span>Zona de risco</span><strong>{painel.geofence.zona?.rotulo ?? 'Fora das zonas'}</strong>
             </article>
+            {retrato.sono && (
+              <article className="operador-card" data-motorista={retrato.sono.status} data-alerta={painel.sono}>
+                <span>Motorista · webcam</span>
+                <strong>{ROTULO_SONO[retrato.sono.status]}</strong>
+                {retrato.sono.closedMs > 0 && <small>Olhos fechados há {segundosSono(retrato.sono.closedMs)}</small>}
+              </article>
+            )}
             <article className="operador-card">
               <span>Fase</span><strong>{FASE[retrato.estado.fase]}</strong><small>{relogio(retrato.estado.tempoMs)}</small>
             </article>
