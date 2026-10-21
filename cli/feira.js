@@ -3,6 +3,7 @@
 // release errada; o tamanho vem de uma sonda, não de um número fixo.
 export const PAGINAS_DA_FEIRA = Object.freeze({ stand: ['/stand/', 'StandPage'], gameplay: ['/gameplay', 'GameplayPage'], operador: ['/operador', 'OperadorPage'], totem: ['/totem', 'TotemPage'] });
 export const CORUJA_GLB = '/stand/avatar/coruja-3d/coruja-3d.glb';
+// O plano lista o nome fixo; na checagem vale o nome com hash achado no chunk do stand.
 const SONDA = '/assets/feira-checar-sonda-inexistente.js';
 
 export function planoDaFeira(origem) {
@@ -52,6 +53,9 @@ export async function checarFeira(origem, { timeout = 15000 } = {}) {
   });
   const entrada = indice ? await asset(indice) : null;
   const vistos = new Set();
+  // GLB da coruja com hash (`?url` do Vite): o nome está num chunk do stand.
+  let corujaComHash = null;
+  const procuraCoruja = codigo => { corujaComHash ??= (codigo || '').match(/\/assets\/coruja-3d-[\w-]+\.glb/)?.[0] ?? null; };
   for (const [pagina, [caminho, chunk]] of Object.entries(PAGINAS_DA_FEIRA)) {
     await tenta(`pagina ${pagina}`, async () => {
       const r = await pega(caminho);
@@ -65,19 +69,23 @@ export async function checarFeira(origem, { timeout = 15000 } = {}) {
     const nome = entrada?.match(new RegExp(`assets/(${chunk}-[\\w-]+\\.js)`))?.[1];
     if (!nome) { if (entrada) anota(`chunk ${pagina}`, false, { motivo: `${chunk} não aparece no index` }); continue; }
     const codigo = await asset(`/assets/${nome}`);
+    procuraCoruja(codigo);
     for (const css of new Set(entrada.match(new RegExp(`assets/${chunk}-[\\w-]+\\.css`, 'g')) || [])) await asset(`/${css}`);
     // Um nível de imports diretos do chunk: pega release pela metade.
     for (const dep of new Set([...(codigo || '').matchAll(/["'(]\.\/([\w.-]+\.(?:js|css))["')]/g)].map(m => m[1]))) {
       if (vistos.has(dep) || dep === indice.slice(8)) continue;
       vistos.add(dep);
-      await asset(`/assets/${dep}`);
+      procuraCoruja(await asset(`/assets/${dep}`));
     }
   }
   await tenta('coruja-3d.glb', async () => {
-    const r = await pega(CORUJA_GLB);
+    const caminho = corujaComHash || CORUJA_GLB;
+    const r = await pega(caminho);
     const glb = r.status === 200 && r.corpo.subarray(0, 4).toString() === 'glTF';
     const ausente = r.status === 404 || r.tipo.includes('text/html');
-    anota('coruja-3d.glb', glb || ausente, { status: r.status, bytes: r.corpo.length, presente: glb, ...(ausente ? { aviso: 'GLB ausente; o stand usa a Coruja A' } : {}) });
+    // Pedido pelo chunk do stand e ausente é release pela metade; só o nome fixo vira aviso.
+    const aviso = ausente && !corujaComHash;
+    anota('coruja-3d.glb', glb || aviso, { status: r.status, caminho, bytes: r.corpo.length, presente: glb, cacheControl: r.headers.get('cache-control'), ...(aviso ? { aviso: 'GLB ausente; o stand usa a Coruja A' } : {}), ...(ausente && corujaComHash ? { motivo: 'o stand pede este GLB e ele não está no servidor' } : {}) });
   });
   const falhas = checks.filter(c => !c.ok).map(c => c.id);
   return { ok: falhas.length === 0, url: origem, versao, verificadoEm: new Date().toISOString(), falhas, checks };

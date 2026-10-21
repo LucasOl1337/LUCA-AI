@@ -5,7 +5,7 @@ import { restoreSompoTextures, useSompoExternalTextures } from '../sompo/restore
 import { soltarLutCompartilhada } from '../sompo/soltarLutCompartilhada';
 import type { EstadoVoz } from './canal';
 import {
-  CLIPE_ENTRADA, CLIPE_POR_VOZ, CORUJA_3D_URL, CROSSFADE_S, ENQUADRAMENTO, MORPH_BICO, MORPH_PISCAR, OSSO_PESCOCO,
+  CLIPE_ENTRADA, CLIPE_POR_VOZ, CORUJA_3D_PUBLICO, CORUJA_3D_URL, CROSSFADE_S, ENQUADRAMENTO, MORPH_BICO, MORPH_PISCAR, OSSO_PESCOCO,
   acenoFala, brilhoCoruja3D, novaMemoriaRosto, rostoCoruja3D, type MemoriaBrilho,
 } from './coruja3dRig';
 
@@ -174,7 +174,8 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
     const resposta = await fetch(CORUJA_3D_URL, { signal: abortar.signal });
     if (!resposta.ok) throw new Error(`Coruja 3D: HTTP ${resposta.status}`);
     const gltf = await useSompoExternalTextures(new GLTFLoader()).parseAsync(await resposta.arrayBuffer(), '/stand/avatar/coruja-3d/');
-    await restoreSompoTextures(gltf, CORUJA_3D_URL, abortar.signal);
+    // O GLB vem com hash de /assets/; o manifesto e as imagens seguem no caminho público.
+    await restoreSompoTextures(gltf, CORUJA_3D_PUBLICO, abortar.signal);
     if (encerrado) { liberar(gltf.scene); return; }
     modelo = gltf.scene;
     // O modelo olha para +X (Tripo); a câmera está em +Z.
