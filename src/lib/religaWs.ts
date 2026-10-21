@@ -34,16 +34,17 @@ export function criarReligador(
 ) {
   let timer: unknown = null;
   let parado = false;
+  let pausado = false;
   let tentando = false;
 
   function agendar() {
-    if (parado || timer !== null) return;
+    if (parado || pausado || timer !== null) return;
     const jitter = Math.floor(Math.min(Math.max(aleatorio(), 0), 0.999) * RELIGA_JITTER_MS);
     timer = relogio.agendar(() => { timer = null; void tentar(); }, intervaloMs + jitter);
   }
 
   async function tentar() {
-    if (parado || tentando) return;
+    if (parado || pausado || tentando) return;
     tentando = true;
     let abriu = false;
     try { abriu = await conectar(); } catch { abriu = false; }
@@ -57,5 +58,45 @@ export function criarReligador(
     timer = null;
   }
 
-  return { tentar, agendar, parar };
+  /** Página escondida: nada de tentativa nem agendamento até `retomar`. */
+  function pausar() {
+    pausado = true;
+    if (timer !== null) relogio.cancelar(timer);
+    timer = null;
+  }
+
+  /** Página de volta: religa pelo caminho normal (prazo + jitter). */
+  function retomar() {
+    if (parado || !pausado) return;
+    pausado = false;
+    agendar();
+  }
+
+  return { tentar, agendar, parar, pausar, retomar, pausado: () => pausado };
+}
+
+type Religador = ReturnType<typeof criarReligador>;
+
+/**
+ * Back/forward cache: o Chromium guarda a página congelada com o /ws aberto por
+ * até ~10 min depois de navegar para fora, e o servidor segue contando o socket
+ * no teto por conta (1013). No `pagehide` (com ou sem `persisted`) o socket fecha
+ * e o religador pausa; no `pageshow` vindo do cache (`persisted`) ele retoma, com
+ * o mesmo prazo + jitter de qualquer religação. Devolve quem desliga os ouvintes.
+ */
+export function ligarCicloDaPagina(
+  janela: Pick<EventTarget, 'addEventListener' | 'removeEventListener'>,
+  religador: Pick<Religador, 'pausar' | 'retomar'>,
+  fecharSocket: () => void,
+) {
+  const aoEsconder = () => { religador.pausar(); fecharSocket(); };
+  const aoMostrar = (evento: Event) => {
+    if ((evento as PageTransitionEvent).persisted) religador.retomar();
+  };
+  janela.addEventListener('pagehide', aoEsconder);
+  janela.addEventListener('pageshow', aoMostrar);
+  return () => {
+    janela.removeEventListener('pagehide', aoEsconder);
+    janela.removeEventListener('pageshow', aoMostrar);
+  };
 }
