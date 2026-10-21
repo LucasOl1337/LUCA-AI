@@ -22,6 +22,7 @@ import { createSompoAtmosphere } from './createSompoAtmosphere';
 import { createSompoPostProcessing } from './createSompoPostProcessing';
 import { createSompoRenderMeter } from './sompoStage';
 import { soltarLutCompartilhada } from './soltarLutCompartilhada';
+import { soltarOrbit } from './soltarOrbit';
 import { PERFIL_PADRAO, criarPortaoDeAquecimento, pixelRatioDoDegrau, qualidadeInicial, regularQualidade, type PerfilQualidade } from './qualidadeAdaptativa';
 import { exportSompoModel } from './refineSompoTruck';
 import { SOMPO_STUDIO_DEFAULT, type SompoStudioConfig, type SompoRenderStats } from './sompoStudioConfig';
@@ -611,7 +612,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
       window.cancelAnimationFrame(frameId);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       resizeObserver.disconnect();
-      orbit.dispose();
+      soltarOrbit(orbit);
       field.dispose();
       if (model) disposeSompoAgriAsset(model);
       assets.dispose();

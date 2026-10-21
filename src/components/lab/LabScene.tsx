@@ -12,6 +12,7 @@ import { hazardsOf, bandColor, innermostEpisodeAt, episodeColor, ROUTE_COLOR, sl
 import { createCropField } from './createCropField';
 import { loadLabHarvester } from './loadLabHarvester';
 import { soltarLutCompartilhada } from '../sompo/soltarLutCompartilhada';
+import { soltarOrbit } from '../sompo/soltarOrbit';
 
 export type LabCameraMode = 'free' | 'top' | 'follow';
 
@@ -651,7 +652,7 @@ export default function LabScene({ labCase, site, elapsedMs, cameraMode, selecte
       renderer.domElement.removeEventListener('pointerup', up);
       renderer.domElement.removeEventListener('wheel', zoomFollow);
       renderer.domElement.removeEventListener('webglcontextlost', lost);
-      controls.dispose();
+      soltarOrbit(controls);
       cameraActions.current = null;
       sunlight.shadow.dispose();
       assetController.abort();
