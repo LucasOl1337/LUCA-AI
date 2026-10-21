@@ -10,6 +10,7 @@ import type { EstadoStand } from '../../shared/stand/eventos.ts';
 import { abrirAudio, FilaDeVoz, HZ_STAND, type AudioStand } from './audioStand';
 import { assinarEventosPagina, emitirEventoStand } from './barramento';
 import { SEM_FALA_MS } from './escuta';
+import { visaoTotem } from './visao';
 import { base64DePcm16, criarDetectorFala } from './protocolo';
 import type { EtapaSessao, FimSessao, SessaoDeVoz, SessaoServidor } from './sessaoVoz';
 import { eventoScribe, interrompeFala, lerNdjson, mensagemAudioScribe, pareceEco, vaiAoCerebro, valeEnquantoPensa, type LinhaTurno } from './turnos';
@@ -311,12 +312,14 @@ export class SessaoTurnos implements SessaoDeVoz {
     if ('texto' in entrada) this.falhaPendente = false;
     const tela = 'texto' in entrada ? this.tela : '';
     if (tela) this.tela = '';
+    // Webcam do Totem: só presença de rosto, detectada no navegador (visao.ts); nunca imagem.
+    const camera = 'texto' in entrada ? visaoTotem.ler() : '';
     try {
       const resposta = await fetch('/api/stand/turno', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversa_id: this.conversaId, ...entrada, ...(tela ? { tela } : {}) }),
+        body: JSON.stringify({ conversa_id: this.conversaId, ...entrada, ...(tela ? { tela } : {}), ...(camera ? { camera } : {}) }),
         signal: controle.signal,
       });
       if (resposta.status === 503) {

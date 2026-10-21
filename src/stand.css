@@ -129,23 +129,6 @@
 }
 .stand-barra button[aria-pressed='true'] { background: rgba(10, 132, 255, 0.85); color: #fff; }
 
-/* Dica do controle: pequena, no canto de cima à esquerda (o selo fica à direita). */
-.stand-dica {
-  position: absolute; top: 0; left: 0; margin: 0; display: inline-flex; align-items: center; gap: 1vmin;
-  padding: 0.6vmin 1.6vmin; border-radius: 999px; background: rgba(9, 12, 17, 0.6);
-  font: 600 clamp(12px, 1.9vmin, 30px) 'Stand Outfit', system-ui, sans-serif; color: rgba(255, 255, 255, 0.72);
-  pointer-events: none !important;
-}
-.stand-dica kbd { font: inherit; font-weight: 800; padding: 0.1vmin 0.9vmin; border-radius: 0.6vmin; background: rgba(255, 255, 255, 0.14); color: #fff; }
-/* Na Simulação o canto de cima à esquerda é dos selos do simulador (ESP32 virtual, SIMULADO); a dica vai pro centro do topo. */
-.stand[data-modo='simulacao'] .stand-dica { left: 50%; transform: translateX(-50%); white-space: nowrap; }
-/* No gameplay o centro do topo é da faixa de alerta ("Obstáculo a 1,5 m · freie"); a dica vai pro canto direito pra não cobrir o aviso. */
-.stand[data-modo='simulacao']:has([data-gameplay]) .stand-dica { left: auto; right: 0; transform: none; }
-/* Em pé não sobra canto ao lado da faixa: a dica desce pra baixo dela. */
-@media (orientation: portrait) {
-  .stand[data-modo='simulacao']:has([data-gameplay]) .stand-dica { right: auto; left: 50%; top: 10vh; transform: translateX(-50%); }
-}
-
 /* Linha fixa da Escuta: no rodapé; na Vitrine sobe para baixo do título (a legenda queimada ocupa o rodapé). */
 .stand-linha-escuta {
   position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); margin: 0; white-space: nowrap;
@@ -214,7 +197,7 @@
 .stand-tela-trator[data-alerta] .stand-trator-figura svg { color: #ff9f0a; }
 @media (orientation: portrait) {
   .stand-tela-trator { grid-template-columns: 1fr; align-content: center; }
-  /* Em pé a dica L1/R1 ocupa o canto: o título desce uma linha e pode usar a largura toda. */
+  /* Em pé o título desce uma linha e pode usar a largura toda. */
   .stand-vitrine-legenda { top: calc(var(--stand-margem) + 6vmin); max-width: 90%; }
 }
 .stand-aviso-mudo { right: var(--stand-margem); bottom: calc(var(--stand-margem) / 2); }
@@ -231,6 +214,18 @@
 .stand-simulacao .is-kiosk .sompo-simulator-stage { height: 100%; min-height: 0; aspect-ratio: auto; border-radius: 0; }
 /* Cenários no meio da borda direita: embaixo ficam os botões de câmera e a barra de modos. */
 .stand-simulacao .is-kiosk .sompo-fp-scenarios { bottom: auto; top: 50%; transform: translateY(-50%); }
+/* Webcam de sonolência na Simulação do Totem: o quadro do /gameplay?webcam=1 dentro da área segura (a moldura come as bordas). */
+.stand-simulacao .stand-webcam-simulacao { top: var(--stand-margem); right: var(--stand-margem); width: clamp(150px, 15vw, 240px); font-size: clamp(11px, 1.4vh, 14px); }
+/* Coruja (Lucas, 21/10): a pessoa se vê no canto inferior esquerdo; a coluna da direita é o "Experimente pedir". */
+.stand-seguro .stand-webcam-coruja { top: auto; right: auto; left: 0; bottom: 0; width: clamp(170px, 17vw, 300px); font-size: clamp(12px, 1.6vh, 16px); }
+.stand-webcam-coruja[data-presenca='rosto'] { border-color: #4fbf7a99; }
+.stand-webcam-coruja[data-presenca='rosto'] .gameplay-webcam-ponto { background: #4fbf7a; }
+/* Selo de câmera ligada: transparência para quem está na frente, sem disputar com a barra. */
+.stand-selo-camera {
+  position: absolute; left: 0; top: 0; margin: 0; padding: 0.6vmin 1.4vmin; border-radius: 999px;
+  font-size: 1.5vmin; color: rgba(255, 255, 255, 0.62); background: rgba(4, 7, 11, 0.45); pointer-events: none;
+}
+.stand-selo-camera::first-letter { color: #e5483b; }
 
 /* Site (Totem-Site Q6): a página ocupa a área segura; a coruja fica pequena no canto inferior direito. */
 .stand-site { position: absolute; inset: var(--stand-margem); display: grid; grid-template-columns: minmax(0, 1fr) 22vmin; gap: 1.6vmin; }

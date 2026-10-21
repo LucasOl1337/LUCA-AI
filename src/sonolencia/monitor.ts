@@ -29,6 +29,12 @@ export interface OpcoesMonitor {
   verificar?(): string | null;
   /** Reduz o frame antes do worker (o gameplay usa 640 px para poupar CPU). */
   larguraAnalise?: number;
+  /**
+   * Intervalo mínimo entre frames enviados ao worker, consultado a cada tique
+   * (o totem usa 250 ms fora da Simulação para poupar CPU; 0 = todo tique).
+   * Precisa ficar abaixo de RESULTADO_FRESCO_MS, senão a leitura zera.
+   */
+  intervaloMs?: () => number;
   // Injeção para teste; o padrão é o navegador.
   abrirCamera?: (mediaDevices: MediaDevices) => Promise<MediaStream>;
   mediaDevices?: MediaDevices;
@@ -131,6 +137,7 @@ export function criarMonitorSonolencia(op: OpcoesMonitor): MonitorSonolencia {
     let inFlight = false;
     let lastVideoTime = -1;
     let lastResultAt = agora();
+    let ultimoEnvio = -Infinity;
     worker.onerror = () => falhar('O detector foi interrompido. Ative o monitor novamente.');
     worker.onmessage = ({ data }) => {
       if (s.disposed) return;
@@ -151,7 +158,8 @@ export function criarMonitorSonolencia(op: OpcoesMonitor): MonitorSonolencia {
       if (now - lastResultAt > RESULTADO_FRESCO_MS) { monitor.reset(); op.aoLer(EMPTY_READING, null); }
       if (now - lastResultAt > WORKER_MUDO_MS) { falhar('A análise da câmera parou de responder. Ative o monitor novamente.'); return; }
       if (inFlight || element.readyState < 2 || element.currentTime === lastVideoTime) return;
-      inFlight = true; lastVideoTime = element.currentTime;
+      if (now - ultimoEnvio < Math.min(RESULTADO_FRESCO_MS - INTERVALO_FRAME_MS, op.intervaloMs?.() ?? 0)) return;
+      inFlight = true; lastVideoTime = element.currentTime; ultimoEnvio = now;
       try {
         const bitmap = await (op.capturar ?? capturarPadrao)(element, op.larguraAnalise);
         if (s.disposed) { bitmap.close(); return; }

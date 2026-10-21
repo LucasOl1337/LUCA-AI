@@ -8,8 +8,9 @@
  * sozinha e, parada 90 s, volta pro repouso depois de 10 s de aviso.
  *
  * Site: uma página do site num iframe, com a coruja no canto e a voz aberta.
- * Só existe com página aberta (pela voz, `abrir_pagina`); L1/R1 passam por ele
- * só nesse caso. PS, `voltar_coruja` ou 90 s sem ninguém fecham a página.
+ * Só existe com página aberta (pela voz, `abrir_pagina`); a barra só o mostra
+ * nesse caso. PS, `voltar_coruja` ou 90 s sem ninguém fecham a página.
+ * Troca de modo: barra (toque/mouse) e voz; L1/R1 não trocam mais (21/10).
  */
 import type { PaginaSite } from '../../../shared/stand/acoes-site.ts';
 
@@ -18,7 +19,7 @@ export type Modo = (typeof MODOS)[number];
 
 export const ROTULO_MODO: Record<Modo, string> = { coruja: 'Coruja', site: 'Site', vitrine: 'Vitrine', simulacao: 'Simulação' };
 
-/** Modos que a barra e o L1/R1 oferecem agora: Site só com página aberta. */
+/** Modos que a barra oferece agora: Site só com página aberta. */
 export function modosDisponiveis(estado: Pick<EstadoModo, 'pagina'>): readonly Modo[] {
   return estado.pagina ? MODOS : MODOS.filter((m) => m !== 'site');
 }
@@ -37,13 +38,12 @@ export interface EstadoModo {
   pausado: boolean;
   /** A barra de modos aparece até este instante (ms). */
   barraAte: number;
-  /** Página do site aberta no modo Site (fica guardada se L1/R1 passar pra outro modo). */
+  /** Página do site aberta no modo Site (fica guardada se a barra passar pra outro modo). */
   pagina: PaginaSite | null;
 }
 
 export type EntradaModo =
   | { tipo: 'ir'; modo: Modo }
-  | { tipo: 'passo'; direcao: 1 | -1 }
   | { tipo: 'atividade'; toque?: boolean }
   | { tipo: 'trocar_video'; direcao: 1 | -1 }
   | { tipo: 'pausar' }
@@ -97,11 +97,6 @@ export function reduzirModo(atual: EstadoModo, entrada: EntradaModo, agora: numb
       if (entrada.modo === 'site' && !atual.pagina) return { ...atual, marco: agora };
       if (entrada.modo === atual.modo) return { ...atual, marco: agora };
       return { ...atual, modo: entrada.modo, marco: agora, pausado: false };
-    case 'passo': {
-      const lista = modosDisponiveis(atual);
-      const indice = Math.max(0, lista.indexOf(atual.modo));
-      return { ...atual, modo: lista[girar(indice, entrada.direcao, lista.length)], marco: agora, pausado: false };
-    }
     case 'abrir_pagina':
       return { ...atual, modo: 'site', pagina: entrada.pagina, marco: agora, pausado: false };
     case 'voltar_coruja':

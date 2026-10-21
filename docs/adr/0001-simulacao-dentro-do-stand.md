@@ -20,7 +20,7 @@ A Simulação é um Modo do stand, ao lado da Coruja e da Vitrine, e roda dentro
 - liga a qualidade automática;
 - mostra o relógio do ESP32 virtual como Tempo do ensaio.
 
-O código do simulador é carregado sob demanda, e `preCarregarSimulador` adianta o carregamento quando a página está ociosa. O `/stand` cuida da troca de modo (L1/R1, PS, toque) e da saída depois de 90 s sem uso (`modoStand.ts`). Fora do kiosk, `/sompo` não muda.
+O código do simulador é carregado sob demanda, e `preCarregarSimulador` adianta o carregamento quando a página está ociosa. O `/stand` cuida da troca de modo (barra por toque ou mouse, voz, PS volta à Coruja) e da saída depois de 90 s sem uso (`modoStand.ts`). Desde 21/10, L1/R1 não trocam de aba (quem joga apertava sem querer) e a Simulação abre o Gameplay por padrão; o simulador clássico é a reserva automática (`GameplayOuClassico`) e pode ser forçado com `?simulacao=classica`. Fora do kiosk, `/sompo` não muda.
 
 ## Consequências
 

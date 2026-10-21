@@ -33,7 +33,7 @@ export function anguloAroRad(esterco: number) {
   return valor === 0 ? 0 : valor;
 }
 
-/** Índices do layout standard que o gameplay lê. PS (16), L1 (4) e R1 (5) são do /stand. */
+/** Índices do layout standard que o gameplay lê. PS (16) é do /stand; L1 (4) e R1 (5) não trocam mais de modo (21/10). */
 export const BOTAO_REINICIAR = 9; // Options
 const R2 = 7, L2 = 6;
 

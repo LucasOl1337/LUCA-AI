@@ -34,13 +34,14 @@ test('/stand?stub=1 liga o modo de teste e só aceita 1', () => {
   assert.equal(formatAppUrl({ page: 'sompo', stub: '1' }), '/sompo');
 });
 
-test('/stand?simulacao=gameplay sobrevive à URL canônica; outro valor ou outra página some', () => {
+test('/stand?simulacao=gameplay|classica sobrevive à URL canônica; outro valor ou outra página some', () => {
   assert.equal(formatAppUrl(parseAppLocation('/stand?simulacao=gameplay')), '/stand?simulacao=gameplay');
-  assert.equal(formatAppUrl(parseAppLocation('/stand?simulacao=classica')), '/stand');
+  // A reserva forçada precisa sobreviver: o SimuladorKiosk lê a URL já canônica.
+  assert.equal(formatAppUrl(parseAppLocation('/stand?simulacao=classica')), '/stand?simulacao=classica');
   assert.equal(formatAppUrl({ page: 'sompo', simulacao: 'gameplay' }), '/sompo');
 });
 
-test('URL canônica: só simulacao=gameplay passa a sobreviver; o resto segue apagado como antes', () => {
+test('URL canônica: só simulacao=gameplay|classica sobrevive; o resto segue apagado como antes', () => {
   const canonica = (href) => formatAppUrl(parseAppLocation(href));
   assert.equal(canonica('/stand'), '/stand');
   assert.equal(canonica('/stand?foo=1'), '/stand');

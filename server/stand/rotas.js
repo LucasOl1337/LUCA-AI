@@ -256,13 +256,14 @@ export function registerStandRoutes(app, {
     }
   });
 
-  // Um turno da conversa (provedor em turnos). Corpo: {conversa_id, texto, tela?} ou
+  // Um turno da conversa (provedor em turnos). Corpo: {conversa_id, texto, tela?, camera?} ou
   // {conversa_id, evento: 'saudacao' | 'video_terminou' | 'acao_falhou' | 'fim', id?}.
-  // `tela` (retrato da página do site) é dado do navegador: cerebro.js limpa e rotula.
+  // `tela` (retrato da página do site) e `camera` (presença de rosto detectada no
+  // navegador, sem imagem) são dados do navegador: cerebro.js limpa e rotula.
   // Resposta NDJSON, uma linha por item: {t:'frase'|'audio'|'evento'|'aviso'|'fim', ...}.
   // Um turno novo da mesma conversa aborta o anterior (barge-in).
   app.post('/api/stand/turno', async (req, res) => {
-    const { conversa_id: id, texto, evento, id: idVideo, tela } = req.body || {};
+    const { conversa_id: id, texto, evento, id: idVideo, tela, camera } = req.body || {};
     const conversa = conversas.get(String(id || ''));
     if (!conversa || conversa.conta !== conta(req)) return res.status(404).json({ ok: false, error: 'conversa_desconhecida' });
     const config = configStand(env, provedores);
@@ -284,7 +285,7 @@ export function registerStandRoutes(app, {
       : evento === 'video_terminou' ? { evento, id: String(idVideo || '').slice(0, 80) }
         // Falha na tela: fala pronta; não conta pergunta nem conversa.
         : evento === 'acao_falhou' ? { evento }
-          : { texto: String(texto || '').trim().slice(0, 500), tela: limparTela(tela) };
+          : { texto: String(texto || '').trim().slice(0, 500), tela: limparTela(tela), camera: limparTela(camera) };
     if (!entrada.evento && !entrada.texto) return res.status(400).json({ ok: false, error: 'texto_vazio' });
     if (entrada.texto) {
       conversa.perguntas = (conversa.perguntas ?? 0) + 1;

@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react';
 import type { BipeCabine } from './alertaCabine';
+import { somCompartilhado, type SomCompartilhado } from './somCompartilhado';
 
 /**
- * Bipe em Web Audio. Sem permissão de autoplay (kiosk sem
- * `--autoplay-policy=no-user-gesture-required`) fica mudo, sem erro na tela.
+ * Bipe em Web Audio, no contexto compartilhado da página (`somCompartilhado`).
+ * Sem permissão de áudio (nenhum gesto e nenhuma captura ativa) fica mudo, sem
+ * erro na tela, e volta a tocar no primeiro gesto.
  */
 export function useBipeCabine(bipe: BipeCabine | null) {
   const motor = useRef<MotorBipe | null>(null);
@@ -17,27 +19,30 @@ export function useBipeCabine(bipe: BipeCabine | null) {
   }, [intervalo, frequencia]);
 }
 
-interface MotorBipe { tocar(intervaloMs: number, frequenciaHz: number): void; parar(): void; fechar(): void }
+export interface MotorBipe { tocar(intervaloMs: number, frequenciaHz: number): void; parar(): void; fechar(): void }
 
 const DURACAO_BIPE_S = 0.09;
 const VOLUME = 0.18;
+/** Contexto ainda travado: tenta de novo a cada meio segundo. */
+const RETENTATIVA_MS = 500;
 
-export function criarMotorBipe(): MotorBipe {
-  let contexto: AudioContext | null = null;
+export function criarMotorBipe(som: SomCompartilhado = somCompartilhado): MotorBipe {
   let relogio: number | null = null;
+  let retentativa: number | null = null;
   let continuo: { osc: OscillatorNode; ganho: GainNode } | null = null;
+  /** Muda a cada `tocar`/`parar`: um resume que chega atrasado não toca o pedido velho. */
+  let geracao = 0;
 
-  const abrir = (): AudioContext | null => {
-    try {
-      contexto ??= new AudioContext({ latencyHint: 'interactive' });
-      if (contexto.state === 'suspended') void contexto.resume().catch(() => undefined);
-      return contexto.state === 'running' ? contexto : null;
-    } catch { return null; }
+  /** Contexto tocando agora, ou `null` (e pede o resume para a próxima vez). */
+  const pronto = (): AudioContext | null => {
+    const ctx = som.obter();
+    if (!ctx) return null;
+    if (ctx.state === 'running') return ctx;
+    void som.destravar();
+    return null;
   };
 
-  const bipar = (hz: number) => {
-    const ctx = abrir();
-    if (!ctx) return;
+  const bipar = (ctx: AudioContext, hz: number) => {
     const osc = ctx.createOscillator();
     const ganho = ctx.createGain();
     const agora = ctx.currentTime;
@@ -52,10 +57,24 @@ export function criarMotorBipe(): MotorBipe {
     osc.stop(agora + DURACAO_BIPE_S + 0.02);
   };
 
+  const ligarContinuo = (ctx: AudioContext, hz: number) => {
+    const osc = ctx.createOscillator();
+    const ganho = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = hz;
+    ganho.gain.value = VOLUME * 0.8;
+    osc.connect(ganho).connect(ctx.destination);
+    osc.start();
+    continuo = { osc, ganho };
+  };
+
   const parar = () => {
+    geracao += 1;
     if (relogio !== null) { window.clearInterval(relogio); relogio = null; }
+    if (retentativa !== null) { window.clearInterval(retentativa); retentativa = null; }
     if (continuo) {
       try { continuo.osc.stop(); } catch { /* já parado */ }
+      try { continuo.osc.disconnect(); } catch { /* já solto */ }
       continuo = null;
     }
   };
@@ -63,31 +82,32 @@ export function criarMotorBipe(): MotorBipe {
   const motor: MotorBipe = {
     tocar(intervaloMs, hz) {
       parar();
+      const minha = geracao;
       if (intervaloMs === 0) {
-        const ctx = abrir();
-        if (!ctx) {
-          // Autoplay ainda travado: tenta de novo no próximo ciclo sem insistir em erro.
-          relogio = window.setInterval(() => { if (abrir()) motor.tocar(0, hz); }, 500);
-          return;
-        }
-        const osc = ctx.createOscillator();
-        const ganho = ctx.createGain();
-        osc.type = 'square';
-        osc.frequency.value = hz;
-        ganho.gain.value = VOLUME * 0.8;
-        osc.connect(ganho).connect(ctx.destination);
-        osc.start();
-        continuo = { osc, ganho };
+        const ctx = pronto();
+        if (ctx) { ligarContinuo(ctx, hz); return; }
+        // Contexto ainda travado: o tom liga assim que destravar (resume ou gesto).
+        void som.destravar().then((ok) => {
+          if (ok && minha === geracao && !continuo) { const c = som.obter(); if (c) ligarContinuo(c, hz); }
+        });
+        retentativa = window.setInterval(() => {
+          const c = pronto();
+          if (!c || minha !== geracao) return;
+          if (retentativa !== null) { window.clearInterval(retentativa); retentativa = null; }
+          if (!continuo) ligarContinuo(c, hz);
+        }, RETENTATIVA_MS);
         return;
       }
-      bipar(hz);
-      relogio = window.setInterval(() => bipar(hz), intervaloMs);
+      const tique = () => { const ctx = pronto(); if (ctx) bipar(ctx, hz); };
+      const ctx = pronto();
+      if (ctx) bipar(ctx, hz);
+      // Recém-criado o contexto fica `suspended` por um instante: o 1º bipe sai quando ele destravar.
+      else void som.destravar().then((ok) => { if (ok && minha === geracao) { const c = som.obter(); if (c) bipar(c, hz); } });
+      relogio = window.setInterval(tique, intervaloMs);
     },
     parar,
-    fechar() {
-      parar();
-      if (contexto) { void contexto.close().catch(() => undefined); contexto = null; }
-    },
+    // O contexto é da página: quem só toca bipe nunca o fecha (a volta à Simulação herdaria um contexto travado).
+    fechar: parar,
   };
   return motor;
 }
