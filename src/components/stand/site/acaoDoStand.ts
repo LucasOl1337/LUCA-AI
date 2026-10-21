@@ -42,8 +42,8 @@ export function planejarAcao(acao: unknown, args: unknown, atual: { modo: Modo; 
 
 export interface DepsPlano {
   despacharModo(entrada: EntradaModoDaVoz): void;
-  /** Espera o Executor do iframe responder no caminho certo. */
-  aguardarExecutor(caminho: string): Promise<boolean>;
+  /** Espera o Executor do iframe responder no caminho certo (com o retrato da página, se mandar). */
+  aguardarExecutor(caminho: string): Promise<boolean | { retrato?: string }>;
   enviarAcaoSite(acao: string, args: Record<string, unknown>): Promise<{ ok: boolean; mensagem: string; retrato?: string }>;
 }
 
@@ -67,12 +67,26 @@ export async function executarPlano(plano: PlanoStand, deps: DepsPlano): Promise
   if (!plano.ok) return { ok: false, mensagem: plano.motivo };
   let mensagem = '';
   let retrato: string | undefined;
-  for (const passo of plano.passos) {
+  for (const [i, passo] of plano.passos.entries()) {
     if (passo.tipo === 'modo') {
       deps.despacharModo(passo.entrada);
+      if (passo.entrada.tipo === 'abrir_pagina') {
+        // Totem B3: "abrir página" só vale quando a página sobe no iframe; antes respondia "Abri" sem ver.
+        // Quando um controle vem depois, a espera é a dele (abaixo).
+        const proximo = plano.passos[i + 1];
+        if (proximo?.tipo === 'executor') { mensagem = `Abri a página ${passo.entrada.pagina}.`; continue; }
+        const caminho = caminhoDaPagina(passo.entrada.pagina);
+        const pronto = await deps.aguardarExecutor(caminho);
+        if (!pronto) {
+          deps.despacharModo({ tipo: 'voltar_coruja' });
+          return { ok: false, mensagem: `A página ${caminho} não carregou no stand; voltei pra coruja.` };
+        }
+        mensagem = `Abri a página ${passo.entrada.pagina}.`;
+        retrato = typeof pronto === 'object' ? pronto.retrato : undefined;
+        continue;
+      }
       mensagem = passo.entrada.tipo === 'voltar_coruja' ? 'Voltei pra coruja, sem página do site na tela.'
-        : passo.entrada.tipo === 'ir' ? 'Abri a Simulação do Trator MAX; a pessoa dirige no controle.'
-          : `Abri a página ${passo.entrada.pagina}.`;
+        : 'Abri a Simulação do Trator MAX; a pessoa dirige no controle.';
       continue;
     }
     if (!(await deps.aguardarExecutor(passo.caminho))) {

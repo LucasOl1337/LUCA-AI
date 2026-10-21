@@ -51,7 +51,7 @@ function StandExecutor() {
 
     canal.onmessage = (mensagem) => {
       const evento = mensagem.data;
-      if (responderPing(canal, evento, window.location.pathname)) return;
+      if (responderPing(canal, evento, window.location.pathname, () => retratoDaPagina(window.location.pathname, leitorDoDocumento(document)))) return;
       if (!ehEvento(evento)) return;
       fila = fila.then(async () => {
         const validado = validarAcaoSite(evento.acao, evento.args);

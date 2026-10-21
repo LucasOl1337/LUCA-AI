@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { criarVigiaConexao, TIMEOUT_SAUDE_MS, type Decisao } from './vigiaConexao';
 
 /** Only the stand opts into public, static offline content. Never cache auth. */
 export function useStandOffline(stand: boolean) {
@@ -7,19 +8,24 @@ export function useStandOffline(stand: boolean) {
     if (!stand) return;
     let disposed = false;
     let checking = false;
-    let wasOffline = !navigator.onLine;
-    const lost = () => { wasOffline = true; setOffline(true); };
+    const vigia = criarVigiaConexao(navigator.onLine);
+    const aplicar = (decisao: Decisao) => {
+      if (disposed) return;
+      if (decisao === 'recarregar') window.location.reload();
+      else if (decisao === 'offline') setOffline(true);
+      else if (decisao === 'online') setOffline(false);
+    };
+    const lost = () => aplicar(vigia.eventoOffline());
     const check = async () => {
       if (checking) return;
       checking = true;
       try {
-        const response = await fetch('/api/health', { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+        const response = await fetch('/api/health', { cache: 'no-store', signal: AbortSignal.timeout(TIMEOUT_SAUDE_MS) });
         const health: unknown = await response.json();
         if (!response.ok || !health || typeof health !== 'object' || !('ok' in health) || health.ok !== true) throw new Error('offline');
-        if (!disposed && wasOffline) window.location.reload();
-        else if (!disposed) setOffline(false);
+        aplicar(vigia.saudeOk());
       } catch {
-        if (!disposed) lost();
+        aplicar(vigia.falhaSaude(navigator.onLine));
       } finally { checking = false; }
     };
     const register = async () => {

@@ -3,7 +3,7 @@ import { ArrowDownToLine, ArrowLeft, ArrowRight, Check, ChevronRight, Compass, D
 import { useAuth } from '@/hooks/useAuth';
 import { parseLabCase, parseLabSite, associateLabSite, labCaseVehicle, getReplayFrame, formatLabTime, polygonDistance, type LabCase, type LabSite } from '../../shared/lab-telemetry.js';
 import { convertSompoDataset } from '../../shared/sompo-lab-export.js';
-import { createFarmDemo } from '../../shared/lab-farm-demo.js';
+import { createFarmDemo, FARM_DEMO_ROUTES } from '../../shared/lab-farm-demo.js';
 import LabEsp32Replay from '@/components/lab/LabEsp32Replay';
 // geofencing (módulo src/geofencing/lab): legenda, minimapa e painel de faixas do laboratório.
 import LabBandLegend from '@/geofencing/lab/LabBandLegend';
@@ -17,8 +17,7 @@ const LabScene = lazy(() => import('@/components/lab/LabScene'));
 const STEPS = ['Carregar caso', 'Explorar incidente', 'Investigar causas', 'Registrar conclusão'];
 const AXES = ['Operação e utilização', 'Saúde mecânica', 'Ambiente e localização', 'Revisão das evidências'];
 const emptyDraft = (): ConclusionDraft => ({ observations: '', category: 'inconclusive', action: 'Solicitar inspeção técnica', hypothesisReviews: [] });
-// A demonstração do caminhão é escrita para a fazenda de Fairfax; qualquer outra área não a oferece.
-const FARM_DEMO_SITE_ID = 'frying-pan-farm-fairfax-v1';
+// A demonstração do caminhão tem percurso escrito por área (Fairfax local; Piracicaba · Artemis fictícia no release público).
 const EXAMPLE_ICONS: Record<string, typeof Tractor> = { normal: Tractor, water: Waves, heat: Thermometer, 'piracicaba-normal': Tractor, 'piracicaba-slope': Compass };
 const prettyNumber = (value: unknown, digits = 0) => typeof value === 'number' ? value.toLocaleString('pt-BR', { maximumFractionDigits: digits }) : 'Indisponível';
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Não foi possível concluir. Tente novamente.';
@@ -252,7 +251,8 @@ export default function LaboratorioPage() {
     try { const result = await labRequest<{ case: SavedCase }>(`/${record.id}/conclusions`, draft); setRecord(result.case); setNotice('Conclusão registrada. A versão anterior foi preservada.'); await refreshLibrary(); }
     catch (reason) { setError(errorMessage(reason)); } finally { setBusy(''); }
   }
-  const farmDemoAvailable = farmSite?.manifest?.site?.id === FARM_DEMO_SITE_ID;
+  const farmDemoAvailable = Object.prototype.hasOwnProperty.call(FARM_DEMO_ROUTES, farmSite?.manifest?.site?.id ?? '');
+  const farmIsSynthetic = farmSite?.manifest?.synthetic === true;
   const hasHazards = useMemo(() => hazardsOf(labCase).length > 0, [labCase]);
   // Faixa mais interna no instante; a distância é medida de novo na posição do quadro, não no evento.
   const bandWarning = useMemo(() => {
@@ -279,11 +279,11 @@ export default function LaboratorioPage() {
       <section className={`lab-viewport ${sensorView ? 'lab-viewport-sensors' : ''}`} aria-label={sensorView ? 'Replay dos sensores ESP32' : 'Mapa e replay do caso'}>
         {labCase?.hasEsp32 && frame && sensorView ? <LabEsp32Replay labCase={labCase} frame={frame} /> : <>
         <Suspense fallback={<div className="lab-scene-loading"><LoaderCircle className="lab-spin" />Preparando o cenário…</div>}><LabScene labCase={labCase} site={selectedSite} elapsedMs={elapsedMs} cameraMode={cameraMode} selectedEventId={selectedEventId} onSelectEvent={selectEvent} showDetails={sceneDetails} onTerrain={sample => setLabTerrain(() => sample)} /></Suspense>
-        <div className="lab-scene-title"><span>{labCase ? labCase.synthetic ? 'DADOS SINTÉTICOS' : 'CASO IMPORTADO' : 'ÁREA REAL · EXPLORAÇÃO'}</span><h2>{labCase?.title || selectedSite?.manifest?.site?.name || 'Explore sua área'}</h2>{!labCase && <p>Explore a imagem e os limites. Sem telemetria, a posição do equipamento está indisponível.</p>}</div>
+        <div className="lab-scene-title"><span>{labCase ? labCase.synthetic ? 'DADOS SINTÉTICOS' : 'CASO IMPORTADO' : selectedSite?.manifest?.synthetic ? 'DEMONSTRAÇÃO · ÁREA FICTÍCIA' : 'ÁREA REAL · EXPLORAÇÃO'}</span><h2>{labCase?.title || selectedSite?.manifest?.site?.name || 'Explore sua área'}</h2>{!labCase && <p>Explore a imagem e os limites. Sem telemetria, a posição do equipamento está indisponível.</p>}</div>
         <div className="lab-camera-control" role="group" aria-label="Câmera">{([{ id: 'follow', label: 'Acompanhar', icon: Tractor }, { id: 'top', label: 'Superior', icon: Map }, { id: 'free', label: 'Livre', icon: Compass }] as const).map(item => <button key={item.id} disabled={item.id === 'follow' && !frame} aria-pressed={cameraMode === item.id} onClick={() => setCameraMode(item.id)}><item.icon size={15} /><span>{item.label}</span></button>)}</div>
         <button className="lab-map-details-button" aria-pressed={sceneDetails} onClick={() => setSceneDetails(value => !value)}>{sceneDetails ? 'Ocultar detalhes' : 'Camadas e fontes'}</button>
         {sceneDetails && labCase && <LabBandLegend labCase={labCase} />}
-        {!labCase && !sceneDetails && farmDemoAvailable && <div className="lab-demo-start"><strong>Veja a máquina no campo</strong><p>Acompanhe um percurso de demonstração na fazenda.</p><button disabled={!farmSite || !!busy} onClick={openFarmDemo}><Play size={16} />Ver caminhão em movimento</button><small>Percurso sintético · cenário real</small></div>}
+        {!labCase && !sceneDetails && farmDemoAvailable && <div className="lab-demo-start"><strong>Veja a máquina no campo</strong><p>Acompanhe um percurso de demonstração na fazenda.</p><button disabled={!farmSite || !!busy} onClick={openFarmDemo}><Play size={16} />Ver caminhão em movimento</button><small>{farmIsSynthetic ? 'DEMONSTRAÇÃO · percurso e área fictícios' : 'Percurso sintético · cenário real'}</small></div>}
         {labCase?.manifest?.demo === 'farm-truck-v1' && <span className="lab-demo-badge">DEMONSTRAÇÃO · PERCURSO SINTÉTICO</span>}
         {labCase && frame?.position && (sceneDetails || frame.activeEvents.length > 0) && <div className={`lab-scene-signal ${frame?.activeEvents.length || frame?.gap ? 'has-warning' : ''}`} data-lab-signal>{frame?.gap ? <WifiOff size={17} /> : frame?.activeEvents.length ? <ScanLine size={17} /> : <ShieldCheck size={17} />}<span>{currentWarnings}</span></div>}
         {labCase && !labCase.hasEsp32 && <div className="lab-sensors" aria-label="Sensores no instante do replay"><div><span>Velocidade <small>GNSS</small></span><strong data-lab-speed>{prettyNumber(frame?.sample.ground_speed_kmh, 1)}<em>{typeof frame?.sample.ground_speed_kmh === 'number' ? 'km/h' : ''}</em></strong></div><div><span>Motor <small>CAN / ECU</small></span><strong>{prettyNumber(frame?.sample.engine_rpm)}<em>{typeof frame?.sample.engine_rpm === 'number' ? 'rpm' : ''}</em></strong></div><div><span>Arrefecimento <small>CAN / ECU</small></span><strong className={Number(frame?.sample.coolant_temp_c) >= 105 ? 'lab-hot' : ''}>{prettyNumber(frame?.sample.coolant_temp_c, 1)}<em>{typeof frame?.sample.coolant_temp_c === 'number' ? '°C' : ''}</em></strong></div></div>}
