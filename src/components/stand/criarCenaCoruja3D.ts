@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { restoreSompoTextures, useSompoExternalTextures } from '../sompo/restoreSompoTextures';
+import { soltarLutCompartilhada } from '../sompo/soltarLutCompartilhada';
 import type { EstadoVoz } from './canal';
 import {
   CLIPE_ENTRADA, CLIPE_POR_VOZ, CORUJA_3D_URL, CROSSFADE_S, ENQUADRAMENTO, MORPH_BICO, MORPH_PISCAR, OSSO_PESCOCO,
@@ -231,6 +232,7 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
   return {
     dispose() {
       encerrado = true;
+      soltarLutCompartilhada(renderer, cena);
       abortar.abort();
       cancelAnimationFrame(quadro);
       observador.disconnect();
