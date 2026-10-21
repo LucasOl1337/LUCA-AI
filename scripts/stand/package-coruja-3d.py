@@ -303,10 +303,12 @@ proveniencia = {
         'decimate': {'type': 'COLLAPSE', 'ratio': round(mod.ratio, 4), 'delimit': ['SEAM', 'UV']},
         'atlas': ATLAS, 'jpegQuality': QUALIDADE_JPEG,
         'emissive': 'frisos azul-claros da cor base (visor, fones, microfone), 512 px',
-        'rosto': 'malha CorujaRosto (100% tripo::Head_2) com morph targets piscar e bico_abre, '
-                 'scripts/stand/coruja3d_rosto.py',
+        'rosto': 'malha CorujaRosto (100% tripo::Head_2) com morph targets piscar e bico_abre e interior '
+                 'da boca no material coruja-3d-boca (sem textura), e bico_abre na malha principal '
+                 '(só o bico de cima dobra para cima), scripts/stand/coruja3d_rosto.py',
     },
-    'morphTargets': [k.name for k in rosto.data.shape_keys.key_blocks[1:]],
+    'morphTargets': {o.name: [k.name for k in o.data.shape_keys.key_blocks[1:]]
+                     for o in (mesh, rosto) if o.data.shape_keys},
     'animations': {a.name: round(a.frame_range[1] - a.frame_range[0]) for a in bpy.data.actions},
     'fps': FPS,
     'triangles': tris,
