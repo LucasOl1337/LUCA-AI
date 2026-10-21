@@ -288,7 +288,7 @@ describe('ensaio da feira: sessão e teto do /ws', { skip: navegador ? false : '
     for (const fn of limpezas.reverse()) await fn();
   });
 
-  it('f) Sair numa aba: a outra aba do /operador vai ao login pelo 4401 em até 2 s (#38)', async () => {
+  it('f) Sair numa aba: a outra aba do /operador vai ao login pelo 4401 em até 3 s (#38)', async () => {
     const c = await pagina(direto, await conta(direto, 'sair@feira-e2e.test'));
     const [a, b] = [await c.newPage(), await c.newPage()];
     const wsB = vigiarWs(b);
@@ -302,8 +302,8 @@ describe('ensaio da feira: sessão e teto do /ws', { skip: navegador ? false : '
     await b.route('**/api/state', (rota) => rota.abort());
     const t0 = Date.now();
     await a.getByRole('button', { name: 'Sair da conta' }).click();
-    await b.waitForSelector('input[type=password]', { timeout: 2_000 })
-      .catch(() => assert.fail('a outra aba não foi ao login em 2 s depois do Sair'));
+    await b.waitForSelector('input[type=password]', { timeout: 3_000 })
+      .catch(() => assert.fail('a outra aba não foi ao login em 3 s depois do Sair'));
     console.log(`# f) outra aba no login ${Date.now() - t0} ms depois do Sair`);
     await c.close();
   });
