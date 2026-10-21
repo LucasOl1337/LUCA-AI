@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  conexaoDaMesmaOrigem, criarGameplayAoVivo, normalizarRetrato, RETRATO_MAX_BYTES, RETRATO_INTERVALO_MIN_MS, TIPO_RETRATO,
+  conexaoDaMesmaOrigem, criarGameplayAoVivo, normalizarRetrato, normalizarSono, RETRATO_MAX_BYTES, RETRATO_INTERVALO_MIN_MS, TIPO_RETRATO,
 } from './gameplay-ao-vivo.js';
 
 const retratoValido = (o = {}) => ({
@@ -101,4 +101,28 @@ test('tablet que conecta depois recebe o último retrato da própria conta, se r
   const tarde = socket('A');
   ao.aoConectar(tarde);
   assert.equal(tarde.recebidas.length, 0);
+});
+
+// Webcam de sonolência no /gameplay?webcam=1 (opção do CP3): só status e tempo, nunca imagem.
+test('campo opcional sono: remontado, repassado ao tablet e ao que abre depois; lixo é descartado', () => {
+  let t = 0;
+  const ao = criarGameplayAoVivo({ agora: () => t });
+  const totem = socket('A'), tablet = socket('A');
+  const env = (extra) => { t += RETRATO_INTERVALO_MIN_MS; return ao.receber(totem, JSON.stringify({ kind: TIPO_RETRATO, estado: retratoValido(), ...extra }), { clientes: [totem, tablet] }); };
+  assert.equal(env({ sono: { status: 'alarm', closedMs: 1200, frame: 'data:image/png;base64,xx' } }), 'repassado');
+  assert.deepEqual(tablet.recebidas.at(-1).sono, { status: 'alarm', closedMs: 1200 }, 'só os dois campos conhecidos');
+  const tarde = socket('A');
+  ao.aoConectar(tarde);
+  assert.deepEqual(tarde.recebidas[0].sono, { status: 'alarm', closedMs: 1200 });
+  for (const sono of [{ status: 'dormindo', closedMs: 0 }, { status: 'open', closedMs: -1 }, { status: 'open', closedMs: '0' }, { status: 'open' }, 'alarm', null]) {
+    assert.equal(env({ sono }), 'descartado:formato', JSON.stringify(sono));
+  }
+  assert.equal(env({}), 'repassado');
+  assert.equal('sono' in tablet.recebidas.at(-1), false, 'webcam desligada: o campo some');
+});
+
+test('normalizarSono: ausente fica ausente, inválido vira null', () => {
+  assert.equal(normalizarSono(undefined), undefined);
+  assert.equal(normalizarSono({ status: 'unknown', closedMs: 0 }).status, 'unknown');
+  assert.equal(normalizarSono({ status: 'closed', closedMs: Infinity }), null);
 });
