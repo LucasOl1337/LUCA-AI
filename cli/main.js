@@ -13,7 +13,7 @@ export function help(prefix = '') {
   for (const c of matches) {
     lines.push(`  ${c.name}${c.args.map(arg => ` <${arg}>`).join('')}  ${c.description}`);
     if (matches.length === 1) {
-      lines.push(`    ${c.method ? `${c.method} ${c.path} · autenticação: ${c.auth}` : 'Local, sem conexão ao servidor.'}`);
+      lines.push(`    ${c.method ? `${c.method} ${c.path} · autenticação: ${c.auth}` : (c.network ? 'Só GET, sem sessão, contra a origem escolhida.' : 'Local, sem conexão ao servidor.')}`);
       for (const f of c.fields) lines.push(`    --${f.name} <${f.type}>${f.required ? ' (obrigatório, ou no --data)' : ''}${f.description ? `: ${f.description}` : ''}`);
       if (c.example) lines.push(`    Exemplo: luca ${c.example}`);
     }
@@ -86,6 +86,16 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   }
   if (!command.method && !command.raw) {
     if (options.query) throw new CliError('unsupported_option', '--query só vale para comandos HTTP.');
+    if (command.network) {
+      const { checarFeira, planoDaFeira } = await import('./feira.js');
+      const { normalizeOrigin } = await import('./config.js');
+      const origem = fields.url ? normalizeOrigin(fields.url) : (await loadConfig(options, env)).url;
+      if (options['dry-run']) return emit({ dryRun: true, command: command.name, method: 'GET', urls: planoDaFeira(origem) }, options);
+      const report = await checarFeira(origem, { timeout: numberOption(options.timeout, 'timeout', 15000) });
+      await emit(report, options);
+      if (!report.ok) process.exitCode = 1;
+      return;
+    }
     if (options['dry-run']) return emit({ dryRun: true, command: command.name, args, fields: redact(fields) }, options);
     const { runLocal } = await import('./local.js');
     return emit(await runLocal(command.name, fields, data), options);

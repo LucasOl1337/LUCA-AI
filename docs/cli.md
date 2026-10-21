@@ -213,6 +213,12 @@ luca api POST /api/mission/context --data @contexto.json
 
 Suporte/impersonação gira o cookie do perfil, preservando o fluxo de retorno ao admin. Overrides de personas são locais ao LUCA; não escrevem no Yume. O comando `api` aceita somente caminhos `/api/` da origem selecionada, nunca URLs arbitrárias, e usa o mesmo transporte/autenticação. Não expõe shell remoto ou bypass de permissão.
 
+```bash
+luca feira checar --url https://luca-ai.com.br --pretty
+```
+
+`feira checar` confere o dia da feira só com GET e sem sessão (vale contra produção). Ele cobre health e versão, `/api/state` em 401, os chunks reais de `/stand`, `/gameplay`, `/operador` e `/totem` (um asset do tamanho do `index.html` é o fallback SPA, ou seja, release errada), o GLB da coruja (ausente é só aviso) e a `Permissions-Policy` (o `/stand` precisa de `microphone=(self)`). A saída é JSON com `ok`, `falhas` e `checks`, e o comando sai com código 1 se algo falhar. `--dry-run` lista as URLs sem rede. Roteiro da equipe em [feira.md](feira.md).
+
 ## Saída e erros para agentes
 
 Respostas JSON preservam a estrutura da API. `--pretty` indenta; `--output arquivo` salva o conteúdo e devolve `{ok,output,bytes}`. Anexos, avatars, frames, artefatos, relatórios e CSV pedem `--output`; `--output -` envia bytes para stdout. Falha HTTP não grava um arquivo de erro no destino solicitado.
