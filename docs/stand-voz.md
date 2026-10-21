@@ -13,12 +13,12 @@ Leia ao mudar a conversa por voz do `/stand`: quem ouve, quem pensa, quem fala, 
 
 ### Voz da coruja (seletor do Totem)
 
-Pedido do Lucas em 21/10: antes de abrir o stand, a página `/totem` mostra "Voz da coruja" com duas opções, **Lucas Oliveira** (padrão) e **Andrea Lot** (voz pública da Voice Library, `HOfBIVLhom4mc9WvXfyH`). A escolha fica no `localStorage` do quiosque (`luca:totem:voz`, com try/catch; sem armazenamento vale o padrão) e vai como `voz:'lucas'|'andrea'` em cada `POST /sessao`.
+Pedido do Lucas em 21/10: antes de abrir o stand, a página `/totem` mostra "Voz da coruja" com **Lucas Oliveira** (padrão) e vozes públicas da Voice Library: **Fêmea 1** (`femea1`, "Roberta", `ohZOfA9iwlZ5nOsoY7LB`), **Otto** (`otto`, `ycxdm1PRMs962FxyyuJ0`), **Locutor grave** (`locutor`, "Leonardo", `4XmhZ74tBbUVCXIYNMMo`) e **Andrea Lot** (`andrea`, `HOfBIVLhom4mc9WvXfyH`). As três primeiras entraram no mesmo dia, a pedido do Lucas, e já foram adicionadas à conta. A escolha fica no `localStorage` do quiosque (`luca:totem:voz`, com try/catch; sem armazenamento vale o padrão) e vai como `voz:'<chave>'` em cada `POST /sessao`.
 
 - **Lista branca.** O servidor só aceita as chaves de `VOZES_STAND` (`server/stand/provedor-elevenlabs.js`). Qualquer outra coisa, inclusive um `voice_id`, vira `lucas`. `lucas` segue `LUCA_STAND_VOZ`.
 - **Por conversa.** A voz fica na conversa (`conversa.voz`) e vale para saudação, respostas e falas prontas daquela sessão. O cache das falas prontas é por voz e modelo.
 - **Voz fora da conta.** Voz da biblioteca só funciona depois de adicionada à conta. Antes de usar, `verificarVoz` faz `GET /v1/voices/{id}` (cache de 10 min). Se falhar, a sessão sai com `voz:'lucas'` e `voz_aviso:{pedida:'andrea', motivo:'voz_indisponivel'}`, e o `status` traz `vozes[].disponivel:false`, que desliga a opção no Totem. Em 21/10 a dona da voz deixou o compartilhamento desligado: a API e o site respondem "Sharing is not enabled for voice", então a Andrea aparece indisponível até ela religar e alguém adicionar a voz à conta do stand. Não precisa de deploy quando isso acontecer.
-- **Custo.** A Andrea tem `rate` 1,0 na biblioteca: o TTS conta o mesmo crédito por caractere que a voz do Lucas, e o teto diário não muda.
+- **Custo.** Todas as vozes da biblioteca na lista têm `rate` 1,0: o TTS conta o mesmo crédito por caractere que a voz do Lucas, e o teto diário não muda.
 
 Sem a credencial do provedor escolhido, `GET /api/stand/status` responde `ligado:false` com `motivo:'sem_credencial'`, e o stand abre sem voz.
 

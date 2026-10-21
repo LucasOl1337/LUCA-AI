@@ -151,7 +151,8 @@ function fetchElevenlabs(pedidos = [], { andrea = true } = {}) {
   return async (url, init = {}) => {
     pedidos.push({ url: String(url), init });
     const u = String(url);
-    if (u.endsWith(`/v1/voices/${VOZ_ANDREA}`)) return new Response('{}', { status: andrea ? 200 : 404 });
+    const voz = u.match(/\/v1\/voices\/([A-Za-z0-9]+)$/);
+    if (voz) return new Response('{}', { status: !andrea && voz[1] === VOZ_ANDREA ? 404 : 200 });
     if (u.endsWith('/v1/single-use-token/realtime_scribe')) return new Response(JSON.stringify({ token: 'scribe-uso-unico' }), { status: 200 });
     if (u.includes('/v2/voices')) return new Response(JSON.stringify({ voices: [{ name: 'Lucas Oliveira', voice_id: VOZ_ID }, { name: 'Outra', voice_id: 'x' }] }), { status: 200 });
     if (u.includes('/v1/text-to-speech/')) return new Response(new Uint8Array([1, 0, 2, 0, 3]), { status: 200 });
@@ -316,11 +317,27 @@ test('voz: Andrea fora da conta cai no Lucas com aviso; status mostra indisponí
   const status = await (await pedir('/api/stand/status')).json();
   assert.deepEqual(status.vozes, [
     { chave: 'lucas', rotulo: 'Lucas Oliveira', padrao: true, disponivel: true },
+    // ainda não conferidas: o status dispara a conferência em segundo plano
+    { chave: 'femea1', rotulo: 'Fêmea 1', padrao: false, disponivel: null },
+    { chave: 'otto', rotulo: 'Otto', padrao: false, disponivel: null },
+    { chave: 'locutor', rotulo: 'Locutor grave', padrao: false, disponivel: null },
     { chave: 'andrea', rotulo: 'Andrea Lot', padrao: false, disponivel: false },
   ]);
   const conferencias = pedidos.filter((p) => p.url.endsWith(`/v1/voices/${VOZ_ANDREA}`)).length;
   await pedir('/api/stand/sessao', { voz: 'andrea' });
   assert.equal(pedidos.filter((p) => p.url.endsWith(`/v1/voices/${VOZ_ANDREA}`)).length, conferencias, 'conferência fica em cache');
+});
+
+test('voz: Fêmea 1, Otto e Locutor grave usam o voice_id da lista branca', async (t) => {
+  const pedidos = [];
+  const pedir = await subir11(t, { pedidos });
+  for (const [chave, id] of [['femea1', 'ohZOfA9iwlZ5nOsoY7LB'], ['otto', 'ycxdm1PRMs962FxyyuJ0'], ['locutor', '4XmhZ74tBbUVCXIYNMMo']]) {
+    pedidos.length = 0;
+    const corpo = await (await pedir('/api/stand/sessao', { voz: chave })).json();
+    assert.equal(corpo.voz, chave);
+    await linhasNdjson(await pedir('/api/stand/turno', { conversa_id: corpo.conversa_id, texto: 'oi' }));
+    assert.deepEqual([...new Set(ttsDe(pedidos))], [id], chave);
+  }
 });
 
 test('voz: créditos da Andrea contam igual (rate 1,0 da biblioteca)', async (t) => {

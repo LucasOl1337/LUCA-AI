@@ -3,11 +3,14 @@
  * navegador guarda e manda só a chave; o servidor confere numa lista branca
  * (`VOZES_STAND` em server/stand/provedor-elevenlabs.js) e nunca aceita voice_id.
  */
-export type ChaveVoz = 'lucas' | 'andrea';
+export type ChaveVoz = 'lucas' | 'femea1' | 'otto' | 'locutor' | 'andrea';
 
 export const VOZ_PADRAO: ChaveVoz = 'lucas';
 export const VOZES_TOTEM: ReadonlyArray<{ chave: ChaveVoz; rotulo: string; detalhe: string }> = [
   { chave: 'lucas', rotulo: 'Lucas Oliveira', detalhe: 'Voz padrão do LUCA' },
+  { chave: 'femea1', rotulo: 'Fêmea 1', detalhe: 'Voz feminina, leve e clara' },
+  { chave: 'otto', rotulo: 'Otto', detalhe: 'Voz masculina intensa' },
+  { chave: 'locutor', rotulo: 'Locutor grave', detalhe: 'Voz masculina grave de narrador' },
   { chave: 'andrea', rotulo: 'Andrea Lot', detalhe: 'Voz feminina de narradora brasileira' },
 ];
 

@@ -15,13 +15,19 @@ const VOZ_ID = /^[A-Za-z0-9]{20}$/;
 /**
  * Vozes que o Totem deixa escolher antes da conversa (Lucas, 21/10). Lista
  * branca: o navegador manda só a chave; nome e voice_id ficam aqui. `lucas`
- * segue `LUCA_STAND_VOZ` (padrão "Lucas Oliveira"). A Andrea é voz pública da
- * Voice Library (rate 1,0: custa o mesmo crédito por caractere); só funciona
- * depois de adicionada à conta, por isso `verificarVoz` confere antes de usar.
+ * segue `LUCA_STAND_VOZ` (padrão "Lucas Oliveira"). As outras são vozes públicas
+ * da Voice Library (todas com rate 1,0: custam o mesmo crédito por caractere);
+ * só funcionam depois de adicionadas à conta, por isso `verificarVoz` confere
+ * antes de usar. Fêmea 1, Otto e Locutor grave entraram em 21/10 (pedido do
+ * Lucas) e já estão na conta; a Andrea segue na lista e volta sozinha quando a
+ * dona religar o compartilhamento e ela for adicionada.
  */
 export const VOZ_STAND_PADRAO = 'lucas';
 export const VOZES_STAND = Object.freeze({
   lucas: Object.freeze({ rotulo: 'Lucas Oliveira', voz: null }),
+  femea1: Object.freeze({ rotulo: 'Fêmea 1', voz: 'ohZOfA9iwlZ5nOsoY7LB' }),
+  otto: Object.freeze({ rotulo: 'Otto', voz: 'ycxdm1PRMs962FxyyuJ0' }),
+  locutor: Object.freeze({ rotulo: 'Locutor grave', voz: '4XmhZ74tBbUVCXIYNMMo' }),
   andrea: Object.freeze({ rotulo: 'Andrea Lot', voz: 'HOfBIVLhom4mc9WvXfyH' }),
 });
 

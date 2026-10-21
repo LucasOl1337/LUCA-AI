@@ -732,7 +732,7 @@ Abrir sessão de voz: token efêmero, conexão, configuração e conversa_id no 
 
 `POST /api/stand/sessao`; autenticação: **session**.
 
-`--origem` (string): toque (padrão) ou escuta; só entra na contagem do dia<br>`--voz` (string): lucas (padrão) ou andrea; fora da lista branca vira lucas, voz fora da conta volta com voz_aviso
+`--origem` (string): toque (padrão) ou escuta; só entra na contagem do dia<br>`--voz` (string): lucas (padrão), femea1, otto, locutor ou andrea; fora da lista branca vira lucas, voz fora da conta volta com voz_aviso
 
 ### `stand turno`
 
