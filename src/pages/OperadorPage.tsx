@@ -45,7 +45,9 @@ const relogio = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(m
 /** Só desenho: serve ao teste SSR e ao print. */
 export function OperadorVista({ retrato, agora, som, oculto = false, aoTrocarSom }: { retrato: RetratoAoVivo | null; agora: number; som: boolean; oculto?: boolean; aoTrocarSom?: () => void }) {
   const sinal = sinalAoVivo(retrato, agora);
-  const selo = sinal.nivel === 'ao-vivo' ? 'Ao vivo' : sinal.nivel === 'sem-sinal' ? `Sem sinal há ${sinal.segundos} s` : 'Aguardando o totem';
+  const selo = sinal.nivel === 'ao-vivo' ? 'Ao vivo'
+    : sinal.nivel === 'pausado' ? 'Jogo pausado no totem'
+    : sinal.nivel === 'sem-sinal' ? `Sem sinal há ${sinal.segundos} s` : 'Aguardando o totem';
   const painel = retrato ? alertaCabine(retrato.estado) : null;
   return (
     <section className="operador" data-sinal={sinal.nivel} data-oculto={oculto || undefined} aria-labelledby="operador-titulo">

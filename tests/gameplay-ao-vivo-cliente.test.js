@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { loadFrontendModule } from './support/load-frontend-module.js';
 
-const { criarAoVivo, sinalAoVivo, ENVIO_INTERVALO_MS, SEM_SINAL_MS, TIPO_RETRATO } = await loadFrontendModule('../../src/lib/gameplayAoVivo.ts');
+const { criarAoVivo, sinalAoVivo, ENVIO_INTERVALO_MS, SEM_SINAL_MS, PAUSADO_MAX_MS, TIPO_RETRATO } = await loadFrontendModule('../../src/lib/gameplayAoVivo.ts');
 
 const estado = (x = 0) => ({ versao: 1, fase: 'dirigindo', maquina: { x } });
 
@@ -53,4 +53,39 @@ test('assinante é avisado a cada retrato e pode cancelar', () => {
   cancelar();
   ao.receber(estado());
   assert.equal(avisos, 1);
+});
+
+// Ensaio da feira (item 7, C3): aba do totem oculta deixava o tablet em "ao vivo" com o retrato congelado.
+test('aba oculta: totem avisa já (ou no fim do intervalo) e o tablet mostra pausado, não sem sinal', () => {
+  let t = 1000;
+  const agendados = [];
+  const ao = criarAoVivo(() => t, (fn, ms) => agendados.push({ fn, ms }));
+  const enviados = [];
+  ao.ligar((texto) => enviados.push(JSON.parse(texto)));
+  ao.enviar(estado(1));
+  assert.equal('oculto' in enviados[0], false);
+  t += 100;
+  ao.marcarOculto(true);
+  assert.equal(enviados.length, 1, 'dentro do intervalo: agenda, não fura os 5 Hz');
+  assert.equal(agendados[0].ms, ENVIO_INTERVALO_MS - 100);
+  t += agendados[0].ms; agendados[0].fn();
+  assert.deepEqual(enviados.at(-1), { kind: TIPO_RETRATO, estado: estado(1), oculto: true });
+  t += 1000;
+  ao.marcarOculto(false);
+  assert.equal(enviados.length, 3, 'fora do intervalo: avisa na hora');
+  assert.equal('oculto' in enviados.at(-1), false);
+  ao.esquecer();
+  t += 1000;
+  ao.marcarOculto(true);
+  assert.equal(enviados.length, 3, 'gameplay desmontado: não reenvia retrato velho');
+});
+
+test('tablet: pausado mostra há quanto tempo; depois de PAUSADO_MAX_MS volta a sem sinal', () => {
+  const t = 100_000;
+  const ao = criarAoVivo(() => t);
+  ao.receber(estado(), 30_000, true);
+  assert.deepEqual(sinalAoVivo(ao.ler(), t), { nivel: 'pausado', segundos: 30 });
+  assert.equal(sinalAoVivo(ao.ler(), t + PAUSADO_MAX_MS).nivel, 'sem-sinal');
+  ao.receber(estado());
+  assert.deepEqual(sinalAoVivo(ao.ler(), t), { nivel: 'ao-vivo' });
 });
