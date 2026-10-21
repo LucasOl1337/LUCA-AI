@@ -170,6 +170,15 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
   observador.observe(canvas.closest('svg') ?? canvas);
   enquadrar();
 
+  // GPU reiniciada ou contexto tomado: o canvas pararia; cai na Coruja A pelo mesmo caminho de erro.
+  const contextoPerdido = (evento: Event) => {
+    evento.preventDefault();
+    if (encerrado) return;
+    cancelAnimationFrame(quadro);
+    aoFalhar(new Error('Coruja 3D: contexto WebGL perdido'));
+  };
+  canvas.addEventListener('webglcontextlost', contextoPerdido);
+
   (async () => {
     const resposta = await fetch(CORUJA_3D_URL, { signal: abortar.signal });
     if (!resposta.ok) throw new Error(`Coruja 3D: HTTP ${resposta.status}`);
@@ -235,6 +244,7 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
   return {
     dispose() {
       encerrado = true;
+      canvas.removeEventListener('webglcontextlost', contextoPerdido);
       soltarLutCompartilhada(renderer, cena);
       abortar.abort();
       cancelAnimationFrame(quadro);
@@ -244,6 +254,7 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
       if (modelo) liberar(modelo);
       ambiente.dispose();
       renderer.dispose();
+      renderer.forceContextLoss();
     },
   };
 }

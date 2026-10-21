@@ -639,6 +639,7 @@ export function mountSensorLab(container: HTMLElement, options: SensorLabOptions
       post.dispose();
       environment.dispose();
       renderer.dispose();
+      renderer.forceContextLoss();
       renderer.domElement.remove();
       if (debugTarget.__sensorLab) delete debugTarget.__sensorLab;
     },
