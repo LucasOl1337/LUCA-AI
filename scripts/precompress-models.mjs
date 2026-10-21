@@ -1,4 +1,5 @@
-// Writes Brotli siblings (model.glb.br) for built GLBs; served by server/precompressed-models.js.
+// Writes Brotli siblings (model.glb.br) for every built GLB (models/ and the
+// stand avatar); served by server/precompressed-models.js.
 // Skips files that shrink less than 10% (GLBs with embedded JPEG/PNG textures).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,5 +19,5 @@ function walk(dir) {
     before += data.length; after += packed.length;
   }
 }
-walk(path.join(root, 'models'));
+walk(root);
 console.log(`precompress-models: ${(before / 1e6).toFixed(1)} MB -> ${(after / 1e6).toFixed(1)} MB (br)`);

@@ -56,3 +56,24 @@ test('precompressed lookup never leaves the served root', async () => {
     assert.notEqual(bad.res.headers['content-encoding'], 'br');
   } finally { close(); }
 });
+
+test('precompress-models comprime o GLB do avatar do stand, fora de models/ (coruja 3D, 1,6 MB → ~1 MB)', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const root = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'luca-br-dist-'));
+  try {
+    const glb = Buffer.from('glTF'.repeat(8192));
+    const textura = (await import('node:crypto')).randomBytes(32768);
+    for (const rel of ['models/arvore.glb', 'stand/avatar/coruja-3d/coruja-3d.glb']) {
+      fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+      fs.writeFileSync(path.join(root, rel), glb);
+    }
+    fs.writeFileSync(path.join(root, 'stand/avatar/textura.glb'), textura);
+    const script = new URL('../scripts/precompress-models.mjs', import.meta.url).pathname;
+    const run = spawnSync(process.execPath, [script, root], { encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stderr);
+    for (const rel of ['models/arvore.glb', 'stand/avatar/coruja-3d/coruja-3d.glb']) {
+      assert.deepEqual(zlib.brotliDecompressSync(fs.readFileSync(path.join(root, `${rel}.br`))), glb, rel);
+    }
+    assert.equal(fs.existsSync(path.join(root, 'stand/avatar/textura.glb.br')), false, 'quem encolhe menos de 10% fica sem .br');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
