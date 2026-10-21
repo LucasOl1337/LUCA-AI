@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
+import { cabecalhosDeSeguranca } from '../server/cabecalhos-seguranca.js';
 
 const RAIZ = fileURLToPath(new URL('..', import.meta.url));
 const TIPOS = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2' };
@@ -73,6 +74,8 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
 
     servidor = createServer(async (req, res) => {
       const url = new URL(req.url, 'http://x');
+      // Cabeçalhos de produção: a Permissions-Policy de cada página vale para o documento inteiro.
+      for (const [nome, valor] of Object.entries(cabecalhosDeSeguranca(url.pathname))) res.setHeader(nome, valor);
       const json = (status, corpo) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(corpo)); };
       if (url.pathname === '/api/health') return json(200, { ok: true });
       if (url.pathname === '/api/auth/session') {
@@ -361,6 +364,34 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
     } finally {
       escutaNoServidor = false;
       await semFlag.close();
+    }
+  });
+
+  it('/totem → "Abrir Totem" carrega o documento do /stand e o microfone abre (20/10)', async () => {
+    // /totem vem com microphone=(); por pushState o /stand herdava a política e o
+    // getUserMedia caía em "Permissions policy violation" (escuta=erro).
+    escutaNoServidor = true;
+    const pagina = await browser.newPage();
+    const avisos = [];
+    pagina.on('console', (m) => avisos.push(m.text()));
+    try {
+      await pagina.goto(`${base}/totem`);
+      await pagina.evaluate(() => { window.__mesmoDocumento = true; });
+      await pagina.getByRole('button', { name: 'Abrir Totem' }).click();
+      await pagina.waitForURL(`${base}/stand/`);
+      await pagina.locator('main.stand[data-escuta="ouvindo"]').waitFor({ timeout: 15000 });
+      assert.equal(await pagina.evaluate(() => window.__mesmoDocumento ?? false), false, 'o /stand é documento novo');
+      assert.equal(await pagina.evaluate(() => document.featurePolicy?.allowsFeature('microphone') ?? true), true);
+      assert.ok(!avisos.some((a) => /Permissions policy violation/.test(a)), avisos.join('\n'));
+      // Volta: sair do stand também troca de documento (o painel não fica com microfone liberado).
+      await pagina.evaluate(() => { window.__mesmoDocumento = true; });
+      await pagina.keyboard.press('Shift+Q');
+      await pagina.waitForURL(`${base}/`);
+      await pagina.locator('#root *').first().waitFor();
+      assert.equal(await pagina.evaluate(() => window.__mesmoDocumento ?? false), false, 'o painel é documento novo');
+    } finally {
+      escutaNoServidor = false;
+      await pagina.close();
     }
   });
 });

@@ -199,3 +199,22 @@ test('Veículos is its own SOMPO tab and the selected vehicle survives the URL',
   assert.equal(location.veiculo, 'trator-0001');
   assert.equal(getSompoView(location), 'telemetry');
 });
+
+test('trocar de Permissions-Policy entre páginas carrega o documento (microfone do /stand, câmera da /sonolencia)', async () => {
+  const { exigeNovoDocumento, APP_PAGES: paginas, PAGE_PATHS: caminhos } = await import('../shared/app-location.js');
+  const { cabecalhosDeSeguranca } = await import('./cabecalhos-seguranca.js');
+  const politica = (page) => cabecalhosDeSeguranca(caminhos[page])['Permissions-Policy'];
+  // 20/10: /totem (microphone=()) → "Abrir Totem" por pushState deixava o /stand sem microfone.
+  assert.equal(exigeNovoDocumento(parseAppLocation('/totem'), parseAppLocation('/stand/')), true);
+  assert.equal(exigeNovoDocumento(parseAppLocation('/stand/'), parseAppLocation('/')), true);
+  assert.equal(exigeNovoDocumento(parseAppLocation('/stand/'), parseAppLocation('/stand/?stub=1')), false);
+  assert.equal(exigeNovoDocumento(parseAppLocation('/totem'), parseAppLocation('/gameplay')), false);
+  assert.equal(exigeNovoDocumento({ kind: 'auth', page: 'inicio' }, parseAppLocation('/stand/')), true);
+  // Toda dupla de páginas: pushState só quando a política dos cabeçalhos é a mesma.
+  for (const de of paginas) {
+    for (const para of paginas) {
+      const mesma = politica(de) === politica(para);
+      assert.equal(exigeNovoDocumento({ kind: 'app', page: de }, { kind: 'app', page: para }), !mesma, `${de} → ${para}`);
+    }
+  }
+});

@@ -50,3 +50,5 @@ export function isAppPage(value: unknown): value is AppPageId;
 export function parseAppLocation(href: string): AppLocation;
 export function formatAppUrl(location: Partial<AppLocation>): string;
 export function mergeAppLocation(current: AppLocation, patch: Partial<AppLocation>): AppLocation;
+export function politicaDoDocumento(location: Partial<AppLocation>): 'stand' | 'sonolencia' | 'padrao';
+export function exigeNovoDocumento(atual: Partial<AppLocation>, proxima: Partial<AppLocation>): boolean;

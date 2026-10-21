@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
+  exigeNovoDocumento,
   formatAppUrl,
   mergeAppLocation,
   parseAppLocation,
@@ -45,9 +46,9 @@ export function AppLocationProvider({ children }: { children: ReactNode }) {
     const nextHref = next.kind === 'app' && next.page === 'stand'
       ? formatted.replace(/^\/stand(?=\?|$)/, '/stand/')
       : formatted;
-    // Camera permission belongs only to the /sonolencia document. Crossing
-    // this boundary must fetch the corresponding Permissions-Policy header.
-    if ((locationRef.current.page === 'sonolencia') !== (next.page === 'sonolencia')) {
+    // Câmera só no documento da /sonolencia, microfone só no do /stand: cruzar
+    // a fronteira carrega o documento para valer a Permissions-Policy dele.
+    if (exigeNovoDocumento(locationRef.current, next)) {
       if (history === 'replace') window.location.replace(nextHref);
       else window.location.assign(nextHref);
       return;

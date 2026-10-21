@@ -300,6 +300,25 @@ export function formatAppUrl(location) {
   return query ? `${path}?${query}` : path;
 }
 
+/**
+ * Páginas com Permissions-Policy própria (server/cabecalhos-seguranca.js): o
+ * /stand usa o microfone, a /sonolencia usa a câmera. A política vale para o
+ * documento inteiro, então pushState entre grupos diferentes deixaria a página
+ * nova com a política da anterior (o /totem → "Abrir Totem" abria o /stand com
+ * `microphone=()`, 20/10). Trocar de grupo exige carregar o documento.
+ */
+const POLITICA_DO_DOCUMENTO = Object.freeze({ stand: 'stand', sonolencia: 'sonolencia' });
+
+export function politicaDoDocumento(location) {
+  const page = location?.kind && location.kind !== 'app' ? 'inicio' : location?.page;
+  return POLITICA_DO_DOCUMENTO[page] ?? 'padrao';
+}
+
+/** A navegação de `atual` para `proxima` precisa de documento novo (cabeçalhos novos)? */
+export function exigeNovoDocumento(atual, proxima) {
+  return politicaDoDocumento(atual) !== politicaDoDocumento(proxima);
+}
+
 export function mergeAppLocation(current, patch) {
   const now = { ...emptyAppLocation(), ...current };
   const next = { ...patch };
