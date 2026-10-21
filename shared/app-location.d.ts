@@ -28,6 +28,7 @@ export interface AppLocation {
     stub: string;
     simulacao: string;
     quiosque: string;
+    fps: string;
   }
 
 export const APP_PAGES: readonly AppPageId[];
