@@ -3,6 +3,7 @@ import { alertaCabine, type AlertaCabine } from './alertaCabine';
 import { useBipeCabine } from './bipeCabine';
 import type { CanalGameplay, EstadoGameplay } from './estadoGameplay';
 import { MapaTalhao } from './MapaTalhao';
+import { useSonoCabine } from './sonoCabine';
 import './painelCabine.css';
 
 // O bipe mora em bipeCabine.ts (sem CSS) para o operador usá-lo sem herdar as
@@ -17,7 +18,9 @@ export { criarMotorBipe, useBipeCabine } from './bipeCabine';
  */
 export function PainelCabine({ canal, som = true }: { canal: CanalGameplay; som?: boolean }) {
   const estado = useSyncExternalStore(canal.assinar, canal.ler, canal.ler);
-  const painel = alertaCabine(estado);
+  // Webcam de sonolência (/gameplay?webcam=1); sem ela `sono` é null e nada muda.
+  const sono = useSonoCabine();
+  const painel = alertaCabine(estado, sono);
   useBipeCabine(som ? painel.bipe : null);
   return <PainelCabineVista painel={painel} estado={estado} />;
 }
@@ -25,7 +28,7 @@ export function PainelCabine({ canal, som = true }: { canal: CanalGameplay; som?
 /** Só desenho, sem canal nem áudio: serve ao teste e ao print. */
 export function PainelCabineVista({ painel, estado }: { painel: AlertaCabine; estado: EstadoGameplay }) {
   return (
-    <div className="gameplay-painel" data-faixa={painel.faixa} data-alerta={painel.alerta} data-fase={estado.fase}>
+    <div className="gameplay-painel" data-faixa={painel.faixa} data-alerta={painel.alerta} data-fase={estado.fase} data-sono={painel.sono || undefined}>
       <div className="gameplay-painel-vinheta" data-nivel={painel.vinheta} aria-hidden="true" />
       <div className="gameplay-painel-alerta" role="alert" hidden={!painel.alerta}>
         {painel.rotuloAlerta}

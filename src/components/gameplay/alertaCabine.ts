@@ -11,6 +11,7 @@
 import { physicalRiskBands } from '../../../shared/sompo-physical-interactions.js';
 import type { EstadoGameplay } from './estadoGameplay';
 import { geofenceTalhao, type GeofenceTalhao } from './geofenceTalhao';
+import { ROTULO_ALERTA_SONO, type SonoCabine } from './sonoCabine';
 
 export type FaixaCabine = 'livre' | 'atencao' | 'perigo';
 
@@ -41,6 +42,8 @@ export interface AlertaCabine {
   vinheta: VinhetaCabine;
   /** Zona de risco do talhão: `rumo` na projeção de 3 s, `dentro` com a máquina nela. */
   geofence: GeofenceTalhao;
+  /** Webcam de sonolência (`/gameplay?webcam=1`): olhos fechados há 1 s ou mais. Sempre false sem webcam. */
+  sono: boolean;
 }
 
 export const ROTULO_ALERTA_CABINE = 'Obstáculo a 1,5 m · freie';
@@ -50,13 +53,21 @@ export const rotuloInclinacaoCabine = (graus: number) => `Inclinação de ${grau
 export const rotuloGeofenceCabine = (g: GeofenceTalhao) => g.nivel === 'dentro' ? `Dentro da ${g.zona!.rotulo.toLowerCase()} · saia` : g.nivel === 'rumo' ? `Rumo à ${g.zona!.rotulo.toLowerCase()} · desvie` : '';
 export const BIPE_LENTO_MS = 600;
 export const BIPE_RAPIDO_MS = 200;
+/** Bipe da sonolência: grave e insistente, diferente dos tons do sensor e da zona. */
+export const BIPE_SONO: BipeCabine = { intervaloMs: 300, frequenciaHz: 520 };
 
 const MUDO: BipeCabine = { intervaloMs: null, frequenciaHz: 0 };
 
 const metros = (cm: number) => `${(cm / 100).toFixed(1).replace('.', ',')} m`;
 
-export function alertaCabine(estado: EstadoGameplay): AlertaCabine {
+/**
+ * `sono` vem da webcam da cabine (`sonoCabine`); sem webcam (`null`) o painel
+ * fica exatamente como antes. A sonolência alerta também parada (pronto), só
+ * não no fim do desafio, quando o cartão do resultado ocupa a tela.
+ */
+export function alertaCabine(estado: EstadoGameplay, sono: SonoCabine | null = null): AlertaCabine {
   const { sensor, atitude, maquina, contato, fase } = estado;
+  const dormindo = sono?.status === 'alarm' && fase !== 'fim';
   const faixas = physicalRiskBands({
     distance: sensor.eco ? sensor.distanciaCm : null,
     pitch: atitude.arfagemGraus,
@@ -67,7 +78,7 @@ export function alertaCabine(estado: EstadoGameplay): AlertaCabine {
     : faixas.proximityLevel === 'attention' ? 'atencao' : 'livre';
   const perto = faixas.distance !== null && faixas.distance <= 100;
   const graus = Math.round(faixas.angle);
-  // Prioridade: contato > obstáculo > zona de risco > inclinação.
+  // Prioridade: contato > obstáculo > sonolência > zona de risco > inclinação.
   const geofence = geofenceTalhao(maquina);
   const zona = geofence.nivel !== 'fora';
 
@@ -75,14 +86,16 @@ export function alertaCabine(estado: EstadoGameplay): AlertaCabine {
   if (fase === 'dirigindo') {
     if (contato || perto) bipe = { intervaloMs: 0, frequenciaHz: 1320 };
     else if (sensor.alerta) bipe = { intervaloMs: BIPE_RAPIDO_MS, frequenciaHz: 1180 };
+    else if (dormindo) bipe = BIPE_SONO;
     // Tom do meio, só da zona de risco: rápido dentro, ritmo do alerta a caminho.
     else if (zona) bipe = { intervaloMs: geofence.nivel === 'dentro' ? 120 : BIPE_RAPIDO_MS, frequenciaHz: 990 };
     // Mesmo ritmo do alerta, tom mais grave: dá para saber qual dos dois sem olhar.
     else if (faixas.inclination) bipe = { intervaloMs: BIPE_RAPIDO_MS, frequenciaHz: 660 };
     else if (faixa === 'atencao') bipe = { intervaloMs: BIPE_LENTO_MS, frequenciaHz: 880 };
-  }
+  } else if (dormindo) bipe = BIPE_SONO;
 
-  const vinheta: VinhetaCabine = fase !== 'dirigindo' ? 'nenhuma'
+  const vinheta: VinhetaCabine = dormindo ? 'critica'
+    : fase !== 'dirigindo' ? 'nenhuma'
     : contato || perto || geofence.nivel === 'dentro' ? 'critica'
       : sensor.alerta || zona || faixas.inclination ? 'alerta' : 'nenhuma';
 
@@ -96,14 +109,15 @@ export function alertaCabine(estado: EstadoGameplay): AlertaCabine {
   return {
     faixa,
     distanciaTexto: sensor.eco ? metros(sensor.distanciaCm) : '+4 m',
-    alerta: sensor.alerta || zona || faixas.inclination,
+    alerta: sensor.alerta || dormindo || zona || faixas.inclination,
     // Os dois juntos: o obstáculo vem primeiro, é o que pede freio mais rápido.
-    rotuloAlerta: sensor.alerta ? ROTULO_ALERTA_CABINE : zona ? rotuloGeofenceCabine(geofence) : faixas.inclination ? rotuloInclinacaoCabine(graus) : '',
+    rotuloAlerta: sensor.alerta ? ROTULO_ALERTA_CABINE : dormindo ? ROTULO_ALERTA_SONO : zona ? rotuloGeofenceCabine(geofence) : faixas.inclination ? rotuloInclinacaoCabine(graus) : '',
     rotulo,
     velocidadeTexto: `${Math.round(maquina.velocidadeKph)} km/h${maquina.re ? ' · ré' : ''}`,
     inclinacao: { ligada: faixas.inclination, graus },
     bipe,
     vinheta,
     geofence,
+    sono: dormindo,
   };
 }
