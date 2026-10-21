@@ -4379,6 +4379,9 @@ if (fs.existsSync(indexPath)) {
 wss.on('connection', (socket, req) => {
   const userId = req?.auth?.user?.id || null;
   socket.userId = userId;
+  // Frame acima do maxPayload (ou quadro inválido): o `ws` fecha com 1009/1002 e
+  // emite 'error' aqui; sem ouvinte, a exceção derrubava o processo inteiro.
+  socket.on('error', () => {});
   if (!userId) {
     socket.close(1008, 'workspace_user_required');
     return;
@@ -4392,9 +4395,6 @@ wss.on('connection', (socket, req) => {
       socket.send(JSON.stringify({ kind: 'sompo.telemetry', telemetry }));
     }
   }).catch(() => {});
-  // Frame acima do maxPayload (ou quadro inválido): o `ws` fecha com 1009/1002 e
-  // emite 'error' aqui; sem ouvinte, a exceção derrubava o processo inteiro.
-  socket.on('error', () => {});
 });
 
 httpServer.listen(PORT, HOST, () => {
