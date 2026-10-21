@@ -29,6 +29,10 @@ test('feira checar no runtime local isolado: só GET, sem sessão, release real 
   const temGlb = fs.existsSync(path.join(root, 'public/stand/avatar/coruja-3d/coruja-3d.glb'));
   assert.equal(porId['coruja-3d.glb'].presente, temGlb);
   assert.equal(porId['coruja-3d.glb'].ok, true);
+  if (temGlb) {
+    assert.match(porId['coruja-3d.glb'].caminho, /^\/assets\/coruja-3d-[\w-]{8}\.glb$/, 'o build sai com o GLB com hash');
+    assert.equal(porId['coruja-3d.glb'].cacheControl, 'public, max-age=31536000, immutable');
+  }
 });
 
 test('feira checar acusa release errada (fallback SPA), microfone bloqueado e /api/state aberto; exit 1', async t => {
@@ -60,4 +64,38 @@ test('feira checar acusa release errada (fallback SPA), microfone bloqueado e /a
   const plano = await cli(['feira', 'checar', '--url', url, '--dry-run'], { env: { LUCA_CLI_CONFIG: path.join(directory, 'cli.json') } });
   assert.equal(plano.code, 0);
   assert.ok(plano.json.urls.every(item => item.startsWith(url)));
+});
+
+test('feira checar segue o GLB da coruja com hash que o chunk do stand pede; release pela metade falha', async t => {
+  const glb = Buffer.from('glTF'.repeat(64));
+  let hashPresente = false;
+  const server = createServer((req, res) => {
+    const js = corpo => { res.setHeader('content-type', 'text/javascript'); res.end(corpo); };
+    if (req.url === '/api/health') return res.end(JSON.stringify({ ok: true, version: '9.9.9' }));
+    if (req.url === '/assets/index-abc123.js') return js('"assets/StandPage-x1.js"');
+    if (req.url === '/assets/StandPage-x1.js') return js('import"./stand-s1.js"');
+    if (req.url === '/assets/stand-s1.js') return js('const u="/assets/coruja-3d-ABCD_e-1.glb"');
+    if (req.url === '/stand/avatar/coruja-3d/coruja-3d.glb') return res.end(glb);
+    if (req.url === '/assets/coruja-3d-ABCD_e-1.glb' && hashPresente) {
+      res.writeHead(200, { 'content-type': 'model/gltf-binary', 'cache-control': 'public, max-age=31536000, immutable' });
+      return res.end(glb);
+    }
+    res.writeHead(200, { 'content-type': 'text/html', 'permissions-policy': 'microphone=(self)' });
+    res.end('<!doctype html><script type="module" src="/assets/index-abc123.js"></script>');
+  }).listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  const directory = await temporary(t);
+  const url = `http://127.0.0.1:${server.address().port}`;
+  const env = { LUCA_CLI_CONFIG: path.join(directory, 'cli.json') };
+  const coruja = async () => (await cli(['feira', 'checar', '--url', url], { env })).json.checks.find(c => c.id === 'coruja-3d.glb');
+
+  const metade = await coruja();
+  assert.equal(metade.caminho, '/assets/coruja-3d-ABCD_e-1.glb', 'o GLB conferido é o que o stand carrega, não a cópia de nome fixo');
+  assert.equal(metade.ok, false, 'chunk pede o GLB com hash e ele não veio: release pela metade');
+  hashPresente = true;
+  const inteira = await coruja();
+  assert.equal(inteira.ok, true);
+  assert.equal(inteira.presente, true);
+  assert.equal(inteira.cacheControl, 'public, max-age=31536000, immutable');
 });

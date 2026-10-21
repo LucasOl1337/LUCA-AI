@@ -92,3 +92,31 @@ test('deploy novo: o index revalidado aponta para o chunk novo; o chunk velho so
   assert.match(sumiu.headers.get('content-type'), /text\/html/);
   assert.equal(sumiu.headers.get('cache-control'), CACHE_REVALIDAR, 'fallback de chunk sumido nunca fica em cache');
 });
+
+test('GLB com hash do Vite em assets/ (coruja 3D pelo ?url) é imutável, cru e em .br; sumido cai no fallback sem cache', async t => {
+  const zlib = await import('node:zlib');
+  assert.equal(cacheDoArquivo('assets/coruja-3d-JoByCbdS.glb'), CACHE_IMUTAVEL);
+  const root = dist(t);
+  const glb = Buffer.from('glTF'.repeat(4096));
+  escreve(root, {
+    'index.html': '<html></html>',
+    'assets/coruja-3d-JoByCbdS.glb': glb,
+    'assets/coruja-3d-JoByCbdS.glb.br': zlib.brotliCompressSync(glb),
+    'stand/avatar/coruja-3d/coruja-3d.glb': glb,
+    'stand/avatar/coruja-3d/coruja-3d.glb.br': zlib.brotliCompressSync(glb),
+  });
+  const get = await servidor(t, root);
+  const br = await get('/assets/coruja-3d-JoByCbdS.glb', { 'accept-encoding': 'gzip, br' });
+  assert.equal(br.status, 200);
+  assert.equal(br.headers.get('content-encoding'), 'br');
+  assert.equal(br.headers.get('cache-control'), CACHE_IMUTAVEL, '.br do nome com hash também imutável');
+  const cru = await get('/assets/coruja-3d-JoByCbdS.glb');
+  assert.equal(cru.headers.get('content-encoding'), null);
+  assert.equal(cru.headers.get('cache-control'), CACHE_IMUTAVEL);
+  assert.equal(Number(cru.headers.get('content-length')), glb.length);
+  // Nome fixo segue revalidando (cópia do public/ que o Vite mantém no dist).
+  assert.equal((await get('/stand/avatar/coruja-3d/coruja-3d.glb', { 'accept-encoding': 'br' })).headers.get('cache-control'), 'public, max-age=0');
+  const sumiu = await get('/assets/coruja-3d-VELHO000.glb', { 'accept-encoding': 'br' });
+  assert.match(sumiu.headers.get('content-type'), /text\/html/);
+  assert.equal(sumiu.headers.get('cache-control'), CACHE_REVALIDAR, 'GLB de release velha nunca vira imutável no fallback');
+});

@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
 import { precompressedModels } from './precompressed-models.js';
@@ -11,10 +12,11 @@ import { precompressedModels } from './precompressed-models.js';
 //   (ETag → 304). É isso que garante que um deploy novo chega: o index novo
 //   aponta para os chunks novos.
 // - O resto (GLB, imagens, vídeos sem hash no nome) fica no padrão do Express.
+//   GLB importado com `?url` (coruja 3D) sai em /assets/ com hash e entra no imutável.
 export const CACHE_IMUTAVEL = 'public, max-age=31536000, immutable';
 export const CACHE_REVALIDAR = 'no-cache';
 
-const COM_HASH = /^assets\/[^/]+-[A-Za-z0-9_-]{8}\.(?:js|css|woff2?|ttf|png|jpe?g|svg|webp|avif|gif|wasm)$/;
+const COM_HASH = /^assets\/[^/]+-[A-Za-z0-9_-]{8}\.(?:js|css|woff2?|ttf|png|jpe?g|svg|webp|avif|gif|wasm|glb)$/;
 const REVALIDAR = /(?:^|\/)(?:index\.html|sw\.js)$/;
 
 /** Cache-Control de um arquivo do dist (caminho relativo, com `/`), ou null para o padrão. */
@@ -27,6 +29,15 @@ export function cacheDoArquivo(relativo) {
 /** Serve o build em `root`: GLB com .br, estáticos com cache por classe e fallback SPA. */
 export function servirDist(app, root) {
   const base = path.resolve(root);
+  // O .br do GLB sai pelo sendFile do precompressedModels, antes do static: o cache
+  // do nome com hash vai aqui, só se o arquivo existe (o fallback nunca fica imutável).
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/assets/') && req.path.endsWith('.glb')) {
+      const relativo = req.path.slice(1);
+      if (cacheDoArquivo(relativo) === CACHE_IMUTAVEL && fs.existsSync(path.join(base, relativo))) res.setHeader('Cache-Control', CACHE_IMUTAVEL);
+    }
+    next();
+  });
   app.use(precompressedModels(base));
   app.use(express.static(base, {
     redirect: false,

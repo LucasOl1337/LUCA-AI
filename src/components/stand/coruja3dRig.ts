@@ -1,5 +1,6 @@
 import type { EstadoVoz } from './canal';
 import { suavizarBoca } from './lipSync';
+import coruja3dGlbComHash from '../../../public/stand/avatar/coruja-3d/coruja-3d.glb?url';
 
 /**
  * Coruja 3D (variante `coruja-3d`): parâmetros puros, sem three.js, para o
@@ -8,7 +9,13 @@ import { suavizarBoca } from './lipSync';
  * `scripts/stand/package-coruja-3d.py`.
  */
 
-export const CORUJA_3D_URL = '/stand/avatar/coruja-3d/coruja-3d.glb';
+/**
+ * GLB pelo `?url` do Vite: no build sai `/assets/coruja-3d-<hash>.glb`, que o
+ * servidor marca `immutable` (sem revalidar 1 MB a cada F5 do quiosque).
+ */
+export const CORUJA_3D_URL = coruja3dGlbComHash;
+/** Caminho público fixo: o manifesto `.textures.json` e os JPGs ficam ao lado dele. */
+export const CORUJA_3D_PUBLICO = '/stand/avatar/coruja-3d/coruja-3d.glb';
 
 /** Um clipe em laço por estado de voz; `aceno` toca uma vez quando a cena abre. */
 export const CLIPE_POR_VOZ: Readonly<Record<EstadoVoz, string>> = Object.freeze({
