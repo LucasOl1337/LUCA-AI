@@ -13,6 +13,8 @@ export async function loadFrontendModule(path) {
     packages: 'external',
     // Folha de estilo não muda comportamento; o Vite cuida dela no build.
     loader: { '.css': 'empty' },
+    // `new Worker(new URL(..., import.meta.url))` é do Vite; no teste o worker é injetado.
+    logOverride: { 'empty-import-meta': 'silent' },
   });
   const module = { exports: {} };
   new Function('require', 'module', 'exports', result.outputFiles[0].text)(
