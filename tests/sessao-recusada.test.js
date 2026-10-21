@@ -32,3 +32,19 @@ test('fio: /api/state avisa o status e o AuthProvider revalida a sessão, sem es
   assert.match(fetchState, /sessaoRecusada\.avisar\(/);
   assert.match(auth, /sessaoRecusada\.assinar\(\(\) => \{ if \(hasUserRef\.current\) void refreshSession\(\); \}\)/);
 });
+
+test('/ws fechado com 4401 avisa a sessão recusada; queda comum (1006, 1001, 1008) não', () => {
+  const s = criarSessaoRecusada();
+  let avisos = 0;
+  s.assinar(() => { avisos += 1; });
+  for (const codigo of [1000, 1001, 1006, 1008, 1011]) assert.equal(s.avisarFechamentoWs(codigo), false, `código ${codigo}`);
+  assert.equal(avisos, 0);
+  assert.equal(s.avisarFechamentoWs(4401), true);
+  assert.equal(avisos, 1);
+});
+
+test('fio: o close do /ws passa o código para a sessão recusada antes de religar', () => {
+  const estado = readFileSync(new URL('../src/hooks/useLucaState.tsx', import.meta.url), 'utf8');
+  const close = estado.slice(estado.indexOf("socket.addEventListener('close'"), estado.indexOf("socket.addEventListener('error'"));
+  assert.match(close, /sessaoRecusada\.avisarFechamentoWs\(evento\.code\);\s*if \(!closed\) religador\.agendar\(\);/);
+});

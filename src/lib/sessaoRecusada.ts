@@ -6,6 +6,9 @@
  */
 type Ouvinte = () => void;
 
+/** Close do /ws quando o servidor encerra a sessão (server/ws-sessao.js). */
+export const WS_SESSAO_ENCERRADA = 4401;
+
 export function criarSessaoRecusada() {
   const ouvintes = new Set<Ouvinte>();
   return {
@@ -18,6 +21,13 @@ export function criarSessaoRecusada() {
       if (status !== 401 && status !== 403) return false;
       for (const fn of [...ouvintes]) fn();
       return true;
+    },
+    /**
+     * O /ws fechou com 4401: a sessão caiu no servidor. Revalida já, sem esperar
+     * os 3 s do religador e o 401 do /api/state. Outros códigos são queda comum.
+     */
+    avisarFechamentoWs(codigo: number) {
+      return codigo === WS_SESSAO_ENCERRADA ? this.avisar(401) : false;
     },
   };
 }
