@@ -254,6 +254,8 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
     const antes = scribe.conexoes;
     const pagina = await browserEscuta.newPage();
     try {
+      // Relógio falso correndo em tempo real, para o teste poder adiantar a barra (abaixo).
+      await pagina.clock.install();
       await pagina.goto(`${base}/stand`);
       const main = pagina.locator('main.stand');
       await pagina.locator('main.stand[data-escuta="ouvindo"]').waitFor({ timeout: 15000 });
@@ -263,8 +265,11 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
         botao.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
       });
       await pagina.locator('main.stand[data-modo="vitrine"][data-escuta="ouvindo"]').waitFor({ timeout: 5000 });
-      // Barra apagada (5 s): a linha fixa aparece.
-      await pagina.locator('.stand-linha-escuta', { hasText: 'O LUCA só ouve quando você fala com ele.' }).waitFor({ timeout: 8000 });
+      // Barra apagada (5 s): a linha fixa aparece. O relógio da página pula os 5 s da barra;
+      // esperar em tempo real disputava com o despertar do WAV (5 s de silêncio desde a
+      // abertura do microfone): sob carga a voz chegava antes e a linha some na conversa.
+      await pagina.clock.fastForward(5_500);
+      await pagina.locator('.stand-linha-escuta', { hasText: 'O LUCA só ouve quando você fala com ele.' }).waitFor({ timeout: 3000 });
       // 1º despertar sem palavra: a sessão abre e fecha sem tirar a Vitrine.
       await pagina.locator('main.stand[data-escuta="conversa"]').waitFor({ timeout: 15000 });
       assert.equal(await main.getAttribute('data-modo'), 'vitrine', 'despertar sem palavra não corta a Vitrine');
@@ -293,13 +298,26 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
           window.__permitirMicrofone = () => original(opcoes).then(resolve, reject);
         });
       });
+      // Relógio da página parado: os 10 s contam do setTimeout do app, não de quando o teste
+      // percebe o "abrindo" (sob carga essa percepção atrasava mais de 0,5 s e a ajuda saía
+      // "cedo" no relógio do teste). A montagem anda em passos de 100 ms (o Suspense do React
+      // usa timer), então ao ver "abrindo" o prazo da ajuda já correu entre 0 e 100 ms.
+      await pagina.clock.install();
+      await pagina.clock.pauseAt(Date.now() + 1000);
       await pagina.goto(`${base}/stand`);
-      await pagina.locator('main.stand[data-escuta="abrindo"]').waitFor({ timeout: 15000 });
-      const inicio = Date.now();
+      const abrindo = pagina.locator('main.stand[data-escuta="abrindo"]');
+      const limite = Date.now() + 15000;
+      while (Date.now() < limite && await abrindo.count() === 0) { await pagina.clock.runFor(100); await pagina.waitForTimeout(20); }
+      await abrindo.waitFor({ timeout: 1000 });
       await pagina.getByText('Ligando o microfone…').waitFor();
-      await pagina.getByText('Permita o microfone pra conversar com o LUCA.').waitFor({ timeout: 12000 });
-      assert.ok(Date.now() - inicio >= 9500, 'não mostrou ajuda antes dos 10 s');
+      await pagina.clock.runFor(9_800);
+      assert.equal(await pagina.locator('main.stand').getAttribute('data-escuta'), 'abrindo', 'não mostrou ajuda antes dos 10 s');
+      assert.equal(await pagina.getByText('Permita o microfone pra conversar com o LUCA.').count(), 0);
+      await pagina.clock.runFor(200);
+      await pagina.getByText('Permita o microfone pra conversar com o LUCA.').waitFor({ timeout: 3000 });
       assert.equal(await pagina.locator('main.stand').getAttribute('data-escuta'), 'ajuda_microfone');
+      // Daqui em diante o relógio volta a correr: o prazo do worklet (2,5 s) precisa passar sozinho.
+      await pagina.clock.resume();
       await pagina.evaluate(() => {
         const botao = [...document.querySelectorAll('.stand-barra button')].find((b) => b.textContent.includes('Vitrine'));
         botao.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
