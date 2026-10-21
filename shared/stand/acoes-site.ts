@@ -40,6 +40,7 @@ export const IDS_PAGINAS = Object.keys(PAGINAS_SITE) as PaginaSite[];
 export type NomeAcaoSite =
   | 'abrir_pagina'
   | 'voltar_coruja'
+  | 'abrir_simulacao'
   | 'sensor_escolher_veiculo'
   | 'sensor_rodar_ensaio'
   | 'sensor_ajustar'
@@ -92,6 +93,12 @@ export const ACOES_SITE: readonly AcaoSiteDef[] = Object.freeze(([
     nome: 'voltar_coruja',
     pagina: null,
     descricao: 'Fecha a página do site e volta a coruja para a tela cheia. Use quando a pessoa pedir pra voltar ou terminar a demonstração.',
+    args: {},
+  },
+  {
+    nome: 'abrir_simulacao',
+    pagina: null,
+    descricao: 'Abre a Simulação do stand: o simulador 3D do Trator MAX em tela cheia, para a pessoa dirigir no controle. Use sempre que ela quiser jogar, dirigir, pilotar ou testar o simulador, a simulação ou a gameplay. Diga antes, em uma frase curta, que vai abrir e que é só pegar o controle; a conversa por voz acaba quando a Simulação abre.',
     args: {},
   },
   {
@@ -196,11 +203,12 @@ export const ACOES_SITE: readonly AcaoSiteDef[] = Object.freeze(([
 ] as AcaoSiteDef[]).map((item) => Object.freeze(item)));
 
 /**
- * Ações que o próprio `/stand` executa (trocam a tela); o resto vai ao Executor
+ * Ações que o próprio `/stand` executa (trocam a tela; `abrir_simulacao` vai pro
+ * modo Simulação); o resto vai ao Executor
  * dentro do iframe. `tour_iniciar` roda no cérebro (falas prontas + ações do
  * `TOUR_STAND`); o `/stand` só recebe as ações do roteiro.
  */
-export const ACOES_DO_STAND: readonly NomeAcaoSite[] = ['abrir_pagina', 'voltar_coruja', 'tour_iniciar'];
+export const ACOES_DO_STAND: readonly NomeAcaoSite[] = ['abrir_pagina', 'voltar_coruja', 'abrir_simulacao', 'tour_iniciar'];
 
 export type PassoTour =
   | { fala: `tour_${number}`; texto: string }

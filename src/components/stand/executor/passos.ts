@@ -282,6 +282,7 @@ export function criarPassos(els: CursorElementos) {
       // Trocar de página é do `/stand` (iframe); aqui dentro não há o que clicar.
       case 'abrir_pagina':
       case 'voltar_coruja':
+      case 'abrir_simulacao':
       case 'tour_iniciar':
         throw new FalhaAcao('Essa ação é da tela do stand, não da página.');
     }

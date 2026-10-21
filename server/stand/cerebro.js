@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { cadeiaCerebroStand, ROUTER_API_KEY, ROUTER_BASE_URL } from '../config.js';
 import { FERRAMENTAS_STAND } from './ferramentas.js';
 import { TOUR_STAND, validarAcaoSite } from '../../shared/stand/acoes-site.ts';
+import { comandoDireto } from '../../shared/stand/comandos-voz.ts';
 
 // Q5 do grill: por sessão, 8 respostas, 300 tokens por resposta e 2.000
 // caracteres de TTS. Os 240 s e os 20 s de silêncio continuam em LIMITES_STAND.
@@ -20,6 +21,7 @@ export const FALAS = Object.freeze({
   falha: 'Tive um problema pra pensar agora. Pode perguntar de novo?',
   teto_respostas: 'Foi ótimo conversar! Pra continuar, chama alguém da equipe do stand.',
   acao_falhou: 'Não consegui fazer isso na tela agora.',
+  simulacao: 'Bora! Vou abrir a Simulação: pega o controle e dirige o Trator MAX.',
   ...Object.fromEntries(TOUR_STAND.filter((passo) => 'fala' in passo).map((passo) => [passo.fala, passo.texto])),
 });
 
@@ -300,6 +302,19 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
   if (conversa.respostas >= LIMITES_TURNO.respostas) {
     await tocarPronta('teto_respostas').catch(() => {});
     return encerrarTurno('teto_respostas');
+  }
+
+  // Pedido direto da Simulação ("testar o simulador", "quero jogar"): sem modelo,
+  // fala pronta e a troca de modo depois dela. O modelo escolhia outra tela (21/10).
+  if (!entrada.evento && comandoDireto(entrada.texto) === 'simulacao') {
+    conversa.respostas += 1;
+    conversa.historico.push({ role: 'user', content: String(entrada.texto).trim() }, { role: 'assistant', content: FALAS.simulacao });
+    metricas.comando_direto = 'simulacao';
+    metricas.ferramentas = ['abrir_simulacao'];
+    await tocarPronta('simulacao').catch(() => {});
+    if (abortado(sinal)) return { motivo: 'interrompido', metricas };
+    emitir({ t: 'evento', evento: { tipo: 'acao_site', acao: 'abrir_simulacao', args: {}, apos_fala: true } });
+    return encerrarTurno('simulacao', { fala: FALAS.simulacao });
   }
 
   let conteudo;

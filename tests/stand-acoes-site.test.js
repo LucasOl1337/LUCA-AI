@@ -5,14 +5,14 @@ import { ACOES_DO_STAND, ACOES_SITE, IDS_PAGINAS, PAGINAS_SITE, TOUR_STAND, ferr
 
 test('lista fechada: abrir_pagina, voltar_coruja e os controles <pagina>_<verbo> (Totem-Site Q7)', () => {
   assert.deepEqual(ACOES_SITE.map((item) => item.nome), [
-    'abrir_pagina', 'voltar_coruja',
+    'abrir_pagina', 'voltar_coruja', 'abrir_simulacao',
     'sensor_escolher_veiculo', 'sensor_rodar_ensaio', 'sensor_ajustar', 'sensor_pausar', 'sensor_continuar', 'sensor_mostrar_vista',
     'sonolencia_ligar_camera', 'sonolencia_desligar_camera', 'sonolencia_testar_som', 'sonolencia_sensibilidade',
     'laboratorio_ver_demonstracao', 'laboratorio_pausar', 'laboratorio_continuar', 'laboratorio_camera',
     'sompo_abrir_aba', 'sompo_voltar_inicio', 'sompo_abrir_caso', 'sompo_rodar_cenario',
     'tour_iniciar',
   ]);
-  assert.deepEqual(ACOES_DO_STAND, ['abrir_pagina', 'voltar_coruja', 'tour_iniciar']);
+  assert.deepEqual(ACOES_DO_STAND, ['abrir_pagina', 'voltar_coruja', 'abrir_simulacao', 'tour_iniciar']);
   for (const def of ACOES_SITE) {
     if (ACOES_DO_STAND.includes(def.nome)) assert.equal(def.pagina, null, def.nome);
     else assert.ok(def.nome.startsWith(`${def.pagina}_`), `${def.nome} pertence a ${def.pagina}`);
