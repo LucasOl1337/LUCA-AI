@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -45,4 +46,20 @@ test('retrato velho: sem sinal há N s, mantendo o último mapa', () => {
   assert.match(h, /data-sinal="sem-sinal"/);
   assert.match(h, /Sem sinal há 9 s/);
   assert.match(h, /gameplay-mapa/);
+});
+
+// Com o /gameplay no mesmo navegador, animação infinita aqui derrubou o jogo de 42 para 23 fps.
+test('CSS do operador: nada infinito, keyframes só com opacity/transform, sem filter', () => {
+  const css = readFileSync(new URL('../src/pages/operadorPage.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.doesNotMatch(css, /infinite/);
+  assert.doesNotMatch(css, /filter\s*:/);
+  for (const [, corpo] of css.matchAll(/@keyframes[^{]+\{((?:[^{}]*\{[^}]*\})*)\s*\}/g)) {
+    for (const [, prop] of corpo.matchAll(/([a-z-]+)\s*:/g)) assert.ok(['opacity', 'transform'].includes(prop), `keyframe anima ${prop}`);
+  }
+  assert.match(css, /\.operador\[data-oculto\] \* \{ animation-play-state: paused/);
+});
+
+test('aba oculta: marca data-oculto para pausar as animações', () => {
+  const h = renderToStaticMarkup(createElement(OperadorVista, { retrato: null, agora: 0, som: false, oculto: true }));
+  assert.match(h, /data-oculto="true"/);
 });
