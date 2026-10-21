@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { EstadoGameplay } from '@/components/gameplay/estadoGameplay';
+import type { SonoCabine } from '@/components/gameplay/sonoCabine';
 
 /**
  * Gameplay ao vivo (inventário #3): o totem manda o retrato pelo /ws e o
@@ -19,7 +20,8 @@ export const SEM_SINAL_MS = 2000;
  */
 export const PAUSADO_MAX_MS = 15 * 60_000;
 
-export interface RetratoAoVivo { estado: EstadoGameplay; recebidoEm: number; oculto?: boolean }
+/** `sono` só existe com a webcam da cabine ligada (`/gameplay?webcam=1`). */
+export interface RetratoAoVivo { estado: EstadoGameplay; recebidoEm: number; oculto?: boolean; sono?: SonoCabine }
 export type SinalAoVivo = { nivel: 'aguardando' } | { nivel: 'ao-vivo' } | { nivel: 'pausado'; segundos: number } | { nivel: 'sem-sinal'; segundos: number };
 
 /** Puro: o que o selo do tablet diz agora. */
@@ -36,12 +38,13 @@ export function criarAoVivo(agora: () => number = Date.now, agendar: (fn: () => 
   let ultimo: RetratoAoVivo | null = null;
   let oculto = false;
   let ultimoEstado: EstadoGameplay | null = null;
+  let sono: SonoCabine | null = null;
   let agendado = false;
   const assinantes = new Set<() => void>();
   const mandar = (estado: EstadoGameplay) => {
     if (!transporte) return false;
     ultimoEnvio = agora();
-    try { transporte(JSON.stringify({ kind: TIPO_RETRATO, estado, ...(oculto ? { oculto: true } : {}) })); } catch { return false; }
+    try { transporte(JSON.stringify({ kind: TIPO_RETRATO, estado, ...(oculto ? { oculto: true } : {}), ...(sono ? { sono } : {}) })); } catch { return false; }
     return true;
   };
   return {
@@ -63,11 +66,13 @@ export function criarAoVivo(agora: () => number = Date.now, agendar: (fn: () => 
       agendado = true;
       agendar(() => { agendado = false; if (ultimoEstado) mandar(ultimoEstado); }, falta);
     },
+    /** Totem: leitura da webcam de sonolência; vai junto no próximo retrato (o motor manda a 4 Hz). `null` = webcam desligada. */
+    marcarSono(valor: SonoCabine | null) { sono = valor; },
     /** Totem: o gameplay desmontou; nada de reenviar retrato velho depois. */
-    esquecer() { ultimoEstado = null; oculto = false; },
+    esquecer() { ultimoEstado = null; oculto = false; sono = null; },
     /** Tablet: `idadeMs` vem do servidor (o retrato guardado pode ter alguns segundos). */
-    receber(estado: EstadoGameplay, idadeMs = 0, ocultoNoTotem = false) {
-      ultimo = { estado, recebidoEm: agora() - Math.max(0, idadeMs), ...(ocultoNoTotem ? { oculto: true } : {}) };
+    receber(estado: EstadoGameplay, idadeMs = 0, ocultoNoTotem = false, sonoNoTotem: SonoCabine | null = null) {
+      ultimo = { estado, recebidoEm: agora() - Math.max(0, idadeMs), ...(ocultoNoTotem ? { oculto: true } : {}), ...(sonoNoTotem ? { sono: sonoNoTotem } : {}) };
       for (const fn of [...assinantes]) fn();
     },
     ler: () => ultimo,
