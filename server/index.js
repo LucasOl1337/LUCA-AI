@@ -220,6 +220,7 @@ import { registerSompoRiskRoutes } from './sompo-risk.js';
 import { registerLabCaseRoutes } from './lab-cases.js';
 import { registerSompoVehicleRoutes } from './sompo-vehicles.js';
 import { lerMaxPorConta, recusarAcimaDoLimite } from './ws-limites.js';
+import { ligarPulso, lerPulsoMs, marcarVivo } from './ws-pulso.js';
 import { registerStandRoutes } from './stand/rotas.js';
 import { cabecalhosDeSeguranca } from './cabecalhos-seguranca.js';
 import { conexaoDaMesmaOrigem, criarGameplayAoVivo, RETRATO_MAX_BYTES } from './gameplay-ao-vivo.js';
@@ -416,6 +417,8 @@ const wss = new WebSocketServer({
     done(true);
   },
 });
+// Heartbeat: socket meio-aberto cai em até 2 intervalos e libera a vaga do teto (ws-pulso.js).
+ligarPulso(wss, lerPulsoMs(process.env.LUCA_WS_PULSO_MS));
 const gameplayAoVivo = criarGameplayAoVivo();
 // Sessão revogada ou expirada fecha os sockets dela (4401); as outras sessões da conta seguem.
 authService.store.aoEncerrarSessoes((ids) => fecharSocketsDasSessoes(wss.clients, ids));
@@ -4391,6 +4394,7 @@ wss.on('connection', (socket, req) => {
   // Frame acima do maxPayload (ou quadro inválido): o `ws` fecha com 1009/1002 e
   // emite 'error' aqui; sem ouvinte, a exceção derrubava o processo inteiro.
   socket.on('error', () => {});
+  marcarVivo(socket);
   if (!userId) {
     socket.close(1008, 'workspace_user_required');
     return;
