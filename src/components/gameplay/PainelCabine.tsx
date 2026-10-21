@@ -20,6 +20,7 @@ export function PainelCabine({ canal, som = true }: { canal: CanalGameplay; som?
 export function PainelCabineVista({ painel, estado }: { painel: AlertaCabine; estado: EstadoGameplay }) {
   return (
     <div className="gameplay-painel" data-faixa={painel.faixa} data-alerta={painel.alerta} data-fase={estado.fase}>
+      <div className="gameplay-painel-vinheta" data-nivel={painel.vinheta} aria-hidden="true" />
       <div className="gameplay-painel-alerta" role="alert" hidden={!painel.alerta}>
         {painel.rotuloAlerta}
       </div>
