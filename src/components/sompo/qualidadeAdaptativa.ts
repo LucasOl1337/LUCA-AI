@@ -123,3 +123,20 @@ export function regularQualidade(estado: EstadoQualidade, fps: number, agora: nu
 export function pixelRatioDoDegrau(degrau: DegrauQualidade, devicePixelRatio: number) {
   return Math.min(degrau.pixelRatio, Math.max(0.5, devicePixelRatio || 1));
 }
+
+/** Leituras descartadas depois que o modelo entra na cena (upload de textura e compilação de shader). */
+export const LEITURAS_DE_AQUECIMENTO = 2;
+
+/**
+ * Portão do regulador: fechado até `abrir()` (modelo carregado) e, depois, ainda
+ * descarta as primeiras leituras. Sem ele, o FPS da carga (10, 35) virava a linha
+ * de base da prova e a descida parecia render 15 % que não existiam: na bancada o
+ * gameplay perdia pós e sombra por 0,45 ms de GPU.
+ */
+export function criarPortaoDeAquecimento(leituras = LEITURAS_DE_AQUECIMENTO) {
+  let restantes = Number.POSITIVE_INFINITY;
+  return {
+    abrir() { if (restantes === Number.POSITIVE_INFINITY) restantes = leituras; },
+    passa() { if (restantes > 0) { restantes -= 1; return false; } return true; },
+  };
+}
