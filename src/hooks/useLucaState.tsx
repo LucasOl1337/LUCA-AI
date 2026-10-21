@@ -16,6 +16,7 @@ import type {
   WsPayload,
 } from '@/lib/types';
 import { aoVivo, TIPO_RETRATO } from '@/lib/gameplayAoVivo';
+import { criarReligador } from '@/lib/religaWs';
 
 const fallbackDatabase: DatabaseState = {
   source: { name: 'database indisponivel', topic: 'LUCA-AI' },
@@ -351,7 +352,6 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let socket: WebSocket | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let pollTimer: ReturnType<typeof setTimeout> | null = null;
     let closed = false;
 
@@ -370,9 +370,13 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
       }, delay);
     }
 
+    // Sem servidor agora: o religador tenta de novo; antes desistia e só um F5 trazia o /ws de volta.
+    const religador = criarReligador(connect);
+
     async function connect() {
       const hasBackend = await refresh();
-      if (!hasBackend || closed) return;
+      if (closed) return true;
+      if (!hasBackend) return false;
       socket = new WebSocket(wsUrl());
       const aberto = socket;
 
@@ -380,10 +384,6 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
         setBackendReady(true);
         setConnectionState('online');
         aoVivo.ligar((texto) => { if (aberto.readyState === WebSocket.OPEN) aberto.send(texto); });
-        if (reconnectTimer) {
-          clearTimeout(reconnectTimer);
-          reconnectTimer = null;
-        }
       });
 
       socket.addEventListener('close', () => {
@@ -391,7 +391,7 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
         setBackendReady(false);
         setConnectionState('offline');
         setSompoTelemetry(current => current ? { ...current, freshness: 'stale', connection: { ...current.connection, state: 'reconnecting' } } : null);
-        if (!closed) reconnectTimer = setTimeout(connect, 3000);
+        if (!closed) religador.agendar();
       });
 
       socket.addEventListener('error', () => {
@@ -411,9 +411,10 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
           // Payload invalido nao deve derrubar a interface.
         }
       });
+      return true;
     }
 
-    void connect();
+    void religador.tentar();
     if (typeof document !== 'undefined') {
       pageVisibleRef.current = document.visibilityState !== 'hidden';
       const onVisibilityChange = () => {
@@ -439,8 +440,8 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
         document.removeEventListener('visibilitychange', onVisibilityChange);
         window.removeEventListener('focus', onAttention);
         window.removeEventListener('pageshow', onAttention);
+        religador.parar();
         if (socket) socket.close();
-        if (reconnectTimer) clearTimeout(reconnectTimer);
         if (pollTimer) clearTimeout(pollTimer);
         if (eventRefreshTimerRef.current) clearTimeout(eventRefreshTimerRef.current);
         clearCloudRefreshTimers();
@@ -451,8 +452,8 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       closed = true;
+      religador.parar();
       if (socket) socket.close();
-      if (reconnectTimer) clearTimeout(reconnectTimer);
       if (pollTimer) clearTimeout(pollTimer);
       if (eventRefreshTimerRef.current) clearTimeout(eventRefreshTimerRef.current);
       clearCloudRefreshTimers();
