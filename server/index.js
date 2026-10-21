@@ -221,6 +221,7 @@ import { registerLabCaseRoutes } from './lab-cases.js';
 import { registerSompoVehicleRoutes } from './sompo-vehicles.js';
 import { registerStandRoutes } from './stand/rotas.js';
 import { cabecalhosDeSeguranca } from './cabecalhos-seguranca.js';
+import { conexaoDaMesmaOrigem, criarGameplayAoVivo, RETRATO_MAX_BYTES } from './gameplay-ao-vivo.js';
 
 const app = express();
 const personaRunJobs = createPersonaRunJobStore();
@@ -392,6 +393,8 @@ const httpServer = createServer(app);
 const wss = new WebSocketServer({
   server: httpServer,
   path: '/ws',
+  // O cliente só manda o retrato do gameplay (≤2 KB); frame maior derruba a conexão antes do parse.
+  maxPayload: RETRATO_MAX_BYTES * 2,
   verifyClient(info, done) {
     const session = authService.sessionFromRequest(info.req, { touch: true });
     if (!session) {
@@ -408,6 +411,7 @@ const wss = new WebSocketServer({
     done(true);
   },
 });
+const gameplayAoVivo = criarGameplayAoVivo();
 
 let supervisorTimer = null;
 let heartbeatProcess = null;
@@ -4392,6 +4396,12 @@ wss.on('connection', (socket, req) => {
       socket.send(JSON.stringify({ kind: 'sompo.telemetry', telemetry }));
     }
   }).catch(() => {});
+  // Totem → tablet do operador (inventário #3): só `gameplay:retrato`, só para a mesma conta.
+  socket.mesmaOrigem = conexaoDaMesmaOrigem(req?.headers);
+  gameplayAoVivo.aoConectar(socket);
+  socket.on('message', (dados, isBinary) => {
+    gameplayAoVivo.receber(socket, dados, { isBinary, clientes: wss.clients });
+  });
 });
 
 httpServer.listen(PORT, HOST, () => {
