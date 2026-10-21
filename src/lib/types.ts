@@ -6,6 +6,7 @@ import type { MissionDomain, MissionDomainSource } from '../../shared/mission-tr
 import type { MissionLedger } from '../../shared/mission-ledger.js';
 import type { SompoTelemetrySnapshot } from '../../shared/sompo-telemetry.js';
 import type { EstadoGameplay } from '@/components/gameplay/estadoGameplay';
+import type { SonoCabine } from '@/components/gameplay/sonoCabine';
 export type {
   SompoTelemetryEpisode,
   SompoTelemetryEpisodeFinishResponse,
@@ -527,7 +528,7 @@ export type WsPayload =
   | { kind: 'state'; state: LucaState }
   | { kind: 'event'; event: BackendEvent }
   | { kind: 'sompo.telemetry'; telemetry: SompoTelemetrySnapshot }
-  | { kind: 'gameplay:retrato'; estado: EstadoGameplay; idadeMs?: number; oculto?: boolean };
+  | { kind: 'gameplay:retrato'; estado: EstadoGameplay; idadeMs?: number; oculto?: boolean; sono?: SonoCabine };
 
 export interface LucaAiChatFolder {
   id: string;
