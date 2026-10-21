@@ -222,6 +222,7 @@ import { registerSompoVehicleRoutes } from './sompo-vehicles.js';
 import { registerStandRoutes } from './stand/rotas.js';
 import { cabecalhosDeSeguranca } from './cabecalhos-seguranca.js';
 import { conexaoDaMesmaOrigem, criarGameplayAoVivo, RETRATO_MAX_BYTES } from './gameplay-ao-vivo.js';
+import { fecharSocketsDasSessoes, VARREDURA_EXPIRADAS_MS } from './ws-sessao.js';
 
 const app = express();
 const personaRunJobs = createPersonaRunJobStore();
@@ -412,6 +413,10 @@ const wss = new WebSocketServer({
   },
 });
 const gameplayAoVivo = criarGameplayAoVivo();
+// Sessão revogada ou expirada fecha os sockets dela (4401); as outras sessões da conta seguem.
+authService.store.aoEncerrarSessoes((ids) => fecharSocketsDasSessoes(wss.clients, ids));
+const varreduraDeSessoes = setInterval(() => authService.store.encerrarExpiradas(), VARREDURA_EXPIRADAS_MS);
+varreduraDeSessoes.unref?.();
 
 let supervisorTimer = null;
 let heartbeatProcess = null;
@@ -4383,6 +4388,7 @@ if (fs.existsSync(indexPath)) {
 wss.on('connection', (socket, req) => {
   const userId = req?.auth?.user?.id || null;
   socket.userId = userId;
+  socket.sessionId = req?.auth?.session?.id || null;
   if (!userId) {
     socket.close(1008, 'workspace_user_required');
     return;

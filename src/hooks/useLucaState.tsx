@@ -17,6 +17,7 @@ import type {
 } from '@/lib/types';
 import { aoVivo, TIPO_RETRATO } from '@/lib/gameplayAoVivo';
 import { criarReligador } from '@/lib/religaWs';
+import { sessaoRecusada } from '@/lib/sessaoRecusada';
 
 const fallbackDatabase: DatabaseState = {
   source: { name: 'database indisponivel', topic: 'LUCA-AI' },
@@ -386,11 +387,14 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
         aoVivo.ligar((texto) => { if (aberto.readyState === WebSocket.OPEN) aberto.send(texto); });
       });
 
-      socket.addEventListener('close', () => {
+      socket.addEventListener('close', (evento) => {
         aoVivo.ligar(null);
         setBackendReady(false);
         setConnectionState('offline');
         setSompoTelemetry(current => current ? { ...current, freshness: 'stale', connection: { ...current.connection, state: 'reconnecting' } } : null);
+        // 4401 = sessão encerrada no servidor: o AuthProvider revalida e leva ao login.
+        // O religador segue: se outra aba já trocou o cookie por um válido, o /ws volta.
+        sessaoRecusada.avisarFechamentoWs(evento.code);
         if (!closed) religador.agendar();
       });
 
