@@ -5,13 +5,16 @@ Roda dentro do Blender (headless):
     blender -b --factory-startup --python scripts/gameplay/package-tripo-props.py -- \
         ORIGEM_DIR [SAIDA_DIR]
 
-ORIGEM_DIR tem gv-console/gv-console.glb, gv-banco/gv-banco.glb e
-gv-fardo/gv-fardo.glb exportados do Tripo (texto -> 3D, PBR). Para cada um:
+ORIGEM_DIR tem gv-<prop>/gv-<prop>.glb exportados do Tripo (texto -> 3D, PBR):
+console, banco, fardo, volante e teto. Só empacota os que estiverem lá, então dá
+para refazer um prop sem baixar os outros de novo. Para cada um:
 decimação planar+colapso até a meta de triângulos, atlas reduzidos, export GLB
 com as imagens embutidas e as mesmas imagens em arquivos externos (contrato de
 CSP de restoreSompoTextures: GLB + .textures.json), mais .provenance.json.
 A orientação fica a do Tripo (+Y cima, frente em +Z); o encaixe na cabine é
-do carregador (src/components/gameplay/visual/).
+do carregador (src/components/gameplay/visual/). O volante é a exceção: sai com
+o centro do aro na origem, o eixo da coluna em +Y (face do aro para +Y, lado do
+operador) e o raio do aditivo em -Z, para o carregador alinhar ao rig da cabine.
 """
 
 import datetime
@@ -24,7 +27,7 @@ from pathlib import Path
 import bpy
 
 ARGS = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
-SOURCE = Path(ARGS[0]) if ARGS else Path('.sompo-preview/gv/tripo')
+SOURCE = Path(ARGS[0]) if ARGS else Path('.sompo-preview/gv2/tripo')
 OUT = Path(ARGS[1]) if len(ARGS) > 1 else Path('public/models/gameplay')
 OUT.mkdir(parents=True, exist_ok=True)
 
@@ -52,13 +55,34 @@ PROPS = {
     'gv-fardo': {
         'stem': 'fardo-feno',
         'project': 'fcc7384e-d85b-439d-b464-a082e76e3b4f',
-        'faces': 12000, 'texture': 1024,
         # A palha solta abre buracos no colapso a 6k (prints/visual-i3-tripo-otimizado.png): decima pouco.
-        # Visto de longe, o atlas cai para 512 e fica dentro do orçamento de 1,5 MB.
-        'targetTriangles': 9500, 'atlas': 512,
+        # O fardo do obstáculo chega a 3 m do olho: com atlas 512 a palha virava borrão
+        # (gameplay-visual-20261021/antes/05-dirigindo.png). Reexportado a 2048 e reduzido a 1024.
+        'faces': 12000, 'texture': 2048,
+        'targetTriangles': 9500, 'atlas': 1024,
         'prompt': 'Round hay bale lying on its side, tightly rolled dry golden straw with visible spiral layers on the '
                   'flat faces and loose strands on the surface, wrapped with a few thin net twine lines, realistic '
                   'PBR game prop, no ground, no base',
+    },
+    'gv-volante': {
+        'stem': 'cabine-volante',
+        'project': '77b91aba-e09f-4a00-a6cd-44839b797bb7',
+        'faces': 15000, 'texture': 2048,
+        # Ocupa o meio da tela em toda a corrida: o aro de borracha precisa de silhueta redonda.
+        'targetTriangles': 7000, 'atlas': 1024, 'orientar': 'volante', 'raioDeBaixoRad': 0.611,
+        'prompt': 'Tractor steering wheel only: round black three-spoke steering wheel with a thick textured rubber '
+                  'grip rim, a dark grey centre hub cap and a small black spinner knob on the rim, realistic PBR game '
+                  'prop, no logos, no text, no steering column, no base',
+    },
+    'gv-teto': {
+        'stem': 'cabine-teto',
+        'project': '4c8b9966-8769-436e-8f9c-cec46470a15d',
+        'faces': 15000, 'texture': 2048,
+        # Painel quase plano: o detalhe está na textura (luz de cúpula, alto-falantes, difusores).
+        'targetTriangles': 3000, 'atlas': 1024, 'soFaceAparente': 0.5, 'margemBorda': 0.08,
+        'prompt': 'Tractor cab ceiling headliner panel: a flat rectangular light grey moulded plastic roof liner with a '
+                  'central dome light, two round speaker grilles and two adjustable air vents, seen from below, '
+                  'realistic PBR game prop, no logos, no text, flat back side',
     },
 }
 ROLES = {'normalTexture': 'normal', 'baseColorTexture': 'basecolor', 'metallicRoughnessTexture': 'metallicroughness'}
@@ -82,8 +106,90 @@ def read_glb(path):
     return data, json.loads(data[20:20 + length]), data[28 + length:]
 
 
+def orientar_volante(obj, raio_baixo_rad):
+    """Centro do aro na origem, eixo em +Z do Blender (+Y no glTF) e o raio de baixo em +Y do Blender (-Z no glTF).
+
+    O plano do aro sai por PCA dos vértices afastados do eixo; o lado da coluna (cubo) é o -eixo.
+    Gira em torno do eixo para que o raio de baixo (o único sem oposto no T) fique em +Y do Blender,
+    que o export (+Y cima) leva para -Z do glTF.
+    """
+    import numpy as np
+    from mathutils import Matrix, Vector
+    # O nó do Tripo vem sob um pai com rotação; sem soltar, v.co (local) não é o espaço exportado.
+    bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    pts = np.array([v.co[:] for v in obj.data.vertices])
+    centro = pts.mean(axis=0)
+    normal = np.linalg.eigh(np.cov((pts - centro).T))[1][:, 0]
+    for _ in range(3):
+        # Círculo do aro (ajuste algébrico de Kasa) no plano atual, partindo do centro da caixa;
+        # a média dos vértices puxa para o lado do botão giratório e diverge.
+        u = np.cross(normal, [0.0, 0.0, 1.0] if abs(normal[2]) < 0.9 else [1.0, 0.0, 0.0])
+        u /= np.linalg.norm(u)
+        v = np.cross(normal, u)
+        q = np.stack([(pts - centro) @ u, (pts - centro) @ v], axis=1)
+        c2 = (q.min(axis=0) + q.max(axis=0)) / 2
+        raio = 0.9 * np.linalg.norm(q - c2, axis=1).max()
+        for _ in range(8):
+            sel = np.abs(np.linalg.norm(q - c2, axis=1) - raio) < 0.2 * raio
+            a = np.column_stack([2 * q[sel], np.ones(sel.sum())])
+            sol = np.linalg.lstsq(a, (q[sel] ** 2).sum(axis=1), rcond=None)[0]
+            c2 = sol[:2]
+            raio = float(np.sqrt(sol[2] + c2 @ c2))
+        aro = pts[sel]
+        raio_aro = raio
+        centro = centro + c2[0] * u + c2[1] * v
+        centro = centro + normal * float((aro - centro).mean(axis=0) @ normal)
+        normal = np.linalg.eigh(np.cov((aro - aro.mean(axis=0)).T))[1][:, 0]
+    dist = np.linalg.norm((pts - centro) - np.outer((pts - centro) @ normal, normal), axis=1)
+    rel = pts - centro
+    # Cubo e coluna ficam do lado oposto ao operador: o eixo aponta para longe deles.
+    if (rel @ normal)[np.linalg.norm(rel - np.outer(rel @ normal, normal), axis=1) < 0.3 * dist.max()].mean() > 0:
+        normal = -normal
+    alinhar = Vector(normal.tolist()).rotation_difference(Vector((0, 0, 1))).to_matrix().to_4x4()
+    obj.matrix_world = alinhar @ Matrix.Translation(-Vector(centro.tolist())) @ obj.matrix_world
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    pts = np.array([v.co[:] for v in obj.data.vertices])
+    # Raio externo do aro (o botão giratório sobra para fora: percentil, não máximo).
+    raio = float(np.percentile(np.linalg.norm(pts[:, :2], axis=1), 99.5))
+    # Raio de baixo do T: ângulo no plano já alinhado, medido na vista de topo desta exportação
+    # (histograma de vértices por ângulo não separa os raios do cubo e do botão giratório com segurança).
+    raio_baixo = raio_baixo_rad
+    obj.matrix_world = Matrix.Rotation(np.pi / 2 - raio_baixo, 4, 'Z') @ obj.matrix_world
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    return {'rimRadiusM': round(raio_aro, 4), 'rimOuterRadiusM': round(raio, 4), 'spokeDownAlignedRad': raio_baixo_rad}
+
+
+def so_face_aparente(obj, cos_minimo, margem):
+    """Fica só a face que o operador vê (normal para +Y do Blender, -Z do glTF), sem a borda; devolve quantas saíram.
+
+    O forro é visto só de baixo: o verso não aparece, e a borda levantada do Tripo
+    tinha aletas que surgiam sob a viga da frente (juiz cego, rodada 1). A faixa de
+    `margem` (fração do lado) em volta sai inteira; o carregador estica o que sobra.
+    """
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    xs = [v.co.x for v in bm.verts]
+    zs = [v.co.z for v in bm.verts]
+    mx = (max(xs) - min(xs)) * margem
+    mz = (max(zs) - min(zs)) * margem
+
+    def na_borda(c):
+        return c.x < min(xs) + mx or c.x > max(xs) - mx or c.z < min(zs) + mz or c.z > max(zs) - mz
+
+    fora = [face for face in bm.faces if face.normal.y < cos_minimo or na_borda(face.calc_center_median())]
+    bmesh.ops.delete(bm, geom=fora, context='FACES')
+    bm.to_mesh(obj.data)
+    bm.free()
+    return len(fora)
+
+
 for key, spec in PROPS.items():
     source = SOURCE / key / f'{key}.glb'
+    if not source.exists():
+        print(f'TRIPO_PROP {key}: sem {source}, fica o empacotado')
+        continue
     source_bytes = source.read_bytes()
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=str(source))
@@ -93,8 +199,12 @@ for key, spec in PROPS.items():
     before = triangles(meshes)
     bpy.context.view_layer.objects.active = obj
     obj.select_set(True)
+    orientacao = orientar_volante(obj, spec['raioDeBaixoRad']) if spec.get('orientar') == 'volante' else None
+    ilhas_fora = so_face_aparente(obj, spec['soFaceAparente'], spec.get('margemBorda', 0)) if spec.get('soFaceAparente') else 0
+    if ilhas_fora:
+        print(f'TRIPO_PROP {key}: {ilhas_fora} faces de borda e verso removidas')
     # Colapso preserva UV (seams delimitadas) e silhueta; triangula no fim para contar igual ao glTF.
-    ratio = min(1.0, spec['targetTriangles'] / before)
+    ratio = min(1.0, spec['targetTriangles'] / triangles(meshes))
     mod = obj.modifiers.new('decimar', 'DECIMATE')
     mod.decimate_type = 'COLLAPSE'
     mod.ratio = ratio
@@ -154,14 +264,17 @@ for key, spec in PROPS.items():
             'tool': f'Blender {bpy.app.version_string}, scripts/gameplay/package-tripo-props.py',
             'decimate': {'type': 'COLLAPSE', 'ratio': round(ratio, 4), 'delimit': ['SEAM', 'UV']},
             'atlas': spec['atlas'], 'jpegQuality': 82,
+            **({'hiddenFacesRemoved': ilhas_fora} if ilhas_fora else {}),
         },
         'triangles': tris,
         'boundsM': {'min': accessor['min'], 'max': accessor['max']},
-        'axes': {'up': '+Y', 'front': '+Z (encaixe e escala no carregador da cabine)'},
+        'axes': ({'axis': '+Y (eixo da coluna, face do aro para o operador)', 'spokeDown': '-Z',
+                  'origin': 'centro do aro', **orientacao} if orientacao else
+                 {'up': '+Y', 'front': '+Z (encaixe e escala no carregador da cabine)'}),
         'externalManifest': f'{spec["stem"]}.textures.json',
         'license': 'GAMEPLAY-ASSET-LICENSE.txt',
         'reproducibleCommand': 'blender -b --factory-startup --python scripts/gameplay/package-tripo-props.py -- '
-                               '.sompo-preview/gv/tripo public/models/gameplay',
+                               f'{SOURCE} public/models/gameplay',
         'sha256': sha256(data),
         'bytes': len(data),
     }

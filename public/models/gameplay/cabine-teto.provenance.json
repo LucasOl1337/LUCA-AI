@@ -1,0 +1,52 @@
+{
+  "asset": "cabine-teto.glb",
+  "generatedBy": "Tripo Studio (studio.tripo3d.ai), texto -> 3D com textura PBR detalhada, pela conta do dono",
+  "createdAt": "2026-10-21",
+  "tripoProject": "4c8b9966-8769-436e-8f9c-cec46470a15d",
+  "tripoUrl": "https://studio.tripo3d.ai/workspace/generate/4c8b9966-8769-436e-8f9c-cec46470a15d",
+  "prompt": "Tractor cab ceiling headliner panel: a flat rectangular light grey moulded plastic roof liner with a central dome light, two round speaker grilles and two adjustable air vents, seen from below, realistic PBR game prop, no logos, no text, flat back side",
+  "tripoExport": {
+    "faces": 15000,
+    "textureResolution": 2048,
+    "format": "glb",
+    "sourceSha256": "b4aa37992452797fc02e04e370c2520c24fcf10b55fa09d548a1450b06b0e46d",
+    "sourceBytes": 3006704,
+    "sourceTriangles": 14682
+  },
+  "packaging": {
+    "tool": "Blender 5.2.0 LTS, scripts/gameplay/package-tripo-props.py",
+    "decimate": {
+      "type": "COLLAPSE",
+      "ratio": 0.8021,
+      "delimit": [
+        "SEAM",
+        "UV"
+      ]
+    },
+    "atlas": 1024,
+    "jpegQuality": 82,
+    "hiddenFacesRemoved": 10942
+  },
+  "triangles": 3000,
+  "boundsM": {
+    "min": [
+      -0.4236298203468323,
+      0.06964111328125,
+      -0.11904147267341614
+    ],
+    "max": [
+      0.4153900742530823,
+      0.904754638671875,
+      0.1084594577550888
+    ]
+  },
+  "axes": {
+    "up": "+Y",
+    "front": "+Z (encaixe e escala no carregador da cabine)"
+  },
+  "externalManifest": "cabine-teto.textures.json",
+  "license": "GAMEPLAY-ASSET-LICENSE.txt",
+  "reproducibleCommand": "blender -b --factory-startup --python scripts/gameplay/package-tripo-props.py -- /tmp/claude-1000/-home-lol/615fe476-18f9-471f-a01f-b6c14a5c07e1/scratchpad/so-teto public/models/gameplay",
+  "sha256": "d662abf1cc37ee082e4c508bfde883f9c0eb34e07f06f80e1a0f262c0bf8d930",
+  "bytes": 538300
+}

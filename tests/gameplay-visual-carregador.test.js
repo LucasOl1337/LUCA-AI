@@ -4,9 +4,10 @@ import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { loadFrontendModule } from './support/load-frontend-module.js';
 
-const { criarCabineMax, acharVolante, ENCAIXE_CABINE, NOME_FARDO_PALCO, PROPS_CABINE_URL, CABINE_MAX_URL } =
+const { criarCabineMax, acharVolante, encaixarVolante, ENCAIXE_CABINE, NOME_FARDO_PALCO, PROPS_CABINE_URL, CABINE_MAX_URL } =
   await loadFrontendModule('../../src/components/gameplay/visual/cabineMax.ts');
 const { anguloAroRad } = await loadFrontendModule('../../src/components/gameplay/volante.ts');
+const { vincarSoFacetas, VINCO_RAD } = await loadFrontendModule('../../src/components/gameplay/visual/materialCabine.ts');
 
 const root = new URL('../public/models/gameplay/', import.meta.url);
 const provenance = JSON.parse(readFileSync(new URL('max-tractor-cabine.provenance.json', root), 'utf8'));
@@ -195,4 +196,124 @@ test('encaixe e URLs: props do Tripo com manifesto, provenance e orçamento', ()
   }
   assert.ok(tris <= 40000, `+${tris} triângulos dentro do orçamento de 40k`);
   assert.ok(ENCAIXE_CABINE.banco.posicao[1] === 1.38 && ENCAIXE_CABINE.coluna.base === 1.38);
+});
+
+/** Volante como o package-tripo-props entrega: aro no plano XZ, centro na origem, raio único em -Z. */
+function volanteTripo(raio = 0.47) {
+  const cena = new THREE.Group(); cena.name = 'volante-tripo';
+  cena.add(new THREE.Mesh(new THREE.TorusGeometry(raio, 0.06, 6, 24).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial()));
+  const raioDeBaixo = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, raio).translate(0, 0, -raio / 2), new THREE.MeshStandardMaterial());
+  raioDeBaixo.name = 'raio-de-baixo';
+  cena.add(raioDeBaixo);
+  return cena;
+}
+/** Forro como o Tripo entrega: painel em XY (+Y cima do Tripo), face aparente em -Z. */
+const forroTripo = () => prop('teto', [1.1, 0.9, 0.05]);
+
+test('volante do Tripo vai para o pivô no tamanho e na pose do aro; o toro do GLB some e volta no fim', async () => {
+  const p = palcoFalso();
+  const assets = { ...assetsFalsos(), volante: volanteTripo(), teto: forroTripo(), detalhe: new THREE.Texture() };
+  const cabine = criarCabineMax({ carregar: async () => assets });
+  cabine.montar(p.maquina, camera);
+  await esperar();
+  cabine.quadro(quadro());
+  const pivo = p.corpo.getObjectByName('cabine-volante-pivo');
+  assert.equal(assets.volante.parent, pivo);
+  assert.equal(p.volante.parent, pivo, 'o toro segue no pivô (gira junto) mas oculto');
+  assert.equal(p.volante.visible, false);
+  p.maquina.updateMatrixWorld(true);
+  const centro = new THREE.Vector3(...rig.center);
+  const eixo = new THREE.Vector3(...rig.axis).normalize();
+  // Raio externo do aro do Tripo = raio externo do toro do GLB (0,19 + 0,024 para rimRadius 0,19).
+  const externo = rig.rimRadius * ENCAIXE_CABINE.volante.raioExterno;
+  const borda = assets.volante.children[0].localToWorld(new THREE.Vector3(0.47 + 0.06, 0, 0)).sub(centro);
+  assert.ok(Math.abs(borda.length() - externo) < 1e-6, `aro com raio externo ${externo} (${borda.length()})`);
+  assert.ok(Math.abs(borda.dot(eixo)) < 1e-6, 'aro no plano perpendicular à coluna');
+  // O raio único aponta para baixo do aro (oposto ao topo) com o volante parado.
+  const ponta = assets.volante.getObjectByName('raio-de-baixo').localToWorld(new THREE.Vector3(0, 0, -0.47)).sub(centro).normalize();
+  assert.ok(ponta.dot(topoDoAro()) < -0.999, 'raio do Tripo para baixo');
+  cabine.desmontar();
+  assert.equal(p.volante.visible, true);
+  assert.equal(p.volante.parent, p.corpo);
+  let soltou = true; p.maquina.traverse((o) => { if (o === assets.volante) soltou = false; });
+  assert.ok(soltou, 'volante do Tripo sai da máquina');
+});
+
+test('encaixarVolante é idempotente: reencaixar não acumula escala nem giro', () => {
+  const v = volanteTripo();
+  encaixarVolante(v, rig);
+  const primeira = v.matrix.clone().compose(v.position, v.quaternion, v.scale);
+  encaixarVolante(v, rig);
+  assert.ok(v.matrix.compose(v.position, v.quaternion, v.scale).equals(primeira));
+});
+
+test('forro do teto do Tripo encosta no teto interno da cabine, face aparente para baixo, e sai no fim', async () => {
+  const p = palcoFalso();
+  const assets = { ...assetsFalsos(), volante: volanteTripo(), teto: forroTripo(), detalhe: new THREE.Texture() };
+  const cabine = criarCabineMax({ carregar: async () => assets });
+  cabine.montar(p.maquina, camera);
+  await esperar();
+  cabine.quadro(quadro());
+  const forro = p.corpo.getObjectByName('cabine-teto');
+  assert.ok(forro);
+  p.maquina.updateMatrixWorld(true);
+  const caixa = new THREE.Box3().setFromObject(forro);
+  const { centro, comprimento, largura, espessura } = ENCAIXE_CABINE.teto;
+  assert.ok(Math.abs(caixa.max.y - centro[1]) < 1e-6, `topo do forro no teto interno (${caixa.max.y})`);
+  assert.ok(caixa.max.y < 2.87, 'abaixo da face interna do teto (2,87), senão some');
+  const tamanho = caixa.getSize(new THREE.Vector3());
+  assert.ok(Math.abs(tamanho.x - comprimento) < 1e-6 && Math.abs(tamanho.z - largura) < 1e-6 && Math.abs(tamanho.y - espessura) < 1e-6);
+  assert.ok(Math.abs(caixa.getCenter(new THREE.Vector3()).x - centro[0]) < 1e-6 && Math.abs(caixa.getCenter(new THREE.Vector3()).z) < 1e-6);
+  // -Z do Tripo (face aparente) vira -Y no mundo: olha para o operador.
+  const baixo = new THREE.Vector3(0, 0, -1).transformDirection(forro.matrixWorld);
+  assert.ok(baixo.y < -0.999);
+  cabine.desmontar();
+  assert.equal(p.corpo.getObjectByName('cabine-teto'), undefined);
+});
+
+test('acabamento da cabine troca shader e geometria só da superfície com cor de vértice, e desmontar devolve', async () => {
+  const p = palcoFalso();
+  p.superficie.material.vertexColors = true;
+  const geometriaOriginal = p.superficie.geometry;
+  const chaveOriginal = p.superficie.material.customProgramCacheKey();
+  const assets = { ...assetsFalsos(), volante: volanteTripo(), teto: forroTripo(), detalhe: new THREE.Texture() };
+  const cabine = criarCabineMax({ carregar: async () => assets });
+  cabine.montar(p.maquina, camera);
+  await esperar();
+  cabine.quadro(quadro());
+  assert.match(p.superficie.material.customProgramCacheKey(), /gameplay-cabine-acabamento-v1$/);
+  assert.notEqual(p.superficie.geometry, geometriaOriginal, 'normais vincadas numa geometria própria');
+  const shader = { uniforms: {}, vertexShader: '#include <begin_vertex>', fragmentShader: '#include <lights_physical_fragment>' };
+  p.superficie.material.onBeforeCompile(shader, null);
+  assert.equal(shader.uniforms.cabDetalhe.value, assets.detalhe);
+  assert.match(shader.fragmentShader, /cabDetalhe/);
+  assert.match(shader.fragmentShader, /#include <lights_physical_fragment>$/);
+  cabine.desmontar();
+  assert.equal(p.superficie.geometry, geometriaOriginal);
+  assert.equal(p.superficie.material.customProgramCacheKey(), chaveOriginal);
+});
+
+test('vincarSoFacetas suaviza só o que veio facetado, abaixo do ângulo de vinco', () => {
+  // Duas faces com dobra de 20° (capô lapidado) e normais de face: a aresta comum fica suave.
+  const dobra = THREE.MathUtils.degToRad(20);
+  const ponta = [Math.cos(dobra), Math.sin(dobra), 0];
+  const facetado = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([
+    0, 0, 0, 0, 0, -1, -1, 0, 0,
+    0, 0, 0, ...ponta, 0, 0, -1,
+  ], 3));
+  facetado.computeVertexNormals();
+  const suave = vincarSoFacetas(facetado);
+  const n0 = new THREE.Vector3().fromBufferAttribute(suave.attributes.normal, 0);
+  const n3 = new THREE.Vector3().fromBufferAttribute(suave.attributes.normal, 3);
+  assert.ok(n0.distanceTo(n3) < 1e-6, 'vértice da aresta comum divide a normal');
+  assert.ok(n0.angleTo(new THREE.Vector3(0, 1, 0)) > 0.01, 'normal média, não a de uma face');
+  // Dobra acima do vinco (quina) segue dura.
+  assert.ok(VINCO_RAD < Math.PI / 2);
+  const quina = new THREE.BoxGeometry(1, 1, 1);
+  const vincada = vincarSoFacetas(quina);
+  quina.toNonIndexed().attributes.normal.array.forEach((v, i) => assert.ok(Math.abs(vincada.attributes.normal.array[i] - v) < 1e-6));
+  // Normal já suave (diferente da face) fica a original.
+  const redondo = facetado.clone();
+  redondo.attributes.normal.setXYZ(0, 0, 0.8, 0.6);
+  assert.deepEqual(new THREE.Vector3().fromBufferAttribute(vincarSoFacetas(redondo).attributes.normal, 0).toArray().map((v) => +v.toFixed(5)), [0, 0.8, 0.6]);
 });
