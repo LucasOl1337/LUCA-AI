@@ -11,6 +11,15 @@ import PublicReadingPage from './pages/PublicReadingPage';
 import EstadosProofPage from './pages/EstadosProofPage';
 import './index.css';
 import { useStandOffline } from './components/stand/useStandOffline';
+import { criarRecarregarAposDeploy } from './lib/recarregarAposDeploy';
+
+/** Chunk sumido depois de um deploy (A5): um reload só, sem loop. */
+const BOOT_OK_MS = 10_000;
+const recargaAposDeploy = criarRecarregarAposDeploy({
+  storage: (() => { try { return window.sessionStorage; } catch { return null; } })(),
+  recarregar: () => window.location.reload(),
+});
+window.addEventListener('vite:preloadError', (e) => recargaAposDeploy.aoFalharPreload(e));
 
 /** /stand sem sessão: Coruja sem voz e Vitrine local no lugar do login (ADR 0001). */
 const StandSemLogin = lazy(() => import('./components/stand/StandSemLogin'));
@@ -67,3 +76,4 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </ThemeProvider>
   </React.StrictMode>,
 );
+window.setTimeout(() => recargaAposDeploy.aoBootOk(), BOOT_OK_MS);
