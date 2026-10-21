@@ -36,7 +36,8 @@ export function cli(args, { input = '', env = {}, cwd = root, signal, onStderr }
   });
 }
 
-export async function runtime(t, directory) {
+/** `env`: só variáveis de teste a mais (ex.: LUCA_WS_PULSO_MS curto). */
+export async function runtime(t, directory, env = {}) {
   const probe = createServer().listen(0, '127.0.0.1');
   await once(probe, 'listening');
   const port = probe.address().port;
@@ -49,6 +50,7 @@ export async function runtime(t, directory) {
       LUCA_SOMPO_OFFLINE: 'true', KAMUI_BASE: 'http://127.0.0.1:9', ROUTER_BASE_URL: 'http://127.0.0.1:9/v1',
       KAMUI_TIMEOUT_MS: '100', ROUTER_TIMEOUT_MS: '100', LUCA_ADMIN_EMAILS: 'admin@cli.test',
       LUCA_MACHINE_TOKEN: 'cli-test-machine-token-local-only-123456789',
+      ...env,
     }, stdio: ['ignore', 'pipe', 'pipe'],
   });
   let log = '';

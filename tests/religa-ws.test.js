@@ -91,13 +91,13 @@ test('jitter: cada religação espera 3 s + 0–999 ms pelo aleatório injetado'
   assert.deepEqual(relogio.prazos, [3000, 3500, 3999, 3999, 3000], 'fora de [0,1) fica preso na faixa');
 });
 
-test('1013 (teto por conta): o close religa no ritmo normal, uma tentativa por prazo, sem tempestade', async () => {
+test('1013 (teto por conta): backoff 3 → 6 → 12 → 24 → 30 s com jitter, uma tentativa por prazo, sem tempestade', async () => {
   const relogio = relogioComPrazos();
   let tentativas = 0;
   const fechamentos = [];
   // Igual ao useLucaState: o connect abre o socket (true), o servidor fecha com 1013
-  // logo depois e o listener de close (que não olha o código) chama `agendar`.
-  const aoFechar = (codigo) => { fechamentos.push(codigo); religa.agendar(); };
+  // logo depois e o listener de close marca a recusa e chama `agendar`.
+  const aoFechar = (codigo) => { fechamentos.push(codigo); if (codigo === 1013) religa.recusado(); religa.agendar(); };
   const religa = criarReligador(async () => {
     tentativas += 1;
     queueMicrotask(() => aoFechar(1013));
@@ -105,13 +105,32 @@ test('1013 (teto por conta): o close religa no ritmo normal, uma tentativa por p
   }, relogio, 3000, () => 0.25);
   await religa.tentar();
   await new Promise((r) => setImmediate(r));
-  for (let ciclo = 1; ciclo <= 5; ciclo += 1) {
+  for (let ciclo = 1; ciclo <= 6; ciclo += 1) {
     assert.equal(relogio.pendentes(), 1, `ciclo ${ciclo}: um agendamento só`);
     assert.equal(tentativas, ciclo, 'nenhuma tentativa fora do prazo');
     await relogio.disparar();
   }
-  assert.ok(relogio.prazos.every((ms) => ms === 3250), 'todo 1013 espera o prazo inteiro');
-  assert.deepEqual(fechamentos, [1013, 1013, 1013, 1013, 1013, 1013]);
+  assert.deepEqual(relogio.prazos, [3250, 6250, 12250, 24250, 30250, 30250, 30250], 'dobra até o teto de 30 s, jitter por cima');
+  assert.deepEqual(fechamentos, Array(7).fill(1013));
+});
+
+test('1013 seguido de conexão aceita: o prazo volta a 3 s; queda comum não entra no backoff', async () => {
+  const relogio = relogioComPrazos();
+  const religa = criarReligador(async () => false, relogio, 3000, () => 0);
+  religa.recusado(); religa.recusado(); religa.recusado();
+  assert.equal(religa.prazoBase(), 12_000);
+  religa.aceito();
+  assert.equal(religa.prazoBase(), 3000);
+  await religa.tentar();
+  await relogio.disparar();
+  assert.deepEqual(relogio.prazos, [3000, 3000], 'falha de rede comum segue em 3 s');
+});
+
+test('fio: 1013 no close marca a recusa e o `state` aceito zera o backoff', () => {
+  const fonte = readFileSync(new URL('../src/hooks/useLucaState.tsx', import.meta.url), 'utf8');
+  const close = fonte.slice(fonte.indexOf("socket.addEventListener('close'"), fonte.indexOf("socket.addEventListener('error'"));
+  assert.match(close, /if \(evento\.code === WS_CODIGO_LIMITE\) religador\.recusado\(\);/);
+  assert.match(fonte, /payload\.kind === 'state'\) \{ religador\.aceito\(\);/);
 });
 
 test('fio: o close do /ws só agenda pelo religador (nenhum código religa na hora)', () => {

@@ -9,6 +9,13 @@ export const RELIGA_MS = 3000;
  * tablets da feira não voltam todos no mesmo instante.
  */
 export const RELIGA_JITTER_MS = 1000;
+/**
+ * Recusa por teto de sockets da conta (1013, server/ws-limites.js): cada recusa
+ * seguida dobra o prazo (3 → 6 → 12 → 24 → 30 s), sem passar do teto, e o
+ * jitter segue por cima. Uma conexão aceita volta ao prazo normal (A3 da revisão).
+ */
+export const RELIGA_RECUSA_TETO_MS = 30_000;
+export const WS_CODIGO_LIMITE = 1013;
 
 interface Relogio {
   agendar: (fn: () => void, ms: number) => unknown;
@@ -36,11 +43,27 @@ export function criarReligador(
   let parado = false;
   let pausado = false;
   let tentando = false;
+  let recusas = 0;
+
+  function prazoBase() {
+    if (recusas === 0) return intervaloMs;
+    return Math.min(intervaloMs * 2 ** (recusas - 1), Math.max(intervaloMs, RELIGA_RECUSA_TETO_MS));
+  }
 
   function agendar() {
     if (parado || pausado || timer !== null) return;
     const jitter = Math.floor(Math.min(Math.max(aleatorio(), 0), 0.999) * RELIGA_JITTER_MS);
-    timer = relogio.agendar(() => { timer = null; void tentar(); }, intervaloMs + jitter);
+    timer = relogio.agendar(() => { timer = null; void tentar(); }, prazoBase() + jitter);
+  }
+
+  /** O servidor recusou com 1013 (teto da conta): a próxima religação espera o dobro. */
+  function recusado() {
+    recusas = Math.min(recusas + 1, 16);
+  }
+
+  /** Conexão aceita (chegou o `state`): volta ao prazo normal. */
+  function aceito() {
+    recusas = 0;
   }
 
   async function tentar() {
@@ -72,7 +95,7 @@ export function criarReligador(
     agendar();
   }
 
-  return { tentar, agendar, parar, pausar, retomar, pausado: () => pausado };
+  return { tentar, agendar, parar, pausar, retomar, recusado, aceito, pausado: () => pausado, prazoBase };
 }
 
 type Religador = ReturnType<typeof criarReligador>;

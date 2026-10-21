@@ -46,5 +46,6 @@ test('/ws fechado com 4401 avisa a sessão recusada; queda comum (1006, 1001, 10
 test('fio: o close do /ws passa o código para a sessão recusada antes de religar', () => {
   const estado = readFileSync(new URL('../src/hooks/useLucaState.tsx', import.meta.url), 'utf8');
   const close = estado.slice(estado.indexOf("socket.addEventListener('close'"), estado.indexOf("socket.addEventListener('error'"));
-  assert.match(close, /sessaoRecusada\.avisarFechamentoWs\(evento\.code\);\s*if \(!closed\) religador\.agendar\(\);/);
+  // Entre os dois pode vir o backoff do 1013 (religador.recusado); a ordem é o que importa.
+  assert.match(close, /sessaoRecusada\.avisarFechamentoWs\(evento\.code\);[\s\S]*?if \(!closed\) religador\.agendar\(\);/);
 });
