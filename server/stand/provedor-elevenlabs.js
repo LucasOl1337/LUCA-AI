@@ -11,6 +11,36 @@ export const HZ_STAND = 24000;
 export const TTS_MODELO_PADRAO = 'eleven_turbo_v2_5';
 export const VOZ_PADRAO_ELEVENLABS = 'Lucas Oliveira';
 const VOZ_ID = /^[A-Za-z0-9]{20}$/;
+
+/**
+ * Vozes que o Totem deixa escolher antes da conversa (Lucas, 21/10). Lista
+ * branca: o navegador manda só a chave; nome e voice_id ficam aqui. `lucas`
+ * segue `LUCA_STAND_VOZ` (padrão "Lucas Oliveira"). As outras são vozes públicas
+ * da Voice Library (todas com rate 1,0: custam o mesmo crédito por caractere);
+ * só funcionam depois de adicionadas à conta, por isso `verificarVoz` confere
+ * antes de usar. Fêmea 1, Otto e Locutor grave entraram em 21/10 (pedido do
+ * Lucas) e já estão na conta; a Andrea segue na lista e volta sozinha quando a
+ * dona religar o compartilhamento e ela for adicionada.
+ */
+export const VOZ_STAND_PADRAO = 'lucas';
+export const VOZES_STAND = Object.freeze({
+  lucas: Object.freeze({ rotulo: 'Lucas Oliveira', voz: null }),
+  femea1: Object.freeze({ rotulo: 'Fêmea 1', voz: 'ohZOfA9iwlZ5nOsoY7LB' }),
+  otto: Object.freeze({ rotulo: 'Otto', voz: 'ycxdm1PRMs962FxyyuJ0' }),
+  locutor: Object.freeze({ rotulo: 'Locutor grave', voz: '4XmhZ74tBbUVCXIYNMMo' }),
+  andrea: Object.freeze({ rotulo: 'Andrea Lot', voz: 'HOfBIVLhom4mc9WvXfyH' }),
+});
+
+/** Chave pedida pelo navegador → chave da lista branca (qualquer outra coisa vira o padrão). */
+export function chaveVozStand(pedido) {
+  const chave = String(pedido ?? '').trim().toLowerCase();
+  return Object.hasOwn(VOZES_STAND, chave) ? chave : VOZ_STAND_PADRAO;
+}
+
+/** Nome ou voice_id da voz de uma chave; `lucas` usa a voz configurada no servidor. */
+export function vozDaChave(chave, vozPadrao = VOZ_PADRAO_ELEVENLABS) {
+  return VOZES_STAND[chaveVozStand(chave)].voz || vozPadrao;
+}
 const MODELO_TTS = /^eleven_[a-z0-9_]+$/;
 
 // Medido em 19/10 (`entregas/totem-voz-rastro.md`): 0,6 s de silêncio fecha a
@@ -59,6 +89,33 @@ export async function resolverVoz({ chave, voz, fetchImpl = globalThis.fetch, ca
   if (iguais.length !== 1) throw new Error(iguais.length ? 'voz_ambigua' : 'voz_nao_encontrada');
   cache.set(pedido, iguais[0].voice_id);
   return iguais[0].voice_id;
+}
+
+export const VERIFICACAO_VOZ_MS = 10 * 60 * 1000;
+const vozesVerificadas = new Map();
+
+/**
+ * A voz existe e a chave pode usá-la? Nome: resolve em /v2/voices. voice_id:
+ * GET /v1/voices/{id} (voz da biblioteca não adicionada responde 404). O
+ * resultado fica 10 min em memória, então uma voz adicionada depois volta sozinha.
+ */
+export async function verificarVoz({ chave, voz, fetchImpl = globalThis.fetch, cache = vozesVerificadas, agora = Date.now() }) {
+  const pedido = String(voz || VOZ_PADRAO_ELEVENLABS).trim();
+  const salvo = cache.get(pedido);
+  if (salvo && agora - salvo.em < VERIFICACAO_VOZ_MS) return salvo.ok;
+  let ok = false;
+  try {
+    if (VOZ_ID.test(pedido)) {
+      const resposta = await fetchImpl(`${URL_API_ELEVENLABS}/v1/voices/${encodeURIComponent(pedido)}`, { headers: { 'xi-api-key': chave }, signal: AbortSignal.timeout(8000) });
+      ok = resposta.ok;
+    } else {
+      ok = Boolean(await resolverVoz({ chave, voz: pedido, fetchImpl, cache: new Map() }));
+    }
+  } catch {
+    ok = false;
+  }
+  cache.set(pedido, { ok, em: agora });
+  return ok;
 }
 
 /**

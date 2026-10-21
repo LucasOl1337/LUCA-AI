@@ -11,6 +11,15 @@ Leia ao mudar a conversa por voz do `/stand`: quem ouve, quem pensa, quem fala, 
 | `elevenlabs` (padrão) | Scribe v2 Realtime, direto do navegador por token de uso único | Claude pelo 9Router Railway, no servidor | ElevenLabs TTS, voz "Lucas Oliveira", no servidor | `ELEVENLABS_API_KEY` + `ROUTER_API_KEY` |
 | `xai` (reserva) | Grok Voice Realtime, tudo num WebSocket do navegador | Grok | Grok | `XAI_API_KEY` ou `XAI_OAUTH_AUTH_FILE` |
 
+### Voz da coruja (seletor do Totem)
+
+Pedido do Lucas em 21/10: antes de abrir o stand, a página `/totem` mostra "Voz da coruja" com **Lucas Oliveira** (padrão) e vozes públicas da Voice Library: **Fêmea 1** (`femea1`, "Roberta", `ohZOfA9iwlZ5nOsoY7LB`), **Otto** (`otto`, `ycxdm1PRMs962FxyyuJ0`), **Locutor grave** (`locutor`, "Leonardo", `4XmhZ74tBbUVCXIYNMMo`) e **Andrea Lot** (`andrea`, `HOfBIVLhom4mc9WvXfyH`). As três primeiras entraram no mesmo dia, a pedido do Lucas, e já foram adicionadas à conta. A escolha fica no `localStorage` do quiosque (`luca:totem:voz`, com try/catch; sem armazenamento vale o padrão) e vai como `voz:'<chave>'` em cada `POST /sessao`.
+
+- **Lista branca.** O servidor só aceita as chaves de `VOZES_STAND` (`server/stand/provedor-elevenlabs.js`). Qualquer outra coisa, inclusive um `voice_id`, vira `lucas`. `lucas` segue `LUCA_STAND_VOZ`.
+- **Por conversa.** A voz fica na conversa (`conversa.voz`) e vale para saudação, respostas e falas prontas daquela sessão. O cache das falas prontas é por voz e modelo.
+- **Voz fora da conta.** Voz da biblioteca só funciona depois de adicionada à conta. Antes de usar, `verificarVoz` faz `GET /v1/voices/{id}` (cache de 10 min). Se falhar, a sessão sai com `voz:'lucas'` e `voz_aviso:{pedida:'andrea', motivo:'voz_indisponivel'}`, e o `status` traz `vozes[].disponivel:false`, que desliga a opção no Totem. Em 21/10 a dona da voz deixou o compartilhamento desligado: a API e o site respondem "Sharing is not enabled for voice", então a Andrea aparece indisponível até ela religar e alguém adicionar a voz à conta do stand. Não precisa de deploy quando isso acontecer.
+- **Custo.** Todas as vozes da biblioteca na lista têm `rate` 1,0: o TTS conta o mesmo crédito por caractere que a voz do Lucas, e o teto diário não muda.
+
 Sem a credencial do provedor escolhido, `GET /api/stand/status` responde `ligado:false` com `motivo:'sem_credencial'`, e o stand abre sem voz.
 
 ## Fluxo de um turno (`elevenlabs`)
@@ -29,6 +38,26 @@ antes de mudar a página, e o stand executa os controles em ordem. Uma nova fala
 do visitante corta o áudio e descarta as ações ainda não consumidas do turno.
 O provedor xAI de reserva recusa esse comando, pois o roteiro depende do fluxo
 de áudio do `SessaoTurnos`.
+
+### Painel "Experimente pedir" e Simulação
+
+Ao lado da coruja (à direita em paisagem, embaixo em retrato), o painel
+`PainelComandos.tsx` mostra os comandos de voz que funcionam, cada um com uma
+frase de exemplo e o que acontece. Ele só aparece quando a voz está ligada (ou
+em `?stub=1`) e some durante o vídeo. A lista vem de `COMANDOS_VOZ` em
+`shared/stand/comandos-voz.ts`, a mesma que `montarPromptBase` põe no prompt do
+cérebro com a ferramenta de cada pedido. `tests/stand-comandos-voz.test.js`
+falha se uma ferramenta do stand ficar sem comando no painel ou se um comando
+apontar para ferramenta que não existe.
+
+"Testar o simulador", "quero jogar", "abre a simulação" e "testar a gameplay"
+abrem a Simulação. Pedidos curtos assim (`comandoDireto`) não passam pelo modelo:
+o servidor fala a frase pronta `FALAS.simulacao` e manda `abrir_simulacao` com
+`apos_fala:true`. A conversa por voz termina quando a Simulação abre. Perguntas
+sobre o simulador ("como funciona o simulador?") seguem para o modelo, que
+também tem a ferramenta `abrir_simulacao`. Antes de 21/10 não havia ação que
+levasse ao modo Simulação: o modelo abria a aba de telemetria do painel SOMPO ou
+só respondia.
 
 ```mermaid
 sequenceDiagram

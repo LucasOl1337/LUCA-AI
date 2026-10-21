@@ -9,8 +9,11 @@
 import { PAGINAS_SITE, paginaDaAcao, validarAcaoSite, type PaginaSite } from '../../../../shared/stand/acoes-site.ts';
 import type { EntradaModo, Modo } from '../modoStand';
 
+/** Entradas de modo que a voz pode pedir: abrir/fechar página e ir pra Simulação. */
+export type EntradaModoDaVoz = Extract<EntradaModo, { tipo: 'abrir_pagina' } | { tipo: 'voltar_coruja' }> | { tipo: 'ir'; modo: 'simulacao' };
+
 export type PassoStand =
-  | { tipo: 'modo'; entrada: Extract<EntradaModo, { tipo: 'abrir_pagina' } | { tipo: 'voltar_coruja' }> }
+  | { tipo: 'modo'; entrada: EntradaModoDaVoz }
   | { tipo: 'executor'; caminho: string; acao: string; args: Record<string, string> };
 
 export type PlanoStand = { ok: true; passos: PassoStand[] } | { ok: false; motivo: string };
@@ -26,6 +29,8 @@ export function planejarAcao(acao: unknown, args: unknown, atual: { modo: Modo; 
     return { ok: true, passos: [{ tipo: 'modo', entrada: { tipo: 'abrir_pagina', pagina: validado.args.pagina as PaginaSite } }] };
   }
   if (validado.acao === 'voltar_coruja') return { ok: true, passos: [{ tipo: 'modo', entrada: { tipo: 'voltar_coruja' } }] };
+  // "Testar o simulador": o stand vai direto pro modo Simulação (o Trator MAX no controle).
+  if (validado.acao === 'abrir_simulacao') return { ok: true, passos: [{ tipo: 'modo', entrada: { tipo: 'ir', modo: 'simulacao' } }] };
   // O tour é do cérebro: ele manda as ações do roteiro uma a uma.
   if (validado.acao === 'tour_iniciar') return { ok: false, motivo: 'O tour é conduzido pela voz do stand, passo a passo.' };
   const pagina = paginaDaAcao(validado.acao);
@@ -36,7 +41,7 @@ export function planejarAcao(acao: unknown, args: unknown, atual: { modo: Modo; 
 }
 
 export interface DepsPlano {
-  despacharModo(entrada: Extract<EntradaModo, { tipo: 'abrir_pagina' } | { tipo: 'voltar_coruja' }>): void;
+  despacharModo(entrada: EntradaModoDaVoz): void;
   /** Espera o Executor do iframe responder no caminho certo. */
   aguardarExecutor(caminho: string): Promise<boolean>;
   enviarAcaoSite(acao: string, args: Record<string, unknown>): Promise<{ ok: boolean; mensagem: string; retrato?: string }>;
@@ -65,7 +70,9 @@ export async function executarPlano(plano: PlanoStand, deps: DepsPlano): Promise
   for (const passo of plano.passos) {
     if (passo.tipo === 'modo') {
       deps.despacharModo(passo.entrada);
-      mensagem = passo.entrada.tipo === 'voltar_coruja' ? 'Voltei pra coruja, sem página do site na tela.' : `Abri a página ${passo.entrada.pagina}.`;
+      mensagem = passo.entrada.tipo === 'voltar_coruja' ? 'Voltei pra coruja, sem página do site na tela.'
+        : passo.entrada.tipo === 'ir' ? 'Abri a Simulação do Trator MAX; a pessoa dirige no controle.'
+          : `Abri a página ${passo.entrada.pagina}.`;
       continue;
     }
     if (!(await deps.aguardarExecutor(passo.caminho))) {

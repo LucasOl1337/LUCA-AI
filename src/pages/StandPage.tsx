@@ -22,6 +22,7 @@ import { avisoDeSaida, barraVisivel, modoInicial, modosDisponiveis, reduzirModo,
 import type { AcaoNavegacao } from '@/components/stand/navegacaoPad';
 import { usePadStand } from '@/components/stand/usePadStand';
 import { AvisoSaida, BarraModos, DicaControle, preCarregarSimulador, SimulacaoStand, VitrineStand } from '@/components/stand/Modos';
+import { PainelComandos } from '@/components/stand/PainelComandos';
 import '@/stand.css';
 
 /** Margem segura padrão (% de cada lado): a moldura de MDF come as bordas. */
@@ -243,6 +244,8 @@ export default function StandPage() {
   }, [sair, terminarVideo, iniciar, encerrarVoz]);
 
   const video = estado.tela === 'video' ? videoDoStand(estado.videoId, modoStub) : undefined;
+  // Painel "Experimente pedir" ao lado da coruja: só com voz (sem voz os pedidos não funcionam).
+  const painelComandos = estado.tela !== 'video' && (modoStub || vozStand === 'ligada');
   const videoAusente = estado.tela === 'video' && !video;
   useEffect(() => { if (videoAusente) terminarVideo(); }, [videoAusente, terminarVideo]);
 
@@ -274,6 +277,7 @@ export default function StandPage() {
       data-tela={estado.tela}
       data-sessao={voz.ativa ? 'ativa' : voz.fim?.motivo ?? 'parada'}
       data-voz-stand={vozStand}
+      data-painel={painelComandos || undefined}
       data-motivo={motivoVoz || undefined}
       data-escuta={escuta.estado}
       onPointerDown={tocar}
@@ -282,7 +286,7 @@ export default function StandPage() {
         <PlayerVideo variante={variante} nivel={nivel} voz={estado.voz} arquivo={video.arquivo} titulo={video.titulo} aoTerminar={terminarVideo} />
       )}
       {modo.modo === 'coruja' && (
-        <div className="stand-seguro">
+        <div className="stand-seguro" data-painel={painelComandos || undefined}>
           {estado.tela === 'atracao' && (
             <Atracao
               variante={variante}
@@ -292,6 +296,7 @@ export default function StandPage() {
             />
           )}
           {estado.tela === 'conversa' && <Conversa variante={variante} nivel={nivel} voz={estado.voz} legenda={estado.legenda} />}
+          {painelComandos && <PainelComandos />}
           <p className="stand-selo" aria-label="Assistente de IA">Assistente de IA</p>
           {aviso && estado.tela === 'atracao' && <p className="stand-aviso-equipe">{aviso}</p>}
         </div>

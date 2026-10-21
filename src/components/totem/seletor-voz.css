@@ -1,0 +1,10 @@
+.totem-voz { border: 0; padding: 0; margin: 4px 0 8px; }
+.totem-voz legend { font-size: 13px; font-weight: 600; color: #53d4ff; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 10px; }
+.totem-voz-opcoes { display: flex; flex-wrap: wrap; gap: 12px; }
+.totem-voz-opcao { position: relative; display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: center; flex: 1 1 220px; max-width: 360px; min-height: 44px; padding: 12px 16px; border: 1px solid #ffffff26; border-radius: 12px; background: #0b131c; cursor: pointer; }
+.totem-voz-opcao:has(input:checked) { border-color: #53d4ff; background: #0f2233; }
+.totem-voz-opcao:has(input:focus-visible) { outline: 3px solid #53d4ff; outline-offset: 3px; }
+.totem-voz-opcao[data-indisponivel] { opacity: .55; cursor: not-allowed; }
+.totem-voz-opcao input { grid-row: span 2; width: 18px; height: 18px; accent-color: #53d4ff; margin: 0; }
+.totem-voz-nome { font-weight: 650; color: #e8edf3; }
+.totem-voz-detalhe { font-size: 13px; color: #9fb0c2; }

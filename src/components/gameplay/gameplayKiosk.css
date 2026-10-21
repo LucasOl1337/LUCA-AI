@@ -1,5 +1,8 @@
 /* Gameplay da Simulação: palco em tela cheia, painel e desafio da Operador por cima. */
-.gameplay-kiosk { position: absolute; inset: 0; overflow: hidden; background: #07100c; user-select: none; }
+/* O HUD (painel, mapa, alerta, resultado) mede em cqh/cqw: escala pelo quadro do jogo,
+   não pela janela. Em tela inteira dá o mesmo que vh/vw; embutido na página, o painel e
+   o mapa ficam dentro do quadro em vez de crescer com a altura da janela. */
+.gameplay-kiosk { position: absolute; inset: 0; overflow: hidden; background: #07100c; user-select: none; container-type: size; }
 .gameplay-kiosk-palco { position: absolute; inset: 0; cursor: grab; touch-action: none; }
 .gameplay-kiosk-palco:active { cursor: grabbing; }
 .gameplay-kiosk-palco canvas { display: block; width: 100%; height: 100%; }
