@@ -33,6 +33,7 @@
 | [`docs/cadastro-veiculos-trator-especificacao.md`](./docs/cadastro-veiculos-trator-especificacao.md) | SOMENTE ao conferir o pedido original do cadastro e as fotos usadas na provenance do MAX TRATOR. |
 | [`docs/sensor-lab.md`](./docs/sensor-lab.md) | SOMENTE ao mudar o laboratorio 3D do sensor (`/sensor`). |
 | [`docs/stand-tailnet.md`](./docs/stand-tailnet.md) | SOMENTE ao abrir o `/stand` com voz em outra maquina da tailnet (`scripts/stand-tailnet.sh`). |
+| [`docs/feira.md`](./docs/feira.md) | No dia da feira ou ao preparar a equipe do stand: o que abrir no totem e no tablet, `feira checar` e como recuperar internet, login ou coruja muda. Escrito para quem nao e dev. |
 | [`docs/stand-voz.md`](./docs/stand-voz.md) | SOMENTE ao mudar a conversa por voz do `/stand` (Scribe, cérebro Claude, TTS, barge-in, tetos de crédito, reserva xai). |
 | [`docs/stand-publico.md`](./docs/stand-publico.md) | SOMENTE ao mudar o que a IA do `/stand` responde ao publico; e a fonte principal de `buscar_no_repo`. |
 | [`docs/adr/`](./docs/adr/) | SOMENTE ao rever uma decisao de arquitetura registrada (ex.: Simulacao dentro do `/stand`). |
