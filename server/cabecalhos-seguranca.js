@@ -4,15 +4,24 @@
 // O /stand mostra as páginas públicas num iframe da mesma origem (Totem-Site
 // Q2): só elas aceitam moldura, e só do próprio site; o resto segue DENY.
 // O /stand delega a câmera ao iframe da sonolência (`allow="camera"`).
+// O /gameplay só ganha câmera com `?webcam=1` (detector de sonolência na
+// cabine, opção do CP3 de 19/10): sem o parâmetro segue `camera=()`.
 const STAND = /^\/stand\/?$/;
 const SONOLENCIA = /^\/sonolencia\/?$/;
+const GAMEPLAY = /^\/gameplay\/?$/;
 const WORKER_VISAO = /^\/assets\/drowsiness-worker-[\w-]+\.js$/;
 const EMOLDURAVEL = /^\/(?:|luca-ai|sompo|laboratorio|sensor|sonolencia)\/?$/;
 
-export function cabecalhosDeSeguranca(caminho) {
+/** `busca` é a query crua (`?webcam=1` ou `webcam=1`); só o /gameplay a consulta. */
+export function usaCamera(caminho, busca = '') {
+  if (SONOLENCIA.test(caminho)) return true;
+  return GAMEPLAY.test(caminho) && new URLSearchParams(String(busca)).get('webcam') === '1';
+}
+
+export function cabecalhosDeSeguranca(caminho, busca = '') {
   const script = WORKER_VISAO.test(caminho) ? "'self' 'wasm-unsafe-eval'" : "'self'";
   const conexoes = STAND.test(caminho) ? "'self' ws: wss: https://api.x.ai wss://api.x.ai wss://api.elevenlabs.io" : "'self' ws: wss:";
-  const permissoes = SONOLENCIA.test(caminho)
+  const permissoes = usaCamera(caminho, busca)
     ? 'camera=(self), microphone=(), geolocation=()'
     : STAND.test(caminho)
       ? 'camera=(self), microphone=(self), geolocation=()'

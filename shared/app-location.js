@@ -112,6 +112,7 @@ const EMPTY_QUERY = Object.freeze({
   stub: '',
   simulacao: '',
   quiosque: '',
+  webcam: '',
 });
 
 export function emptyAppLocation() {
@@ -185,6 +186,8 @@ function parseQuery(search) {
     simulacao: readParam(search, 'simulacao') === 'gameplay' ? 'gameplay' : '',
     // /gameplay?quiosque=1: abre direto na cabine, sem landing nem menu (F5 no totem volta jogando).
     quiosque: readParam(search, 'quiosque') === '1' ? '1' : '',
+    // /gameplay?webcam=1: detector de sonolência da /sonolencia dentro da cabine (opção, CP3 19/10).
+    webcam: readParam(search, 'webcam') === '1' ? '1' : '',
   };
 }
 
@@ -248,6 +251,7 @@ export function formatAppUrl(location) {
 
   if (page === 'sensor' && loc.veiculo === 'trator') params.set('veiculo', 'trator');
   if (page === 'gameplay' && loc.quiosque === '1') params.set('quiosque', '1');
+  if (page === 'gameplay' && loc.webcam === '1') params.set('webcam', '1');
 
   if (page === 'stand') {
     setIfPresent(params, 'margem', parseMargem(String(loc.margem || '')));
@@ -309,16 +313,18 @@ export function formatAppUrl(location) {
 
 /**
  * Páginas com Permissions-Policy própria (server/cabecalhos-seguranca.js): o
- * /stand usa o microfone, a /sonolencia usa a câmera. A política vale para o
- * documento inteiro, então pushState entre grupos diferentes deixaria a página
- * nova com a política da anterior (o /totem → "Abrir Totem" abria o /stand com
- * `microphone=()`, 20/10). Trocar de grupo exige carregar o documento.
+ * /stand usa o microfone; a /sonolencia e o /gameplay?webcam=1 usam a câmera.
+ * A política vale para o documento inteiro, então pushState entre grupos
+ * diferentes deixaria a página nova com a política da anterior (o /totem →
+ * "Abrir Totem" abria o /stand com `microphone=()`, 20/10). Trocar de grupo
+ * exige carregar o documento.
  */
-const POLITICA_DO_DOCUMENTO = Object.freeze({ stand: 'stand', sonolencia: 'sonolencia' });
-
 export function politicaDoDocumento(location) {
-  const page = location?.kind && location.kind !== 'app' ? 'inicio' : location?.page;
-  return POLITICA_DO_DOCUMENTO[page] ?? 'padrao';
+  if (location?.kind && location.kind !== 'app') return 'padrao';
+  if (location?.page === 'stand') return 'stand';
+  if (location?.page === 'sonolencia') return 'camera';
+  if (location?.page === 'gameplay' && location.webcam === '1') return 'camera';
+  return 'padrao';
 }
 
 /** A navegação de `atual` para `proxima` precisa de documento novo (cabeçalhos novos)? */
