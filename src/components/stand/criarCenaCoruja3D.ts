@@ -4,8 +4,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { restoreSompoTextures, useSompoExternalTextures } from '../sompo/restoreSompoTextures';
 import type { EstadoVoz } from './canal';
 import {
-  CLIPE_ENTRADA, CLIPE_POR_VOZ, CORUJA_3D_URL, CROSSFADE_S, ENQUADRAMENTO, OSSO_PESCOCO,
-  acenoFala, brilhoCoruja3D, type MemoriaBrilho,
+  CLIPE_ENTRADA, CLIPE_POR_VOZ, CORUJA_3D_URL, CROSSFADE_S, ENQUADRAMENTO, MORPH_BICO, MORPH_PISCAR, OSSO_PESCOCO,
+  acenoFala, brilhoCoruja3D, novaMemoriaRosto, rostoCoruja3D, type MemoriaBrilho,
 } from './coruja3dRig';
 
 /**
@@ -24,6 +24,21 @@ interface Opcoes {
   aoFalhar(erro: unknown): void;
   /** Por quadro, depois do render: voz em vigor e nível de fala suavizado (0..1), para o halo. */
   aoQuadro?(voz: EstadoVoz, fala: number, agoraMs: number): void;
+}
+
+/** Índices dos morph targets do rosto numa malha; ausentes ficam -1 (GLB sem rosto segue sem ele). */
+interface Rosto { influencias: number[]; piscar: number; bico: number }
+
+function acharRosto(raiz: THREE.Object3D): Rosto[] {
+  const rostos: Rosto[] = [];
+  raiz.traverse((no) => {
+    const malha = no as THREE.Mesh;
+    const nomes = malha.isMesh ? malha.morphTargetDictionary : undefined;
+    if (!nomes || !malha.morphTargetInfluences) return;
+    const r = { influencias: malha.morphTargetInfluences, piscar: nomes[MORPH_PISCAR] ?? -1, bico: nomes[MORPH_BICO] ?? -1 };
+    if (r.piscar >= 0 || r.bico >= 0) rostos.push(r);
+  });
+  return rostos;
 }
 
 function liberar(raiz: THREE.Object3D) {
@@ -71,6 +86,10 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
   const abortar = new AbortController();
   const relogio = new THREE.Timer();
   const memoria: MemoriaBrilho = { nivel: 0 };
+  const memoriaRosto = novaMemoriaRosto(performance.now());
+  const movimentoReduzido = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+  let rostos: Rosto[] = [];
+  let entrada: THREE.AnimationAction | null = null;
   let modelo: THREE.Object3D | null = null;
   let mixer: THREE.AnimationMixer | null = null;
   let acoes = new Map<string, THREE.AnimationAction>();
@@ -120,6 +139,14 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
     const v = vozAtual ?? 'ocioso';
     const brilho = brilhoCoruja3D(memoria, v, nivel.current, agora);
     for (const m of emissivos) m.emissiveIntensity = brilho;
+    const rosto = rostoCoruja3D(memoriaRosto, v, nivel.current, agora, {
+      acenando: entrada !== null && atual === entrada && entrada.isRunning(),
+      movimentoReduzido: movimentoReduzido?.matches ?? false,
+    });
+    for (const r of rostos) {
+      if (r.piscar >= 0) r.influencias[r.piscar] = rosto.piscar;
+      if (r.bico >= 0) r.influencias[r.bico] = rosto.bico;
+    }
     const aceno = acenoFala(memoria, v);
     if (pescoco?.parent && aceno > 0.0005) {
       // Soma o aceno por cima do clipe: eixo lateral do mundo (X) levado ao espaço do pai do osso.
@@ -163,6 +190,7 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
       }
     });
     pescoco = modelo.getObjectByName(OSSO_PESCOCO) ?? null;
+    rostos = acharRosto(modelo);
     cena.add(modelo);
     mixer = new THREE.AnimationMixer(modelo);
     acoes = new Map(gltf.animations.map((clipe) => [clipe.name, mixer!.clipAction(clipe)]));
@@ -178,16 +206,17 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
     }
     // Entrada: acena uma vez (só ocioso) e cai no clipe do estado; se a voz mudar
     // no meio, `trocarEstado` faz o crossfade e o fim do aceno não mexe em nada.
-    const entrada = acoes.get(CLIPE_ENTRADA);
+    entrada = acoes.get(CLIPE_ENTRADA) ?? null;
     if (entrada && voz() === 'ocioso') {
-      entrada.setLoop(THREE.LoopOnce, 1).clampWhenFinished = true;
-      entrada.play();
-      atual = entrada;
+      const aceno = entrada;
+      aceno.setLoop(THREE.LoopOnce, 1).clampWhenFinished = true;
+      aceno.play();
+      atual = aceno;
       vozAtual = 'ocioso';
       mixer.addEventListener('finished', function aoAcabar(e) {
-        if (e.action !== entrada) return;
+        if (e.action !== aceno) return;
         mixer?.removeEventListener('finished', aoAcabar);
-        if (atual !== entrada) return;
+        if (atual !== aceno) return;
         vozAtual = null;
         trocarEstado(voz());
       });

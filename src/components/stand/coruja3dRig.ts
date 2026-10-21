@@ -1,4 +1,5 @@
 import type { EstadoVoz } from './canal';
+import { suavizarBoca } from './lipSync';
 
 /**
  * Coruja 3D (variante `coruja-3d`): parâmetros puros, sem three.js, para o
@@ -58,6 +59,74 @@ export function brilhoCoruja3D(m: MemoriaBrilho, voz: EstadoVoz, nivelAudio: num
     case 'pensando': return 0.7 + (Math.sin(t * 2.4) * 0.5 + 0.5) * 0.9;
     default: return 0.45 + (Math.sin(t * 1.05) * 0.5 + 0.5) * 0.25;
   }
+}
+
+/**
+ * Rosto: a malha `CorujaRosto` do GLB tem dois morph targets (ver
+ * `scripts/stand/coruja3d_rosto.py`). `piscar` 0 = olho aberto, 1 = fechado;
+ * `bico_abre` 0 = fechado, 1 = aberto (32°).
+ */
+export const MORPH_PISCAR = 'piscar';
+export const MORPH_BICO = 'bico_abre';
+export const PISCADA_MS = 120;
+export const PISCADA_INTERVALO_MS = Object.freeze({ min: 2000, max: 6000 });
+/** Pensando: pálpebra meio caída, como o olho 0,62 aberto da Coruja A. */
+export const PALPEBRA_PENSANDO = 0.38;
+
+export interface MemoriaRosto {
+  /** Quando a próxima piscada começa (ms, relógio do rAF). */
+  proxima: number;
+  /** Início da piscada em curso, ou -1. */
+  inicio: number;
+  bico: number;
+  anterior: number;
+}
+
+export function novaMemoriaRosto(agoraMs: number, sorteio: () => number = Math.random): MemoriaRosto {
+  return { proxima: agoraMs + intervaloPiscada(sorteio), inicio: -1, bico: 0, anterior: agoraMs };
+}
+
+function intervaloPiscada(sorteio: () => number): number {
+  const { min, max } = PISCADA_INTERVALO_MS;
+  return min + sorteio() * (max - min);
+}
+
+/**
+ * Pesos dos morph targets por quadro. Pisca a cada 2–6 s por 120 ms (fecha e
+ * abre em triângulo), nunca durante o aceno de entrada nem com movimento
+ * reduzido. Pensando deixa a pálpebra meio caída. O bico só abre falando,
+ * pelo nível de áudio suavizado como a boca da Coruja A (`suavizarBoca`).
+ */
+export function rostoCoruja3D(
+  m: MemoriaRosto,
+  voz: EstadoVoz,
+  nivelAudio: number,
+  agoraMs: number,
+  { acenando = false, movimentoReduzido = false, sorteio = Math.random }:
+    { acenando?: boolean; movimentoReduzido?: boolean; sorteio?: () => number } = {},
+): { piscar: number; bico: number } {
+  const dt = Math.min(100, Math.max(0, agoraMs - m.anterior));
+  m.anterior = agoraMs;
+  m.bico = suavizarBoca(m.bico, voz === 'falando' ? nivelAudio : 0, dt);
+
+  const base = voz === 'pensando' ? PALPEBRA_PENSANDO : 0;
+  if (movimentoReduzido || acenando) {
+    // Sem piscada: com movimento reduzido nunca; no aceno, adia para depois dele.
+    m.inicio = -1;
+    if (acenando && m.proxima <= agoraMs) m.proxima = agoraMs + intervaloPiscada(sorteio);
+    return { piscar: base, bico: m.bico };
+  }
+  if (m.inicio < 0 && agoraMs >= m.proxima) {
+    m.inicio = agoraMs;
+    m.proxima = agoraMs + PISCADA_MS + intervaloPiscada(sorteio);
+  }
+  let fechado = 0;
+  if (m.inicio >= 0) {
+    const t = (agoraMs - m.inicio) / PISCADA_MS;
+    if (t >= 1) m.inicio = -1;
+    else fechado = 1 - Math.abs(1 - 2 * t);
+  }
+  return { piscar: base + (1 - base) * fechado, bico: m.bico };
 }
 
 /** Aceno de cabeça extra na fala (rad), a partir do nível suavizado em `MemoriaBrilho`. */

@@ -24,7 +24,8 @@ Head_1/Head_2 (pescoço/cabeça), bone_10/11 (asa direita: ombro/antebraço),
 bone_12/13 (asa esquerda). Head_0 carrega as asas, então nunca é girado.
 Rotações são dadas em eixos do mundo e convertidas para o espaço de repouso de
 cada osso. O rig não tem osso de bico/pálpebra (testado: bone_6..9 e bone_14
-movem os penachos), então a fala é corpo + brilho, não boca.
+movem os penachos); piscar e bico vêm de uma malha extra com shape keys
+(`coruja3d_rosto.py`), presa 100% à cabeça.
 """
 import datetime
 import hashlib
@@ -244,6 +245,10 @@ mod.delimit = {'SEAM', 'UV'}
 # Armature vem antes na pilha; o decimate tem de ir para o topo antes de aplicar.
 bpy.ops.object.modifier_move_to_index(modifier=mod.name, index=0)
 bpy.ops.object.modifier_apply(modifier=mod.name)
+# Pálpebras e bico inferior: malha extra com shape keys `piscar` e `bico_abre` (ver coruja3d_rosto.py).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from coruja3d_rosto import adicionar_rosto  # noqa: E402
+rosto = adicionar_rosto(mesh, arm)
 for image in bpy.data.images:
     if image.size[0] > ATLAS:
         image.scale(ATLAS, ATLAS)
@@ -298,7 +303,10 @@ proveniencia = {
         'decimate': {'type': 'COLLAPSE', 'ratio': round(mod.ratio, 4), 'delimit': ['SEAM', 'UV']},
         'atlas': ATLAS, 'jpegQuality': QUALIDADE_JPEG,
         'emissive': 'frisos azul-claros da cor base (visor, fones, microfone), 512 px',
+        'rosto': 'malha CorujaRosto (100% tripo::Head_2) com morph targets piscar e bico_abre, '
+                 'scripts/stand/coruja3d_rosto.py',
     },
+    'morphTargets': [k.name for k in rosto.data.shape_keys.key_blocks[1:]],
     'animations': {a.name: round(a.frame_range[1] - a.frame_range[0]) for a in bpy.data.actions},
     'fps': FPS,
     'triangles': tris,
