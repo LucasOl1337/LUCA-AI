@@ -32,6 +32,8 @@ export async function loadFrontendModule(path) {
     // Folha de estilo não muda comportamento; o Vite cuida dela no build.
     loader: { '.css': 'empty' },
     plugins: [urlDoVite],
+    // `new Worker(new URL(..., import.meta.url))` é do Vite; no teste o worker é injetado.
+    logOverride: { 'empty-import-meta': 'silent' },
   });
   const module = { exports: {} };
   new Function('require', 'module', 'exports', result.outputFiles[0].text)(
