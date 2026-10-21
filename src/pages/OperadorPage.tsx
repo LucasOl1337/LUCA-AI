@@ -49,7 +49,10 @@ export function OperadorVista({ retrato, agora, som, oculto = false, aoTrocarSom
     : sinal.nivel === 'pausado' ? 'Jogo pausado no totem'
     : sinal.nivel === 'sem-sinal' ? `Sem sinal há ${sinal.segundos} s` : 'Aguardando o totem';
   // `sono` só chega com a webcam da cabine ligada no totem (/gameplay?webcam=1).
-  const painel = retrato ? alertaCabine(retrato.estado, retrato.sono ?? null) : null;
+  // Só vale ao vivo: sem sinal, a última leitura é velha e não pode deixar o
+  // alarme de sono aceso no tablet (soak luca-soak item 5, 21/10).
+  const sono = sinal.nivel === 'ao-vivo' ? retrato?.sono ?? null : null;
+  const painel = retrato ? alertaCabine(retrato.estado, sono) : null;
   return (
     <section className="operador" data-sinal={sinal.nivel} data-oculto={oculto || undefined} aria-labelledby="operador-titulo">
       <header className="operador-topo">
@@ -83,11 +86,11 @@ export function OperadorVista({ retrato, agora, som, oculto = false, aoTrocarSom
             <article className="operador-card" data-alerta={painel.geofence.nivel !== 'fora'}>
               <span>Zona de risco</span><strong>{painel.geofence.zona?.rotulo ?? 'Fora das zonas'}</strong>
             </article>
-            {retrato.sono && (
-              <article className="operador-card" data-motorista={retrato.sono.status} data-alerta={painel.sono}>
+            {sono && (
+              <article className="operador-card" data-motorista={sono.status} data-alerta={painel.sono}>
                 <span>Motorista · webcam</span>
-                <strong>{ROTULO_SONO[retrato.sono.status]}</strong>
-                {retrato.sono.closedMs > 0 && <small>Olhos fechados há {segundosSono(retrato.sono.closedMs)}</small>}
+                <strong>{ROTULO_SONO[sono.status]}</strong>
+                {sono.closedMs > 0 && <small>Olhos fechados há {segundosSono(sono.closedMs)}</small>}
               </article>
             )}
             <article className="operador-card">
