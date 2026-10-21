@@ -4384,11 +4384,12 @@ if (fs.existsSync(indexPath)) {
 wss.on('connection', (socket, req) => {
   const userId = req?.auth?.user?.id || null;
   socket.userId = userId;
-  socket.sessionId = req?.auth?.session?.id || null;
   if (!userId) {
     socket.close(1008, 'workspace_user_required');
     return;
   }
+  // Sessão que abriu o socket: logout/expiração dela fecha este socket (ws-sessao.js).
+  socket.sessionId = req?.auth?.session?.id || null;
   ensureWorkspace(userId);
   runWithWorkspaceUser(userId, () => {
     socket.send(JSON.stringify({ kind: 'state', state: publicStateSnapshot() }));
