@@ -2,7 +2,7 @@
 
 Gerada por `npm run cli:docs` a partir de `cli/catalog.js`. Não editar à mão.
 
-123 comandos; 102 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
+124 comandos; 102 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
 
 IDs são argumentos posicionais. Campos comuns podem ser flags; corpos completos usam `--data @arquivo.json`. Flags prevalecem sobre o corpo; objetos aninhados não são mesclados. Campos string são literais; apenas campos JSON e `--data` interpretam `@arquivo`/`-`.
 
@@ -989,6 +989,16 @@ Reproduzir observações de olhos; sem câmera/inferência/som.
 Comando local, sem iniciar o runtime.
 
 `--sensitivity` (string): low, normal ou high
+
+### `feira checar`
+
+Conferir o dia da feira só com GET e sem login: health, versão, /api/state 401, assets reais de /stand, /gameplay, /operador e /totem (não o fallback SPA), GLB da coruja e Permissions-Policy (microfone no /stand); sai com código 1 se algo falhar.
+
+Só GET e sem sessão, contra a origem escolhida; não altera nada.
+
+`--url` (string): Origem a conferir; padrão --base-url, LUCA_URL ou o perfil
+
+Exemplo: `luca feira checar --url https://luca-ai.com.br --pretty`
 
 ### `api <method> <path>`
 

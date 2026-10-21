@@ -136,6 +136,7 @@ export const commands = [
   local('sensor scenarios', 'Listar ensaios e parâmetros da física MEMS'),
   local('sensor sample', 'Leitura física determinística; não renderiza 3D', [s('scenario', '', true), n('parameter'), n('time', 'Tempo em segundos')]),
   local('drowsiness evaluate', 'Reproduzir observações de olhos; sem câmera/inferência/som', [s('sensitivity', 'low, normal ou high')]),
+  local('feira checar', 'Conferir o dia da feira só com GET e sem login: health, versão, /api/state 401, assets reais de /stand, /gameplay, /operador e /totem (não o fallback SPA), GLB da coruja e Permissions-Policy (microfone no /stand); sai com código 1 se algo falhar', [s('url', 'Origem a conferir; padrão --base-url, LUCA_URL ou o perfil')], { network: true, example: 'feira checar --url https://luca-ai.com.br --pretty' }),
   local('api', 'Requisição para rota /api/ na origem selecionada', [], { args: ['method', 'path'], raw: true, auth: 'session' }),
 ];
 
