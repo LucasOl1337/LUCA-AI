@@ -233,18 +233,18 @@ export function criarPassos(els: CursorElementos) {
     narrar('Abrindo a demonstração na fazenda');
     const inicio = '.lab-demo-start';
     const biblioteca = 'button.lab-demo-library';
-    await aguardar(() => achar(`${inicio} button`) || achar(biblioteca) || achar('.lab-demo-badge'), 15000, 'A demonstração da fazenda não está disponível nesta instalação.');
-    if (achar('.lab-demo-badge')) return 'A demonstração já está aberta.';
+    await aguardar(() => achar(`${inicio} button`) || achar(biblioteca) || achar('.lab-demo-badge'), 15000, 'Demonstração da fazenda indisponível neste totem; veja o Sensor em ação.');
+    if (achar('.lab-demo-badge')) return 'DEMONSTRAÇÃO da fazenda já está aberta (percurso sintético).';
     if (achar(`${inicio} button`)) await clicar(`${inicio} button`, 'o botão Ver caminhão em movimento', 15000);
     else await clicar(biblioteca, 'o botão Caminhão na fazenda', 15000);
-    await aguardar(() => achar('.lab-demo-badge'), 8000, 'A demonstração não abriu.');
-    return 'Demonstração da fazenda rodando.';
+    await aguardar(() => achar('.lab-demo-badge'), 8000, 'A demonstração da fazenda não abriu; veja o Sensor em ação.');
+    return 'DEMONSTRAÇÃO da fazenda rodando: percurso sintético, não é operação real.';
   }
 
   async function labPausa(pausar: boolean) {
     await garantirPagina('/laboratorio', 'do laboratório');
     const rotulo = pausar ? 'Pausar reprodução' : 'Reproduzir operação';
-    if (!achar('.lab-play')) throw new FalhaAcao('Abra a demonstração primeiro.');
+    if (!achar('.lab-play:not(:disabled)')) throw new FalhaAcao('Nada tocando no laboratório; peça "ver a fazenda em 3D" primeiro.');
     if (!achar(`.lab-play[aria-label="${rotulo}"]`)) return;
     narrar(pausar ? 'Pausando o replay' : 'Continuando o replay');
     await clicar(`.lab-play[aria-label="${rotulo}"]`, 'o botão de reprodução');
@@ -255,6 +255,9 @@ export function criarPassos(els: CursorElementos) {
   async function labCamera(modo: string) {
     await garantirPagina('/laboratorio', 'do laboratório');
     narrar(`Câmera: ${ROTULO_CAMERA_LAB[modo]}`);
+    if (modo === 'acompanhar' && !achar('.lab-demo-badge') && !achar('.lab-play:not(:disabled)')) {
+      throw new FalhaAcao('A câmera Acompanhar segue a máquina; peça "ver a fazenda em 3D" primeiro.');
+    }
     await clicarTexto('.lab-camera-control', new RegExp(`^${ROTULO_CAMERA_LAB[modo]}$`), `a câmera ${ROTULO_CAMERA_LAB[modo]} (acompanhar pede a demonstração aberta)`, 10000);
   }
 
