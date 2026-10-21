@@ -52,7 +52,7 @@
 /* Bordas vermelhas de "dano": centro livre para dirigir, vermelho só nas bordas. */
 .gameplay-painel-vinheta {
   position: absolute; inset: 0; pointer-events: none; opacity: 0;
-  background: radial-gradient(ellipse 78% 72% at 50% 50%, transparent 55%, #e5483b55 78%, #b3110cd0 100%);
+  background: radial-gradient(ellipse 78% 72% at 50% 50%, transparent 50%, #e5483b66 74%, #b3110ce0 100%);
   transition: opacity .12s;
 }
 .gameplay-painel-vinheta[data-nivel='alerta'] { animation: gameplay-dano .5s ease-in-out infinite alternate; }
