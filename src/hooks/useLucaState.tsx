@@ -16,7 +16,7 @@ import type {
   WsPayload,
 } from '@/lib/types';
 import { aoVivo, TIPO_RETRATO } from '@/lib/gameplayAoVivo';
-import { criarReligador, ligarCicloDaPagina } from '@/lib/religaWs';
+import { criarReligador, ligarCicloDaPagina, WS_CODIGO_LIMITE } from '@/lib/religaWs';
 import { sessaoRecusada } from '@/lib/sessaoRecusada';
 
 const fallbackDatabase: DatabaseState = {
@@ -397,6 +397,8 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
         // 4401 = sessão encerrada no servidor: o AuthProvider revalida e leva ao login.
         // O religador segue: se outra aba já trocou o cookie por um válido, o /ws volta.
         sessaoRecusada.avisarFechamentoWs(evento.code);
+        // 1013 = teto de sockets da conta: religa com backoff em vez de bater a cada 3 s.
+        if (evento.code === WS_CODIGO_LIMITE) religador.recusado();
         if (!closed) religador.agendar();
       });
 
@@ -409,7 +411,7 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
       socket.addEventListener('message', (message) => {
         try {
           const payload = JSON.parse(message.data) as WsPayload;
-          if (payload.kind === 'state') syncState(payload.state);
+          if (payload.kind === 'state') { religador.aceito(); syncState(payload.state); }
           if (payload.kind === 'event') applyBackendEvent(payload.event);
           if (payload.kind === 'sompo.telemetry') setSompoTelemetry(payload.telemetry);
           if (payload.kind === TIPO_RETRATO) aoVivo.receber(payload.estado, payload.idadeMs, payload.oculto === true, payload.sono ?? null);
