@@ -1,66 +1,77 @@
 {
   "asset": "coruja-3d.glb",
-  "generatedBy": "Tripo Studio (studio.tripo3d.ai), imagem -> 3D (H3.1, PBR) e Auto Rig \"Other\" (avian), pela conta do dono",
+  "generatedBy": "Tripo Studio (studio.tripo3d.ai), imagem -> 3D (H3.1, Ultra Mesh, 4K, PBR) pela conta do dono; ossos e pesos do Auto Rig \"Other\" (avian) da coruja do #16",
   "createdAt": "2026-10-21",
   "reference": "Imagem frontal de corpo inteiro gerada por cx/gpt-5.6-sol-image (9Router) a partir de public/stand/avatar/coruja-a/coruja-a-1024.png, para manter a identidade da Coruja A",
-  "tripoProject": "f66f3bb8-0f29-4aa1-89a8-15564f97ac2b",
-  "tripoUrl": "https://studio.tripo3d.ai/workspace/generate/f66f3bb8-0f29-4aa1-89a8-15564f97ac2b",
+  "tripoProject": "9d92de09-8985-49fe-b7f8-8f80d18e56db",
+  "tripoUrl": "https://studio.tripo3d.ai/workspace/generate/9d92de09-8985-49fe-b7f8-8f80d18e56db",
   "tripoOperations": {
-    "generate": "be17927f-e461-403c-9033-824fb1141468",
-    "autoRig": "3756a343-ec50-45d7-bd60-b396e7c5350a"
+    "generate": "8f83a2b9-8999-472c-801a-e4a1199a9e66",
+    "rigSource": {
+      "project": "f66f3bb8-0f29-4aa1-89a8-15564f97ac2b",
+      "autoRig": "3756a343-ec50-45d7-bd60-b396e7c5350a"
+    }
   },
-  "tripoCredits": 75,
+  "tripoCredits": 55,
   "tripoExport": {
-    "faces": 30000,
-    "format": "glb (meshopt + quantização, decodificado com gltf-transform dequantize)",
-    "sourceSha256": "69f3b94a6438ad474d9d7ef2bf9a90b2f9cb3569bbd42c74fcbc742cb59e6f02",
-    "sourceBytes": 11227456,
-    "sourceTriangles": 29196,
+    "faces": 250000,
+    "format": "glb (export do Studio, sem meshopt)",
+    "sourceSha256": "83e888390f28e9ed5ddf6dff7a6642c13c775b4bde3b53a12598cf01a2e52b9a",
+    "sourceBytes": 18183120,
+    "sourceTriangles": 248647,
+    "rigSha256": "69f3b94a6438ad474d9d7ef2bf9a90b2f9cb3569bbd42c74fcbc742cb59e6f02",
+    "rigBytes": 11227456,
     "joints": 60
   },
   "packaging": {
     "tool": "Blender 5.2.0 LTS, scripts/stand/package-coruja-3d.py",
     "decimate": {
       "type": "COLLAPSE",
-      "ratio": 4.543793632202729e+30,
-      "delimit": [
-        "SEAM",
-        "UV"
-      ]
+      "triangles": 38074,
+      "delimit": "UV",
+      "ratio": 0.1531
     },
-    "atlas": 1024,
-    "jpegQuality": 84,
-    "emissive": "frisos azul-claros da cor base (visor, fones, microfone), 512 px",
-    "rosto": "malha CorujaRosto (100% tripo::Head_2) com morph targets piscar e bico_abre e interior da boca no material coruja-3d-boca (sem textura), e bico_abre na malha principal (só o bico de cima dobra para cima), scripts/stand/coruja3d_rosto.py"
+    "uv": "UVs originais do Tripo Studio (decimação com delimit UV)",
+    "textures": "mapas do Tripo reduzidos; olhos pintados apagados por preenchimento Laplace",
+    "atlas": {
+      "basecolor": 2048,
+      "normal": 2048,
+      "metallicroughness": 1024,
+      "emissive": 512
+    },
+    "jpegQuality": 86,
+    "images": "fora do GLB (images[].uri), mesmos arquivos do manifesto externo",
+    "olhos": "olhos pintados apagados do visor; tela CorujaOlhos (material coruja-3d-olhos) desenhada em canvas no three.js; scripts/stand/coruja3d_rosto.py",
+    "rosto": "bico_abre na malha principal (bico de cima) e CorujaRosto (boca escura + bico de baixo), 100% tripo::Head_2"
   },
   "morphTargets": {
     "Coruja": [
       "bico_abre"
     ],
     "CorujaRosto": [
-      "piscar",
       "bico_abre"
     ]
   },
   "animations": {
     "aceno": 78,
     "falando": 120,
+    "feliz": 60,
     "ocioso": 180,
     "ouvindo": 120,
     "pensando": 150
   },
   "fps": 30,
-  "triangles": 20468,
+  "triangles": 40570,
   "boundsM": {
     "min": [
-      -0.2892150282859802,
-      -5.8906152844429016e-08,
-      -0.4914973974227905
+      -0.27163562178611755,
+      -0.000784501142334193,
+      -0.49537011981010437
     ],
     "max": [
-      0.2892151474952698,
-      0.9710081815719604,
-      0.4918997585773468
+      0.2717447876930237,
+      0.9715407490730286,
+      0.49528756737709045
     ]
   },
   "axes": {
@@ -68,7 +79,7 @@
     "front": "+X (o componente gira -90° em Y para olhar a câmera)"
   },
   "externalManifest": "coruja-3d.textures.json",
-  "reproducibleCommand": "gltf-transform dequantize RIG_TRIPO.glb rig-decoded.glb && blender -b --factory-startup --python scripts/stand/package-coruja-3d.py -- rig-decoded.glb public/stand/avatar/coruja-3d",
-  "sha256": "a731b8815ff07e0ab74f1b9a01124f9b6c2c8f2783355bca026977a2c6d11917",
-  "bytes": 1676780
+  "reproducibleCommand": "gltf-transform dequantize RIG_TRIPO.glb rig-decoded.glb && blender -b --factory-startup --python scripts/stand/package-coruja-3d.py -- rig-decoded.glb coruja-tripo-alta.glb public/stand/avatar/coruja-3d",
+  "sha256": "cee54392777b01eb40e61f3125630bef9af61764e69aa6a07bb3c7ac1bb5c9e6",
+  "bytes": 1844388
 }
