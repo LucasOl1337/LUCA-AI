@@ -1,5 +1,6 @@
 import { useAppLocation } from '@/hooks/useAppLocation';
 import '@/experience-pages.css';
+import { SeletorVoz } from '@/components/totem/SeletorVoz';
 
 export default function TotemPage() {
   const { navigate } = useAppLocation();
@@ -14,6 +15,7 @@ export default function TotemPage() {
         <h2>Coruja, Vitrine e Simulação</h2>
         <p>No Totem, toque na tela para mostrar a barra de modos. Use L1 e R1 no controle para alternar entre eles. Pressione Shift+Q para voltar ao painel.</p>
         <p>A conversa depende da sessão, da disponibilidade da voz e da permissão de microfone. Sem voz, a Vitrine e a Simulação continuam disponíveis.</p>
+        <SeletorVoz />
         <button type="button" className="experience-primary" onClick={() => navigate({ page: 'stand' }, 'push')}>Abrir Totem</button>
       </div>
       <div className="experience-card">

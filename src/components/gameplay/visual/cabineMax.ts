@@ -4,8 +4,11 @@
  * O palco carrega a variante `max-tractor-cabine.glb` pelo gancho `modeloUrl`
  * (mesmo gerador e bounds do /sompo, sem painel, assento e volante antigos;
  * build-max-tractor.py com MAX_TRACTOR_VARIANT=cabine). A cabine então só:
- *  - põe a superfície do `rig-volante` num pivô que gira com o esterço;
- *  - monta o console e o banco do Tripo na cabine (e a tela `tela-luca-ai`, se houver);
+ *  - põe a superfície do `rig-volante` num pivô que gira com o esterço e, por cima
+ *    dela, o volante do Tripo (o toro procedural fica oculto);
+ *  - monta o console, o banco e o forro do teto do Tripo na cabine (e a tela
+ *    `tela-luca-ai`, se houver);
+ *  - dá acabamento aos plásticos e à pintura do corpo (materialCabine);
  *  - veste os fardos do palco com o fardo do Tripo (os procedurais ficam ocultos).
  * Tudo volta ao original em `desmontar`. O /sompo e o palco não mudam.
  */
@@ -16,12 +19,15 @@ import { urlPublica } from '../../sompo/urlsPublicas';
 import type { CabineGameplay, CriarCabineGameplay, QuadroCabine } from '../cabineGameplay';
 import type { EstadoGameplay } from '../estadoGameplay';
 import { criarCampoVisual } from './campoVisual';
+import { acabarCabine, carregarDetalheCabine, DETALHE_CABINE_URL, type AcabamentoCabine } from './materialCabine';
 
 export const CABINE_MAX_URL = '/models/gameplay/max-tractor-cabine.glb';
 export const PROPS_CABINE_URL = Object.freeze({
   console: '/models/gameplay/cabine-console.glb',
   banco: '/models/gameplay/cabine-banco.glb',
   fardo: '/models/gameplay/fardo-feno.glb',
+  volante: '/models/gameplay/cabine-volante.glb',
+  teto: '/models/gameplay/cabine-teto.glb',
 });
 /** Grupo do fardo que o palco cria por obstáculo (createSompoAgriStage). */
 export const NOME_FARDO_PALCO = 'agri-max-obstacle-hay-bale';
@@ -42,6 +48,12 @@ export interface AssetsCabine {
   console: THREE.Object3D;
   banco: THREE.Object3D;
   fardo: THREE.Object3D;
+  /** Volante do Tripo: centro do aro na origem, eixo da coluna em +Y (para o operador), raio de baixo em -Z. */
+  volante?: THREE.Object3D;
+  /** Forro do teto do Tripo: painel em pé, face aparente (luz de cúpula) em -Z, base em y=0. */
+  teto?: THREE.Object3D;
+  /** Mapa de detalhe dos plásticos (normal RG + rugosidade B). Sem ele, o corpo fica como o palco deixou. */
+  detalhe?: THREE.Texture;
 }
 
 /** Tela do console (a `criarTelaPainel` da Operador cumpre isto). */
@@ -66,6 +78,12 @@ export const ENCAIXE_CABINE = Object.freeze({
   tela: { centro: [0, 0.7, -0.212] as const, largura: 0.26 },
   // Banco encostado na parede de trás, sobre o piso, de frente para +X.
   banco: { posicao: [-0.87, 1.38, 0] as const, escala: 0.85 },
+  // Forro sob o teto (face interna do teto em y≈2,87, x -1,39..0,37, |z|≤0,74): cobre o vão
+  // escuro que tomava o alto da vista de frente, sem encostar nas barras da moldura.
+  // A face olha para baixo e só recebe o chão: `luz` é o rebatimento dos vidros (emissivo pelo próprio mapa).
+  teto: { centro: [-0.57, 2.86, 0] as const, comprimento: 1.24, largura: 1.24, espessura: 0.06, luz: 0.16 },
+  // O toro tinha raio externo 0,19+0,024 no gerador (build-max-tractor.py): mesmo tamanho de aro.
+  volante: { raioExterno: (0.19 + 0.024) / 0.19 },
 });
 
 export async function carregarPropTripo(url: string, signal: AbortSignal) {
@@ -77,15 +95,31 @@ export async function carregarPropTripo(url: string, signal: AbortSignal) {
 }
 
 async function carregarAssetsPadrao(signal: AbortSignal): Promise<AssetsCabine> {
-  const [provenance, console, banco, fardo] = await Promise.all([
+  const [provenance, console, banco, fardo, volante, teto] = await Promise.all([
     fetch(urlPublica(CABINE_MAX_URL.replace(/\.glb$/, '.provenance.json')), { signal }).then((r) => { if (!r.ok) throw new Error(`Cabine MAX provenance: HTTP ${r.status}`); return r.json(); }),
     carregarPropTripo(PROPS_CABINE_URL.console, signal),
     carregarPropTripo(PROPS_CABINE_URL.banco, signal),
     carregarPropTripo(PROPS_CABINE_URL.fardo, signal),
+    carregarPropTripo(PROPS_CABINE_URL.volante, signal),
+    carregarPropTripo(PROPS_CABINE_URL.teto, signal),
   ]);
   const rig = provenance?.rig?.steeringWheel as VolanteRig | undefined;
   if (!rig?.center || !rig?.axis) throw new Error('Cabine MAX: provenance sem rig.steeringWheel');
-  return { rig, console, banco, fardo };
+  return { rig, console, banco, fardo, volante, teto, detalhe: carregarDetalheCabine(urlPublica(DETALHE_CABINE_URL)) };
+}
+
+/** Base do volante do Tripo no referencial do pivô: +Y no eixo, +Z no topo do aro, raio externo do toro. */
+export function encaixarVolante(volante: THREE.Object3D, rig: VolanteRig) {
+  volante.position.set(0, 0, 0);
+  volante.quaternion.identity();
+  volante.scale.setScalar(1);
+  const caixa = new THREE.Box3().setFromObject(volante);
+  const raioModelo = Math.max(caixa.max.x - caixa.min.x, caixa.max.z - caixa.min.z) / 2;
+  const eixo = new THREE.Vector3(...rig.axis).normalize();
+  const topo = new THREE.Vector3(0, 0, 1).cross(eixo).normalize().negate();
+  const lado = new THREE.Vector3().crossVectors(eixo, topo);
+  volante.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(lado, eixo, topo));
+  volante.scale.setScalar(rig.rimRadius * ENCAIXE_CABINE.volante.raioExterno / raioModelo);
 }
 
 /**
@@ -113,7 +147,7 @@ function liberar(raiz: THREE.Object3D) {
     if (!mesh.isMesh) return;
     mesh.geometry.dispose();
     for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-      for (const valor of Object.values(material)) if (valor instanceof THREE.Texture) valor.dispose();
+      for (const valor of Object.values(material)) if ((valor as THREE.Texture | null)?.isTexture) (valor as THREE.Texture).dispose();
       material.dispose();
     }
   });
@@ -130,7 +164,12 @@ export interface OpcoesCabineMax {
   criarTela?: () => TelaCabine;
 }
 
-type VolanteMovido = { mesh: THREE.Mesh; pai: THREE.Object3D; posicao: THREE.Vector3; sombra: boolean };
+type VolanteMovido = { mesh: THREE.Mesh; pai: THREE.Object3D; posicao: THREE.Vector3; sombra: boolean; visivel: boolean };
+
+function liberarAssets(prontos: AssetsCabine) {
+  for (const raiz of [prontos.console, prontos.banco, prontos.fardo, prontos.volante, prontos.teto]) if (raiz) liberar(raiz);
+  prontos.detalhe?.dispose();
+}
 type FardoVestido = { grupo: THREE.Object3D; ocultos: THREE.Object3D[]; roupa: THREE.Object3D };
 
 export function criarCabineMax(opcoes: OpcoesCabineMax = {}): CabineGameplay {
@@ -144,6 +183,7 @@ export function criarCabineMax(opcoes: OpcoesCabineMax = {}): CabineGameplay {
   let volantes: VolanteMovido[] = [];
   let tela: TelaCabine | null = null;
   let campo: ReturnType<typeof criarCampoVisual> | null = null;
+  let acabamento: AcabamentoCabine | null = null;
   const extras: THREE.Object3D[] = [];
   const fardos = new Map<THREE.Object3D, FardoVestido>();
   const eixo = new THREE.Vector3();
@@ -167,13 +207,50 @@ export function criarCabineMax(opcoes: OpcoesCabineMax = {}): CabineGameplay {
     pivo.position.fromArray(rig.center);
     corpo.add(pivo);
     volantes = achados.map((mesh) => {
-      const movido = { mesh, pai: mesh.parent!, posicao: mesh.position.clone(), sombra: mesh.castShadow };
+      const movido = { mesh, pai: mesh.parent!, posicao: mesh.position.clone(), sombra: mesh.castShadow, visivel: mesh.visible };
       pivo!.add(mesh);
       mesh.position.set(-rig.center[0], -rig.center[1], -rig.center[2]);
       mesh.name = 'cabine-volante';
       mesh.castShadow = false;
+      // Com o volante do Tripo, o toro só guarda o lugar (e volta em desmontar).
+      if (assets!.volante) mesh.visible = false;
       return movido;
     });
+    if (assets.volante) {
+      const volante = assets.volante;
+      volante.name = 'cabine-volante-tripo';
+      encaixarVolante(volante, rig);
+      sombras(volante, false);
+      pivo.add(volante);
+    }
+    if (assets.teto) {
+      const teto = assets.teto;
+      teto.name = 'cabine-teto';
+      const caixa = new THREE.Box3().setFromObject(teto);
+      const tamanho = caixa.getSize(new THREE.Vector3());
+      const { centro, comprimento, largura, espessura } = ENCAIXE_CABINE.teto;
+      // Painel em pé (+Y) com a luz de cúpula na face -Z: deitado (x, y, z) -> (x, z, -y), face para baixo.
+      teto.rotation.set(-Math.PI / 2, 0, 0);
+      teto.scale.set(comprimento / tamanho.x, largura / tamanho.y, espessura / tamanho.z);
+      teto.position.set(
+        centro[0] - (caixa.min.x + tamanho.x / 2) * teto.scale.x,
+        centro[1] - caixa.max.z * teto.scale.z,
+        centro[2] + (caixa.min.y + tamanho.y / 2) * teto.scale.y,
+      );
+      teto.traverse((node) => {
+        const material = (node as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+        if (!material?.isMeshStandardMaterial || !material.map) return;
+        material.emissiveMap = material.map;
+        material.emissive.setScalar(ENCAIXE_CABINE.teto.luz);
+      });
+      sombras(teto, false);
+      corpo.add(teto);
+      extras.push(teto);
+    }
+    if (assets.detalhe) {
+      const superficies = corpo.children.filter((filho): filho is THREE.Mesh => (filho as THREE.Mesh).isMesh && filho.visible);
+      acabamento = acabarCabine(superficies, assets.detalhe);
+    }
 
     const consoleProp = assets.console;
     consoleProp.name = 'cabine-console';
@@ -245,7 +322,7 @@ export function criarCabineMax(opcoes: OpcoesCabineMax = {}): CabineGameplay {
     montar(alvo) {
       maquina = alvo;
       void carregar(abort.signal).then((prontos) => {
-        if (abort.signal.aborted) { liberar(prontos.console); liberar(prontos.banco); liberar(prontos.fardo); return; }
+        if (abort.signal.aborted) { liberarAssets(prontos); return; }
         assets = prontos;
         aplicar();
       }).catch((erro) => {
@@ -265,10 +342,13 @@ export function criarCabineMax(opcoes: OpcoesCabineMax = {}): CabineGameplay {
       abort.abort();
       campo?.descartar();
       campo = null;
-      for (const { mesh, pai, posicao, sombra } of volantes) {
+      acabamento?.desfazer();
+      acabamento = null;
+      for (const { mesh, pai, posicao, sombra, visivel } of volantes) {
         pai.add(mesh);
         mesh.position.copy(posicao);
         mesh.castShadow = sombra;
+        mesh.visible = visivel;
         mesh.name = 'agri-body-surface';
       }
       pivo?.removeFromParent();
@@ -282,7 +362,7 @@ export function criarCabineMax(opcoes: OpcoesCabineMax = {}): CabineGameplay {
         if (extra) { extra.geometry.dispose(); (extra.material as THREE.Material).dispose(); extra.removeFromParent(); }
       }
       tela?.descartar();
-      if (assets) { liberar(assets.console); liberar(assets.banco); liberar(assets.fardo); }
+      if (assets) liberarAssets(assets);
       volantes = []; extras.length = 0; fardos.clear();
       pivo = null; tela = null; assets = null; maquina = null; montada = false; semVolante = false;
     },

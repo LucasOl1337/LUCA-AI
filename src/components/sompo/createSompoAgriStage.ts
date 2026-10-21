@@ -409,7 +409,15 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
 
   let focusTarget: 'truck' | 'sensor' = 'truck';
   let overviewPending = operation; // Visão geral do talhão inteiro: só na montagem e ao clicar, não a cada relayout.
+  // Zoom do navegador ou troca de monitor mudam o devicePixelRatio: o buffer acompanha
+  // (no teto do degrau atual ou do orçamento) para o canvas não sair borrado nem pesado.
+  let dprVisto = window.devicePixelRatio;
   function resize() {
+    if (window.devicePixelRatio !== dprVisto) {
+      dprVisto = window.devicePixelRatio;
+      const ratio = adaptiveQuality ? pixelRatioDoDegrau(degraus[qualidade.degrau], dprVisto) : sompoRenderBudget().pixelRatio;
+      if (ratio !== renderer.getPixelRatio()) { renderer.setPixelRatio(ratio); post.setPixelRatio(ratio); }
+    }
     const { width, height } = mount.getBoundingClientRect();
     renderer.setSize(Math.max(1, width), Math.max(1, height), false);
     camera.aspect = Math.max(1, width) / Math.max(1, height);

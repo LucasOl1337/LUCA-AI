@@ -12,7 +12,10 @@ import { executarTurno, FALAS, LIMITES_TURNO, criarChamadaDeModelo, limparTela, 
 import { FERRAMENTAS_STAND, executarFerramentaStand, videoPublicado } from './ferramentas.js';
 import { buscarNoRepo, montarPromptBase } from './conhecimento.js';
 import { provedorXai } from './provedor-xai.js';
-import { CREDITOS_STT_POR_MINUTO, fatorCreditosTts, modeloTtsStand, provedorElevenlabs, resolverVoz, sintetizarElevenlabs } from './provedor-elevenlabs.js';
+import {
+  CREDITOS_STT_POR_MINUTO, VERIFICACAO_VOZ_MS, VOZES_STAND, VOZ_STAND_PADRAO, chaveVozStand, fatorCreditosTts, modeloTtsStand,
+  provedorElevenlabs, resolverVoz, sintetizarElevenlabs, verificarVoz, vozDaChave,
+} from './provedor-elevenlabs.js';
 import { arquivoPadrao, criarTetoDiario, tetoDiarioDoEnv } from './teto-diario.js';
 
 export const LIMITES_STAND = Object.freeze({ silencio_s: 20, teto_s: 240, sessoes_por_hora: 30 });
@@ -147,16 +150,42 @@ export function registerStandRoutes(app, {
     return null;
   };
 
-  // TTS da conversa em turnos: voz pelo nome (skill elevenlabs-voz), modelo por env.
-  let vozId = null;
-  const sintetizarCom = (config) => {
+  // TTS da conversa em turnos: voz pelo nome (skill elevenlabs-voz) ou voice_id
+  // da lista branca, modelo por env. Cada conversa guarda a voz escolhida no Totem.
+  const vozesIds = new Map();
+  const vozesOk = new Map();
+  const sintetizarCom = (config, voz = config.voz) => {
     const modelo = modeloTtsStand(env);
     return async function* sintetizar({ texto, anterior = '', sinal, pronta = false }) {
-      vozId ??= await resolverVoz({ chave: config.chave, voz: config.voz, fetchImpl });
+      const vozId = await resolverVoz({ chave: config.chave, voz, fetchImpl, cache: vozesIds });
       if (pronta) teto.somar(texto.length * fatorCreditosTts(modelo));
       yield* sintetizarElevenlabs({ chave: config.chave, vozId, texto, modelo, anterior, sinal, fetchImpl });
     };
   };
+
+  /**
+   * Voz pedida pelo navegador (só a chave da lista branca) → {chave, voz}.
+   * Fora da lista vira o padrão; voz da lista que a conta não tem (Andrea sem
+   * adicionar) também cai no padrão, com `aviso`, para a conversa não ficar muda.
+   */
+  const escolherVoz = async (config, pedido) => {
+    const chave = chaveVozStand(pedido);
+    if (chave === VOZ_STAND_PADRAO) return { chave, voz: config.voz };
+    const voz = vozDaChave(chave, config.voz);
+    const ok = await verificarVoz({ chave: config.chave, voz, fetchImpl, cache: vozesOk, agora: agora() });
+    return ok ? { chave, voz } : { chave: VOZ_STAND_PADRAO, voz: config.voz, aviso: { pedida: chave, motivo: 'voz_indisponivel' } };
+  };
+
+  /** Vozes do seletor do Totem; `disponivel:null` enquanto a 1ª conferência não volta. */
+  const vozesDoStatus = (config) => Object.entries(VOZES_STAND).map(([chave, { rotulo }]) => {
+    if (chave === VOZ_STAND_PADRAO) return { chave, rotulo, padrao: true, disponivel: true };
+    const voz = vozDaChave(chave, config.voz);
+    const salvo = vozesOk.get(voz);
+    if (config.chave && (!salvo || agora() - salvo.em >= VERIFICACAO_VOZ_MS)) {
+      verificarVoz({ chave: config.chave, voz, fetchImpl, cache: vozesOk, agora: agora() }).catch(() => {});
+    }
+    return { chave, rotulo, padrao: false, disponivel: salvo ? salvo.ok : null };
+  });
 
   app.get('/api/stand/status', (req, res) => {
     limparConversas();
@@ -171,7 +200,7 @@ export function registerStandRoutes(app, {
       escuta: !motivo && escutaLigada(env, config),
       limites: config.provedor?.turnos ? { ...LIMITES_STAND, ...LIMITES_TURNO } : LIMITES_STAND,
       sessoes_na_hora: guarda.usadas(conta(req)),
-      ...(config.provedor?.turnos ? { creditos_dia: teto.resumo() } : {}),
+      ...(config.provedor?.turnos ? { creditos_dia: teto.resumo(), vozes: vozesDoStatus(config) } : {}),
     });
   });
 
@@ -186,12 +215,14 @@ export function registerStandRoutes(app, {
     }
     // Aquece o cache de embeddings do roteador enquanto o navegador conecta.
     obterRoteador().then((r) => r.preaquecer()).catch(() => {});
-    if (config.provedor.turnos) {
-      // Pré-aquecimento: resolve a voz enquanto o microfone conecta.
-      resolverVoz({ chave: config.chave, voz: config.voz, fetchImpl }).then((id) => { vozId ??= id; }).catch(() => {});
-    }
     try {
-      const token = await config.provedor.pedirToken({ chave: config.chave, fetchImpl });
+      // A voz escolhida é conferida junto com o pedido do token.
+      const [token, voz] = await Promise.all([
+        config.provedor.pedirToken({ chave: config.chave, fetchImpl }),
+        config.provedor.turnos ? escolherVoz(config, req.body?.voz) : null,
+      ]);
+      // Pré-aquecimento: resolve a voz enquanto o microfone conecta.
+      if (voz) resolverVoz({ chave: config.chave, voz: voz.voz, fetchImpl, cache: vozesIds }).catch(() => {});
       if (!token.ok) {
         console.warn(`[stand] token recusado por ${config.nome}: HTTP ${token.status}`);
         return res.status(502).json({ ok: false, error: 'stand_provedor_recusou', status: token.status });
@@ -210,9 +241,12 @@ export function registerStandRoutes(app, {
         // Origem só para a contagem do dia: Despertar da Escuta ou toque.
         conversa.origem = req.body?.origem === 'escuta' ? 'escuta' : 'toque';
         conversa.perguntas = 0;
+        conversa.voz = voz.voz;
         if (conversa.origem === 'escuta') teto.contar('despertares');
         conversas.set(conversa.id, conversa);
         corpo.conversa_id = conversa.id;
+        corpo.voz = voz.chave;
+        if (voz.aviso) corpo.voz_aviso = voz.aviso;
         corpo.limites = { ...LIMITES_STAND, ...LIMITES_TURNO };
       }
       res.json(corpo);
@@ -267,7 +301,8 @@ export function registerStandRoutes(app, {
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
     const emitir = (linha) => { if (!controle.signal.aborted) res.write(`${JSON.stringify(linha)}\n`); };
-    const sintetizar = sintetizarCom(config);
+    const vozConversa = conversa.voz ?? config.voz;
+    const sintetizar = sintetizarCom(config, vozConversa);
     const modeloTts = modeloTtsStand(env);
     try {
       const { metricas, motivo } = await executarTurno({
@@ -278,7 +313,7 @@ export function registerStandRoutes(app, {
         deps: {
           chamarModelo,
           sintetizar,
-          falaPronta: falasProntas(config, sintetizar),
+          falaPronta: falasProntas(vozConversa, sintetizar),
           rotear,
           buscar: (texto) => buscarNoRepo(texto, { limite: 3, maxChars: 500 }),
           executarFerramenta: (nome, args) => executarFerramenta(nome, args),
@@ -299,8 +334,8 @@ export function registerStandRoutes(app, {
 
   // Falas prontas guardadas por voz e modelo (trocar a env troca o cache).
   const cacheFalas = new Map();
-  function falasProntas(config, sintetizar) {
-    const chave = `${config.voz}|${modeloTtsStand(env)}`;
+  function falasProntas(voz, sintetizar) {
+    const chave = `${voz}|${modeloTtsStand(env)}`;
     if (!cacheFalas.has(chave)) cacheFalas.set(chave, criarFalasProntas(sintetizar));
     return cacheFalas.get(chave);
   }

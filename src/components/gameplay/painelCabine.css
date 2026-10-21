@@ -9,9 +9,9 @@
 .gameplay-painel[data-faixa='perigo'] { --gp-cor: var(--gp-perigo); }
 
 .gameplay-painel-alerta {
-  position: absolute; top: 4.5vh; left: 50%; transform: translateX(-50%);
-  padding: 1.1vh 3.2vw; border-radius: 12px; background: #c4291ff0; color: #fff;
-  font-size: clamp(20px, 3.4vh, 40px); font-weight: 800; letter-spacing: .01em; white-space: nowrap;
+  position: absolute; top: 4.5cqh; left: 50%; transform: translateX(-50%);
+  padding: 1.1cqh 3.2cqw; border-radius: 12px; background: #c4291ff0; color: #fff;
+  font-size: clamp(20px, 3.4cqh, 40px); font-weight: 800; letter-spacing: .01em; white-space: nowrap;
   box-shadow: 0 0 0 3px #ffffff3a, 0 10px 40px #b3261e88;
   animation: gameplay-pisca .4s steps(2, jump-none) infinite alternate;
 }
@@ -19,9 +19,9 @@
 @keyframes gameplay-pisca { from { opacity: 1; } to { opacity: .72; } }
 
 .gameplay-painel-cabine {
-  position: absolute; bottom: 3.5vh; left: 50%; transform: translateX(-50%);
-  display: grid; grid-template-columns: auto auto; align-items: center; gap: 0 2.4vw;
-  min-width: min(560px, 80vw); padding: 1.6vh 2.4vw 1.4vh;
+  position: absolute; bottom: 3.5cqh; left: 50%; transform: translateX(-50%);
+  display: grid; grid-template-columns: auto auto; align-items: center; gap: 0 2.4cqw;
+  min-width: min(560px, 80cqw); padding: 1.6cqh 2.4cqw 1.4cqh;
   border-radius: 18px; background: #07110ee6; color: #edf3ed;
   border: 2px solid color-mix(in srgb, var(--gp-cor) 70%, transparent);
   box-shadow: 0 0 34px color-mix(in srgb, var(--gp-cor) 30%, transparent);
@@ -39,14 +39,14 @@
   border: 1px solid #ffffff22;
 }
 .gameplay-painel-distancia { display: grid; gap: 2px; }
-.gameplay-painel-cabine span { font-size: clamp(11px, 1.4vh, 15px); color: #b9cdbf; text-transform: uppercase; letter-spacing: .08em; }
+.gameplay-painel-cabine span { font-size: clamp(11px, 1.4cqh, 15px); color: #b9cdbf; text-transform: uppercase; letter-spacing: .08em; }
 .gameplay-painel-distancia strong {
-  font-size: clamp(44px, 8vh, 96px); line-height: 1; font-weight: 800; color: var(--gp-cor);
+  font-size: clamp(44px, 8cqh, 96px); line-height: 1; font-weight: 800; color: var(--gp-cor);
 }
-.gameplay-painel-distancia small { font-size: clamp(14px, 2vh, 22px); font-weight: 650; color: #edf3ed; }
-.gameplay-painel-lado { display: grid; gap: 1vh; justify-items: end; text-align: right; }
+.gameplay-painel-distancia small { font-size: clamp(14px, 2cqh, 22px); font-weight: 650; color: #edf3ed; }
+.gameplay-painel-lado { display: grid; gap: 1cqh; justify-items: end; text-align: right; }
 .gameplay-painel-lado > div { display: grid; }
-.gameplay-painel-lado strong { font-size: clamp(22px, 3.6vh, 42px); font-weight: 750; }
+.gameplay-painel-lado strong { font-size: clamp(22px, 3.6cqh, 42px); font-weight: 750; }
 .gameplay-painel-lado [data-alerta='true'] strong { color: var(--gp-perigo); }
 
 /* Bordas vermelhas de "dano": centro livre para dirigir, vermelho só nas bordas. */
@@ -74,20 +74,20 @@
 /* Abertura e Resultado do desafio: cartão central, sem placar. */
 .gameplay-resultado, .gameplay-abertura {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -55%); z-index: 5;
-  min-width: min(620px, 86vw); padding: 4vh 3.4vw 3vh; border-radius: 22px;
+  min-width: min(620px, 86cqw); padding: 4cqh 3.4cqw 3cqh; border-radius: 22px;
   background: #07110ef2; color: #edf3ed; text-align: center; pointer-events: none;
   border: 2px solid #4fbf7a99; box-shadow: 0 20px 60px #000a;
 }
 .gameplay-resultado[data-desfecho='encostou'] { border-color: #e5483bb3; }
 .gameplay-resultado[data-desfecho='tempo'] { border-color: #f2c14e99; }
 .gameplay-resultado .gameplay-painel-selo, .gameplay-abertura .gameplay-painel-selo { left: 50%; transform: translateX(-50%); }
-.gameplay-resultado h2 { margin: 0 0 2vh; font-size: clamp(30px, 5.4vh, 64px); font-weight: 800; }
+.gameplay-resultado h2 { margin: 0 0 2cqh; font-size: clamp(30px, 5.4cqh, 64px); font-weight: 800; }
 .gameplay-resultado[data-desfecho='parou'] h2 { color: #4fbf7a; }
 .gameplay-resultado[data-desfecho='encostou'] h2 { color: #ff6a5c; }
-.gameplay-resultado ul { display: grid; gap: 1.2vh; margin: 0; padding: 0; list-style: none; font-size: clamp(18px, 3vh, 34px); font-weight: 650; font-variant-numeric: tabular-nums; }
-.gameplay-resultado p { margin: 2.6vh 0 0; font-size: clamp(16px, 2.4vh, 26px); color: #c9dccf; }
-.gameplay-resultado small { display: block; margin-top: 1.6vh; color: #8fa897; font-size: clamp(12px, 1.6vh, 16px); }
-.gameplay-abertura p { margin: 0; font-size: clamp(22px, 4vh, 46px); font-weight: 750; }
+.gameplay-resultado ul { display: grid; gap: 1.2cqh; margin: 0; padding: 0; list-style: none; font-size: clamp(18px, 3cqh, 34px); font-weight: 650; font-variant-numeric: tabular-nums; }
+.gameplay-resultado p { margin: 2.6cqh 0 0; font-size: clamp(16px, 2.4cqh, 26px); color: #c9dccf; }
+.gameplay-resultado small { display: block; margin-top: 1.6cqh; color: #8fa897; font-size: clamp(12px, 1.6cqh, 16px); }
+.gameplay-abertura p { margin: 0; font-size: clamp(22px, 4cqh, 46px); font-weight: 750; }
 
 /* O minimapa do talhão tem CSS próprio (mapaTalhao.css), importado pelo MapaTalhao. */
 .gameplay-desafio[data-etapa='resultado'] .gameplay-mapa { display: none; }

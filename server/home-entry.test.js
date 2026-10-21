@@ -30,6 +30,7 @@ function loadTsModule(source, imports = {}) {
 function homeTree(navigate) {
   const stories = loadTsModule(readFileSync(join(root, 'src/lib/sompo-stories.ts'), 'utf8'));
   const { default: Home } = loadTsModule(landing, {
+    '@/lib/home-funcoes': funcoesModule(),
     '@/hooks/useAppLocation': { useAppLocation: () => ({ navigate }) },
     '@/hooks/useAuth': { useAuth: () => ({ user: { role: 'user' } }) },
     '@/hooks/useLucaState': { useLuca: () => ({ backendReady: true, connectionState: 'online' }) },
@@ -41,18 +42,33 @@ function homeTree(navigate) {
   return Home({ onNavigate() {} });
 }
 
+function funcoesModule() {
+  return loadTsModule(readFileSync(join(root, 'src/lib/home-funcoes.ts'), 'utf8'));
+}
+
 function elements(node) {
   if (Array.isArray(node)) return node.flatMap(elements);
   if (!node?.props) return [];
   return [node, ...elements(node.props.children)];
 }
 
-test('home puts two stories before the unchanged mode entry and uses existing images', () => {
+test('home lists every visitor function in order, then the mode entry, then the two value stories', () => {
+  const { HOME_FUNCOES } = funcoesModule();
+  assert.deepEqual([...HOME_FUNCOES.map((funcao) => funcao.id)], ['totem', 'gameplay', 'operador', 'sompo', 'sensor', 'sonolencia', 'laboratorio']);
+  assert.equal(HOME_FUNCOES.some((funcao) => funcao.id === 'admin'), false);
+  for (const funcao of HOME_FUNCOES) {
+    assert.ok(existsSync(join(root, 'public', funcao.imagem)), funcao.imagem);
+    assert.ok(funcao.titulo && funcao.valor && funcao.imagemAlt && funcao.detalhes.length >= 2, funcao.id);
+  }
   const nodes = elements(homeTree(() => {}));
+  const blocos = nodes.filter((node) => node.props.funcao);
+  assert.deepEqual(blocos.map((node) => node.props.funcao.id), [...HOME_FUNCOES.map((funcao) => funcao.id)]);
   const stories = nodes.filter((node) => node.props['data-home-story']);
   assert.deepEqual(stories.map((node) => node.props['data-home-story']), ['field', 'portfolio']);
   const hero = nodes.findIndex((node) => node.props.className === 'home-a-hero');
-  assert.ok(stories.every((story) => nodes.indexOf(story) < hero));
+  assert.equal(nodes[hero].props['data-home-funcao'], 'luca-ai');
+  assert.ok(blocos.every((bloco) => nodes.indexOf(bloco) < hero));
+  assert.ok(stories.every((story) => nodes.indexOf(story) > hero));
   for (const story of stories) {
     const img = elements(story).find((node) => node.type === 'img');
     assert.ok(existsSync(join(root, 'public', img.props.src)), img.props.src);
@@ -77,6 +93,22 @@ test('story CTAs navigate to the preventive scenario and fleet performance', () 
   assert.equal(getSompoAgriFrame(scenario.scenarioId, 4000, 'controlled-stop').inclinationRisk, true);
   assert.equal(getSompoAgriFrame(scenario.scenarioId, scenario.totalMs, 'controlled-stop').speedKph, 0);
   assert.equal(getSompoAgriEpisodePlan(scenario.scenarioId, 'controlled-stop').frameMoments.length, 5);
+});
+
+test('function CTAs open the real pages', () => {
+  const { HOME_FUNCOES } = funcoesModule();
+  const esperado = {
+    totem: '/stand', gameplay: '/gameplay', operador: '/operador', sompo: '/sompo?aba=telemetria',
+    sensor: '/sensor', sonolencia: '/sonolencia', laboratorio: '/laboratorio',
+  };
+  for (const funcao of HOME_FUNCOES) {
+    assert.equal(formatAppUrl(mergeAppLocation(emptyAppLocation(), funcao.acao.destino)), esperado[funcao.id], funcao.id);
+  }
+  let href;
+  const nodes = elements(homeTree((patch) => { href = formatAppUrl(mergeAppLocation(emptyAppLocation(), patch)); }));
+  const bloco = nodes.find((node) => node.props.funcao?.id === 'sompo');
+  bloco.props.aoAbrir(bloco.props.funcao.secundaria.destino);
+  assert.equal(href, '/sompo?aba=casos');
 });
 
 test('home ships binary mode entry with cyber agent art', () => {

@@ -1,16 +1,16 @@
 {
   "asset": "fardo-feno.glb",
   "generatedBy": "Tripo Studio (studio.tripo3d.ai), texto -> 3D com textura PBR detalhada, pela conta do dono",
-  "createdAt": "2026-10-19",
+  "createdAt": "2026-10-21",
   "tripoProject": "fcc7384e-d85b-439d-b464-a082e76e3b4f",
   "tripoUrl": "https://studio.tripo3d.ai/workspace/generate/fcc7384e-d85b-439d-b464-a082e76e3b4f",
   "prompt": "Round hay bale lying on its side, tightly rolled dry golden straw with visible spiral layers on the flat faces and loose strands on the surface, wrapped with a few thin net twine lines, realistic PBR game prop, no ground, no base",
   "tripoExport": {
     "faces": 12000,
-    "textureResolution": 1024,
+    "textureResolution": 2048,
     "format": "glb",
-    "sourceSha256": "42c07a98aa42d14f89cbb631bd146d9b16f22576826d17689846ec17a5e96a33",
-    "sourceBytes": 1570992,
+    "sourceSha256": "9c1f935f56dcaba4bc9af59879c78f2693cbbfaaf967754991277a00ca1ae06b",
+    "sourceBytes": 3673704,
     "sourceTriangles": 10676
   },
   "packaging": {
@@ -23,7 +23,7 @@
         "UV"
       ]
     },
-    "atlas": 512,
+    "atlas": 1024,
     "jpegQuality": 82
   },
   "triangles": 9500,
@@ -45,7 +45,7 @@
   },
   "externalManifest": "fardo-feno.textures.json",
   "license": "GAMEPLAY-ASSET-LICENSE.txt",
-  "reproducibleCommand": "blender -b --factory-startup --python scripts/gameplay/package-tripo-props.py -- .sompo-preview/gv/tripo public/models/gameplay",
-  "sha256": "ee2622912391956bba896521d39a1589f9d63908664d56ba4523a7c6e2ed99e1",
-  "bytes": 551904
+  "reproducibleCommand": "blender -b --factory-startup --python scripts/gameplay/package-tripo-props.py -- .sompo-preview/gv2/tripo public/models/gameplay",
+  "sha256": "cddc733be0f24d478de4919738c743e33b59b2ddeb79c93dd2041eea1ef06b8e",
+  "bytes": 806184
 }

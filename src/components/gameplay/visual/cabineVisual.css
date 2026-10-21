@@ -2,8 +2,14 @@
    HTML sai de cima dele e vai para o canto de baixo à esquerda, menor. */
 .gameplay-com-cabine { position: absolute; inset: 0; }
 .gameplay-com-cabine .gameplay-painel-cabine {
-  left: 2.4vw; bottom: 3vh; transform: none;
-  min-width: min(400px, 34vw); padding: 1.2vh 1.8vw 1vh;
+  left: 2.4cqw; bottom: 3cqh; transform: none;
+  min-width: min(400px, 34cqw); padding: 1.2cqh 1.8cqw 1cqh;
 }
-.gameplay-com-cabine .gameplay-painel-distancia strong { font-size: clamp(34px, 6vh, 72px); }
-.gameplay-com-cabine .gameplay-painel-lado strong { font-size: clamp(18px, 2.8vh, 32px); }
+.gameplay-com-cabine .gameplay-painel-distancia strong { font-size: clamp(34px, 6cqh, 72px); }
+.gameplay-com-cabine .gameplay-painel-lado strong { font-size: clamp(18px, 2.8cqh, 32px); }
+/* Quadro estreito (celular em pé): painel e mapa não cabem lado a lado embaixo;
+   o mapa sobe para o canto de cima à direita, menor, e o painel fica sozinho embaixo. */
+@container (max-width: 640px) {
+  .gameplay-com-cabine .gameplay-mapa { top: 2cqh; bottom: auto; right: 3cqw; width: clamp(96px, 28cqw, 150px); }
+  .gameplay-com-cabine .gameplay-painel-cabine { left: 3cqw; right: 3cqw; min-width: 0; }
+}

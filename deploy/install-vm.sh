@@ -47,7 +47,7 @@ for key in ('ROUTER_API_KEY', 'KAMUI_INTERNAL_API_TOKEN'):
     if not existing.get(key, '').strip().strip('\"\''):
         raise SystemExit(f'required service setting missing: {key}')
 values = {
-    'LUCA_CAMERA_ENABLED': 'false',
+    'LUCA_CAMERA_ENABLED': 'true',
 }
 lines = [line for line in p.read_text().splitlines() if line.split('=', 1)[0] not in values]
 p.write_text('\n'.join(lines + [f'{k}={v}' for k, v in values.items()]) + '\n')

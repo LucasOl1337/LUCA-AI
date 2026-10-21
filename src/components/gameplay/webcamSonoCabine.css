@@ -2,10 +2,10 @@
  * Faixa de alerta no alto ao centro, painel embaixo à esquerda e mapa embaixo à
  * direita: o canto de cima à direita é o único livre na vista de frente. */
 .gameplay-webcam {
-  position: absolute; top: 2.4vh; right: 1.6vw; z-index: 6; width: clamp(150px, 15vw, 240px);
+  position: absolute; top: 2.4cqh; right: 1.6cqw; z-index: 6; width: clamp(150px, 15cqw, 240px);
   display: grid; gap: 6px; padding: 6px 6px 8px; border-radius: 14px;
   background: #07110ee6; border: 2px solid #ffffff22; color: #edf3ed;
-  font-size: clamp(11px, 1.4vh, 14px); font-variant-numeric: tabular-nums;
+  font-size: clamp(11px, 1.4cqh, 14px); font-variant-numeric: tabular-nums;
   transition: border-color .15s, box-shadow .15s;
 }
 .gameplay-webcam-quadro { position: relative; aspect-ratio: 16 / 9; border-radius: 9px; overflow: hidden; background: #0b1712; }

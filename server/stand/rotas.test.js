@@ -145,10 +145,14 @@ test('microfone, api.x.ai e api.elevenlabs.io só liberados em /stand', () => {
 const CHAVE_11 = 'xi-teste-nao-real';
 const VOZ_ID = 'AbCdEfGhIjKlMnOpQrSt';
 
-function fetchElevenlabs(pedidos = []) {
+const VOZ_ANDREA = 'HOfBIVLhom4mc9WvXfyH';
+
+function fetchElevenlabs(pedidos = [], { andrea = true } = {}) {
   return async (url, init = {}) => {
     pedidos.push({ url: String(url), init });
     const u = String(url);
+    const voz = u.match(/\/v1\/voices\/([A-Za-z0-9]+)$/);
+    if (voz) return new Response('{}', { status: !andrea && voz[1] === VOZ_ANDREA ? 404 : 200 });
     if (u.endsWith('/v1/single-use-token/realtime_scribe')) return new Response(JSON.stringify({ token: 'scribe-uso-unico' }), { status: 200 });
     if (u.includes('/v2/voices')) return new Response(JSON.stringify({ voices: [{ name: 'Lucas Oliveira', voice_id: VOZ_ID }, { name: 'Outra', voice_id: 'x' }] }), { status: 200 });
     if (u.includes('/v1/text-to-speech/')) return new Response(new Uint8Array([1, 0, 2, 0, 3]), { status: 200 });
@@ -156,7 +160,7 @@ function fetchElevenlabs(pedidos = []) {
   };
 }
 
-async function subir11(t, { env = {}, teto = criarTetoDiario({ teto: 1000 }), chamarModelo, pedidos = [], agora = () => Date.now() } = {}) {
+async function subir11(t, { env = {}, teto = criarTetoDiario({ teto: 1000 }), chamarModelo, pedidos = [], agora = () => Date.now(), andrea = true } = {}) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => { req.auth = { user: { id: req.headers['x-conta'] || 'demo' } }; next(); });
@@ -167,7 +171,7 @@ async function subir11(t, { env = {}, teto = criarTetoDiario({ teto: 1000 }), ch
   })());
   registerStandRoutes(app, {
     env: { ELEVENLABS_API_KEY: CHAVE_11, ...env },
-    fetchImpl: fetchElevenlabs(pedidos),
+    fetchImpl: fetchElevenlabs(pedidos, { andrea }),
     criarRoteador: roteadorFalso,
     publicado: () => true,
     instrucoes: () => 'prompt-base',
@@ -268,6 +272,80 @@ test('turno: NDJSON com frases, PCM par em base64 e fim; voz resolvida pelo nome
   assert.equal(fim.ok, true);
   assert.equal(teto.usados(), 17.5 + 36, 'o fim da conversa cobra 1 minuto de STT');
   assert.equal((await pedir('/api/stand/turno', { conversa_id, texto: 'oi' })).status, 404);
+});
+
+const ttsDe = (pedidos) => pedidos.filter((p) => p.url.includes('/v1/text-to-speech/')).map((p) => p.url.split('/v1/text-to-speech/')[1].split('/')[0]);
+
+test('voz por conversa: Andrea escolhida vale só na conversa dela; sem escolha, Lucas', async (t) => {
+  const pedidos = [];
+  const pedir = await subir11(t, { pedidos });
+  const andrea = await (await pedir('/api/stand/sessao', { voz: 'andrea' })).json();
+  const padrao = await (await pedir('/api/stand/sessao', {})).json();
+  assert.equal(andrea.voz, 'andrea');
+  assert.equal(padrao.voz, 'lucas');
+  assert.equal(andrea.voz_aviso, undefined);
+  await linhasNdjson(await pedir('/api/stand/turno', { conversa_id: andrea.conversa_id, evento: 'saudacao' }));
+  assert.deepEqual([...new Set(ttsDe(pedidos))], [VOZ_ANDREA]);
+  pedidos.length = 0;
+  await linhasNdjson(await pedir('/api/stand/turno', { conversa_id: padrao.conversa_id, evento: 'saudacao' }));
+  assert.deepEqual([...new Set(ttsDe(pedidos))], [VOZ_ID], 'a saudação em cache da Andrea não vaza para a conversa do Lucas');
+  pedidos.length = 0;
+  await linhasNdjson(await pedir('/api/stand/turno', { conversa_id: andrea.conversa_id, texto: 'o que é o LUCA?' }));
+  assert.deepEqual([...new Set(ttsDe(pedidos))], [VOZ_ANDREA]);
+});
+
+test('voz: lista branca; voice_id, nome ou chave estranha do navegador vira o padrão', async (t) => {
+  const pedidos = [];
+  const pedir = await subir11(t, { pedidos });
+  for (const voz of ['AbCdEfGhIjKlMnOpQrSt', 'Outra', 'Lucas Oliveira', '../andrea', 42, { chave: 'andrea' }]) {
+    const corpo = await (await pedir('/api/stand/sessao', { voz })).json();
+    assert.equal(corpo.voz, 'lucas', String(voz));
+    await linhasNdjson(await pedir('/api/stand/turno', { conversa_id: corpo.conversa_id, texto: 'oi' }));
+  }
+  assert.deepEqual([...new Set(ttsDe(pedidos))], [VOZ_ID]);
+  assert.equal((await (await pedir('/api/stand/sessao', { voz: ' ANDREA ' })).json()).voz, 'andrea');
+});
+
+test('voz: Andrea fora da conta cai no Lucas com aviso; status mostra indisponível', async (t) => {
+  const pedidos = [];
+  const pedir = await subir11(t, { pedidos, andrea: false });
+  const corpo = await (await pedir('/api/stand/sessao', { voz: 'andrea' })).json();
+  assert.equal(corpo.voz, 'lucas');
+  assert.deepEqual(corpo.voz_aviso, { pedida: 'andrea', motivo: 'voz_indisponivel' });
+  await linhasNdjson(await pedir('/api/stand/turno', { conversa_id: corpo.conversa_id, evento: 'saudacao' }));
+  assert.deepEqual([...new Set(ttsDe(pedidos))], [VOZ_ID]);
+  const status = await (await pedir('/api/stand/status')).json();
+  assert.deepEqual(status.vozes, [
+    { chave: 'lucas', rotulo: 'Lucas Oliveira', padrao: true, disponivel: true },
+    // ainda não conferidas: o status dispara a conferência em segundo plano
+    { chave: 'femea1', rotulo: 'Fêmea 1', padrao: false, disponivel: null },
+    { chave: 'otto', rotulo: 'Otto', padrao: false, disponivel: null },
+    { chave: 'locutor', rotulo: 'Locutor grave', padrao: false, disponivel: null },
+    { chave: 'andrea', rotulo: 'Andrea Lot', padrao: false, disponivel: false },
+  ]);
+  const conferencias = pedidos.filter((p) => p.url.endsWith(`/v1/voices/${VOZ_ANDREA}`)).length;
+  await pedir('/api/stand/sessao', { voz: 'andrea' });
+  assert.equal(pedidos.filter((p) => p.url.endsWith(`/v1/voices/${VOZ_ANDREA}`)).length, conferencias, 'conferência fica em cache');
+});
+
+test('voz: Fêmea 1, Otto e Locutor grave usam o voice_id da lista branca', async (t) => {
+  const pedidos = [];
+  const pedir = await subir11(t, { pedidos });
+  for (const [chave, id] of [['femea1', 'ohZOfA9iwlZ5nOsoY7LB'], ['otto', 'ycxdm1PRMs962FxyyuJ0'], ['locutor', '4XmhZ74tBbUVCXIYNMMo']]) {
+    pedidos.length = 0;
+    const corpo = await (await pedir('/api/stand/sessao', { voz: chave })).json();
+    assert.equal(corpo.voz, chave);
+    await linhasNdjson(await pedir('/api/stand/turno', { conversa_id: corpo.conversa_id, texto: 'oi' }));
+    assert.deepEqual([...new Set(ttsDe(pedidos))], [id], chave);
+  }
+});
+
+test('voz: créditos da Andrea contam igual (rate 1,0 da biblioteca)', async (t) => {
+  const teto = criarTetoDiario({ teto: 1000 });
+  const pedir = await subir11(t, { teto });
+  const { conversa_id } = await (await pedir('/api/stand/sessao', { voz: 'andrea' })).json();
+  await linhasNdjson(await pedir('/api/stand/turno', { conversa_id, texto: 'o que é o LUCA?' }));
+  assert.equal(teto.usados(), (21 + 14) * 0.5);
 });
 
 test('turno: conversa de outra conta, texto vazio e modelo TTS pelo env', async (t) => {
