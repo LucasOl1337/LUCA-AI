@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { sessaoRecusada } from '@/lib/sessaoRecusada';
 
 export interface AuthUser {
   id: string;
@@ -190,7 +191,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void refreshSession();
     const onFocus = () => void refreshSession();
     window.addEventListener('focus', onFocus);
+    // Quiosque não ganha foco: o 401 do /api/state é o que revela a sessão caída.
+    const soltar = sessaoRecusada.assinar(() => { if (hasUserRef.current) void refreshSession(); });
     return () => {
+      soltar();
       window.removeEventListener('focus', onFocus);
       if (retryTimerRef.current !== null) window.clearTimeout(retryTimerRef.current);
     };
