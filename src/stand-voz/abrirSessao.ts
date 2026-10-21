@@ -4,6 +4,7 @@
  * `'websocket'` (xai, reserva) vira a `SessaoVoz` Realtime.
  */
 import { SessaoTurnos, type Emprestimo, type SessaoServidorTurnos } from './sessaoTurnos';
+import { lerVozEscolhida } from './vozEscolhida';
 import { postar, SessaoVoz, type FimSessao, type SessaoDeVoz, type SessaoServidor } from './sessaoVoz';
 
 type RespostaSessao = (SessaoServidor | SessaoServidorTurnos) & { error?: string; motivo?: string };
@@ -16,7 +17,8 @@ export async function abrirSessaoDeVoz(aoTerminar: (motivo: FimSessao, detalhe?:
   let resposta: { status: number; dados: RespostaSessao };
   try {
     // A origem só entra na contagem do dia no servidor (despertares e falsos).
-    resposta = await postar<RespostaSessao>('/api/stand/sessao', { origem: emprestimo && !emprestimo.saudar ? 'escuta' : 'toque' });
+    // A voz é a escolhida no Totem; o servidor confere na lista branca.
+    resposta = await postar<RespostaSessao>('/api/stand/sessao', { origem: emprestimo && !emprestimo.saudar ? 'escuta' : 'toque', voz: lerVozEscolhida() });
   } catch {
     aoTerminar('erro', 'servidor_indisponivel');
     return null;
