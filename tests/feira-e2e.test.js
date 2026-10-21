@@ -80,6 +80,18 @@ describe('ensaio da feira de ponta a ponta', { skip: navegador ? false : 'sem Ch
     return result.value;
   }
 
+  /**
+   * Garante a cabine no totem. Sem o quiosque (211ba5c) a página fica na landing: toca em
+   * Iniciar para os outros cenários seguirem e só o c) acusar a regressão.
+   */
+  async function totemJogando() {
+    const cabine = totem.locator('[data-gameplay] [data-palco="falso"]');
+    const iniciar = totem.getByRole('button', { name: 'Iniciar Gameplay' });
+    await cabine.or(iniciar).first().waitFor({ timeout: 15_000 });
+    if (await iniciar.isVisible()) await iniciar.click();
+    await cabine.waitFor({ timeout: 15_000 });
+  }
+
   const sinal = (p) => p.evaluate(() => document.querySelector('.operador')?.dataset.sinal ?? null);
   /** Espera o selo do tablet chegar a `nivel`; devolve quanto levou (ms). */
   async function tabletEm(nivel, prazoMs) {
@@ -111,7 +123,7 @@ describe('ensaio da feira de ponta a ponta', { skip: navegador ? false : 'sem Ch
     totem = await contexto('totem', direto, await entrar(direto, 'login', { email: EMAIL, password: SENHA }), { abaControlavel: true });
     tablet = await contexto('tablet', redeTablet.url, await entrar(direto, 'login', { email: EMAIL, password: SENHA }));
     await totem.goto(`${direto}/gameplay?quiosque=1`);
-    await totem.waitForSelector('[data-gameplay] [data-palco="falso"]', { timeout: 15_000 });
+    await totemJogando();
     console.log(`# preparo: build ${tBuild} ms, total ${Date.now() - inicio} ms`);
   });
 
@@ -124,11 +136,14 @@ describe('ensaio da feira de ponta a ponta', { skip: navegador ? false : 'sem Ch
   it('a) rede do tablet cai 10 s e o /operador volta ao vivo sozinho em até 5 s (C1)', async () => {
     await abrirTablet();
     redeTablet.cair();
-    await tabletEm('sem-sinal', 5_000);
-    // Queda do ensaio: longa o bastante para a religação de 3 s achar a rede fora.
-    await new Promise((r) => setTimeout(r, 10_000));
-    assert.equal(await sinal(tablet), 'sem-sinal');
-    redeTablet.voltar();
+    try {
+      await tabletEm('sem-sinal', 5_000);
+      // Queda do ensaio: longa o bastante para a religação de 3 s achar a rede fora.
+      await new Promise((r) => setTimeout(r, 10_000));
+      assert.equal(await sinal(tablet), 'sem-sinal');
+    } finally {
+      redeTablet.voltar();
+    }
     const volta = await tabletEm('ao-vivo', 5_000);
     console.log(`# a) ao vivo ${volta} ms depois da rede voltar`);
   });
@@ -136,17 +151,42 @@ describe('ensaio da feira de ponta a ponta', { skip: navegador ? false : 'sem Ch
   it('e) aba do totem oculta: o tablet mostra "Jogo pausado no totem" e volta ao vivo (C3)', async () => {
     await abrirTablet();
     await noTotem('window.__abaOculta(true)');
-    const pausa = await tabletEm('pausado', 3_000);
-    assert.equal((await tablet.textContent('.operador-sinal')).trim(), 'Jogo pausado no totem');
-    // Passado o SEM_SINAL_MS (2 s) segue "pausado", não "sem sinal".
-    await new Promise((r) => setTimeout(r, 2_500));
-    assert.equal(await sinal(tablet), 'pausado');
-    await noTotem('window.__abaOculta(false)');
-    const volta = await tabletEm('ao-vivo', 3_000);
-    console.log(`# e) pausado em ${pausa} ms, ao vivo de novo em ${volta} ms`);
+    try {
+      const pausa = await tabletEm('pausado', 3_000);
+      assert.equal((await tablet.textContent('.operador-sinal')).trim(), 'Jogo pausado no totem');
+      // Passado o SEM_SINAL_MS (2 s) segue "pausado", não "sem sinal".
+      await new Promise((r) => setTimeout(r, 2_500));
+      assert.equal(await sinal(tablet), 'pausado');
+      await noTotem('window.__abaOculta(false)');
+      const volta = await tabletEm('ao-vivo', 3_000);
+      console.log(`# e) pausado em ${pausa} ms, ao vivo de novo em ${volta} ms`);
+    } finally {
+      // Falhou no meio: o totem não pode seguir "oculto" e derrubar os cenários seguintes.
+      await noTotem('window.__abaOculta(false)');
+    }
   });
 
-  it('c) F5 no /gameplay?quiosque=1 volta à cabine sem clique e d) o /operador volta ao vivo', async () => {
+  it('c) F5 no /gameplay?quiosque=1 volta à cabine sem clique', async () => {
+    const t0 = Date.now();
+    await totem.reload({ waitUntil: 'commit' });
+    try {
+      // Só CDP sem gesto daqui em diante: o waitForSelector do Playwright também ativa o usuário.
+      let cabine = null;
+      while (cabine === null && Date.now() - t0 < 10_000) {
+        const pronto = await noTotem('!!document.querySelector(\'[data-quiosque="true"] [data-gameplay] [data-palco="falso"]\')').catch(() => false);
+        if (pronto) cabine = Date.now() - t0;
+        else await new Promise((r) => setTimeout(r, 100));
+      }
+      assert.ok(cabine !== null, 'a cabine do quiosque não voltou em 10 s depois do F5');
+      assert.equal(await noTotem('navigator.userActivation.hasBeenActive'), false, 'ninguém tocou no totem');
+      assert.equal(await noTotem('document.body.innerText.includes("Iniciar Gameplay")'), false, 'sem landing');
+      console.log(`# c) cabine ${cabine} ms depois do F5, sem gesto`);
+    } finally {
+      await totemJogando();
+    }
+  });
+
+  it('d) F5 no totem: o /operador recebe o jogo novo sem ninguém mexer no tablet', async () => {
     await abrirTablet();
     // Antes do F5 o totem sai dirigindo: o retrato do jogo novo ("Parado") prova que o tablet ouviu o totem recarregado.
     await totem.keyboard.down('ArrowUp');
@@ -154,19 +194,10 @@ describe('ensaio da feira de ponta a ponta', { skip: navegador ? false : 'sem Ch
     await totem.keyboard.up('ArrowUp');
     const t0 = Date.now();
     await totem.reload({ waitUntil: 'commit' });
-    // Só CDP sem gesto daqui em diante: o waitForSelector do Playwright também ativa o usuário.
-    let cabine = null;
-    while (cabine === null && Date.now() - t0 < 10_000) {
-      const pronto = await noTotem('!!document.querySelector(\'[data-quiosque="true"] [data-gameplay] [data-palco="falso"]\')').catch(() => false);
-      if (pronto) cabine = Date.now() - t0;
-      else await new Promise((r) => setTimeout(r, 100));
-    }
-    assert.ok(cabine !== null, 'a cabine não voltou em 10 s depois do F5');
-    assert.equal(await noTotem('navigator.userActivation.hasBeenActive'), false, 'ninguém tocou no totem');
-    assert.equal(await noTotem('document.body.innerText.includes("Iniciar Gameplay")'), false, 'sem landing');
-    const volta = await tabletEm('ao-vivo', 8_000);
-    await tablet.waitForFunction(() => document.body.innerText.includes('Parado · esperando R2'), null, { timeout: 8_000, polling: 100 });
-    console.log(`# c) cabine ${cabine} ms depois do F5; d) tablet com o jogo novo ${Date.now() - t0} ms depois do F5 (ao vivo em ${volta} ms)`);
+    await tablet.waitForFunction(() => document.body.innerText.includes('Parado · esperando R2'), null, { timeout: 8_000, polling: 100 })
+      .catch(() => assert.fail('o tablet não recebeu o jogo novo do totem em 8 s depois do F5'));
+    const volta = await tabletEm('ao-vivo', 1_000);
+    console.log(`# d) tablet com o jogo novo ${Date.now() - t0} ms depois do F5 (ao vivo em +${volta} ms)`);
   });
 
   it('b) sessão revogada de fora: /operador vai ao login e /stand ao "sem login" (C6)', async () => {
@@ -186,10 +217,16 @@ describe('ensaio da feira de ponta a ponta', { skip: navegador ? false : 'sem Ch
     // Pular 5 s alcança o poll do /api/state (LOCAL_POLL_MS) e não o de /api/stand/status (60 s):
     // sem o e6f13f8 o stand seguiria "ouvindo" com a sessão morta.
     await stand.clock.fastForward(5_000);
-    await Promise.all([
+    // Os dois aparelhos são conferidos e relatados, mesmo quando um deles falha.
+    const [operador, standSemLogin] = await Promise.allSettled([
       tablet.waitForSelector('input[type=password]', { timeout: 6_000 }).then(() => console.log(`# b) /operador no login em ${Date.now() - t0} ms`)),
       stand.waitForSelector('main.stand[data-sem-login][data-motivo="sem_login"]', { timeout: 3_000 }).then(() => console.log(`# b) /stand sem login em ${Date.now() - t0} ms (relógio +5 s)`)),
     ]);
+    const falhas = [
+      operador.status === 'rejected' && '/operador não foi ao login em 6 s',
+      standSemLogin.status === 'rejected' && '/stand não foi ao "sem login" em 3 s com o relógio +5 s',
+    ].filter(Boolean);
+    assert.deepEqual(falhas, []);
     assert.equal(await tablet.locator('.operador').count(), 0, 'o painel com o usuário antigo saiu da tela');
   });
 });
