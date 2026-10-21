@@ -148,3 +148,14 @@ test('painel da análise: espera honesta, falha com a mensagem do servidor, pron
   assert.match(pronta, /data-pronta/);
   assert.match(pronta, /Caso completo no Laboratório: Percurso do totem · x/);
 });
+
+test('cabine do percurso desenha a trilha e a abertura do 1º trecho, com o painel e o minimapa', async () => {
+  const { PercursoCabine } = await loadFrontendModule('../../src/components/gameplay/PercursoCabine.tsx');
+  const motor = criarMotorGameplay(() => 0);
+  const h = renderToStaticMarkup(createElement(PercursoCabine, { canal: motor, som: false, aoSair() {} }));
+  assert.match(h, /data-percurso-trecho="fardo-a-frente"/);
+  assert.match(h, /data-etapa="abertura"/);
+  assert.match(h, /1\/3 · /);
+  for (const t of TRECHOS_PERCURSO) assert.ok(h.includes(`>${t.titulo}</li>`), t.titulo);
+  assert.match(h, /gameplay-painel/);
+});
