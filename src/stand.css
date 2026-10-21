@@ -226,6 +226,8 @@
   font-size: 1.5vmin; color: rgba(255, 255, 255, 0.62); background: rgba(4, 7, 11, 0.45); pointer-events: none;
 }
 .stand-selo-camera::first-letter { color: #e5483b; }
+/* No Site a página (ex.: /sonolencia) já mostra a câmera; o selo cobriria o vídeo dela. */
+.stand[data-modo='site'] .stand-selo-camera { display: none; }
 
 /* Site (Totem-Site Q6): a página ocupa a área segura; a coruja fica pequena no canto inferior direito. */
 .stand-site { position: absolute; inset: var(--stand-margem); display: grid; grid-template-columns: minmax(0, 1fr) 22vmin; gap: 1.6vmin; }
