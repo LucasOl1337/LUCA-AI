@@ -21,8 +21,9 @@ import { SiteStand } from '@/components/stand/site/SiteStand';
 import { avisoDeSaida, barraVisivel, modoInicial, modosDisponiveis, reduzirModo, type EntradaModo, type EstadoModo } from '@/components/stand/modoStand';
 import type { AcaoNavegacao } from '@/components/stand/navegacaoPad';
 import { usePadStand } from '@/components/stand/usePadStand';
-import { AvisoSaida, BarraModos, DicaControle, preCarregarSimulador, SimulacaoStand, VitrineStand } from '@/components/stand/Modos';
+import { AvisoSaida, BarraModos, preCarregarSimulador, SimulacaoStand, VitrineStand } from '@/components/stand/Modos';
 import { PainelComandos } from '@/components/stand/PainelComandos';
+import { SeloCamera, useCameraTotem, WebcamCoruja } from '@/components/stand/CameraTotem';
 import '@/stand.css';
 
 /** Margem segura padrão (% de cada lado): a moldura de MDF come as bordas. */
@@ -83,6 +84,8 @@ export default function StandPage() {
   const reduzirModoAgora = useCallback((atual: EstadoModo, entrada: EntradaModo) => reduzirModo(atual, entrada, Date.now(), prontos.current), []);
   const [modo, despacharModo] = useReducer(reduzirModoAgora, undefined, () => modoInicial(Date.now()));
   const telas = useTelasDoApp(modo.modo === 'vitrine');
+  // Webcam sempre ligada no Totem: um stream para todas as abas (presença para a coruja, sono na Simulação).
+  const webcam = useCameraTotem(modo.modo);
   prontos.current = disponiveis(ITENS_VITRINE, telas.prontidao);
   const [agora, setAgora] = useState(() => Date.now());
   const voz = useSessaoVoz();
@@ -187,8 +190,9 @@ export default function StandPage() {
 
   const agirNoPad = useCallback((acao: AcaoNavegacao) => {
     if (acao.tipo === 'conversar') {
-      // ✕ na Coruja só conversa quando há voz; sem voz, a chamada já manda apertar R1.
+      // ✕ na Coruja conversa quando há voz; sem voz mostra a Vitrine (igual ao toque).
       if (vozStand === 'ligada' && estado.tela === 'atracao') iniciar();
+      else if (vozStand === 'desligada' && estado.tela === 'atracao') despacharModo({ tipo: 'ir', modo: 'vitrine' });
       despacharModo({ tipo: 'atividade' });
       return;
     }
@@ -263,7 +267,7 @@ export default function StandPage() {
     : itemVitrine?.tipo === 'trator'
       ? <TelaTrator key={volta} trator={telas.trator} pausado={modo.pausado} aoTerminar={terminarVitrine} />
       : undefined;
-  // Voltou pra Vitrine num item que saiu do ar (L1/R1 guarda o índice): segue pro próximo.
+  // Voltou pra Vitrine num item que saiu do ar (a Vitrine guarda o índice): segue pro próximo.
   const itemFora = modo.modo === 'vitrine' && !!itemVitrine && !prontos.current[modo.video];
   useEffect(() => { if (itemFora) terminarVitrine(); }, [itemFora, terminarVitrine]);
 
@@ -280,6 +284,8 @@ export default function StandPage() {
       data-painel={painelComandos || undefined}
       data-motivo={motivoVoz || undefined}
       data-escuta={escuta.estado}
+      data-camera={webcam.camera.fase}
+      data-presenca={webcam.presenca}
       onPointerDown={tocar}
     >
       {modo.modo === 'coruja' && video && (
@@ -298,6 +304,7 @@ export default function StandPage() {
           {estado.tela === 'conversa' && <Conversa variante={variante} nivel={nivel} voz={estado.voz} legenda={estado.legenda} />}
           {painelComandos && <PainelComandos />}
           <p className="stand-selo" aria-label="Assistente de IA">Assistente de IA</p>
+          <WebcamCoruja presenca={webcam.presenca} />
           {aviso && estado.tela === 'atracao' && <p className="stand-aviso-equipe">{aviso}</p>}
         </div>
       )}
@@ -309,12 +316,24 @@ export default function StandPage() {
         <SiteStand pagina={modo.pagina} variante={variante} nivel={nivel} voz={estado.voz} legenda={estado.legenda} aoMexer={mexeuNoPad} />
       )}
       <div className="stand-seguro stand-camada">
-        {controleConectado && <DicaControle modo={modo.modo} />}
+        <SeloCamera estado={webcam.camera} />
         {segundosParaSair !== null && <AvisoSaida segundos={segundosParaSair} />}
         {avisoControle && <p className="stand-aviso-equipe stand-aviso-controle">{avisoControle}</p>}
         {falhaSite && <p className="stand-aviso-equipe stand-aviso-site" role="status">ação no site: {falhaSite}</p>}
         {linhaEscuta && !barraVisivel(modo, agora) && <p className="stand-linha-escuta">{linhaEscuta}</p>}
-        <BarraModos modo={modo.modo} modos={modosDisponiveis(modo)} visivel={barraVisivel(modo, agora)} aoEscolher={(m) => { despacharModo({ tipo: 'atividade', toque: true }); despacharModo({ tipo: 'ir', modo: m }); }} />
+        <BarraModos
+          modo={modo.modo}
+          modos={modosDisponiveis(modo)}
+          visivel={barraVisivel(modo, agora)}
+          aoEscolher={(m) => { despacharModo({ tipo: 'atividade', toque: true }); despacharModo({ tipo: 'ir', modo: m }); }}
+          atalhos={[{
+            // Sonolência como função do Totem: a /sonolencia inteira no modo Site, com a mesma webcam.
+            id: 'sonolencia',
+            rotulo: 'Sonolência',
+            ativo: modo.modo === 'site' && modo.pagina === 'sonolencia',
+            aoEscolher: () => { despacharModo({ tipo: 'atividade', toque: true }); despacharModo({ tipo: 'abrir_pagina', pagina: 'sonolencia' }); },
+          }]}
+        />
       </div>
     </main>
   );

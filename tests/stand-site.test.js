@@ -8,17 +8,16 @@ const { dentroDoStand } = await loadFrontendModule('../../src/components/stand/e
 
 const passo = (estado, entrada, agora) => reduzirModo(estado, entrada, agora, 3);
 
-test('Site só existe com página aberta; L1/R1 pulam ele sem página', () => {
+test('Site só existe com página aberta; a barra guarda a página ao passar pra outro modo', () => {
   let e = modoInicial(0);
   assert.deepEqual(modosDisponiveis(e), ['coruja', 'vitrine', 'simulacao']);
-  assert.equal(passo(e, { tipo: 'passo', direcao: 1 }, 1).modo, 'vitrine');
   assert.equal(passo(e, { tipo: 'ir', modo: 'site' }, 1).modo, 'coruja', 'barra não abre Site vazio');
   e = passo(e, { tipo: 'abrir_pagina', pagina: 'sensor' }, 2);
   assert.deepEqual([e.modo, e.pagina], ['site', 'sensor']);
   assert.deepEqual(modosDisponiveis(e), ['coruja', 'site', 'vitrine', 'simulacao']);
-  const vitrine = passo(e, { tipo: 'passo', direcao: 1 }, 3);
-  assert.deepEqual([vitrine.modo, vitrine.pagina], ['vitrine', 'sensor'], 'L1/R1 guardam a página');
-  assert.equal(passo(vitrine, { tipo: 'passo', direcao: -1 }, 4).modo, 'site');
+  const vitrine = passo(e, { tipo: 'ir', modo: 'vitrine' }, 3);
+  assert.deepEqual([vitrine.modo, vitrine.pagina], ['vitrine', 'sensor'], 'a barra guarda a página');
+  assert.equal(passo(vitrine, { tipo: 'ir', modo: 'site' }, 4).modo, 'site');
 });
 
 test('PS, Coruja da barra e voltar_coruja fecham a página', () => {

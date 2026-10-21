@@ -33,7 +33,7 @@ export const HOME_FUNCOES: readonly HomeFuncao[] = [
     detalhes: [
       'Coruja conversa por voz e pode abrir uma página do site com ela no canto.',
       'Vitrine passa em sequência os vídeos do produto e telas do app.',
-      'Simulação jogável no controle; L1 e R1 alternam os modos em tela cheia.',
+      'Simulação jogável no controle; a barra de toque e a voz alternam os modos em tela cheia.',
     ],
     imagem: '/home/funcoes/totem.webp',
     imagemAlt: 'Tela do Totem com a coruja LUCA convidando a pegar o microfone e perguntar.',

@@ -183,8 +183,8 @@ function parseQuery(search) {
     variante: STAND_VARIANTES.includes(readParam(search, 'variante')) ? readParam(search, 'variante') : '',
     // /stand?stub=1: fala de teste local no lugar do cérebro de voz.
     stub: readParam(search, 'stub') === '1' ? '1' : '',
-    // /stand?simulacao=gameplay: Simulação em direção livre (src/components/gameplay); qualquer outro valor é a clássica.
-    simulacao: readParam(search, 'simulacao') === 'gameplay' ? 'gameplay' : '',
+    // /stand?simulacao=classica força o simulador clássico; 'gameplay' (o padrão desde 21/10) segue aceito; o resto some.
+    simulacao: ['gameplay', 'classica'].includes(readParam(search, 'simulacao')) ? readParam(search, 'simulacao') : '',
     // /gameplay?quiosque=1: abre direto na cabine, sem landing nem menu (F5 no totem volta jogando).
     quiosque: readParam(search, 'quiosque') === '1' ? '1' : '',
     // /gameplay?fps=1: selo de FPS no canto para medir no totem real (pergunta 6).
@@ -261,7 +261,7 @@ export function formatAppUrl(location) {
     setIfPresent(params, 'margem', parseMargem(String(loc.margem || '')));
     if (STAND_VARIANTES.includes(loc.variante)) params.set('variante', loc.variante);
     if (loc.stub === '1') params.set('stub', '1');
-    if (loc.simulacao === 'gameplay') params.set('simulacao', 'gameplay');
+    if (loc.simulacao === 'gameplay' || loc.simulacao === 'classica') params.set('simulacao', loc.simulacao);
   }
 
   if (page === 'personas') {

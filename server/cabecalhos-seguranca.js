@@ -3,7 +3,8 @@
 // voz ao vivo por WebSocket: Scribe Realtime da ElevenLabs ou Grok Voice da xAI.
 // O /stand mostra as páginas públicas num iframe da mesma origem (Totem-Site
 // Q2): só elas aceitam moldura, e só do próprio site; o resto segue DENY.
-// O /stand delega a câmera ao iframe da sonolência (`allow="camera"`).
+// O /stand mantém a webcam do Totem ligada (presença e sonolência, 21/10) e
+// delega a câmera ao iframe da sonolência (`allow="camera"`).
 // O /gameplay só ganha câmera com `?webcam=1` (detector de sonolência na
 // cabine, opção do CP3 de 19/10): sem o parâmetro segue `camera=()`.
 const STAND = /^\/stand\/?$/;
