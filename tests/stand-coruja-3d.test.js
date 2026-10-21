@@ -97,6 +97,12 @@ test('GLB traz o rosto: morphs piscar e bico_abre numa malha 100% na cabeça; na
     assert.ok(alvo.sparse && alvo.sparse.count > 10 && alvo.sparse.count < 120, `bico com ${alvo.sparse?.count} vértices`);
     assert.ok(Math.max(...alvo.max.map(Math.abs), ...alvo.min.map(Math.abs)) < 0.03, 'desloca menos de 3 cm');
   }
+  // Interior da boca: material próprio quase preto, sem textura (fora do manifesto externo).
+  const materiais = rosto.primitives.map((p) => json.materials[p.material]);
+  const boca = materiais.find((m) => !m.pbrMetallicRoughness?.baseColorTexture);
+  assert.ok(boca, 'rosto com o material escuro da boca');
+  assert.ok(Math.max(...boca.pbrMetallicRoughness.baseColorFactor.slice(0, 3)) < 0.1, 'boca quase preta');
+  assert.ok(!boca.emissiveTexture && !boca.normalTexture);
   const no = json.nodes.find((n) => n.mesh === json.meshes.indexOf(rosto));
   assert.equal(no.skin, 0, 'mesma skin da coruja');
   // Todos os vértices num osso só (o da cabeça), com peso 1.
@@ -153,12 +159,16 @@ test('sem piscada no aceno nem com movimento reduzido; pensando deixa a pálpebr
 test('bico abre com o áudio só falando, suavizado, e fecha fora da fala', () => {
   const { m } = relogioRosto([0.99]);
   let bico = 0;
-  for (let t = 16; t <= 320; t += 16) bico = rig.rostoCoruja3D(m, 'falando', 0.8, t).bico;
-  assert.ok(bico > 0.75 && bico <= 0.8, `abre até o nível: ${bico}`);
-  const primeiro = rig.rostoCoruja3D(m, 'ouvindo', 0.8, 336).bico;
-  assert.ok(primeiro < bico && primeiro > 0.5, 'fecha devagar, sem estalo');
-  for (let t = 352; t <= 1500; t += 16) bico = rig.rostoCoruja3D(m, 'ouvindo', 0.8, t).bico;
+  for (let t = 16; t <= 320; t += 16) bico = rig.rostoCoruja3D(m, 'falando', 0.4, t).bico;
+  const alvo = 0.4 * rig.GANHO_BICO;
+  assert.ok(bico > alvo - 0.03 && bico <= alvo, `abre até o nível com ganho (fala típica ~0,4): ${bico}`);
+  const primeiro = rig.rostoCoruja3D(m, 'ouvindo', 0.4, 336).bico;
+  assert.ok(primeiro < bico && primeiro > 0.35, 'fecha devagar, sem estalo');
+  for (let t = 352; t <= 1500; t += 16) bico = rig.rostoCoruja3D(m, 'ouvindo', 0.4, t).bico;
   assert.ok(bico < 0.01, `fechado fora da fala: ${bico}`);
+  const { m: alto } = relogioRosto([0.99]);
+  for (let t = 16; t <= 320; t += 16) bico = rig.rostoCoruja3D(alto, 'falando', 1, t).bico;
+  assert.equal(bico, 1, 'satura em 1 (morph nunca passa de 100%)');
   const { m: q } = relogioRosto([0.99]);
   assert.equal(rig.rostoCoruja3D(q, 'pensando', 1, 16).bico, 0);
 });

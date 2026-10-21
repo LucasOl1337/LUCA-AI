@@ -22,7 +22,7 @@
     "tool": "Blender 5.2.0 LTS, scripts/stand/package-coruja-3d.py",
     "decimate": {
       "type": "COLLAPSE",
-      "ratio": 0.0,
+      "ratio": 4.543793632202729e+30,
       "delimit": [
         "SEAM",
         "UV"
@@ -31,7 +31,7 @@
     "atlas": 1024,
     "jpegQuality": 84,
     "emissive": "frisos azul-claros da cor base (visor, fones, microfone), 512 px",
-    "rosto": "malha CorujaRosto (100% tripo::Head_2) com morph targets piscar e bico_abre, e bico_abre na malha principal (só o bico de cima sobe), scripts/stand/coruja3d_rosto.py"
+    "rosto": "malha CorujaRosto (100% tripo::Head_2) com morph targets piscar e bico_abre e interior da boca no material coruja-3d-boca (sem textura), e bico_abre na malha principal (só o bico de cima dobra para cima), scripts/stand/coruja3d_rosto.py"
   },
   "morphTargets": {
     "Coruja": [
@@ -69,6 +69,6 @@
   },
   "externalManifest": "coruja-3d.textures.json",
   "reproducibleCommand": "gltf-transform dequantize RIG_TRIPO.glb rig-decoded.glb && blender -b --factory-startup --python scripts/stand/package-coruja-3d.py -- rig-decoded.glb public/stand/avatar/coruja-3d",
-  "sha256": "281b219b4eae2598fbf9fbce29861ca7b39c134a67d53e4ec26175ea94eb8d50",
-  "bytes": 1674732
+  "sha256": "a731b8815ff07e0ab74f1b9a01124f9b6c2c8f2783355bca026977a2c6d11917",
+  "bytes": 1676780
 }

@@ -182,11 +182,13 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
       const malha = no as THREE.Mesh;
       if (malha.isMesh) {
         malha.frustumCulled = false; // a pele animada sai do bounding box de repouso
-        const m = malha.material as THREE.MeshStandardMaterial;
-        // O mesh do Tripo tem frestas de subpixel entre as penas; com face única o fundo
-        // vaza por elas em pontinhos escuros. Dupla face tapa com o interior claro.
-        m.side = THREE.DoubleSide;
-        if (m.emissiveMap) { m.emissive.set(0xffffff); emissivos.push(m); }
+        // O rosto tem dois materiais (o da coruja e o interior escuro da boca).
+        for (const m of (Array.isArray(malha.material) ? malha.material : [malha.material]) as THREE.MeshStandardMaterial[]) {
+          // O mesh do Tripo tem frestas de subpixel entre as penas; com face única o fundo
+          // vaza por elas em pontinhos escuros. Dupla face tapa com o interior claro.
+          m.side = THREE.DoubleSide;
+          if (m.emissiveMap && !emissivos.includes(m)) { m.emissive.set(0xffffff); emissivos.push(m); }
+        }
       }
     });
     pescoco = modelo.getObjectByName(OSSO_PESCOCO) ?? null;

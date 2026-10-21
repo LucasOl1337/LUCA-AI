@@ -14,11 +14,12 @@ malha pequena à parte (`CorujaRosto`) com o mesmo material e a mesma skin,
   (projetar o UV ponto a ponto puxava trechos de outras ilhas). Em repouso
   ela fica comprimida numa faixa fina 0,8 mm atrás da superfície, escondida.
 - `bico_abre`: uma mandíbula inferior (cunha) que em repouso fica dentro do
-  bico superior e gira 45° para baixo numa dobradiça atrás. O topo é escuro
-  (interior da boca), o resto tem o azul do bico. A mesma chave existe na
-  malha principal (`abrir_bico_superior`): só os ~47 vértices do bico de cima
-  (azul escuro na textura) sobem 10° pela base, um giro rígido que não estica
-  a textura do bico. As penas ficam paradas e, com influência 0, a malha é a
+  bico superior e gira 45° para baixo numa dobradiça atrás. O topo usa um
+  material próprio quase preto (`coruja-3d-boca`, interior da boca), o resto
+  tem o azul do bico. A mesma chave existe na malha principal
+  (`abrir_bico_superior`): só os ~47 vértices do bico de cima (azul escuro na
+  textura) dobram até 12° para cima, com peso 0 na base colada às penas e 1 da
+  metade para baixo. As penas ficam paradas e, com influência 0, a malha é a
   do #16 byte a byte.
 
 Coordenadas do Blender: frente +X, cima +Z, asa direita em -Y. Contornos dos
@@ -48,10 +49,17 @@ DOBRADICA_X, PONTA_X, MEIA_LARGURA = 0.189, 0.232, 0.015
 # mandíbula fica escondida atrás dele na vista de frente do totem.
 ABERTURA_GRAUS = 45.0
 # Bico de cima (malha principal): caixa (x mínimo, |y| máximo, z mínimo, z máximo)
-# onde procurar o azul escuro do bico, e a dobradiça na base de cima, atrás.
+# onde procurar o azul escuro do bico. Ele dobra para cima numa dobradiça atrás
+# da ponta, na altura dela (girar pela base de cima empurraria a ponta para a
+# frente, sem abrir nada de frente); o peso vai de 0 na base (z ≥ 0,735, colada
+# nas penas) a 1 da metade para baixo (z ≤ 0,69).
 CAIXA_BICO = (0.165, 0.05, 0.60, 0.745)
-DOBRADICA_SUPERIOR = (0.198, 0.0, 0.728)
-SUBIDA_GRAUS = 10.0
+DOBRADICA_SUPERIOR = (0.19, 0.0, 0.655)
+SUBIDA_GRAUS = 12.0
+BASE_FIXA_Z, PESO_CHEIO_Z = 0.735, 0.69
+# Interior da boca: material próprio, quase preto e fosco (o atlas não tem preto;
+# o azul mais escuro dele some contra o bico).
+COR_BOCA = (0.03, 0.006, 0.012, 1.0)
 JANELA_PX = 4  # meia janela (px) para medir o quanto o texel é liso
 
 
@@ -119,11 +127,11 @@ class Construtor:
             lista.append(Vector(abertos.get(nome, repouso)))
         return len(self.base) - 1
 
-    def grade(self, ids, uvs):
+    def grade(self, ids, uvs, material=0):
         for r in range(len(ids) - 1):
             for c in range(len(ids[r]) - 1):
                 quad = (ids[r][c], ids[r + 1][c], ids[r + 1][c + 1], ids[r][c + 1])
-                self.faces.append((quad, [uvs[r][c], uvs[r + 1][c], uvs[r + 1][c + 1], uvs[r][c + 1]]))
+                self.faces.append((quad, [uvs[r][c], uvs[r + 1][c], uvs[r + 1][c + 1], uvs[r][c + 1]], material))
 
 
 def _uv_visor(sup, lado):
@@ -174,7 +182,7 @@ def _palpebra(cons, sup, lado, uv_escuro):
 
 
 def _mandibula(cons, sup, uv_bico, uv_escuro):
-    """Cunha sob o bico: fundo e laterais azuis, topo escuro; gira na dobradiça."""
+    """Cunha sob o bico: fundo e laterais azuis, topo no material da boca; gira na dobradiça."""
     us = np.linspace(0, 1, 7)
     vs = np.linspace(-1, 1, 7)
     z_dob = sup.de_baixo(DOBRADICA_X, 0.0).z + 0.002
@@ -194,7 +202,7 @@ def _mandibula(cons, sup, uv_bico, uv_escuro):
         fundo.append(lf), topo.append(lt)
     n_u, n_v = len(us), len(vs)
     cons.grade([list(reversed(l)) for l in fundo], [[uv_bico] * n_v] * n_u)  # normal para baixo
-    cons.grade(topo, [[uv_escuro] * n_v] * n_u)  # normal para cima
+    cons.grade(topo, [[uv_escuro] * n_v] * n_u, material=1)  # normal para cima, interior da boca
     # Laterais e frente: vértices próprios com o azul do bico.
     borda = [(u, 0) for u in range(n_u)] + [(n_u - 1, v) for v in range(1, n_v)] + \
         [(u, n_v - 1) for u in range(n_u - 2, -1, -1)]
@@ -229,15 +237,27 @@ def abrir_bico_superior(malha, sup):
             if p.x > x0 and abs(p.y) < ay and z0 < p.z < z1 and np.mean(cantos.get(i, [False])) > 0.5]
     if not bico:
         raise RuntimeError('bico superior não encontrado na textura')
-    giro = (Matrix.Translation(DOBRADICA_SUPERIOR) @ Matrix.Rotation(-math.radians(SUBIDA_GRAUS), 4, 'Y')
-            @ Matrix.Translation(-Vector(DOBRADICA_SUPERIOR)))
     if not me.shape_keys:
         malha.shape_key_add(name='Basis')
     chave = malha.shape_key_add(name='bico_abre', from_mix=False)
     inv = sup.mw.inverted()
     for i in bico:
-        chave.data[i].co = inv @ (giro @ sup.vs[i])
+        p = sup.vs[i]
+        peso = min(1.0, max(0.0, (BASE_FIXA_Z - p.z) / (BASE_FIXA_Z - PESO_CHEIO_Z)))
+        giro = (Matrix.Translation(DOBRADICA_SUPERIOR) @ Matrix.Rotation(-math.radians(SUBIDA_GRAUS * peso), 4, 'Y')
+                @ Matrix.Translation(-Vector(DOBRADICA_SUPERIOR)))
+        chave.data[i].co = inv @ (giro @ p)
     return len(bico)
+
+
+def _material_boca():
+    mat = bpy.data.materials.new('coruja-3d-boca')
+    mat.use_nodes = True
+    bsdf = next(n for n in mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
+    bsdf.inputs['Base Color'].default_value = COR_BOCA
+    bsdf.inputs['Roughness'].default_value = 0.9
+    bsdf.inputs['Metallic'].default_value = 0.0
+    return mat
 
 
 def adicionar_rosto(malha, arm):
@@ -256,9 +276,10 @@ def adicionar_rosto(malha, arm):
     bm = bmesh.new()
     vb = [bm.verts.new(inv @ p) for p in cons.base]
     camada = bm.loops.layers.uv.new('UVMap')
-    for quad, uvs in cons.faces:
+    for quad, uvs, material in cons.faces:
         f = bm.faces.new([vb[i] for i in quad])
         f.smooth = True
+        f.material_index = material
         for loop, uv in zip(f.loops, uvs):
             loop[camada].uv = uv
     bm.to_mesh(me)
@@ -268,6 +289,7 @@ def adicionar_rosto(malha, arm):
     rosto.parent = arm
     rosto.matrix_world = sup.mw
     me.materials.append(malha.material_slots[0].material)
+    me.materials.append(_material_boca())
     grupo = rosto.vertex_groups.new(name=OSSO)
     grupo.add(range(len(cons.base)), 1.0, 'REPLACE')
     mod = rosto.modifiers.new('Armature', 'ARMATURE')
