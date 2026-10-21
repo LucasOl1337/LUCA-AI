@@ -25,7 +25,10 @@ test('feira checar no runtime local isolado: só GET, sem sessão, release real 
   for (const chunk of ['StandPage', 'GameplayPage', 'OperadorPage', 'TotemPage']) {
     assert.ok(result.json.checks.some(c => c.id.startsWith(`asset /assets/${chunk}-`) && c.ok && c.bytes > 0), chunk);
   }
-  assert.equal(porId['coruja-3d.glb'].presente, true);
+  // Sem o GLB no checkout (aceite sem a coruja 3D) ele é só aviso, como na produção.
+  const temGlb = fs.existsSync(path.join(root, 'public/stand/avatar/coruja-3d/coruja-3d.glb'));
+  assert.equal(porId['coruja-3d.glb'].presente, temGlb);
+  assert.equal(porId['coruja-3d.glb'].ok, true);
 });
 
 test('feira checar acusa release errada (fallback SPA), microfone bloqueado e /api/state aberto; exit 1', async t => {
