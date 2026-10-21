@@ -60,4 +60,14 @@ test('/ws repassa o retrato do gameplay só para a mesma conta', { timeout: 3000
   await delay(200);
   assert.equal(tarde.retratos.at(-1)?.estado.maquina.x, 20);
   assert.equal(outra.retratos.length, 0);
+
+  // Aba do totem oculta (item 7): `oculto` booleano passa; outro tipo derruba o retrato inteiro.
+  await delay(250);
+  totem.ws.send(JSON.stringify({ kind: 'gameplay:retrato', estado: retrato(21), oculto: 'talvez' }));
+  await delay(250);
+  totem.ws.send(JSON.stringify({ kind: 'gameplay:retrato', estado: retrato(22), oculto: true }));
+  await delay(300);
+  assert.ok(!tablet.retratos.some((m) => m.estado.maquina.x === 21), 'oculto não booleano é descartado');
+  assert.equal(tablet.retratos.at(-1).estado.maquina.x, 22);
+  assert.equal(tablet.retratos.at(-1).oculto, true);
 });

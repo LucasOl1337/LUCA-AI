@@ -72,6 +72,11 @@ export default function App() {
     );
   }
 
+  // /gameplay?quiosque=1: totem da feira só com a cabine, sem sidebar nem dock (F5 volta jogando).
+  if (authorizedPage === 'gameplay' && location.quiosque === '1') {
+    return <Suspense fallback={<div className="stand-carregando" role="status">Abrindo o Gameplay…</div>}><GameplayPage /></Suspense>;
+  }
+
   // Página dentro do iframe do /stand (Totem-Site Q3): só a página e o Executor, sem menu nem chat.
   if (EMBUTIDO_NO_STAND) {
     return (

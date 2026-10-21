@@ -527,7 +527,7 @@ export type WsPayload =
   | { kind: 'state'; state: LucaState }
   | { kind: 'event'; event: BackendEvent }
   | { kind: 'sompo.telemetry'; telemetry: SompoTelemetrySnapshot }
-  | { kind: 'gameplay:retrato'; estado: EstadoGameplay; idadeMs?: number };
+  | { kind: 'gameplay:retrato'; estado: EstadoGameplay; idadeMs?: number; oculto?: boolean };
 
 export interface LucaAiChatFolder {
   id: string;

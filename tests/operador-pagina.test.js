@@ -99,3 +99,10 @@ test('aba oculta: marca data-oculto para pausar as animações', () => {
   const h = renderToStaticMarkup(createElement(OperadorVista, { retrato: null, agora: 0, som: false, oculto: true }));
   assert.match(h, /data-oculto="true"/);
 });
+
+test('totem com a aba oculta: selo "Jogo pausado no totem", mapa mantido', () => {
+  const h = html({ estado: estado(), recebidoEm: 1_000, oculto: true }, 10_000);
+  assert.match(h, /data-sinal="pausado"/);
+  assert.match(h, /Jogo pausado no totem/);
+  assert.match(h, /gameplay-mapa/);
+});

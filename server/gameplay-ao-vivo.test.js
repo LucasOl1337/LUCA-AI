@@ -58,6 +58,27 @@ test('descarta tipo desconhecido, JSON inválido, binário, excesso de tamanho e
   assert.equal(par.recebidas.length, 2);
 });
 
+// Ensaio da feira (item 7): aba do totem oculta vira "jogo pausado" no tablet.
+test('campo opcional oculto: só booleano passa, chega ao par e ao tablet que abre depois', () => {
+  let t = 0;
+  const ao = criarGameplayAoVivo({ agora: () => t });
+  const totem = socket('A'), tablet = socket('A');
+  const env = (extra) => { t += RETRATO_INTERVALO_MIN_MS; return ao.receber(totem, JSON.stringify({ kind: TIPO_RETRATO, estado: retratoValido(), ...extra }), { clientes: [totem, tablet] }); };
+  assert.equal(env({ oculto: 'sim' }), 'descartado:formato');
+  assert.equal(env({ oculto: 1 }), 'descartado:formato');
+  assert.equal(env({ oculto: true }), 'repassado');
+  assert.equal(tablet.recebidas.at(-1).oculto, true);
+  const tarde = socket('A');
+  ao.aoConectar(tarde);
+  assert.equal(tarde.recebidas[0].oculto, true);
+  assert.equal(env({ oculto: false }), 'repassado');
+  assert.equal('oculto' in tablet.recebidas.at(-1), false, 'visível de novo: o campo some');
+  assert.equal(env({}), 'repassado');
+  assert.equal('oculto' in tablet.recebidas.at(-1), false);
+  // Mesmo teto de tamanho: o campo não abre brecha para mensagem maior.
+  assert.equal(env({ oculto: true, x: 'a'.repeat(RETRATO_MAX_BYTES) }), 'descartado:tamanho');
+});
+
 test('só escreve quem conectou da própria origem', () => {
   assert.equal(conexaoDaMesmaOrigem({ host: 'luca-ai.com.br', origin: 'https://luca-ai.com.br' }), true);
   assert.equal(conexaoDaMesmaOrigem({ host: '127.0.0.1:4242' }), true);

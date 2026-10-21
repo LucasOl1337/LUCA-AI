@@ -18,8 +18,11 @@ export default function TotemPage() {
       </div>
       <div className="experience-card">
         <h2>Quer testar a direção livre?</h2>
-        <p>A cabine jogável do Trator MAX tem acesso próprio no painel, sem precisar descobrir parâmetros de URL.</p>
-        <button type="button" className="experience-secondary" onClick={() => navigate({ page: 'gameplay' }, 'push')}>Ir para Gameplay</button>
+        <p>A cabine jogável do Trator MAX tem acesso próprio no painel, sem precisar descobrir parâmetros de URL. Para o totem da feira, abra em tela inteira: F5 volta direto à cabine e Shift+Q sai.</p>
+        <div className="experience-acoes">
+          <button type="button" className="experience-primary" onClick={() => navigate({ page: 'gameplay', quiosque: '1' }, 'push')}>Abrir Gameplay em tela inteira</button>
+          <button type="button" className="experience-secondary" onClick={() => navigate({ page: 'gameplay' }, 'push')}>Ir para Gameplay</button>
+        </div>
       </div>
     </section>
   );

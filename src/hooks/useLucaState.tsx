@@ -410,7 +410,7 @@ export function LucaStateProvider({ children }: { children: React.ReactNode }) {
           if (payload.kind === 'state') syncState(payload.state);
           if (payload.kind === 'event') applyBackendEvent(payload.event);
           if (payload.kind === 'sompo.telemetry') setSompoTelemetry(payload.telemetry);
-          if (payload.kind === TIPO_RETRATO) aoVivo.receber(payload.estado, payload.idadeMs);
+          if (payload.kind === TIPO_RETRATO) aoVivo.receber(payload.estado, payload.idadeMs, payload.oculto === true);
         } catch {
           // Payload invalido nao deve derrubar a interface.
         }

@@ -67,7 +67,8 @@ export function criarGameplayAoVivo({ agora = Date.now } = {}) {
   // `idadeMs` em vez da hora do servidor: o tablet não depende do próprio relógio.
   const enviar = (socket, ultimo) => {
     if (socket.readyState !== 1) return;
-    socket.send(JSON.stringify({ kind: TIPO_RETRATO, estado: ultimo.estado, idadeMs: Math.max(0, agora() - ultimo.recebidoEm) }));
+    const idadeMs = Math.max(0, agora() - ultimo.recebidoEm);
+    socket.send(JSON.stringify({ kind: TIPO_RETRATO, estado: ultimo.estado, idadeMs, ...(ultimo.oculto ? { oculto: true } : {}) }));
   };
 
   return {
@@ -88,7 +89,9 @@ export function criarGameplayAoVivo({ agora = Date.now } = {}) {
       if (objeto(mensagem).kind !== TIPO_RETRATO) return 'descartado:tipo';
       const estado = normalizarRetrato(mensagem.estado);
       if (!estado) return 'descartado:formato';
-      const ultimo = { estado, recebidoEm: instante };
+      // `oculto` (opcional): a aba do totem saiu da tela; o tablet mostra "jogo pausado".
+      if (mensagem.oculto !== undefined && typeof mensagem.oculto !== 'boolean') return 'descartado:formato';
+      const ultimo = { estado, recebidoEm: instante, oculto: mensagem.oculto === true };
       ultimos.set(userId, ultimo);
       for (const outro of clientes) {
         if (outro !== socket && outro.userId === userId) enviar(outro, ultimo);
