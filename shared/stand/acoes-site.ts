@@ -148,7 +148,7 @@ export const ACOES_SITE: readonly AcaoSiteDef[] = Object.freeze(([
   {
     nome: 'laboratorio_ver_demonstracao',
     pagina: 'laboratorio',
-    descricao: `No laboratório 3D, abre a demonstração do caminhão em movimento na fazenda (percurso sintético sobre área real). ${SO_LEITURA}`,
+    descricao: `No laboratório 3D, abre a demonstração do caminhão em movimento na fazenda 3D (percurso e área fictícios: é demonstração, não operação real). ${SO_LEITURA}`,
     args: {},
   },
   { nome: 'laboratorio_pausar', pagina: 'laboratorio', descricao: 'Pausa o replay do laboratório 3D.', args: {} },

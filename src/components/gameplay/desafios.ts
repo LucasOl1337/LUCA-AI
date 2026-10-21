@@ -11,13 +11,14 @@ import {
   type InicioGameplay,
 } from './estadoGameplay';
 import { RAMPA_LINHA_Z } from './rampaLateral';
+import { ZONAS_TALHAO, geofenceTalhao } from './geofenceTalhao';
 
 /** Emissor do HC-SR04 à frente da origem da máquina (FREE_DRIVE.sensorAheadM). */
 const SENSOR_A_FRENTE_M = 2.2461;
 /** Raio do fardo de feno do palco (HAY_BALE_RADIUS). */
 const RAIO_FARDO_M = 0.72;
 
-export type IdDesafio = 'fardo-a-frente' | 'pendente-lateral';
+export type IdDesafio = 'fardo-a-frente' | 'pendente-lateral' | 'area-alagada';
 
 export interface Desafio {
   id: IdDesafio;
@@ -81,6 +82,21 @@ export const DESAFIO_PENDENTE: Desafio = {
 };
 
 /** Desafios ligados no totem, na ordem em que as rodadas se alternam. */
+/** Área alagada do talhão (geofenceTalhao.ts): parte no eixo da zona e precisa contorná-la. Só entra no percurso guiado. */
+const ALAGADO = ZONAS_TALHAO[0].poligono.rings[0];
+const ALAGADO_X1 = Math.max(...ALAGADO.map((p) => p.x));
+const ALAGADO_Z0 = Math.min(...ALAGADO.map((p) => p.z));
+export const DESAFIO_ALAGADO: Desafio = {
+  id: 'area-alagada',
+  titulo: 'Área alagada',
+  abertura: 'Área alagada à frente. Quando o LUCA-AI avisar, desvie dela.',
+  // Parte 4 m dentro da faixa da zona: dá para contornar pela borda mais próxima com o volante.
+  inicio: { x: -6, z: ALAGADO_Z0 + 4, rumoGraus: 0, obstaculos: [], tetoKph: GAMEPLAY_TETO_DESAFIO_KPH },
+  limiteMs: 60_000,
+  // Chegada: passar 4 m do fim da zona em x (medido em x, não em distância andada).
+  atravessarM: ALAGADO_X1 + 4 - -6,
+};
+
 export const DESAFIOS: readonly Desafio[] = [DESAFIO_FARDO, DESAFIO_PENDENTE];
 
 /** Desafio da rodada (1, 2, 3…): fardo, pendente, fardo… */
@@ -112,7 +128,15 @@ export interface ResultadoPendente {
   grauMaximo: number;
 }
 
-export type ResultadoDesafio = ResultadoFardo | ResultadoPendente;
+export interface ResultadoAlagado {
+  desafio: 'area-alagada';
+  desfecho: 'desviou' | 'entrou' | 'parou' | 'tempo';
+  /** O geofence avisou (rumo à zona ou dentro). */
+  alertou: boolean;
+  reacaoS: number | null;
+}
+
+export type ResultadoDesafio = ResultadoFardo | ResultadoPendente | ResultadoAlagado;
 export type DesfechoDesafio = ResultadoDesafio['desfecho'];
 
 /** O que o desafio acumula enquanto roda. Imutável: cada passo devolve outro. */
@@ -163,7 +187,9 @@ export function passoDesafio(rastro: RastroDesafio, estado: EstadoGameplay, desa
   if (rastro.resultado || estado.fase === 'pronto') return rastro;
   let r = rastro;
   if (estado.maquina.velocidadeKph > 1 && !r.andou) r = { ...r, andou: true };
-  r = desafio.id === 'pendente-lateral' ? passoPendente(r, estado, desafio) : passoFardo(r, estado, desafio);
+  r = desafio.id === 'pendente-lateral' ? passoPendente(r, estado, desafio)
+    : desafio.id === 'area-alagada' ? passoAlagado(r, estado, desafio)
+      : passoFardo(r, estado, desafio);
   if (r.resultado) return r;
   if (r.alertaMs !== null && r.freioMs === null && estado.comandos.freio >= FREIO_MINIMO) r = { ...r, freioMs: estado.tempoMs };
   return r;
@@ -212,9 +238,26 @@ function passoPendente(rastro: RastroDesafio, estado: EstadoGameplay, desafio: D
 }
 
 /** Motivo passado ao `encerrar` da Direção. */
+function passoAlagado(rastro: RastroDesafio, estado: EstadoGameplay, desafio: Desafio): RastroDesafio {
+  let r = rastro;
+  const t = estado.tempoMs;
+  const geofence = geofenceTalhao(estado.maquina);
+  if (geofence.nivel !== 'fora' && r.alertaMs === null) r = marcarAlerta(r, t, estado, {});
+  if (r.alertaMs !== null && r.freioMs === null && estado.comandos.freio >= FREIO_MINIMO) r = { ...r, freioMs: t };
+  const fechar = (desfecho: ResultadoAlagado['desfecho']): RastroDesafio => ({
+    ...r, resultado: { desafio: 'area-alagada', desfecho, alertou: r.alertaMs !== null, reacaoS: reacao(r) },
+  });
+  if (geofence.nivel === 'dentro') return fechar('entrou');
+  const { x = 0 } = desafio.inicio;
+  if (desafio.atravessarM !== undefined && estado.maquina.x - x >= desafio.atravessarM) return fechar('desviou');
+  if (parado(estado) && r.andou && r.alertaMs !== null) return fechar('parou');
+  if (acabouTempo(estado, desafio)) return fechar('tempo');
+  return r;
+}
+
 export const MOTIVO_FIM: Record<DesfechoDesafio, string> = {
   parou: 'desafio-parou', encostou: 'desafio-encostou', tempo: 'desafio-tempo',
-  atravessou: 'desafio-atravessou', tombou: 'desafio-tombou',
+  atravessou: 'desafio-atravessou', tombou: 'desafio-tombou', desviou: 'desafio-desviou', entrou: 'desafio-entrou',
 };
 
 export interface TextoResultado {
@@ -235,7 +278,8 @@ function linhaReacao(reacaoS: number | null) {
 
 /** As três linhas e a frase da tela de resultado (Q4). "Reação atrasada" como no glossário. */
 export function textoResultado(resultado: ResultadoDesafio): TextoResultado {
-  return resultado.desafio === 'pendente-lateral' ? textoPendente(resultado) : textoFardo(resultado);
+  return resultado.desafio === 'pendente-lateral' ? textoPendente(resultado)
+    : resultado.desafio === 'area-alagada' ? textoAlagado(resultado) : textoFardo(resultado);
 }
 
 function textoFardo(resultado: ResultadoFardo): TextoResultado {
@@ -274,4 +318,13 @@ function textoPendente(resultado: ResultadoPendente): TextoResultado {
     };
   }
   return { titulo: 'Tempo esgotado', linhas, frase: 'Acelere com R2 pela encosta e freie com L2 se o LUCA-AI avisar.' };
+}
+
+function textoAlagado(resultado: ResultadoAlagado): TextoResultado {
+  const linhas = [resultado.alertou ? 'O LUCA-AI avisou a área alagada no caminho' : 'O LUCA-AI não precisou avisar'];
+  if (resultado.alertou) linhas.push(resultado.reacaoS === null ? 'Você não freou depois do aviso' : resultado.reacaoS === 0 ? 'Você já estava freando no aviso' : `Você freou ${segundos(resultado.reacaoS)} depois do aviso`);
+  if (resultado.desfecho === 'entrou') return { titulo: 'Entrou na área alagada', linhas, frase: 'O aviso vem 3 s antes da borda: é a hora de virar ou frear.' };
+  if (resultado.desfecho === 'parou') return { titulo: 'Parou antes da água', linhas, frase: 'Parar resolve; contornar a área também termina o trecho.' };
+  if (resultado.desfecho === 'desviou') return { titulo: 'Contornou a área alagada', linhas, frase: 'Ficou fora da área marcada no mapa do talhão.' };
+  return { titulo: 'Tempo esgotado', linhas, frase: 'Acelere com R2 e contorne a área azul do mapa.' };
 }

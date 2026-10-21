@@ -91,3 +91,41 @@
 
 /* O minimapa do talhão tem CSS próprio (mapaTalhao.css), importado pelo MapaTalhao. */
 .gameplay-desafio[data-etapa='resultado'] .gameplay-mapa { display: none; }
+
+/* Percurso guiado do totem (PercursoCabine): trilha dos trechos, resumo que espera a pessoa e botões tocáveis. */
+.gameplay-percurso-trechos {
+  position: absolute; top: 2.4cqh; left: 50%; transform: translateX(-50%); z-index: 4;
+  display: flex; gap: .6cqw; margin: 0; padding: 0; list-style: none; pointer-events: none;
+}
+.gameplay-percurso-trechos li {
+  padding: .7cqh 1.2cqw; border-radius: 999px; background: #07110ecc; color: #8fa897;
+  font-size: clamp(12px, 1.8cqh, 20px); font-weight: 700; border: 1px solid #ffffff22;
+}
+.gameplay-percurso-trechos li[data-estado='atual'] { color: #07110e; background: #e8c96a; }
+.gameplay-percurso-trechos li[data-estado='feito'] { color: #c9dccf; border-color: #4fbf7a99; }
+.gameplay-percurso-resumo {
+  pointer-events: auto; text-align: left; width: min(980px, 92cqw); max-height: 88cqh; overflow: auto;
+  transform: translate(-50%, -50%); padding: 3.6cqh 3cqw 2.6cqh;
+}
+.gameplay-percurso-resumo h2 { text-align: center; font-size: clamp(26px, 4.6cqh, 54px); }
+.gameplay-percurso-resumo > ul li small { display: block; margin-top: .4cqh; }
+.gameplay-percurso-regras { margin-top: 1.6cqh; color: #b9cdbf; font-size: clamp(13px, 1.7cqh, 18px); }
+.gameplay-percurso-regras summary { cursor: pointer; font-weight: 700; }
+.gameplay-percurso-regras ul { margin: 1cqh 0 0; padding-left: 1.2em; list-style: disc; font-size: inherit; display: block; }
+.gameplay-percurso-regras p { font-size: inherit; margin-top: 1cqh; }
+.gameplay-percurso-analise { margin-top: 2cqh; padding: 1.6cqh 1.4cqw; border-radius: 14px; background: #0f2219; color: #dbe8de; font-size: clamp(14px, 1.9cqh, 21px); }
+.gameplay-percurso-analise p { margin: 0; font-size: inherit; color: inherit; }
+.gameplay-percurso-analise ul { margin: 1cqh 0 0; padding-left: 1.2em; list-style: disc; display: block; font-size: inherit; }
+.gameplay-percurso-analise[data-falha] { background: #2a1512; color: #ffd2cb; }
+.gameplay-percurso-caso { margin-top: 1cqh !important; color: #8fa897 !important; font-size: clamp(12px, 1.5cqh, 16px) !important; }
+.gameplay-percurso-acoes { display: flex; flex-wrap: wrap; justify-content: center; gap: 1cqw; margin-top: 2.2cqh; }
+.gameplay-percurso-acoes button {
+  min-height: 56px; padding: 0 1.8cqw; border-radius: 14px; border: 2px solid #4fbf7a99; background: #0f2219; color: #edf3ed;
+  font: inherit; font-size: clamp(16px, 2.2cqh, 24px); font-weight: 750; cursor: pointer;
+}
+.gameplay-percurso-acoes button[data-acao='analisar'] { background: #e8c96a; color: #1d1a0d; border-color: #e8c96a; }
+.gameplay-percurso-acoes button:disabled { opacity: .55; cursor: progress; }
+.gameplay-percurso-acoes kbd { font: inherit; font-size: .72em; padding: 1px 6px; margin-right: 4px; border-radius: 6px; background: #0004; }
+.gameplay-percurso-livre { position: absolute; top: 2.4cqh; right: 2cqw; z-index: 4; margin: 0; }
+.gameplay-percurso-livre button { min-height: 48px; }
+.gameplay-percurso[data-etapa='resumo'] .gameplay-mapa { display: none; }

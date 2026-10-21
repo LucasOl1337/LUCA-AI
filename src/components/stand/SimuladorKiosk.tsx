@@ -32,7 +32,7 @@ export default function SimuladorKiosk() {
   return (
     <GameplayOuClassico classico={classico}>
       <Suspense fallback={<p className="stand-simulacao-carregando" role="status">Ligando o trator…</p>}>
-        <GameplayKiosk />
+        <GameplayKiosk experiencia="percurso" />
       </Suspense>
     </GameplayOuClassico>
   );

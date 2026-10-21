@@ -1,4 +1,4 @@
-import GameplayKiosk from '../GameplayKiosk';
+import GameplayKiosk, { type ExperienciaGameplay } from '../GameplayKiosk';
 import { criarTelaPainel } from '../telaPainel';
 import { CABINE_MAX_URL, criarCabineMax } from './cabineMax';
 import { criarCameraCabineMax } from './cameraCabineMax';
@@ -11,10 +11,10 @@ const criarCabineComTela = () => criarCabineMax({ criarTela: criarTelaPainel });
  * `modeloUrl` da Direção) e a cabine monta volante, console, banco e fardos.
  * Mesmo chunk lazy do GameplayKiosk (GLTFLoader fica fora do stand).
  */
-export default function GameplayComCabine({ seloFps = false }: { seloFps?: boolean }) {
+export default function GameplayComCabine({ seloFps = false, experiencia = 'desafios' }: { seloFps?: boolean; experiencia?: ExperienciaGameplay }) {
   return (
     <div className="gameplay-com-cabine">
-      <GameplayKiosk criarCabine={criarCabineComTela} modeloUrl={CABINE_MAX_URL} criarCamera={criarCameraCabineMax} seloFps={seloFps} />
+      <GameplayKiosk criarCabine={criarCabineComTela} modeloUrl={CABINE_MAX_URL} criarCamera={criarCameraCabineMax} seloFps={seloFps} experiencia={experiencia} />
     </div>
   );
 }
