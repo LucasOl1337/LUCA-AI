@@ -6,7 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { runInNewContext } from 'node:vm';
 import express from 'express';
-import { precompressedModels } from './precompressed-models.js';
+import { servirDist } from './servir-dist.js';
 
 const source = fs.readFileSync(new URL('./index.js', import.meta.url), 'utf8');
 const start = source.indexOf('if (fs.existsSync(indexPath)) {');
@@ -29,7 +29,7 @@ for (const variant of ['dist', 'v2-design']) {
     fs.writeFileSync(path.join(root, 'assets', 'app.js'), 'window.LUCA = true;');
     const app = express();
     runInNewContext(servingBlock, {
-      app, express, fs, distPath, v2DesignPath, precompressedModels,
+      app, express, fs, distPath, v2DesignPath, servirDist,
       indexPath: path.join(distPath, 'index.html'),
       v2IndexPath: path.join(v2DesignPath, 'index.html'),
     });
