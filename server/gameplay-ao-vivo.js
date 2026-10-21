@@ -10,6 +10,11 @@ export const RETRATO_MAX_BYTES = 2048;
 export const RETRATO_INTERVALO_MIN_MS = 200;
 /** Quem conecta depois recebe o último retrato se ele tiver até 60 s. */
 export const RETRATO_RECENTE_MS = 60_000;
+/**
+ * Retrato `oculto` (totem pausado) vale mais: o tablet mostra "Jogo pausado"
+ * por até 15 min (mesmo valor de `PAUSADO_MAX_MS` em src/lib/gameplayAoVivo.ts).
+ */
+export const PAUSADO_MAX_MS = 15 * 60_000;
 
 const FASES = new Set(['pronto', 'dirigindo', 'fim']);
 const STATUS_SONO = new Set(['unknown', 'open', 'closed', 'alarm']);
@@ -113,10 +118,12 @@ export function criarGameplayAoVivo({ agora = Date.now } = {}) {
       }
       return 'repassado';
     },
-    /** Tablet que abre depois do totem já começa com o último retrato da conta. */
+    /** Tablet que abre depois do totem já começa com o último retrato da conta (pausado vale até PAUSADO_MAX_MS). */
     aoConectar(socket) {
       const ultimo = ultimos.get(socket.userId);
-      if (ultimo && agora() - ultimo.recebidoEm <= RETRATO_RECENTE_MS) enviar(socket, ultimo);
+      if (!ultimo) return;
+      const validade = ultimo.oculto ? PAUSADO_MAX_MS : RETRATO_RECENTE_MS;
+      if (agora() - ultimo.recebidoEm <= validade) enviar(socket, ultimo);
     },
   };
 }
