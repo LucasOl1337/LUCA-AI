@@ -3,6 +3,8 @@ import { useAppLocation } from '@/hooks/useAppLocation';
 import '@/experience-pages.css';
 
 const GameplayComCabine = lazy(() => import('@/components/gameplay/visual/GameplayComCabine'));
+// Só baixa com ?webcam=1: sem o parâmetro o gameplay não carrega câmera nem detector.
+const WebcamSonoCabine = lazy(() => import('@/components/gameplay/WebcamSonoCabine'));
 
 class GameplayBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -20,12 +22,14 @@ class GameplayBoundary extends Component<{ children: ReactNode }, { failed: bool
   }
 }
 
-function Cabine({ seloFps = false }: { seloFps?: boolean }) {
+function Cabine({ seloFps = false, webcam = false }: { seloFps?: boolean; webcam?: boolean }) {
   return (
     <GameplayBoundary>
       <Suspense fallback={<p className="experience-game-status" role="status">Carregando a cabine do Trator MAX…</p>}>
         <GameplayComCabine seloFps={seloFps} />
       </Suspense>
+      {/* Fora do Suspense da cabine: a webcam abre enquanto o GLB carrega e não derruba a cabine se falhar. */}
+      {webcam && <Suspense fallback={null}><WebcamSonoCabine /></Suspense>}
     </GameplayBoundary>
   );
 }
@@ -34,7 +38,7 @@ function Cabine({ seloFps = false }: { seloFps?: boolean }) {
  * /gameplay?quiosque=1 (ensaio da feira, item 7): tela inteira, sem landing nem
  * menu, para F5 no totem voltar jogando sem ninguém tocar. Shift+Q volta à landing.
  */
-export function GameplayQuiosque({ aoSair, seloFps = false }: { aoSair: () => void; seloFps?: boolean }) {
+export function GameplayQuiosque({ aoSair, seloFps = false, webcam = false }: { aoSair: () => void; seloFps?: boolean; webcam?: boolean }) {
   useEffect(() => {
     const tecla = (evento: KeyboardEvent) => {
       if (evento.shiftKey && evento.key.toLowerCase() === 'q' && !evento.ctrlKey && !evento.metaKey && !evento.altKey) aoSair();
@@ -44,7 +48,7 @@ export function GameplayQuiosque({ aoSair, seloFps = false }: { aoSair: () => vo
   }, [aoSair]);
   return (
     <div className="experience-game-quiosque" data-quiosque="true" aria-label="Cabine jogável do Trator MAX">
-      <Cabine seloFps={seloFps} />
+      <Cabine seloFps={seloFps} webcam={webcam} />
     </div>
   );
 }
@@ -55,7 +59,9 @@ export default function GameplayPage() {
   const sairDoQuiosque = useCallback(() => navigate({ quiosque: '' }, 'push'), [navigate]);
   // /gameplay?fps=1 (pergunta 6): selo de FPS no canto, sozinho ou com ?quiosque=1.
   const seloFps = location.fps === '1';
-  if (location.quiosque === '1') return <GameplayQuiosque aoSair={sairDoQuiosque} seloFps={seloFps} />;
+  // /gameplay?webcam=1 (opção do CP3, 19/10): detector de sonolência da /sonolencia na cabine.
+  const webcam = location.webcam === '1';
+  if (location.quiosque === '1') return <GameplayQuiosque aoSair={sairDoQuiosque} seloFps={seloFps} webcam={webcam} />;
   return (
     <section className="experience-page" aria-labelledby="gameplay-title">
       <header>
@@ -72,10 +78,15 @@ export default function GameplayPage() {
           {playing ? 'Encerrar teste' : 'Iniciar Gameplay'}
         </button>
         <p className="experience-note">No totem da feira, abra <code>/gameplay?quiosque=1</code>: a cabine abre direto em tela inteira e volta sozinha depois de F5. Shift+Q sai.</p>
+        <p className="experience-note" data-webcam={webcam || undefined}>
+          {webcam
+            ? 'Webcam de sonolência ligada: ao iniciar, a câmera abre no canto da cabine e olhos fechados por 1 s acendem o alerta. A imagem fica neste navegador.'
+            : <>Opcional: com <code>?webcam=1</code> no endereço, a webcam de sonolência entra no canto da cabine e avisa olhos fechados por 1 s.</>}
+        </p>
       </div>
       {playing && (
         <div className="experience-game-viewport" aria-label="Cabine jogável do Trator MAX">
-          <Cabine seloFps={seloFps} />
+          <Cabine seloFps={seloFps} webcam={webcam} />
         </div>
       )}
       <p className="experience-note">Disponível para teste. Áudio, vibração, desempenho e legibilidade no equipamento final ainda dependem de validação no aparelho.</p>

@@ -267,7 +267,9 @@ const PERSONA_ROSTER_SYNC_INTERVAL_MS = Math.max(
 app.disable('x-powered-by');
 app.set('trust proxy', 'loopback');
 app.use((req, res, next) => {
-  for (const [nome, valor] of Object.entries(cabecalhosDeSeguranca(req.path))) res.setHeader(nome, valor);
+  const inicioBusca = req.originalUrl.indexOf('?');
+  const busca = inicioBusca < 0 ? '' : req.originalUrl.slice(inicioBusca);
+  for (const [nome, valor] of Object.entries(cabecalhosDeSeguranca(req.path, busca))) res.setHeader(nome, valor);
   if (req.path.startsWith('/api/')) {
     res.setHeader('Cache-Control', 'no-store');
   }

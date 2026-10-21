@@ -12,6 +12,7 @@ export const RETRATO_INTERVALO_MIN_MS = 200;
 export const RETRATO_RECENTE_MS = 60_000;
 
 const FASES = new Set(['pronto', 'dirigindo', 'fim']);
+const STATUS_SONO = new Set(['unknown', 'open', 'closed', 'alarm']);
 
 const numero = (v, min, max) => (typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? v : undefined);
 const booleano = (v) => (typeof v === 'boolean' ? v : undefined);
@@ -57,6 +58,18 @@ export function normalizarRetrato(bruto) {
 }
 
 /**
+ * Leitura da webcam de sonolência da cabine (`/gameplay?webcam=1`): só status
+ * e tempo de olhos fechados, nunca imagem. `undefined` = sem webcam; `null` = inválida.
+ */
+export function normalizarSono(bruto) {
+  if (bruto === undefined) return undefined;
+  const s = objeto(bruto);
+  const closedMs = numero(s.closedMs, 0, 3_600_000);
+  if (!STATUS_SONO.has(s.status) || closedMs === undefined) return null;
+  return { status: s.status, closedMs };
+}
+
+/**
  * Estado do repasse de um servidor. `receber` devolve o motivo para log e
  * teste: 'repassado', ou 'descartado:<motivo>'.
  */
@@ -68,7 +81,7 @@ export function criarGameplayAoVivo({ agora = Date.now } = {}) {
   const enviar = (socket, ultimo) => {
     if (socket.readyState !== 1) return;
     const idadeMs = Math.max(0, agora() - ultimo.recebidoEm);
-    socket.send(JSON.stringify({ kind: TIPO_RETRATO, estado: ultimo.estado, idadeMs, ...(ultimo.oculto ? { oculto: true } : {}) }));
+    socket.send(JSON.stringify({ kind: TIPO_RETRATO, estado: ultimo.estado, idadeMs, ...(ultimo.oculto ? { oculto: true } : {}), ...(ultimo.sono ? { sono: ultimo.sono } : {}) }));
   };
 
   return {
@@ -91,7 +104,9 @@ export function criarGameplayAoVivo({ agora = Date.now } = {}) {
       if (!estado) return 'descartado:formato';
       // `oculto` (opcional): a aba do totem saiu da tela; o tablet mostra "jogo pausado".
       if (mensagem.oculto !== undefined && typeof mensagem.oculto !== 'boolean') return 'descartado:formato';
-      const ultimo = { estado, recebidoEm: instante, oculto: mensagem.oculto === true };
+      const sono = normalizarSono(mensagem.sono);
+      if (sono === null) return 'descartado:formato';
+      const ultimo = { estado, recebidoEm: instante, oculto: mensagem.oculto === true, ...(sono ? { sono } : {}) };
       ultimos.set(userId, ultimo);
       for (const outro of clientes) {
         if (outro !== socket && outro.userId === userId) enviar(outro, ultimo);

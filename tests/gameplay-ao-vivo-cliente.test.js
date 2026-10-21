@@ -89,3 +89,28 @@ test('tablet: pausado mostra há quanto tempo; depois de PAUSADO_MAX_MS volta a 
   ao.receber(estado());
   assert.deepEqual(sinalAoVivo(ao.ler(), t), { nivel: 'ao-vivo' });
 });
+
+// Webcam de sonolência (/gameplay?webcam=1): a leitura vai no retrato; sem webcam o retrato é o de antes.
+test('totem leva o sono no retrato só com a webcam ligada; tablet guarda e esquecer limpa', () => {
+  let t = 0;
+  const ao = criarAoVivo(() => t);
+  const enviados = [];
+  ao.ligar((texto) => enviados.push(JSON.parse(texto)));
+  ao.enviar(estado(1));
+  assert.deepEqual(Object.keys(enviados.at(-1)), ['kind', 'estado']);
+  ao.marcarSono({ status: 'alarm', closedMs: 1300 });
+  t += ENVIO_INTERVALO_MS; ao.enviar(estado(2));
+  assert.deepEqual(enviados.at(-1).sono, { status: 'alarm', closedMs: 1300 });
+  ao.marcarSono(null);
+  t += ENVIO_INTERVALO_MS; ao.enviar(estado(3));
+  assert.equal('sono' in enviados.at(-1), false);
+  ao.marcarSono({ status: 'open', closedMs: 0 });
+  ao.esquecer();
+  t += ENVIO_INTERVALO_MS; ao.enviar(estado(4));
+  assert.equal('sono' in enviados.at(-1), false, 'gameplay desmontado não carrega sono velho');
+
+  ao.receber(estado(5), 0, false, { status: 'closed', closedMs: 400 });
+  assert.deepEqual(ao.ler().sono, { status: 'closed', closedMs: 400 });
+  ao.receber(estado(6));
+  assert.equal('sono' in ao.ler(), false);
+});
