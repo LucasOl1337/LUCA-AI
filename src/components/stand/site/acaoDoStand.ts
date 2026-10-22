@@ -10,7 +10,7 @@ import { PAGINAS_SITE, paginaDaAcao, validarAcaoSite, type PaginaSite } from '..
 import type { EntradaModo, Modo } from '../modoStand';
 
 /** Entradas de modo que a voz pode pedir: abrir/fechar página e ir pra Simulação. */
-export type EntradaModoDaVoz = Extract<EntradaModo, { tipo: 'abrir_pagina' } | { tipo: 'voltar_coruja' }> | { tipo: 'ir'; modo: 'simulacao' };
+export type EntradaModoDaVoz = Extract<EntradaModo, { tipo: 'abrir_pagina' } | { tipo: 'voltar_coruja' }> | { tipo: 'ir'; modo: 'simulacao' | 'vitrine' };
 
 export type PassoStand =
   | { tipo: 'modo'; entrada: EntradaModoDaVoz }
@@ -31,6 +31,7 @@ export function planejarAcao(acao: unknown, args: unknown, atual: { modo: Modo; 
   if (validado.acao === 'voltar_coruja') return { ok: true, passos: [{ tipo: 'modo', entrada: { tipo: 'voltar_coruja' } }] };
   // "Testar o simulador": o stand vai direto pro modo Simulação (o Trator MAX no controle).
   if (validado.acao === 'abrir_simulacao') return { ok: true, passos: [{ tipo: 'modo', entrada: { tipo: 'ir', modo: 'simulacao' } }] };
+  if (validado.acao === 'abrir_vitrine') return { ok: true, passos: [{ tipo: 'modo', entrada: { tipo: 'ir', modo: 'vitrine' } }] };
   // O tour é do cérebro: ele manda as ações do roteiro uma a uma.
   if (validado.acao === 'tour_iniciar') return { ok: false, motivo: 'O tour é conduzido pela voz do stand, passo a passo.' };
   const pagina = paginaDaAcao(validado.acao);
@@ -53,10 +54,13 @@ export interface ResultadoPlano { ok: boolean; mensagem: string; retrato?: strin
  * Linha `Tela:` que volta ao cérebro: o que a ação fez e o que a página mostra.
  * Uma linha só, até 200 caracteres (o servidor corta de novo, em 300).
  */
-export function linhaDaTela(r: ResultadoPlano): string {
+export function linhaDaTela(r: ResultadoPlano, abertas: readonly string[] = []): string {
   const feito = r.ok ? r.mensagem : `a ação falhou: ${r.mensagem}`;
   const linha = [feito, r.retrato && `Mostra: ${r.retrato}`].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-  return linha.length > 200 ? `${linha.slice(0, 199).trimEnd()}…` : linha;
+  const historico = abertas.length ? ` Experiências já abertas: ${abertas.join(', ')}.` : '';
+  const limite = 200 - historico.length;
+  const atual = linha.length > limite ? `${linha.slice(0, limite - 1).trimEnd()}…` : linha;
+  return atual + historico;
 }
 
 /**
@@ -86,7 +90,8 @@ export async function executarPlano(plano: PlanoStand, deps: DepsPlano): Promise
         continue;
       }
       mensagem = passo.entrada.tipo === 'voltar_coruja' ? 'Voltei pra coruja, sem página do site na tela.'
-        : 'Abri a Simulação do Trator MAX; a pessoa dirige no controle.';
+        : passo.entrada.modo === 'vitrine' ? 'Abri a Vitrine, igual ao botão Vitrine.'
+          : 'Abri a Simulação do Trator MAX; a pessoa dirige no controle ou teclado.';
       continue;
     }
     if (!(await deps.aguardarExecutor(passo.caminho))) {

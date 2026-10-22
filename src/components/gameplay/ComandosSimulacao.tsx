@@ -1,3 +1,6 @@
+import { useEffect, useState } from 'react';
+import './painelCabine.css';
+
 /**
  * Legenda discreta de comandos da Simulação (/stand e /gameplay):
  * exibe ícones SVG nítidos de controle PS5 (DualSense) e de Teclado/Mouse
@@ -6,10 +9,20 @@
  * minimapa e do PIP da câmera).
  */
 export function ComandosSimulacao() {
+  const [controle, setControle] = useState(false);
+  useEffect(() => {
+    const conferir = () => setControle(Array.from(navigator.getGamepads?.() ?? []).some((pad) => pad?.mapping === 'standard'));
+    conferir();
+    const timer = window.setInterval(conferir, 1000);
+    window.addEventListener('gamepadconnected', conferir);
+    window.addEventListener('gamepaddisconnected', conferir);
+    return () => { window.clearInterval(timer); window.removeEventListener('gamepadconnected', conferir); window.removeEventListener('gamepaddisconnected', conferir); };
+  }, []);
   return (
     <aside
       className="gameplay-comandos"
       data-comandos-simulacao=""
+      data-entrada={controle ? 'controle' : 'teclado'}
       aria-label="Comandos no controle PS5 e no teclado e mouse"
     >
       <div className="gameplay-comandos-linha" data-dispositivo="ps5">
@@ -45,11 +58,11 @@ export function ComandosSimulacao() {
         </svg>
         <span className="gameplay-comandos-rotulo">PS5</span>
         <span className="gameplay-comandos-itens">
-          <span><kbd>R2</kbd>/<kbd>L2</kbd> Acelerar/Frear</span>
+          <span><kbd>R2 / RT</kbd> Acelerar · <kbd>L2 / LT</kbd> Frear</span>
           <i aria-hidden="true">·</i>
-          <span><kbd>L</kbd> Direção</span>
+          <span><kbd>Analógico esquerdo</kbd> Virar</span>
           <i aria-hidden="true">·</i>
-          <span><kbd>✕</kbd>/<kbd>△</kbd> Ações</span>
+          <span><kbd>PS / Home</kbd> Coruja</span>
         </span>
       </div>
       <div className="gameplay-comandos-linha" data-dispositivo="teclado-mouse">
@@ -95,11 +108,11 @@ export function ComandosSimulacao() {
         </svg>
         <span className="gameplay-comandos-rotulo">Teclado/Mouse</span>
         <span className="gameplay-comandos-itens">
-          <span><kbd>WASD</kbd>/<kbd>↑↓←→</kbd> Dirigir</span>
+          <span><kbd>W / ↑</kbd> Acelerar · <kbd>S / ↓</kbd> Frear · <kbd>A D / ← →</kbd> Virar</span>
           <i aria-hidden="true">·</i>
           <span><kbd>Espaço</kbd> Freio</span>
           <i aria-hidden="true">·</i>
-          <span><kbd>Mouse</kbd> Olhar</span>
+          <span><kbd>Esc</kbd> Voltar à Coruja no Totem</span>
         </span>
       </div>
     </aside>

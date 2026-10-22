@@ -352,3 +352,20 @@
 }
 /* No modo Site o retorno fica na coluna da coruja (fora da página emoldurada). */
 .stand[data-modo='site'] .stand-status-acao { top: var(--stand-margem); bottom: auto; left: auto; right: var(--stand-margem); transform: none; box-sizing: border-box; width: 22vmin; max-width: none; font-size: clamp(12px, 1.7vmin, 26px); }
+
+/* Orientação antes de dirigir; navegação do Totem continua disponível. */
+.stand-guia-simulacao { position: absolute; inset: 17% 12%; display: flex; flex-direction: column; justify-content: center; gap: 2vmin; padding: 4vmin; border: 1px solid #64d2ff66; border-radius: 3vmin; background: #09131f; text-align: center; }
+.stand-guia-simulacao h1 { margin: 0; font-size: clamp(28px, 4vmin, 64px); }
+.stand-guia-simulacao p { margin: 0; font-size: clamp(18px, 2.4vmin, 34px); }
+.stand-guia-simulacao .gameplay-comandos { position: static; font-size: clamp(18px, 2.2vmin, 30px); padding: 2vmin; }
+.stand-guia-simulacao button, .stand-ajuda-simulacao { padding: 1.4vmin 2vmin; border: 1px solid #64d2ff; border-radius: 1.5vmin; background: #12364c; color: #fff; font: 700 clamp(16px, 2.2vmin, 32px) system-ui; cursor: pointer; }
+.stand-ajuda-simulacao { position: absolute; top: 23%; left: var(--stand-margem); z-index: 6; }
+/* Legenda com largura e altura para leitura; webcam do produto preservada. */
+.stand-site { grid-template-columns: minmax(0, 1fr) clamp(280px, 25vw, 560px); }
+.stand-site-coruja { align-self: stretch; justify-content: center; overflow: auto; padding: 1vmin; }
+.stand-site-legenda { display: block; overflow: visible; font-size: clamp(20px, 2.5vmin, 36px); line-height: 1.35; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .stand-site { grid-template-columns: minmax(0, 1fr) minmax(180px, 30%); }
+  .stand-site-legenda { font-size: 18px; }
+  .stand-guia-simulacao { inset: 18% 5%; padding: 2vmin; overflow: auto; }
+}
