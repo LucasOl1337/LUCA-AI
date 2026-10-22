@@ -27,8 +27,15 @@ fi
 install -d -o root -g root -m 755 "$release"
 tar -xf "$staging/source.tar" -C "$release"
 tar -xf "$staging/dist.tar" -C "$release"
+bash "$release/deploy/prepare-release-files.sh" "$release"
 cd "$release"
 npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+
+# Check as the service user BEFORE replacing current. A root-only file test
+# misses private directory/file modes preserved by tar from the build machine.
+for entry in dist/index.html server/index.js package.json; do
+  runuser -u luca-ai -- /usr/bin/test -r "$release/$entry"
+done
 
 install -d -o luca-ai -g luca-ai -m 700 /var/lib/luca-ai
 tar -xf "$staging/state.tar" -C /var/lib/luca-ai --strip-components=1
@@ -71,7 +78,7 @@ curl -fsS --max-time 5 http://127.0.0.1:4242/api/auth/session >/dev/null
 # INSTALL_VM_HEALTH_GATE_V1: fail closed if health/version diverge from package.json
 expected_version="$(node -p "require('./package.json').version" 2>/dev/null || true)"
 test -n "$expected_version"
-health_json="$(curl -fsS --max-time 5 http://127.0.0.1:4242/api/health)"
+health_json="$(bash "$release/deploy/wait-runtime-health.sh" http://127.0.0.1:4242/api/health "$expected_version" 30)"
 printf '%s' "$health_json" | node -e '
 const fs = require("fs");
 const expected = process.argv[1];
