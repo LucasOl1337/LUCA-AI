@@ -94,7 +94,44 @@
 .gameplay-abertura p { margin: 0; font-size: clamp(22px, 4cqh, 46px); font-weight: 750; }
 
 /* O minimapa do talhão tem CSS próprio (mapaTalhao.css), importado pelo MapaTalhao. */
-.gameplay-desafio[data-etapa='resultado'] .gameplay-mapa { display: none; }
+.gameplay-desafio[data-etapa='resultado'] .gameplay-mapa,
+.gameplay-desafio[data-etapa='resultado'] .gameplay-comandos { display: none; }
+
+/* Guia discreto de comandos PS5 (DualSense) + Teclado/Mouse no modo Simulação e /gameplay. */
+.gameplay-comandos {
+  position: absolute; left: 2.4cqw; bottom: 3.5cqh; z-index: 4;
+  display: grid; gap: 4px; padding: 6px 11px; border-radius: 12px;
+  background: rgba(7, 17, 14, 0.72); color: rgba(237, 243, 237, 0.86);
+  border: 1px solid rgba(159, 201, 173, 0.22); backdrop-filter: blur(6px);
+  font-size: clamp(10px, 1.18cqh, 13px); line-height: 1.25; pointer-events: none;
+}
+/* Dentro do painel da cabine: logo acima dele, livre dos selos SIMULADO/LUCA-AI (top: -12px). */
+.gameplay-painel-cabine > .gameplay-comandos {
+  left: 0; bottom: calc(100% + 18px); max-width: 94cqw;
+  text-transform: none; letter-spacing: normal;
+}
+.gameplay-painel-cabine .gameplay-comandos span { font-size: inherit; color: inherit; text-transform: none; letter-spacing: normal; }
+.gameplay-painel-cabine .gameplay-comandos .gameplay-comandos-rotulo { font-size: .92em; color: #b9cdbf; text-transform: uppercase; letter-spacing: .04em; }
+.gameplay-comandos-linha {
+  display: flex; align-items: center; gap: 7px; white-space: nowrap;
+}
+.gameplay-comandos-icone {
+  width: clamp(16px, 1.9cqh, 21px); height: clamp(12px, 1.4cqh, 16px);
+  flex: 0 0 auto; color: #7ce0a3;
+}
+.gameplay-comandos-rotulo {
+  min-width: 7.4em; font-weight: 750; letter-spacing: .04em;
+  text-transform: uppercase; color: #b9cdbf; font-size: .92em;
+}
+.gameplay-comandos-itens {
+  display: inline-flex; align-items: center; gap: 5px; color: rgba(237, 243, 237, 0.84);
+}
+.gameplay-comandos-itens i { font-style: normal; opacity: .45; }
+.gameplay-comandos kbd {
+  display: inline-block; padding: 1px 5px; border-radius: 5px;
+  background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f4faf6; font: 700 .92em/1.2 ui-monospace, 'JetBrains Mono', monospace;
+}
 
 /* Percurso guiado do totem (PercursoCabine): trilha dos trechos, resumo que espera a pessoa e botões tocáveis. */
 .gameplay-percurso .gameplay-painel-alerta { top: 7.4cqh; }
@@ -136,7 +173,8 @@
 .gameplay-percurso-acoes kbd { font: inherit; font-size: .72em; padding: 1px 6px; margin-right: 4px; border-radius: 6px; background: #0004; }
 .gameplay-percurso-livre { position: absolute; top: 2.4cqh; right: 2cqw; z-index: 4; margin: 0; pointer-events: auto; }
 .gameplay-percurso-livre button { min-height: 48px; }
-.gameplay-percurso[data-etapa='resumo'] .gameplay-mapa { display: none; }
+.gameplay-percurso[data-etapa='resumo'] .gameplay-mapa,
+.gameplay-percurso[data-etapa='resumo'] .gameplay-comandos { display: none; }
 @container (max-aspect-ratio: 4 / 5) {
   .gameplay-desafio.gameplay-percurso .gameplay-painel-cabine,
   .gameplay-desafio.gameplay-percurso .gameplay-mapa { bottom: 11.5cqh; }

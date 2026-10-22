@@ -32,6 +32,21 @@ import type { SompoTelemetrySnapshot } from '@/lib/types';
 
 export type SompoAgriStageApi = SompoStageApi;
 
+export interface SompoLookContexto {
+  mount: HTMLElement;
+  scene: THREE.Scene;
+  renderer: THREE.WebGLRenderer;
+  sun: THREE.DirectionalLight;
+  /** Liga/desliga o grade do pós (o look que já gradua no tone mapping desliga). */
+  setPostGrade(enabled: boolean): void;
+  night: boolean;
+}
+
+export interface SompoLook {
+  quadro(camera: THREE.Camera, anchor: THREE.Vector3): void;
+  dispose(): void;
+}
+
 /** Modo físico: a máquina do cadastro acoplada ao ESP32 do feed, em vez do roteiro. */
 export interface SompoAgriPhysicalInput {
   previewRef: { current: SompoTelemetrySnapshot };
@@ -129,7 +144,7 @@ function createUltrasonicBeam(origin: readonly [number, number, number]) {
  * real em forma fechada: separado do loop do caminhão para não arriscar o
  * fluxo rural. Desmontado e remontado a cada troca de cenário/desfecho.
  */
-export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig, adaptiveQuality = false, obstaclesRef, assetUrl, qualityProfile = PERFIL_PADRAO, terrainRelief, waterZones }: {
+export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig, adaptiveQuality = false, obstaclesRef, assetUrl, qualityProfile = PERFIL_PADRAO, terrainRelief, cropHeight, look, waterZones }: {
   mount: HTMLElement;
   scenarioId: SompoAgriScenarioId;
   outcomeId: string;
@@ -158,6 +173,13 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   qualityProfile?: PerfilQualidade;
   /** Relevo somado ao do ambiente (gameplay: rampa lateral). O `ground` do drive já o inclui. */
   terrainRelief?: (x: number, z: number) => number;
+  /** Altura da lavoura no lugar da do equipamento (gameplay: milho mais crescido). */
+  cropHeight?: number;
+  /**
+   * Look de quem monta o palco (gameplay): ajusta luz, névoa e tone mapping a
+   * cada quadro, depois da atmosfera e antes do render. Sem ele, nada muda.
+   */
+  look?: (ctx: SompoLookContexto) => SompoLook;
   /** Lâminas d'água planas (retângulos x0..x1, z0..z1 em metros): a área alagada do gameplay, a mesma do geofence. */
   waterZones?: readonly { x0: number; x1: number; z0: number; z1: number }[];
 }): SompoAgriStageApi | null {
@@ -198,9 +220,10 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   scene.add(worldRoot);
   const night = scenario.environmentId === 'row-crop-field-night';
   const budget = sompoRenderBudget();
-  const field = createSompoAgriScene(worldRoot, scenario.environmentId, budget.compact, scenario.equipmentId, terrainRelief);
+  const field = createSompoAgriScene(worldRoot, scenario.environmentId, budget.compact, scenario.equipmentId, terrainRelief, cropHeight);
   const atmosphere = createSompoAtmosphere(scene, renderer, field.sun);
   const post = createSompoPostProcessing(renderer, scene, camera);
+  const lookAtivo = look?.({ mount, scene, renderer, sun: field.sun, setPostGrade: (on) => post.setGrade(on), night }) ?? null;
   // Qualidade automática (só no totem): o medidor de 1 s alimenta o regulador.
   const degraus = qualityProfile.degraus;
   let qualidade = qualidadeInicial(qualityProfile.degrauInicial ?? Math.max(0, degraus.findIndex(d => d.pixelRatio <= renderer.getPixelRatio())), qualityProfile);
@@ -584,6 +607,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
       scene.environmentIntensity = 0.1;
       field.sun.intensity = 0.32;
     }
+    lookAtivo?.quadro(camera, machine.position);
     post.render(elapsed);
     meter.end();
     onAfterRender?.(renderer.domElement);
@@ -629,6 +653,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
       disposed = true;
       soltarLutCompartilhada(renderer, scene);
       pasture.dispose();
+      lookAtivo?.dispose();
       post.dispose();
       atmosphere.dispose();
       abort.abort();
