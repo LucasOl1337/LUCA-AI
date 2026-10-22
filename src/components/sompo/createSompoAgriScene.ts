@@ -655,7 +655,7 @@ function createRuts() {
 // Boca do escapamento do Trator MAX (provenance: tubo em +Z, curva pra frente no topo).
 const MAX_EXHAUST = [0.1, 3.04, 0.82] as const;
 
-export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAgriEnvironmentId, compact = false, equipmentId: SompoAgriEquipmentId = 'harvester', extraRelief?: (x: number, z: number) => number) {
+export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAgriEnvironmentId, compact = false, equipmentId: SompoAgriEquipmentId = 'harvester', extraRelief?: (x: number, z: number) => number, cropHeight?: number) {
   const base = SOMPO_AGRI_ENVIRONMENTS[environmentId] || SOMPO_AGRI_ENVIRONMENTS['row-crop-field'];
   const baseRelief = (base as { relief?: (x: number, z: number) => number }).relief;
   // Relevo extra (rampa do Gameplay): somado ao do ambiente; sem ele, o talhão é o de sempre.
@@ -667,7 +667,7 @@ export function createSompoAgriScene(parent: THREE.Group, environmentId: SompoAg
   const terrain = createTerrain(definition);
   root.add(terrain);
   const operation = environmentId === 'geofence-operacao';
-  const crops = definition.barn ? null : createSompoCropRows((x,z)=>terrainHeight(x,z,definition.slope,(definition as { relief?: (x: number, z: number) => number }).relief), compact, equipmentId !== 'harvester' ? .32 : 1, operation, equipmentId === 'harvester');
+  const crops = definition.barn ? null : createSompoCropRows((x,z)=>terrainHeight(x,z,definition.slope,(definition as { relief?: (x: number, z: number) => number }).relief), compact, cropHeight ?? (equipmentId !== 'harvester' ? .32 : 1), operation, equipmentId === 'harvester');
   if (crops) root.add(crops.root);
   const weeds = definition.barn ? null : createEdgeWeeds((x, z) => terrainHeight(x, z, definition.slope, (definition as { relief?: (x: number, z: number) => number }).relief));
   if (weeds) root.add(weeds.root);

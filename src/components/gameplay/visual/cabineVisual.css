@@ -13,3 +13,8 @@
   .gameplay-com-cabine .gameplay-mapa { top: 2cqh; bottom: auto; right: 3cqw; width: clamp(96px, 28cqw, 150px); }
   .gameplay-com-cabine .gameplay-painel-cabine { left: 3cqw; right: 3cqw; min-width: 0; }
 }
+/* Vinheta do look do gameplay (lookGameplay.ts): no CSS, sem passe na GPU. */
+.gameplay-look-vinheta {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 78% 72% at 50% 46%, transparent 58%, rgba(14, 10, 4, .34) 100%);
+}
