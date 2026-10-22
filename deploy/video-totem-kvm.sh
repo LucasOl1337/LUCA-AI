@@ -26,8 +26,17 @@ if [[ "$mode" == --dry-run ]]; then
 fi
 [[ "$EUID" == 0 ]] || { echo 'apply exige sudo' >&2; exit 1; }
 exec 9>/run/lock/luca-ai-deploy.lock
-flock -n 9 || { echo 'lock ocupado: manter fila e aguardar evento, sem repetir instalação' >&2; exit 75; }
+echo 'Aguardando lock de deploy; manter este job e a vaga de Portaria até conclusão.'
+flock 9
+echo 'Lock adquirido; revalidando release antes de instalar.'
 [[ "$(readlink -f "$root/current")" == "$current" ]]
+systemctl is-active --quiet luca-ai.service cloudflared-luca-ai.service
+curl -fsS --max-time 10 http://127.0.0.1:4242/api/health | node --input-type=module -e '
+let input = ""; for await (const chunk of process.stdin) input += chunk;
+const h = JSON.parse(input);
+if (!h.ok || h.activeMission || h.scheduledMissions > 0) {
+  console.error("runtime ocupado/indisponível: reconciliar evento com Portaria"); process.exit(1);
+}'
 # Horário de Brasília nos artefatos do lote; não imprime configuração/estado.
 backup="/opt/sennin/backups/luca-video-$commit-$(TZ=America/Sao_Paulo date +%Y%m%dT%H%M%S)"
 install -d -m 700 "$backup"
