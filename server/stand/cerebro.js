@@ -8,6 +8,7 @@ import { cadeiaCerebroStand, ROUTER_API_KEY, ROUTER_BASE_URL } from '../config.j
 import { FERRAMENTAS_STAND } from './ferramentas.js';
 import { TOUR_STAND, validarAcaoSite } from '../../shared/stand/acoes-site.ts';
 import { comandoDireto } from '../../shared/stand/comandos-voz.ts';
+import { RESERVA_TTS_TURNO } from './continuidade.js';
 
 // Q5 do grill: por sessão, 8 respostas, 300 tokens por resposta e 2.000
 // caracteres de TTS. Os 240 s e os 20 s de silêncio continuam em LIMITES_STAND.
@@ -19,7 +20,7 @@ const RODADAS_DE_FERRAMENTA = 3;
 export const FALAS = Object.freeze({
   saudacao: 'Oi! Eu sou o LUCA, o assistente de IA deste stand. Pode perguntar o que quiser.',
   falha: 'Tive um problema pra pensar agora. Pode perguntar de novo?',
-  teto_respostas: 'Foi ótimo conversar! Pra continuar, chama alguém da equipe do stand.',
+  teto_respostas: 'Preciso renovar o limite desta conversa. Diga continuar para retomar sua pergunta.',
   acao_falhou: 'Não consegui fazer isso na tela agora.',
   simulacao: 'Bora! Vou abrir a Simulação: pega o controle e dirige o Trator MAX.',
   ...Object.fromEntries(TOUR_STAND.filter((passo) => 'fala' in passo).map((passo) => [passo.fala, passo.texto])),
@@ -225,13 +226,23 @@ function criarFilaDeFala({ conversa, sintetizar, emitir, aoCobrarTts, sinal, mar
   let corrente = Promise.resolve();
   let anterior = '';
   const faladas = [];
+  let caracteresDoTurno = 0;
+  let truncada = false;
   return {
     faladas,
+    get truncada() { return truncada; },
     /** Teto de frases por turno: a instrução sozinha não segurou (19/10, 4 a 5 frases). */
     falar(fraseCrua) {
-      const frase = textoFalavel(fraseCrua);
+      let frase = textoFalavel(fraseCrua);
       if (!frase) return false;
       if (faladas.length >= LIMITES_TURNO.frases) return false;
+      const restante = RESERVA_TTS_TURNO - caracteresDoTurno;
+      if (restante < 2) return false;
+      if (frase.length > restante) {
+        frase = frase.slice(0, restante - 1).replace(/\s+\S*$/, '').replace(/[,:;.!?]+$/, '') + '.';
+        truncada = true;
+      }
+      caracteresDoTurno += frase.length;
       faladas.push(frase);
       corrente = corrente.then(async () => {
         if (abortado(sinal)) return;
@@ -448,9 +459,10 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
       else cortou = true;
     }
     // Passou do teto de frases: o histórico guarda só o que o visitante ouviu.
-    if (cortou) {
+    if (cortou || fala.truncada) {
       textoDaRodada = fala.faladas.slice(faladasAntes).join(' ');
       metricas.frases_cortadas = true;
+      if (fala.truncada) metricas.caracteres_cortados = true;
     }
 
     const chamadas = abortado(sinal) ? [] : fim?.ferramentas || [];
