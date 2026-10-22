@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import test from 'node:test';
@@ -158,4 +159,9 @@ test('cabine do percurso desenha a trilha e a abertura do 1º trecho, com o pain
   assert.match(h, /1\/3 · /);
   for (const t of TRECHOS_PERCURSO) assert.ok(h.includes(`>${t.titulo}</li>`), t.titulo);
   assert.match(h, /gameplay-painel/);
+  const css = fs.readFileSync(new URL('../src/components/gameplay/painelCabine.css', import.meta.url), 'utf8');
+  assert.match(css, /\.gameplay-percurso-livre\s*\{[^}]*pointer-events:\s*auto/);
+  assert.match(css, /\.gameplay-percurso-resumo\s+\.gameplay-painel-selo\s*\{[^}]*position:\s*static/);
+  assert.match(css, /\.gameplay-percurso\s+\.gameplay-painel-alerta\s*\{[^}]*top:\s*7\.4cqh/);
+  assert.match(css, /@container\s*\(max-aspect-ratio:\s*4\s*\/\s*5\)/);
 });
