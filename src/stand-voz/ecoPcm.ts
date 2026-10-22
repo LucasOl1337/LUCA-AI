@@ -21,6 +21,7 @@ function reduzir(pcm: ArrayLike<number>, escala: number): Float32Array {
 
 export class ReferenciaEco {
   private trechos: Trecho[] = [];
+  private atrasoConfirmado: number | null = null;
 
   agendar(pcm: Float32Array, inicioSegundos: number): void {
     this.trechos.push({ inicio: Math.round(inicioSegundos * HZ), dados: pcm });
@@ -75,11 +76,18 @@ export class ReferenciaEco {
       const quadrado = produto * produto / (energiaMic * energiaRef);
       if (quadrado > melhor) { melhor = Math.min(1, quadrado); melhorAtraso = atraso; }
     };
+    // Eco mantém um percurso relativamente estável. Refinar o último atraso
+    // confirmado evita trocar a fase correta por outro período da mesma vogal.
+    if (this.atrasoConfirmado !== null) {
+      for (let atraso = Math.max(0, this.atrasoConfirmado - 24); atraso <= Math.min(ATRASO_MAX, this.atrasoConfirmado + 24); atraso++) comparar(atraso);
+    }
     for (let atraso = 0; atraso <= ATRASO_MAX; atraso += PASSO) comparar(atraso);
     const candidato = melhorAtraso;
     for (let atraso = Math.max(0, candidato - PASSO + 1); atraso <= Math.min(ATRASO_MAX, candidato + PASSO - 1); atraso++) comparar(atraso);
     const residual = Math.sqrt(energiaMic * (1 - melhor) / microfone.length);
+    const eco = melhor >= 0.96 ** 2 && residual < 0.008;
+    if (eco) this.atrasoConfirmado = melhorAtraso;
     // >=96% de correlação e residual absoluto baixo: não silenciar fala dupla.
-    return { eco: melhor >= 0.96 ** 2 && residual < 0.008, correlacao: Math.sqrt(melhor), residual, referencia: true };
+    return { eco, correlacao: Math.sqrt(melhor), residual, referencia: true };
   }
 }
