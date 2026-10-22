@@ -91,7 +91,10 @@ export default function SonolenciaPage() {
     if (testSound.current) { release(testSound.current); testSound.current = null; setSoundTesting(false); }
     const session: Session = { disposed: false };
     current.current = session;
-    setPhase('starting'); setMessage('Aguardando permissão da câmera…'); setReading(EMPTY); setScores(null);
+    setPhase('starting'); setMessage('Preparando áudio e aguardando permissão da câmera…'); setReading(EMPTY); setScores(null);
+    session.timeout = window.setTimeout(() => {
+      if (current.current === session) stop('O monitor não ficou pronto em 30 segundos. Confira câmera, permissão e áudio; depois toque em Ativar webcam para tentar novamente.', true);
+    }, 30_000);
     try {
       session.alarm = new DrowsinessAlarm();
       await session.alarm.unlock();
@@ -112,7 +115,8 @@ export default function SonolenciaPage() {
       });
       const cameraQuality = await session.monitor.iniciar();
       if (session.disposed || !cameraQuality) return;
-      setPhase('running'); setMessage(`${formatCameraQuality(cameraQuality)} Mantenha seu rosto de frente para a câmera, com boa iluminação.`);
+      clearTimeout(session.timeout);
+      setPhase('running'); setMessage(`Monitor pronto e som liberado. ${formatCameraQuality(cameraQuality)} Posicione o rosto iluminado; só teste quando houver leitura dos olhos.`);
     } catch (error) { if (!session.disposed) stop(mensagemErroCamera(error), true); }
   }
 
@@ -120,7 +124,7 @@ export default function SonolenciaPage() {
   const label = phase === 'running' ? STATUS[reading.status] : phase === 'starting' ? 'Preparando monitor' : phase === 'error' ? 'Monitor indisponível' : 'Webcam desligada';
   const sensitivityThreshold = SENSITIVITY_THRESHOLDS[sensitivity];
   return (
-    <div className="drowsiness-page" data-state={phase} data-eyes={reading.status}>
+    <div className="drowsiness-page" data-state={phase} data-ready={phase === 'running' ? 'true' : 'false'} data-eyes={reading.status}>
       <header className="drowsiness-heading">
         <div><span className="drowsiness-eyebrow">LUCA · VISÃO COMPUTACIONAL</span><h1>Monitor de sonolência</h1><p>Olhos fechados por 1 segundo. Um alerta para chamar sua atenção.</p></div>
         <span className="drowsiness-private"><ShieldCheck size={16} /> Processamento neste computador</span>
@@ -129,7 +133,7 @@ export default function SonolenciaPage() {
         <section className="drowsiness-camera" aria-label="Prévia da webcam">
           <video ref={video} muted playsInline autoPlay aria-label="Imagem ao vivo da webcam" />
           {!active && <div className="drowsiness-placeholder"><CameraOff size={42} strokeWidth={1} /><h2>Sua atenção em foco</h2><p>A câmera só liga quando você iniciar.<br />Nenhuma imagem é gravada ou enviada.</p></div>}
-          <span className="drowsiness-camera-badge"><i />{active ? 'WEBCAM ATIVA' : 'CÂMERA DESLIGADA'}</span>
+          <span className="drowsiness-camera-badge"><i />{phase === 'running' ? 'WEBCAM ATIVA' : phase === 'starting' ? 'PREPARANDO CÂMERA' : 'CÂMERA DESLIGADA'}</span>
           {phase === 'running' && <div className="drowsiness-overlay" role={reading.alarm ? 'alert' : undefined}><Eye size={20} /><strong>{STATUS[reading.status]}</strong>{reading.alarm && <span>Faça uma pausa em local seguro.</span>}</div>}
         </section>
         <section className="drowsiness-panel" aria-label="Controles do monitor">
@@ -154,7 +158,7 @@ export default function SonolenciaPage() {
       </div>
       <div className="drowsiness-guidance">
         <div><span>01</span><h3>Prepare a câmera</h3><p>Fique de frente e ilumine bem o rosto. Óculos escuros e reflexos podem impedir a leitura.</p></div>
-        <div><span>02</span><h3>Experimente parado</h3><p>Feche os dois olhos por 1 segundo. Piscadas rápidas não completam a contagem.</p></div>
+        <div><span>02</span><h3>Experimente parado</h3><p>{phase === 'running' ? 'Monitor pronto e som liberado. Com leitura dos olhos, feche os dois por 1 segundo. Piscadas rápidas não completam a contagem.' : 'Primeiro ative a webcam e autorize a câmera. Espere “Monitor pronto e som liberado” e a leitura dos olhos antes de testar.'}</p></div>
         <div><span>03</span><h3>Mantenha a aba visível</h3><p>Trocar de aba pausa o monitor e libera a webcam. Sem rosto visível, a contagem é zerada.</p></div>
       </div>
       <p className="drowsiness-notice">Protótipo experimental: pode falhar e não substitui um sistema de segurança veicular. Faça testes somente com o veículo parado. Se sentir sono, pare em local seguro e descanse.</p>
