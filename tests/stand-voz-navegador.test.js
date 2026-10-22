@@ -5,9 +5,9 @@
 // "Ligando o microfone…". Sob Playwright o `audioWorklet.addModule` não resolve
 // sozinho: o Playwright anexa os alvos com `waitForDebuggerOnStart` e o alvo
 // `worklet` fica pausado esperando um debugger que nunca o solta (21/10). Sem
-// cliente CDP o módulo carrega em ~5 ms. Os testes que não chamam
-// `soltarWorklets` exercitam a reserva pelo ScriptProcessor; os que chamam,
-// o caminho do worklet, que é o do totem.
+// cliente CDP o módulo carrega em ~5 ms. `abrirStand` força a reserva
+// explicitamente quando worklet=false; quando
+// worklet=true, `soltarWorklets` libera o caminho usado pelo totem.
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -53,12 +53,16 @@ async function soltarWorklets(pagina) {
 function wavDeEscuta(silencioS, vozS, hz = 24000) {
   const amostras = new Int16Array(Math.round((silencioS + vozS) * hz));
   for (let i = Math.round(silencioS * hz); i < amostras.length; i += 1) amostras[i] = Math.round(Math.sin(i / 12) * 9000);
+  return wavDePcm(Buffer.from(amostras.buffer), hz);
+}
+
+function wavDePcm(pcm, hz = 24000) {
   const cabecalho = Buffer.alloc(44);
-  cabecalho.write('RIFF', 0); cabecalho.writeUInt32LE(36 + amostras.byteLength, 4); cabecalho.write('WAVE', 8);
+  cabecalho.write('RIFF', 0); cabecalho.writeUInt32LE(36 + pcm.byteLength, 4); cabecalho.write('WAVE', 8);
   cabecalho.write('fmt ', 12); cabecalho.writeUInt32LE(16, 16); cabecalho.writeUInt16LE(1, 20); cabecalho.writeUInt16LE(1, 22);
   cabecalho.writeUInt32LE(hz, 24); cabecalho.writeUInt32LE(hz * 2, 28); cabecalho.writeUInt16LE(2, 32); cabecalho.writeUInt16LE(16, 34);
-  cabecalho.write('data', 36); cabecalho.writeUInt32LE(amostras.byteLength, 40);
-  return Buffer.concat([cabecalho, Buffer.from(amostras.buffer)]);
+  cabecalho.write('data', 36); cabecalho.writeUInt32LE(pcm.byteLength, 40);
+  return Buffer.concat([cabecalho, pcm]);
 }
 
 describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium para o Playwright' }, () => {
@@ -69,6 +73,7 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
   let tcpMudo;
   /** `formatos`: taxa e bytes de PCM de cada `input_audio_chunk` que chega. */
   const scribe = { conexoes: 0, audios: 0, rajadas: [], formatos: [] };
+  const capturas = [];
   const turnos = [];
   let modoSessao = 'ok';
   let escutaNoServidor = false;
@@ -128,6 +133,8 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
       if (!req.url.startsWith('/scribe-falso')) return socket.destroy();
       wss.handleUpgrade(req, socket, head, (ws) => {
         scribe.conexoes += 1;
+        const captura = { formatos: [], blocosComVoz: 0 };
+        capturas.push(captura);
         // Pedaços que chegam nos primeiros 100 ms da conexão: a pré-rolagem da escuta vem de uma vez.
         const rajada = { inicio: 0, pedacos: 0 };
         scribe.rajadas.push(rajada);
@@ -137,7 +144,13 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
             const mensagem = JSON.parse(String(dados));
             if (mensagem.message_type !== 'input_audio_chunk') return;
             scribe.audios += 1;
-            scribe.formatos.push({ hz: mensagem.sample_rate, bytes: Buffer.from(mensagem.audio_base_64, 'base64').length });
+            const pcm = Buffer.from(mensagem.audio_base_64, 'base64');
+            const formato = { hz: mensagem.sample_rate, bytes: pcm.length };
+            scribe.formatos.push(formato);
+            captura.formatos.push(formato);
+            let energia = 0;
+            for (let i = 0; i + 1 < pcm.length; i += 2) energia += (pcm.readInt16LE(i) / 32768) ** 2;
+            if (Math.sqrt(energia / (pcm.length / 2)) > 0.003) captura.blocosComVoz++;
             rajada.inicio ||= Date.now();
             if (Date.now() - rajada.inicio < 100) rajada.pedacos += 1;
             pedacos += 1;
@@ -148,9 +161,13 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
     });
     await new Promise((ok) => servidor.listen(0, '127.0.0.1', ok));
     base = `http://127.0.0.1:${servidor.address().port}`;
+    // Fixture local opcional: UM trecho humano existente, sem publicar áudio pessoal no repo.
+    const wavCaptura = join(pasta, 'captura.wav');
+    writeFileSync(wavCaptura, process.env.LUCA_TESTE_PCM_VISITANTE
+      ? wavDePcm(readFileSync(process.env.LUCA_TESTE_PCM_VISITANTE)) : wavDeEscuta(0, 3));
     browser = await navegador.chromium.launch({
       executablePath: navegador.caminho,
-      args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'],
+      args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${wavCaptura}`, '--autoplay-policy=no-user-gesture-required'],
     });
     // Microfone da escuta: 5 s de silêncio e 1 s de voz, em laço (folga para a página abrir sob carga).
     const wav = join(pasta, 'escuta.wav');
@@ -173,28 +190,45 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
     const pagina = await browser.newPage();
     const avisos = [];
     pagina.on('console', (m) => avisos.push(m.text()));
+    pagina.on('pageerror', (erro) => avisos.push(`pageerror: ${erro.message}`));
     if (worklet) await soltarWorklets(pagina);
+    else await pagina.addInitScript(() => {
+      // Reserva determinística: não depender da corrida do auto-attach CDP com addModule.
+      const Original = window.AudioContext;
+      window.AudioContext = class extends Original {
+        constructor(...args) {
+          super(...args);
+          this.audioWorklet.addModule = async () => { throw new Error('reserva_forcada_pelo_teste'); };
+        }
+      };
+    });
     await pagina.goto(`${base}/stand`);
     await pagina.locator('main.stand[data-voz-stand="ligada"]').waitFor({ timeout: 15000 });
     await pagina.locator('main.stand').click({ position: { x: 40, y: 40 } });
     return { pagina, avisos };
   }
 
-  it('toque abre o microfone, manda áudio ao Scribe e toca a saudação', async () => {
+  it('toque abre o microfone, manda áudio ao Scribe e toca a saudação', async (t) => {
     modoSessao = 'ok';
     const { pagina, avisos } = await abrirStand();
-    await pagina.waitForFunction(() => document.querySelector('main.stand')?.dataset.sessao === 'ativa');
-    const prazo = Date.now() + 12000;
-    while ((scribe.audios < 5 || !turnos.some((t) => t.evento === 'saudacao')) && Date.now() < prazo) {
-      await new Promise((ok) => setTimeout(ok, 200));
+    try {
+      await pagina.waitForFunction(() => document.querySelector('main.stand')?.dataset.sessao === 'ativa');
+      const prazo = Date.now() + 12000;
+      while ((scribe.audios < 5 || (capturas[0]?.blocosComVoz ?? 0) < 5 || !turnos.some((t) => t.evento === 'saudacao')) && Date.now() < prazo) {
+        await new Promise((ok) => setTimeout(ok, 200));
+      }
+      assert.equal(scribe.conexoes, 1, 'abriu o WebSocket do Scribe');
+      assert.ok(scribe.audios >= 5, `áudio do microfone chegou ao Scribe (${scribe.audios} pedaços)\n${avisos.join('\n')}`);
+      assert.ok(capturas[0].blocosComVoz >= 5, 'a entrada não vazia atravessou o ScriptProcessor até o Scribe');
+      t.diagnostic(`ScriptProcessor: ${capturas[0].blocosComVoz} blocos com voz recebidos pelo Scribe`);
+      assert.ok(avisos.some((a) => a.includes('reserva_forcada_pelo_teste')), 'exercitou a reserva explicitamente');
+      assert.deepEqual(turnos.find((t) => t.evento === 'saudacao'), { conversa_id: 'c-teste', turno_id: 'c-teste:1', evento: 'saudacao' });
+      await pagina.getByText('Oi! Eu sou o LUCA.').waitFor({ timeout: 5000 });
+      assert.equal(await pagina.locator('main.stand').getAttribute('data-sessao'), 'ativa');
+      assert.ok(!avisos.some((a) => /turno falhou/.test(a)), avisos.join('\n'));
+    } finally {
+      await pagina.close();
     }
-    assert.equal(scribe.conexoes, 1, 'abriu o WebSocket do Scribe');
-    assert.ok(scribe.audios >= 5, `áudio do microfone chegou ao Scribe (${scribe.audios} pedaços)`);
-    assert.deepEqual(turnos.find((t) => t.evento === 'saudacao'), { conversa_id: 'c-teste', evento: 'saudacao' });
-    await pagina.getByText('Oi! Eu sou o LUCA.').waitFor({ timeout: 5000 });
-    assert.equal(await pagina.locator('main.stand').getAttribute('data-sessao'), 'ativa');
-    assert.ok(!avisos.some((a) => /turno falhou/.test(a)), avisos.join('\n'));
-    await pagina.close();
   });
 
   it('menu do Totem: pergunta pronta tocada vira turno de texto na mesma conversa (grill r1, Q5)', async () => {
@@ -217,26 +251,38 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
     }
   });
 
-  it('captura pelo worklet (o caminho do totem): sem reserva, mesmo formato do ScriptProcessor', async () => {
+  it('captura pelo worklet (o caminho do totem): sem reserva, mesmo formato do ScriptProcessor', async (t) => {
     modoSessao = 'ok';
-    // Referência: o caminho da reserva, como o Playwright deixa sem ajuda.
-    const formatosDaReserva = [...scribe.formatos];
-    assert.ok(formatosDaReserva.length >= 5, 'o teste anterior mandou áudio pelo ScriptProcessor');
-    const conexoesAntes = scribe.conexoes;
-    const pedacosAntes = scribe.formatos.length;
+    // A própria prova monta sua referência; não depende de sucesso de outro teste.
+    const indiceReserva = capturas.length;
+    const reserva = await abrirStand();
+    let capturaReserva;
+    try {
+      await reserva.pagina.waitForFunction(() => document.querySelector('main.stand')?.dataset.sessao === 'ativa');
+      const prazo = Date.now() + 12000;
+      while ((capturas[indiceReserva]?.blocosComVoz ?? 0) < 5 && Date.now() < prazo) await new Promise((ok) => setTimeout(ok, 100));
+      capturaReserva = capturas[indiceReserva];
+      assert.ok(capturaReserva?.blocosComVoz >= 5, `reserva enviou voz: ${capturaReserva?.blocosComVoz ?? 0}\n${reserva.avisos.join('\n')}`);
+    } finally {
+      await reserva.pagina.close();
+    }
+    const indiceWorklet = capturas.length;
     const { pagina, avisos } = await abrirStand({ worklet: true });
     try {
       await pagina.waitForFunction(() => document.querySelector('main.stand')?.dataset.sessao === 'ativa');
       const prazo = Date.now() + 12000;
-      while (scribe.formatos.length - pedacosAntes < 20 && Date.now() < prazo) await new Promise((ok) => setTimeout(ok, 100));
-      assert.equal(scribe.conexoes, conexoesAntes + 1);
+      while (((capturas[indiceWorklet]?.formatos.length ?? 0) < 20 || (capturas[indiceWorklet]?.blocosComVoz ?? 0) < 5) && Date.now() < prazo) await new Promise((ok) => setTimeout(ok, 100));
+      const capturaWorklet = capturas[indiceWorklet];
+      assert.ok(capturaWorklet, `abriu nova conexão Scribe\n${avisos.join('\n')}`);
       assert.ok(!avisos.some((a) => /worklet do microfone falhou/.test(a)), `caiu na reserva:\n${avisos.join('\n')}`);
-      const doWorklet = scribe.formatos.slice(pedacosAntes);
+      assert.ok(capturaWorklet.blocosComVoz >= 5, 'voz não vazia atravessou o worklet até o Scribe');
+      t.diagnostic(`Referência ScriptProcessor: ${capturaReserva.blocosComVoz}; worklet: ${capturaWorklet.blocosComVoz} blocos com voz recebidos pelo Scribe`);
+      const doWorklet = capturaWorklet.formatos;
       assert.ok(doWorklet.length >= 20, `áudio do worklet chegou ao Scribe (${doWorklet.length} pedaços)`);
       // Mesmo contrato nos dois caminhos: PCM16 a 24 kHz em blocos de 50 ms (1200 amostras).
       const formato = (lista) => [...new Set(lista.map((f) => `${f.hz} Hz, ${f.bytes} B`))];
       assert.deepEqual(formato(doWorklet), ['24000 Hz, 2400 B']);
-      assert.deepEqual(formato(formatosDaReserva), ['24000 Hz, 2400 B']);
+      assert.deepEqual(formato(capturaReserva.formatos), ['24000 Hz, 2400 B']);
     } finally {
       await pagina.close();
     }

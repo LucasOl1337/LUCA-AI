@@ -53,7 +53,8 @@ test('setas e pad: vence o maior módulo; sem pad standard é parado', () => {
   assert.deepEqual(volante.comandoDesejado(pad({ x: 0.5, r2: 0.5 }), setas), { esterco: -1, acelerador: 1, freio: 0 });
   assert.deepEqual(volante.comandoDesejado({ ...pad({ x: 1 }), mapping: '' }), volante.COMANDO_PARADO);
   assert.equal(volante.setaDaTecla('ArrowLeft'), 'esquerda');
-  assert.equal(volante.setaDaTecla('a'), null);
+  assert.equal(volante.setaDaTecla('a'), 'esquerda');
+  assert.equal(volante.setaDaTecla('q'), null);
 });
 
 test('Options reinicia só na borda de descida', () => {
