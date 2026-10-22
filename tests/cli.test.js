@@ -109,8 +109,10 @@ test('transport distinguishes HTTP, logical errors, HTML fallbacks, redirects, t
   });
   const env = { LUCA_URL: url, LUCA_CLI_CONFIG: path.join(directory, 'config.json') };
   for (const [route, expected] of [['denied', 3], ['failure', 1], ['redirect', 1], ['html', 1], ['slow', 4]]) {
-    const result = await cli(['api', 'POST', `/api/${route}`, '--timeout', '150'], { env });
-    assert.equal(result.code, expected, result.stderr);
+    // HTTP imediato não deve virar um teste de agendamento de150ms sob suíte.
+    // Só a rota que nunca responde usa prazo curto para testar timeout real.
+    const result = await cli(['api', 'POST', `/api/${route}`, '--timeout', route === 'slow' ? '500' : '5000'], { env });
+    assert.equal(result.code, expected, `${route}: ${result.stderr}`);
     assert.equal(result.stdout, '');
   }
   assert.equal(mutations, 5, 'Mutações não são repetidas');
