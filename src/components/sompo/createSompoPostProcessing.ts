@@ -19,6 +19,7 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
       resize(_width: number, _height: number) {},
       setPixelRatio(_ratio: number) {},
       setEnabled(_enabled: boolean) {},
+      setGrade(_enabled: boolean) {},
       render(_delta: number) { renderer.render(scene, camera); },
       dispose() {},
     };
@@ -88,6 +89,8 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
     },
     setPixelRatio(ratio: number) { composer.setPixelRatio(ratio); },
     setEnabled(value: boolean) { enabled = value; },
+    /** Quem já gradua no tone mapping (look do gameplay) desliga este passe para não graduar duas vezes. */
+    setGrade(value: boolean) { grade.enabled = value; },
     render(_delta: number) { if (enabled) composer.render(); else renderer.render(scene, camera); },
     dispose() { ambientOcclusion.dispose(); composer.dispose(); target.dispose(); },
   };

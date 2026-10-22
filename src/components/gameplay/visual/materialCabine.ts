@@ -10,6 +10,8 @@
  *    Poly Haven, CC0) em triplanar no espaço do objeto (não escorrega com a máquina),
  *    com a rugosidade do mesmo mapa;
  *  - pintura azul: verniz mais liso, que reflete o céu, e casca de laranja leve.
+ *  - escapamento: aço escurecido, metálico (era uma coluna branca à direita);
+ *  - pilares e travessas acima do painel: grafite acetinado no lugar do preto brilhante.
  * O vidro (cor azulada, como no desgaste) fica como está. As normais saem
  * vincadas (até VINCO_RAD suaviza, acima mantém a aresta): o capô e os pilares
  * deixam de parecer lapidados. `desfazer` devolve geometria, shader e chave de
@@ -61,6 +63,24 @@ const FRAGMENTO = `#ifdef USE_COLOR
     diffuseColor.rgb *= mix(1., .88 + .24 * cabGrao, cabPlastico * .6);
     // Pintura: verniz (abaixo do piso acetinado de 0,46), sem passar por cima da poeira.
     roughnessFactor = mix(roughnessFactor, min(roughnessFactor, .3), cabAzul * .85);
+    // Escapamento (cinza claro do brinquedo, em x≈0,28 e z≈0,84 acima do capô): na vista
+    // do operador virava uma coluna branca de plástico. Fica aço escurecido pelo calor,
+    // metálico, com a ponta queimada em âmbar-azulado.
+    // O cinza neutro passa no teste de vidro (azul/verde ≈ 1): aqui vale a posição, não a classe.
+    // O cavity AO do gerador escurece o cinza 0,42 para 0,15–0,4 no vértice.
+    float cabCinza = step(.12, cabLum) * (1. - cabAzul) * step(abs(cabC.r - cabC.b), .04);
+    // Caixa do escapamento; acima de 2,9 m só fora da aba do teto (|z| ≤ 0,78).
+    float cabEscape = cabCinza * step(1.3, cabP.y) * step(cabP.x, .4) * step(.02, cabP.x) * step(.7, cabP.z) * step(cabP.z, 1.02)
+      * max(step(cabP.y, 2.9), step(.79, cabP.z));
+    vec3 cabAco = mix(vec3(.13, .12, .11), vec3(.24, .17, .11), smoothstep(2.5, 3.1, cabP.y));
+    diffuseColor.rgb = mix(diffuseColor.rgb, cabAco * (.85 + .3 * cabGrao), cabEscape);
+    metalnessFactor = mix(metalnessFactor, .85, cabEscape);
+    roughnessFactor = mix(roughnessFactor, .38, cabEscape);
+    // Pilares e travessas da cabine (preto acima do piso, fora do capô): grafite acetinado
+    // em vez do preto brilhante que recortava um buraco na tela.
+    float cabMoldura = cabPreto * step(1.9, cabP.y) * (1. - cabEscape);
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.075, .078, .082) * (.82 + .36 * cabGrao), cabMoldura);
+    roughnessFactor = mix(roughnessFactor, .5, cabMoldura);
   }
 #endif
 #include <lights_physical_fragment>`;
@@ -141,7 +161,7 @@ export function acabarCabine(superficies: THREE.Mesh[], detalhe: THREE.Texture):
         shader.fragmentShader = 'uniform sampler2D cabDetalhe;\nuniform float cabEscala;\nvarying vec3 cabP;\nvarying vec3 cabN;\nvarying vec3 cabVX;\nvarying vec3 cabVY;\nvarying vec3 cabVZ;\n'
           + shader.fragmentShader.replace('#include <lights_physical_fragment>', FRAGMENTO);
       };
-      material.customProgramCacheKey = () => `${chaveAnterior}|gameplay-cabine-acabamento-v1`;
+      material.customProgramCacheKey = () => `${chaveAnterior}|gameplay-cabine-acabamento-v2`;
       material.needsUpdate = true;
     }
   }

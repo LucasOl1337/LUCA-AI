@@ -81,7 +81,9 @@ export const ENCAIXE_CABINE = Object.freeze({
   // Forro sob o teto (face interna do teto em y≈2,87, x -1,39..0,37, |z|≤0,74): cobre o vão
   // escuro que tomava o alto da vista de frente, sem encostar nas barras da moldura.
   // A face olha para baixo e só recebe o chão: `luz` é o rebatimento dos vidros (emissivo pelo próprio mapa).
-  teto: { centro: [-0.57, 2.86, 0] as const, comprimento: 1.24, largura: 1.24, espessura: 0.06, luz: 0.16 },
+  // Rodada 2 (look de fim de tarde, ambiente menor): o forro novo do Tripo traz o console de teto
+  // (rádio, alto-falantes, difusores) na frente; com 0,16 de rebatimento virava uma placa azul-escura.
+  teto: { centro: [-0.57, 2.86, 0] as const, comprimento: 1.24, largura: 1.24, espessura: 0.06, luz: 0.42 },
   // O toro tinha raio externo 0,19+0,024 no gerador (build-max-tractor.py): mesmo tamanho de aro.
   volante: { raioExterno: (0.19 + 0.024) / 0.19 },
 });

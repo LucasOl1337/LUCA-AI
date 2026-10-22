@@ -281,7 +281,7 @@ test('acabamento da cabine troca shader e geometria só da superfície com cor d
   cabine.montar(p.maquina, camera);
   await esperar();
   cabine.quadro(quadro());
-  assert.match(p.superficie.material.customProgramCacheKey(), /gameplay-cabine-acabamento-v1$/);
+  assert.match(p.superficie.material.customProgramCacheKey(), /gameplay-cabine-acabamento-v2$/);
   assert.notEqual(p.superficie.geometry, geometriaOriginal, 'normais vincadas numa geometria própria');
   const shader = { uniforms: {}, vertexShader: '#include <begin_vertex>', fragmentShader: '#include <lights_physical_fragment>' };
   p.superficie.material.onBeforeCompile(shader, null);

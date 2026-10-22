@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type * as THREE from 'three';
 import { getSompoAgriOutcomes } from '../../../shared/sompo-agri-brief.js';
-import { mountSompoAgriStage } from '../sompo/createSompoAgriStage';
+import { mountSompoAgriStage, type SompoLook, type SompoLookContexto } from '../sompo/createSompoAgriStage';
 import { PERFIL_GAMEPLAY } from '../sompo/qualidadeAdaptativa';
 import type { SompoCameraRig, SompoDrivePose } from '../sompo/sompoStage';
 import type { SompoRenderStats } from '../sompo/sompoStudioConfig';
@@ -21,6 +21,12 @@ import type { CabineGameplay, CriarCabineGameplay } from './cabineGameplay';
 import type { ObstaculoGameplay } from './estadoGameplay';
 import { aoVivo } from '@/lib/gameplayAoVivo';
 import './gameplayKiosk.css';
+
+/** Look do mundo vindo da Visual; constante de módulo (não remonta o palco). */
+export interface MundoGameplay {
+  look?: (ctx: SompoLookContexto) => SompoLook;
+  alturaLavoura?: number;
+}
 
 /** Lâmina d'água no palco onde o geofence marca área alagada (mesmo polígono do minimapa). */
 const AGUA_DO_TALHAO = ZONAS_TALHAO.filter((zona) => zona.id === 'alagado').map((zona) => {
@@ -64,12 +70,13 @@ function zumbidoMotor(acelerador: number, velocidadeKph: number) {
  * nada no servidor; □ △ ○ ficam livres, Options reinicia o desafio.
  * `criarCabine` é o ponto da Visual: monta sobre a máquina e recebe o ângulo do aro.
  * `modeloUrl` troca o GLB do MAX (ex.: variante com cabine); sem ele, o do catálogo.
+ * `mundo` (Visual) troca o look do palco (luz, névoa, tone mapping) e a altura da lavoura.
  * `seloFps` (/gameplay?fps=1) mostra o selo de FPS no canto; sem ele nada é montado.
  */
 /** `desafios`: rodadas alternadas (/gameplay). `percurso`: percurso guiado do totem, com condução livre a um toque. */
 export type ExperienciaGameplay = 'desafios' | 'percurso';
 
-export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = createFirstPersonRig, seloFps = false, experiencia = 'desafios' }: { criarCabine?: CriarCabineGameplay; modeloUrl?: string; criarCamera?: CriarCameraGameplay; seloFps?: boolean; experiencia?: ExperienciaGameplay }) {
+export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = createFirstPersonRig, seloFps = false, experiencia = 'desafios', mundo }: { criarCabine?: CriarCabineGameplay; modeloUrl?: string; criarCamera?: CriarCameraGameplay; seloFps?: boolean; experiencia?: ExperienciaGameplay; mundo?: MundoGameplay }) {
   const motor = useMemo(() => criarMotorGameplay(), []);
   const raizRef = useRef<HTMLDivElement>(null);
   const palcoRef = useRef<HTMLDivElement>(null);
@@ -172,13 +179,15 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
       obstaclesRef: obstaculosDoPalco(motor),
       assetUrl: modeloUrl,
       terrainRelief: relevoRampaLateral,
+      look: mundo?.look,
+      cropHeight: mundo?.alturaLavoura,
       waterZones: AGUA_DO_TALHAO,
     });
     return () => {
       cabine?.desmontar();
       stage?.dispose();
     };
-  }, [motor, modeloUrl, criarCamera]);
+  }, [motor, modeloUrl, criarCamera, mundo]);
 
   // Setas dirigem (Q9). Só as setas: as letras do stand (r, n, d, g, f) seguem com a equipe.
   useEffect(() => {
