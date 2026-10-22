@@ -7,11 +7,12 @@ import { randomUUID } from 'node:crypto';
 import { cadeiaCerebroStand, ROUTER_API_KEY, ROUTER_BASE_URL } from '../config.js';
 import { FERRAMENTAS_STAND } from './ferramentas.js';
 import { TOUR_STAND, validarAcaoSite } from '../../shared/stand/acoes-site.ts';
-import { comandoDireto } from '../../shared/stand/comandos-voz.ts';
+import { aceitaAlternativa, pedidoDireto } from '../../shared/stand/comandos-voz.ts';
 import { RESERVA_TTS_TURNO } from './continuidade.js';
+import { contextoExperiencias, registrarExperiencias } from './experiencias.js';
 
-// Q5 do grill: por sessão, 8 respostas, 300 tokens por resposta e 2.000
-// caracteres de TTS. Os 240 s e os 20 s de silêncio continuam em LIMITES_STAND.
+// Por janela: 8 respostas, 300 tokens por resposta e 2.000 caracteres de TTS.
+// Renovar cobra outra vaga no guarda/hora; diário e silêncio continuam valendo.
 export const LIMITES_TURNO = Object.freeze({ respostas: 8, tokens: 300, caracteres_tts: 2000, frases: 3 });
 export const ESPERA_PRIMEIRO_TOKEN_MS = 7000;
 export const ROTEAR_MS = 1500;
@@ -23,6 +24,11 @@ export const FALAS = Object.freeze({
   teto_respostas: 'Preciso renovar o limite desta conversa. Diga continuar para retomar sua pergunta.',
   acao_falhou: 'Não consegui fazer isso na tela agora.',
   simulacao: 'Bora! Vou abrir a Simulação: pega o controle e dirige o Trator MAX.',
+  vitrine: 'Vou abrir a Vitrine, a mesma opção do botão na tela.',
+  animal: 'O cenário com animal na pista existe no simulador clássico, mas ainda não está disponível pelos controles deste Totem. Posso mostrar o cenário simulado do Trator MAX com um fardo como obstáculo. Quer ver?',
+  obstaculo: 'Vou mostrar o cenário simulado do Trator MAX freando diante de um fardo, sem animal na pista.',
+  voltar: 'Vou voltar pra coruja. Pode continuar falando comigo.',
+  ajuda: 'No controle, R dois acelera, L dois freia e o analógico esquerdo vira. No teclado, W ou seta para cima acelera; S, seta para baixo ou espaço freia; A e D viram. Para sair, diga volta pra coruja.',
   ...Object.fromEntries(TOUR_STAND.filter((passo) => 'fala' in passo).map((passo) => [passo.fala, passo.texto])),
 });
 
@@ -322,17 +328,25 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
     return encerrarTurno('teto_respostas');
   }
 
-  // Pedido direto da Simulação ("testar o simulador", "quero jogar"): sem modelo,
-  // fala pronta e a troca de modo depois dela. O modelo escolhia outra tela (21/10).
-  if (!entrada.evento && comandoDireto(entrada.texto) === 'simulacao') {
+  registrarExperiencias(conversa, limparTela(entrada.tela));
+
+  let pedido = !entrada.evento ? pedidoDireto(entrada.texto) : null;
+  if (!entrada.evento && conversa.alternativaAnimal && aceitaAlternativa(entrada.texto)) pedido = 'obstaculo';
+  if (!entrada.evento) conversa.alternativaAnimal = pedido === 'animal';
+  if (pedido) {
+    const acoes = {
+      simulacao: ['abrir_simulacao', {}], vitrine: ['abrir_vitrine', {}],
+      voltar: ['voltar_coruja', {}], obstaculo: ['sompo_rodar_cenario', { id: 'stand-obstaculo-a-tempo' }],
+    };
+    const acao = acoes[pedido];
     conversa.respostas += 1;
-    conversa.historico.push({ role: 'user', content: String(entrada.texto).trim() }, { role: 'assistant', content: FALAS.simulacao });
-    metricas.comando_direto = 'simulacao';
-    metricas.ferramentas = ['abrir_simulacao'];
-    await tocarPronta('simulacao').catch(() => {});
+    conversa.historico.push({ role: 'user', content: String(entrada.texto).trim() }, { role: 'assistant', content: FALAS[pedido] });
+    metricas.comando_direto = pedido;
+    metricas.ferramentas = acao ? [acao[0]] : [];
+    await tocarPronta(pedido).catch(() => {});
     if (abortado(sinal)) return { motivo: 'interrompido', metricas };
-    emitir({ t: 'evento', evento: { tipo: 'acao_site', acao: 'abrir_simulacao', args: {}, apos_fala: true } });
-    return encerrarTurno('simulacao', { fala: FALAS.simulacao });
+    if (acao) emitir({ t: 'evento', evento: { tipo: 'acao_site', acao: acao[0], args: acao[1], apos_fala: true } });
+    return encerrarTurno(pedido, { fala: FALAS[pedido] });
   }
 
   let conteudo;
@@ -391,6 +405,7 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
     for (const passo of TOUR_STAND) {
       if (abortado(sinal)) break;
       if ('fala' in passo) {
+        if (passo.fala === 'tour_1' && fala.faladas.length) continue;
         await tocarPronta(passo.fala).catch(() => {});
         if (!abortado(sinal)) ditas.push(passo.texto);
       } else {
@@ -401,7 +416,7 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
   };
 
   for (let rodada = 0; rodada < RODADAS_DE_FERRAMENTA && !videoComecou && !tourFeito; rodada++) {
-    const mensagens = [{ role: 'system', content: `${instrucoes()}\n\n${INSTRUCAO_VOZ}` }, ...comDocumentacao(conversa.historico)];
+    const mensagens = [{ role: 'system', content: `${instrucoes()}\n\n${INSTRUCAO_VOZ}\n\n${contextoExperiencias(conversa)}` }, ...comDocumentacao(conversa.historico)];
     let resultado = null;
     for (const modelo of (falouAlgo ? [metricas.modelo] : modelos)) {
       if (abortado(sinal)) break;

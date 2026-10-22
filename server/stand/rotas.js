@@ -113,13 +113,13 @@ export function registerStandRoutes(app, {
     return decisao && publicado(decisao.id) ? decisao : null;
   };
 
-  /** Conversas em turnos vivas, por id. Expiram depois do teto da sessão. */
+  /** Conversas por id: janela renovável, expiração por inatividade. */
   const conversas = new Map();
   const validadeMs = (LIMITES_STAND.teto_s + 60) * 1000;
   /**
-   * Fecha a conta de STT de uma conversa, uma vez: minutos de microfone aberto.
+   * Cobra o trecho ainda não contado de STT: minutos de microfone aberto.
    * Sem 'fim' (aba fechada, queda) estima pelo último turno + o relógio de
-   * silêncio do navegador + 30 s de folga, sempre dentro do teto da sessão.
+   * silêncio do navegador + 30 s de folga. Trechos já pagos não são repetidos.
    */
   const cobrarStt = (conversa, { estimado = false } = {}) => {
     const desde = conversa.sttAte ?? conversa.criadaEm;
@@ -305,72 +305,72 @@ export function registerStandRoutes(app, {
     lembrarTurno(conversa, turnoId, 'ativo');
     res.on('close', () => { if (!res.writableFinished) controle.abort(); });
     try {
-    // O anterior termina seu histórico antes da renovação/compactação.
-    await fimAnterior;
-    if (controle.signal.aborted) return res.end();
-    if (/^continuar[.!?]?$/i.test(entrada.texto || '') && conversa.perguntaPendente) {
-      entrada = { ...conversa.perguntaPendente, tela: entrada.tela || conversa.perguntaPendente.tela };
-    }
-    // Cobra o tempo já usado antes de renovar, inclusive se o diário acabou.
-    cobrarStt(conversa);
-    const janela = prepararJanela(conversa, {
-      agora: agora(), limites: LIMITES_TURNO, tetoS: LIMITES_STAND.teto_s,
-      permitir: () => guarda.tentar(conta(req)), diario: () => teto.estourou(),
-    });
-    if (!janela.ok) {
-      if (entrada.texto) conversa.perguntaPendente = entrada;
-      lembrarTurno(conversa, turnoId, 'pausado');
-      // Sem modelo, TTS, ferramenta ou cobrança extra em uma pausa de custo.
-      return res.type('application/x-ndjson').send(`${JSON.stringify({
-        t: 'fim', motivo: 'pausa_limite', causa: janela.causa,
-        texto: TEXTOS_PAUSA[janela.causa], turno_id: turnoId,
-      })}\n`);
-    }
-    if (janela.renovada) console.info(`[stand] janela renovada total=${conversa.renovacoes} sessoes_hora=${guarda.usadas?.(conta(req)) ?? '-'}`);
-    conversa.perguntaPendente = null;
-    conversa.eventosJanela += 1;
-    if (evento === 'saudacao') conversa.saudou = true;
-    lembrarTurno(conversa, turnoId, 'ativo');
-    if (entrada.texto) {
-      conversa.perguntas = (conversa.perguntas ?? 0) + 1;
-      if (conversa.perguntas === 1) teto.contar('conversas');
-    }
-
-    conversa.ultimoUso = agora();
-    res.status(200);
-    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('X-Accel-Buffering', 'no');
-    res.flushHeaders();
-    const emitir = (linha) => { if (!controle.signal.aborted) res.write(`${JSON.stringify(linha)}\n`); };
-    const vozConversa = conversa.voz ?? config.voz;
-    const sintetizar = sintetizarCom(config, vozConversa);
-    const modeloTts = modeloTtsStand(env);
-    try {
-      const { metricas, motivo } = await executarTurno({
-        conversa,
-        entrada,
-        emitir,
-        sinal: controle.signal,
-        deps: {
-          chamarModelo,
-          sintetizar,
-          falaPronta: falasProntas(vozConversa, sintetizar),
-          rotear,
-          buscar: (texto) => buscarNoRepo(texto, { limite: 3, maxChars: 500 }),
-          executarFerramenta: (nome, args) => executarFerramenta(nome, args),
-          instrucoes,
-          aoCobrarTts: (caracteres) => teto.somar(caracteres * fatorCreditosTts(modeloTts)),
-          agora,
-        },
+      // O anterior termina seu histórico antes da renovação/compactação.
+      await fimAnterior;
+      if (controle.signal.aborted) return res.end();
+      if (/^continuar[.!?]?$/i.test(entrada.texto || '') && conversa.perguntaPendente) {
+        entrada = { ...conversa.perguntaPendente, tela: entrada.tela || conversa.perguntaPendente.tela };
+      }
+      // Cobra o tempo já usado antes de renovar, inclusive se o diário acabou.
+      cobrarStt(conversa);
+      const janela = prepararJanela(conversa, {
+        agora: agora(), limites: LIMITES_TURNO, tetoS: LIMITES_STAND.teto_s,
+        permitir: () => guarda.tentar(conta(req)), diario: () => teto.estourou(),
       });
-      console.info(`[stand] turno ${motivo} modelo=${metricas.modelo ?? '-'} 1o_audio=${metricas.primeiro_audio_ms ?? '-'}ms total=${metricas.total_ms ?? '-'}ms`);
-    } catch (erro) {
-      console.warn('[stand] turno falhou:', erro?.message || erro);
-      emitir({ t: 'fim', motivo: 'falha' });
-    } finally {
-      res.end();
-    }
+      if (!janela.ok) {
+        if (entrada.texto) conversa.perguntaPendente = entrada;
+        lembrarTurno(conversa, turnoId, 'pausado');
+        // Sem modelo, TTS, ferramenta ou cobrança extra em uma pausa de custo.
+        return res.type('application/x-ndjson').send(`${JSON.stringify({
+          t: 'fim', motivo: 'pausa_limite', causa: janela.causa,
+          texto: TEXTOS_PAUSA[janela.causa], turno_id: turnoId,
+        })}\n`);
+      }
+      if (janela.renovada) console.info(`[stand] janela renovada total=${conversa.renovacoes} sessoes_hora=${guarda.usadas?.(conta(req)) ?? '-'}`);
+      conversa.perguntaPendente = null;
+      conversa.eventosJanela += 1;
+      if (evento === 'saudacao') conversa.saudou = true;
+      lembrarTurno(conversa, turnoId, 'ativo');
+      if (entrada.texto) {
+        conversa.perguntas = (conversa.perguntas ?? 0) + 1;
+        if (conversa.perguntas === 1) teto.contar('conversas');
+      }
+
+      conversa.ultimoUso = agora();
+      res.status(200);
+      res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders();
+      const emitir = (linha) => { if (!controle.signal.aborted) res.write(`${JSON.stringify(linha)}\n`); };
+      const vozConversa = conversa.voz ?? config.voz;
+      const sintetizar = sintetizarCom(config, vozConversa);
+      const modeloTts = modeloTtsStand(env);
+      try {
+        const { metricas, motivo } = await executarTurno({
+          conversa,
+          entrada,
+          emitir,
+          sinal: controle.signal,
+          deps: {
+            chamarModelo,
+            sintetizar,
+            falaPronta: falasProntas(vozConversa, sintetizar),
+            rotear,
+            buscar: (texto) => buscarNoRepo(texto, { limite: 3, maxChars: 500 }),
+            executarFerramenta: (nome, args) => executarFerramenta(nome, args),
+            instrucoes,
+            aoCobrarTts: (caracteres) => teto.somar(caracteres * fatorCreditosTts(modeloTts)),
+            agora,
+          },
+        });
+        console.info(`[stand] turno ${motivo} modelo=${metricas.modelo ?? '-'} 1o_audio=${metricas.primeiro_audio_ms ?? '-'}ms total=${metricas.total_ms ?? '-'}ms`);
+      } catch (erro) {
+        console.warn('[stand] turno falhou:', erro?.message || erro);
+        emitir({ t: 'fim', motivo: 'falha' });
+      } finally {
+        res.end();
+      }
     } finally {
       lembrarTurno(conversa, turnoId, 'concluido');
       if (conversa.turno === controle) conversa.turno = null;

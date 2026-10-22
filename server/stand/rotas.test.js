@@ -201,13 +201,17 @@ test('continuidade: pergunta8→9 renova uma vaga por hora sem perder pergunta n
   const { conversa_id } = await (await pedir('/api/stand/sessao', {})).json();
   for (let i = 1; i <= 9; i++) {
     const texto = i === 9 ? 'Como funciona a plataforma?' : `Pergunta ${i}?`;
-    const linhas = await linhasNdjson(await pedir('/api/stand/turno', { conversa_id, texto, turno_id: `p:${i}` }));
+    const linhas = await linhasNdjson(await pedir('/api/stand/turno', {
+      conversa_id, texto, turno_id: `p:${i}`,
+      ...(i === 1 ? { tela: 'Experiências já abertas: simulacao, sonolencia.' } : {}),
+    }));
     assert.equal(linhas.at(-1).motivo, 'ok');
     assert.ok(!linhas.some((l) => l.texto === FALAS.teto_respostas || l.texto === FALAS.saudacao));
   }
   assert.equal(guarda.usadas('demo'), 2);
   assert.match(vistas.at(-1).at(-1).content, /^Como funciona a plataforma/);
   assert.ok(vistas.at(-1).length <= 10, 'contexto mínimo: quatro pares mais pergunta e sistema');
+  assert.match(vistas.at(-1)[0].content, /já abertas nesta visita: simulacao, sonolencia/);
 });
 
 test('continuidade: reserva de600 renova antes do TTS2000 sem resposta muda', async (t) => {
