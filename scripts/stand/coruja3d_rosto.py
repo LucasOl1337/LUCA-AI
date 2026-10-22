@@ -1,20 +1,22 @@
-"""Olhos de visor e bico da Coruja 3D (v2), chamados por `package-coruja-3d.py`.
+"""Olhos de visor e bico da Coruja 3D (v3), chamados por `package-coruja-3d.py`.
 
-O modelo do Tripo traz os olhos pintados no visor, com sobrancelha baixa (cara
-de brava) e sem como piscar. Esta etapa:
+O Tripo pinta no visor os olhos da Coruja A (íris radial, cavidade escura,
+anéis do HUD). A v2 apagava esses olhos por Laplace e desenhava olhos de
+desenho por cima: o visor ficava leitoso e o olho, chapado. Esta etapa mantém
+o olho pintado e só o anima:
 
-- `apagar_olhos_pintados`: tira os olhos da cor base e do mapa normal (o visor
-  é liso nessa região, sem concha), preenchendo de dentro da borda para o meio
-  (Laplace), para o visor ficar de vidro limpo;
-- `malha_olhos`: cria `CorujaOlhos`, uma tela fina 1,5 mm à frente do visor em
-  cada olho, 100% no osso da cabeça, com UV plano (olho direito da coruja na
-  metade esquerda do UV, esquerdo na direita) e material próprio
-  `coruja-3d-olhos` sem textura. No three.js essa tela recebe um canvas que
-  desenha íris, pupila, brilho e pálpebras a cada quadro (piscar, olhar,
-  feliz, pensando), então a expressão não depende de shape key;
+- `recorte_olhos`: projeta de frente a cor base 4K da malha alta num quadrado
+  de 9 cm por olho e grava `coruja-3d-olhos.jpg` (olho direito da coruja na
+  metade esquerda). No three.js o canvas da tela usa o recorte para mover a
+  íris (olhar) e desenhar as pálpebras; no resto a tela é transparente e
+  aparece o olho pintado do modelo, com a cavidade esculpida;
+- `malha_olhos`: `CorujaOlhos`, grade 2 mm à frente do visor (em +X, a mesma
+  projeção de frente do recorte), 100% no osso da cabeça, UV plano por olho e
+  material próprio `coruja-3d-olhos` sem textura;
 - `bico`: shape key `bico_abre` na malha principal (o bico de cima sobe numa
-  dobradiça atrás da ponta) e a malha `CorujaRosto`, com a boca escura e o bico
-  de baixo que nascem recolhidos atrás da ponta e se abrem com a mesma chave.
+  dobradiça na base, com peso suave, sem rasgo) e a malha `CorujaRosto`: o
+  bico de baixo, uma cunha azul com o interior da boca escuro em cima, que nasce
+  dentro do bico de cima e desce com a mesma chave.
 
 Coordenadas do Blender: frente +X, cima +Z, asa direita da coruja em -Y.
 """
@@ -27,140 +29,115 @@ from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
 
 OSSO = 'tripo::Head_2'
-# Olhos pintados no visor do Tripo (medidos em vista ortográfica de frente).
-OLHO_Y, OLHO_Z = 0.0805, 0.739
-OLHO_RAIO = (0.050, 0.037)  # meia largura e meia altura do olho pintado, com a sombra e os traços de sobrancelha
-BORDA_SUAVE = 0.008
 # Tela dos olhos: quadrado de 9 cm por olho, centrado no olho pintado.
+OLHO_Y, OLHO_Z = 0.0805, 0.739
 TELA_MEIA = 0.045
 TELA_GRADE = 24
-TELA_FRENTE_M = 0.004
-# Bico de cima: caixa (x mínimo, |y| máximo, z mínimo, z máximo) e dobradiça.
-CAIXA_BICO = (0.15, 0.04, 0.612, 0.725)
-PONTA_Z = 0.622
-DOBRADICA = (0.14, 0.0, 0.628)
-SUBIDA_GRAUS = 20.0
-BASE_FIXA_Z, PESO_CHEIO_Z = 0.708, 0.668
-# Boca aberta: logo abaixo da ponta erguida; bico de baixo na frente dela.
-# A ponta sobe de 0,628 a ~0,662 com o bico aberto: a boca vai até logo abaixo dela.
-BOCA_TOPO, BOCA_BASE, BOCA_MEIA = 0.658, 0.596, 0.026
-BOCA_TETO_X = 0.21
-QUEIXO_TOPO, QUEIXO_PONTA, QUEIXO_MEIA = 0.628, 0.602, 0.018
-COR_BOCA = (0.012, 0.003, 0.006, 1.0)
+TELA_FRENTE_M = 0.002
+RECORTE_PX = 512  # por olho: ~5700 px/m, acima da cor base 4K do Tripo no visor
+# Bico de cima (medido na malha alta): ponta em (0,239, 0, 0,628), base no visor
+# em z ~0,71, junta com a cara em x ~0,20. Gira na base, peso suave em z e em x.
+BICO_CAIXA = (0.199, 0.052, 0.615, 0.712)  # x mínimo, |y| máximo, z mínimo, z máximo
+BICO_DOBRADICA = (0.205, 0.0, 0.700)
+BICO_SUBIDA_GRAUS = 8.0
+BICO_PESO_Z = (0.704, 0.684)  # peso 0 acima do primeiro, 1 abaixo do segundo
+BICO_PESO_X = (0.201, 0.211)  # peso 0 na junta com a cara, 1 no bico
+# Bico de baixo: cunha com dobradiça na base do bico de cima (1 mm acima da face
+# de baixo dele, plana em z 0,651). Aberto, desce MANDIBULA_ABERTO_GRAUS abaixo da
+# horizontal e a ponta passa ~2,8 cm abaixo da ponta do bico de cima (o gancho
+# esconde uma boca curta de quem olha de frente). Fechado, encolhe para
+# MANDIBULA_RECOLHIDA do comprimento, gira MANDIBULA_RECOLHE_GRAUS para cima e
+# fica dentro do bico. Boca escura no meio da face de cima, borda azul nos lados.
+MANDIBULA_DOBRADICA = (0.198, 0.652)
+MANDIBULA_COMPRIMENTO = 0.064
+MANDIBULA_ABERTO_GRAUS = 54.0
+MANDIBULA_RECOLHE_GRAUS = 58.0
+MANDIBULA_RECOLHIDA = 0.5
+MANDIBULA_MEIA = 0.013
+MANDIBULA_ESPESSURA = 0.0045
+MANDIBULA_BORDA = 0.17  # fração da largura, de cada lado, com a cor do bico
+COR_BOCA = (0.012, 0.003, 0.010, 1.0)
 
 
 class Superficie:
     """Raycast de frente (+X para -X) numa malha em repouso, em coordenadas do mundo."""
 
     def __init__(self, malha):
-        dg = bpy.context.evaluated_depsgraph_get()
         self.mw = malha.matrix_world.copy()
         me = malha.data
         self.vs = [self.mw @ v.co for v in me.vertices]
         me.calc_loop_triangles()
-        self.bvh = BVHTree.FromPolygons(self.vs, [t.vertices[:] for t in me.loop_triangles])
+        self.tris = me.loop_triangles
+        self.bvh = BVHTree.FromPolygons(self.vs, [t.vertices[:] for t in self.tris])
 
     def frente(self, y, z):
         for dy, dz in ((0, 0), (0.0007, 0), (-0.0007, 0), (0, 0.0007), (0, -0.0007)):
-            p, n, _, _ = self.bvh.ray_cast(Vector((1.0, y + dy, z + dz)), Vector((-1.0, 0.0, 0.0)))
+            p, n, i, _ = self.bvh.ray_cast(Vector((1.0, y + dy, z + dz)), Vector((-1.0, 0.0, 0.0)))
             if p is not None:  # fresta entre triângulos: desloca um tico e tenta de novo
                 p.y, p.z = y, z
-                return p, (n if n.x > 0 else -n)
+                return p, (n if n.x > 0 else -n), i
         raise RuntimeError(f'sem superfície em y={y:.3f} z={z:.3f}')
 
 
-def _peso_olho(y, z):
-    """1 dentro da elipse de cada olho pintado, caindo a 0 em BORDA_SUAVE."""
-    peso = np.zeros_like(y)
-    for lado in (-1, 1):
-        d = np.sqrt(((y - lado * OLHO_Y) / OLHO_RAIO[0]) ** 2 + ((z - OLHO_Z) / OLHO_RAIO[1]) ** 2)
-        borda = 1 + BORDA_SUAVE / min(OLHO_RAIO)
-        peso = np.maximum(peso, np.clip((borda - d) / (borda - 1), 0, 1))
-    return peso
+def _pixels(img):
+    w, h = img.size
+    px = np.empty(w * h * 4, np.float32)
+    img.pixels.foreach_get(px)
+    return px.reshape(h, w, 4)
 
 
-def mascara_uv(malha, tamanho):
-    """Rasteriza, no espaço UV (tamanho x tamanho), o peso dos olhos pintados."""
-    me = malha.data
-    me.calc_loop_triangles()
-    uv = me.uv_layers.active.data
-    mw = malha.matrix_world
-    mascara = np.zeros((tamanho, tamanho), np.float32)
-    for t in me.loop_triangles:
-        ps = [mw @ me.vertices[i].co for i in t.vertices]
-        c = sum(ps, Vector()) / 3
-        if c.x < 0.1 or abs(abs(c.y) - OLHO_Y) > 0.07 or abs(c.z - OLHO_Z) > 0.06:
-            continue
-        uvs = np.array([uv[l].uv[:] for l in t.loops]) * tamanho
-        x0, y0 = np.floor(uvs.min(0)).astype(int)
-        x1, y1 = np.ceil(uvs.max(0)).astype(int)
-        xs, ys = np.meshgrid(np.arange(max(x0, 0), min(x1 + 1, tamanho)), np.arange(max(y0, 0), min(y1 + 1, tamanho)))
-        px = np.stack([xs.ravel() + 0.5, ys.ravel() + 0.5], 1)
-        a, b, cc = uvs
-        m = np.array([[b[0] - a[0], cc[0] - a[0]], [b[1] - a[1], cc[1] - a[1]]])
-        if abs(np.linalg.det(m)) < 1e-9:
-            continue
-        l12 = np.linalg.solve(m, (px - a).T).T
-        l0 = 1 - l12.sum(1)
-        dentro = (l0 >= -0.02) & (l12[:, 0] >= -0.02) & (l12[:, 1] >= -0.02)
-        if not dentro.any():
-            continue
-        bary = np.column_stack([l0, l12])[dentro]
-        p3 = bary @ np.array([p[:] for p in ps])
-        w = _peso_olho(p3[:, 1], p3[:, 2])
-        xi, yi = xs.ravel()[dentro], ys.ravel()[dentro]
-        mascara[yi, xi] = np.maximum(mascara[yi, xi], w)
-    return mascara
+def recorte_olhos(malha_alta, base, caminho, qualidade):
+    """Cor base vista de frente nos dois olhos -> JPEG (2*RECORTE_PX x RECORTE_PX).
 
-
-def preencher(pixels, mascara, iteracoes=600):
-    """Laplace dentro da máscara (> 0), com a borda fixa; mistura pelo peso suave."""
-    alvo = mascara > 0.001
-    if not alvo.any():
-        return pixels
-    ys, xs = np.nonzero(alvo)
-    y0, y1 = max(ys.min() - 2, 0), min(ys.max() + 3, pixels.shape[0])
-    x0, x1 = max(xs.min() - 2, 0), min(xs.max() + 3, pixels.shape[1])
-    bloco = pixels[y0:y1, x0:x1].copy()
-    m = alvo[y0:y1, x0:x1]
-    # Partida: média da borda, para convergir rápido.
-    borda = np.zeros_like(m)
-    borda[1:-1, 1:-1] = m[1:-1, 1:-1] & ~(m[:-2, 1:-1] & m[2:, 1:-1] & m[1:-1, :-2] & m[1:-1, 2:])
-    fora = ~m
-    vizinho_fora = np.zeros_like(m)
-    vizinho_fora[1:-1, 1:-1] = fora[:-2, 1:-1] | fora[2:, 1:-1] | fora[1:-1, :-2] | fora[1:-1, 2:]
-    anel = fora.copy()
-    anel[1:-1, 1:-1] &= (m[:-2, 1:-1] | m[2:, 1:-1] | m[1:-1, :-2] | m[1:-1, 2:])
-    if anel.any():
-        bloco[m] = bloco[anel].mean(0)
-    for _ in range(iteracoes):
-        media = (np.roll(bloco, 1, 0) + np.roll(bloco, -1, 0) + np.roll(bloco, 1, 1) + np.roll(bloco, -1, 1)) / 4
-        bloco[m] = media[m]
-    peso = mascara[y0:y1, x0:x1, None]
-    saida = pixels.copy()
-    saida[y0:y1, x0:x1] = pixels[y0:y1, x0:x1] * (1 - peso) + bloco * peso
-    return saida
-
-
-def apagar_olhos_pintados(malha, base, normal):
-    """base/normal: imagens do Blender já assadas no UV da malha. Altera os pixels no lugar."""
-    w, h = base.size
-    mascara = mascara_uv(malha, w)
-    # Alarga a máscara 2 px (a borda do olho pintado no atlas tem antisserrilhado).
-    alargada = mascara.copy()
-    for _ in range(2):
-        alargada = np.maximum.reduce([alargada, np.roll(alargada, 1, 0), np.roll(alargada, -1, 0),
-                                      np.roll(alargada, 1, 1), np.roll(alargada, -1, 1)])
-    px = np.array(base.pixels[:], np.float32).reshape(h, w, 4)
-    px = preencher(px, alargada)
-    base.pixels = px.ravel()
-    assert normal.size[:] == base.size[:], 'normal e cor base no mesmo tamanho'
-    pn = np.array(normal.pixels[:], np.float32).reshape(h, w, 4)
-    plano = np.array([0.5, 0.5, 1.0, 1.0], np.float32)
-    pn = pn * (1 - alargada[..., None]) + plano * alargada[..., None]
-    normal.pixels = pn.ravel()
-    print('OLHOS apagados: pixels', int((alargada > 0.5).sum()))
-    return alargada
+    Coluna c da metade de um olho = y crescente; linha 0 = topo (z alto), como o
+    canvas da tela (UV do glTF com v=0 no topo).
+    """
+    sup = Superficie(malha_alta)
+    me = malha_alta.data
+    uv = np.empty(len(me.loops) * 2, np.float32)
+    me.uv_layers.active.data.foreach_get('uv', uv)
+    uv = uv.reshape(-1, 2)
+    tex = _pixels(base)
+    th, tw, _ = tex.shape
+    n = RECORTE_PX
+    passo = 2 * TELA_MEIA / n
+    uvs = np.zeros((n, 2 * n, 2), np.float64)  # linha 0 = topo
+    for metade, lado in enumerate((-1, 1)):
+        for linha in range(n):
+            z = OLHO_Z + TELA_MEIA - (linha + 0.5) * passo
+            for c in range(n):
+                y = lado * OLHO_Y - TELA_MEIA + (c + 0.5) * passo
+                _, _, i = sup.frente(y, z)
+                t = sup.tris[i]
+                a, b, d = (sup.vs[v] for v in t.vertices)
+                # Baricêntricas em (y, z): a projeção é de frente.
+                det = (b.y - a.y) * (d.z - a.z) - (d.y - a.y) * (b.z - a.z)
+                if abs(det) < 1e-14:
+                    l1 = l2 = 0.0
+                else:
+                    l1 = ((y - a.y) * (d.z - a.z) - (d.y - a.y) * (z - a.z)) / det
+                    l2 = ((b.y - a.y) * (z - a.z) - (y - a.y) * (b.z - a.z)) / det
+                uvs[linha, metade * n + c] = ((1 - l1 - l2) * uv[t.loops[0]] + l1 * uv[t.loops[1]]
+                                              + l2 * uv[t.loops[2]])
+    # Bilinear no atlas 4K (pixels do Blender: linha 0 embaixo, como v=0).
+    fx, fy = (uvs[..., 0] % 1) * tw - 0.5, (uvs[..., 1] % 1) * th - 0.5
+    x0, y0 = np.floor(fx).astype(int), np.floor(fy).astype(int)
+    ax, ay = (fx - x0)[..., None], (fy - y0)[..., None]
+    x1, y1 = np.clip(x0 + 1, 0, tw - 1), np.clip(y0 + 1, 0, th - 1)
+    x0, y0 = np.clip(x0, 0, tw - 1), np.clip(y0, 0, th - 1)
+    cor = ((tex[y0, x0] * (1 - ax) + tex[y0, x1] * ax) * (1 - ay)
+           + (tex[y1, x0] * (1 - ax) + tex[y1, x1] * ax) * ay)
+    saida = np.ones((n, 2 * n, 4), np.float32)
+    saida[..., :3] = cor[::-1, :, :3]  # imagem nova do Blender também tem a linha 0 embaixo
+    img = bpy.data.images.new('coruja-3d-olhos', 2 * n, n)
+    img.colorspace_settings.name = 'sRGB'
+    img.pixels.foreach_set(saida.ravel())
+    cena = bpy.context.scene
+    cena.render.image_settings.file_format = 'JPEG'
+    cena.render.image_settings.quality = qualidade
+    img.save_render(str(caminho), scene=cena)
+    bpy.data.images.remove(img)
+    print('OLHOS recorte', caminho, f'{2 * n}x{n}')
 
 
 def _material(nome, cor, aspereza=0.6):
@@ -191,12 +168,17 @@ def _objeto(nome, bm, arm, materiais, mw):
 
 
 def malha_olhos(malha, arm):
-    """Tela dos olhos: grade conformada ao visor, 1,5 mm à frente, UV plano por olho."""
+    """Tela dos olhos: grade conformada ao visor, TELA_FRENTE_M à frente em +X, UV plano por olho.
+
+    O deslocamento é em +X e não na normal: a normal da malha decimada é ruidosa e
+    o recorte do olho pintado é de frente, então a tela fica registrada com ele.
+    """
     sup = Superficie(malha)
     inv = sup.mw.inverted()
     bm = bmesh.new()
     camada = bm.loops.layers.uv.new('UVMap')
     n = TELA_GRADE
+    frente = Vector((TELA_FRENTE_M, 0.0, 0.0))
     for metade, lado in enumerate((-1, 1)):  # olho direito da coruja (y<0) na metade esquerda do UV
         grade = []
         for r in range(n + 1):
@@ -204,8 +186,8 @@ def malha_olhos(malha, arm):
             for c in range(n + 1):
                 y = lado * OLHO_Y + TELA_MEIA * (2 * c / n - 1)
                 z = OLHO_Z + TELA_MEIA * (2 * r / n - 1)
-                p, normal = sup.frente(y, z)
-                linha.append((bm.verts.new(inv @ (p + normal * TELA_FRENTE_M)), (metade + c / n) / 2, r / n))
+                p, _, _ = sup.frente(y, z)
+                linha.append((bm.verts.new(inv @ (p + frente)), (metade + c / n) / 2, r / n))
             grade.append(linha)
         for r in range(n):
             for c in range(n):
@@ -221,89 +203,153 @@ def malha_olhos(malha, arm):
     return olhos
 
 
-def _azul_escuro(cor):
-    return cor[2] - cor[0] > 0.28 and cor[0] < 0.42
+def _degrau(a, b, x):
+    """smoothstep de a para b (a > b vale: peso cresce quando x desce)."""
+    t = min(1.0, max(0.0, (x - a) / (b - a)))
+    return t * t * (3 - 2 * t)
+
+
+def _giro_y(centro, graus):
+    """Giro no eixo Y em torno de `centro`; graus > 0 levanta a frente (+X sobe)."""
+    c = Vector(centro)
+    return Matrix.Translation(c) @ Matrix.Rotation(-math.radians(graus), 4, 'Y') @ Matrix.Translation(-c)
+
+
+def _peso_bico(p):
+    x0, ay, z0, z1 = BICO_CAIXA
+    if not (p.x > x0 and abs(p.y) < ay and z0 < p.z < z1):
+        return 0.0
+    return (_degrau(*BICO_PESO_Z, p.z) * _degrau(*BICO_PESO_X, p.x)
+            * _degrau(ay, ay * 0.7, abs(p.y)))
+
+
+def _dentro(bvh, p):
+    """Paridade do raio em +X: ímpar = dentro da malha fechada."""
+    n, o = 0, Vector(p)
+    for _ in range(40):
+        acerto, _, _, d = bvh.ray_cast(o, Vector((1.0, 0.0, 0.0)))
+        if acerto is None:
+            break
+        n += 1
+        o = acerto + Vector((1e-5, 0.0, 0.0))
+    return n % 2 == 1
+
+
+def _cunha(bm, sup, inv):
+    """Bico de baixo + véu escuro do meio. Devolve (vértices em repouso, aberto) em mundo."""
+    n_t, n_s = 8, 8
+    hx, hz = MANDIBULA_DOBRADICA
+    aberto = math.radians(-MANDIBULA_ABERTO_GRAUS)
+    fecha = _giro_y((hx, 0.0, hz), MANDIBULA_RECOLHE_GRAUS)
+    eixo = Vector((math.cos(aberto), 0.0, math.sin(aberto)))
+    baixo = Vector((math.sin(aberto), 0.0, -math.cos(aberto)))
+    pares = []  # (posição aberta, posição fechada)
+    dobra = Vector((hx, 0.0, hz))
+
+    def recolher(p):
+        rel = p - dobra
+        ao_longo = rel.dot(eixo)
+        return fecha @ (dobra + rel + eixo * (ao_longo * (MANDIBULA_RECOLHIDA - 1)))
+
+    def novo(p_aberto, p_fechado=None):
+        p_fechado = recolher(p_aberto) if p_fechado is None else p_fechado
+        v = bm.verts.new(inv @ p_fechado)
+        pares.append((p_aberto, p_fechado))
+        return v
+
+    topo, fundo = [], []
+    for i in range(n_t + 1):
+        t = i / n_t
+        meio = Vector((hx, 0.0, hz)) + eixo * (t * MANDIBULA_COMPRIMENTO)
+        meia = MANDIBULA_MEIA * (1 - t) ** 0.55 + 0.0018
+        esp = MANDIBULA_ESPESSURA * (1 - 0.55 * t)
+        lt, lf = [], []
+        for j in range(n_s + 1):
+            s = 2 * j / n_s - 1
+            lado = Vector((0.0, s * meia, 0.0))
+            lt.append(novo(meio + lado + baixo * (0.0012 * (1 - s * s))))
+            lf.append(novo(meio + lado + baixo * (esp * (0.55 + 0.45 * (1 - s * s)))))
+        topo.append(lt), fundo.append(lf)
+
+    def face(vs, material, liso=True):
+        f = bm.faces.new(vs)
+        f.material_index = material
+        f.smooth = liso
+
+    for i in range(n_t):
+        for j in range(n_s):
+            borda = abs(2 * (j + 0.5) / n_s - 1) > 1 - 2 * MANDIBULA_BORDA
+            face([topo[i][j], topo[i][j + 1], topo[i + 1][j + 1], topo[i + 1][j]], 1 if borda else 0)
+            face([fundo[i][j], fundo[i + 1][j], fundo[i + 1][j + 1], fundo[i][j + 1]], 1)
+        for j in (0, n_s):  # laterais
+            face([topo[i][j], topo[i + 1][j], fundo[i + 1][j], fundo[i][j]], 1, False)
+    for i in (0, n_t):  # base e ponta
+        for j in range(n_s):
+            face([topo[i][j], fundo[i][j], fundo[i][j + 1], topo[i][j + 1]], 1, False)
+
+    # Véu do meio (y=0): da boca até a face de baixo do bico de cima, para quem
+    # olha de lado ver a boca escura e não o fundo através dela.
+    cima, chao = [], []
+    for i in range(n_t + 1):
+        p_ab, p_fe = pares[(i * (n_s + 1) + n_s // 2) * 2]
+        teto_ab = _teto(sup, p_ab.x)
+        teto_fe = _teto(sup, p_fe.x)
+        teto_ab = _giro_y(BICO_DOBRADICA, BICO_SUBIDA_GRAUS * _peso_bico(teto_ab)) @ teto_ab
+        cima.append(novo(teto_ab + Vector((0, 0, 0.0015)), teto_fe + Vector((0, 0, 0.0015))))
+        chao.append(novo(p_ab, p_fe))
+    for i in range(n_t):
+        face([chao[i], chao[i + 1], cima[i + 1], cima[i]], 0)
+    return pares
+
+
+def _teto(sup, x):
+    """Ponto da face de baixo do bico de cima em y=0 na coluna x (raio de baixo para cima)."""
+    acerto, _, _, _ = sup.bvh.ray_cast(Vector((x, 0.0, 0.615)), Vector((0.0, 0.0, 1.0)))
+    if acerto is None or not 0.62 < acerto.z < 0.70:
+        return Vector((x, 0.0, 0.651))
+    return acerto
 
 
 def bico(malha, arm, base_px):
-    """Shape key `bico_abre`: bico de cima (malha principal) e boca + bico de baixo (CorujaRosto)."""
+    """Shape key `bico_abre`: bico de cima (malha principal) e bico de baixo (CorujaRosto)."""
     me = malha.data
     h, w, _ = base_px.shape
     uv = me.uv_layers.active.data
     sup = Superficie(malha)
-    cantos = {}
-    for loop in me.loops:
-        u, v = uv[loop.index].uv
-        cor = base_px[min(int(v % 1 * h), h - 1), min(int(u % 1 * w), w - 1)]
-        cantos.setdefault(loop.vertex_index, []).append(_azul_escuro(cor))
-    x0, ay, z0, z1 = CAIXA_BICO
-    ids = [i for i, p in enumerate(sup.vs)
-           if p.x > x0 and abs(p.y) < ay and z0 < p.z < z1 and np.mean(cantos.get(i, [False])) > 0.5]
-    if not ids:
-        raise RuntimeError('bico superior não encontrado na textura')
+    pesos = {i: _peso_bico(p) for i, p in enumerate(sup.vs)}
+    pesos = {i: k for i, k in pesos.items() if k > 1e-3}
+    if not pesos:
+        raise RuntimeError('bico superior não encontrado na malha')
     if not me.shape_keys:
         malha.shape_key_add(name='Basis')
     chave = malha.shape_key_add(name='bico_abre', from_mix=False)
     chave.value = 0.0
     inv = sup.mw.inverted()
-    dob = Vector(DOBRADICA)
-    for i in ids:
-        p = sup.vs[i]
-        peso = min(1.0, max(0.0, (BASE_FIXA_Z - p.z) / (BASE_FIXA_Z - PESO_CHEIO_Z)))
-        giro = Matrix.Translation(dob) @ Matrix.Rotation(-math.radians(SUBIDA_GRAUS * peso), 4, 'Y') @ Matrix.Translation(-dob)
-        chave.data[i].co = inv @ (giro @ p)
-    ponta = max((sup.vs[i] for i in ids), key=lambda p: -p.z)
+    for i, k in pesos.items():
+        chave.data[i].co = inv @ (_giro_y(BICO_DOBRADICA, BICO_SUBIDA_GRAUS * k) @ sup.vs[i])
+    cheios = {i for i, k in pesos.items() if k > 0.8}
+    ponta = min((sup.vs[i] for i in cheios), key=lambda p: p.z)
 
-    # Boca e bico de baixo: grade aberta conformada à superfície; em repouso, recolhida
-    # na linha de cima e 8 mm para dentro (some atrás da ponta do bico).
-    # Cor do bico de baixo: média dos texels azuis do bico de cima (um texel só saía quase preto).
-    no_bico = set(ids)
-    amostras = [base_px[min(int(uv[l.index].uv[1] % 1 * h), h - 1), min(int(uv[l.index].uv[0] % 1 * w), w - 1)][:3]
-                for l in me.loops if l.vertex_index in no_bico]
+    # Cor do bico de baixo: média dos texels do bico de cima.
     # .pixels de imagem sRGB vem em sRGB; o fator de cor do material é linear.
+    amostras = [base_px[min(int(uv[l.index].uv[1] % 1 * h), h - 1), min(int(uv[l.index].uv[0] % 1 * w), w - 1)][:3]
+                for l in me.loops if l.vertex_index in cheios]
     cor_bico = np.mean(amostras, axis=0) ** 2.2
     print('BICO cor de baixo', [round(float(x), 3) for x in cor_bico])
+
     bm = bmesh.new()
-    base_co, aberto = [], []
-
-    def placa(topo, fundo, meia, frente, material, forma, teto_x=9.0):
-        n_u, n_v = 8, 6
-        grade = []
-        for r in range(n_v + 1):
-            t = r / n_v
-            z = topo + (fundo - topo) * t
-            linha = []
-            ys = [(2 * c / n_u - 1) * meia * forma(t) for c in range(n_u + 1)]
-            acertos = [sup.frente(y, z)[0] for y in ys]
-            # As penas são pontudas: conformar vértice a vértice deixa pontas furarem
-            # a placa (a boca sumia atrás delas). A fileira fica plana, na frente da
-            # pena mais saliente.
-            x_max = max(a.x for a in acertos)
-            for c, y in enumerate(ys):
-                a = Vector((min(teto_x, x_max + frente), y, z))
-                atras, _ = sup.frente(y * 0.6, topo)
-                fechado = Vector((atras.x - 0.008, y * 0.6, topo))
-                linha.append(bm.verts.new(inv @ fechado))
-                base_co.append(fechado), aberto.append(a)
-            grade.append(linha)
-        for r in range(n_v):
-            for c in range(n_u):
-                f = bm.faces.new([grade[r][c], grade[r + 1][c], grade[r + 1][c + 1], grade[r][c + 1]])
-                f.material_index = material
-                f.smooth = True
-
-    # Acima da ponta em repouso o raio acerta o próprio bico; com o bico erguido ali fica o
-    # vão da boca, então a placa recua para BOCA_TETO_X (atrás do bico, rente à cara).
-    placa(BOCA_TOPO, BOCA_BASE, BOCA_MEIA, 0.003, 0, lambda t: 0.55 + 0.45 * math.sin(math.pi * min(1, 0.25 + t)), BOCA_TETO_X)
-    placa(QUEIXO_TOPO, QUEIXO_PONTA, QUEIXO_MEIA, 0.01, 1, lambda t: max(0.08, 1 - t ** 1.4))
+    pares = _cunha(bm, sup, inv)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
     bm.normal_update()
     boca = _material('coruja-3d-boca', COR_BOCA, 0.9)
-    queixo = _material('coruja-3d-bico', (*[float(x) for x in cor_bico[:3]], 1.0), 0.35)
-    rosto = _objeto('CorujaRosto', bm, arm, [boca, queixo], sup.mw)
+    baixo = _material('coruja-3d-bico', (*[float(x) for x in cor_bico[:3]], 1.0), 0.35)
+    rosto = _objeto('CorujaRosto', bm, arm, [boca, baixo], sup.mw)
     rosto.shape_key_add(name='Basis')
     k = rosto.shape_key_add(name='bico_abre', from_mix=False)
     k.value = 0.0
-    for i, p in enumerate(aberto):
-        k.data[i].co = inv @ p
-    print(f'BICO {len(ids)} vértices no bico de cima (ponta z={ponta.z:.3f}); rosto {len(base_co)} vértices')
+    for i, (p_aberto, _) in enumerate(pares):
+        k.data[i].co = inv @ p_aberto
+    escondidos = sum(_dentro(sup.bvh, p) for _, p in pares)
+    print(f'BICO {len(pesos)} vértices no bico de cima ({len(cheios)} cheios, ponta z={ponta.z:.3f}); '
+          f'bico de baixo {len(pares)} vértices, {escondidos} dentro do bico fechado')
     return rosto
