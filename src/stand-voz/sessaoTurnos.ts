@@ -69,7 +69,6 @@ export class SessaoTurnos implements SessaoDeVoz {
   private legendas: number[] = [];
   private videoTocando = false;
   private relogioSilencio = 0;
-  private relogioTeto = 0;
   private pararNivel: (() => void) | null = null;
   private desligarPagina: (() => void) | null = null;
   private limites = { silencio_s: 20, teto_s: 240 };
@@ -117,7 +116,8 @@ export class SessaoTurnos implements SessaoDeVoz {
     // Despertada pela voz: manda ao Scribe o começo da frase, ouvido enquanto a sessão abria.
     for (const pcm of emprestimo?.drenar() ?? []) ws.send(mensagemAudioScribe(base64DePcm16(pcm), HZ_STAND));
     this.pararNivel = audio.medirNivel((nivel) => emitirEventoStand({ tipo: 'nivel_audio', valor: this.estado === 'falando' ? nivel : 0 }));
-    this.relogioTeto = window.setTimeout(() => this.encerrar('teto'), this.limites.teto_s * 1000);
+    // ElevenLabs: servidor renova a janela com guarda de sessão e orçamento.
+    // Timer absoluto local cortava a pessoa/áudio ativos; inatividade segue20s.
     this.desligarPagina = assinarEventosPagina((evento) => {
       if (evento.tipo === 'encerrar' || evento.tipo === 'reiniciar') this.encerrar();
       if (evento.tipo === 'video_terminou') {
@@ -162,7 +162,6 @@ export class SessaoTurnos implements SessaoDeVoz {
     if (this.terminada) return;
     this.terminada = true;
     window.clearTimeout(this.relogioSilencio);
-    window.clearTimeout(this.relogioTeto);
     window.clearTimeout(this.relogioVolume);
     this.limparLegendas();
     window.removeEventListener('pagehide', this.aoSairDaPagina);
@@ -171,6 +170,8 @@ export class SessaoTurnos implements SessaoDeVoz {
     this.turno?.abort();
     this.turno = null;
     this.fila?.cortar();
+    this.referenciaEco = new ReferenciaEco();
+    this.falaIndependenteAte = 0;
     const ws = this.ws;
     this.ws = null;
     if (ws) { ws.onclose = null; ws.onmessage = null; ws.close(); }
@@ -357,7 +358,7 @@ export class SessaoTurnos implements SessaoDeVoz {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversa_id: this.conversaId, ...entrada, ...(tela ? { tela } : {}), ...(camera ? { camera } : {}) }),
+        body: JSON.stringify({ conversa_id: this.conversaId, turno_id: `${this.conversaId}:${idTurno}`, ...entrada, ...(tela ? { tela } : {}), ...(camera ? { camera } : {}) }),
         signal: controle.signal,
       });
       if (resposta.status === 503) {
@@ -435,6 +436,9 @@ export class SessaoTurnos implements SessaoDeVoz {
         console.warn('[stand] aviso do turno:', linha.aviso, linha.detalhe ?? '');
         break;
       case 'fim':
+        if (linha.motivo === 'pausa_limite' && linha.texto) {
+          emitirEventoStand({ tipo: 'legenda', texto: linha.texto });
+        }
         if (linha.metricas) console.info('[stand] turno', linha.motivo, linha.metricas);
         break;
     }

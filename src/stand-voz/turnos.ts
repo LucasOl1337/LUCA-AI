@@ -10,7 +10,7 @@ export type LinhaTurno =
   | { t: 'audio'; pcm: string }
   | { t: 'evento'; evento: { tipo: string; id?: string; acao?: string; args?: Record<string, unknown>; apos_fala?: boolean } }
   | { t: 'aviso'; aviso: string; detalhe?: string }
-  | { t: 'fim'; motivo: string; respostas?: number; metricas?: Record<string, unknown> };
+  | { t: 'fim'; motivo: string; texto?: string; causa?: string; detalhe?: string; respostas?: number; metricas?: Record<string, unknown> };
 
 /** Lê um corpo NDJSON pedaço a pedaço; linhas quebradas entre pedaços são juntadas. */
 export async function* lerNdjson(corpo: AsyncIterable<Uint8Array> | ReadableStream<Uint8Array>): AsyncGenerator<LinhaTurno> {
