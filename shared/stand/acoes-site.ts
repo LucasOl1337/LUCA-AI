@@ -45,6 +45,7 @@ export type NomeAcaoSite =
   | 'abrir_pagina'
   | 'voltar_coruja'
   | 'abrir_simulacao'
+  | 'abrir_vitrine'
   | 'sensor_escolher_veiculo'
   | 'sensor_rodar_ensaio'
   | 'sensor_ajustar'
@@ -100,9 +101,15 @@ export const ACOES_SITE: readonly AcaoSiteDef[] = Object.freeze(([
     args: {},
   },
   {
+    nome: 'abrir_vitrine',
+    pagina: null,
+    descricao: 'Abre o modo Vitrine, exatamente como o botão Vitrine do Totem. Não inicia o tour guiado.',
+    args: {},
+  },
+  {
     nome: 'abrir_simulacao',
     pagina: null,
-    descricao: 'Abre a Simulação do stand: o simulador 3D do Trator MAX em tela cheia, para a pessoa dirigir no controle. Use sempre que ela quiser jogar, dirigir, pilotar ou testar o simulador, a simulação ou a gameplay. Diga antes, em uma frase curta, que vai abrir e que é só pegar o controle; a conversa por voz acaba quando a Simulação abre.',
+    descricao: 'Abre a Simulação do stand: o simulador 3D do Trator MAX em tela cheia, para a pessoa dirigir no controle. Use sempre que ela quiser jogar, dirigir, pilotar ou testar o simulador, a simulação ou a gameplay. Diga antes, em uma frase curta, que vai abrir e que é só pegar o controle; ajuda e volta por voz continuam disponíveis.',
     args: {},
   },
   {
@@ -212,7 +219,7 @@ export const ACOES_SITE: readonly AcaoSiteDef[] = Object.freeze(([
  * dentro do iframe. `tour_iniciar` roda no cérebro (falas prontas + ações do
  * `TOUR_STAND`); o `/stand` só recebe as ações do roteiro.
  */
-export const ACOES_DO_STAND: readonly NomeAcaoSite[] = ['abrir_pagina', 'voltar_coruja', 'abrir_simulacao', 'tour_iniciar'];
+export const ACOES_DO_STAND: readonly NomeAcaoSite[] = ['abrir_pagina', 'voltar_coruja', 'abrir_simulacao', 'abrir_vitrine', 'tour_iniciar'];
 
 export type PassoTour =
   | { fala: `tour_${number}`; texto: string }
@@ -227,7 +234,7 @@ export type PassoTour =
 export const TOUR_STAND: readonly PassoTour[] = Object.freeze(([
   { fala: 'tour_1', texto: 'Bora lá, vou te mostrar o LUCA em menos de um minuto. Primeiro, o monitor de sonolência.' },
   { acao: 'abrir_pagina', args: { pagina: 'sonolencia' } },
-  { fala: 'tour_2', texto: 'Ele usa a webcam pra perceber quando o operador fecha os olhos por um segundo, e aí toca um alerta. Tudo roda aqui no computador, nada é gravado.' },
+  { fala: 'tour_2', texto: 'Este é o monitor de sonolência. A demonstração ainda não está ativa. Toque em Ativar webcam e autorize a câmera; só experimente fechar os olhos quando a tela confirmar Monitor pronto e som liberado.' },
   { acao: 'sensor_escolher_veiculo', args: { veiculo: 'trator' } },
   { fala: 'tour_3', texto: 'Agora o laboratório do sensor, com o Trator MAX na bancada.' },
   { acao: 'sensor_rodar_ensaio', args: { ensaio: 'curva' } },
