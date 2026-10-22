@@ -1,18 +1,34 @@
 import type { EstadoVoz } from './canal';
 
 /**
- * Olhos da Coruja 3D: a malha `CorujaOlhos` do GLB é uma tela no visor (uma
- * grade por olho, UV plano: metade esquerda = olho da esquerda na tela). Aqui
- * fica o estado puro (olhar, abertura, feliz) e o desenho num canvas 2D que
- * vira a textura da tela. Sem three.js, para os testes.
+ * Olhos da Coruja 3D: a malha `CorujaOlhos` do GLB é uma tela 2 mm à frente do
+ * visor (uma grade por olho, UV plano: metade esquerda = olho da esquerda na
+ * tela). O olho é o pintado pelo Tripo, que fica no modelo; o pipeline grava o
+ * recorte dele de frente (`coruja-3d-olhos.jpg`, mesmo enquadramento da tela).
+ * Aqui fica o estado puro (olhar, abertura, feliz) e o desenho num canvas 2D
+ * que vira a textura da tela: dentro da abertura, o próprio recorte deslocado
+ * (a íris olha), o brilho e as pálpebras feitas da pele de cima e de baixo
+ * esticada. Fora da abertura a tela é transparente. Sem three.js, para os testes.
  */
 
-export const OLHOS_CANVAS = Object.freeze({ largura: 512, altura: 256 });
+export const OLHOS_CANVAS = Object.freeze({ largura: 1024, altura: 512 });
+/** Arquivo do recorte, ao lado do GLB (fora do manifesto de texturas). */
+export const OLHOS_RECORTE = 'coruja-3d-olhos.jpg';
 /** Cada metade do canvas cobre 9 cm do visor (TELA_MEIA 0,045 m em coruja3d_rosto.py). */
-const PX_POR_M = 256 / 0.09;
-/** Olho desenhado e fundo que tapa o relevo do olho pintado de origem (raio 0,040 x 0,031 m). */
-const OLHO = Object.freeze({ rx: 0.031 * PX_POR_M, ry: 0.027 * PX_POR_M });
-const FUNDO = Object.freeze({ rx: 0.0445 * PX_POR_M, ry: 0.04 * PX_POR_M });
+const MEIA = OLHOS_CANVAS.altura;
+/**
+ * Abertura do olho pintado na metade esquerda (px do recorte): elipse girada,
+ * canto de dentro mais baixo (cara brava da Coruja A). A da direita é o espelho.
+ */
+export const ABERTURA = Object.freeze({ cx: 250, cy: 205, rx: 170, ry: 125, giro: (14 * Math.PI) / 180 });
+const PUPILA_PINTADA = Object.freeze({ x: 258, y: 200 });
+/** Quanto a íris anda no olhar extremo (px): ~4,5 mm de lado, ~3 mm na vertical. */
+const ANDA = Object.freeze({ x: 26, y: 18 });
+/** Altura da linha escura do cílio que vai junto na pálpebra (px). */
+const CILIO = 18;
+const FAIXA = 8;
+/** Cor do traço da borda da pálpebra (o azul-marinho do contorno pintado). */
+const COR_CILIO = '#0d1f45';
 
 /** Para onde o olhar vai por estado (-1..1; x para a direita da tela, y para cima). */
 const OLHAR_ESTADO: Readonly<Record<EstadoVoz, { x: number; y: number; espalho: number }>> = {
@@ -112,111 +128,121 @@ function clamp(v: number, a: number, b: number) { return Math.min(b, Math.max(a,
 
 /** Ganchos mínimos do CanvasRenderingContext2D (os testes passam um falso). */
 type Ctx = Pick<CanvasRenderingContext2D,
-  'clearRect' | 'save' | 'restore' | 'beginPath' | 'ellipse' | 'fill' | 'stroke' | 'clip' | 'moveTo' |
-  'quadraticCurveTo' | 'createRadialGradient' | 'translate' | 'rect' | 'closePath'
+  'clearRect' | 'save' | 'restore' | 'beginPath' | 'ellipse' | 'fill' | 'clip' | 'translate' | 'scale' |
+  'drawImage' | 'createRadialGradient' | 'moveTo' | 'lineTo' | 'stroke'
 > & { fillStyle: unknown; strokeStyle: unknown; lineWidth: number; lineCap: CanvasLineCap; globalAlpha: number };
 
-const COR = Object.freeze({
-  vidro: 'rgba(205, 228, 252, 1)',
-  vidroBorda: 'rgba(205, 228, 252, 0)',
-  esclera: '#f4f9ff',
-  irisFora: '#0a3f9e',
-  irisMeio: '#1f86f0',
-  irisDentro: '#7fdcff',
-  pupila: '#071226',
-  contorno: '#123a78',
-  feliz: '#1a5fd0',
-});
+interface Abertura { cx: number; cy: number; rx: number; ry: number; giro: number }
 
-/** Desenha os dois olhos no canvas da tela (512 x 256). */
-export function desenharOlhos(ctx: Ctx, o: Olhos) {
+/** Abertura de cada metade: a da direita é o espelho da da esquerda. */
+function aberturaDe(lado: number): Abertura {
+  return lado === 0 ? ABERTURA : { ...ABERTURA, cx: MEIA - ABERTURA.cx, giro: -ABERTURA.giro };
+}
+
+/** Borda de cima e de baixo da abertura na coluna x (px), ou null fora dela. */
+export function bordasAbertura(a: Abertura, x: number): [number, number] | null {
+  const X = x - a.cx;
+  const c = Math.cos(a.giro), s = Math.sin(a.giro);
+  const rx2 = a.rx * a.rx, ry2 = a.ry * a.ry;
+  const A = (s * s) / rx2 + (c * c) / ry2;
+  const B = 2 * X * c * s * (1 / rx2 - 1 / ry2);
+  const C = X * X * ((c * c) / rx2 + (s * s) / ry2) - 1;
+  const d = B * B - 4 * A * C;
+  if (d <= 0) return null;
+  const r = Math.sqrt(d);
+  return [a.cy + (-B - r) / (2 * A), a.cy + (-B + r) / (2 * A)];
+}
+
+/**
+ * Desenha os dois olhos no canvas da tela (1024 x 512). Sem o recorte (ainda
+ * carregando ou falhou) a tela fica transparente e aparece o olho pintado, parado.
+ */
+export function desenharOlhos(ctx: Ctx, o: Olhos, recorte: CanvasImageSource | null) {
   const { largura, altura } = OLHOS_CANVAS;
   ctx.clearRect(0, 0, largura, altura);
+  if (!recorte) return;
   for (let lado = 0; lado < 2; lado += 1) {
     ctx.save();
-    ctx.translate(lado * 256 + 128, 128);
-    desenharUm(ctx, o);
+    ctx.translate(lado * MEIA, 0);
+    desenharUm(ctx, o, recorte, lado);
     ctx.restore();
   }
 }
 
-function desenharUm(ctx: Ctx, o: Olhos) {
-  // Fundo de vidro liso: tapa o relevo do olho de origem e funde na borda.
-  const g = ctx.createRadialGradient(0, 0, Math.min(FUNDO.rx, FUNDO.ry) * 0.88, 0, 0, FUNDO.rx);
-  g.addColorStop(0, COR.vidro);
-  g.addColorStop(1, COR.vidroBorda);
-  ctx.fillStyle = g;
+function desenharUm(ctx: Ctx, o: Olhos, img: CanvasImageSource, lado: number) {
+  const a = aberturaDe(lado);
+  const sx = lado * MEIA;
+  const px = lado === 0 ? PUPILA_PINTADA.x : MEIA - PUPILA_PINTADA.x;
+  // Recorta na abertura (um tico para dentro: a borda escura pintada fica parada).
   ctx.beginPath();
-  ctx.ellipse(0, 0, FUNDO.rx, FUNDO.ry, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.ellipse(a.cx, a.cy, a.rx * 0.97, a.ry * 0.95, a.giro, 0, Math.PI * 2);
+  ctx.clip();
 
-  const { rx, ry } = OLHO;
-  const aberto = Math.min(1.15, o.abertura) * (1 - o.feliz);
-  if (aberto > 0.04) {
-    // Olho: esclera clara, íris grande, pupila, dois brilhos. A pálpebra corta por cima.
-    const meiaAltura = ry * Math.min(1.12, aberto);
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(0, (ry - meiaAltura) * 0.35, rx, Math.max(1, meiaAltura), 0, 0, Math.PI * 2);
-    ctx.clip();
-    ctx.fillStyle = COR.esclera;
-    ctx.beginPath();
-    ctx.rect(-rx, -ry * 1.3, rx * 2, ry * 2.6);
-    ctx.fill();
-    const ix = o.x * rx * 0.32;
-    const iy = -o.y * ry * 0.3;
-    const rIris = ry * 0.86;
-    const gi = ctx.createRadialGradient(ix, iy - rIris * 0.25, rIris * 0.1, ix, iy, rIris);
-    gi.addColorStop(0, COR.irisDentro);
-    gi.addColorStop(0.55, COR.irisMeio);
-    gi.addColorStop(1, COR.irisFora);
-    ctx.fillStyle = gi;
-    ctx.beginPath();
-    ctx.ellipse(ix, iy, rIris, rIris, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = COR.pupila;
-    ctx.beginPath();
-    ctx.ellipse(ix, iy, rIris * 0.46 * o.pupila, rIris * 0.5 * o.pupila, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
-    ctx.beginPath();
-    ctx.ellipse(ix - rIris * 0.34, iy - rIris * 0.38, rIris * 0.2, rIris * 0.17, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    ctx.beginPath();
-    ctx.ellipse(ix + rIris * 0.3, iy + rIris * 0.34, rIris * 0.08, rIris * 0.08, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    // Contorno e cílio de cima (mais grosso), para o olho ler a 2–3 m.
-    ctx.strokeStyle = COR.contorno;
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.ellipse(0, (ry - meiaAltura) * 0.35, rx, Math.max(1, meiaAltura), 0, Math.PI * 1.04, Math.PI * 1.96);
-    ctx.stroke();
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.ellipse(0, (ry - meiaAltura) * 0.35, rx, Math.max(1, meiaAltura), 0, 0, Math.PI);
-    ctx.stroke();
-  } else if (o.feliz < 0.5) {
-    // Fechado (piscada): só a linha da pálpebra.
-    ctx.strokeStyle = COR.contorno;
-    ctx.lineCap = 'round';
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.moveTo(-rx * 0.92, ry * 0.12);
-    ctx.quadraticCurveTo(0, ry * 0.42, rx * 0.92, ry * 0.12);
-    ctx.stroke();
+  // Íris: o próprio olho pintado, deslocado pelo olhar e com a pupila mais ou menos aberta.
+  const dx = o.x * ANDA.x, dy = -o.y * ANDA.y;
+  const escala = 1 + (o.pupila - 1) * 0.35 + Math.max(0, o.abertura - 1) * 0.3;
+  ctx.save();
+  ctx.translate(px + dx, PUPILA_PINTADA.y + dy);
+  ctx.scale(escala, escala);
+  ctx.drawImage(img, sx, 0, MEIA, MEIA, -px, -PUPILA_PINTADA.y, MEIA, MEIA);
+  ctx.restore();
+
+  // Brilho da luz principal (alto, à direita), que anda menos que a íris.
+  const bx = px + dx * 0.6 + 42, by = PUPILA_PINTADA.y + dy * 0.6 - 46;
+  const brilho = ctx.createRadialGradient(bx, by, 0, bx, by, 24);
+  brilho.addColorStop(0, 'rgba(255,255,255,0.9)');
+  brilho.addColorStop(0.55, 'rgba(235,248,255,0.55)');
+  brilho.addColorStop(1, 'rgba(235,248,255,0)');
+  ctx.fillStyle = brilho;
+  ctx.beginPath();
+  ctx.ellipse(bx, by, 24, 21, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.beginPath();
+  ctx.ellipse(px + dx * 0.6 - 34, PUPILA_PINTADA.y + dy * 0.6 + 40, 8, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Pálpebras: faixas verticais da pele pintada esticadas até a linha da pálpebra.
+  // Piscar desce a de cima até fechar; feliz (^^) é o olho que sorri: a de baixo
+  // sobe em arco e deixa só o alto da íris, a de cima desce um pouco. Um traço
+  // escuro marca a borda de cada pálpebra, senão o olho fechado lê como vazio.
+  const fecha = Math.min(1, Math.max(0, 1 - o.abertura));
+  const f = Math.min(1, Math.max(0, o.feliz));
+  if (fecha < 0.01 && f < 0.01) return;
+  const x0 = a.cx - a.rx - 4, x1 = a.cx + a.rx + 4;
+  const tracoCima: [number, number][] = [];
+  const tracoBaixo: [number, number][] = [];
+  for (let x = x0; x < x1; x += FAIXA) {
+    const b = bordasAbertura(a, x + FAIXA / 2);
+    if (!b) continue;
+    const [cima, baixo] = b;
+    const alto = baixo - cima;
+    const u = (x + FAIXA / 2 - a.cx) / a.rx;
+    const sorriso = baixo - alto * (0.16 + 0.3 * (1 - u * u));
+    const linhaBaixo = baixo + (sorriso - baixo) * f;
+    const linhaCima = Math.min(cima + alto * Math.max(fecha, 0.08 * f), linhaBaixo);
+    if (f > 0.01) {
+      ctx.drawImage(img, sx + x, baixo - CILIO, FAIXA, MEIA - baixo + CILIO, x, linhaBaixo - CILIO, FAIXA + 1, MEIA - linhaBaixo + CILIO);
+      tracoBaixo.push([x + FAIXA / 2, linhaBaixo]);
+    }
+    ctx.drawImage(img, sx + x, 0, FAIXA, cima + CILIO, x, 0, FAIXA + 1, linhaCima + CILIO);
+    tracoCima.push([x + FAIXA / 2, linhaCima]);
   }
-  if (o.feliz > 0) {
-    // ^^: arco para cima, mais grosso, entra por cima do olho que fecha.
-    ctx.globalAlpha = Math.min(1, o.feliz * 1.4);
-    ctx.strokeStyle = COR.feliz;
-    ctx.lineCap = 'round';
-    ctx.lineWidth = 11;
-    ctx.beginPath();
-    ctx.moveTo(-rx * 0.8, ry * 0.42);
-    ctx.quadraticCurveTo(0, -ry * 0.75, rx * 0.8, ry * 0.42);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-  }
+  ctx.strokeStyle = COR_CILIO;
+  ctx.lineCap = 'round';
+  tracar(ctx, tracoBaixo, f, 9);
+  tracar(ctx, tracoCima, Math.max(0, fecha * 2 - 1), 8);
+  ctx.globalAlpha = 1;
+}
+
+function tracar(ctx: Ctx, pontos: [number, number][], alfa: number, largura: number) {
+  if (alfa < 0.02 || pontos.length < 2) return;
+  ctx.globalAlpha = alfa;
+  ctx.lineWidth = largura;
+  ctx.beginPath();
+  ctx.moveTo(pontos[0][0], pontos[0][1]);
+  for (const [x, y] of pontos.slice(1)) ctx.lineTo(x, y);
+  ctx.stroke();
 }

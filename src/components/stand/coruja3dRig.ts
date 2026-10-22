@@ -76,8 +76,8 @@ export function brilhoCoruja3D(m: MemoriaBrilho, voz: EstadoVoz, nivelAudio: num
 }
 
 /**
- * Bico: morph `bico_abre` na malha principal (bico de cima sobe 20° na
- * dobradiça) e em `CorujaRosto` (boca escura e bico de baixo), ver
+ * Bico: morph `bico_abre` na malha principal (bico de cima sobe 8° na base)
+ * e em `CorujaRosto` (bico de baixo que desce, com a boca escura), ver
  * `scripts/stand/coruja3d_rosto.py`. 0 = fechado, 1 = aberto. A piscada não é
  * morph: `rostoCoruja3D().piscar` vai para a tela dos olhos.
  */
@@ -86,7 +86,15 @@ export const MORPH_BICO = 'bico_abre';
  * A fala de teste fica em ~0,4 de nível suavizado (p90 0,65): sem ganho o bico
  * passa a maior parte da fala meio aberto e não se lê a 2–3 m do totem.
  */
-export const GANHO_BICO = 1.6;
+export const GANHO_BICO = 1.3;
+/**
+ * O gancho do bico de cima esconde o começo da abertura: meio morph ainda lê
+ * como bico comprido. Curva que abre rápido no começo e assenta no fim.
+ */
+export function curvaBico(b: number): number {
+  const x = Math.min(1, Math.max(0, b));
+  return 1 - (1 - x) * (1 - x);
+}
 export const PISCADA_MS = 120;
 export const PISCADA_INTERVALO_MS = Object.freeze({ min: 2000, max: 6000 });
 /** Pensando: pálpebra só um pouco baixa; mais que isso, a tela dos olhos lê como sono ou tristeza (juiz cego, 21/10). */
@@ -133,7 +141,7 @@ export function rostoCoruja3D(
     // Sem piscada: com movimento reduzido nunca; no aceno, adia para depois dele.
     m.inicio = -1;
     if (acenando && m.proxima <= agoraMs) m.proxima = agoraMs + intervaloPiscada(sorteio);
-    return { piscar: base, bico: Math.min(1, m.bico * GANHO_BICO) };
+    return { piscar: base, bico: curvaBico(m.bico * GANHO_BICO) };
   }
   if (m.inicio < 0 && agoraMs >= m.proxima) {
     m.inicio = agoraMs;
@@ -145,7 +153,7 @@ export function rostoCoruja3D(
     if (t >= 1) m.inicio = -1;
     else fechado = 1 - Math.abs(1 - 2 * t);
   }
-  return { piscar: base + (1 - base) * fechado, bico: Math.min(1, m.bico * GANHO_BICO) };
+  return { piscar: base + (1 - base) * fechado, bico: curvaBico(m.bico * GANHO_BICO) };
 }
 
 /** Aceno de cabeça extra na fala (rad), a partir do nível suavizado em `MemoriaBrilho`. */

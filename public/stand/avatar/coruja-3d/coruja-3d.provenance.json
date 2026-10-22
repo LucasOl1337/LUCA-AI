@@ -1,7 +1,7 @@
 {
   "asset": "coruja-3d.glb",
   "generatedBy": "Tripo Studio (studio.tripo3d.ai), imagem -> 3D (H3.1, Ultra Mesh, 4K, PBR) pela conta do dono; ossos e pesos do Auto Rig \"Other\" (avian) da coruja do #16",
-  "createdAt": "2026-10-21",
+  "createdAt": "2026-10-22",
   "reference": "Imagem frontal de corpo inteiro gerada por cx/gpt-5.6-sol-image (9Router) a partir de public/stand/avatar/coruja-a/coruja-a-1024.png, para manter a identidade da Coruja A",
   "tripoProject": "9d92de09-8985-49fe-b7f8-8f80d18e56db",
   "tripoUrl": "https://studio.tripo3d.ai/workspace/generate/9d92de09-8985-49fe-b7f8-8f80d18e56db",
@@ -25,24 +25,35 @@
   },
   "packaging": {
     "tool": "Blender 5.2.0 LTS, scripts/stand/package-coruja-3d.py",
+    "weld": {
+      "distanceM": 0.0001,
+      "vertices": [
+        142477,
+        124287
+      ],
+      "arestasAbertas": [
+        36275,
+        4
+      ]
+    },
     "decimate": {
       "type": "COLLAPSE",
-      "triangles": 38074,
+      "triangles": 38073,
       "delimit": "UV",
       "ratio": 0.1531
     },
     "uv": "UVs originais do Tripo Studio (decimação com delimit UV)",
-    "textures": "mapas do Tripo reduzidos; olhos pintados apagados por preenchimento Laplace; branco fosco (rugosidade >= 0.62, metal <= 0,04)",
+    "textures": "mapas do Tripo reduzidos, olhos pintados mantidos; branco fosco (rugosidade >= 0.55, metal <= 0,04)",
     "atlas": {
       "basecolor": 2048,
       "normal": 2048,
       "metallicroughness": 1024,
-      "emissive": 512
+      "emissive": 1024
     },
     "jpegQuality": 86,
     "images": "fora do GLB (images[].uri), mesmos arquivos do manifesto externo",
-    "olhos": "olhos pintados apagados do visor; tela CorujaOlhos (material coruja-3d-olhos) desenhada em canvas no three.js; scripts/stand/coruja3d_rosto.py",
-    "rosto": "bico_abre na malha principal (bico de cima) e CorujaRosto (boca escura + bico de baixo), 100% tripo::Head_2"
+    "olhos": "olhos pintados mantidos no visor; recorte de frente coruja-3d-olhos.jpg (fora do manifesto do GLB); tela CorujaOlhos (material coruja-3d-olhos) transparente, desenhada em canvas no three.js com o recorte (íris que olha) e as pálpebras; scripts/stand/coruja3d_rosto.py",
+    "rosto": "bico_abre: bico de cima sobe na base (peso suave) e CorujaRosto (bico de baixo com a boca escura em cima) desce; 100% tripo::Head_2"
   },
   "morphTargets": {
     "Coruja": [
@@ -61,17 +72,17 @@
     "pensando": 150
   },
   "fps": 30,
-  "triangles": 40570,
+  "triangles": 40713,
   "boundsM": {
     "min": [
-      -0.27163562178611755,
-      -0.000784501142334193,
+      -0.27140572667121887,
+      -0.0002611456729937345,
       -0.49537011981010437
     ],
     "max": [
-      0.2717447876930237,
-      0.9715407490730286,
-      0.49528756737709045
+      0.2715291678905487,
+      0.9702457189559937,
+      0.4953230321407318
     ]
   },
   "axes": {
@@ -80,6 +91,6 @@
   },
   "externalManifest": "coruja-3d.textures.json",
   "reproducibleCommand": "gltf-transform dequantize RIG_TRIPO.glb rig-decoded.glb && blender -b --factory-startup --python scripts/stand/package-coruja-3d.py -- rig-decoded.glb coruja-tripo-alta.glb public/stand/avatar/coruja-3d",
-  "sha256": "d7ecc0955def318f3884c4e32bfec61d4b16c6be6c09cf938bdf40bb5faa2c3f",
-  "bytes": 1843808
+  "sha256": "97dcf89857aa34f4376aa03d081ab5073dc914cfb7831627ff1210aa8512922c",
+  "bytes": 1656072
 }

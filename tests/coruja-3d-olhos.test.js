@@ -57,7 +57,7 @@ test('feliz (^^) no aceno de entrada e por 1,8 s depois da fala; ouvindo corta',
   assert.ok(rodar(m, 'ouvindo', 6116, 6700).feliz < 0.05, 'nova pergunta corta o sorriso');
 });
 
-test('desenha os dois olhos no canvas 512x256: aberto, fechado e feliz', () => {
+test('desenha os olhos pintados do modelo no canvas: aberto, fechado e feliz', () => {
   const chamadas = [];
   const gradiente = { addColorStop() {} };
   const ctx = new Proxy({}, {
@@ -67,19 +67,34 @@ test('desenha os dois olhos no canvas 512x256: aberto, fechado e feliz', () => {
     },
     set() { return true; },
   });
-  const conta = (nome) => chamadas.filter((c) => c[0] === nome).length;
-  olhos.desenharOlhos(ctx, { abertura: 1, x: 0, y: 0, feliz: 0, pupila: 1 });
-  assert.deepEqual(chamadas[0], ['clearRect', 0, 0, olhos.OLHOS_CANVAS.largura, olhos.OLHOS_CANVAS.altura]);
-  assert.deepEqual(chamadas.filter((c) => c[0] === 'translate').map((c) => c[1]), [128, 384], 'um olho por metade');
-  const aberto = conta('ellipse');
-  assert.ok(aberto >= 2 * 7, `fundo, esclera, íris, pupila, brilhos, contorno: ${aberto}`);
+  const recorte = { width: olhos.OLHOS_CANVAS.largura, height: olhos.OLHOS_CANVAS.altura };
+  const fontes = () => chamadas.filter((c) => c[0] === 'drawImage').map((c) => c[2]);
+  const { largura, altura } = olhos.OLHOS_CANVAS;
+
+  olhos.desenharOlhos(ctx, { abertura: 1, x: 0, y: 0, feliz: 0, pupila: 1 }, null);
+  assert.deepEqual(chamadas, [['clearRect', 0, 0, largura, altura]], 'sem o recorte, a tela fica vazia');
+
   chamadas.length = 0;
-  olhos.desenharOlhos(ctx, { abertura: 0, x: 0, y: 0, feliz: 0, pupila: 1 });
-  assert.equal(conta('quadraticCurveTo'), 2, 'fechado: só a linha da pálpebra');
+  olhos.desenharOlhos(ctx, { abertura: 1, x: 0, y: 0, feliz: 0, pupila: 1 }, recorte);
+  assert.deepEqual(chamadas[0], ['clearRect', 0, 0, largura, altura]);
+  assert.deepEqual(chamadas.filter((c) => c[0] === 'translate' && c[2] === 0).map((c) => c[1]), [0, largura / 2], 'um olho por metade');
+  assert.deepEqual(fontes(), [0, largura / 2], 'aberto: só o olho pintado, sem pálpebra');
+
   chamadas.length = 0;
-  olhos.desenharOlhos(ctx, { abertura: 1, x: 0, y: 0, feliz: 1, pupila: 1 });
-  assert.equal(conta('quadraticCurveTo'), 2, 'feliz: um arco por olho');
-  assert.equal(conta('ellipse'), 2, 'feliz: só o fundo de vidro');
+  olhos.desenharOlhos(ctx, { abertura: 0, x: 0, y: 0, feliz: 0, pupila: 1 }, recorte);
+  const fechado = fontes();
+  assert.ok(fechado.length > 2 * 10, `fechado: pálpebra em faixas da própria pele (${fechado.length})`);
+
+  chamadas.length = 0;
+  olhos.desenharOlhos(ctx, { abertura: 1, x: 0, y: 0, feliz: 1, pupila: 1 }, recorte);
+  assert.ok(fontes().length > fechado.length, 'feliz: sobe também a pálpebra de baixo (^^)');
+});
+
+test('bordasAbertura: cima e baixo da elipse do olho; fora dela, nada', () => {
+  const a = { cx: 250, cy: 205, rx: 170, ry: 125, giro: 0 };
+  const [cima, baixo] = olhos.bordasAbertura(a, 250);
+  assert.ok(Math.abs(cima - 80) < 1e-6 && Math.abs(baixo - 330) < 1e-6, `${cima} ${baixo}`);
+  assert.equal(olhos.bordasAbertura(a, 500), null);
 });
 
 test('cabeça fica de frente: segue pouco o olhar e quase não inclina', () => {

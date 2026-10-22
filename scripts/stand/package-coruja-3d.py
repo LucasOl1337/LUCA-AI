@@ -12,12 +12,14 @@ Roda dentro do Blender (headless):
 
 O script:
 
-1. alinha a malha alta à do rig (mesma referência, mesma pose) e cria uma
-   malha leve por decimação, guardando mais detalhe no rosto;
+1. alinha a malha alta à do rig (mesma referência, mesma pose), solda os
+   vértices duplicados nas costuras do export (sem isso a decimação abre
+   frestas e borra o sombreado) e cria uma malha leve por decimação;
 2. mantém as UVs do Tripo (a decimação respeita as costuras) e reaproveita as
    texturas dele reduzidas: cor base e normal 2048, metal/rugosidade 1024;
-3. tira os olhos pintados do visor e cria a tela dos olhos (`CorujaOlhos`), o
-   bico que abre (`bico_abre`) e a boca (`CorujaRosto`), em coruja3d_rosto.py;
+3. mantém os olhos pintados do visor e recorta-os de frente em
+   `coruja-3d-olhos.jpg`; cria a tela dos olhos (`CorujaOlhos`), o bico de cima
+   que sobe (`bico_abre`) e o bico de baixo (`CorujaRosto`), em coruja3d_rosto.py;
 4. transfere os pesos do rig antigo (mesma silhueta) e cria as animações por
    estado de voz, o aceno de entrada e o feliz, em 30 fps;
 5. exporta o GLB sem imagens dentro: elas vão em arquivos ao lado (`uri`), o
@@ -55,9 +57,10 @@ ALVO_TRIANGULOS = 38000
 ATLAS = 2048          # cor base
 ATLAS_NORMAL = 2048
 ATLAS_MR = 1024
-ATLAS_EMISSIVO = 512
+ATLAS_EMISSIVO = 1024
 QUALIDADE_JPEG = 86
-FOSCO_BRANCO = 0.62  # rugosidade mínima do branco (penas e casco)
+FOSCO_BRANCO = 0.55  # rugosidade mínima do branco (penas e casco)
+SOLDA_M = 1e-4  # vértices repetidos nas costuras do export do Studio
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import coruja3d_rosto as rosto_mod  # noqa: E402
@@ -121,6 +124,23 @@ desloc = Vector((centro_v[0] - centro_a[0] * escala, centro_v[1] - centro_a[1] *
 alta.data.transform(Matrix.Translation(desloc) @ Matrix.Scale(escala, 4))
 alta.data.update()
 print('ALINHAMENTO escala', round(escala, 4), 'desloc', tuple(round(x, 4) for x in desloc))
+# O export do Studio separa vértices em toda costura de UV e de normal: a malha
+# chega em ilhas soltas. A decimação puxa cada ilha para um lado (frestas e
+# sombreado manchado). Solda por distância; as UVs ficam nos loops, as costuras
+# continuam e a decimação com delimit UV as respeita.
+bm = bmesh.new()
+bm.from_mesh(alta.data)
+abertas = sum(not e.is_manifold for e in bm.edges)
+antes = len(bm.verts)
+bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=SOLDA_M)
+SOLDA = {'vertices': [antes, len(bm.verts)], 'arestasAbertas': [abertas, sum(not e.is_manifold for e in bm.edges)]}
+bm.to_mesh(alta.data)
+bm.free()
+if alta.data.has_custom_normals:
+    ativar(alta)
+    bpy.ops.mesh.customdata_custom_splitnormals_clear()
+alta.data.update()
+print('SOLDA', SOLDA)
 TRIS_ALTA = triangulos(alta)
 
 # Malha leve: decimação uniforme que respeita as costuras de UV do Tripo (delimit
@@ -191,8 +211,7 @@ def no_img(img):
 
 n_base, n_mr, n_normal = no_img(img_base), no_img(img_mr), no_img(img_normal)
 
-# 3. Olhos: tira os pintados (cor e normal) e cria a tela; bico e boca.
-rosto_mod.apagar_olhos_pintados(mesh, n_base.image, n_normal.image)
+# 3. Olhos pintados ficam na cor base; o recorte deles sai da malha alta (abaixo).
 h = w = ATLAS
 base_px = np.array(n_base.image.pixels[:], np.float32).reshape(h, w, 4)[..., :3]
 
@@ -239,6 +258,7 @@ mesh.matrix_parent_inverse = arm.matrix_world.inverted()
 am = mesh.modifiers.new('Armature', 'ARMATURE')
 am.object = arm
 bpy.data.objects.remove(velha)
+rosto_mod.recorte_olhos(alta, imagem_de('Base Color'), OUT / f'{STEM}-olhos.jpg', QUALIDADE_JPEG)
 bpy.data.objects.remove(alta)
 
 olhos = rosto_mod.malha_olhos(mesh, arm)
@@ -287,27 +307,47 @@ def asa_alvo(lado, cotovelo, ponta):
     return {o_asa: q1, o_ant: q1.inverted() @ q2w @ q1}
 
 
+# Atraso por osso (s): o tronco puxa e pescoço, cabeça e asas seguem com folga,
+# em vez de todos baterem no mesmo quadro (o ar de boneco de corda).
+ATRASO = {'tronco': 0.0, 'pescoco': 0.08, 'cabeca': 0.16, 'asaD': 0.12, 'asaE': 0.2, 'antD': 0.22, 'antE': 0.3}
+
+
+def _rot(v):
+    return v[1] if isinstance(v, tuple) and v and v[0] == 'q' else v
+
+
+def chaves_osso(o, chaves, total, ciclo):
+    """(segundos, quaternion local) do osso, já com o atraso; no ciclo o fim volta ao começo."""
+    qs = [(t, local(o, _rot(chaves[t].get(o, [])))) for t in sorted(chaves)]
+    d = ATRASO.get(o, 0.0)
+    if not d:
+        return qs
+    if not ciclo:
+        return [(t if i in (0, len(qs) - 1) else t + d, q) for i, (t, q) in enumerate(qs)]
+
+    def em(t):
+        for (t0, q0), (t1, q1) in zip(qs, qs[1:]):
+            if t0 <= t <= t1:
+                return q0.slerp(q1, (t - t0) / (t1 - t0))
+        return qs[-1][1]
+
+    novos = {t + d: q for t, q in qs if t + d < total - 1e-6}
+    novos[0.0] = novos[total] = em(total - d)
+    return sorted(novos.items())
+
+
 def acao(nome, quadros, chaves, ciclo=True):
-    """chaves: {segundos: {osso: rot | ('esc', fator)}}; ossos ausentes ficam em repouso."""
+    """chaves: {segundos: {osso: rot}}; ossos ausentes ficam em repouso."""
     act = bpy.data.actions.new(nome)
     act.use_fake_user = True
     arm.animation_data_create()
     arm.animation_data.action = act
     usados = sorted({o for pose in chaves.values() for o in pose})
-    for t, pose in sorted(chaves.items()):
-        f = 1 + round(t * FPS)
-        for o in usados:
-            pb = arm.pose.bones[OSSOS[o]]
-            v = pose.get(o, [])
-            if isinstance(v, tuple) and v and v[0] == 'q':
-                v = v[1]
-            if isinstance(v, tuple) and v[0] == 'esc':
-                pb.rotation_quaternion = Quaternion()
-                pb.scale = Vector((v[1], v[1], v[1]))
-                pb.keyframe_insert('scale', frame=f)
-                continue
-            pb.rotation_quaternion = local(o, v)
-            pb.keyframe_insert('rotation_quaternion', frame=f)
+    for o in usados:
+        pb = arm.pose.bones[OSSOS[o]]
+        for t, q in chaves_osso(o, chaves, quadros / FPS, ciclo):
+            pb.rotation_quaternion = q
+            pb.keyframe_insert('rotation_quaternion', frame=1 + round(t * FPS))
     for fc in act.fcurves if hasattr(act, 'fcurves') else []:
         for k in fc.keyframe_points:
             k.interpolation = 'BEZIER'
@@ -545,16 +585,19 @@ proveniencia = {
                     'rigSha256': sha256(fonte), 'rigBytes': len(fonte), 'joints': len(arm.data.bones)},
     'packaging': {
         'tool': f'Blender {bpy.app.version_string}, scripts/stand/package-coruja-3d.py',
+        'weld': {'distanceM': SOLDA_M, **SOLDA},
         'decimate': {'type': 'COLLAPSE', 'triangles': TRIS, 'delimit': 'UV', 'ratio': round(RAZAO, 4)},
         'uv': 'UVs originais do Tripo Studio (decimação com delimit UV)',
-        'textures': 'mapas do Tripo reduzidos; olhos pintados apagados por preenchimento Laplace; '
+        'textures': 'mapas do Tripo reduzidos, olhos pintados mantidos; '
                     f'branco fosco (rugosidade >= {FOSCO_BRANCO}, metal <= 0,04)',
         'atlas': {'basecolor': ATLAS, 'normal': ATLAS_NORMAL, 'metallicroughness': ATLAS_MR, 'emissive': ATLAS_EMISSIVO},
         'jpegQuality': QUALIDADE_JPEG,
         'images': 'fora do GLB (images[].uri), mesmos arquivos do manifesto externo',
-        'olhos': 'olhos pintados apagados do visor; tela CorujaOlhos (material coruja-3d-olhos) desenhada em canvas no '
-                 'three.js; scripts/stand/coruja3d_rosto.py',
-        'rosto': 'bico_abre na malha principal (bico de cima) e CorujaRosto (boca escura + bico de baixo), 100% tripo::Head_2',
+        'olhos': 'olhos pintados mantidos no visor; recorte de frente coruja-3d-olhos.jpg (fora do manifesto do GLB); '
+                 'tela CorujaOlhos (material coruja-3d-olhos) transparente, desenhada em canvas no three.js com o '
+                 'recorte (íris que olha) e as pálpebras; scripts/stand/coruja3d_rosto.py',
+        'rosto': 'bico_abre: bico de cima sobe na base (peso suave) e CorujaRosto (bico de baixo com a boca escura '
+                 'em cima) desce; 100% tripo::Head_2',
     },
     'morphTargets': {o.name: [k.name for k in o.data.shape_keys.key_blocks[1:]]
                      for o in (mesh, rosto) if o.data.shape_keys},
