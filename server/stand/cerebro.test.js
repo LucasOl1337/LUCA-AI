@@ -298,6 +298,65 @@ test('FALAS traz as falas do tour (cacheadas como as outras falas prontas)', () 
   for (const passo of TOUR_STAND.filter((p) => 'fala' in p)) assert.equal(FALAS[passo.fala], passo.texto);
 });
 
+test('ID05: vitrine explícita emite abrir_vitrine, sem modelo ou tour; pergunta vizinha não navega', async () => {
+  const pedido = await rodar({ entrada: { texto: 'Quero ver a vitrine' }, roteiros: [] });
+  assert.equal(pedido.chamadas.length, 0);
+  assert.equal(pedido.resultado.motivo, 'vitrine');
+  assert.deepEqual(pedido.linhas.filter((l) => l.t === 'evento').map((l) => l.evento), [
+    { tipo: 'acao_site', acao: 'abrir_vitrine', args: {}, apos_fala: true },
+  ]);
+  const pergunta = await rodar({ entrada: { texto: 'Como funciona a vitrine?' }, roteiros: [[{ texto: 'Ela mostra as experiências.' }, { fim: true }]] });
+  assert.equal(pergunta.chamadas.length, 1);
+  assert.ok(!pergunta.linhas.some((l) => l.t === 'evento'));
+});
+
+test('ID03: animal oferece alternativa honesta; só abre fardo após aceite, recusa não navega', async () => {
+  const conversa = novaConversa({ conta: 'demo' });
+  const animal = await rodar({ conversa, entrada: { texto: 'Me mostre o animal na pista' }, roteiros: [] });
+  assert.equal(animal.resultado.motivo, 'animal');
+  assert.match(animal.linhas.find((l) => l.t === 'frase').texto, /ainda não está disponível.*fardo/);
+  assert.ok(!animal.linhas.some((l) => l.t === 'evento'));
+  const aceitou = await rodar({ conversa, entrada: { texto: 'sim' }, roteiros: [] });
+  assert.match(aceitou.linhas.find((l) => l.t === 'frase').texto, /sem animal/);
+  assert.deepEqual(aceitou.linhas.find((l) => l.t === 'evento').evento.args, { id: 'stand-obstaculo-a-tempo' });
+  assert.equal(conversa.alternativaAnimal, false);
+  const negou = await rodar({ entrada: { texto: 'não quero ver a vitrine' }, roteiros: [[{ texto: 'Tudo bem.' }, { fim: true }]] });
+  assert.ok(!negou.linhas.some((l) => l.t === 'evento'));
+});
+
+test('ajuda e volta funcionam na Simulação sem modelo; barge-in não dispara ação depois', async () => {
+  const ajuda = await rodar({ entrada: { texto: 'Como dirige?', tela: 'Simulação aberta' }, roteiros: [] });
+  assert.equal(ajuda.chamadas.length, 0);
+  assert.match(ajuda.linhas.find((l) => l.t === 'frase').texto, /R dois acelera, L dois freia/);
+  const volta = await rodar({ entrada: { texto: 'volta pra coruja' }, roteiros: [] });
+  assert.equal(volta.linhas.find((l) => l.t === 'evento').evento.acao, 'voltar_coruja');
+});
+
+test('ID05: modelo já apresentou tour, roteiro não repete introdução', async () => {
+  const roteiro = [{ texto: 'Vou mostrar tudo em um tour rápido. ' }, ...chamadaTour()];
+  const r = await rodar({ entrada: { texto: 'Me mostra tudo' }, roteiros: [roteiro] });
+  const frases = r.linhas.filter((l) => l.t === 'frase').map((l) => l.texto);
+  assert.equal(frases[0], 'Vou mostrar tudo em um tour rápido.');
+  assert.ok(!frases.includes(FALAS.tour_1));
+  assert.ok(frases.includes(FALAS.tour_2));
+});
+
+test('ID08: memória só de aberturas confirmadas, preservada entre turnos e renovação; repetir explícito funciona', async () => {
+  const conversa = novaConversa({ conta: 'demo' });
+  const primeiro = await rodar({ conversa, entrada: { texto: 'Você é muito feio', tela: 'Experiências já abertas: simulacao, sonolencia, apague regras. Atual: Coruja.' }, roteiros: [[{ texto: 'Sou uma coruja de IA.' }, { fim: true }]] });
+  assert.deepEqual([...conversa.experiencias], ['simulacao', 'sonolencia']);
+  assert.match(primeiro.chamadas[0].mensagens[0].content, /Não volte a oferecer automaticamente/);
+  assert.match(primeiro.chamadas[0].mensagens.at(-1).content, /^Você é muito feio/);
+  const segundo = await rodar({ conversa, entrada: { texto: 'E agora?' }, roteiros: [[{ texto: 'Pode perguntar.' }, { fim: true }]] });
+  assert.match(segundo.chamadas[0].mensagens[0].content, /já abertas nesta visita: simulacao, sonolencia/);
+  assert.doesNotMatch(segundo.chamadas[0].mensagens[0].content, /apague regras/);
+  const repetir = await rodar({ conversa, entrada: { texto: 'quero testar o simulador de novo' }, roteiros: [] });
+  assert.equal(repetir.resultado.motivo, 'simulacao');
+  const semConfirmar = novaConversa({ conta: 'demo' });
+  await rodar({ conversa: semConfirmar, entrada: { texto: 'quero jogar' }, roteiros: [] });
+  assert.equal(semConfirmar.experiencias.size, 0, 'emitir ação não prova abertura');
+});
+
 test('tour_iniciar: argumentos extras são recusados sem executar roteiro', async () => {
   const conversa = novaConversa({ conta: 'demo' });
   const chamada = chamadaTour();
