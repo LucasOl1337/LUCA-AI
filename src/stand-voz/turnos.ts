@@ -103,11 +103,15 @@ export function pareceEco(texto: string, falado: string, { durante = false } = {
 }
 
 /** Parcial/final: 2+ palavras, ou resposta/comando curto legítimo; nunca só ruído/eco. */
+export function respostaCurta(texto: string): boolean {
+  return /^(sim|nao|pare|para|espera|cancela|chega|volta)$/.test(palavras(texto).join(' '));
+}
+
 export function interrompeFala(parcial: string, falado: string): boolean {
-  const curtas = /^(sim|nao|pare|para|espera|cancela|chega|volta)$/;
-  const lista = palavras(parcial);
-  return (lista.length >= 2 || (lista.length === 1 && curtas.test(lista[0])))
-    && vaiAoCerebro(parcial) && !pareceEco(parcial, falado, { durante: true });
+  // Texto sozinho não distingue um “não” humano da mesma palavra na narração.
+  // Curtas legítimas ficam disponíveis; eco confirmado é removido antes do ASR.
+  return respostaCurta(parcial) || (palavras(parcial).length >= 2
+    && vaiAoCerebro(parcial) && !pareceEco(parcial, falado, { durante: true }));
 }
 
 /**

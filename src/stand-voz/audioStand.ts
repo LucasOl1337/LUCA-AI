@@ -3,6 +3,7 @@
  * a 24 kHz pelo worklet, saída com analisador para o lip-sync e a fila que
  * toca os pedaços de PCM em sequência.
  */
+import { registrarVoz } from './diagnosticoVoz';
 import { floatDeBase64Pcm16, nivelNormalizado, rms } from './protocolo';
 
 export const HZ_STAND = 24000;
@@ -90,6 +91,13 @@ export async function abrirAudio({ prazoWorkletMs = PRAZO_WORKLET_MS } = {}): Pr
   const microfone = await navigator.mediaDevices.getUserMedia({
     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
   });
+  const ajustes = microfone.getAudioTracks()[0]?.getSettings();
+  registrarVoz('captura', {
+    echoCancellation: ajustes?.echoCancellation ?? 'nao_informado',
+    noiseSuppression: ajustes?.noiseSuppression ?? 'nao_informado',
+    autoGainControl: ajustes?.autoGainControl ?? 'nao_informado',
+    sampleRate: ajustes?.sampleRate, channelCount: ajustes?.channelCount,
+  });
   let contexto: AudioContext;
   try {
     contexto = new AudioContext({ sampleRate: HZ_STAND, latencyHint: 'interactive' });
@@ -164,7 +172,11 @@ export class FilaDeVoz {
   private fontes = new Set<AudioBufferSourceNode>();
   private proximoInicio = 0;
 
-  constructor(private audio: Pick<AudioStand, 'contexto' | 'saida'>, private aoEsvaziar: () => void = () => {}) {}
+  constructor(
+    private audio: Pick<AudioStand, 'contexto' | 'saida'>,
+    private aoEsvaziar: () => void = () => {},
+    private aoAgendar: (pcm: Float32Array, inicio: number) => void = () => {},
+  ) {}
 
   get tocando(): boolean {
     return this.fontes.size > 0;
@@ -182,6 +194,7 @@ export class FilaDeVoz {
     fonte.connect(saida);
     const inicio = Math.max(contexto.currentTime + 0.02, this.proximoInicio);
     fonte.start(inicio);
+    this.aoAgendar(amostras, inicio);
     this.proximoInicio = inicio + buffer.duration;
     this.fontes.add(fonte);
     fonte.onended = () => {

@@ -9,11 +9,13 @@
 import type { EstadoStand } from '../../shared/stand/eventos.ts';
 import { abrirAudio, FilaDeVoz, HZ_STAND, type AudioStand } from './audioStand';
 import { assinarEventosPagina, emitirEventoStand } from './barramento';
+import { registrarVoz } from './diagnosticoVoz';
+import { ReferenciaEco } from './ecoPcm';
 import { SEM_FALA_MS } from './escuta';
 import { visaoTotem } from './visao';
 import { base64DePcm16, criarDetectorFala } from './protocolo';
 import type { EtapaSessao, FimSessao, SessaoDeVoz, SessaoServidor } from './sessaoVoz';
-import { eventoScribe, interrompeFala, lerNdjson, mensagemAudioScribe, pareceEco, vaiAoCerebro, valeEnquantoPensa, type LinhaTurno } from './turnos';
+import { eventoScribe, interrompeFala, lerNdjson, mensagemAudioScribe, pareceEco, respostaCurta, vaiAoCerebro, valeEnquantoPensa, type LinhaTurno } from './turnos';
 
 export interface SessaoServidorTurnos extends Omit<SessaoServidor, 'conexao'> {
   conexao: { transporte: 'scribe'; url: string };
@@ -53,6 +55,12 @@ export class SessaoTurnos implements SessaoDeVoz {
   private conversaId = '';
   private turno: AbortController | null = null;
   private detector = criarDetectorFala();
+  private referenciaEco = new ReferenciaEco();
+  private detectorIndependente = criarDetectorFala({ limiar: 0.015, minimoMs: 100 });
+  private falaIndependenteAte = 0;
+  private ultimoEco = false;
+  private sequenciaTurno = 0;
+  private idsTurno = new WeakMap<AbortController, number>();
   /** O que o LUCA falou no turno atual e no anterior, para descartar o próprio eco. */
   private falado = '';
   private faladoAnterior = '';
@@ -90,7 +98,7 @@ export class SessaoTurnos implements SessaoDeVoz {
     const audio = emprestimo?.audio ?? await abrirAudio();
     this.audio = audio;
     if (this.terminada) return this.soltarAudio();
-    this.fila = new FilaDeVoz(audio, () => this.aoFilaVazia());
+    this.fila = new FilaDeVoz(audio, () => this.aoFilaVazia(), (pcm, inicio) => this.referenciaEco.agendar(pcm, inicio));
 
     this.etapa = 'provedor';
     const ws = new WebSocket(dados.conexao.url);
@@ -211,7 +219,21 @@ export class SessaoTurnos implements SessaoDeVoz {
       this.ws.send(mensagemAudioScribe(SILENCIO_50MS, HZ_STAND));
       return;
     }
-    this.ws.send(mensagemAudioScribe(base64DePcm16(pcm), HZ_STAND));
+    const eco = this.referenciaEco.analisar(pcm, this.audio?.contexto.currentTime ?? 0);
+    if (eco.eco !== this.ultimoEco) {
+      registrarVoz('eco_pcm', { ...eco });
+      this.ultimoEco = eco.eco;
+    }
+    // Evidência local para não confundir um “Oi” humano (ou palavras que a
+    // narração também contém) com eco textual. Correspondência incerta passa
+    // ao ASR, mas só resíduo de voz sustentado libera esse caminho curto.
+    const independente = !eco.eco && (!eco.referencia || (eco.correlacao < 0.8 && eco.residual >= 0.015));
+    if (this.detectorIndependente.alimentar(independente ? nivel : 0, 50)) {
+      this.falaIndependenteAte = performance.now() + 2000;
+    }
+    // Mantém o relógio/VAD do Scribe vivo sem reenviar a própria voz como entrada.
+    this.ws.send(mensagemAudioScribe(eco.eco ? SILENCIO_50MS : base64DePcm16(pcm), HZ_STAND));
+    if (eco.eco) { this.detector.zerar(); return; }
     if (this.estado === 'falando' && this.detector.alimentar(nivel, 50)) this.abaixarVoz();
     if (this.estado !== 'falando') this.detector.zerar();
   }
@@ -246,14 +268,19 @@ export class SessaoTurnos implements SessaoDeVoz {
     }
     if (evento.tipo === 'outro' || this.videoTocando || !evento.texto) return;
     const durante = this.emFalaOuCauda();
-    if (pareceEco(evento.texto, this.textoFalado(), { durante })) return;
+    const independente = performance.now() < this.falaIndependenteAte;
+    registrarVoz('scribe', { ...evento, estado: this.estado, turno: this.sequenciaTurno, independente });
+    if (durante && !independente && !respostaCurta(evento.texto) && pareceEco(evento.texto, this.textoFalado(), { durante })) {
+      registrarVoz('eco_texto', { texto: evento.texto });
+      return;
+    }
     // Resposta a caminho: 1 palavra solta não atropela o turno. Na fala, "sim"
     // curto por cima do fim da pergunta do LUCA é resposta e continua valendo.
-    if (this.estado === 'pensando' && !valeEnquantoPensa(evento.texto, this.textoFalado())) return;
+    if (this.estado === 'pensando' && !independente && !valeEnquantoPensa(evento.texto, this.textoFalado())) return;
     if (evento.tipo === 'parcial') {
       if (this.estado === 'falando' || this.fila?.tocando) {
         // 2º tempo do barge-in: palavras de verdade por cima da fala.
-        if (interrompeFala(evento.texto, this.textoFalado())) this.interromper();
+        if (vaiAoCerebro(evento.texto) && (independente || interrompeFala(evento.texto, this.textoFalado()))) this.interromper();
         return;
       }
       if (!vaiAoCerebro(evento.texto)) return;
@@ -263,7 +290,7 @@ export class SessaoTurnos implements SessaoDeVoz {
       return;
     }
     // O final não pode contornar a mesma confirmação exigida da parcial.
-    if ((this.estado === 'falando' || this.fila?.tocando) && !interrompeFala(evento.texto, this.textoFalado())) return;
+    if (!independente && (this.estado === 'falando' || this.fila?.tocando) && !interrompeFala(evento.texto, this.textoFalado())) return;
     if (!vaiAoCerebro(evento.texto)) return;
     emitirEventoStand({ tipo: 'legenda', texto: evento.texto });
     void this.perguntar({ texto: evento.texto });
@@ -278,6 +305,7 @@ export class SessaoTurnos implements SessaoDeVoz {
   }
 
   private cortarFala(): void {
+    this.referenciaEco.cortar(this.audio?.contexto.currentTime ?? 0);
     this.fila?.cortar();
     this.limparLegendas();
     this.restaurarVoz();
@@ -308,7 +336,10 @@ export class SessaoTurnos implements SessaoDeVoz {
     this.turno?.abort();
     this.cortarFala();
     const controle = new AbortController();
+    const idTurno = ++this.sequenciaTurno;
+    this.idsTurno.set(controle, idTurno);
     this.turno = controle;
+    registrarVoz('envio', { turno: idTurno, ...entrada });
     window.clearTimeout(this.relogioSilencio);
     if ('texto' in entrada) this.mudarEstado('pensando');
     if (this.falado) this.faladoAnterior = this.falado;
@@ -338,7 +369,10 @@ export class SessaoTurnos implements SessaoDeVoz {
       for await (const linha of lerNdjson(resposta.body)) {
         if (controle.signal.aborted) return;
         fraseAudio = await this.aoLinha(linha, controle, fraseAudio);
-        if (linha.t === 'fim') fimTurno = linha;
+        if (linha.t === 'fim') {
+          fimTurno = linha;
+          registrarVoz('fim_turno', { turno: idTurno, motivo: linha.motivo });
+        }
       }
     } catch (erro) {
       if (controle.signal.aborted) return;
@@ -361,7 +395,7 @@ export class SessaoTurnos implements SessaoDeVoz {
   private async aoLinha(linha: LinhaTurno, controle: AbortController, legendaPendente: string): Promise<string> {
     switch (linha.t) {
       case 'frase':
-        this.falado = `${this.falado} ${linha.texto}`.trim();
+        registrarVoz('resposta', { turno: this.idsTurno.get(controle), texto: linha.texto });
         return linha.texto;
       case 'audio': {
         const inicio = this.fila?.tocar(linha.pcm);
@@ -369,7 +403,10 @@ export class SessaoTurnos implements SessaoDeVoz {
         this.mudarEstado('falando');
         if (legendaPendente) {
           const texto = legendaPendente;
-          this.legendas.push(window.setTimeout(() => emitirEventoStand({ tipo: 'legenda', texto }), this.fila.msAte(inicio)));
+          this.legendas.push(window.setTimeout(() => {
+            this.falado = `${this.falado} ${texto}`.trim();
+            emitirEventoStand({ tipo: 'legenda', texto });
+          }, this.fila.msAte(inicio)));
         }
         return '';
       }
