@@ -16,7 +16,7 @@ import { descreverPulos, disponiveis, montarItens } from '@/components/stand/vit
 import { TelaLab, TelaTrator, useTelasDoApp } from '@/components/stand/TelasDoApp';
 import { enviarAcaoSite } from '@/components/stand/executor/ponte';
 import { aguardarExecutor } from '@/components/stand/executor/prontidao';
-import { executarPlano, linhaDaTela, planejarAcao } from '@/components/stand/site/acaoDoStand';
+import { caminhoDaPagina as planejarCaminho, executarPlano, linhaDaTela, planejarAcao } from '@/components/stand/site/acaoDoStand';
 import { SiteStand } from '@/components/stand/site/SiteStand';
 import { avisoDeSaida, barraVisivel, modoInicial, modosDisponiveis, reduzirModo, type EntradaModo, type EstadoModo } from '@/components/stand/modoStand';
 import type { AcaoNavegacao } from '@/components/stand/navegacaoPad';
@@ -25,10 +25,11 @@ import { AvisoSaida, BarraModos, preCarregarSimulador, SimulacaoStand, VitrineSt
 import { PainelComandos } from '@/components/stand/PainelComandos';
 import { MenuTotem, type EstadoItem } from '@/components/stand/MenuTotem';
 import type { ItemCatalogo } from '../../shared/stand/catalogo.ts';
-import { TOUR_STAND } from '../../shared/stand/acoes-site.ts';
+import { TOUR_STAND, paginaDaAcao } from '../../shared/stand/acoes-site.ts';
 import type { ResultadoPlano } from '@/components/stand/site/acaoDoStand';
 import { SeloCamera, useCameraTotem, WebcamCoruja } from '@/components/stand/CameraTotem';
 import { EVENTO_EM_USO as EVENTO_GAMEPLAY_EM_USO } from '@/components/gameplay/eventoEmUso';
+import { SimulacaoComGuia } from '@/components/stand/GuiaSimulacao';
 import '@/stand.css';
 
 /** Margem segura padrão (% de cada lado): a moldura de MDF come as bordas. */
@@ -48,9 +49,9 @@ const ITENS_VITRINE = montarItens(VIDEOS_VITRINE);
 const STATUS_A_CADA_MS = 60_000;
 /**
  * Onde a escuta fica aberta: Coruja, Vitrine (r5 Q1, vídeo mudo) e o modo do site (Totem-Site).
- * Simulação não: é jogada no controle, com barulho de jogo e de gente em volta.
+ * Simulação usa a mesma sessão: pedidos de ajuda e retorno continuam chegando ao LUCA.
  */
-const MODOS_COM_ESCUTA: readonly string[] = ['coruja', 'vitrine', 'site'];
+const MODOS_COM_ESCUTA: readonly string[] = ['coruja', 'vitrine', 'site', 'simulacao'];
 
 function useStatusStand(ativo: boolean, fimSessao: unknown, aoPerderSessao: () => void) {
   const [status, setStatus] = useState<StatusStand | null>(null);
@@ -127,6 +128,7 @@ export default function StandPage() {
   falando.current = estado.voz === 'pensando' || estado.voz === 'falando';
   /** Falha de ação no site: só a equipe vê (canto da tela), some sozinha. */
   const [falhaSite, setFalhaSite] = useState('');
+  const experienciasAbertas = useRef(new Set<string>());
   const filaAcoes = useRef<Promise<void>>(Promise.resolve());
   /** Menu fixo (grill Totem interativo r1): grupo aberto, item em execução e o retorno. */
   const [menu, setMenu] = useState<{ aberto: boolean; grupo: string | null }>({ aberto: false, grupo: null });
@@ -143,7 +145,11 @@ export default function StandPage() {
       const plano = planejarAcao(acao, args, { modo: modoAtual.current, pagina: paginaAtual.current });
       return executarPlano(plano, { despacharModo, aguardarExecutor, enviarAcaoSite });
     }).then((r) => {
-      canal.current.enviar({ tipo: 'tela', texto: linhaDaTela(r) });
+      if (r.ok) {
+        const aberta = acao === 'abrir_pagina' ? String(args.pagina) : paginaDaAcao(acao);
+        if (aberta && ['vitrine', 'simulacao', 'sonolencia', 'sensor', 'laboratorio', 'sompo', 'inicio', 'luca_ai', 'gameplay', 'operador'].includes(aberta)) experienciasAbertas.current.add(aberta);
+      }
+      canal.current.enviar({ tipo: 'tela', texto: linhaDaTela(r, [...experienciasAbertas.current]) });
       if (!r.ok) {
         console.warn('[stand] ação no site falhou:', r.mensagem);
         canal.current.enviar({ tipo: 'acao_falhou' });
@@ -156,6 +162,21 @@ export default function StandPage() {
     filaAcoes.current = feito.then(() => undefined);
     return feito;
   }, []);
+
+  // Botão e voz registram abertura confirmada, nunca teste concluído.
+  useEffect(() => {
+    let vivo = true;
+    const registrar = async () => {
+      if (modo.modo === 'coruja') return;
+      if (modo.modo === 'site' && modo.pagina && !(await aguardarExecutor(planejarCaminho(modo.pagina)))) return;
+      if (!vivo) return;
+      const aberta = modo.modo === 'site' ? modo.pagina : modo.modo;
+      if (aberta) experienciasAbertas.current.add(aberta);
+      canal.current.enviar({ tipo: 'tela', texto: linhaDaTela({ ok: true, mensagem: `Tela atual: ${aberta}.` }, [...experienciasAbertas.current]) });
+    };
+    void registrar();
+    return () => { vivo = false; };
+  }, [modo.modo, modo.pagina]);
 
   const sair = useCallback(() => navigate({ page: 'inicio' }, 'push'), [navigate]);
 
@@ -202,10 +223,9 @@ export default function StandPage() {
     else void iniciarVoz(tocouNaEscuta() ?? undefined);
   }, [modoStub, iniciarVoz, tocouNaEscuta]);
 
-  // Saiu da Coruja: a conversa acaba e a Coruja volta limpa na Atração.
-  // No Site a coruja segue ouvindo e narra a página (contrato com a Totem-Voz).
+  // Vitrine encerra a conversa anterior. Site e Simulação preservam a mesma sessão.
   useEffect(() => {
-    if (modo.modo === 'coruja' || modo.modo === 'site') return;
+    if (modo.modo === 'coruja' || modo.modo === 'site' || modo.modo === 'simulacao') return;
     nivel.current = 0;
     despachar({ tipo: 'encerrar' });
     canal.current.enviar({ tipo: 'encerrar' });
@@ -336,6 +356,14 @@ export default function StandPage() {
     };
     const aoTeclar = (evento: KeyboardEvent) => {
       despacharModo({ tipo: 'atividade' });
+      if (modoAtual.current === 'simulacao') {
+        if (evento.key === 'Escape') {
+          despacharModo({ tipo: 'voltar_coruja' });
+          evento.preventDefault();
+        }
+        // WASD, espaço e R pertencem ao jogo, sem acionar atalhos de voz.
+        if (!(evento.shiftKey && evento.key.toLowerCase() === 'q')) return;
+      }
       if (tratarTecla(evento, atalhos)) evento.preventDefault();
     };
     window.addEventListener('keydown', aoTeclar);
@@ -413,7 +441,7 @@ export default function StandPage() {
       {modo.modo === 'vitrine' && (
         <VitrineStand item={itemVitrine} pausado={modo.pausado} aoTerminar={terminarVitrine} telaApp={telaApp} pulos={descreverPulos(telas.prontidao)} semSom={escutaLigada} />
       )}
-      {modo.modo === 'simulacao' && <SimulacaoStand />}
+      {modo.modo === 'simulacao' && <SimulacaoComGuia comVoz={comVoz && !modoStub}><SimulacaoStand /></SimulacaoComGuia>}
       {modo.modo === 'site' && modo.pagina && (
         <SiteStand pagina={modo.pagina} variante={variante} nivel={nivel} voz={estado.voz} legenda={estado.legenda} aoMexer={mexeuNoPad} />
       )}

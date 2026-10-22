@@ -179,3 +179,10 @@
   .gameplay-desafio.gameplay-percurso .gameplay-painel-cabine,
   .gameplay-desafio.gameplay-percurso .gameplay-mapa { bottom: 11.5cqh; }
 }
+
+/* Guia acompanha a família de comandos do dispositivo conectado. */
+.gameplay-comandos[data-entrada='teclado'] [data-dispositivo='ps5'],
+.gameplay-comandos[data-entrada='controle'] [data-dispositivo='teclado-mouse'] { display: none; }
+.gameplay-comandos-linha, .gameplay-comandos-itens { flex-wrap: wrap; white-space: normal; }
+.gameplay-comandos { font-size: clamp(14px, 1.6cqh, 20px); }
+.gameplay-painel-cabine > .gameplay-comandos { width: min(550px, 70cqw); box-sizing: border-box; }

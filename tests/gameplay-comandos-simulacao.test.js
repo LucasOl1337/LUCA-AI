@@ -28,15 +28,15 @@ test('ComandosSimulacao renderiza ícones SVG nítidos de PS5 DualSense e Teclad
   assert.match(html, /data-dispositivo="ps5"/);
   assert.match(html, /data-icone="ps5"/);
   assert.match(html, /<svg[^>]*data-icone="ps5"/);
-  assert.match(html, /<kbd>R2<\/kbd>\/<kbd>L2<\/kbd> Acelerar\/Frear/);
-  assert.match(html, /<kbd>L<\/kbd> Direção/);
-  assert.match(html, /<kbd>✕<\/kbd>\/<kbd>△<\/kbd> Ações/);
+  assert.match(html, /<kbd>R2 \/ RT<\/kbd> Acelerar · <kbd>L2 \/ LT<\/kbd> Frear/);
+  assert.match(html, /<kbd>Analógico esquerdo<\/kbd> Virar/);
+  assert.match(html, /<kbd>PS \/ Home<\/kbd> Coruja/);
 
   assert.match(html, /data-dispositivo="teclado-mouse"/);
   assert.match(html, /<svg[^>]*data-icone="teclado-mouse"/);
-  assert.match(html, /<kbd>WASD<\/kbd>\/<kbd>↑↓←→<\/kbd> Dirigir/);
+  assert.match(html, /<kbd>W \/ ↑<\/kbd> Acelerar · <kbd>S \/ ↓<\/kbd> Frear/);
   assert.match(html, /<kbd>Espaço<\/kbd> Freio/);
-  assert.match(html, /<kbd>Mouse<\/kbd> Olhar/);
+  assert.match(html, /<kbd>Esc<\/kbd> Voltar à Coruja no Totem/);
 });
 
 test('PainelCabine e DesafioCabine (usados na Simulação do /stand e em /gameplay) incluem o guia discreto de comandos', () => {
@@ -58,7 +58,7 @@ test('PainelCabine e DesafioCabine (usados na Simulação do /stand e em /gamepl
 
   const htmlDesafio = renderToStaticMarkup(createElement(DesafioCabine, { canal, som: false }));
   assert.match(htmlDesafio, /data-comandos-simulacao=""/);
-  assert.match(htmlDesafio, /Acelerar\/Frear/);
+  assert.match(htmlDesafio, /Acelerar/);
   assert.match(htmlDesafio, /Teclado\/Mouse/);
 });
 
