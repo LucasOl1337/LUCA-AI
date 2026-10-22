@@ -262,6 +262,8 @@ export class SessaoTurnos implements SessaoDeVoz {
       emitirEventoStand({ tipo: 'legenda', texto: evento.texto });
       return;
     }
+    // O final não pode contornar a mesma confirmação exigida da parcial.
+    if ((this.estado === 'falando' || this.fila?.tocando) && !interrompeFala(evento.texto, this.textoFalado())) return;
     if (!vaiAoCerebro(evento.texto)) return;
     emitirEventoStand({ tipo: 'legenda', texto: evento.texto });
     void this.perguntar({ texto: evento.texto });

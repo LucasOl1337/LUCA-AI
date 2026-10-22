@@ -102,9 +102,12 @@ export function pareceEco(texto: string, falado: string, { durante = false } = {
   return false;
 }
 
-/** Parcial que interrompe a fala do LUCA: 2+ palavras de verdade que não são eco. */
+/** Parcial/final: 2+ palavras, ou resposta/comando curto legítimo; nunca só ruído/eco. */
 export function interrompeFala(parcial: string, falado: string): boolean {
-  return palavras(parcial).length >= 2 && vaiAoCerebro(parcial) && !pareceEco(parcial, falado, { durante: true });
+  const curtas = /^(sim|nao|pare|para|espera|cancela|chega|volta)$/;
+  const lista = palavras(parcial);
+  return (lista.length >= 2 || (lista.length === 1 && curtas.test(lista[0])))
+    && vaiAoCerebro(parcial) && !pareceEco(parcial, falado, { durante: true });
 }
 
 /**
@@ -114,7 +117,7 @@ export function interrompeFala(parcial: string, falado: string): boolean {
  * (prova de 19/10, 67 s); isso não é o visitante e não pode atropelar a resposta.
  */
 export function valeEnquantoPensa(texto: string, falado: string): boolean {
-  return interrompeFala(texto, falado);
+  return palavras(texto).length >= 2 && interrompeFala(texto, falado);
 }
 
 /**
