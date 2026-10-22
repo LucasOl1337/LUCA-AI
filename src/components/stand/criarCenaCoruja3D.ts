@@ -67,6 +67,18 @@ function criarTelaOlhos() {
   return { ctx, textura, material };
 }
 
+/**
+ * Recorte dos olhos pintados. Sem `Image` (servidor, testes sem DOM) ou com
+ * falha no carregamento devolve null, e a tela fica transparente: o olho pintado
+ * do modelo aparece parado, sem derrubar a cena.
+ */
+function carregarRecorte(url: string): Promise<HTMLImageElement | null> {
+  if (typeof Image === 'undefined') return Promise.resolve(null);
+  const imagem = new Image();
+  imagem.src = url;
+  return imagem.decode().then(() => imagem, () => null);
+}
+
 function liberar(raiz: THREE.Object3D) {
   const materiais = new Set<THREE.Material>();
   const texturas = new Set<THREE.Texture>();
@@ -262,9 +274,7 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
   canvas.addEventListener('webglcontextlost', contextoPerdido);
 
   const pastaPublica = CORUJA_3D_PUBLICO.replace(/[^/]+$/, '');
-  const imagemOlhos = new Image();
-  imagemOlhos.src = pastaPublica + OLHOS_RECORTE;
-  const recortePronto = imagemOlhos.decode().then(() => imagemOlhos, () => null);
+  const recortePronto = carregarRecorte(pastaPublica + OLHOS_RECORTE);
 
   (async () => {
     const resposta = await fetch(CORUJA_3D_URL, { signal: abortar.signal });
