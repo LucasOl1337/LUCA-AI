@@ -70,7 +70,7 @@ export const CATALOGO: readonly GrupoCatalogo[] = Object.freeze(([
   {
     id: 'simulacao', titulo: 'Dirigir o trator', faz: 'Simulação: você dirige o Trator MAX',
     itens: [
-      acao('simulacao', 'Abrir a Simulação no totem', 'abrir_simulacao', {}, { detalhe: 'Cabine do gameplay em tela cheia; pegue o controle' }),
+      acao('simulacao', 'Abrir a Simulação no totem', 'abrir_simulacao', {}, { detalhe: 'Percurso guiado (fardo, encosta, área alagada) ou condução livre; pegue o controle' }),
       acao('gameplay', 'Página do Gameplay', 'abrir_pagina', { pagina: 'gameplay' }, { detalhe: 'Instruções e cabine jogável' }),
       acao('operador', 'Painel do operador', 'abrir_pagina', { pagina: 'operador' }, { detalhe: 'O gameplay ao vivo, como no tablet' }),
     ],
