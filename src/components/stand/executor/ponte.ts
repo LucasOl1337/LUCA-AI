@@ -5,11 +5,13 @@
  * Uso na página do stand: `assinarEventosCerebro(ev => ev.tipo === 'acao_site' && enviarAcaoSite(ev.acao, ev.args))`.
  */
 import { CANAL_STAND, type AcaoSiteResultado } from '../../../../shared/stand/acoes-site.ts';
+import { idDoStand, mensagemDoMeuStand } from './escopo';
 
 const PRAZO_MS = 90_000;
 
 export function enviarAcaoSite(acao: string, args: Record<string, unknown> = {}): Promise<AcaoSiteResultado> {
   const id = `acao-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const stand = idDoStand();
   return new Promise((resolver) => {
     const canal = new BroadcastChannel(CANAL_STAND);
     const fim = (resultado: AcaoSiteResultado) => {
@@ -22,8 +24,8 @@ export function enviarAcaoSite(acao: string, args: Record<string, unknown> = {})
       mensagem: 'O painel não respondeu. Confira se a janela do app está aberta com ?stand=1.',
     }), PRAZO_MS);
     canal.onmessage = ({ data }) => {
-      if (data?.tipo === 'acao_site_resultado' && data.id === id) fim(data as AcaoSiteResultado);
+      if (data?.tipo === 'acao_site_resultado' && data.id === id && mensagemDoMeuStand(data, stand)) fim(data as AcaoSiteResultado);
     };
-    canal.postMessage({ tipo: 'acao_site', id, acao, args });
+    canal.postMessage({ tipo: 'acao_site', id, acao, args, stand });
   });
 }

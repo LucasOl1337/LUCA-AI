@@ -51,7 +51,8 @@ export function motivoSemVoz(status: StatusStand | null, fim: Fim, agora = Date.
 /** Chamada da Atração sem voz (grill r1, Q12): nada de microfone. */
 export function chamadaSemVoz(controleConectado: boolean): { titulo: string; sub: string } {
   return controleConectado
-    ? { titulo: 'Pega o controle e aperta R1', sub: 'ou toca aqui' }
+    // ✕ na Coruja sem voz mostra a Vitrine (L1/R1 não trocam mais de modo, 21/10).
+    ? { titulo: 'Toca aqui pra ver o LUCA\u2011AI em ação', sub: 'ou aperta ✕ no controle' }
     // U+2011 (hífen inseparável): "LUCA-" e "AI" não se separam na quebra de linha.
     : { titulo: 'Toca aqui pra ver o LUCA\u2011AI em ação', sub: '' };
 }

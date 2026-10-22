@@ -20,11 +20,9 @@ test('sem login a Vitrine só tem os vídeos públicos do manifesto', async () =
   assert.deepEqual([...MODOS_SEM_LOGIN], ['coruja', 'vitrine']);
 });
 
-test('pad sem login: ✕ na Coruja abre a Vitrine, L1/R1 alternam e Simulação/Site não entram', () => {
+test('pad sem login: ✕ na Coruja abre a Vitrine e Simulação/Site não entram', () => {
   assert.deepEqual(entradaSemLogin({ tipo: 'conversar' }, 'coruja'), { tipo: 'ir', modo: 'vitrine' });
   assert.deepEqual(entradaSemLogin({ tipo: 'conversar' }, 'vitrine'), { tipo: 'atividade' });
-  assert.deepEqual(entradaSemLogin({ tipo: 'passo', direcao: 1 }, 'coruja'), { tipo: 'ir', modo: 'vitrine' });
-  assert.deepEqual(entradaSemLogin({ tipo: 'passo', direcao: -1 }, 'vitrine'), { tipo: 'ir', modo: 'coruja' });
   assert.deepEqual(entradaSemLogin({ tipo: 'ir', modo: 'simulacao' }, 'coruja'), { tipo: 'atividade' });
   assert.deepEqual(entradaSemLogin({ tipo: 'ir', modo: 'site' }, 'coruja'), { tipo: 'atividade' });
   assert.deepEqual(entradaSemLogin({ tipo: 'ir', modo: 'coruja' }, 'vitrine'), { tipo: 'ir', modo: 'coruja' });

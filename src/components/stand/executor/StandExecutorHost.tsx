@@ -15,6 +15,7 @@ import { destacar, mostrarRotulo } from './cursor';
 import { FalhaAcao, criarPassos } from './passos';
 import { EMBUTIDO_NO_STAND } from './embutido';
 import { responderPing } from './prontidao';
+import { idDoStandPai, mensagemDoMeuStand } from './escopo';
 import { leitorDoDocumento, retratoDaPagina } from './retrato';
 import './executor.css';
 
@@ -42,17 +43,18 @@ function StandExecutor() {
     const executar = criarPassos(els);
     let fila = Promise.resolve();
     let vivo = true;
+    const meuStand = idDoStandPai();
 
     const responder = (resultado: Omit<AcaoSiteResultado, 'tipo'>) => {
       if (!vivo) return;
       const retrato = retratoDaPagina(window.location.pathname, leitorDoDocumento(document));
-      canal.postMessage({ tipo: 'acao_site_resultado', ...resultado, retrato } satisfies AcaoSiteResultado);
+      canal.postMessage({ tipo: 'acao_site_resultado', ...resultado, retrato, ...(meuStand ? { stand: meuStand } : {}) } satisfies AcaoSiteResultado);
     };
 
     canal.onmessage = (mensagem) => {
       const evento = mensagem.data;
-      if (responderPing(canal, evento, window.location.pathname)) return;
-      if (!ehEvento(evento)) return;
+      if (responderPing(canal, evento, window.location.pathname, () => retratoDaPagina(window.location.pathname, leitorDoDocumento(document)), meuStand)) return;
+      if (!ehEvento(evento) || !mensagemDoMeuStand(evento, meuStand)) return;
       fila = fila.then(async () => {
         const validado = validarAcaoSite(evento.acao, evento.args);
         if (!validado.ok) {

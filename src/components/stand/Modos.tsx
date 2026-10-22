@@ -1,15 +1,16 @@
 import { lazy, memo, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { MODOS, ROTULO_MODO, type Modo } from './modoStand';
 import type { ItemVitrine } from './vitrineStand';
+import { WebcamSimulacao } from './CameraTotem';
 
 /** Vitrine, Simulação e a barra de modos do totem (grill r1, Q1–Q7). */
 
 const carregarSimulador = () => import('./SimuladorKiosk');
 const SimuladorKiosk = lazy(carregarSimulador);
 
-/** Pré-carrega o simulador (Three.js) quando a página sossega, pra Simulação abrir rápido. */
+/** Pré-carrega o simulador (Three.js) e o chunk do gameplay quando a página sossega, pra Simulação abrir rápido. */
 export function preCarregarSimulador() {
-  void carregarSimulador();
+  void carregarSimulador().then((m) => m.preCarregarGameplay()).catch(() => undefined);
 }
 
 /**
@@ -62,24 +63,33 @@ export function VitrineStand({ item, pausado, aoTerminar, telaApp, pulos, semSom
   );
 }
 
-/** Simulação: o simulador do Trator MAX direto, na cabine, sem cabeçalho nem painel. Memo: o relógio da página não re-renderiza o 3D. */
+/**
+ * Simulação: o simulador do Trator MAX direto, na cabine, sem cabeçalho nem painel.
+ * A webcam do Totem aparece no canto: olhos fechados por 1 s acendem o alarme da cabine.
+ * Memo: o relógio da página não re-renderiza o 3D.
+ */
 export const SimulacaoStand = memo(function SimulacaoStand() {
   return (
     <section className="stand-simulacao" aria-label="Simulação do Trator MAX">
       <Suspense fallback={<p className="stand-simulacao-carregando" role="status">Ligando o trator…</p>}>
         <SimuladorKiosk />
       </Suspense>
+      <WebcamSimulacao />
     </section>
   );
 });
 
-export function BarraModos({ modo, modos = MODOS, visivel, aoEscolher }: { modo: Modo; modos?: readonly Modo[]; visivel: boolean; aoEscolher(modo: Modo): void }) {
+/** Atalho da barra que não é modo (ex.: Sonolência abre a página no modo Site). */
+export interface AtalhoBarra { id: string; rotulo: string; ativo: boolean; aoEscolher(): void }
+
+export function BarraModos({ modo, modos = MODOS, visivel, aoEscolher, atalhos = [] }: { modo: Modo; modos?: readonly Modo[]; visivel: boolean; aoEscolher(modo: Modo): void; atalhos?: readonly AtalhoBarra[] }) {
   return (
     <nav className="stand-barra" aria-label="Modo do stand" data-visivel={visivel || undefined}>
       {modos.map((m) => (
         <button
           key={m}
           type="button"
+          data-modo={m}
           aria-pressed={m === modo}
           tabIndex={visivel ? 0 : -1}
           onPointerDown={(evento) => { evento.stopPropagation(); aoEscolher(m); }}
@@ -87,15 +97,19 @@ export function BarraModos({ modo, modos = MODOS, visivel, aoEscolher }: { modo:
           {ROTULO_MODO[m]}
         </button>
       ))}
+      {atalhos.map((a) => (
+        <button
+          key={a.id}
+          type="button"
+          data-atalho={a.id}
+          aria-pressed={a.ativo}
+          tabIndex={visivel ? 0 : -1}
+          onPointerDown={(evento) => { evento.stopPropagation(); a.aoEscolher(); }}
+        >
+          {a.rotulo}
+        </button>
+      ))}
     </nav>
-  );
-}
-
-export function DicaControle({ modo }: { modo: Modo }) {
-  return (
-    <p className="stand-dica" aria-hidden="true">
-      <kbd>L1</kbd> ◀ {ROTULO_MODO[modo]} ▶ <kbd>R1</kbd>
-    </p>
   );
 }
 

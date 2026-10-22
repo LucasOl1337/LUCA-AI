@@ -8,7 +8,7 @@ import { montarItens } from '@/components/stand/vitrineStand';
 import { modoInicial, reduzirModo, type EntradaModo, type EstadoModo, type Modo } from '@/components/stand/modoStand';
 import type { AcaoNavegacao } from '@/components/stand/navegacaoPad';
 import { usePadStand } from '@/components/stand/usePadStand';
-import { BarraModos, DicaControle, VitrineStand } from '@/components/stand/Modos';
+import { BarraModos, VitrineStand } from '@/components/stand/Modos';
 import AuthPage from '@/pages/AuthPage';
 import '@/stand.css';
 
@@ -31,7 +31,6 @@ const reduzirAgora = (atual: EstadoModo, entrada: EntradaModo) => reduzirModo(at
 /** Pad e barra só alternam entre Coruja e Vitrine; ✕ na Coruja mostra a Vitrine (não há voz). */
 export function entradaSemLogin(acao: AcaoNavegacao, modo: Modo): EntradaModo | null {
   if (acao.tipo === 'conversar') return modo === 'coruja' ? { tipo: 'ir', modo: 'vitrine' } : { tipo: 'atividade' };
-  if (acao.tipo === 'passo') return { tipo: 'ir', modo: modo === 'coruja' ? 'vitrine' : 'coruja' };
   if (acao.tipo === 'ir') return MODOS_SEM_LOGIN.includes(acao.modo) ? acao : { tipo: 'atividade' };
   return acao;
 }
@@ -76,7 +75,8 @@ export default function StandSemLogin({ offline = false }: { offline?: boolean }
   const { conectado } = usePadStand({ modo: modo.modo, aoAgir: agirNoPad, aoMexer: mexeuNoPad });
   const chamada = chamadaSemVoz(conectado);
   const nivel = useRef(0);
-  const barraVisivel = agora < modo.barraAte;
+  // Barra permanente (grill Totem interativo r1, Q6): o primeiro toque já troca o modo.
+  const barraVisivel = true;
 
   // Login só quando a equipe pede (AuthPage); ao entrar, o main.tsx troca para o StandPage em /stand.
   if (entrando) return <AuthPage />;
@@ -108,7 +108,6 @@ export default function StandSemLogin({ offline = false }: { offline?: boolean }
         <VitrineStand item={ITENS_SEM_LOGIN[modo.video]} pausado={modo.pausado} aoTerminar={() => despachar({ tipo: 'video_terminou' })} />
       )}
       <div className="stand-seguro stand-camada">
-        {conectado && <DicaControle modo={modo.modo} />}
         {/* Só na Coruja: na Vitrine o canto de cima é do selo queimado no vídeo. O repouso volta à Coruja a cada volta. */}
         {modo.modo === 'coruja' && <p className="stand-aviso-equipe stand-aviso-sem-login" role="status">{offline ? 'sem rede · vídeos salvos neste aparelho · a conversa volta quando reconectar' : AVISO_SEM_LOGIN}</p>}
         <BarraModos modo={modo.modo} modos={MODOS_SEM_LOGIN} visivel={barraVisivel} aoEscolher={(m) => { despachar({ tipo: 'atividade', toque: true }); despachar({ tipo: 'ir', modo: m }); }} />

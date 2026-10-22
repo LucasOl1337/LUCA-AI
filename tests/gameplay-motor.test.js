@@ -125,9 +125,10 @@ test('aro do volante: esterço ±1 = ±1 volta, sem -0', () => {
   assert.equal(anguloAroRad(Number.NaN), 0);
 });
 
-test('?simulacao: só "gameplay" liga o gameplay; padrão é a clássica', { skip: !varianteSimulacao }, () => {
-  assert.equal(varianteSimulacao(''), 'classica');
+test('?simulacao: padrão é o gameplay; só "classica" força o simulador clássico', { skip: !varianteSimulacao }, () => {
+  assert.equal(varianteSimulacao(''), 'gameplay');
   assert.equal(varianteSimulacao('?simulacao=classica'), 'classica');
   assert.equal(varianteSimulacao('?simulacao=gameplay'), 'gameplay');
-  assert.equal(varianteSimulacao('?simulacao=GAMEPLAY'), 'classica');
+  assert.equal(varianteSimulacao('?simulacao=CLASSICA'), 'gameplay');
+  assert.equal(varianteSimulacao('?stub=1'), 'gameplay');
 });

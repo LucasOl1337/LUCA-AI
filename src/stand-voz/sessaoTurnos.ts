@@ -10,6 +10,7 @@ import type { EstadoStand } from '../../shared/stand/eventos.ts';
 import { abrirAudio, FilaDeVoz, HZ_STAND, type AudioStand } from './audioStand';
 import { assinarEventosPagina, emitirEventoStand } from './barramento';
 import { SEM_FALA_MS } from './escuta';
+import { visaoTotem } from './visao';
 import { base64DePcm16, criarDetectorFala } from './protocolo';
 import type { EtapaSessao, FimSessao, SessaoDeVoz, SessaoServidor } from './sessaoVoz';
 import { eventoScribe, interrompeFala, lerNdjson, mensagemAudioScribe, pareceEco, vaiAoCerebro, valeEnquantoPensa, type LinhaTurno } from './turnos';
@@ -117,6 +118,11 @@ export class SessaoTurnos implements SessaoDeVoz {
       }
       // Guardar a tela não mexe no estado da sessão.
       if (evento.tipo === 'tela') this.tela = evento.texto;
+      // Pergunta do menu (toque ou texto): mesmo turno que a fala transcrita.
+      if (evento.tipo === 'pergunta_texto' && !this.videoTocando) {
+        emitirEventoStand({ tipo: 'legenda', texto: evento.texto });
+        void this.perguntar({ texto: evento.texto });
+      }
       // Falha na tela vira fala pronta na hora; antes da 1ª palavra (despertar
       // discreto, sessão ainda ociosa) não dispara nada.
       if (evento.tipo === 'acao_falhou' && this.estado !== 'ocioso' && !this.videoTocando) {
@@ -311,12 +317,14 @@ export class SessaoTurnos implements SessaoDeVoz {
     if ('texto' in entrada) this.falhaPendente = false;
     const tela = 'texto' in entrada ? this.tela : '';
     if (tela) this.tela = '';
+    // Webcam do Totem: só presença de rosto, detectada no navegador (visao.ts); nunca imagem.
+    const camera = 'texto' in entrada ? visaoTotem.ler() : '';
     try {
       const resposta = await fetch('/api/stand/turno', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversa_id: this.conversaId, ...entrada, ...(tela ? { tela } : {}) }),
+        body: JSON.stringify({ conversa_id: this.conversaId, ...entrada, ...(tela ? { tela } : {}), ...(camera ? { camera } : {}) }),
         signal: controle.signal,
       });
       if (resposta.status === 503) {

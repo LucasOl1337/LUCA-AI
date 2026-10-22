@@ -3,6 +3,7 @@ import { Camera, CameraOff, Eye, ShieldCheck, Square, Volume2 } from 'lucide-rea
 import { DrowsinessAlarm } from './alarm';
 import { formatCameraQuality } from './camera.js';
 import { CLOSED_DURATION_MS, SENSITIVITY_THRESHOLDS, normalizeEyeClosure, type EyeReading, type EyeSample } from './eye-state.js';
+import { cameraDoTotem } from './cameraDoTotem';
 import { criarMonitorSonolencia, EMPTY_READING, faltaNoNavegador, mensagemErroCamera, type MonitorSonolencia } from './monitor';
 import './sonolencia.css';
 
@@ -99,6 +100,8 @@ export default function SonolenciaPage() {
       session.monitor = criarMonitorSonolencia({
         video: video.current!,
         limiar: SENSITIVITY_THRESHOLDS[sensitivity],
+        // No Totem (iframe do /stand) usa a webcam que o Totem já mantém ligada.
+        abrirCamera: cameraDoTotem(),
         aoEtapa: () => setMessage('Preparando detector de olhos. Na primeira vez, isso pode levar alguns segundos…'),
         verificar: () => (alarm.available ? null : 'O áudio foi interrompido. Ative o monitor novamente para rearmar o alarme.'),
         aoLer: (next, sample) => {

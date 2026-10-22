@@ -33,6 +33,10 @@ export const PAGINAS_SITE = Object.freeze({
   laboratorio: '/laboratorio',
   sensor: '/sensor',
   sonolencia: '/sonolencia',
+  // Destinos explícitos do menu do Totem (grill Totem interativo r1, Q4): o
+  // Gameplay da página e o painel do operador, além da Simulação.
+  gameplay: '/gameplay',
+  operador: '/operador',
 } as const);
 export type PaginaSite = keyof typeof PAGINAS_SITE;
 export const IDS_PAGINAS = Object.keys(PAGINAS_SITE) as PaginaSite[];
@@ -84,7 +88,7 @@ export const ACOES_SITE: readonly AcaoSiteDef[] = Object.freeze(([
     descricao: 'Abre uma página do site no monitor do stand; a coruja fica pequena no canto e continua conversando. Diga em uma frase o que a página mostra.',
     args: {
       pagina: {
-        descricao: 'inicio = apresentação do LUCA-AI; luca_ai = bancada de agentes (só olhar); sompo = painel SOMPO; laboratorio = laboratório 3D da fazenda; sensor = laboratório do sensor (caminhão e trator em ensaios); sonolencia = monitor de sonolência pela webcam.',
+        descricao: 'inicio = apresentação do LUCA-AI; luca_ai = bancada de agentes (só olhar); sompo = painel SOMPO; laboratorio = laboratório 3D da fazenda; sensor = laboratório do sensor (caminhão e trator em ensaios); sonolencia = monitor de sonolência pela webcam; gameplay = página do Gameplay (instruções e cabine; para dirigir no totem prefira abrir_simulacao); operador = painel do operador com o gameplay ao vivo.',
         valores: IDS_PAGINAS,
       },
     },
@@ -281,9 +285,10 @@ export function ferramentasAcaoSite(formato: 'realtime' | 'chat' = 'realtime') {
 }
 
 /** Página do stand → executor. `id` correlaciona com o resultado. */
-export interface AcaoSiteEvento { tipo: 'acao_site'; id: string; acao: string; args: Record<string, unknown> }
+/** `stand`: id da janela de /stand que pediu (escopo do canal; ausente em versões antigas). */
+export interface AcaoSiteEvento { tipo: 'acao_site'; id: string; acao: string; args: Record<string, unknown>; stand?: string }
 /**
  * Executor → página do stand. `mensagem` é em PT-BR, pronta pra IA falar.
  * `retrato`: o que a página mostra depois da ação (≤200 caracteres, uma linha).
  */
-export interface AcaoSiteResultado { tipo: 'acao_site_resultado'; id: string; ok: boolean; mensagem: string; retrato?: string }
+export interface AcaoSiteResultado { tipo: 'acao_site_resultado'; id: string; ok: boolean; mensagem: string; retrato?: string; stand?: string }

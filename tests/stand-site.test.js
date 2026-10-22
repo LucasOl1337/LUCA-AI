@@ -8,17 +8,16 @@ const { dentroDoStand } = await loadFrontendModule('../../src/components/stand/e
 
 const passo = (estado, entrada, agora) => reduzirModo(estado, entrada, agora, 3);
 
-test('Site só existe com página aberta; L1/R1 pulam ele sem página', () => {
+test('Site só existe com página aberta; a barra guarda a página ao passar pra outro modo', () => {
   let e = modoInicial(0);
   assert.deepEqual(modosDisponiveis(e), ['coruja', 'vitrine', 'simulacao']);
-  assert.equal(passo(e, { tipo: 'passo', direcao: 1 }, 1).modo, 'vitrine');
   assert.equal(passo(e, { tipo: 'ir', modo: 'site' }, 1).modo, 'coruja', 'barra não abre Site vazio');
   e = passo(e, { tipo: 'abrir_pagina', pagina: 'sensor' }, 2);
   assert.deepEqual([e.modo, e.pagina], ['site', 'sensor']);
   assert.deepEqual(modosDisponiveis(e), ['coruja', 'site', 'vitrine', 'simulacao']);
-  const vitrine = passo(e, { tipo: 'passo', direcao: 1 }, 3);
-  assert.deepEqual([vitrine.modo, vitrine.pagina], ['vitrine', 'sensor'], 'L1/R1 guardam a página');
-  assert.equal(passo(vitrine, { tipo: 'passo', direcao: -1 }, 4).modo, 'site');
+  const vitrine = passo(e, { tipo: 'ir', modo: 'vitrine' }, 3);
+  assert.deepEqual([vitrine.modo, vitrine.pagina], ['vitrine', 'sensor'], 'a barra guarda a página');
+  assert.equal(passo(vitrine, { tipo: 'ir', modo: 'site' }, 4).modo, 'site');
 });
 
 test('PS, Coruja da barra e voltar_coruja fecham a página', () => {
@@ -132,4 +131,43 @@ test('plano: tour_iniciar solto não vai ao Executor (o cérebro manda o roteiro
   const r = planejarAcao('tour_iniciar', {}, { modo: 'coruja', pagina: null });
   assert.equal(r.ok, false);
   assert.match(r.motivo, /tour/);
+});
+
+test('retrato da bancada LUCA AI: só os templates prontos, sem missão nem chat (Totem B3)', () => {
+  const botoes = ['Aplicar preset Pesquisa rápida', 'Aplicar preset Revisão de código'];
+  const comGaleria = {
+    texto: () => null,
+    atributo: (s, n) => (s === '[data-luca-preset-gallery]' && n === 'data-luca-preset-gallery' ? 'Equipes prontas' : null),
+    todos: (s, n) => (n === 'aria-label' && s.includes('Aplicar preset') ? botoes : []),
+  };
+  assert.equal(retratoDaPagina('/luca-ai', comGaleria), 'Página LUCA AI. Equipes prontas: Pesquisa rápida, Revisão de código');
+  assert.equal(retratoDaPagina('/luca-ai', leitor()), 'Página LUCA AI', 'leitor sem lista ou galeria fechada: só o nome da página');
+});
+
+test('abrir_pagina só responde "Abri" quando a página sobe; traz o retrato dela (Totem B3)', async () => {
+  const modos = [];
+  const plano = planejarAcao('abrir_pagina', { pagina: 'luca_ai' }, { modo: 'coruja', pagina: null });
+  const pedidos = [];
+  const ok = await executarPlano(plano, {
+    despacharModo: (e) => modos.push(e.tipo),
+    aguardarExecutor: async (caminho) => { pedidos.push(caminho); return { retrato: 'Página LUCA AI. Equipes prontas: A, B' }; },
+    enviarAcaoSite: async () => { throw new Error('abrir página não vai ao Executor'); },
+  });
+  assert.deepEqual(ok, { ok: true, mensagem: 'Abri a página luca_ai.', retrato: 'Página LUCA AI. Equipes prontas: A, B' });
+  assert.deepEqual(pedidos, ['/luca-ai']);
+  modos.length = 0;
+  const caiu = await executarPlano(plano, { despacharModo: (e) => modos.push(e.tipo), aguardarExecutor: async () => false, enviarAcaoSite: async () => ({ ok: true, mensagem: '' }) });
+  assert.equal(caiu.ok, false);
+  assert.match(caiu.mensagem, /não carregou/);
+  assert.deepEqual(modos, ['abrir_pagina', 'voltar_coruja']);
+  // Executor antigo (sem retrato no pronto): continua valendo.
+  assert.deepEqual(await executarPlano(plano, { despacharModo: () => {}, aguardarExecutor: async () => true, enviarAcaoSite: async () => ({ ok: true, mensagem: '' }) }), { ok: true, mensagem: 'Abri a página luca_ai.' });
+});
+
+test('controle com página fechada espera uma vez só (abrir + executor)', async () => {
+  const pedidos = [];
+  const plano = planejarAcao('sensor_pausar', {}, { modo: 'coruja', pagina: null });
+  const r = await executarPlano(plano, { despacharModo: () => {}, aguardarExecutor: async (c) => { pedidos.push(c); return {}; }, enviarAcaoSite: async () => ({ ok: true, mensagem: 'Ensaio pausado.' }) });
+  assert.deepEqual(r, { ok: true, mensagem: 'Ensaio pausado.' });
+  assert.deepEqual(pedidos, ['/sensor']);
 });

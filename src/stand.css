@@ -110,7 +110,7 @@
 .stand-camada { pointer-events: none; z-index: 20; }
 .stand-camada > * { pointer-events: auto; }
 
-/* Barra de modos: 3 botões discretos na borda de baixo da área segura; some 5 s depois do toque. */
+/* Barra de modos: permanente na borda de baixo da área segura (grill Totem interativo r1, Q6). */
 .stand-barra {
   position: absolute; left: 50%; bottom: 0; transform: translate(-50%, 1vmin);
   display: flex; gap: 1vmin; padding: 0.8vmin; border-radius: 999px;
@@ -129,26 +129,9 @@
 }
 .stand-barra button[aria-pressed='true'] { background: rgba(10, 132, 255, 0.85); color: #fff; }
 
-/* Dica do controle: pequena, no canto de cima à esquerda (o selo fica à direita). */
-.stand-dica {
-  position: absolute; top: 0; left: 0; margin: 0; display: inline-flex; align-items: center; gap: 1vmin;
-  padding: 0.6vmin 1.6vmin; border-radius: 999px; background: rgba(9, 12, 17, 0.6);
-  font: 600 clamp(12px, 1.9vmin, 30px) 'Stand Outfit', system-ui, sans-serif; color: rgba(255, 255, 255, 0.72);
-  pointer-events: none !important;
-}
-.stand-dica kbd { font: inherit; font-weight: 800; padding: 0.1vmin 0.9vmin; border-radius: 0.6vmin; background: rgba(255, 255, 255, 0.14); color: #fff; }
-/* Na Simulação o canto de cima à esquerda é dos selos do simulador (ESP32 virtual, SIMULADO); a dica vai pro centro do topo. */
-.stand[data-modo='simulacao'] .stand-dica { left: 50%; transform: translateX(-50%); white-space: nowrap; }
-/* No gameplay o centro do topo é da faixa de alerta ("Obstáculo a 1,5 m · freie"); a dica vai pro canto direito pra não cobrir o aviso. */
-.stand[data-modo='simulacao']:has([data-gameplay]) .stand-dica { left: auto; right: 0; transform: none; }
-/* Em pé não sobra canto ao lado da faixa: a dica desce pra baixo dela. */
-@media (orientation: portrait) {
-  .stand[data-modo='simulacao']:has([data-gameplay]) .stand-dica { right: auto; left: 50%; top: 10vh; transform: translateX(-50%); }
-}
-
 /* Linha fixa da Escuta: no rodapé; na Vitrine sobe para baixo do título (a legenda queimada ocupa o rodapé). */
 .stand-linha-escuta {
-  position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); margin: 0; white-space: nowrap;
+  position: absolute; left: 50%; bottom: calc(var(--stand-reserva-barra) - 1vmin); transform: translateX(-50%); margin: 0; white-space: nowrap;
   padding: 0.5vmin 1.8vmin; border-radius: 999px; background: rgba(9, 12, 17, 0.6);
   font: 500 clamp(12px, 1.8vmin, 28px) 'Stand Outfit', system-ui, sans-serif; color: rgba(255, 255, 255, 0.7);
   pointer-events: none !important;
@@ -214,7 +197,7 @@
 .stand-tela-trator[data-alerta] .stand-trator-figura svg { color: #ff9f0a; }
 @media (orientation: portrait) {
   .stand-tela-trator { grid-template-columns: 1fr; align-content: center; }
-  /* Em pé a dica L1/R1 ocupa o canto: o título desce uma linha e pode usar a largura toda. */
+  /* Em pé o título desce uma linha e pode usar a largura toda. */
   .stand-vitrine-legenda { top: calc(var(--stand-margem) + 6vmin); max-width: 90%; }
 }
 .stand-aviso-mudo { right: var(--stand-margem); bottom: calc(var(--stand-margem) / 2); }
@@ -231,6 +214,20 @@
 .stand-simulacao .is-kiosk .sompo-simulator-stage { height: 100%; min-height: 0; aspect-ratio: auto; border-radius: 0; }
 /* Cenários no meio da borda direita: embaixo ficam os botões de câmera e a barra de modos. */
 .stand-simulacao .is-kiosk .sompo-fp-scenarios { bottom: auto; top: 50%; transform: translateY(-50%); }
+/* Webcam de sonolência na Simulação do Totem: o quadro do /gameplay?webcam=1 dentro da área segura (a moldura come as bordas). */
+.stand-simulacao .stand-webcam-simulacao { top: var(--stand-margem); right: var(--stand-margem); width: clamp(150px, 15vw, 240px); font-size: clamp(11px, 1.4vh, 14px); }
+/* Coruja (Lucas, 21/10): a pessoa se vê no canto inferior esquerdo; a coluna da direita é o "Experimente pedir". */
+.stand-seguro .stand-webcam-coruja { top: auto; right: auto; left: 0; bottom: var(--stand-reserva-barra); width: clamp(170px, 17vw, 300px); font-size: clamp(12px, 1.6vh, 16px); }
+.stand-webcam-coruja[data-presenca='rosto'] { border-color: #4fbf7a99; }
+.stand-webcam-coruja[data-presenca='rosto'] .gameplay-webcam-ponto { background: #4fbf7a; }
+/* Selo de câmera ligada: transparência para quem está na frente, sem disputar com a barra. */
+.stand-selo-camera {
+  position: absolute; left: 0; top: 0; margin: 0; padding: 0.6vmin 1.4vmin; border-radius: 999px;
+  font-size: 1.5vmin; color: rgba(255, 255, 255, 0.62); background: rgba(4, 7, 11, 0.45); pointer-events: none;
+}
+.stand-selo-camera::first-letter { color: #e5483b; }
+/* No Site a página (ex.: /sonolencia) já mostra a câmera; o selo cobriria o vídeo dela. */
+.stand[data-modo='site'] .stand-selo-camera { display: none; }
 
 /* Site (Totem-Site Q6): a página ocupa a área segura; a coruja fica pequena no canto inferior direito. */
 .stand-site { position: absolute; inset: var(--stand-margem); display: grid; grid-template-columns: minmax(0, 1fr) 22vmin; gap: 1.6vmin; }
@@ -262,7 +259,13 @@
 }
 .stand-comandos-titulo { margin: 0; font-size: clamp(16px, 2.4vmin, 40px); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #64d2ff; }
 .stand-comandos-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.3vmin; }
-.stand-comando { display: flex; flex-direction: column; gap: 0.3vmin; padding-left: 1.6vmin; border-left: 0.5vmin solid rgba(10, 132, 255, 0.75); }
+.stand-comando {
+  display: flex; flex-direction: column; gap: 0.3vmin; width: 100%; text-align: left; cursor: pointer;
+  padding: 0.6vmin 1vmin 0.6vmin 1.6vmin; border: 0; border-left: 0.5vmin solid rgba(10, 132, 255, 0.75); border-radius: 0 1.2vmin 1.2vmin 0;
+  background: transparent; color: inherit; font: inherit;
+}
+.stand-comando:hover, .stand-comando:focus-visible { background: rgba(10, 132, 255, 0.16); outline: none; }
+.stand-comando:active { background: rgba(10, 132, 255, 0.3); }
 .stand-comando[data-comando='simulacao'] { border-left-color: var(--stand-verde); }
 .stand-comando-exemplo { font-size: clamp(18px, 2.7vmin, 46px); font-weight: 700; line-height: 1.15; color: #fff; text-wrap: balance; }
 /* Paisagem: o aviso da equipe sobe pro canto de cima à esquerda (abaixo da dica do controle), fora do painel e da barra. */
@@ -280,6 +283,72 @@
   .stand-seguro[data-painel] .stand-chamada-titulo { font-size: clamp(30px, 4.2vmax, 96px); }
   .stand-comandos { grid-column: 1; grid-row: 2; align-self: end; margin: 0 0 var(--stand-reserva-barra); max-height: none; }
   .stand[data-modo='coruja'][data-painel] .stand-barra { left: 50%; }
-  .stand-seguro[data-painel] > .stand-aviso-equipe { top: auto; bottom: 0; left: auto; right: 0; text-align: right; }
+  /* Barra permanente embaixo: aviso da equipe e webcam sobem para o topo, longe do painel. */
+  .stand-seguro[data-painel] > .stand-aviso-equipe { top: 0; bottom: auto; left: 50%; right: auto; transform: translateX(-50%); text-align: center; }
+  .stand-seguro[data-painel] .stand-webcam-coruja { top: 0; bottom: auto; }
   .stand-comandos-lista { grid-template-columns: 1fr 1fr; column-gap: 3vmin; row-gap: 1.8vmin; }
 }
+
+/* ── Menu fixo do Totem (shared/stand/catalogo.ts; grill Totem interativo r1) ── */
+.stand[data-modo='site'] .stand-site { bottom: calc(var(--stand-margem) + var(--stand-reserva-barra)); }
+.stand-barra button[data-atalho='menu'] { color: #fff; background: rgba(67, 209, 138, 0.22); border: 0.2vmin solid rgba(67, 209, 138, 0.6); }
+.stand-barra button[data-atalho='menu'][aria-pressed='true'] { background: var(--stand-verde); color: #06140c; }
+.stand-menu {
+  position: absolute; left: 50%; top: 0; bottom: var(--stand-reserva-barra); transform: translateX(-50%);
+  width: min(100%, 120vmin); display: flex; flex-direction: column; gap: 1.4vmin; padding: 2.4vmin 2.8vmin;
+  border-radius: 2.4vmin; border: 0.2vmin solid rgba(100, 210, 255, 0.35);
+  background: rgba(9, 12, 17, 0.94); backdrop-filter: blur(10px); color: #fff; z-index: 3;
+  font-family: 'Stand Outfit', system-ui, sans-serif;
+}
+.stand-menu-topo { display: flex; align-items: center; justify-content: space-between; gap: 2vmin; }
+.stand-menu-titulo { margin: 0; font-size: clamp(20px, 3.4vmin, 56px); font-weight: 800; }
+.stand-menu-voltar, .stand-menu-fechar {
+  min-height: 6.4vmin; padding: 0 2.4vmin; border-radius: 999px; border: 0.2vmin solid rgba(100, 210, 255, 0.45);
+  background: rgba(10, 132, 255, 0.16); color: #fff; font: 700 clamp(14px, 2.4vmin, 36px) 'Stand Outfit', system-ui, sans-serif; cursor: pointer;
+}
+.stand-menu-fechar { min-width: 6.4vmin; padding: 0; }
+.stand-menu-grupo { margin: 0; font-size: clamp(18px, 3vmin, 48px); font-weight: 800; color: #64d2ff; }
+.stand-menu-grupo span { font-weight: 500; color: rgba(255, 255, 255, 0.7); font-size: 0.7em; }
+.stand-menu-lista {
+  list-style: none; margin: 0; padding: 0 0.6vmin 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 34vmin), 1fr));
+  gap: 1.2vmin; overflow-y: auto; min-height: 0; flex: 1 1 auto; align-content: start;
+}
+.stand-menu-item {
+  display: flex; flex-direction: column; gap: 0.4vmin; width: 100%; min-height: 8vmin; padding: 1.4vmin 1.8vmin; text-align: left; cursor: pointer;
+  border-radius: 1.6vmin; border: 0.2vmin solid rgba(100, 210, 255, 0.3); background: rgba(10, 132, 255, 0.1); color: #fff; font-family: inherit;
+}
+.stand-menu-item:active:not(:disabled) { background: rgba(10, 132, 255, 0.32); }
+.stand-menu-item:disabled { opacity: 0.55; cursor: not-allowed; }
+.stand-menu-item[data-fase='executando'] { border-color: #64d2ff; opacity: 1; }
+.stand-menu-item[data-fase='ok'] { border-color: var(--stand-verde); }
+.stand-menu-item[data-fase='falha'] { border-color: #ff9f0a; }
+.stand-menu-rotulo { font-size: clamp(16px, 2.6vmin, 42px); font-weight: 700; line-height: 1.15; }
+.stand-menu-detalhe { font-size: clamp(12px, 1.8vmin, 28px); color: rgba(255, 255, 255, 0.68); line-height: 1.2; }
+.stand-menu-status, .stand-status-acao {
+  margin: 0; padding: 1.2vmin 1.8vmin; border-radius: 1.4vmin; font: 700 clamp(14px, 2.2vmin, 34px) 'Stand Outfit', system-ui, sans-serif;
+  background: rgba(10, 132, 255, 0.18); border: 0.2vmin solid rgba(100, 210, 255, 0.45); color: #fff;
+}
+.stand-menu-status[data-fase='falha'], .stand-status-acao[data-fase='falha'] { background: rgba(255, 159, 10, 0.16); border-color: rgba(255, 159, 10, 0.7); }
+.stand-menu-status[data-fase='ok'], .stand-status-acao[data-fase='ok'] { background: rgba(67, 209, 138, 0.16); border-color: rgba(67, 209, 138, 0.7); }
+.stand-status-acao { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--stand-reserva-barra) + 4vmin); z-index: 3; max-width: min(90%, 110vmin); text-align: center; text-wrap: balance; }
+.stand-menu-texto { display: flex; gap: 1.2vmin; }
+.stand-menu-texto input {
+  flex: 1 1 auto; min-width: 0; min-height: 6.4vmin; padding: 0 1.8vmin; border-radius: 1.4vmin; border: 0.2vmin solid rgba(100, 210, 255, 0.45);
+  background: rgba(255, 255, 255, 0.06); color: #fff; font: 500 clamp(14px, 2.2vmin, 34px) 'Stand Outfit', system-ui, sans-serif;
+}
+.stand-menu-texto button {
+  min-height: 6.4vmin; padding: 0 2.6vmin; border-radius: 1.4vmin; border: 0; background: rgba(10, 132, 255, 0.85); color: #fff;
+  font: 700 clamp(14px, 2.2vmin, 34px) 'Stand Outfit', system-ui, sans-serif; cursor: pointer;
+}
+.stand-menu-texto button:disabled, .stand-menu-texto input:disabled { opacity: 0.5; cursor: not-allowed; }
+@media (max-aspect-ratio: 4 / 5) {
+  .stand-menu { width: 100%; }
+  .stand-menu-lista { grid-template-columns: 1fr 1fr; }
+}
+/* A webcam da coruja fica no canto esquerdo, logo acima da barra permanente: a assinatura
+   desvia dela para não ter o começo coberto ("LUCA-AI · demonstração"). */
+@media (min-aspect-ratio: 4 / 5) {
+  .stand[data-modo='coruja'] .stand-marca { padding-left: clamp(170px, 17vw, 300px); text-align: right; }
+}
+/* No modo Site o retorno fica na coluna da coruja (fora da página emoldurada). */
+.stand[data-modo='site'] .stand-status-acao { top: var(--stand-margem); bottom: auto; left: auto; right: var(--stand-margem); transform: none; box-sizing: border-box; width: 22vmin; max-width: none; font-size: clamp(12px, 1.7vmin, 26px); }

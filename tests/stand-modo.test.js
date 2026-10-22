@@ -11,20 +11,6 @@ const { avisoDeControle, chamadaSemVoz, motivoSemVoz, PAUSA_APOS_FALHA_MS, vozDo
 const VIDEOS = 3;
 const passo = (estado, entrada, agora) => reduzirModo(estado, entrada, agora, VIDEOS);
 
-test('L1/R1 giram Coruja → Vitrine → Simulação e voltam', () => {
-  let e = modoInicial(0);
-  assert.equal(e.modo, 'coruja');
-  e = passo(e, { tipo: 'passo', direcao: 1 }, 1);
-  assert.equal(e.modo, 'vitrine');
-  e = passo(e, { tipo: 'passo', direcao: 1 }, 2);
-  assert.equal(e.modo, 'simulacao');
-  e = passo(e, { tipo: 'passo', direcao: 1 }, 3);
-  assert.equal(e.modo, 'coruja');
-  e = passo(e, { tipo: 'passo', direcao: -1 }, 4);
-  assert.equal(e.modo, 'simulacao');
-  assert.equal(passo(e, { tipo: 'ir', modo: 'coruja' }, 5).modo, 'coruja');
-});
-
 test('repouso: Coruja parada 60 s vira Vitrine; conversa em andamento segura a Coruja', () => {
   const e = modoInicial(0);
   assert.equal(passo(e, { tipo: 'relogio' }, REPOUSO_MS - 1).modo, 'coruja');
@@ -78,26 +64,34 @@ test('pausa só vale na Vitrine e se desfaz quando a pessoa vai embora', () => {
   assert.equal(passo(modoInicial(0), { tipo: 'pausar' }, 0).pausado, false);
 });
 
-test('barra de modos some 5 s depois do último toque; controle não acende a barra', () => {
+test('barra de modos é permanente: visível na abertura e muito depois do último toque (grill r1, Q6)', () => {
   const e = modoInicial(0);
-  assert.equal(barraVisivel(e, 0), false, 'abre sem barra');
+  assert.equal(barraVisivel(e, 0), true, 'abre com a barra');
   const tocado = passo(e, { tipo: 'atividade', toque: true }, 1000);
-  assert.equal(barraVisivel(tocado, 1000 + BARRA_MS - 1), true);
-  assert.equal(barraVisivel(tocado, 1000 + BARRA_MS), false);
-  assert.equal(barraVisivel(passo(e, { tipo: 'atividade' }, 9000), 9001), false);
-  assert.equal(barraVisivel(passo(e, { tipo: 'atividade', toque: true }, 9000), 9001), true);
+  assert.equal(barraVisivel(tocado, 1000 + BARRA_MS + 60_000), true);
+  assert.equal(barraVisivel(passo(e, { tipo: 'atividade' }, 9000), 9001), true);
 });
 
 function pad(botoes = [], eixos = [0, 0, 0, 0], mapping = 'standard') {
   return { mapping, axes: eixos, buttons: Array.from({ length: 17 }, (_, i) => ({ pressed: botoes.includes(i), value: botoes.includes(i) ? 1 : 0 })) };
 }
 
-test('controle: L1/R1/PS navegam em qualquer modo, por borda', () => {
-  const r1 = lerNavegacao(pad([5]), { pressed: [] }, 'simulacao');
-  assert.deepEqual(r1.acoes, [{ tipo: 'passo', direcao: 1 }]);
-  assert.deepEqual(lerNavegacao(pad([5]), r1.next, 'simulacao').acoes, [], 'segurar não repete');
-  assert.deepEqual(lerNavegacao(pad([4]), { pressed: [] }, 'coruja').acoes, [{ tipo: 'passo', direcao: -1 }]);
-  assert.deepEqual(lerNavegacao(pad([16]), { pressed: [] }, 'vitrine').acoes, [{ tipo: 'ir', modo: 'coruja' }]);
+test('controle: L1/R1 não trocam de aba em modo nenhum (quem joga apertava sem querer, 21/10)', () => {
+  for (const modo of ['coruja', 'vitrine', 'simulacao', 'site']) {
+    for (const botao of [4, 5]) {
+      const leitura = lerNavegacao(pad([botao]), { pressed: [] }, modo);
+      assert.deepEqual(leitura.acoes, [], `${modo}: botão ${botao}`);
+      assert.equal(leitura.ativo, true, 'L1/R1 ainda contam como gente por perto');
+    }
+  }
+  const ambos = lerNavegacao(pad([4, 5, 0, 7]), { pressed: [] }, 'simulacao');
+  assert.deepEqual(ambos.acoes, [], 'jogando com L1/R1 + ✕ + R2 a Simulação fica');
+});
+
+test('controle: PS volta à Coruja, por borda', () => {
+  const ps = lerNavegacao(pad([16]), { pressed: [] }, 'vitrine');
+  assert.deepEqual(ps.acoes, [{ tipo: 'ir', modo: 'coruja' }]);
+  assert.deepEqual(lerNavegacao(pad([16]), ps.next, 'vitrine').acoes, [], 'segurar não repete');
 });
 
 test('controle: ✕ e D-pad mudam de sentido conforme o modo; na Simulação ficam com o simulador', () => {
@@ -138,7 +132,8 @@ test('voz que cai na abertura (prazo, worklet, WebSocket) vira modo sem voz por 
 });
 
 test('textos sem voz não prometem microfone e mudam com o controle conectado', () => {
-  assert.deepEqual(chamadaSemVoz(true), { titulo: 'Pega o controle e aperta R1', sub: 'ou toca aqui' });
+  assert.deepEqual(chamadaSemVoz(true), { titulo: 'Toca aqui pra ver o LUCA\u2011AI em ação', sub: 'ou aperta ✕ no controle' });
+  assert.doesNotMatch(JSON.stringify(chamadaSemVoz(true)), /R1|L1/);
   assert.deepEqual(chamadaSemVoz(false), { titulo: 'Toca aqui pra ver o LUCA\u2011AI em ação', sub: '' });
   for (const texto of Object.values({ ...chamadaSemVoz(true), ...chamadaSemVoz(false) })) {
     assert.doesNotMatch(texto, /microfone|pergunt|fala/i);

@@ -28,7 +28,7 @@ test('piscada fecha no meio e reabre no fim', () => {
 });
 
 test('as 3 variações vetoriais antigas renderizam SVG com rig e sem ids', () => {
-  assert.equal(VARIANTE_PADRAO, 'coruja-a');
+  assert.equal(VARIANTE_PADRAO, 'coruja-3d');
   for (const variante of ['coruja', 'operario', 'robo']) {
     const svg = renderToStaticMarkup(createElement(AvatarLuca, { variante, parado: true }));
     assert.match(svg, /^<svg/);
