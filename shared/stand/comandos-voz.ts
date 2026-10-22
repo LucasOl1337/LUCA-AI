@@ -25,6 +25,13 @@ export interface ComandoVoz {
 
 export const COMANDOS_VOZ: readonly ComandoVoz[] = Object.freeze(([
   {
+    id: 'vitrine',
+    titulo: 'Ver a vitrine',
+    exemplo: 'Quero ver a vitrine',
+    faz: 'Abre a mesma Vitrine do botão',
+    ferramentas: ['abrir_vitrine'],
+  },
+  {
     id: 'simulacao',
     titulo: 'Dirigir o trator',
     exemplo: 'Quero testar o simulador',
