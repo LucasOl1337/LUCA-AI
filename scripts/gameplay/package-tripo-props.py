@@ -76,13 +76,17 @@ PROPS = {
     },
     'gv-teto': {
         'stem': 'cabine-teto',
-        'project': '4c8b9966-8769-436e-8f9c-cec46470a15d',
+        # Rodada 2 (mundo do gameplay): o forro liso virava uma placa cinza chapada no alto da tela.
+        # O console de teto (rádio, alto-falantes, difusores e cúpula) chega deitado para a frente:
+        # a exportação do Studio veio com a face rica em -Y do Blender e o console no alto; antes
+        # de empacotar, gira 180° em Z e 90° em Y (face rica para +Y, console para +X).
+        'project': 'f9c8aa93-c59f-4092-b2f6-fea60d95c636',
         'faces': 15000, 'texture': 2048,
-        # Painel quase plano: o detalhe está na textura (luz de cúpula, alto-falantes, difusores).
-        'targetTriangles': 3000, 'atlas': 1024, 'soFaceAparente': 0.5, 'margemBorda': 0.08,
-        'prompt': 'Tractor cab ceiling headliner panel: a flat rectangular light grey moulded plastic roof liner with a '
-                  'central dome light, two round speaker grilles and two adjustable air vents, seen from below, '
-                  'realistic PBR game prop, no logos, no text, flat back side',
+        'targetTriangles': 4000, 'atlas': 1024, 'soFaceAparente': 0.5, 'margemBorda': 0.04,
+        'prompt': 'Tractor cab roof headliner panel seen from below: a flat rectangular moulded light grey textured '
+                  'plastic ceiling panel with a raised central overhead console holding a car radio, two round speaker '
+                  'grilles, four round adjustable air vents and a rectangular dome light, quilted padded edges, '
+                  'realistic PBR game prop, no logos, n… (texto completo no projeto do Studio)',
     },
 }
 ROLES = {'normalTexture': 'normal', 'baseColorTexture': 'basecolor', 'metallicRoughnessTexture': 'metallicroughness'}
