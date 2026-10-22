@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import SompoTruckSimulator from '../SompoTruckSimulator';
 import { SOMPO_VEHICLE_SEED, type SompoVehicle } from '../../../shared/sompo-vehicles.js';
+import { ComandosSimulacao } from '../gameplay/ComandosSimulacao';
 import { GameplayOuClassico } from '../gameplay/GameplayOuClassico';
 import '@/sompo-page.css';
 
@@ -27,7 +28,12 @@ export function varianteSimulacao(busca: string): VarianteSimulacao {
 }
 
 export default function SimuladorKiosk() {
-  const classico = <SompoTruckSimulator source="simulation" vehicle={TRATOR_DO_STAND} kiosk />;
+  const classico = (
+    <>
+      <SompoTruckSimulator source="simulation" vehicle={TRATOR_DO_STAND} kiosk />
+      <ComandosSimulacao />
+    </>
+  );
   if (varianteSimulacao(typeof window === 'undefined' ? '' : window.location.search) === 'classica') return classico;
   return (
     <GameplayOuClassico classico={classico}>
