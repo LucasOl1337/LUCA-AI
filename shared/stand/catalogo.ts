@@ -68,6 +68,10 @@ export const PERGUNTAS_PRONTAS: readonly string[] = Object.freeze([
 
 export const CATALOGO: readonly GrupoCatalogo[] = Object.freeze(([
   {
+    id: 'vitrine', titulo: 'Ver a vitrine', faz: 'Abre a mesma Vitrine do botão',
+    itens: [acao('abrir_vitrine', 'Abrir a Vitrine', 'abrir_vitrine')],
+  },
+  {
     id: 'simulacao', titulo: 'Dirigir o trator', faz: 'Simulação: você dirige o Trator MAX',
     itens: [
       acao('simulacao', 'Abrir a Simulação no totem', 'abrir_simulacao', {}, { detalhe: 'Percurso guiado (fardo, encosta, área alagada) ou condução livre; pegue o controle' }),
