@@ -167,7 +167,10 @@ export default function StandPage() {
   useEffect(() => {
     let vivo = true;
     const registrar = async () => {
-      if (modo.modo === 'coruja') return;
+      if (modo.modo === 'coruja') {
+        canal.current.enviar({ tipo: 'tela', texto: linhaDaTela({ ok: true, mensagem: 'Tela atual: coruja.' }, [...experienciasAbertas.current]) });
+        return;
+      }
       if (modo.modo === 'site' && modo.pagina && !(await aguardarExecutor(planejarCaminho(modo.pagina)))) return;
       if (!vivo) return;
       const aberta = modo.modo === 'site' ? modo.pagina : modo.modo;
