@@ -26,6 +26,7 @@ export type EventoCerebro =
 
 /** Página → cérebro. */
 export type EventoPagina =
+  | { tipo: 'video_iniciado'; id: string }
   | { tipo: 'video_terminou'; id: string }
   | { tipo: 'reiniciar' }
   | { tipo: 'encerrar' }
@@ -66,7 +67,7 @@ export function ehEventoCerebro(valor: unknown): valor is EventoCerebro {
 
 export function ehEventoPagina(valor: unknown): valor is EventoPagina {
   if (!objeto(valor)) return false;
-  if (valor.tipo === 'video_terminou') return textoNaoVazio(valor.id);
+  if (valor.tipo === 'video_iniciado' || valor.tipo === 'video_terminou') return textoNaoVazio(valor.id);
   if (valor.tipo === 'tela') return typeof valor.texto === 'string';
   if (valor.tipo === 'pergunta_texto') return textoNaoVazio(valor.texto) && valor.texto.length <= 500;
   return valor.tipo === 'reiniciar' || valor.tipo === 'encerrar' || valor.tipo === 'acao_falhou';
