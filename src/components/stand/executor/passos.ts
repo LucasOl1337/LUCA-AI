@@ -193,7 +193,7 @@ export function criarPassos(els: CursorElementos) {
   async function sonoLigar() {
     await garantirPagina('/sonolencia', 'de sonolência');
     const estado = () => document.querySelector('.drowsiness-page')?.getAttribute('data-state');
-    if (estado() === 'running') return 'A câmera já está ligada.';
+    if (estado() === 'running') return 'Monitor pronto e som liberado; espere a leitura dos olhos antes de testar.';
     narrar('Ligando a webcam');
     await clicarTexto(SONO, /Ativar webcam/, 'o botão Ativar webcam', 10000);
     const fim = await aguardar(() => {
@@ -201,7 +201,7 @@ export function criarPassos(els: CursorElementos) {
       return atual === 'running' || atual === 'error' ? atual : null;
     }, 30000, 'A câmera não respondeu em 30 s.');
     if (fim === 'error') throw new FalhaAcao(achar(`${SONO} .drowsiness-message`)?.textContent?.trim() || 'A câmera não abriu.');
-    return 'Webcam ligada: feche os olhos por 1 segundo para ouvir o alerta.';
+    return 'Monitor pronto e som liberado. Posicione o rosto; somente com leitura dos olhos, feche os dois por 1 segundo para testar o alerta.';
   }
 
   async function sonoDesligar() {
@@ -286,6 +286,7 @@ export function criarPassos(els: CursorElementos) {
       case 'abrir_pagina':
       case 'voltar_coruja':
       case 'abrir_simulacao':
+      case 'abrir_vitrine':
       case 'tour_iniciar':
         throw new FalhaAcao('Essa ação é da tela do stand, não da página.');
     }
