@@ -98,5 +98,5 @@ export function bordaReiniciar(pad: GamepadLike | null | undefined, antes: boole
 
 /** Tecla do teclado → seta do volante, ou null. */
 export function setaDaTecla(tecla: string): keyof SetasVolante | null {
-  return ({ ArrowUp: 'cima', ArrowDown: 'baixo', ArrowLeft: 'esquerda', ArrowRight: 'direita' } as const)[tecla as 'ArrowUp'] ?? null;
+  return ({ arrowup: 'cima', w: 'cima', arrowdown: 'baixo', s: 'baixo', ' ': 'baixo', arrowleft: 'esquerda', a: 'esquerda', arrowright: 'direita', d: 'direita' } as const)[tecla.toLowerCase() as 'arrowup'] ?? null;
 }

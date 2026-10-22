@@ -10,7 +10,7 @@ export type LinhaTurno =
   | { t: 'audio'; pcm: string }
   | { t: 'evento'; evento: { tipo: string; id?: string; acao?: string; args?: Record<string, unknown>; apos_fala?: boolean } }
   | { t: 'aviso'; aviso: string; detalhe?: string }
-  | { t: 'fim'; motivo: string; respostas?: number; metricas?: Record<string, unknown> };
+  | { t: 'fim'; motivo: string; texto?: string; causa?: string; detalhe?: string; respostas?: number; metricas?: Record<string, unknown> };
 
 /** Lê um corpo NDJSON pedaço a pedaço; linhas quebradas entre pedaços são juntadas. */
 export async function* lerNdjson(corpo: AsyncIterable<Uint8Array> | ReadableStream<Uint8Array>): AsyncGenerator<LinhaTurno> {
@@ -102,9 +102,16 @@ export function pareceEco(texto: string, falado: string, { durante = false } = {
   return false;
 }
 
-/** Parcial que interrompe a fala do LUCA: 2+ palavras de verdade que não são eco. */
+/** Parcial/final: 2+ palavras, ou resposta/comando curto legítimo; nunca só ruído/eco. */
+export function respostaCurta(texto: string): boolean {
+  return /^(sim|nao|pare|para|espera|cancela|chega|volta)$/.test(palavras(texto).join(' '));
+}
+
 export function interrompeFala(parcial: string, falado: string): boolean {
-  return palavras(parcial).length >= 2 && vaiAoCerebro(parcial) && !pareceEco(parcial, falado, { durante: true });
+  // Texto sozinho não distingue um “não” humano da mesma palavra na narração.
+  // Curtas legítimas ficam disponíveis; eco confirmado é removido antes do ASR.
+  return respostaCurta(parcial) || (palavras(parcial).length >= 2
+    && vaiAoCerebro(parcial) && !pareceEco(parcial, falado, { durante: true }));
 }
 
 /**
@@ -114,7 +121,7 @@ export function interrompeFala(parcial: string, falado: string): boolean {
  * (prova de 19/10, 67 s); isso não é o visitante e não pode atropelar a resposta.
  */
 export function valeEnquantoPensa(texto: string, falado: string): boolean {
-  return interrompeFala(texto, falado);
+  return palavras(texto).length >= 2 && interrompeFala(texto, falado);
 }
 
 /**

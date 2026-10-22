@@ -34,6 +34,9 @@ test('não esconde opções: cada valor de cada argumento das ações tem item p
 
 test('grupos do menu são os mesmos ids dos comandos de voz (painel e prompt não divergem)', () => {
   assert.deepEqual(CATALOGO.map((g) => g.id), COMANDOS_VOZ.map((c) => c.id));
+  const vitrine = itemDoCatalogo('abrir_vitrine');
+  assert.deepEqual(vitrine.alvo, { tipo: 'acao', acao: 'abrir_vitrine', args: {} });
+  assert.equal(vitrine.requer, undefined, 'o toque abre a vitrine também sem voz');
 });
 
 test('gameplay e operador são destinos explícitos; admin continua fora (grill r1, Q4)', () => {

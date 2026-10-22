@@ -31,7 +31,7 @@ sem argumentos. O servidor toca o roteiro fixo `TOUR_STAND` de
 `shared/stand/acoes-site.ts`: sonolência, Trator MAX no laboratório do sensor,
 ensaio de curva e volta para a Coruja. As falas são prontas e usam o mesmo cache
 por voz e modelo da saudação. O modelo só escolhe o tour, sem escrever a narração.
-O tour conta uma resposta. A câmera não liga e nenhuma etapa grava dados.
+O tour conta uma resposta. O tour não ativa a câmera automaticamente: a tela explica essa condição e oferece ativação por toque; nenhuma etapa grava dados.
 
 As ações chegam com `apos_fala:true`. O cliente espera o áudio anterior terminar
 antes de mudar a página, e o stand executa os controles em ordem. Uma nova fala
@@ -53,7 +53,7 @@ apontar para ferramenta que não existe.
 "Testar o simulador", "quero jogar", "abre a simulação" e "testar a gameplay"
 abrem a Simulação. Pedidos curtos assim (`comandoDireto`) não passam pelo modelo:
 o servidor fala a frase pronta `FALAS.simulacao` e manda `abrir_simulacao` com
-`apos_fala:true`. A conversa por voz termina quando a Simulação abre. Perguntas
+`apos_fala:true`. A conversa por voz permanece disponível na Simulação, com o mesmo microfone da escuta. Perguntas
 sobre o simulador ("como funciona o simulador?") seguem para o modelo, que
 também tem a ferramenta `abrir_simulacao`. Antes de 21/10 não havia ação que
 levasse ao modo Simulação: o modelo abria a aba de telemetria do painel SOMPO ou
@@ -85,8 +85,8 @@ sequenceDiagram
 - **Voz.** O texto vira frases (`CortadorDeFrases`). Cada frase vai ao TTS em fila, com `previous_text` para manter a entonação. O áudio volta como PCM16 a 24 kHz em base64, no NDJSON. Saudação, falha e despedida são falas prontas, guardadas em cache por voz e modelo.
 - **Navegador.** `src/stand-voz/sessaoTurnos.ts` toca as frases em sequência. A legenda aparece quando a frase começa a soar. `tocar_video` espera a fala que anuncia o vídeo terminar. `abrirSessaoDeVoz` escolhe entre `SessaoTurnos` e a `SessaoVoz` (xai) por `conexao.transporte`.
 - **Abertura.** `abrirAudio` (`src/stand-voz/audioStand.ts`) lê o microfone por `AudioWorklet`. Se `addModule` não resolver em 2,5 s, cai para `ScriptProcessor` com a mesma reamostragem (`Bloqueador`). Em 19/10, `addModule` ficou pendente para sempre sob Playwright e a tela travou em "Ligando o microfone…". Do toque até a sessão pronta há 8 s (`PRAZO_CONEXAO_MS` em `useSessaoVoz.ts`). Passou disso, ou se o microfone ou o WebSocket falhar na abertura, a página fica 60 s no modo sem voz (`PAUSA_APOS_FALHA_MS`) e mostra o motivo em `data-motivo` no `<main>`, por exemplo `erro:sem_conexao_provedor`. `tests/stand-voz-navegador.test.js` cobre isso num Chromium real, com Scribe e turno falsos.
-- **Interrupção (barge-in).** Volume alto no microfone abaixa a voz na hora. Uma transcrição parcial com 2 ou mais palavras de verdade, que não sejam eco da própria fala, corta o áudio e aborta o turno no servidor. Um turno novo da mesma conversa também aborta o anterior.
-- **Eco.** Uma transcrição contida no que o LUCA acabou de falar é descartada (`pareceEco`). Durante o vídeo, o microfone manda silêncio ao Scribe.
+- **Interrupção (barge-in).** Volume alto no microfone abaixa a voz na hora. Parciais e finais usam a mesma confirmação: evidência acústica de fala distinta também permite palavras curtas; eco confirmado não abaixa nem corta a voz. Veja Eco e rastreio de turnos. Um turno novo da mesma conversa também aborta o anterior.
+- **Eco.** Cópia PCM muito próxima do playback vira silêncio antes do Scribe; a comparação textual é reserva apenas durante a fala e sua cauda. Durante o vídeo, o microfone manda silêncio ao Scribe.
 
 ## Webcam do Totem (21/10)
 
@@ -138,7 +138,7 @@ som nenhum (não é regressão: nunca teve).
 
 
 
-Pedido do Lucas em 19/10: o assistente fica ativo por padrão, e a pessoa só fala. Na Coruja, na Vitrine e no Site (`MODOS_COM_ESCUTA` em `StandPage.tsx`), com voz ligada e `escuta:true` no status, `useEscuta` (`src/stand-voz/useEscuta.ts`) mantém o microfone aberto, mas o áudio fica no navegador. Só o volume é medido. Nada vai ao Scribe, e nenhum crédito é gasto, até o despertar. A Simulação fica sem escuta (jogo no controle, barulho de jogo).
+Pedido do Lucas em 19/10: o assistente fica ativo por padrão, e a pessoa só fala. Na Coruja, na Vitrine e no Site (`MODOS_COM_ESCUTA` em `StandPage.tsx`), com voz ligada e `escuta:true` no status, `useEscuta` (`src/stand-voz/useEscuta.ts`) mantém o microfone aberto, mas o áudio fica no navegador. Só o volume é medido. Nada vai ao Scribe, e nenhum crédito é gasto, até o despertar. A Simulação também mantém escuta e sessão; o mesmo pipeline filtra TTS, mas ruído de jogo e alarme ainda precisam de verificação acústica.
 
 ```mermaid
 stateDiagram-v2
@@ -151,7 +151,7 @@ stateDiagram-v2
   conversa --> ouvindo: sessão fechou (2,5 s de refratário)
   conversa --> pausada: 2º despertar seguido sem fala
   pausada --> ouvindo: 10 s, 20 s, 40 s... até 2 min
-  ouvindo --> [*]: foi para a Simulação ou saiu do stand
+  ouvindo --> [*]: saiu do stand ou desativou a voz
 ```
 
 - **Despertador** (`criarDespertador` em `src/stand-voz/escuta.ts`): desperta com RMS de pelo menos 3× o piso de ruído e nunca abaixo de 0,03, por 250 ms seguidos. O piso é uma média móvel do ruído. Abaixo do limiar ele anda 2 % por bloco de 50 ms; acima, 0,2 %, então barulho que fica na feira vira fundo. O piso continua aprendendo durante a pausa e entre conversas.
@@ -161,7 +161,7 @@ stateDiagram-v2
 - **Vitrine.** Com a escuta ligada, os vídeos tocam mudos (a legenda já vem queimada), então o microfone não ouve o próprio vídeo. Um despertar na Vitrine também é discreto: o vídeo segue, e só com a 1ª palavra (sessão sai de `ocioso`) a página vai para a Coruja, já na Conversa e com a pergunta na legenda. Um falso fecha sem cortar o vídeo.
 - **Linha fixa.** Com o microfone aberto (`ouvindo`, `pausada` ou `conversa` sem conversa na tela), a camada comum mostra "O LUCA só ouve quando você fala com ele." (`linhaDaEscuta` em `avisos.ts`). Fica no rodapé; na Vitrine sobe para baixo do título, porque a legenda queimada ocupa o rodapé. Some com a barra de modos acesa e na Conversa.
 - **Falsos seguidos.** O primeiro não pausa. Do segundo em diante, a escuta pausa por 10 s, depois 20 s e 40 s, até 2 min (`pausaAposFalsos`). Uma conversa de verdade ou um toque zera a conta. Teto de sessão, sessões por hora e teto diário seguem valendo: o despertar abre sessão pelo mesmo `POST /sessao`.
-- **Um microfone só.** A sessão pega o áudio da escuta emprestado (`Emprestimo` em `sessaoTurnos.ts`) e, ao fechar, não o fecha. A escuta só fecha o microfone ao ir para a Simulação ou sair do stand. Se a conversa ainda estiver em andamento, ele fecha quando ela acabar. A Grok (`xai`) não usa empréstimo e não tem escuta.
+- **Um microfone só.** A sessão pega o áudio da escuta emprestado (`Emprestimo` em `sessaoTurnos.ts`) e, ao fechar, não o fecha. A escuta só fecha o microfone ao sair do stand ou desativar a voz. Se a conversa ainda estiver em andamento, ele fecha quando ela acabar. A Grok (`xai`) não usa empréstimo e não tem escuta.
 - **Toque.** Na Atração, o toque continua abrindo a conversa com saudação, no mesmo microfone. No primeiro toque do dia, o navegador também libera o áudio (`precisa_toque`).
 - **Tela.** A Atração mostra "É só falar que eu escuto." com a escuta ouvindo. Sem escuta, mostra "Toca na tela pra começar a conversa.". O estado fica em `data-escuta` no `<main>`.
 - **Permissão pendente.** Ao abrir, mostra "Ligando o microfone…". Após 10 s sem resposta, `ajuda_microfone` mostra "Permita o microfone pra conversar com o LUCA.". A Vitrine continua disponível. A ajuda não cancela nem repete o pedido: quando a permissão chega, a escuta volta a `ouvindo` sozinha. Isso não muda a reserva de autoplay (`precisa_toque`).
@@ -174,11 +174,11 @@ O CLI tem `stand sessao` e `stand turno` (NDJSON em stdout); veja [`cli-referenc
 
 | Limite | Valor | Onde |
 | --- | --- | --- |
-| Silêncio, teto de sessão, sessões por hora | 20 s, 240 s, 30 | `LIMITES_STAND` em `server/stand/rotas.js` |
-| Respostas por conversa | 8 (a 9ª pergunta ouve a despedida e a sessão fecha) | `LIMITES_TURNO` em `server/stand/cerebro.js` |
+| Silêncio, janela de sessão, sessões por hora | 20 s, 240 s, 30 | `LIMITES_STAND` em `server/stand/rotas.js` |
+| Respostas por conversa | 8 por janela (renovação cobrada, contexto preservado) | `LIMITES_TURNO` em `server/stand/cerebro.js` |
 | Frases por resposta | 3 (a 4ª é cortada) | idem |
 | Tokens por resposta | 300 | idem |
-| Caracteres de TTS por conversa | 2.000 (passou disso, a resposta sai só em legenda) | idem |
+| Caracteres de TTS por conversa | 2.000 por janela, com reserva de600 por resposta | idem |
 | Créditos ElevenLabs por dia | 25.000 (`STAND_TETO_DIARIO_CREDITOS`) | `server/stand/teto-diario.js` |
 
 O teto diário soma o TTS (caracteres × 0,5 no turbo/flash, × 1 nos outros) e o STT (36 créditos por minuto de sessão aberta, medido ~35). O contador fica em `LUCA_DATA_DIR/stand/creditos-dia.json`, sobrevive a restart e zera à meia-noite de Brasília. Estourado, `status` responde `ligado:false` com `motivo:'teto_diario'`, `sessao` e `turno` respondem 503, e a equipe vê "voz pausada" no rodapé. Uma conversa fechada sem `fim` (aba fechada, queda) é cobrada pela estimativa: último turno + 20 s de silêncio + 30 s.
@@ -200,3 +200,92 @@ O teto diário soma o TTS (caracteres × 0,5 no turbo/flash, × 1 nos outros) e 
 
 - [ADR 0002](./adr/0002-claude-no-cerebro-da-voz-do-stand.md): Claude no cérebro da voz do stand, exceção à regra do Astra.
 - [ADR 0003](./adr/0003-escuta-por-volume-no-navegador.md): escuta por volume no navegador, sem palavra de ativação.
+
+## Eco e rastreio de turnos (22/10)
+
+O navegador solicita `echoCancellation`, `noiseSuppression` e `autoGainControl`.
+Isso não comprova que o AEC funcione na sala. `ReferenciaEco` (`ecoPcm.ts`)
+compara o PCM do microfone com o PCM efetivamente agendado na `FilaDeVoz`,
+com até450ms de atraso, média em3kHz e refinamento de fase em24kHz. A busca
+acompanha o último atraso confirmado para não confundir períodos de uma vogal.
+Só cópia com correlação≥0,96 e resíduo<0,008 vira silêncio no transporte Scribe;
+esse bloco também não abaixa a caixa. Sinal incerto segue intacto. É uma
+proteção conservadora contra cópias próximas, não um cancelador adaptativo de sala.
+
+Fala residual distinta sustentada por100ms dá evidência local por2s para a
+transcrição chegar. Assim “Oi” e uma frase humana que contenha palavras da
+narração podem interromper sem depender do número de palavras. Sem essa
+evidência, parcial e final usam a mesma confirmação de interrupção; respostas
+curtas como sim/não/pare/volta continuam disponíveis. Eco textual só é filtrado
+durante playback e sua cauda de2,5s; repetir uma pergunta depois disso é válido.
+Texto só vira referência textual quando seu áudio começa. Um corte remove
+referências futuras, preservando a cauda do que já tocou.
+
+A comparação não reconhece identidade, nem garante distinguir voz humana de
+reverberação/distorção. Microfone, caixa próximos, AGC e relógio da captura
+podem produzir eco sem correlação alta. O aceite no equipamento físico fica
+pendente até o protocolo abaixo; os testes offline não resolvem esse aceite.
+
+Diagnóstico manual, sem PCM, dispositivo, token ou persistência em servidor:
+na bancada do teste, execute `sessionStorage.setItem('luca:voz:diagnostico','1')`
+e recarregue. Leia `window.__lucaVozDiagnostico`: até200 eventos na memória da
+página, com tempo relativo em ms, ajustes efetivamente informados pela track,
+parcial/final Scribe, evidência independente, texto enviado, id sequencial do
+turno e resposta. Ajuste não informado aparece como tal. Mesmo um
+`echoCancellation:true` informado não mede o efeito acústico. Para desligar,
+remova a chave e recarregue. Não compartilhe transcrições pessoais desnecessárias.
+
+A legenda parcial pode mudar antes do final. Só o final enviado ao servidor é
+pergunta; o mesmo texto aparece na legenda. O cliente manda `turno_id` estável
+por requisição (`conversa_id:sequência`), sem repetição automática. Uma resposta
+de requisição abortada não produz áudio, legenda ou ação no turno novo.
+`fim:pausa_limite` mostra seu `texto` mesmo sem áudio e mantém a escuta; o
+visitante pede “continuar” para retomar a pergunta conservada no servidor.
+O servidor controla a renovação cobrada das janelas de240s; o cliente ElevenLabs
+não tem timer absoluto que corte uma pessoa ativa. O silêncio de20s permanece.
+A sessão xAI mantém seu contrato anterior.
+
+### Provas e repetição no Totem
+
+`tests/stand-barge-in.test.js`, `stand-eco-pcm.test.js` e
+`stand-transcricao.test.js` cobrem eco, atraso, cauda, fala dupla, Oi humano,
+palavras repetidas da narração, ausência de TTS, parcial→final→POST e resposta
+antiga abortada. `scripts/verificar-eco-voz.mjs LUCA.pcm VISITANTE.pcm` recebe
+UM par fixo PCM16 mono24k do vídeo existente, sem reproduzir nem gravar som.
+Trechos usados: LUCA473,1–476,1s e visitante503,1–506,1s; extraídos offline com
+ffmpeg (`-ss INICIO -t 3 -map 0:a:0 -ac 1 -ar 24000 -f s16le`). Originais e
+hashes estão no relatório da rodada, fora do Git. O script exige≥95% dos blocos
+ativos de cópia filtrados e100% dos blocos humanos com RMS≥0,015 intactos.
+Isso mede o algoritmo sobre uma mistura digital, não a sala nem a acurácia ASR.
+
+Para o aceite físico, combinar intervenção com o operador, em runtime local
+isolado com o mesmo build, sem mutações de teste na produção e sem gravar PCM.
+Manter microfone/distância, browser e frase constantes entre três condições:
+LUCA silencioso, LUCA na caixa do Totem e LUCA em fone. Registrar ajustes da
+track, volume físico e o rastro parcial/final/envio/resposta. Usar uma frase
+humana fixa, incluindo “Oi” e palavras presentes na narração. Critérios:
+
+- Só TTS: termina a fala sem POST textual adicional, corte ou nova resposta.
+- TTS+visitante: a fala humana chega ao Scribe, a final correta vira um único
+  POST com id próprio e interrompe a fala anterior; teste também “pare”.
+- Sem TTS e em fone: a mesma frase não perde começo/fim; comparar a final
+  com a frase pronunciada e com a condição de caixa, separando ASR de eco.
+- Conferir a cauda após a fala e ausência de resposta atrasada de outro id.
+
+Divergência Nanda/Netolik ou feio/vivo exige o rastro final do caso real antes
+de atribuir causa ao cérebro ou ao reconhecedor. A instrumentação permite
+essa conferência; não reconstrói os finais históricos ausentes no vídeo.
+
+## Continuidade e limites do ElevenLabs
+Os limites8 respostas/2000caracteres de TTS/240s agora delimitam uma janela técnica da conversa. Ao cruzá-los, o servidor preserva quatro pares completos de contexto e a pergunta atual, debita uma vaga no mesmo guarda30sessões/hora e renova os contadores internos, sem saudação nem reconectar Scribe. Cada resposta dinâmica é limitada a600caracteres (além das3frases/300tokens existentes), reservados antes do turno; o histórico guarda só o texto falado. O diário não muda. Eventos de saudação/falha também contam para proteção de janela; a saudação só ocorre uma vez. STT é cobrado incrementalmente, no fim e no abandono (estimativa último uso+50s). Conversas inativas expiram em300s; o cliente ElevenLabs mantém silêncio20s e não corta áudio no relógio absoluto240s. A reserva xAI segue com seu teto absoluto.
+
+Negação por uso horário ou diário responde NDJSON fim pausa_limite, causa hora|diario, texto honesto visível sem depender de TTS. Não há modelo, síntese ou ação nesse pedido. A pergunta fica em memória enquanto a sessão existe; dizer continuar com novo turno_id retoma quando houver vaga/crédito. Não há retry automático. Silêncio20s, encerramento explícito, restart ou abandono descartam essa pergunta, exigindo perguntar novamente. --turno-id no CLI e turno_id nos POSTs do cliente (conversa:sequência) impedem repetição de ação por retry: ativo409, finalizado ja_processado sem replay. O cache guarda últimos240ids da conversa. Novo turno legítimo aborta e aguarda conclusão anterior antes de renovar/compactar.
+
+## Pedidos e experiências
+Quero ver a vitrine emite abrir_vitrine args{} apos_fala:true, o mesmo modo do botão Vitrine; não inicia tour. Me mostre o animal na pista recebe resposta honesta: o clássico tem animal, mas a superfície do Totem ainda não o expõe; oferece a alternativa de um fardo no Trator MAX e só abre sompo_rodar_cenario stand-obstaculo-a-tempo após aceite explícito. Limitação tratada, animal não implementado. Como dirige e volta pra coruja funcionam sem modelo; controles R2/L2/analógico confirmados em volante.ts. A introdução do tour pronta é omitida se o modelo já apresentou o tour. Sonolência é uma explicação até a tela confirmar Monitor pronto e som liberado; navegação não ativa câmera.
+
+O frontend anexa ao campo tela existente Experiências já abertas: simulacao, sonolencia, vitrine, sensor, laboratorio, sompo. O servidor só retém nomes reconhecidos. Emissão de ação não confirma abertura; visita não confirma teste concluído. Contexto orienta responder à pergunta e não repetir convites para experiências abertas; pedido explícito de repetir continua válido. Isso é mudança de prompt versionada, aplicação pelo regente.
+
+## Prova/limites
+Casos reais do vídeo e vizinhos rodam localmente com Express e provedores controlados; sem mutação de produção. ID09/11 não têm causa histórica provada no cérebro: não corrigir palavras pelo prompt. Trace opt-in do cliente de Acustica registra final e turno recebido, sem áudio/persistência. Prova acústica física permanece distinta de testes sintéticos.
+

@@ -91,7 +91,7 @@ const leitor = (textos = {}, atributos = {}) => ({
 test('retrato: sonolência, sensor e laboratório dizem o que a tela mostra, em uma linha', () => {
   assert.equal(
     retratoDaPagina('/sonolencia', leitor({}, { '.drowsiness-page|data-state': 'idle', '.drowsiness-sensitivity select|value': 'high' })),
-    'Página sonolência. webcam desligada. sensibilidade alta',
+    'Página sonolência. webcam desligada. demonstração ainda inativa; toque em Ativar webcam. sensibilidade alta',
   );
   assert.equal(
     retratoDaPagina('/sonolencia', leitor({ '.drowsiness-panel .drowsiness-message': 'Nenhuma webcam\nencontrada.' }, { '.drowsiness-page|data-state': 'error' })),
@@ -170,4 +170,24 @@ test('controle com página fechada espera uma vez só (abrir + executor)', async
   const r = await executarPlano(plano, { despacharModo: () => {}, aguardarExecutor: async (c) => { pedidos.push(c); return {}; }, enviarAcaoSite: async () => ({ ok: true, mensagem: 'Ensaio pausado.' }) });
   assert.deepEqual(r, { ok: true, mensagem: 'Ensaio pausado.' });
   assert.deepEqual(pedidos, ['/sensor']);
+});
+
+test('Vitrine falada usa a mesma entrada do botão; sem executor nem tour', async () => {
+  const plano = planejarAcao('abrir_vitrine', {}, { modo: 'coruja', pagina: null });
+  assert.deepEqual(plano, { ok: true, passos: [{ tipo: 'modo', entrada: { tipo: 'ir', modo: 'vitrine' } }] });
+  const entradas = [];
+  const r = await executarPlano(plano, {
+    despacharModo: e => entradas.push(e),
+    aguardarExecutor: () => { throw Error('Vitrine não é iframe'); },
+    enviarAcaoSite: () => { throw Error('Não chama executor'); },
+  });
+  assert.equal(r.ok, true);
+  assert.equal(passo(modoInicial(0), entradas[0], 1).modo, 'vitrine');
+});
+
+test('contexto conserva aberturas confirmadas dentro de 200 caracteres sem chamá-las concluídas', () => {
+  const texto = linhaDaTela({ ok: true, mensagem: 'm'.repeat(200), retrato: 'r'.repeat(200) }, ['simulacao', 'sonolencia', 'vitrine', 'sensor', 'laboratorio', 'sompo']);
+  assert.ok(texto.length <= 200);
+  assert.match(texto, /Experiências já abertas: simulacao, sonolencia, vitrine, sensor, laboratorio, sompo\.$/);
+  assert.doesNotMatch(texto, /concluíd/);
 });

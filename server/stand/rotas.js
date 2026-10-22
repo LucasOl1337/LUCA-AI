@@ -9,6 +9,7 @@
 //   com frases, áudio da voz do Lucas e eventos (cerebro.js).
 // - `xai`: Grok Voice Realtime, conversa inteira no navegador (reserva).
 import { executarTurno, FALAS, LIMITES_TURNO, criarChamadaDeModelo, limparTela, novaConversa } from './cerebro.js';
+import { idTurno, lembrarTurno, prepararJanela, TEXTOS_PAUSA } from './continuidade.js';
 import { FERRAMENTAS_STAND, executarFerramentaStand, videoPublicado } from './ferramentas.js';
 import { buscarNoRepo, montarPromptBase } from './conhecimento.js';
 import { provedorXai } from './provedor-xai.js';
@@ -112,20 +113,20 @@ export function registerStandRoutes(app, {
     return decisao && publicado(decisao.id) ? decisao : null;
   };
 
-  /** Conversas em turnos vivas, por id. Expiram depois do teto da sessão. */
+  /** Conversas por id: janela renovável, expiração por inatividade. */
   const conversas = new Map();
   const validadeMs = (LIMITES_STAND.teto_s + 60) * 1000;
   /**
-   * Fecha a conta de STT de uma conversa, uma vez: minutos de microfone aberto.
+   * Cobra o trecho ainda não contado de STT: minutos de microfone aberto.
    * Sem 'fim' (aba fechada, queda) estima pelo último turno + o relógio de
-   * silêncio do navegador + 30 s de folga, sempre dentro do teto da sessão.
+   * silêncio do navegador + 30 s de folga. Trechos já pagos não são repetidos.
    */
   const cobrarStt = (conversa, { estimado = false } = {}) => {
-    if (conversa.sttCobrado) return;
-    conversa.sttCobrado = true;
+    const desde = conversa.sttAte ?? conversa.criadaEm;
     const ultimo = (conversa.ultimoUso ?? conversa.criadaEm) + (LIMITES_STAND.silencio_s + 30) * 1000;
     const fimMs = estimado ? Math.min(agora(), ultimo) : agora();
-    const minutos = Math.min(LIMITES_STAND.teto_s, Math.max(0, fimMs - conversa.criadaEm) / 1000) / 60;
+    const minutos = Math.max(0, fimMs - desde) / 60_000;
+    conversa.sttAte = Math.max(desde, fimMs);
     teto.somar(minutos * CREDITOS_STT_POR_MINUTO);
   };
   // Conversa que sumiu sem 'fim' é cobrada pela estimativa ao ser despejada.
@@ -139,7 +140,7 @@ export function registerStandRoutes(app, {
   };
   const limparConversas = () => {
     for (const [id, c] of conversas) {
-      if (agora() - c.criadaEm > validadeMs) despejar(id);
+      if (!c.turno && agora() - c.ultimoUso > validadeMs) despejar(id);
     }
     while (conversas.size > CONVERSAS_MAX) despejar(conversas.keys().next().value);
   };
@@ -263,73 +264,117 @@ export function registerStandRoutes(app, {
   // Resposta NDJSON, uma linha por item: {t:'frase'|'audio'|'evento'|'aviso'|'fim', ...}.
   // Um turno novo da mesma conversa aborta o anterior (barge-in).
   app.post('/api/stand/turno', async (req, res) => {
-    const { conversa_id: id, texto, evento, id: idVideo, tela, camera } = req.body || {};
+    const { conversa_id: id, turno_id: turnoIdBruto, texto, evento, id: idVideo, tela, camera } = req.body || {};
     const conversa = conversas.get(String(id || ''));
     if (!conversa || conversa.conta !== conta(req)) return res.status(404).json({ ok: false, error: 'conversa_desconhecida' });
     const config = configStand(env, provedores);
     if (!config.provedor?.turnos || !config.chave) {
       return res.status(503).json({ ok: false, error: 'stand_desligado', motivo: config.chave ? 'provedor_sem_turnos' : config.motivo });
     }
-    conversa.turno?.abort();
-    conversa.turno = null;
+    const turnoId = idTurno(turnoIdBruto);
+    if (turnoIdBruto !== undefined && !turnoId) return res.status(400).json({ ok: false, error: 'turno_id_invalido' });
+    const anterior = turnoId && conversa.turnosRecebidos?.get(turnoId);
+    if (anterior === 'ativo') return res.status(409).json({ ok: false, error: 'turno_em_andamento' });
+    if (anterior) {
+      return res.type('application/x-ndjson').send(`${JSON.stringify({ t: 'fim', motivo: 'ja_processado', turno_id: turnoId })}\n`);
+    }
     if (evento === 'fim') {
       despejar(conversa.id, { estimado: false });
       return res.json({ ok: true, creditos_dia: teto.resumo() });
     }
-    if (agora() - conversa.criadaEm > validadeMs) {
+    if (!conversa.turno && agora() - conversa.ultimoUso > validadeMs) {
       despejar(conversa.id);
       return res.status(410).json({ ok: false, error: 'conversa_expirada' });
     }
-    if (teto.estourou()) return res.status(503).json({ ok: false, error: 'stand_desligado', motivo: 'teto_diario' });
-    const entrada = evento === 'saudacao' ? { evento }
+    let entrada = evento === 'saudacao' ? { evento }
       : evento === 'video_terminou' ? { evento, id: String(idVideo || '').slice(0, 80) }
         // Falha na tela: fala pronta; não conta pergunta nem conversa.
         : evento === 'acao_falhou' ? { evento }
           : { texto: String(texto || '').trim().slice(0, 500), tela: limparTela(tela), camera: limparTela(camera) };
     if (!entrada.evento && !entrada.texto) return res.status(400).json({ ok: false, error: 'texto_vazio' });
-    if (entrada.texto) {
-      conversa.perguntas = (conversa.perguntas ?? 0) + 1;
-      if (conversa.perguntas === 1) teto.contar('conversas');
+    if (evento === 'saudacao' && conversa.saudou) {
+      return res.type('application/x-ndjson').send(`${JSON.stringify({ t: 'fim', motivo: 'ja_processado' })}\n`);
     }
-
+    // Uma nova pergunta interrompe; retry com o mesmo id foi recusado acima.
+    const fimAnterior = conversa.turnoFim;
+    conversa.turno?.abort();
     const controle = new AbortController();
     conversa.turno = controle;
-    conversa.ultimoUso = agora();
+    let liberarTurno;
+    conversa.turnoFim = new Promise((ok) => { liberarTurno = ok; });
+    lembrarTurno(conversa, turnoId, 'ativo');
     res.on('close', () => { if (!res.writableFinished) controle.abort(); });
-    res.status(200);
-    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('X-Accel-Buffering', 'no');
-    res.flushHeaders();
-    const emitir = (linha) => { if (!controle.signal.aborted) res.write(`${JSON.stringify(linha)}\n`); };
-    const vozConversa = conversa.voz ?? config.voz;
-    const sintetizar = sintetizarCom(config, vozConversa);
-    const modeloTts = modeloTtsStand(env);
     try {
-      const { metricas, motivo } = await executarTurno({
-        conversa,
-        entrada,
-        emitir,
-        sinal: controle.signal,
-        deps: {
-          chamarModelo,
-          sintetizar,
-          falaPronta: falasProntas(vozConversa, sintetizar),
-          rotear,
-          buscar: (texto) => buscarNoRepo(texto, { limite: 3, maxChars: 500 }),
-          executarFerramenta: (nome, args) => executarFerramenta(nome, args),
-          instrucoes,
-          aoCobrarTts: (caracteres) => teto.somar(caracteres * fatorCreditosTts(modeloTts)),
-          agora,
-        },
+      // O anterior termina seu histórico antes da renovação/compactação.
+      await fimAnterior;
+      if (controle.signal.aborted) return res.end();
+      if (/^continuar[.!?]?$/i.test(entrada.texto || '') && conversa.perguntaPendente) {
+        entrada = { ...conversa.perguntaPendente, tela: entrada.tela || conversa.perguntaPendente.tela };
+      }
+      // Cobra o tempo já usado antes de renovar, inclusive se o diário acabou.
+      cobrarStt(conversa);
+      const janela = prepararJanela(conversa, {
+        agora: agora(), limites: LIMITES_TURNO, tetoS: LIMITES_STAND.teto_s,
+        permitir: () => guarda.tentar(conta(req)), diario: () => teto.estourou(),
       });
-      console.info(`[stand] turno ${motivo} modelo=${metricas.modelo ?? '-'} 1o_audio=${metricas.primeiro_audio_ms ?? '-'}ms total=${metricas.total_ms ?? '-'}ms`);
-    } catch (erro) {
-      console.warn('[stand] turno falhou:', erro?.message || erro);
-      emitir({ t: 'fim', motivo: 'falha' });
+      if (!janela.ok) {
+        if (entrada.texto) conversa.perguntaPendente = entrada;
+        lembrarTurno(conversa, turnoId, 'pausado');
+        // Sem modelo, TTS, ferramenta ou cobrança extra em uma pausa de custo.
+        return res.type('application/x-ndjson').send(`${JSON.stringify({
+          t: 'fim', motivo: 'pausa_limite', causa: janela.causa,
+          texto: TEXTOS_PAUSA[janela.causa], turno_id: turnoId,
+        })}\n`);
+      }
+      if (janela.renovada) console.info(`[stand] janela renovada total=${conversa.renovacoes} sessoes_hora=${guarda.usadas?.(conta(req)) ?? '-'}`);
+      conversa.perguntaPendente = null;
+      conversa.eventosJanela += 1;
+      if (evento === 'saudacao') conversa.saudou = true;
+      lembrarTurno(conversa, turnoId, 'ativo');
+      if (entrada.texto) {
+        conversa.perguntas = (conversa.perguntas ?? 0) + 1;
+        if (conversa.perguntas === 1) teto.contar('conversas');
+      }
+
+      conversa.ultimoUso = agora();
+      res.status(200);
+      res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders();
+      const emitir = (linha) => { if (!controle.signal.aborted) res.write(`${JSON.stringify(linha)}\n`); };
+      const vozConversa = conversa.voz ?? config.voz;
+      const sintetizar = sintetizarCom(config, vozConversa);
+      const modeloTts = modeloTtsStand(env);
+      try {
+        const { metricas, motivo } = await executarTurno({
+          conversa,
+          entrada,
+          emitir,
+          sinal: controle.signal,
+          deps: {
+            chamarModelo,
+            sintetizar,
+            falaPronta: falasProntas(vozConversa, sintetizar),
+            rotear,
+            buscar: (texto) => buscarNoRepo(texto, { limite: 3, maxChars: 500 }),
+            executarFerramenta: (nome, args) => executarFerramenta(nome, args),
+            instrucoes,
+            aoCobrarTts: (caracteres) => teto.somar(caracteres * fatorCreditosTts(modeloTts)),
+            agora,
+          },
+        });
+        console.info(`[stand] turno ${motivo} modelo=${metricas.modelo ?? '-'} 1o_audio=${metricas.primeiro_audio_ms ?? '-'}ms total=${metricas.total_ms ?? '-'}ms`);
+      } catch (erro) {
+        console.warn('[stand] turno falhou:', erro?.message || erro);
+        emitir({ t: 'fim', motivo: 'falha' });
+      } finally {
+        res.end();
+      }
     } finally {
+      lembrarTurno(conversa, turnoId, 'concluido');
       if (conversa.turno === controle) conversa.turno = null;
-      res.end();
+      liberarTurno();
     }
   });
 

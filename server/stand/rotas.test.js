@@ -160,7 +160,7 @@ function fetchElevenlabs(pedidos = [], { andrea = true } = {}) {
   };
 }
 
-async function subir11(t, { env = {}, teto = criarTetoDiario({ teto: 1000 }), chamarModelo, pedidos = [], agora = () => Date.now(), andrea = true } = {}) {
+async function subir11(t, { env = {}, teto = criarTetoDiario({ teto: 1000 }), chamarModelo, pedidos = [], agora = () => Date.now(), andrea = true, guarda } = {}) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => { req.auth = { user: { id: req.headers['x-conta'] || 'demo' } }; next(); });
@@ -178,6 +178,7 @@ async function subir11(t, { env = {}, teto = criarTetoDiario({ teto: 1000 }), ch
     teto,
     chamarModelo: modelo,
     agora,
+    guarda,
   });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((ok) => server.once('listening', ok));
@@ -189,6 +190,67 @@ async function subir11(t, { env = {}, teto = criarTetoDiario({ teto: 1000 }), ch
 }
 
 const linhasNdjson = async (resposta) => (await resposta.text()).trim().split('\n').map((l) => JSON.parse(l));
+
+test('continuidade: pergunta8→9 renova uma vaga por hora sem perder pergunta nem saudar', async (t) => {
+  const guarda = criarGuardaDeSessoes();
+  const vistas = [];
+  const pedir = await subir11(t, { guarda, teto: criarTetoDiario({ teto: 100000 }), chamarModelo: async ({ mensagens }) => {
+    vistas.push(mensagens);
+    return (async function* () { yield { texto: 'Sim.' }; yield { fim: true }; })();
+  } });
+  const { conversa_id } = await (await pedir('/api/stand/sessao', {})).json();
+  for (let i = 1; i <= 9; i++) {
+    const texto = i === 9 ? 'Como funciona a plataforma?' : `Pergunta ${i}?`;
+    const linhas = await linhasNdjson(await pedir('/api/stand/turno', {
+      conversa_id, texto, turno_id: `p:${i}`,
+      ...(i === 1 ? { tela: 'Experiências já abertas: simulacao, sonolencia.' } : {}),
+    }));
+    assert.equal(linhas.at(-1).motivo, 'ok');
+    assert.ok(!linhas.some((l) => l.texto === FALAS.teto_respostas || l.texto === FALAS.saudacao));
+  }
+  assert.equal(guarda.usadas('demo'), 2);
+  assert.match(vistas.at(-1).at(-1).content, /^Como funciona a plataforma/);
+  assert.ok(vistas.at(-1).length <= 10, 'contexto mínimo: quatro pares mais pergunta e sistema');
+  assert.match(vistas.at(-1)[0].content, /já abertas nesta visita: simulacao, sonolencia/);
+});
+
+test('continuidade: reserva de600 renova antes do TTS2000 sem resposta muda', async (t) => {
+  const guarda = criarGuardaDeSessoes();
+  const pedir = await subir11(t, { guarda, teto: criarTetoDiario({ teto: 100000 }), chamarModelo: async () => (
+    async function* () { yield { texto: `${'Palavra '.repeat(90)}fim.` }; yield { fim: true }; }
+  )() });
+  const { conversa_id } = await (await pedir('/api/stand/sessao', {})).json();
+  for (let i = 0; i < 4; i++) {
+    const linhas = await linhasNdjson(await pedir('/api/stand/turno', { conversa_id, texto: 'Explique o alerta.' }));
+    assert.ok(linhas.some((l) => l.t === 'audio'));
+    assert.ok(!linhas.some((l) => l.aviso === 'teto_caracteres_tts'));
+    assert.ok(linhas.filter((l) => l.t === 'frase').reduce((s, l) => s + l.texto.length, 0) <= 600);
+  }
+  assert.equal(guarda.usadas('demo'), 2);
+});
+
+test('continuidade: ativa cruza240/300s, abandono expira e fim legítimo cobra uma vez', async (t) => {
+  let relogio = 0;
+  const guarda = criarGuardaDeSessoes({ agora: () => relogio });
+  const teto = criarTetoDiario({ teto: 100000 });
+  const pedir = await subir11(t, { guarda, teto, agora: () => relogio });
+  const { conversa_id } = await (await pedir('/api/stand/sessao', {})).json();
+  relogio = 239000;
+  await linhasNdjson(await pedir('/api/stand/turno', { conversa_id, texto: 'Ainda aqui.' }));
+  relogio = 240000;
+  assert.equal((await linhasNdjson(await pedir('/api/stand/turno', { conversa_id, texto: 'Você tá me vendo agora?' }))).at(-1).motivo, 'ok');
+  assert.equal(guarda.usadas('demo'), 2);
+  relogio = 301000;
+  assert.equal((await linhasNdjson(await pedir('/api/stand/turno', { conversa_id, texto: 'E a câmera?' }))).at(-1).motivo, 'ok');
+  assert.equal((await pedir('/api/stand/turno', { conversa_id, evento: 'fim' })).status, 200);
+  const usado = teto.usados();
+  assert.equal((await pedir('/api/stand/turno', { conversa_id, evento: 'fim' })).status, 404);
+  assert.equal(teto.usados(), usado);
+  const { conversa_id: abandonada } = await (await pedir('/api/stand/sessao', {})).json();
+  relogio += 301000;
+  assert.equal((await pedir('/api/stand/turno', { conversa_id: abandonada, texto: 'Voltei.' })).status, 410);
+  assert.ok(teto.usados() - usado < 40, 'abandono cobra último uso+50s, não301s');
+});
 
 test('elevenlabs é o padrão: sessão devolve token Scribe, conversa e nunca a chave', async (t) => {
   const pedidos = [];
@@ -215,6 +277,64 @@ test('elevenlabs é o padrão: sessão devolve token Scribe, conversa e nunca a 
   assert.match(corpo.conversa_id, /^[0-9a-f-]{36}$/);
   assert.deepEqual(corpo.sessao, { modo: 'turnos', entrada_hz: 24000, saida_hz: 24000 });
   assert.equal(pedidos.find((p) => p.url.endsWith('realtime_scribe')).init.headers['xi-api-key'], CHAVE_11);
+});
+
+test('renovação negada preserva pergunta; continuar explícito retoma uma vez, diário não chama TTS', async (t) => {
+  let permitir = false;
+  let vagas = 0;
+  const guarda = { tentar: () => ++vagas === 1 || permitir };
+  const vistas = [];
+  const teto = criarTetoDiario({ teto: 100000 });
+  const pedir = await subir11(t, { guarda, teto, chamarModelo: async ({ mensagens }) => {
+    vistas.push(mensagens.at(-1).content);
+    return (async function* () { yield { texto: 'Certo.' }; yield { fim: true }; })();
+  } });
+  const { conversa_id } = await (await pedir('/api/stand/sessao', {})).json();
+  for (let i = 1; i <= 8; i++) await linhasNdjson(await pedir('/api/stand/turno', { conversa_id, texto: `Pergunta ${i}` }));
+  const pausa = await linhasNdjson(await pedir('/api/stand/turno', { conversa_id, texto: 'Como funciona o LUCA?', turno_id: 'p:9' }));
+  assert.equal(pausa.at(-1).motivo, 'pausa_limite');
+  assert.equal(pausa.at(-1).causa, 'hora');
+  assert.match(pausa.at(-1).texto, /limite de uso por hora/);
+  assert.equal(vistas.length, 8);
+  permitir = true;
+  const retry = await linhasNdjson(await pedir('/api/stand/turno', { conversa_id, texto: 'Como funciona o LUCA?', turno_id: 'p:9' }));
+  assert.equal(retry.at(-1).motivo, 'ja_processado', 'não reenvia cegamente o pedido pausado');
+  await linhasNdjson(await pedir('/api/stand/turno', { conversa_id, texto: 'continuar', turno_id: 'p:10' }));
+  assert.match(vistas.at(-1), /^Como funciona o LUCA/);
+  assert.equal(vistas.length, 9);
+  teto.somar(100000);
+  const diario = await linhasNdjson(await pedir('/api/stand/turno', { conversa_id, texto: 'Outra pergunta' }));
+  assert.equal(diario.at(-1).causa, 'diario');
+  assert.deepEqual(diario.map((l) => l.t), ['fim']);
+  assert.equal(vistas.length, 9);
+});
+
+test('turno_id: dois pedidos concorrentes e retry concluído nunca repetem ação', async (t) => {
+  let entrou;
+  const iniciado = new Promise((ok) => { entrou = ok; });
+  let soltar;
+  const continuar = new Promise((ok) => { soltar = ok; });
+  let chamadas = 0;
+  const pedir = await subir11(t, { teto: criarTetoDiario({ teto: 100000 }), chamarModelo: async () => {
+    chamadas++;
+    return (async function* () {
+      entrou();
+      await continuar;
+      yield { fim: true, ferramentas: [{ id: 'f1', type: 'function', function: { name: 'tocar_video', arguments: '{"id":"pipeline-completo"}' } }] };
+    })();
+  } });
+  const { conversa_id } = await (await pedir('/api/stand/sessao', {})).json();
+  const corpo = { conversa_id, texto: 'Mostre o vídeo', turno_id: 'mesmo:1' };
+  const primeiro = pedir('/api/stand/turno', corpo);
+  await iniciado;
+  assert.equal((await pedir('/api/stand/turno', corpo)).status, 409);
+  soltar();
+  const linhas = await linhasNdjson(await primeiro);
+  assert.equal(linhas.filter((l) => l.t === 'evento').length, 1);
+  const retry = await linhasNdjson(await pedir('/api/stand/turno', corpo));
+  assert.deepEqual(retry.map((l) => l.t), ['fim']);
+  assert.equal(retry.at(-1).motivo, 'ja_processado');
+  assert.equal(chamadas, 1);
 });
 
 test('escuta: padrão no provedor em turnos, STAND_ESCUTA=0 desliga, Grok nunca', () => {

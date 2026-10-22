@@ -25,6 +25,13 @@ export interface ComandoVoz {
 
 export const COMANDOS_VOZ: readonly ComandoVoz[] = Object.freeze(([
   {
+    id: 'vitrine',
+    titulo: 'Ver a vitrine',
+    exemplo: 'Quero ver a vitrine',
+    faz: 'Abre a mesma Vitrine do botão',
+    ferramentas: ['abrir_vitrine'],
+  },
+  {
     id: 'simulacao',
     titulo: 'Dirigir o trator',
     exemplo: 'Quero testar o simulador',
@@ -143,4 +150,25 @@ export function comandoDireto(texto: string): 'simulacao' | null {
   if (alvo >= 0 && verbo >= 0 && verbo < alvo) return 'simulacao';
   if (JOGAR_DIRETO.test(frase)) return 'simulacao';
   return null;
+}
+
+export type PedidoDireto = 'simulacao' | 'vitrine' | 'animal' | 'obstaculo' | 'voltar' | 'ajuda';
+
+/** Nomes da navegação têm prioridade sobre a escolha probabilística do modelo. */
+export function pedidoDireto(texto: string): PedidoDireto | null {
+  const frase = normalizar(texto);
+  if (!frase || frase.split(' ').length > 18 || /\b(nao|nunca)\b/.test(frase)) return null;
+  if (/^(?:por favor )?(?:volta|voltar|volte|sair|sai)(?: pra| para| a| pro| para a| para o)?(?: coruja| inicio)?(?: por favor)?$/.test(frase)) return 'voltar';
+  if (/^(como (?:eu )?(?:dirijo|dirige|acelero|freio)|como funciona o controle|(?:me )?ajuda(?: aqui| no simulador)?)$/.test(frase)) return 'ajuda';
+  // "Como funciona..." e "o que é..." continuam sendo perguntas, sem navegação.
+  if (/\b(como|explica|saber|entender|o que|qual)\b/.test(frase)) return null;
+  const pede = /\b(quero|queria|abre|abrir|abra|mostra|mostrar|mostre|ver|veja|testa|testar)\b/.test(frase);
+  if (pede && /\bvitrine\b/.test(frase)) return 'vitrine';
+  if (pede && /\b(animal|animais|vaca|boi)\b/.test(frase) && /\b(pista|estrada)\b/.test(frase)) return 'animal';
+  if (pede && /\b(fardo|obstaculo)\b/.test(frase)) return 'obstaculo';
+  return comandoDireto(texto);
+}
+
+export function aceitaAlternativa(texto: string): boolean {
+  return /^(sim|pode|pode mostrar|quero|quero ver|mostra|mostre|vamos|bora)( por favor)?$/.test(normalizar(texto));
 }

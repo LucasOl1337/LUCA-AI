@@ -22,7 +22,7 @@ export function limparLinha(texto: string, max = RETRATO_MAX): string {
 
 const juntar = (partes: Array<string | null | false | undefined>) => partes.filter(Boolean).join('. ');
 
-const ESTADO_SONO: Record<string, string> = { idle: 'webcam desligada', starting: 'webcam ligando', running: 'webcam ligada', error: 'webcam com erro' };
+const ESTADO_SONO: Record<string, string> = { idle: 'webcam desligada', starting: 'webcam ligando', running: 'monitor pronto e som liberado', error: 'webcam com erro' };
 const SENSIBILIDADE: Record<string, string> = { low: 'baixa', normal: 'normal', high: 'alta' };
 
 export function retratoDaPagina(caminho: string, ler: LeitorTela): string {
@@ -34,6 +34,7 @@ export function retratoDaPagina(caminho: string, ler: LeitorTela): string {
         'Página sonolência',
         ESTADO_SONO[estado] ?? null,
         estado === 'running' && ler.texto('.drowsiness-panel h2'),
+        estado === 'idle' && 'demonstração ainda inativa; toque em Ativar webcam',
         estado === 'error' && ler.texto('.drowsiness-panel .drowsiness-message'),
         sens && `sensibilidade ${SENSIBILIDADE[sens] ?? sens}`,
       ]));
