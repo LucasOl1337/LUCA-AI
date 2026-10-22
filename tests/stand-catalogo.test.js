@@ -68,7 +68,8 @@ test('pergunta do menu é evento da página válido, com limite de 500 caractere
 
 test('painel ao lado da coruja: grupos são botões (não texto morto), com ou sem voz', () => {
   const html = renderToStaticMarkup(createElement(PainelComandos, { voz: false, aoEscolher() {} }));
-  assert.equal((html.match(/<button/g) ?? []).length, CATALOGO.length);
+  assert.equal((html.match(/<button/g) ?? []).length, CATALOGO.filter((g) => g.id !== 'sonolencia').length);
+  assert.doesNotMatch(html, /data-comando="sonolencia"/);
   assert.match(html, /Toque para ver/);
   assert.match(renderToStaticMarkup(createElement(PainelComandos, { voz: true, aoEscolher() {} })), /Toque ou peça/);
 });
@@ -76,7 +77,8 @@ test('painel ao lado da coruja: grupos são botões (não texto morto), com ou s
 test('menu: nível 1 lista grupos; nível 2 mostra todas as opções, motivo de indisponível e o retorno', () => {
   const base = { aberto: true, status: null, indisponivel: () => null, motivoSemTexto: null, aoAbrirGrupo() {}, aoFechar() {}, aoExecutar() {}, aoPerguntar() {} };
   const n1 = renderToStaticMarkup(createElement(MenuTotem, { ...base, grupo: null }));
-  assert.equal((n1.match(/data-grupo="/g) ?? []).length, CATALOGO.length);
+  assert.equal((n1.match(/data-grupo="/g) ?? []).length, CATALOGO.filter((g) => g.id !== 'sonolencia').length);
+  assert.doesNotMatch(n1, /data-grupo="sonolencia"/);
   const sompo = CATALOGO.find((g) => g.id === 'sompo');
   const n2 = renderToStaticMarkup(createElement(MenuTotem, {
     ...base,

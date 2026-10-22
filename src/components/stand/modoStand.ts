@@ -129,8 +129,8 @@ export function reduzirModo(atual: EstadoModo, entrada: EntradaModo, agora: numb
         return { ...atual, modo: 'coruja', marco: agora, pagina: null };
       }
       if (atual.modo === 'simulacao') {
-        if (parado < SIMULACAO_PARADA_MS) return atual;
-        return { ...atual, modo: 'coruja', marco: agora, pagina: null };
+        // Uma run só termina por chegada/sinistro ou saída explícita, nunca idle.
+        return atual;
       }
       // Vitrine pausada por alguém que foi embora volta a tocar.
       if (atual.pausado && parado >= REPOUSO_MS) return { ...atual, pausado: false };
@@ -141,7 +141,7 @@ export function reduzirModo(atual: EstadoModo, entrada: EntradaModo, agora: numb
 
 /** Segundos até a Simulação ou o Site parados voltarem pro repouso, só durante o aviso; senão null. */
 export function avisoDeSaida(estado: EstadoModo, agora: number): number | null {
-  if (estado.modo !== 'simulacao' && estado.modo !== 'site') return null;
+  if (estado.modo !== 'site') return null;
   const resta = SIMULACAO_PARADA_MS - (agora - estado.marco);
   if (resta > AVISO_SIMULACAO_MS || resta <= 0) return null;
   return Math.ceil(resta / 1000);

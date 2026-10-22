@@ -9,7 +9,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
  * (alfa recorta a silhueta): 6 triângulos por planta mantém ~20 mil pés
  * dentro do orçamento do teste de recursos: densidade de lavoura de verdade.
  */
-export function createSompoCropRows(groundHeight: (x: number, z: number) => number, compact: boolean, height = 1, operation = false, mature = false) {
+export function createSompoCropRows(groundHeight: (x: number, z: number) => number, compact: boolean, height = 1, operation = false, mature = false, circuitRoute?: readonly { x: number; z: number }[]) {
   const root = new THREE.Group(); root.name = 'sompo-agri-crop-rows';
   const leaf = (lean: number, spread: number) => {
     const quad = new THREE.PlaneGeometry(0.78, 1, 1, 1);
@@ -89,7 +89,12 @@ export function createSompoCropRows(groundHeight: (x: number, z: number) => numb
       const x = operation ? -80 + tile * 20 + col * 20 / columns + Math.sin(seed * 1.7) * .1 : -64 + tile * 16 + col * 16 / columns + Math.sin(seed * 1.7) * .1;
       // A máquina deixa uma faixa de restolho; a lavoura começa inteira.
       const z = operation ? -50 + row * 96 / rows + Math.sin(seed * 2.1) * .09 : -12 + row * 24 / rows + Math.sin(seed * 2.1) * .09;
-      const girth = 1.15 + (Math.sin(seed * 3.7) * .5 + .5) * .5;
+      const pertoRota = circuitRoute?.slice(1).some((p, i) => {
+        const a = circuitRoute[i], dx = p.x - a.x, dz = p.z - a.z;
+        const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz)));
+        return Math.hypot(x - a.x - t * dx, z - a.z - t * dz) < 5;
+      });
+      const girth = pertoRota ? 0.02 : 1.15 + (Math.sin(seed * 3.7) * .5 + .5) * .5;
       dummy.position.set(x, groundHeight(x, z), z);
       dummy.rotation.set(0, 0, 0); dummy.scale.set(girth, height * (1.3 + (Math.sin(seed) * .5 + .5) * .6), girth); dummy.updateMatrix();
       mesh.setMatrixAt(row * columns + col, dummy.matrix);

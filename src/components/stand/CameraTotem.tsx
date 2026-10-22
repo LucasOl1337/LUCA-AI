@@ -28,8 +28,11 @@ export function useCameraTotem(modo: Modo): { camera: EstadoCamera; presenca: Pr
   const [presenca, setPresenca] = useState<Presenca>('desconhecida');
   const visao = useRef<ReturnType<typeof criarVisaoTotem> | null>(null);
   const estado = useSyncExternalStore((fn) => camera().assinar(fn), () => camera().ler(), () => SEM_CAMERA);
+  const naSimulacao = modo === 'simulacao';
 
   useEffect(() => {
+    // A simulação tem consentimento próprio, OFF por padrão; libera captura/detector da Coruja.
+    if (naSimulacao) { camera().desligar(); sonoCabine.definir(null); return; }
     const soltarSom = somCompartilhado.ligarDestravas(window, document);
     const cam = camera();
     const janela = window as unknown as Record<string, unknown>;
@@ -66,7 +69,7 @@ export function useCameraTotem(modo: Modo): { camera: EstadoCamera; presenca: Pr
       soltarSono();
       aoVivo.marcarSono(null);
     };
-  }, []);
+  }, [naSimulacao]);
 
   useEffect(() => { visao.current?.aoMudarModo(); }, [modo]);
 

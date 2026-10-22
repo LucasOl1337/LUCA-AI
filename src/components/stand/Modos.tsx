@@ -1,7 +1,7 @@
 import { lazy, memo, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { MODOS, ROTULO_MODO, type Modo } from './modoStand';
 import type { ItemVitrine } from './vitrineStand';
-import { WebcamSimulacao } from './CameraTotem';
+
 
 /** Vitrine, Simulação e a barra de modos do totem (grill r1, Q1–Q7). */
 
@@ -74,7 +74,7 @@ export const SimulacaoStand = memo(function SimulacaoStand() {
       <Suspense fallback={<p className="stand-simulacao-carregando" role="status">Ligando o trator…</p>}>
         <SimuladorKiosk />
       </Suspense>
-      <WebcamSimulacao />
+
     </section>
   );
 });

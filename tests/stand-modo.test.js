@@ -39,7 +39,7 @@ test('Vitrine em loop: ao fim da volta sem ninguém, volta pra Coruja; com gente
   assert.deepEqual([gente.modo, gente.video], ['vitrine', 0], 'volta completa com gente perto continua na Vitrine');
 });
 
-test('Simulação nunca entra sozinha e, parada 90 s, volta pra Coruja com 10 s de aviso', () => {
+test('Simulação nunca entra sozinha e não expulsa a run por inatividade', () => {
   let e = modoInicial(0);
   for (let t = 0; t < 600_000; t += 500) {
     e = passo(e, { tipo: 'relogio' }, t);
@@ -48,12 +48,13 @@ test('Simulação nunca entra sozinha e, parada 90 s, volta pra Coruja com 10 s 
   }
   let sim = passo(modoInicial(0), { tipo: 'ir', modo: 'simulacao' }, 1000);
   assert.equal(avisoDeSaida(sim, 1000 + SIMULACAO_PARADA_MS - 10_001), null);
-  assert.equal(avisoDeSaida(sim, 1000 + SIMULACAO_PARADA_MS - 10_000), 10);
-  assert.equal(avisoDeSaida(sim, 1000 + SIMULACAO_PARADA_MS - 400), 1);
+  assert.equal(avisoDeSaida(sim, 1000 + SIMULACAO_PARADA_MS - 10_000), null);
+  assert.equal(avisoDeSaida(sim, 1000 + SIMULACAO_PARADA_MS - 400), null);
   const mexeu = passo(sim, { tipo: 'atividade' }, 1000 + SIMULACAO_PARADA_MS - 2000);
   assert.equal(avisoDeSaida(mexeu, 1000 + SIMULACAO_PARADA_MS - 1000), null, 'mexer no controle cancela o aviso');
   sim = passo(sim, { tipo: 'relogio' }, 1000 + SIMULACAO_PARADA_MS);
-  assert.equal(sim.modo, 'coruja');
+  assert.equal(sim.modo, 'simulacao');
+  assert.equal(passo(sim, { tipo: 'relogio' }, 900_000).modo, 'simulacao');
 });
 
 test('pausa só vale na Vitrine e se desfaz quando a pessoa vai embora', () => {

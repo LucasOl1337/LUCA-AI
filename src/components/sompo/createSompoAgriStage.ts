@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { criarSinalizacaoCircuito } from '../gameplay/sinalizacaoCircuito';
 import { rigSompoAgriAsset, SOMPO_AGRI_RIG_LAYOUT } from './rigSompoAgriAsset';
 import { createSompoMotionPath, integrateSompoMotion } from '../../../shared/sompo-motion.js';
 import { createSompoPastureSurface } from './createSompoPastureSurface';
@@ -144,7 +145,7 @@ function createUltrasonicBeam(origin: readonly [number, number, number]) {
  * real em forma fechada: separado do loop do caminhão para não arriscar o
  * fluxo rural. Desmontado e remontado a cada troca de cenário/desfecho.
  */
-export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig, adaptiveQuality = false, obstaclesRef, assetUrl, qualityProfile = PERFIL_PADRAO, terrainRelief, cropHeight, look, waterZones }: {
+export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig, adaptiveQuality = false, obstaclesRef, assetUrl, qualityProfile = PERFIL_PADRAO, terrainRelief, cropHeight, look, waterZones, circuitRoute }: {
   mount: HTMLElement;
   scenarioId: SompoAgriScenarioId;
   outcomeId: string;
@@ -182,6 +183,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   look?: (ctx: SompoLookContexto) => SompoLook;
   /** Lâminas d'água planas (retângulos x0..x1, z0..z1 em metros): a área alagada do gameplay, a mesma do geofence. */
   waterZones?: readonly { x0: number; x1: number; z0: number; z1: number }[];
+  circuitRoute?: readonly { x: number; z: number }[];
 }): SompoAgriStageApi | null {
   const scenario = getSompoAgriScenario(scenarioId);
   const operation = scenario.environmentId === 'geofence-operacao';
@@ -220,7 +222,8 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   scene.add(worldRoot);
   const night = scenario.environmentId === 'row-crop-field-night';
   const budget = sompoRenderBudget();
-  const field = createSompoAgriScene(worldRoot, scenario.environmentId, budget.compact, scenario.equipmentId, terrainRelief, cropHeight);
+  const field = createSompoAgriScene(worldRoot, scenario.environmentId, budget.compact, scenario.equipmentId, terrainRelief, cropHeight, circuitRoute);
+  if (circuitRoute) criarSinalizacaoCircuito(worldRoot, circuitRoute, field.groundHeight);
   const atmosphere = createSompoAtmosphere(scene, renderer, field.sun);
   const post = createSompoPostProcessing(renderer, scene, camera);
   const lookAtivo = look?.({ mount, scene, renderer, sun: field.sun, setPostGrade: (on) => post.setGrade(on), night }) ?? null;
