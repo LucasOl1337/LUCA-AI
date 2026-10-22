@@ -48,8 +48,9 @@ export function PainelCabineVista({ painel, estado }: { painel: AlertaCabine; es
           )}
         </div>
         <span className="gameplay-painel-marca">LUCA-AI</span>
+        {/* Ancorada no painel: sobe junto com ele (retrato, percurso) e nunca cobre os selos. */}
+        <ComandosSimulacao />
       </section>
-      <ComandosSimulacao />
       <MapaTalhao estado={estado} geofence={painel.geofence} />
     </div>
   );

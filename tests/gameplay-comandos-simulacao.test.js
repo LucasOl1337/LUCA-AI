@@ -61,3 +61,13 @@ test('PainelCabine e DesafioCabine (usados na Simulação do /stand e em /gamepl
   assert.match(htmlDesafio, /Acelerar\/Frear/);
   assert.match(htmlDesafio, /Teclado\/Mouse/);
 });
+
+test('a legenda mora dentro do painel da cabine: sobe junto com ele em retrato e não cobre os selos', async () => {
+  const e = estadoBase();
+  const html = renderToStaticMarkup(createElement(PainelCabineVista, { painel: alertaCabine(e), estado: e }));
+  const secao = html.match(/<section class="gameplay-painel-cabine"[\s\S]*?<\/section>/)?.[0] ?? '';
+  assert.match(secao, /data-comandos-simulacao=""/);
+  const { readFile } = await import('node:fs/promises');
+  const css = await readFile(new URL('../src/components/gameplay/painelCabine.css', import.meta.url), 'utf8');
+  assert.match(css, /\.gameplay-painel-cabine > \.gameplay-comandos \{[^}]*bottom: calc\(100% \+ 18px\)/);
+});

@@ -105,6 +105,13 @@
   border: 1px solid rgba(159, 201, 173, 0.22); backdrop-filter: blur(6px);
   font-size: clamp(10px, 1.18cqh, 13px); line-height: 1.25; pointer-events: none;
 }
+/* Dentro do painel da cabine: logo acima dele, livre dos selos SIMULADO/LUCA-AI (top: -12px). */
+.gameplay-painel-cabine > .gameplay-comandos {
+  left: 0; bottom: calc(100% + 18px); max-width: 94cqw;
+  text-transform: none; letter-spacing: normal;
+}
+.gameplay-painel-cabine .gameplay-comandos span { font-size: inherit; color: inherit; text-transform: none; letter-spacing: normal; }
+.gameplay-painel-cabine .gameplay-comandos .gameplay-comandos-rotulo { font-size: .92em; color: #b9cdbf; text-transform: uppercase; letter-spacing: .04em; }
 .gameplay-comandos-linha {
   display: flex; align-items: center; gap: 7px; white-space: nowrap;
 }
@@ -171,5 +178,4 @@
 @container (max-aspect-ratio: 4 / 5) {
   .gameplay-desafio.gameplay-percurso .gameplay-painel-cabine,
   .gameplay-desafio.gameplay-percurso .gameplay-mapa { bottom: 11.5cqh; }
-  .gameplay-desafio.gameplay-percurso .gameplay-comandos { bottom: calc(11.5cqh + clamp(114px, 14.5cqh, 164px)); }
 }
