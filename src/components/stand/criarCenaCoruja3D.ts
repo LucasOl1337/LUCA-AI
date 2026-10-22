@@ -8,7 +8,7 @@ import {
   CLIPE_ENTRADA, CLIPE_FELIZ, CLIPE_POR_VOZ, CORUJA_3D_PUBLICO, CORUJA_3D_URL, CROSSFADE_S, ENQUADRAMENTO, MALHA_OLHOS, MORPH_BICO,
   OSSO_CABECA, OSSO_PESCOCO, acenoFala, brilhoCoruja3D, cabecaViva, novaMemoriaCabeca, novaMemoriaRosto, rostoCoruja3D, type MemoriaBrilho,
 } from './coruja3dRig';
-import { OLHOS_CANVAS, desenharOlhos, novaMemoriaOlhos, olhosCoruja3D } from './coruja3dOlhos';
+import { OLHOS_CANVAS, OLHOS_RECORTE, desenharOlhos, novaMemoriaOlhos, olhosCoruja3D } from './coruja3dOlhos';
 
 /**
  * Cena three.js da Coruja 3D. Fica num módulo próprio, importado sob demanda
@@ -49,7 +49,7 @@ function acharRosto(raiz: THREE.Object3D): Rosto[] {
 
 /**
  * Tela dos olhos: canvas 2D como textura da malha `CorujaOlhos`. Transparente
- * fora do olho; emissivo fraco, como uma tela atrás do vidro do visor.
+ * fora da abertura; dentro, o olho pintado (recorte) com a mesma luz do visor.
  */
 function criarTelaOlhos() {
   const canvas = document.createElement('canvas');
@@ -61,8 +61,8 @@ function criarTelaOlhos() {
   textura.colorSpace = THREE.SRGBColorSpace;
   textura.anisotropy = 4;
   const material = new THREE.MeshStandardMaterial({
-    map: textura, emissiveMap: textura, emissive: 0xffffff, emissiveIntensity: 0.32,
-    transparent: true, depthWrite: false, roughness: 0.18, metalness: 0,
+    map: textura, emissiveMap: textura, emissive: 0xffffff, emissiveIntensity: 0.2,
+    transparent: true, depthWrite: false, roughness: 0.35, metalness: 0,
   });
   return { ctx, textura, material };
 }
@@ -89,13 +89,14 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
   renderer.setPixelRatio(Math.min(Math.max(window.devicePixelRatio || 1, 1.5), 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 0.92;
   renderer.setClearColor(0x000000, 0);
 
   const cena = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(ENQUADRAMENTO.fov, 1, 0.1, 20);
-  cena.add(new THREE.HemisphereLight(0xdcefff, 0x10203a, 0.9));
-  const chave = new THREE.DirectionalLight(0xffffff, 2.2);
+  // Penas brancas estouravam com a chave forte: luz mais baixa e lateral, sombra no peito.
+  cena.add(new THREE.HemisphereLight(0xdcefff, 0x10203a, 0.7));
+  const chave = new THREE.DirectionalLight(0xfff6ec, 1.8);
   chave.position.set(1.6, 2.4, 3);
   cena.add(chave);
   const recorte = new THREE.DirectionalLight(0x64d2ff, 1.6);
@@ -105,7 +106,7 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
   const sala = new RoomEnvironment();
   const ambiente = pmrem.fromScene(sala, 0.04);
   cena.environment = ambiente.texture;
-  cena.environmentIntensity = 0.55;
+  cena.environmentIntensity = 0.45;
   liberar(sala);
   pmrem.dispose();
 
@@ -132,6 +133,8 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
   /** Clipe de uma vez em curso (aceno de entrada ou feliz depois da fala). */
   let umaVez: THREE.AnimationAction | null = null;
   const emissivos: THREE.MeshStandardMaterial[] = [];
+  /** Recorte do olho pintado para a tela; sem ele a tela fica transparente. */
+  let recorteOlhos: HTMLImageElement | null = null;
   let quadro = 0;
   let encerrado = false;
   const qPai = new THREE.Quaternion();
@@ -203,6 +206,7 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
     const v = vozAtual ?? 'ocioso';
     const brilho = brilhoCoruja3D(memoria, v, nivel.current, agora);
     for (const m of emissivos) m.emissiveIntensity = brilho;
+    acenderTela(brilho);
     const reduzido = movimentoReduzido?.matches ?? false;
     const acenando = entrada !== null && umaVez === entrada && entrada.isRunning();
     const rosto = rostoCoruja3D(memoriaRosto, v, nivel.current, agora, { acenando, movimentoReduzido: reduzido });
@@ -224,12 +228,17 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
     aoQuadro?.(v, memoria.nivel, agora);
   }
 
+  /** A tela tapa a íris pintada, que brilha com o emissivo: acompanha o brilho do visor. */
+  function acenderTela(brilho: number) {
+    if (tela) tela.material.emissiveIntensity = 0.12 + brilho * 0.18;
+  }
+
   function pintarOlhos(olhos: ReturnType<typeof olhosCoruja3D>) {
     if (!tela?.ctx) return;
     const chave = [olhos.abertura, olhos.x, olhos.y, olhos.feliz, olhos.pupila].map((n) => n.toFixed(3)).join();
     if (chave === ultimoDesenho) return;
     ultimoDesenho = chave;
-    desenharOlhos(tela.ctx, olhos);
+    desenharOlhos(tela.ctx, olhos, recorteOlhos);
     tela.textura.needsUpdate = true;
   }
 
@@ -252,12 +261,18 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
   };
   canvas.addEventListener('webglcontextlost', contextoPerdido);
 
+  const pastaPublica = CORUJA_3D_PUBLICO.replace(/[^/]+$/, '');
+  const imagemOlhos = new Image();
+  imagemOlhos.src = pastaPublica + OLHOS_RECORTE;
+  const recortePronto = imagemOlhos.decode().then(() => imagemOlhos, () => null);
+
   (async () => {
     const resposta = await fetch(CORUJA_3D_URL, { signal: abortar.signal });
     if (!resposta.ok) throw new Error(`Coruja 3D: HTTP ${resposta.status}`);
     const gltf = await useSompoExternalTextures(new GLTFLoader()).parseAsync(await resposta.arrayBuffer(), '/stand/avatar/coruja-3d/');
     // O GLB vem com hash de /assets/; o manifesto e as imagens seguem no caminho público.
     await restoreSompoTextures(gltf, CORUJA_3D_PUBLICO, abortar.signal);
+    recorteOlhos = await recortePronto;
     if (encerrado) { liberar(gltf.scene); return; }
     modelo = gltf.scene;
     // O modelo olha para +X (Tripo); a câmera está em +Z.
@@ -278,6 +293,8 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
           // O mesh do Tripo tem frestas de subpixel entre as penas; com face única o fundo
           // vaza por elas em pontinhos escuros. Dupla face tapa com o interior claro.
           m.side = THREE.DoubleSide;
+          // Boca: sem o reflexo cinza da sala, senão o interior lê como plástico.
+          if (m.name === 'coruja-3d-boca') m.envMapIntensity = 0.1;
           if (m.emissiveMap && !emissivos.includes(m)) { m.emissive.set(0xffffff); emissivos.push(m); }
         }
       }
@@ -296,6 +313,7 @@ export function criarCenaCoruja3D({ canvas, voz, nivel, parado, aoPronto, aoFalh
       acoes.get(CLIPE_POR_VOZ.ocioso)!.play();
       mixer.update(0);
       for (const m of emissivos) m.emissiveIntensity = 0.55;
+      acenderTela(0.55);
       pintarOlhos(olhosCoruja3D(memoriaOlhos, 'ocioso', 0, performance.now(), { movimentoReduzido: true }));
       renderer.render(cena, camera);
       aoPronto();

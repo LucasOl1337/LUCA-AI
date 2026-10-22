@@ -128,8 +128,8 @@ test('GLB traz o rosto: bico_abre na principal (bico de cima) e no rosto (boca +
     assert.equal(p.targets.length, 1);
     // Esparso e pequeno: só os vértices do bico se movem, penas vizinhas ficam paradas.
     const alvo = json.accessors[p.targets[0].POSITION];
-    assert.ok(alvo.sparse && alvo.sparse.count > 10 && alvo.sparse.count < 120, `bico com ${alvo.sparse?.count} vértices`);
-    assert.ok(Math.max(...alvo.max.map(Math.abs), ...alvo.min.map(Math.abs)) < 0.05, 'desloca menos de 5 cm (bico sobe 20°)');
+    assert.ok(alvo.sparse && alvo.sparse.count > 10 && alvo.sparse.count < 400, `bico de cima com peso suave: com ${alvo.sparse?.count} vértices`);
+    assert.ok(Math.max(...alvo.max.map(Math.abs), ...alvo.min.map(Math.abs)) < 0.05, 'desloca menos de 5 cm (bico sobe 8°)');
   }
   // Interior da boca: material próprio quase preto, sem textura (fora do manifesto externo).
   const materiais = rosto.primitives.map((p) => json.materials[p.material]);
@@ -198,8 +198,9 @@ test('bico abre com o áudio só falando, suavizado, e fecha fora da fala', () =
   const { m } = relogioRosto([0.99]);
   let bico = 0;
   for (let t = 16; t <= 320; t += 16) bico = rig.rostoCoruja3D(m, 'falando', 0.4, t).bico;
-  const alvo = 0.4 * rig.GANHO_BICO;
-  assert.ok(bico > alvo - 0.03 && bico <= alvo, `abre até o nível com ganho (fala típica ~0,4): ${bico}`);
+  const alvo = rig.curvaBico(0.4 * rig.GANHO_BICO);
+  assert.ok(alvo > 0.7, 'fala típica abre bem o bico (o gancho esconde o começo)');
+  assert.ok(bico > alvo - 0.03 && bico <= alvo, `abre até o nível com ganho e curva (fala típica ~0,4): ${bico}`);
   const primeiro = rig.rostoCoruja3D(m, 'ouvindo', 0.4, 336).bico;
   assert.ok(primeiro < bico && primeiro > 0.35, 'fecha devagar, sem estalo');
   for (let t = 352; t <= 1500; t += 16) bico = rig.rostoCoruja3D(m, 'ouvindo', 0.4, t).bico;
