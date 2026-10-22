@@ -28,6 +28,7 @@ import type { ItemCatalogo } from '../../shared/stand/catalogo.ts';
 import { TOUR_STAND } from '../../shared/stand/acoes-site.ts';
 import type { ResultadoPlano } from '@/components/stand/site/acaoDoStand';
 import { SeloCamera, useCameraTotem, WebcamCoruja } from '@/components/stand/CameraTotem';
+import { EVENTO_EM_USO as EVENTO_GAMEPLAY_EM_USO } from '@/components/gameplay/eventoEmUso';
 import '@/stand.css';
 
 /** Margem segura padrão (% de cada lado): a moldura de MDF come as bordas. */
@@ -222,6 +223,12 @@ export default function StandPage() {
     despacharModo(acao);
   }, [vozStand, estado.tela, iniciar]);
   const mexeuNoPad = useCallback(() => despacharModo({ tipo: 'atividade' }), []);
+  // Quem espera a análise dos agentes do percurso está usando o totem (estande aberto: nada expulsa usuário ativo).
+  useEffect(() => {
+    const emUso = () => despacharModo({ tipo: 'atividade' });
+    window.addEventListener(EVENTO_GAMEPLAY_EM_USO, emUso);
+    return () => window.removeEventListener(EVENTO_GAMEPLAY_EM_USO, emUso);
+  }, []);
 
   // ── Menu fixo: toque e texto chegam à mesma ação que a voz (grill r1, Q1/Q2/Q5) ──
   const abrirMenu = useCallback((grupo: string | null = null) => {

@@ -129,7 +129,7 @@ function createUltrasonicBeam(origin: readonly [number, number, number]) {
  * real em forma fechada: separado do loop do caminhão para não arriscar o
  * fluxo rural. Desmontado e remontado a cada troca de cenário/desfecho.
  */
-export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig, adaptiveQuality = false, obstaclesRef, assetUrl, qualityProfile = PERFIL_PADRAO, terrainRelief }: {
+export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig, adaptiveQuality = false, obstaclesRef, assetUrl, qualityProfile = PERFIL_PADRAO, terrainRelief, waterZones }: {
   mount: HTMLElement;
   scenarioId: SompoAgriScenarioId;
   outcomeId: string;
@@ -158,6 +158,8 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   qualityProfile?: PerfilQualidade;
   /** Relevo somado ao do ambiente (gameplay: rampa lateral). O `ground` do drive já o inclui. */
   terrainRelief?: (x: number, z: number) => number;
+  /** Lâminas d'água planas (retângulos x0..x1, z0..z1 em metros): a área alagada do gameplay, a mesma do geofence. */
+  waterZones?: readonly { x0: number; x1: number; z0: number; z1: number }[];
 }): SompoAgriStageApi | null {
   const scenario = getSompoAgriScenario(scenarioId);
   const operation = scenario.environmentId === 'geofence-operacao';
@@ -364,6 +366,19 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
       bale.position.set(item.x, field.groundHeight(item.x, item.z), item.z);
     });
   };
+  // Área alagada: lâmina plana, um pouco acima do chão, sem asset novo.
+  const waterMaterial = waterZones?.length ? new THREE.MeshStandardMaterial({ color: 0x2f6f9a, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.82 }) : null;
+  const waterGeometries: THREE.PlaneGeometry[] = [];
+  for (const zone of waterZones ?? []) {
+    const geometry = new THREE.PlaneGeometry(zone.x1 - zone.x0, zone.z1 - zone.z0);
+    waterGeometries.push(geometry);
+    const sheet = new THREE.Mesh(geometry, waterMaterial!);
+    sheet.rotation.x = -Math.PI / 2;
+    const cx = (zone.x0 + zone.x1) / 2, cz = (zone.z0 + zone.z1) / 2;
+    sheet.position.set(cx, field.groundHeight(cx, cz) + 0.04, cz);
+    sheet.name = 'area-alagada';
+    worldRoot.add(sheet);
+  }
   beacon.position.set(beaconX, beaconTop, beaconZ);
   machine.add(beacon);
   // Giroflex de verdade varre o campo: um feixe estreito girando no topo.
@@ -622,6 +637,8 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
       resizeObserver.disconnect();
       soltarOrbit(orbit);
       field.dispose();
+      for (const geometry of waterGeometries) geometry.dispose();
+      waterMaterial?.dispose();
       if (model) disposeSompoAgriAsset(model);
       assets.dispose();
       skyMap.dispose();

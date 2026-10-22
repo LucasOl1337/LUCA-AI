@@ -332,6 +332,25 @@ test('lab AI aceita JSON cercado ou com prosa e completa a investigação', asyn
   assert.equal(result.body.analysis.hypotheses.length, 4);
 });
 
+test('evidência que cita o instante (elapsedMs) como campo segue válida; só instante, sem medição, derruba o eixo', async (t) => {
+  // Caso real de 21/10: astra-high listou elapsedMs em fields e 3 dos 4 eixos caíram por invalid_evidence_field.
+  const comInstante = structuredClone(validResponse);
+  comInstante.hypotheses[0].evidence[0].fields = ['elapsedMs', 'coolant_temp_c'];
+  const soInstante = structuredClone(validResponse);
+  soInstante.hypotheses[0].evidence[0].fields = ['elapsedMs', 'x'];
+  let resposta = comInstante;
+  const chat = async () => ({ content: JSON.stringify(resposta), toolCalls: [], finishReason: 'stop' });
+  const { request, register } = await fixture(t, { chat });
+  const cookie = await register('instante');
+  const saved = await request('/api/lab/cases', { cookie, body: source() });
+  const ok = await request(`/api/lab/cases/${saved.body.case.id}/analyses`, { cookie, body: {} });
+  assert.equal(ok.body.analysis.status, 'completed');
+  assert.deepEqual(Object.keys(ok.body.analysis.hypotheses[0].evidence[0].values), ['coolant_temp_c']);
+  resposta = soInstante;
+  const ruim = await request(`/api/lab/cases/${saved.body.case.id}/analyses`, { cookie, body: {} });
+  assert.equal(ruim.body.analysis.status, 'unavailable');
+});
+
 test('router network outage is persisted as unavailable and retry creates a new version, never a fake analysis', async (t) => {
   const originalFetch = globalThis.fetch;
   let attempts = 0;

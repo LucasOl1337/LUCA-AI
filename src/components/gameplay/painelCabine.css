@@ -64,7 +64,11 @@
 
 /* No resultado a faixa de alerta já cumpriu o papel e não disputa o cartão. */
 .gameplay-desafio[data-etapa='resultado'] .gameplay-painel-alerta,
-.gameplay-desafio[data-etapa='resultado'] .gameplay-painel-vinheta { display: none; }
+.gameplay-desafio[data-etapa='resultado'] .gameplay-painel-vinheta,
+.gameplay-percurso[data-etapa='transicao'] .gameplay-painel-alerta,
+.gameplay-percurso[data-etapa='transicao'] .gameplay-painel-vinheta,
+.gameplay-percurso[data-etapa='resumo'] .gameplay-painel-alerta,
+.gameplay-percurso[data-etapa='resumo'] .gameplay-painel-vinheta { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .gameplay-painel-alerta { animation: none; }
@@ -91,3 +95,49 @@
 
 /* O minimapa do talhão tem CSS próprio (mapaTalhao.css), importado pelo MapaTalhao. */
 .gameplay-desafio[data-etapa='resultado'] .gameplay-mapa { display: none; }
+
+/* Percurso guiado do totem (PercursoCabine): trilha dos trechos, resumo que espera a pessoa e botões tocáveis. */
+.gameplay-percurso .gameplay-painel-alerta { top: 7.4cqh; }
+.gameplay-percurso-trechos {
+  position: absolute; top: 2.4cqh; left: 50%; transform: translateX(-50%); z-index: 4;
+  display: flex; gap: .6cqw; margin: 0; padding: 0; list-style: none; pointer-events: none;
+}
+.gameplay-percurso-trechos li {
+  padding: .7cqh 1.2cqw; border-radius: 999px; background: #07110ecc; color: #8fa897;
+  font-size: clamp(12px, 1.8cqh, 20px); font-weight: 700; border: 1px solid #ffffff22; white-space: nowrap;
+}
+.gameplay-percurso-trechos li[data-estado='atual'] { color: #07110e; background: #e8c96a; }
+.gameplay-percurso-trechos li[data-estado='feito'] { color: #c9dccf; border-color: #4fbf7a99; }
+.gameplay-percurso-resumo {
+  pointer-events: auto; text-align: left; width: min(980px, 92cqw); max-height: 84cqh; overflow: auto;
+  transform: translate(-50%, -52%); padding: 2.6cqh 3cqw 2.4cqh;
+}
+.gameplay-percurso-resumo .gameplay-painel-selo {
+  position: static; display: table; transform: none; margin: 0 auto 1.2cqh;
+}
+.gameplay-percurso-resumo h2 { text-align: center; font-size: clamp(26px, 4.6cqh, 54px); }
+.gameplay-percurso-resumo > ul li small { display: block; margin-top: .4cqh; }
+.gameplay-percurso-regras { margin-top: 1.6cqh; color: #b9cdbf; font-size: clamp(13px, 1.7cqh, 18px); }
+.gameplay-percurso-regras summary { cursor: pointer; font-weight: 700; }
+.gameplay-percurso-regras ul { margin: 1cqh 0 0; padding-left: 1.2em; list-style: disc; font-size: inherit; display: block; }
+.gameplay-percurso-regras p { font-size: inherit; margin-top: 1cqh; }
+.gameplay-percurso-analise { margin-top: 2cqh; padding: 1.6cqh 1.4cqw; border-radius: 14px; background: #0f2219; color: #dbe8de; font-size: clamp(14px, 1.9cqh, 21px); }
+.gameplay-percurso-analise p { margin: 0; font-size: inherit; color: inherit; }
+.gameplay-percurso-analise ul { margin: 1cqh 0 0; padding-left: 1.2em; list-style: disc; display: block; font-size: inherit; }
+.gameplay-percurso-analise[data-falha] { background: #2a1512; color: #ffd2cb; }
+.gameplay-percurso-caso { margin-top: 1cqh !important; color: #8fa897 !important; font-size: clamp(12px, 1.5cqh, 16px) !important; }
+.gameplay-percurso-acoes { display: flex; flex-wrap: wrap; justify-content: center; gap: 1cqw; margin-top: 2.2cqh; pointer-events: auto; }
+.gameplay-percurso-acoes button {
+  min-height: 56px; padding: 0 1.8cqw; border-radius: 14px; border: 2px solid #4fbf7a99; background: #0f2219; color: #edf3ed;
+  font: inherit; font-size: clamp(16px, 2.2cqh, 24px); font-weight: 750; cursor: pointer;
+}
+.gameplay-percurso-acoes button[data-acao='analisar'] { background: #e8c96a; color: #1d1a0d; border-color: #e8c96a; }
+.gameplay-percurso-acoes button:disabled { opacity: .55; cursor: progress; }
+.gameplay-percurso-acoes kbd { font: inherit; font-size: .72em; padding: 1px 6px; margin-right: 4px; border-radius: 6px; background: #0004; }
+.gameplay-percurso-livre { position: absolute; top: 2.4cqh; right: 2cqw; z-index: 4; margin: 0; pointer-events: auto; }
+.gameplay-percurso-livre button { min-height: 48px; }
+.gameplay-percurso[data-etapa='resumo'] .gameplay-mapa { display: none; }
+@container (max-aspect-ratio: 4 / 5) {
+  .gameplay-desafio.gameplay-percurso .gameplay-painel-cabine,
+  .gameplay-desafio.gameplay-percurso .gameplay-mapa { bottom: 11.5cqh; }
+}

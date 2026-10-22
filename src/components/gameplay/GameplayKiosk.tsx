@@ -10,14 +10,23 @@ import { nudgeLook, stepLook, type LookState } from '../sompo/firstPersonLook';
 import { applyDeadZone, type GamepadLike } from '../sompo/gamepadMapping';
 import { firstStandardPad, rumble } from '../sompo/gamepadLoop';
 import { DesafioCabine } from './DesafioCabine';
+import { PercursoCabine } from './PercursoCabine';
+import { PainelCabine } from './PainelCabine';
 import SeloFps from './SeloFps';
 import { criarMotorGameplay, vibracaoDoEvento, type MotorGameplay } from './motorGameplay';
 import { relevoRampaLateral } from './rampaLateral';
+import { ZONAS_TALHAO } from './geofenceTalhao';
 import { anguloAroRad, bordaReiniciar, comandoDesejado, setaDaTecla, SETAS_SOLTAS, type SetasVolante } from './volante';
 import type { CabineGameplay, CriarCabineGameplay } from './cabineGameplay';
 import type { ObstaculoGameplay } from './estadoGameplay';
 import { aoVivo } from '@/lib/gameplayAoVivo';
 import './gameplayKiosk.css';
+
+/** Lâmina d'água no palco onde o geofence marca área alagada (mesmo polígono do minimapa). */
+const AGUA_DO_TALHAO = ZONAS_TALHAO.filter((zona) => zona.id === 'alagado').map((zona) => {
+  const xs = zona.poligono.rings[0].map((p) => p.x), zs = zona.poligono.rings[0].map((p) => p.z);
+  return { x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs) };
+});
 
 /** Palco do case do fardo: talhão diurno, Trator MAX, sem roteiro (quem move é o motor). */
 const CENARIO = 'max-front-obstacle' as const;
@@ -57,13 +66,18 @@ function zumbidoMotor(acelerador: number, velocidadeKph: number) {
  * `modeloUrl` troca o GLB do MAX (ex.: variante com cabine); sem ele, o do catálogo.
  * `seloFps` (/gameplay?fps=1) mostra o selo de FPS no canto; sem ele nada é montado.
  */
-export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = createFirstPersonRig, seloFps = false }: { criarCabine?: CriarCabineGameplay; modeloUrl?: string; criarCamera?: CriarCameraGameplay; seloFps?: boolean }) {
+/** `desafios`: rodadas alternadas (/gameplay). `percurso`: percurso guiado do totem, com condução livre a um toque. */
+export type ExperienciaGameplay = 'desafios' | 'percurso';
+
+export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = createFirstPersonRig, seloFps = false, experiencia = 'desafios' }: { criarCabine?: CriarCabineGameplay; modeloUrl?: string; criarCamera?: CriarCameraGameplay; seloFps?: boolean; experiencia?: ExperienciaGameplay }) {
   const motor = useMemo(() => criarMotorGameplay(), []);
   const raizRef = useRef<HTMLDivElement>(null);
   const palcoRef = useRef<HTMLDivElement>(null);
   const setasRef = useRef<SetasVolante>({ ...SETAS_SOLTAS });
   const lookRef = useRef<LookState>({ yaw: 0, pitch: 0 });
   const [rodada, setRodada] = useState(0);
+  // No percurso, Options (ou o botão) recomeça o percurso; "Dirigir livre" tira o roteiro sem sair da cabine.
+  const [livre, setLivre] = useState(false);
   const [falhaWebgl, setFalhaWebgl] = useState(false);
   const criarCabineRef = useRef(criarCabine);
 
@@ -123,7 +137,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
         const pad = firstStandardPad() as GamepadLike | null;
         const borda = bordaReiniciar(pad, reiniciarSegurado);
         reiniciarSegurado = borda.segurado;
-        if (borda.reiniciar) setRodada((n) => n + 1);
+        if (borda.reiniciar) { setLivre(false); setRodada((n) => n + 1); }
         const olhar = pad ? { yaw: 0 - applyDeadZone(pad.axes[2] ?? 0), pitch: 0 - applyDeadZone(pad.axes[3] ?? 0) } : { yaw: 0, pitch: 0 };
         lookRef.current = stepLook(lookRef.current, olhar, dt, { recenter: !!pad });
         const estado = motor.quadro(dt, comandoDesejado(pad, setasRef.current), cena.ground);
@@ -158,6 +172,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
       obstaclesRef: obstaculosDoPalco(motor),
       assetUrl: modeloUrl,
       terrainRelief: relevoRampaLateral,
+      waterZones: AGUA_DO_TALHAO,
     });
     return () => {
       cabine?.desmontar();
@@ -200,8 +215,23 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
           alvo.addEventListener('pointercancel', parar);
         }}
       />
-      <DesafioCabine key={rodada} canal={motor} />
+      {experiencia === 'desafios' && <DesafioCabine key={rodada} canal={motor} />}
+      {experiencia === 'percurso' && !livre && <PercursoCabine key={rodada} canal={motor} aoSair={() => setLivre(true)} />}
+      {experiencia === 'percurso' && livre && <ConducaoLivre canal={motor} aoPercurso={() => { setLivre(false); setRodada((n) => n + 1); }} />}
       {seloFps && <SeloFps palcoRef={palcoRef} />}
+    </div>
+  );
+}
+
+/** Condução livre no totem: talhão inteiro, sem roteiro nem nota; o percurso guiado volta a um toque ou com Options. */
+function ConducaoLivre({ canal, aoPercurso }: { canal: MotorGameplay; aoPercurso: () => void }) {
+  useEffect(() => { canal.reiniciar({}); }, [canal]);
+  return (
+    <div className="gameplay-desafio gameplay-percurso" data-etapa="livre">
+      <PainelCabine canal={canal} />
+      <div className="gameplay-percurso-acoes gameplay-percurso-livre">
+        <button type="button" data-acao="percurso" onClick={aoPercurso}><kbd>Options</kbd> Percurso guiado</button>
+      </div>
     </div>
   );
 }
