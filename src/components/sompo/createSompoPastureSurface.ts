@@ -81,8 +81,8 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
     if (field) shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', `
       #ifdef USE_NORMALMAP_TANGENTSPACE
         vec3 mapN = texture2D(normalMap, vNormalMapUv).xyz * 2.0 - 1.0;
-        float groundBlend = smoothstep(10.5, 18.5, abs(ruralWorld.z) + (macro - .5) * 3.2);
-        mapN.xy *= normalScale * mix(1.0, .28, groundBlend);
+        float groundBlend = pasture * (1.0 - smoothstep(18.5, 28.0, fieldDistance));
+        mapN.xy *= normalScale * mix(1.0, .7, groundBlend);
         normal = normalize(tbn * mapN);
       #else
         #include <normal_fragment_maps>
@@ -91,7 +91,7 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
     if (field) {
       shader.fragmentShader = shader.fragmentShader.replace('#include <aomap_fragment>', THREE.ShaderChunk.aomap_fragment.replace(
         '* aoMapIntensity + 1.0',
-        '* aoMapIntensity * mix(1.0, .18, smoothstep(10.5, 18.5, abs(ruralWorld.z) + (macro - .5) * 3.2)) + 1.0',
+        '* aoMapIntensity * mix(1.0, .65, pasture * (1.0 - smoothstep(18.5, 28.0, fieldDistance))) + 1.0',
       ));
     }
     shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', `
@@ -101,9 +101,8 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       float edgeOffset = (macro - .5) * 3.2;
       float fieldDistance = abs(ruralWorld.z) + edgeOffset;
       float pasture = smoothstep(10.5, 18.5, fieldDistance);
-      // Distorção de baixa frequência reutiliza macro já calculado: uma
-      // leitura só por material, sem duplicar o custo da cobertura em tela.
-      vec2 grassUv = ruralWorld.xz * .23 + vec2(macro, micro) * .18;
+      // Preserva escala/grão do atlas original, com uma leitura por material.
+      vec2 grassUv = ruralWorld.xz * .23;
       vec3 grassland = mix(vec3(.10,.135,.04), texture2D(pastureMap, grassUv).rgb, pastureReady);
       ` : `
       float pasture = smoothstep(4.1,7.2,abs(ruralWorld.z+2.05));
@@ -235,7 +234,7 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       float cloudShade = smoothstep(.45, .72, ruralNoise(cloudUv + vec2(3.7, 11.2)) * .72 + ruralNoise(cloudUv * 2.6 + 5.1) * .28);
       reflectedLight.directDiffuse *= 1.0 - cloudShade * .6 * smoothstep(16.0, 34.0, max(abs(ruralWorld.x) * .55, abs(ruralWorld.z)));`);
   };
-  material.customProgramCacheKey = () => `sompo-pasture-albedo-v13-continuous-${field}-${farmland}`;
+  material.customProgramCacheKey = () => `sompo-pasture-albedo-v14-local-edge-${field}-${farmland}`;
   return {
     /** Relógio da sombra de nuvem do talhão (segundos). */
     update(seconds: number) { cloudDrift.value = seconds * 1.6; },
