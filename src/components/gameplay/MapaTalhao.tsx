@@ -2,6 +2,7 @@ import { ROTA_CIRCUITO, INICIO_CIRCUITO } from './circuito';
 import { ENCOSTA_TALHAO, TALHAO, ZONAS_TALHAO, type GeofenceTalhao } from './geofenceTalhao';
 import type { EstadoGameplay } from './estadoGameplay';
 import './mapaTalhao.css';
+import { MODELOS_RURAIS, PROPS_RURAIS } from './propsRurais';
 
 /**
  * Minimapa do talhão no canto de baixo à direita: zonas de risco, encosta e a
@@ -24,6 +25,7 @@ export function MapaTalhao({ estado, geofence, circuito = false }: { estado: Est
         ))}
         {circuito && <><polyline className="gameplay-mapa-rota" points={ROTA_CIRCUITO.map(tela).join(' ')} />
           {INICIO_CIRCUITO.obstaculos?.map((o, i) => <circle key={i} className="gameplay-mapa-fardo" cx={o.z} cy={-o.x} r={o.raioM + 1.05} />)}</>}
+        {PROPS_RURAIS.map((p) => <circle key={p.id} cx={p.z} cy={-p.x} r={MODELOS_RURAIS[p.modelo].raioM + .6} fill="#a99678" stroke="#493d2d" strokeWidth=".5"><title>{`${p.modelo} · obstáculo rural`}</title></circle>)}
         <g className="gameplay-mapa-maquina" data-x={x.toFixed(2)} data-z={z.toFixed(2)} data-heading={rumoGraus.toFixed(2)} transform={`translate(${z} ${-x}) rotate(${-rumoGraus}) scale(1.8)`}>
           <path d="M0,-4.5L3.2,3.5L0,1.8L-3.2,3.5Z" />
         </g>

@@ -6,6 +6,7 @@
  * Operador: o retrato do `ler()` é atualizado ANTES de qualquer evento de borda.
  */
 import { physicalRiskBands } from '../../../shared/sompo-physical-interactions.js';
+import { COLISORES_RURAIS } from './propsRurais';
 import {
   GAMEPLAY_TETO_LIVRE_KPH,
   type CanalGameplay, type EstadoGameplay, type EventoGameplay, type InicioGameplay, type ObstaculoGameplay,
@@ -49,7 +50,7 @@ export function criarMotorGameplay(agora: () => number = () => performance.now()
   const ouvintes = new Set<(evento: EventoGameplay) => void>();
 
   const montarRetrato = (): EstadoGameplay => {
-    const sensor = leituraSensor(trator, inicio.obstaculos);
+    const sensor = leituraSensor(trator, [...inicio.obstaculos, ...COLISORES_RURAIS]);
     return {
       versao: 1,
       fase,
@@ -106,7 +107,7 @@ export function criarMotorGameplay(agora: () => number = () => performance.now()
     if (fase === 'pronto' && comando.acelerador > PARTIDA) fase = 'dirigindo';
     if (fase === 'dirigindo') tempoMs += segundos * 1000;
     const antes = trator;
-    trator = passoTrator(trator, comando, segundos, { obstaculos: inicio.obstaculos, tetoKph: inicio.tetoKph });
+    trator = passoTrator(trator, comando, segundos, { obstaculos: [...inicio.obstaculos, ...COLISORES_RURAIS], tetoKph: inicio.tetoKph });
     if (chao) {
       const a = atitudeNoChao(chao, trator.x, trator.z, trator.rumo);
       atitude = { rolagemGraus: arredondar(a.rolagemGraus, 1), arfagemGraus: arredondar(a.arfagemGraus, 1) };

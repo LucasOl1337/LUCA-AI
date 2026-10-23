@@ -9,7 +9,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
  * (alfa recorta a silhueta): 6 triângulos por planta mantém ~20 mil pés
  * dentro do orçamento do teste de recursos: densidade de lavoura de verdade.
  */
-export function createSompoCropRows(groundHeight: (x: number, z: number) => number, compact: boolean, height = 1, operation = false, mature = false, circuitRoute?: readonly { x: number; z: number }[]) {
+export function createSompoCropRows(groundHeight: (x: number, z: number) => number, compact: boolean, height = 1, operation = false, mature = false, circuitRoute?: readonly { x: number; z: number }[], clearings: readonly { x: number; z: number; radius: number }[] = []) {
   const root = new THREE.Group(); root.name = 'sompo-agri-crop-rows';
   const leaf = (lean: number, spread: number) => {
     const quad = new THREE.PlaneGeometry(0.78, 1, 1, 1);
@@ -95,8 +95,10 @@ export function createSompoCropRows(groundHeight: (x: number, z: number) => numb
         return Math.hypot(x - a.x - t * dx, z - a.z - t * dz) < 5;
       });
       const girth = pertoRota ? 0.02 : 1.15 + (Math.sin(seed * 3.7) * .5 + .5) * .5;
+      const patio = clearings.some((p) => Math.hypot(x - p.x, z - p.z) < p.radius);
       dummy.position.set(x, groundHeight(x, z), z);
       dummy.rotation.set(0, 0, 0); dummy.scale.set(girth, height * (1.3 + (Math.sin(seed) * .5 + .5) * .6), girth); dummy.updateMatrix();
+      if (patio) { dummy.scale.setScalar(0); dummy.updateMatrix(); }
       mesh.setMatrixAt(row * columns + col, dummy.matrix);
     }
     mesh.computeBoundingSphere(); mesh.boundingSphere!.radius += 1;

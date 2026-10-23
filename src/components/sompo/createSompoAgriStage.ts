@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { criarPropsRurais } from '../gameplay/criarPropsRurais';
+import { COLISORES_RURAIS } from '../gameplay/propsRurais';
 import { criarSinalizacaoCircuito } from '../gameplay/sinalizacaoCircuito';
 import { rigSompoAgriAsset, SOMPO_AGRI_RIG_LAYOUT } from './rigSompoAgriAsset';
 import { createSompoMotionPath, integrateSompoMotion } from '../../../shared/sompo-motion.js';
@@ -145,7 +147,8 @@ function createUltrasonicBeam(origin: readonly [number, number, number]) {
  * real em forma fechada: separado do loop do caminhão para não arriscar o
  * fluxo rural. Desmontado e remontado a cada troca de cenário/desfecho.
  */
-export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig, adaptiveQuality = false, obstaclesRef, assetUrl, qualityProfile = PERFIL_PADRAO, terrainRelief, cropHeight, look, waterZones, circuitRoute }: {
+export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, outcomeId, startedAtRef, onModelStatus, onWebglError, onAfterRender, studioRef, getElapsed, onStats, physical, cameraRig, adaptiveQuality = false, obstaclesRef, assetUrl, qualityProfile = PERFIL_PADRAO, terrainRelief, cropHeight, look, waterZones, circuitRoute }: {
+  ruralProps?: boolean;
   mount: HTMLElement;
   scenarioId: SompoAgriScenarioId;
   outcomeId: string;
@@ -222,7 +225,9 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
   scene.add(worldRoot);
   const night = scenario.environmentId === 'row-crop-field-night';
   const budget = sompoRenderBudget();
-  const field = createSompoAgriScene(worldRoot, scenario.environmentId, budget.compact, scenario.equipmentId, terrainRelief, cropHeight, circuitRoute);
+  const clearings = ruralProps ? COLISORES_RURAIS.map((p) => ({ x: p.x, z: p.z, radius: p.raioM + 1.7 })) : [];
+  const field = createSompoAgriScene(worldRoot, scenario.environmentId, budget.compact, scenario.equipmentId, terrainRelief, cropHeight, circuitRoute, clearings);
+  const propsRurais = ruralProps ? criarPropsRurais(worldRoot, field.groundHeight) : null;
   if (circuitRoute) criarSinalizacaoCircuito(worldRoot, circuitRoute, field.groundHeight);
   const atmosphere = createSompoAtmosphere(scene, renderer, field.sun);
   const post = createSompoPostProcessing(renderer, scene, camera);
@@ -654,6 +659,7 @@ export function mountSompoAgriStage({ mount, scenarioId, outcomeId, startedAtRef
     recenterHeading() { /* sem rumo integrado no palco agrícola */ },
     dispose() {
       disposed = true;
+      propsRurais?.dispose();
       soltarLutCompartilhada(renderer, scene);
       pasture.dispose();
       lookAtivo?.dispose();

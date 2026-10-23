@@ -224,6 +224,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
     const inicio = { current: performance.now() };
     const stage = mountSompoAgriStage({
       mount,
+      ruralProps: true,
       scenarioId: CENARIO,
       outcomeId: DESFECHO,
       startedAtRef: inicio,
@@ -298,6 +299,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
         aoAnalisar={(relatorio) => aoAnalisarCircuito?.(relatorio)} aoNovo={() => { alterarMenu(false); setVolta((n) => n + 1); }}
         touch={(key, ligada) => { const seta = setaDaTecla(key); if (seta) setasRef.current = { ...setasRef.current, [seta]: ligada }; }} />}
       {seloFps && <SeloFps palcoRef={palcoRef} />}
+      <a className="gameplay-creditos-rurais" href="/models/scenario/CREDITOS.html" target="_blank" rel="noreferrer">Créditos 3D · Scenario</a>
     </div>
   );
 }
