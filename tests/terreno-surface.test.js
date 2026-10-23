@@ -39,7 +39,9 @@ test('highway path keeps legacy normal/AO and does not receive field plot/soil c
 
 test('operation excludes neighboring patchwork, owns textures and preserves clock/disposal',()=>{
  const {shader,surface,material}=compile(true,false);
- assert.ok(shader.fragmentShader.includes('furrowsShift'));
+ assert.ok(shader.fragmentShader.includes('vec3 furrows = texture2D(tilledMap, soilUv).rgb'));
+ assert.equal((shader.fragmentShader.match(/texture2D\(tilledMap/g)??[]).length,1);
+ assert.equal((shader.fragmentShader.match(/texture2D\(pastureMap/g)??[]).length,1);
  assert.ok(!shader.fragmentShader.includes('plotUv'));
  surface.update(12);assert.equal(shader.uniforms.cloudDrift.value,19.200000000000003);
  const textures=new Set(Object.values(shader.uniforms).map(u=>u.value).filter(t=>t?.isTexture));

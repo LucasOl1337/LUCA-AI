@@ -101,10 +101,10 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       float edgeOffset = (macro - .5) * 3.2;
       float fieldDistance = abs(ruralWorld.z) + edgeOffset;
       float pasture = smoothstep(10.5, 18.5, fieldDistance);
-      vec2 grassUv = ruralWorld.xz * .23;
-      vec3 grassSample = texture2D(pastureMap, grassUv).rgb;
-      vec3 grassCross = texture2D(pastureMap, vec2(-grassUv.y, grassUv.x) * .71 + vec2(.37, .61)).rgb;
-      vec3 grassland = mix(vec3(.10,.135,.04), mix(grassSample, grassCross, .38), pastureReady);
+      // Distorção de baixa frequência reutiliza macro já calculado: uma
+      // leitura só por material, sem duplicar o custo da cobertura em tela.
+      vec2 grassUv = ruralWorld.xz * .23 + vec2(macro, micro) * .18;
+      vec3 grassland = mix(vec3(.10,.135,.04), texture2D(pastureMap, grassUv).rgb, pastureReady);
       ` : `
       float pasture = smoothstep(4.1,7.2,abs(ruralWorld.z+2.05));
       vec3 grassland = mix(vec3(.10,.135,.04), texture2D(pastureMap,ruralWorld.xz*.23).rgb, pastureReady);
@@ -170,12 +170,8 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       // |z|<~12 fica fora da máscara do pasto, então aplica direto no diffuse.
       ${field ? `
       float fieldZone = 1.0 - smoothstep(10.5, 18.5, fieldDistance);
-      vec2 soilUv = vec2(ruralWorld.z * .36, ruralWorld.x * .16);
+      vec2 soilUv = vec2(ruralWorld.z * .36, ruralWorld.x * .16 + (macro - .5) * .12);
       vec3 furrows = texture2D(tilledMap, soilUv).rgb;
-      // Só translada a segunda amostra: preserva o rumo e a escala das
-      // fileiras, mas desfaz a repetição de torrões claros em cada tile.
-      vec3 furrowsShift = texture2D(tilledMap, soilUv + vec2(.43, .61)).rgb;
-      furrows = mix(furrows, furrowsShift, .24 + macro * .16);
       vec3 tilled = mix(vec3(.24, .17, .1), furrows * vec3(.9, .8, .7), tilledReady);
       tilled *= .75 + macro * .36;
       diffuseColor.rgb = mix(diffuseColor.rgb, tilled, fieldZone);${farmland ? `
