@@ -75,9 +75,40 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
     shader.uniforms.cloudDrift = cloudDrift;
     shader.fragmentShader = 'uniform float cloudDrift;\n' + shader.fragmentShader;
     shader.fragmentShader = 'uniform sampler2D pastureMap; uniform float pastureReady;\nuniform sampler2D soilMap; uniform float soilReady;\nuniform sampler2D tilledMap; uniform float tilledReady;\nuniform sampler2D bladeMap; uniform float bladeReady;\nuniform sampler2D canopyMap; uniform float canopyReady;\nuniform sampler2D aerialMap; uniform float aerialReady;\n' + shader.fragmentShader;
+    // O atlas PBR de terra também cobria o pasto: seus sulcos repetidos eram
+    // iluminados como barro mesmo após trocar o albedo. A transição do relevo
+    // óptico precisa seguir o material, sem tocar na normal/altura da malha.
+    if (field) shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', `
+      #ifdef USE_NORMALMAP_TANGENTSPACE
+        vec3 mapN = texture2D(normalMap, vNormalMapUv).xyz * 2.0 - 1.0;
+        float groundBlend = smoothstep(10.5, 18.5, abs(ruralWorld.z) + (macro - .5) * 3.2);
+        mapN.xy *= normalScale * mix(1.0, .28, groundBlend);
+        normal = normalize(tbn * mapN);
+      #else
+        #include <normal_fragment_maps>
+      #endif
+    `);
+    if (field) {
+      shader.fragmentShader = shader.fragmentShader.replace('#include <aomap_fragment>', THREE.ShaderChunk.aomap_fragment.replace(
+        '* aoMapIntensity + 1.0',
+        '* aoMapIntensity * mix(1.0, .18, smoothstep(10.5, 18.5, abs(ruralWorld.z) + (macro - .5) * 3.2)) + 1.0',
+      ));
+    }
     shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', `
-      float pasture = ${field ? 'smoothstep(11.0,18.0,abs(ruralWorld.z))' : 'smoothstep(4.1,7.2,abs(ruralWorld.z+2.05))'};
+      ${field ? `
+      // A mesma mancha macro desloca as duas máscaras: não sobra faixa seca
+      // reta entre o solo e o pasto, nem se desloca qualquer planta/colisor.
+      float edgeOffset = (macro - .5) * 3.2;
+      float fieldDistance = abs(ruralWorld.z) + edgeOffset;
+      float pasture = smoothstep(10.5, 18.5, fieldDistance);
+      vec2 grassUv = ruralWorld.xz * .23;
+      vec3 grassSample = texture2D(pastureMap, grassUv).rgb;
+      vec3 grassCross = texture2D(pastureMap, vec2(-grassUv.y, grassUv.x) * .71 + vec2(.37, .61)).rgb;
+      vec3 grassland = mix(vec3(.10,.135,.04), mix(grassSample, grassCross, .38), pastureReady);
+      ` : `
+      float pasture = smoothstep(4.1,7.2,abs(ruralWorld.z+2.05));
       vec3 grassland = mix(vec3(.10,.135,.04), texture2D(pastureMap,ruralWorld.xz*.23).rgb, pastureReady);
+      `}
       // Oitava fina com foto de lâminas: só perto da câmera, senão o horizonte suja.
       float bladeNear = (1.0 - smoothstep(9.0, 34.0, distance(cameraPosition, ruralWorld))) * bladeReady;
       grassland = mix(grassland, grassland * texture2D(bladeMap, ruralWorld.xz*1.63 + 7.7).rgb * 2.1, ${field ? '.3' : '.08'} * bladeNear);
@@ -138,9 +169,15 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       // o x do mundo) com resteva nas valetas, escurecido sob a copa. A faixa
       // |z|<~12 fica fora da máscara do pasto, então aplica direto no diffuse.
       ${field ? `
-      float fieldZone = 1.0 - smoothstep(11.5, 15.5, abs(ruralWorld.z));
-      vec3 tilled = mix(vec3(.24, .17, .1), texture2D(tilledMap, vec2(ruralWorld.z * .36, ruralWorld.x * .16)).rgb * vec3(.9, .8, .7), tilledReady);
-      tilled *= .68 + macro * .5;
+      float fieldZone = 1.0 - smoothstep(10.5, 18.5, fieldDistance);
+      vec2 soilUv = vec2(ruralWorld.z * .36, ruralWorld.x * .16);
+      vec3 furrows = texture2D(tilledMap, soilUv).rgb;
+      // Só translada a segunda amostra: preserva o rumo e a escala das
+      // fileiras, mas desfaz a repetição de torrões claros em cada tile.
+      vec3 furrowsShift = texture2D(tilledMap, soilUv + vec2(.43, .61)).rgb;
+      furrows = mix(furrows, furrowsShift, .24 + macro * .16);
+      vec3 tilled = mix(vec3(.24, .17, .1), furrows * vec3(.9, .8, .7), tilledReady);
+      tilled *= .75 + macro * .36;
       diffuseColor.rgb = mix(diffuseColor.rgb, tilled, fieldZone);${farmland ? `
       // Fazenda vizinha: fora do talhão da cena o chão vira uma colcha de
       // talhões de ~60 m em estágios diferentes (soja verde, palha colhida,
@@ -150,16 +187,24 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       float beyond = smoothstep(15.0, 24.0, abs(ruralWorld.z)) + smoothstep(76.0, 88.0, abs(ruralWorld.x));
       beyond = clamp(beyond, 0.0, 1.0);
       if (beyond > 0.001) {
-        vec2 plotUv = ruralWorld.xz / vec2(46.0, 38.0) + vec2(.37, .61);
+        vec2 plotUv = (ruralWorld.xz + vec2(macro - .5, micro - .5) * 1.4) / vec2(46.0, 38.0) + vec2(.37, .61);
         vec2 plotId = floor(plotUv), plotF = fract(plotUv);
         float kind = ruralHash(plotId + 17.3);
         float rowAngle = ruralHash(plotId + 3.1) * 3.14159;
         vec2 rowDir = vec2(cos(rowAngle), sin(rowAngle));
         float camDist = distance(cameraPosition, ruralWorld);
-        float rows = .5 + .5 * sin(dot(ruralWorld.xz, rowDir) * 8.4);
-        rows = mix(.5, rows, 1.0 - smoothstep(45.0, 120.0, camDist));
-        vec3 soy = mix(vec3(.13, .21, .06), vec3(.22, .31, .09), rows) * (.85 + macro * .3);
-        vec3 stubble = mix(vec3(.36, .27, .14), vec3(.47, .37, .2), rows) * (.85 + macro * .3);
+        float rowPhase = dot(ruralWorld.xz, rowDir) * 8.4;
+        float rows = .5 + .5 * sin(rowPhase);
+        float rowFootprint = fwidth(rowPhase);
+        rows = mix(.5, rows, (1.0 - smoothstep(45.0, 120.0, camDist)) * (1.0 - smoothstep(1.0, 3.14159, rowFootprint)));
+        // Talhões continuam plantados em linhas, mas a cor não é uma zebra
+        // lisa: reaproveita o detalhe de cobertura já amostrado, sem novo atlas.
+        vec3 coverDetail = clamp(grassland / max(dot(grassland, vec3(.3,.6,.1)), .02), vec3(.65), vec3(1.35));
+        float surfaceGrain = clamp(dot(grassland, vec3(.3,.6,.1)) * 4.0, .72, 1.24);
+        vec3 soy = mix(vec3(.15, .23, .07), vec3(.20, .28, .085), rows) * (.85 + macro * .3);
+        vec3 stubble = mix(vec3(.38, .29, .155), vec3(.445, .345, .185), rows) * (.85 + macro * .3);
+        soy *= mix(vec3(1.0), coverDetail * surfaceGrain, .48);
+        stubble *= mix(1.0, surfaceGrain, .38);
         vec3 bare = mix(vec3(.27, .15, .09), vec3(.34, .2, .12), rows) * (.8 + macro * .4);
         vec3 pastureC = vec3(.26, .31, .13) * (.8 + macro * .45);
         vec3 plot = kind < .42 ? soy : kind < .64 ? stubble : kind < .78 ? bare : pastureC;
@@ -172,8 +217,14 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
         plot = mix(plot, plot * vec3(.72, .8, .66), terrace * .6);
         // Carreador: faixa de terra batida de ~4 m na divisa dos talhões.
         vec2 edge = min(plotF, 1.0 - plotF) * vec2(46.0, 38.0);
-        float track = 1.0 - smoothstep(1.4, 2.4, min(edge.x, edge.y));
-        plot = mix(plot, vec3(.42, .27, .16) * (.9 + macro * .2), track * .85);
+        float edgeDistance = min(edge.x, edge.y);
+        // Ombro de vegetação/terra em metros, contínuo nos dois lados da divisa.
+        float shoulder = 1.0 - smoothstep(1.5, 5.5, edgeDistance);
+        vec3 margin = grassland * vec3(.82, .86, .74);
+        plot = mix(plot, margin, shoulder * .72);
+        float track = 1.0 - smoothstep(1.2, 2.6, edgeDistance);
+        vec3 trackSoil = mix(vec3(.42, .27, .16) * (.9 + macro * .2), tilled, .24);
+        plot = mix(plot, trackSoil, track);
         diffuseColor.rgb = mix(diffuseColor.rgb, plot, beyond);
       }` : ''}` : ''}
       #include <roughnessmap_fragment>`);
@@ -189,7 +240,7 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
       float cloudShade = smoothstep(.45, .72, ruralNoise(cloudUv + vec2(3.7, 11.2)) * .72 + ruralNoise(cloudUv * 2.6 + 5.1) * .28);
       reflectedLight.directDiffuse *= 1.0 - cloudShade * .6 * smoothstep(16.0, 34.0, max(abs(ruralWorld.x) * .55, abs(ruralWorld.z)));`);
   };
-  material.customProgramCacheKey = () => `sompo-pasture-albedo-v12-${field}-${farmland}`;
+  material.customProgramCacheKey = () => `sompo-pasture-albedo-v13-continuous-${field}-${farmland}`;
   return {
     /** Relógio da sombra de nuvem do talhão (segundos). */
     update(seconds: number) { cloudDrift.value = seconds * 1.6; },
