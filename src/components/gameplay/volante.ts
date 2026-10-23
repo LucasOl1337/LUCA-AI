@@ -5,6 +5,7 @@
  * (2,5/s: do centro ao batente em 0,4 s). R2/L2: curva x^1,5.
  */
 import { applyDeadZone, type GamepadLike } from '../sompo/gamepadMapping';
+import { COMANDOS_CABINE, setaDoComando } from './comandosCabine';
 
 export const VOLANTE = Object.freeze({
   zonaMorta: 0.12,
@@ -34,8 +35,8 @@ export function anguloAroRad(esterco: number) {
 }
 
 /** Índices do layout standard que o gameplay lê. PS (16) é do /stand; L1 (4) e R1 (5) não trocam mais de modo (21/10). */
-export const BOTAO_REINICIAR = 9; // Options
-const R2 = 7, L2 = 6;
+export const BOTAO_REINICIAR = COMANDOS_CABINE.pausa.botao;
+const R2 = COMANDOS_CABINE.acelerar.botao, L2 = COMANDOS_CABINE.frear.botao;
 
 export interface ComandoVolante { esterco: number; acelerador: number; freio: number }
 export const COMANDO_PARADO: ComandoVolante = Object.freeze({ esterco: 0, acelerador: 0, freio: 0 });
@@ -72,7 +73,7 @@ const gatilho = (pad: GamepadLike, indice: number) => {
  */
 export function comandoDesejado(pad: GamepadLike | null | undefined, setas: SetasVolante = SETAS_SOLTAS): ComandoVolante {
   const doPad = pad && pad.mapping === 'standard'
-    ? { esterco: curvaEsterco(pad.axes[0] ?? 0), acelerador: gatilho(pad, R2), freio: gatilho(pad, L2) }
+    ? { esterco: curvaEsterco(pad.axes[COMANDOS_CABINE.esquerda.eixo] ?? 0), acelerador: gatilho(pad, R2), freio: gatilho(pad, L2) }
     : COMANDO_PARADO;
   const estercoSetas = (setas.direita ? 1 : 0) - (setas.esquerda ? 1 : 0);
   return {
@@ -98,5 +99,5 @@ export function bordaReiniciar(pad: GamepadLike | null | undefined, antes: boole
 
 /** Tecla do teclado → seta do volante, ou null. */
 export function setaDaTecla(tecla: string): keyof SetasVolante | null {
-  return ({ arrowup: 'cima', w: 'cima', arrowdown: 'baixo', s: 'baixo', ' ': 'baixo', arrowleft: 'esquerda', a: 'esquerda', arrowright: 'direita', d: 'direita' } as const)[tecla.toLowerCase() as 'arrowup'] ?? null;
+  return setaDoComando(tecla);
 }

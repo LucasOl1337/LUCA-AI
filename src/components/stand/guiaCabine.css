@@ -1,0 +1,59 @@
+.stand .stand-guia-simulacao { inset: 7% max(6%, calc((100% - 1080px)/2)); justify-content: start; gap: 22px; padding: clamp(24px, 3vw, 46px); text-align: left; overflow: auto; border-radius: 24px; background: #0b1922; border-color: #32515e; box-shadow: 0 24px 90px #0006; }
+.stand-guia-simulacao .cabine-sobretitulo { color: #8bd9d2; letter-spacing: .16em; font-size: 12px; font-weight: 700; }
+.stand .stand-guia-simulacao h1 { font-size: clamp(30px, 3.2vw, 48px); line-height: 1.1; margin: 10px 0 12px; }
+.stand .stand-guia-simulacao p { font-size: clamp(15px, 1.3vw, 19px); color: #b9cbd3; line-height: 1.5; }
+.cabine-dispositivo { display: flex; justify-content: space-between; gap: 12px; color: #8bd9d2; font-size: 12px; letter-spacing: .08em; border-top: 1px solid #28424f; padding-top: 20px; }
+.cabine-dispositivo span { color: #91a9b5; letter-spacing: 0; }
+.cabine-comandos { display: grid; grid-template-columns: 1.15fr 1fr; align-items: center; gap: 34px; flex: 1; }
+.cabine-desenho svg { width: 100%; max-height: 280px; overflow: visible; }
+.cabine-desenho svg rect, .cabine-desenho svg circle { fill: #123d43; stroke: #8bd9d2; stroke-width: 2; }
+.cabine-desenho .cabine-pad-corpo { fill: #152a36; stroke: #60818f; stroke-width: 2; }
+.cabine-desenho .cabine-pad-detalhe { fill: none; stroke: #60818f; stroke-width: 3; }
+.cabine-desenho text { text-anchor: middle; fill: #e9fffc; font: 700 22px system-ui; }
+.cabine-desenho text.cabine-svg-pequeno { font-size: 13px; }
+.stand-guia-simulacao .cabine-mapa { margin: 0; padding: 0; display: grid; gap: 0; }
+.stand-guia-simulacao .cabine-comandos { min-height: 0; flex: 1 1 0; }
+.stand-guia-simulacao .cabine-mapa > div { min-height: 0; }
+.stand-guia-simulacao .cabine-mapa dt, .stand-guia-simulacao .cabine-mapa dd { padding: 0; margin: 0; }
+.cabine-mapa > div { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 10px 0; border-bottom: 1px solid #28424f; }
+.cabine-mapa dt { color: #d9e8ed; font-size: 15px; }
+.cabine-mapa dd { margin: 0; display: flex; gap: 6px; color: #91a9b5; font-size: 12px; }
+.stand-guia-simulacao kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; padding: 5px 9px; border: 1px solid #688390; border-bottom-width: 3px; border-radius: 6px; background: #1b303d; color: #f1fbff; font: 600 13px system-ui; }
+.cabine-teclado { text-align: center; }
+.cabine-teclado > div { display: flex; justify-content: center; gap: 8px; margin-bottom: 8px; }
+.cabine-teclado kbd { width: 58px; height: 54px; font-size: 24px; border-radius: 10px; }
+.cabine-teclado .cabine-espaco { width: auto; height: 40px; padding: 0 32px; font-size: 14px; }
+.cabine-teclado .cabine-setas { color: #8aa5b4; margin: 16px 0; font-size: 23px; }
+.stand-guia-simulacao footer { display: flex; justify-content: space-between; align-items: center; gap: 24px; border-top: 1px solid #28424f; padding-top: 20px; }
+.stand-guia-simulacao footer strong { font-size: 17px; }
+.stand .stand-guia-simulacao footer p { font-size: 13px; margin-top: 5px; }
+.stand .stand-guia-simulacao footer button { flex-shrink: 0; display: flex; align-items: center; gap: 20px; padding: 13px 20px; background: #a4e9cf; color: #082d2d; border: 0; border-radius: 10px; font: 700 17px system-ui; }
+.stand-guia-simulacao footer button kbd { background: #0b3b3520; color: #082d2d; border-color: #548779; }
+@media (max-height: 850px) {
+  .stand .stand-guia-simulacao { gap: 14px; padding: 26px 36px; }
+  .stand .stand-guia-simulacao h1 { margin: 7px 0; font-size: 36px; }
+  .cabine-dispositivo { padding-top: 12px; }
+  .cabine-mapa > div { padding: 7px 0; }
+  .stand-guia-simulacao footer { padding-top: 12px; }
+}
+@media (max-width: 650px) {
+  .stand .stand-guia-simulacao { inset: 2% 4%; padding: 18px; gap: 12px; }
+  .cabine-sobretitulo { font-size: 10px; }
+  .cabine-teclado .cabine-espaco { height: 30px; }
+  .cabine-teclado .cabine-setas { display: none; }
+  .stand-guia-simulacao footer strong { display: none; }
+  .stand .stand-guia-simulacao footer p { margin: 0; }
+  .stand-guia-simulacao footer { gap: 9px; }
+  .stand-guia-simulacao .cabine-desenho svg { max-height: 135px; }
+  .stand-guia-simulacao .cabine-comandos { grid-template-columns: 1fr; gap: 10px; flex: none; }
+  .stand .stand-guia-simulacao h1 { font-size: 30px; }
+  .stand-guia-simulacao header p { font-size: 14px; }
+  .cabine-desenho svg { max-height: 180px; }
+  .cabine-dispositivo { flex-direction: column; gap: 5px; }
+  .cabine-teclado kbd { width: 40px; height: 36px; font-size: 19px; }
+  .cabine-teclado .cabine-setas { margin: 7px 0; }
+  .cabine-mapa { gap: 0; }
+  .cabine-mapa > div { padding: 7px 0; }
+  .stand-guia-simulacao footer { align-items: stretch; flex-direction: column; gap: 14px; }
+  .stand-guia-simulacao footer button { justify-content: center; }
+}
