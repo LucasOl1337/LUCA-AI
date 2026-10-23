@@ -9,6 +9,9 @@ interface ConversaCircuito { relatorio: RelatorioCircuito; casoId: string | null
 export function guardarConversaCircuito(conversa: ConversaCircuito) {
   try { sessionStorage.setItem(CHAVE_CHAT_CIRCUITO, JSON.stringify(conversa)); } catch { /* Falta de cota não apaga a run em memória. */ }
 }
+export function descartarConversaCircuito() {
+  try { sessionStorage.removeItem(CHAVE_CHAT_CIRCUITO); } catch { /* Sem storage, não há o que descartar. */ }
+}
 export function recuperarConversaCircuito(): ConversaCircuito | null {
   try {
     const texto = sessionStorage.getItem(CHAVE_CHAT_CIRCUITO);
