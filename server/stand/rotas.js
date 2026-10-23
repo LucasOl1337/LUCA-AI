@@ -317,6 +317,8 @@ export function registerStandRoutes(app, {
         agora: agora(), limites: LIMITES_TURNO, tetoS: LIMITES_STAND.teto_s,
         permitir: () => guarda.tentar(conta(req)), diario: () => teto.estourou(),
       });
+      // Crédito do dia acabou: encerra a sessão (microfone e STT) como antes, em vez de pausar cobrando STT.
+      if (janela.causa === 'diario') return res.status(503).json({ ok: false, error: 'stand_desligado', motivo: 'teto_diario' });
       if (!janela.ok) {
         if (entrada.texto) conversa.perguntaPendente = entrada;
         lembrarTurno(conversa, turnoId, 'pausado');

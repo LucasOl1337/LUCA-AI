@@ -39,7 +39,6 @@ export function prepararJanela(conversa, { agora, limites, tetoS, permitir, diar
 
 export const TEXTOS_PAUSA = Object.freeze({
   hora: 'Preciso pausar porque chegamos ao limite de uso por hora. Guardei sua pergunta sem executá-la. Quando houver uma vaga, diga continuar para retomá-la.',
-  diario: 'Preciso pausar porque o crédito de hoje acabou. Guardei sua pergunta sem executá-la. O crédito renova à meia-noite de Brasília; diga continuar quando estiver disponível.',
 });
 
 export function idTurno(valor) {
