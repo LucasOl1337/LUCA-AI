@@ -32,6 +32,7 @@ export function criarMotorBipe(som: SomCompartilhado = somCompartilhado): MotorB
   let continuo: { osc: OscillatorNode; ganho: GainNode } | null = null;
   /** Muda a cada `tocar`/`parar`: um resume que chega atrasado não toca o pedido velho. */
   let geracao = 0;
+  let intervaloAtual = 0, hzAtual = 0, fase = 0;
 
   /** Contexto tocando agora, ou `null` (e pede o resume para a próxima vez). */
   const pronto = (): AudioContext | null => {
@@ -81,7 +82,13 @@ export function criarMotorBipe(som: SomCompartilhado = somCompartilhado): MotorB
 
   const motor: MotorBipe = {
     tocar(intervaloMs, hz) {
+      // Distância chega ~15 vezes/s. Atualizar a curva não reinicia o pulso:
+      // mantém a fase, em vez de bipar a cada retrato do sensor.
+      intervaloAtual = intervaloMs; hzAtual = hz;
+      if (intervaloMs > 0 && relogio !== null) return;
+      if (intervaloMs === 0 && continuo) { continuo.osc.frequency.value = hz; return; }
       parar();
+      fase = 0;
       const minha = geracao;
       if (intervaloMs === 0) {
         const ctx = pronto();
@@ -98,12 +105,17 @@ export function criarMotorBipe(som: SomCompartilhado = somCompartilhado): MotorB
         }, RETENTATIVA_MS);
         return;
       }
-      const tique = () => { const ctx = pronto(); if (ctx) bipar(ctx, hz); };
+      const tique = () => {
+        fase += 10 / intervaloAtual;
+        if (fase < 1 - 1e-9) return;
+        fase = Math.max(0, fase - 1);
+        const ctx = pronto(); if (ctx) bipar(ctx, hzAtual);
+      };
       const ctx = pronto();
       if (ctx) bipar(ctx, hz);
       // Recém-criado o contexto fica `suspended` por um instante: o 1º bipe sai quando ele destravar.
       else void som.destravar().then((ok) => { if (ok && minha === geracao) { const c = som.obter(); if (c) bipar(c, hz); } });
-      relogio = window.setInterval(tique, intervaloMs);
+      relogio = window.setInterval(tique, 10);
     },
     parar,
     // O contexto é da página: quem só toca bipe nunca o fecha (a volta à Simulação herdaria um contexto travado).

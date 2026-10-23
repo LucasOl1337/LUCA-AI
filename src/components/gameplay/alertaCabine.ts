@@ -58,6 +58,11 @@ export const BIPE_SONO: BipeCabine = { intervaloMs: 300, frequenciaHz: 520 };
 
 const MUDO: BipeCabine = { intervaloMs: null, frequenciaHz: 0 };
 
+/** Mesmo timbre, intervalo contínuo até a iminência (10 cm). */
+export function bipeProximidade(cm: number): BipeCabine {
+  return { intervaloMs: cm <= 10 ? 0 : 100 + 700 * (Math.min(400, cm) - 10) / 390, frequenciaHz: 1180 };
+}
+
 const metros = (cm: number) => `${(cm / 100).toFixed(1).replace('.', ',')} m`;
 
 /**
@@ -75,7 +80,7 @@ export function alertaCabine(estado: EstadoGameplay, sono: SonoCabine | null = n
     collisionFlag: sensor.alerta || contato,
   });
   const faixa: FaixaCabine = faixas.proximityLevel === 'danger' ? 'perigo'
-    : faixas.proximityLevel === 'attention' ? 'atencao' : 'livre';
+    : sensor.eco ? 'atencao' : 'livre';
   const perto = faixas.distance !== null && faixas.distance <= 100;
   const graus = Math.round(faixas.angle);
   // Prioridade: contato > obstáculo > sonolência > zona de risco > inclinação.
@@ -84,14 +89,14 @@ export function alertaCabine(estado: EstadoGameplay, sono: SonoCabine | null = n
 
   let bipe: BipeCabine = MUDO;
   if (fase === 'dirigindo') {
-    if (contato || perto) bipe = { intervaloMs: 0, frequenciaHz: 1320 };
-    else if (sensor.alerta) bipe = { intervaloMs: BIPE_RAPIDO_MS, frequenciaHz: 1180 };
+    if (contato) bipe = bipeProximidade(0);
+    else if (sensor.alerta) bipe = bipeProximidade(sensor.distanciaCm);
     else if (dormindo) bipe = BIPE_SONO;
     // Tom do meio, só da zona de risco: rápido dentro, ritmo do alerta a caminho.
     else if (zona) bipe = { intervaloMs: geofence.nivel === 'dentro' ? 120 : BIPE_RAPIDO_MS, frequenciaHz: 990 };
     // Mesmo ritmo do alerta, tom mais grave: dá para saber qual dos dois sem olhar.
     else if (faixas.inclination) bipe = { intervaloMs: BIPE_RAPIDO_MS, frequenciaHz: 660 };
-    else if (faixa === 'atencao') bipe = { intervaloMs: BIPE_LENTO_MS, frequenciaHz: 880 };
+    else if (sensor.eco) bipe = bipeProximidade(sensor.distanciaCm);
   } else if (dormindo) bipe = BIPE_SONO;
 
   const vinheta: VinhetaCabine = dormindo ? 'critica'

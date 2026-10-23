@@ -113,6 +113,21 @@ test('bipe intermitente: o primeiro bipe sai quando o contexto recém-criado des
   assert.equal(criados[0].tocados, 2, 'parado não bipa');
 });
 
+test('atualizar distância não reinicia o relógio nem emite um bipe por render', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const { politica, criados, ContextoFalso } = navegador();
+  politica.liberado = true;
+  const motor = criarMotorBipe(criarSomCompartilhado(ContextoFalso));
+  motor.tocar(800, 1180);
+  await tique();
+  motor.tocar(600, 1180);
+  motor.tocar(400, 1180);
+  assert.equal(criados[0].tocados, 1, 'atualização não bipa');
+  t.mock.timers.tick(410);
+  assert.equal(criados[0].tocados, 2, 'cadência nova passa a valer sem reinício');
+  motor.fechar();
+});
+
 test('reserva clássica: erro do gameplay (WebGL, chunk) devolve a Simulação ao simulador clássico', () => {
   assert.deepEqual(GameplayOuClassico.getDerivedStateFromError(new Error('WebGL indisponível para o gameplay')), { falhou: true });
   const caixa = new GameplayOuClassico({ classico: createElement('p', null, 'clássico'), children: createElement('p', null, 'gameplay') });

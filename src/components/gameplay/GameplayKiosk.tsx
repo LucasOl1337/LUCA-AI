@@ -55,7 +55,7 @@ function obstaculosDoPalco(motor: MotorGameplay) {
   return {
     get current() {
       const atual = motor.obstaculos();
-      if (atual !== origem) { origem = atual; palco = atual.map((o) => ({ x: o.x, z: o.z, radius: o.raioM })); }
+      if (atual !== origem) { origem = atual; palco = atual.filter((o) => o.tipo !== 'estaca').map((o) => ({ x: o.x, z: o.z, radius: o.raioM })); }
       return palco;
     },
   };

@@ -11,7 +11,7 @@
 export type FaseGameplay = 'pronto' | 'dirigindo' | 'fim';
 
 /** Obstáculo redondo no chão (o fardo de feno é um cilindro deitado visto de cima). */
-export interface ObstaculoGameplay { x: number; z: number; raioM: number }
+export interface ObstaculoGameplay { x: number; z: number; raioM: number; tipo?: 'feno' | 'estaca' }
 
 export interface EstadoGameplay {
   versao: 1;

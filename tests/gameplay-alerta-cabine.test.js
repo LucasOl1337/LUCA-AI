@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { loadFrontendModule } from './support/load-frontend-module.js';
 
-const { alertaCabine, ROTULO_ALERTA_CABINE, BIPE_LENTO_MS, BIPE_RAPIDO_MS } =
+const { alertaCabine, bipeProximidade, ROTULO_ALERTA_CABINE, BIPE_LENTO_MS, BIPE_RAPIDO_MS } =
   await loadFrontendModule('../../src/components/gameplay/alertaCabine.ts');
 
 /** Estado da Direção com o sensor como a física entrega: eco até 400 cm, alerta a 150 cm. */
@@ -17,16 +17,16 @@ const estado = ({ cm = 400, eco = cm < 400, fase = 'dirigindo', contato = false,
 
 test('faixa de cor segue o /sompo e o alerta segue o flag de 150 cm', () => {
   const casos = [
-    [201, 'livre', false, null], [200, 'livre', false, null],
-    [199, 'atencao', false, BIPE_LENTO_MS], [151, 'atencao', false, BIPE_LENTO_MS],
-    [150, 'perigo', true, BIPE_RAPIDO_MS], [101, 'perigo', true, BIPE_RAPIDO_MS],
-    [100, 'perigo', true, 0], [2, 'perigo', true, 0],
+    [201, 'atencao', false], [200, 'atencao', false],
+    [199, 'atencao', false], [151, 'atencao', false],
+    [150, 'perigo', true], [101, 'perigo', true],
+    [100, 'perigo', true], [2, 'perigo', true],
   ];
-  for (const [cm, faixa, alerta, intervalo] of casos) {
+  for (const [cm, faixa, alerta] of casos) {
     const a = alertaCabine(estado({ cm }));
     assert.equal(a.faixa, faixa, `${cm} cm`);
     assert.equal(a.alerta, alerta, `${cm} cm`);
-    assert.equal(a.bipe.intervaloMs, intervalo, `${cm} cm`);
+    assert.equal(a.bipe.intervaloMs, bipeProximidade(cm).intervaloMs, `${cm} cm`);
     assert.equal(a.rotuloAlerta, alerta ? ROTULO_ALERTA_CABINE : '');
   }
 });

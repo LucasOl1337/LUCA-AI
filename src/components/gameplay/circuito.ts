@@ -1,5 +1,6 @@
 import type { EstadoGameplay, InicioGameplay } from './estadoGameplay';
 import { geofenceTalhao } from './geofenceTalhao';
+import { estacasCircuito } from './estacasCircuito';
 
 /** Um mundo, uma partida. As estacas indicam uma rota, não reposicionam a máquina. */
 export const ROTA_CIRCUITO = Object.freeze([
@@ -9,7 +10,8 @@ export const ROTA_CIRCUITO = Object.freeze([
 export const INICIO_CIRCUITO: InicioGameplay = {
   ...ROTA_CIRCUITO[0], rumoGraus: 0, tetoKph: 12,
   obstaculos: [{ x: 8, z: 0, raioM: 0.72 }, { x: 23, z: -3, raioM: 0.72 },
-    { x: 37, z: -18, raioM: 0.72 }, { x: 49, z: 3, raioM: 0.72 }, { x: 65, z: 18, raioM: 0.72 }],
+    { x: 37, z: -18, raioM: 0.72 }, { x: 49, z: 3, raioM: 0.72 }, { x: 65, z: 18, raioM: 0.72 },
+    ...estacasCircuito(ROTA_CIRCUITO)],
 };
 export type SensorCircuito = 'feno' | 'agua' | 'encosta' | 'sonolencia';
 export type MotivoCircuito = 'chegada' | 'colisao' | 'atolamento' | 'tombamento' | 'abandono';

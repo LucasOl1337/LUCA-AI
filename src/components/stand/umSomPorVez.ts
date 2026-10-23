@@ -1,4 +1,5 @@
 import type { CanalStand } from './canal';
+import { perigoCabine } from '../gameplay/perigoCabine';
 import { sonoCabine as sonoDaCabine } from '../gameplay/sonoCabine';
 import { somCompartilhado, type SomCompartilhado } from '../gameplay/somCompartilhado';
 
@@ -17,16 +18,20 @@ export function ligarUmSomPorVez(canal: CanalStand, { som = somCompartilhado, so
   const soltarEstado = canal.assinar((evento) => {
     if (evento.tipo === 'estado') som.segurar?.(evento.valor === 'falando' && !alarme);
   });
-  const soltarSono = sono.assinar(() => {
-    const agora = sono.ler()?.status === 'alarm';
+  const atualizarAlarme = () => {
+    const agora = sono.ler()?.status === 'alarm' || perigoCabine.ler();
     if (agora === alarme) return;
     alarme = agora;
     if (agora) som.segurar?.(false);
     canal.enviar({ tipo: 'alarme_sono', ativo: agora });
-  });
+  };
+  const soltarSono = sono.assinar(atualizarAlarme);
+  const soltarPerigo = perigoCabine.assinar(atualizarAlarme);
+  atualizarAlarme();
   return () => {
     soltarEstado();
     soltarSono();
+    soltarPerigo();
     som.segurar?.(false);
     if (alarme) canal.enviar({ tipo: 'alarme_sono', ativo: false });
   };
