@@ -2,7 +2,6 @@ import { lazy, memo, Suspense, useEffect, useRef, useState, type ReactNode } fro
 import { MODOS, ROTULO_MODO, type Modo } from './modoStand';
 import type { ItemVitrine } from './vitrineStand';
 
-
 /** Vitrine, Simulação e a barra de modos do totem (grill r1, Q1–Q7). */
 
 const carregarSimulador = () => import('./SimuladorKiosk');
@@ -61,7 +60,6 @@ export const SimulacaoStand = memo(function SimulacaoStand() {
       <Suspense fallback={<p className="stand-simulacao-carregando" role="status">Ligando o trator…</p>}>
         <SimuladorKiosk />
       </Suspense>
-
     </section>
   );
 });
