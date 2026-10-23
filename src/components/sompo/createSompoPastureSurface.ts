@@ -195,14 +195,13 @@ export function createSompoPastureSurface(material: THREE.MeshStandardMaterial, 
         float camDist = distance(cameraPosition, ruralWorld);
         float rowPhase = dot(ruralWorld.xz, rowDir) * 8.4;
         float rows = .5 + .5 * sin(rowPhase);
-        float rowFootprint = fwidth(rowPhase);
-        rows = mix(.5, rows, (1.0 - smoothstep(45.0, 120.0, camDist)) * (1.0 - smoothstep(1.0, 3.14159, rowFootprint)));
+        rows = mix(.5, rows, 1.0 - smoothstep(45.0, 120.0, camDist));
         // Talhões continuam plantados em linhas, mas a cor não é uma zebra
         // lisa: reaproveita o detalhe de cobertura já amostrado, sem novo atlas.
         vec3 coverDetail = clamp(grassland / max(dot(grassland, vec3(.3,.6,.1)), .02), vec3(.65), vec3(1.35));
         float surfaceGrain = clamp(dot(grassland, vec3(.3,.6,.1)) * 4.0, .72, 1.24);
-        vec3 soy = mix(vec3(.15, .23, .07), vec3(.20, .28, .085), rows) * (.85 + macro * .3);
-        vec3 stubble = mix(vec3(.38, .29, .155), vec3(.445, .345, .185), rows) * (.85 + macro * .3);
+        vec3 soy = mix(vec3(.13, .21, .06), vec3(.22, .31, .09), rows) * (.85 + macro * .3);
+        vec3 stubble = mix(vec3(.36, .27, .14), vec3(.47, .37, .2), rows) * (.85 + macro * .3);
         soy *= mix(vec3(1.0), coverDetail * surfaceGrain, .48);
         stubble *= mix(1.0, surfaceGrain, .38);
         vec3 bare = mix(vec3(.27, .15, .09), vec3(.34, .2, .12), rows) * (.8 + macro * .4);

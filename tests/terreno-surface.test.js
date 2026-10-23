@@ -20,7 +20,8 @@ test('agricultural soil ties optical normals/AO and both color masks to the same
  assert.match(shader.fragmentShader,/float fieldZone = 1.0 - smoothstep\(10.5, 18.5, fieldDistance\)/);
  assert.match(shader.fragmentShader,/mapN.xy \*= normalScale \* mix\(1.0, .28, groundBlend\)/);
  assert.match(shader.fragmentShader,/aoMapIntensity \* mix\(1.0, .18/);
- assert.match(shader.fragmentShader,/float rowFootprint = fwidth\(rowPhase\)/);
+ assert.match(shader.fragmentShader,/rows = mix\(.5, rows, 1.0 - smoothstep\(45.0, 120.0, camDist\)\)/);
+ assert.match(shader.fragmentShader,/vec3 soy = mix\(vec3\(.13, .21, .06\), vec3\(.22, .31, .09\), rows\)/);
  assert.match(shader.fragmentShader,/plot = mix\(plot, trackSoil, track\)/);
  assert.equal(shader.vertexShader,THREE.ShaderLib.standard.vertexShader,'surface never displaces ground vertices');
  assert.match(material.customProgramCacheKey(),/v13-continuous-true-true/);
