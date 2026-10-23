@@ -95,7 +95,7 @@ test('painel desenha a faixa de sonolência e marca data-sono só com o alarme',
   assert.match(com, /role="alert">Atenção: sinais de sono</);
 });
 
-test('quiosque sem ?webcam=1 não monta o quadro da câmera; com ele, monta sem derrubar a cabine', () => {
+test('SSR sem descoberta de dispositivos não monta câmera; opt-in mantém cabine independente', () => {
   const sem = renderToStaticMarkup(createElement(GameplayQuiosque, { aoSair() {} }));
   assert.doesNotMatch(sem, /gameplay-webcam|Webcam de sonolência/);
   // SSR não resolve o lazy: o Suspense do quadro fica vazio e a cabine continua carregando.
