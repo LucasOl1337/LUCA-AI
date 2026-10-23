@@ -44,7 +44,7 @@
 @media(max-width:600px) {
   .circuito-estado { left:10px; right:10px; top:10px; gap:12px; }
   .circuito-menu-botao { top:60px; left:10px; right:auto; }
-  .circuito-hud .gameplay-mapa { top:60px; right:10px; width:110px; transform:none; margin:0; }
+  .gameplay-com-cabine .circuito-hud .gameplay-mapa { top:60px; right:10px; width:110px; transform:none; margin:0; }
   .circuito-avisos { top:230px; left:10px; max-width:240px; }
   .circuito-webcam .gameplay-webcam { top:110px; left:10px; width:120px; }
 }
