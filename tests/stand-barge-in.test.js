@@ -54,15 +54,32 @@ function sinal(inicio, humana = false) {
   return Int16Array.from({ length: 1200 }, (_, i) => Math.round(32767 * (
     0.5 * tts[inicio + i] + (humana ? 0.12 * Math.sin(i / 17) : 0))));
 }
+// Ganho da voz que registra toda escrita: a voz não pode mudar de volume sozinha.
+function ganhoVigiado() {
+  const escritas = [];
+  let valor = 1;
+  const anotar = (nome) => (...args) => { escritas.push([nome, ...args]); };
+  return {
+    escritas,
+    gain: {
+      get value() { return valor; },
+      set value(v) { escritas.push(['value', v]); valor = v; },
+      setTargetAtTime: anotar('setTargetAtTime'),
+      setValueAtTime: anotar('setValueAtTime'),
+      linearRampToValueAtTime: anotar('linearRampToValueAtTime'),
+      exponentialRampToValueAtTime: anotar('exponentialRampToValueAtTime'),
+      cancelScheduledValues: anotar('cancelScheduledValues'),
+    },
+  };
+}
 function comMicrofone() {
   const caso = emFala();
   const enviados = [];
-  let abaixadas = 0;
+  const saida = ganhoVigiado();
   caso.sessao.ws = { readyState: WebSocket.OPEN, send: (m) => enviados.push(JSON.parse(m)) };
-  caso.sessao.audio = { contexto: { currentTime: 1.42 } };
-  caso.sessao.abaixarVoz = () => { abaixadas++; };
+  caso.sessao.audio = { contexto: { currentTime: 1.42 }, saida };
   caso.sessao.referenciaEco.agendar(tts, 1);
-  return { ...caso, enviados, abaixadas: () => abaixadas };
+  return { ...caso, enviados, saida, abaixadas: () => saida.escritas.length };
 }
 
 test('eco puro envia silêncio ao Scribe e não abaixa/corta a própria caixa', () => {
@@ -76,17 +93,84 @@ test('eco puro envia silêncio ao Scribe e não abaixa/corta a própria caixa', 
   assert.deepEqual(entradas, []);
 });
 
-test('Oi humano e palavras da narração continuam válidos com fala dupla comprovada no PCM', () => {
+// Até 23/10 este caso exigia o defeito D1: com o PCM "independente" (eco de
+// sala que não bate 96% com a referência), o próprio texto da narração cortava
+// a fala. Agora o microfone segue íntegro ao Scribe, mas durante a fala só o
+// texto decide: eco do que ele está dizendo e "Oi" solto não cortam.
+test('fala dupla no PCM não deixa o próprio texto nem um Oi solto cortarem a fala', () => {
   for (const texto of ['Oi', 'O animal na pista']) {
-    const { sessao, entradas, enviados } = comMicrofone();
+    const { sessao, entradas, enviados, cortes } = comMicrofone();
     const primeiro = sinal(6000, true);
     sessao.aoMicrofone(primeiro, 0.1);
     sessao.audio.contexto.currentTime = 1.47;
     sessao.aoMicrofone(sinal(7200, true), 0.1);
     assert.deepEqual(Buffer.from(enviados[0].audio_base_64, 'base64'), Buffer.from(primeiro.buffer));
+    sessao.aoScribe({ message_type: 'partial_transcript', text: texto });
     sessao.aoScribe({ message_type: 'committed_transcript', text: texto });
-    assert.deepEqual(entradas, [{ texto }]);
+    assert.equal(cortes(), 0, texto);
+    assert.deepEqual(entradas, [], texto);
   }
+});
+
+test('(a) volume alto no microfone durante a fala não mexe no ganho da voz', () => {
+  const { sessao, saida } = comMicrofone();
+  // 2 s de "outro som" alto (bipe, vídeo, plateia) sem relação com a voz.
+  for (let i = 0; i < 40; i++) {
+    sessao.audio.contexto.currentTime = 1.42 + i * 0.05;
+    sessao.aoMicrofone(Int16Array.from({ length: 1200 }, (_, j) => Math.round(20000 * Math.sin(j / 3))), 0.6);
+  }
+  assert.deepEqual(saida.escritas, []);
+  assert.equal(saida.gain.value, 1);
+});
+
+test('(b) eco sujo do próprio texto não interrompe, nem com PCM independente (caso real 22/10)', () => {
+  const ecos = [
+    'Oi, animal na pista é um dos seus... Ô, animal.',
+    'Ô, animal.',
+    'animal na pista é um dos cenários',
+    'é um dos cenários do simulador',
+  ];
+  for (const texto of ecos) {
+    const { sessao, entradas, cortes } = emFala();
+    sessao.falaIndependenteAte = Number.POSITIVE_INFINITY;
+    sessao.aoScribe({ message_type: 'partial_transcript', text: texto });
+    sessao.aoScribe({ message_type: 'committed_transcript', text: texto });
+    assert.equal(cortes(), 0, texto);
+    assert.deepEqual(entradas, [], texto);
+  }
+});
+
+test('(b) comando curto que está na própria fala é eco; fora dela continua valendo', () => {
+  const { sessao, entradas, cortes } = emFala();
+  sessao.falado = 'Não é nada sério, deve ter sido só um susto.';
+  sessao.aoScribe({ message_type: 'partial_transcript', text: 'Não' });
+  sessao.aoScribe({ message_type: 'committed_transcript', text: 'Não' });
+  assert.equal(cortes(), 0);
+  assert.deepEqual(entradas, []);
+  sessao.aoScribe({ message_type: 'partial_transcript', text: 'Pare' });
+  assert.equal(cortes(), 1);
+});
+
+test('(c) visitante com frase clara e diferente interrompe a fala', () => {
+  const { sessao, entradas, cortes } = emFala();
+  sessao.aoScribe({ message_type: 'partial_transcript', text: 'Quanto custa o trator?' });
+  assert.equal(cortes(), 1);
+  sessao.aoScribe({ message_type: 'committed_transcript', text: 'Quanto custa o trator?' });
+  assert.deepEqual(entradas, [{ texto: 'Quanto custa o trator?' }]);
+});
+
+test('(d) eco na cauda logo depois da fala não abre turno novo', () => {
+  const { sessao, entradas } = emFala();
+  sessao.estado = 'ouvindo';
+  sessao.fila.tocando = false;
+  sessao.fimDaFala = performance.now() - 800;
+  sessao.falaIndependenteAte = Number.POSITIVE_INFINITY;
+  for (const texto of ['cenários do nosso simulador', 'Simulador 3D.', 'um dos cenários']) {
+    sessao.aoScribe({ message_type: 'committed_transcript', text: texto });
+  }
+  assert.deepEqual(entradas, []);
+  sessao.aoScribe({ message_type: 'committed_transcript', text: 'Como funciona a sonolência?' });
+  assert.deepEqual(entradas, [{ texto: 'Como funciona a sonolência?' }]);
 });
 
 test('cauda textual expira: repetir uma frase humana após TTS continua válido', () => {

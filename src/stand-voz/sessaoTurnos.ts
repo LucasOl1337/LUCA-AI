@@ -15,7 +15,7 @@ import { SEM_FALA_MS } from './escuta';
 import { visaoTotem } from './visao';
 import { base64DePcm16, criarDetectorFala } from './protocolo';
 import type { EtapaSessao, FimSessao, SessaoDeVoz, SessaoServidor } from './sessaoVoz';
-import { eventoScribe, interrompeFala, lerNdjson, mensagemAudioScribe, pareceEco, respostaCurta, vaiAoCerebro, valeEnquantoPensa, type LinhaTurno } from './turnos';
+import { eventoScribe, interrompeFala, lerNdjson, mensagemAudioScribe, pareceEco, vaiAoCerebro, valeEnquantoPensa, type LinhaTurno } from './turnos';
 
 export interface SessaoServidorTurnos extends Omit<SessaoServidor, 'conexao'> {
   conexao: { transporte: 'scribe'; url: string };
@@ -39,10 +39,8 @@ export interface Emprestimo {
 // Pedaço de silêncio enviado ao Scribe durante o vídeo: o WebSocket segue vivo
 // e o VAD não transcreve a narração do vídeo.
 const SILENCIO_50MS = base64DePcm16(new Int16Array(HZ_STAND / 20));
-// Barge-in em dois tempos: volume alto no microfone abaixa a voz na hora; só a
-// transcrição parcial com palavras de verdade corta. Ruído de feira não mata a resposta.
-const VOLUME_ABAIXADO = 0.25;
-const ESPERA_CONFIRMAR_MS = 1200;
+// A voz toca sempre a volume cheio: nada no microfone abaixa o ganho (Lucas,
+// 23/10: "a gente nunca pediu pra ter isso"). Só palavras claras cortam a fala.
 // Depois da fala, o eco ainda pode chegar transcrito por este tempo.
 const CAUDA_ECO_MS = 2500;
 
@@ -54,7 +52,6 @@ export class SessaoTurnos implements SessaoDeVoz {
   private estado: EstadoStand = 'ocioso';
   private conversaId = '';
   private turno: AbortController | null = null;
-  private detector = criarDetectorFala();
   private referenciaEco = new ReferenciaEco();
   private detectorIndependente = criarDetectorFala({ limiar: 0.015, minimoMs: 100 });
   private falaIndependenteAte = 0;
@@ -65,7 +62,6 @@ export class SessaoTurnos implements SessaoDeVoz {
   private falado = '';
   private faladoAnterior = '';
   private fimDaFala = 0;
-  private relogioVolume = 0;
   private legendas: number[] = [];
   private videoTocando = false;
   private relogioSilencio = 0;
@@ -171,7 +167,6 @@ export class SessaoTurnos implements SessaoDeVoz {
     if (this.terminada) return;
     this.terminada = true;
     window.clearTimeout(this.relogioSilencio);
-    window.clearTimeout(this.relogioVolume);
     this.limparLegendas();
     window.removeEventListener('pagehide', this.aoSairDaPagina);
     this.pararNivel?.();
@@ -243,22 +238,6 @@ export class SessaoTurnos implements SessaoDeVoz {
     }
     // Mantém o relógio/VAD do Scribe vivo sem reenviar a própria voz como entrada.
     this.ws.send(mensagemAudioScribe(eco.eco ? SILENCIO_50MS : base64DePcm16(pcm), HZ_STAND));
-    if (eco.eco) { this.detector.zerar(); return; }
-    if (this.estado === 'falando' && this.detector.alimentar(nivel, 50)) this.abaixarVoz();
-    if (this.estado !== 'falando') this.detector.zerar();
-  }
-
-  /** 1º tempo do barge-in: voz baixa até a transcrição confirmar (ou não) a interrupção. */
-  private abaixarVoz(): void {
-    if (!this.audio || this.relogioVolume) return;
-    this.audio.saida.gain.setTargetAtTime(VOLUME_ABAIXADO, this.audio.contexto.currentTime, 0.03);
-    this.relogioVolume = window.setTimeout(() => this.restaurarVoz(), ESPERA_CONFIRMAR_MS);
-  }
-
-  private restaurarVoz(): void {
-    window.clearTimeout(this.relogioVolume);
-    this.relogioVolume = 0;
-    if (this.audio) this.audio.saida.gain.setTargetAtTime(1, this.audio.contexto.currentTime, 0.05);
   }
 
   private textoFalado(): string {
@@ -278,9 +257,12 @@ export class SessaoTurnos implements SessaoDeVoz {
     }
     if (evento.tipo === 'outro' || this.videoTocando || !evento.texto) return;
     const durante = this.emFalaOuCauda();
-    const independente = performance.now() < this.falaIndependenteAte;
+    // Na fala e na cauda o PCM não decide: numa sala com caixa de som o eco da
+    // própria voz quase nunca bate 96% com a referência e passava por "fala
+    // independente", cortando o LUCA com o próprio texto. Lá só o texto decide.
+    const independente = !durante && performance.now() < this.falaIndependenteAte;
     registrarVoz('scribe', { ...evento, estado: this.estado, turno: this.sequenciaTurno, independente });
-    if (durante && !independente && !respostaCurta(evento.texto) && pareceEco(evento.texto, this.textoFalado(), { durante })) {
+    if (durante && pareceEco(evento.texto, this.textoFalado(), { durante })) {
       registrarVoz('eco_texto', { texto: evento.texto });
       return;
     }
@@ -289,8 +271,8 @@ export class SessaoTurnos implements SessaoDeVoz {
     if (this.estado === 'pensando' && !independente && !valeEnquantoPensa(evento.texto, this.textoFalado())) return;
     if (evento.tipo === 'parcial') {
       if (this.estado === 'falando' || this.fila?.tocando) {
-        // 2º tempo do barge-in: palavras de verdade por cima da fala.
-        if (vaiAoCerebro(evento.texto) && (independente || interrompeFala(evento.texto, this.textoFalado()))) this.interromper();
+        // Barge-in: palavras claras e diferentes do que ele está dizendo.
+        if (interrompeFala(evento.texto, this.textoFalado())) this.interromper();
         return;
       }
       if (!vaiAoCerebro(evento.texto)) return;
@@ -300,7 +282,7 @@ export class SessaoTurnos implements SessaoDeVoz {
       return;
     }
     // O final não pode contornar a mesma confirmação exigida da parcial.
-    if (!independente && (this.estado === 'falando' || this.fila?.tocando) && !interrompeFala(evento.texto, this.textoFalado())) return;
+    if ((this.estado === 'falando' || this.fila?.tocando) && !interrompeFala(evento.texto, this.textoFalado())) return;
     if (!vaiAoCerebro(evento.texto)) return;
     emitirEventoStand({ tipo: 'legenda', texto: evento.texto });
     void this.perguntar({ texto: evento.texto });
@@ -318,7 +300,6 @@ export class SessaoTurnos implements SessaoDeVoz {
     this.referenciaEco.cortar(this.audio?.contexto.currentTime ?? 0);
     this.fila?.cortar();
     this.limparLegendas();
-    this.restaurarVoz();
     this.fimDaFala = performance.now();
   }
 
@@ -329,7 +310,6 @@ export class SessaoTurnos implements SessaoDeVoz {
 
   private aoFilaVazia(): void {
     this.fimDaFala = performance.now();
-    this.restaurarVoz();
     if (this.turno || this.videoTocando || this.terminada) return;
     if (this.falhaPendente) {
       this.falhaPendente = false;

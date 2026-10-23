@@ -12,7 +12,7 @@
 import type { EstadoStand } from '../../shared/stand/eventos.ts';
 import { abrirAudio, type AudioStand } from './audioStand';
 import { assinarEventosPagina, emitirEventoStand } from './barramento';
-import { criarDetectorFala, floatDeBase64Pcm16, LegendaCorrente, base64DePcm16 } from './protocolo';
+import { floatDeBase64Pcm16, LegendaCorrente, base64DePcm16 } from './protocolo';
 
 export interface SessaoServidor {
   provedor: string;
@@ -58,7 +58,6 @@ export class SessaoVoz implements SessaoDeVoz {
   private proximoInicio = 0;
   private estado: EstadoStand = 'ocioso';
   private legenda = new LegendaCorrente();
-  private detector = criarDetectorFala();
   private respostaAtual: string | null = null;
   private respostaNossa = false;
   /** Respostas cujo áudio e legenda ignoramos (automáticas do VAD ou interrompidas). */
@@ -110,7 +109,7 @@ export class SessaoVoz implements SessaoDeVoz {
     ws.onclose = () => this.terminar(this.encerrando ? 'encerrada' : 'erro', 'conexao_fechada');
     this.enviar({ type: 'session.update', session: dados.sessao });
 
-    audio.ouvir((pcm, nivel) => this.aoMicrofone(pcm, nivel));
+    audio.ouvir((pcm) => this.aoMicrofone(pcm));
     this.pararNivel = audio.medirNivel((nivel) => emitirEventoStand({ tipo: 'nivel_audio', valor: this.estado === 'falando' ? nivel : 0 }));
     this.relogioTeto = window.setTimeout(() => this.encerrar('teto'), this.limites.teto_s * 1000);
     this.armarSilencio();
@@ -183,16 +182,15 @@ export class SessaoVoz implements SessaoDeVoz {
     this.relogioSilencio = window.setTimeout(() => this.encerrar('silencio'), this.limites.silencio_s * 1000);
   }
 
-  private aoMicrofone(pcm: Int16Array, nivel: number): void {
+  private aoMicrofone(pcm: Int16Array): void {
     if (this.videoTocando) {
       // Durante o vídeo a sessão não ouve; o relógio de silêncio também fica parado.
       this.armarSilencio();
       return;
     }
-    this.enviar({ type: 'input_audio_buffer.append', audio: base64DePcm16(pcm) });
-    // Barge-in local: corta a voz da IA antes de o VAD do servidor confirmar.
-    if (this.estado === 'falando' && this.detector.alimentar(nivel, 50)) this.interromper();
-    if (this.estado !== 'falando') this.detector.zerar();
+    // Meio-duplex: com a IA falando o servidor recebe silêncio, para o eco da
+    // caixa não virar speech_started e cortar a própria fala. Volume não corta.
+    this.enviar({ type: 'input_audio_buffer.append', audio: base64DePcm16(this.estado === 'falando' ? new Int16Array(pcm.length) : pcm) });
   }
 
   private interromper(): void {

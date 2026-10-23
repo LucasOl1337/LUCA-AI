@@ -80,20 +80,36 @@ const palavras = (texto: string): string[] => texto
   .split(/[^\p{L}\p{N}]+/u)
   .filter(Boolean);
 
+// Palavras que aparecem em qualquer frase: não contam como conteúdo ao comparar
+// o que o microfone ouviu com o que o LUCA falou.
+const VAZIAS = new Set(('a o as os e de da do das dos um uma uns umas que em no na nos nas pra pro para por com se ao aos '
+  + 'eu voce ele ela isso esse essa este esta ta ai la ja mas ou meu minha seu sua seus suas')
+  .split(' '));
+const conteudo = (lista: string[]): string[] => lista.filter((p) => !VAZIAS.has(p));
+
 /**
  * Transcrição que é só a voz do LUCA voltando pelo microfone (o cancelamento
  * de eco do navegador falha em caixa de som alta). Fora da fala: 3+ palavras e
  * um trecho consecutivo de pelo menos 80% delas na narração. Durante a fala
- * (ou logo depois), um trecho curto idêntico também é eco. Palavras espalhadas
- * pelo roteiro não bastam: "o que é o sensor?" é uma pergunta nova.
+ * (ou logo depois) o ASR do eco sai sujo ("Oi, animal na pista é um dos seus...
+ * Ô, animal", stand 22/10): basta trecho curto todo dito, 3 palavras seguidas
+ * da fala, 60% de 2+ palavras de conteúdo já ditas, ou nenhuma de conteúdo.
+ * Palavras espalhadas pelo roteiro não bastam: "o que é o sensor?" é uma pergunta nova.
  */
 export function pareceEco(texto: string, falado: string, { durante = false } = {}): boolean {
   const ouvidas = palavras(texto);
   if (!ouvidas.length || !falado) return false;
   const palavrasDitas = palavras(falado);
   const ditas = ` ${palavrasDitas.join(' ')} `;
-  if (durante && ouvidas.length < 3 && ouvidas.every((p) => palavrasDitas.includes(p))) return true;
-  if (durante && ditas.includes(` ${ouvidas.join(' ')} `)) return true;
+  if (durante) {
+    if (ouvidas.length < 3 && ouvidas.every((p) => palavrasDitas.includes(p))) return true;
+    for (let inicio = 0; inicio + 3 <= ouvidas.length; inicio++) {
+      if (ditas.includes(` ${ouvidas.slice(inicio, inicio + 3).join(' ')} `)) return true;
+    }
+    const proprias = conteudo(ouvidas);
+    if (!proprias.length) return true;
+    if (proprias.length >= 2 && proprias.filter((p) => palavrasDitas.includes(p)).length >= proprias.length * 0.6) return true;
+  }
   if (ouvidas.length < 3) return false;
   const minimo = Math.ceil(ouvidas.length * 0.8);
   for (let inicio = 0; inicio <= ouvidas.length - minimo; inicio++) {
@@ -104,14 +120,21 @@ export function pareceEco(texto: string, falado: string, { durante = false } = {
 
 /** Parcial/final: 2+ palavras, ou resposta/comando curto legítimo; nunca só ruído/eco. */
 export function respostaCurta(texto: string): boolean {
-  return /^(sim|nao|pare|para|espera|cancela|chega|volta)$/.test(palavras(texto).join(' '));
+  return /^(sim|nao|pare|para|espera|cancela|chega|volta)( ai| la)?$/.test(palavras(texto).join(' '));
 }
 
+/**
+ * Fala do visitante que corta o LUCA no meio: comando curto que ele não acabou
+ * de dizer, ou 2+ palavras de conteúdo novas que não sejam eco. Volume, "Oi"
+ * solto e o próprio texto voltando pela caixa nunca cortam (Lucas, 23/10: "a
+ * fala dele mesmo interrompe ele mesmo falando").
+ */
 export function interrompeFala(parcial: string, falado: string): boolean {
-  // Texto sozinho não distingue um “não” humano da mesma palavra na narração.
-  // Curtas legítimas ficam disponíveis; eco confirmado é removido antes do ASR.
-  return respostaCurta(parcial) || (palavras(parcial).length >= 2
-    && vaiAoCerebro(parcial) && !pareceEco(parcial, falado, { durante: true }));
+  const ouvidas = palavras(parcial);
+  const ditas = palavras(falado);
+  if (respostaCurta(parcial)) return !ditas.includes(ouvidas[0]);
+  const novas = conteudo(ouvidas).filter((p) => !ditas.includes(p));
+  return novas.length >= 2 && vaiAoCerebro(parcial) && !pareceEco(parcial, falado, { durante: true });
 }
 
 /**

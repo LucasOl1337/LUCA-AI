@@ -51,7 +51,11 @@ test('eco do tour: "o que é o sensor?" após a narração é pergunta, não pal
   const falado = TOUR_STAND.filter((passo) => 'texto' in passo).map((passo) => passo.texto).join(' ');
   assert.equal(pareceEco('o que é o sensor?', falado, { durante: true }), false);
   assert.equal(pareceEco('o que é o sensor?', falado), false);
-  assert.equal(interrompeFala('o que é o sensor?', falado), true);
+  // Durante a narração do sensor, a pergunta só com palavras que ele está
+  // dizendo não corta a fala (23/10: frase completa vale mais que barge-in);
+  // feita depois que ele termina, é pergunta normal (pareceEco fora da fala = false).
+  assert.equal(interrompeFala('o que é o sensor?', falado), false);
+  assert.equal(interrompeFala('quanto custa o sensor?', falado), true);
   assert.equal(pareceEco('o sensor mede a inclinação', falado, { durante: true }), true);
   assert.equal(pareceEco('Pode me perguntar qualquer coisa sobre o que você viu.', falado), true);
 });
