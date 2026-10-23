@@ -48,10 +48,10 @@ const ITENS_VITRINE = montarItens(VIDEOS_VITRINE);
 /** Status da voz no servidor: o texto da Atração segue `ligado` + `motivo` (inclusive `teto_diario`). */
 const STATUS_A_CADA_MS = 60_000;
 /**
- * Onde a escuta fica aberta: Coruja, Vitrine (r5 Q1, vídeo mudo) e o modo do site (Totem-Site).
+ * Onde a escuta fica aberta: Coruja e Site. Vitrine narrada é exclusiva, sem microfone.
  * Simulação usa a mesma sessão: pedidos de ajuda e retorno continuam chegando ao LUCA.
  */
-const MODOS_COM_ESCUTA: readonly string[] = ['coruja', 'vitrine', 'site', 'simulacao'];
+const MODOS_COM_ESCUTA: readonly string[] = ['coruja', 'site', 'simulacao'];
 
 function useStatusStand(ativo: boolean, fimSessao: unknown, aoPerderSessao: () => void) {
   const [status, setStatus] = useState<StatusStand | null>(null);
@@ -98,7 +98,7 @@ export default function StandPage() {
   const { refreshSession } = useAuth();
   const status = useStatusStand(!modoStub, voz.fim, refreshSession);
   const vozStand = modoStub ? 'ligada' : vozDoStand(status, voz.fim, agora);
-  /** Escuta ligada no servidor: abre o microfone (Totem-Voz) e deixa a Vitrine muda (Totem-Tela). */
+  /** Escuta ligada no servidor; Vitrine narrada suspende captura em vez de silenciar o vídeo. */
   const escutaLigada = escutaNoStand(status, vozStand, modoStub);
   const { iniciar: iniciarVoz, encerrar: encerrarVoz } = voz;
   // Escuta: na Coruja, alguém falando abre a conversa sem toque (Lucas, 19/10).
@@ -449,7 +449,7 @@ export default function StandPage() {
         </div>
       )}
       {modo.modo === 'vitrine' && (
-        <VitrineStand item={itemVitrine} pausado={modo.pausado} aoTerminar={terminarVitrine} telaApp={telaApp} pulos={descreverPulos(telas.prontidao)} semSom={escutaLigada} />
+        <VitrineStand aoPausar={() => despacharModo({ tipo: 'pausar' })} item={itemVitrine} pausado={modo.pausado} aoTerminar={terminarVitrine} telaApp={telaApp} pulos={descreverPulos(telas.prontidao)} />
       )}
       {modo.modo === 'simulacao' && <SimulacaoComGuia comVoz={comVoz && !modoStub}><SimulacaoStand /></SimulacaoComGuia>}
       {modo.modo === 'site' && modo.pagina && (

@@ -30,3 +30,17 @@
 .circuito-chat textarea { min-height:100px; color:#edf2e6; background:#111d16; border:1px solid #8ea28b; border-radius:7px; padding:12px; }
 .circuito-chat button:disabled { opacity:.6; cursor:wait; }
 @media(max-height:800px) { .circuito-dialogo { padding:18px; font-size:13px; } .circuito-dialogo h2 { font-size:22px; } }
+
+.circuito-sensores { position:absolute; left:18px; bottom:20px; width:250px; padding:12px; border-radius:12px; background:#111e18ec; border:1px solid #a9be9b66; }
+.circuito-sensores>small { font-size:10px; letter-spacing:.1em; color:#c3d5bb; }
+.circuito-sensores>div { display:grid; grid-template-columns:1fr auto; padding:9px 0; border-bottom:1px solid #b5cbaa33; }
+.circuito-sensores span { font-size:13px; font-weight:650; }
+.circuito-sensores strong { font-size:17px; }
+.circuito-sensores div small { grid-column:1/-1; font-size:12px; color:#c4d5be; }
+.circuito-sensores [data-nivel=atencao] { color:#ffe092; }
+.circuito-sensores [data-nivel=critico] { color:#ffad9b; border-left:3px solid #fb806c; padding-left:7px; }
+.circuito-hud .gameplay-mapa { right:18px; bottom:auto; top:65px; width:200px; color:#dce6d5; }
+.circuito-hud .gameplay-mapa small { font-size:10px; line-height:1.5; }
+.gameplay-mapa-rota { fill:none; stroke:#e5f4ab; stroke-width:1.1; stroke-dasharray:2 2; }
+.gameplay-mapa-fardo { fill:#ff7967; stroke:#ffd2c1; stroke-width:.6; }
+@media(max-height:800px) { .circuito-sensores { bottom:12px; padding:9px; width:250px; } .circuito-sensores>div { padding:6px 0; } .circuito-hud .gameplay-mapa { width:170px; } }

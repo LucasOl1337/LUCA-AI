@@ -18,20 +18,18 @@ test('Escuta ligada só com voz ligada e escuta no status, nunca no stub', () =>
   assert.equal(escutaNoStand({ ligado: true, escuta: true }, 'ligada', true), false);
 });
 
-test('a página usa o mesmo sinal para a Escuta e para a Vitrine muda', async () => {
+test('Vitrine narrada suspende a Escuta em vez de eliminar áudio do vídeo', async () => {
   const pagina = await ler('src/pages/StandPage.tsx');
   assert.match(pagina, /const escutaLigada = escutaNoStand\(status, vozStand, modoStub\)/);
-  assert.match(pagina, /ativa: escutaLigada && estado\.tela !== 'video' && MODOS_COM_ESCUTA/);
-  assert.match(pagina, /<VitrineStand [^>]*semSom=\{escutaLigada\}/);
+  assert.doesNotMatch(pagina, /<VitrineStand [^>]*semSom/);
+  const modos = pagina.match(/const MODOS_COM_ESCUTA[^=]*= (.*);/)[1];
+  assert.ok(!modos.includes('vitrine'));
 });
-
-test('Vitrine sem som: vídeo mudo, sem aviso de autoplay e sem desmutar no toque', async () => {
+test('autoplay bloqueado oferece botão acessível sem falar por cima da narração', async () => {
   const modos = await ler('src/components/stand/Modos.tsx');
-  assert.match(modos, /el\.muted = semSom;/);
-  assert.match(modos, /<video [^>]*muted=\{semSom\}/);
-  assert.match(modos, /if \(!mudo \|\| semSom\) return undefined;/);
-  assert.match(modos, /\{mudo && !semSom && video && <p className="stand-aviso-equipe stand-aviso-mudo">/);
-  assert.match(modos, /data-som=\{semSom \? 'mudo_escuta' : undefined\}/);
+  assert.match(modos, /Ativar som da Vitrine/);
+  assert.match(modos, /aguardando_gesto/);
+  assert.match(modos, /el.volume = 1/);
 });
 
 test('todo vídeo da Vitrine tem a fala em legenda (.srt ao lado, queimada no vídeo)', async () => {

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { somCompartilhado } from '../gameplay/somCompartilhado';
 import { ComandosSimulacao } from '../gameplay/ComandosSimulacao';
 
 /** Gesto explícito antes de começar: dá tempo para conhecer os comandos. */
@@ -28,7 +29,7 @@ export function GuiaSimulacao({ aoComecar, comVoz }: { aoComecar(): void; comVoz
 
 export function SimulacaoComGuia({ children, comVoz }: { children: ReactNode; comVoz: boolean }) {
   const [pronto, setPronto] = useState(false);
-  return <>{pronto ? children : <GuiaSimulacao comVoz={comVoz} aoComecar={() => setPronto(true)} />}
+  return <>{pronto ? children : <GuiaSimulacao comVoz={comVoz} aoComecar={() => { void somCompartilhado.destravar(); setPronto(true); }} />}
 
   </>;
 }
