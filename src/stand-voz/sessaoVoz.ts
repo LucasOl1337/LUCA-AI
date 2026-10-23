@@ -11,6 +11,7 @@
  */
 import type { EstadoStand } from '../../shared/stand/eventos.ts';
 import { abrirAudio, type AudioStand } from './audioStand';
+import { microfonePermitido } from './portaMicrofone';
 import { assinarEventosPagina, emitirEventoStand } from './barramento';
 import { floatDeBase64Pcm16, LegendaCorrente, base64DePcm16 } from './protocolo';
 
@@ -192,7 +193,7 @@ export class SessaoVoz implements SessaoDeVoz {
     }
     // Meio-duplex: com a IA falando o servidor recebe silêncio, para o eco da
     // caixa não virar speech_started e cortar a própria fala. Volume não corta.
-    this.enviar({ type: 'input_audio_buffer.append', audio: base64DePcm16(this.estado === 'falando' ? new Int16Array(pcm.length) : pcm) });
+    this.enviar({ type: 'input_audio_buffer.append', audio: base64DePcm16(this.estado === 'falando' || !microfonePermitido() ? new Int16Array(pcm.length) : pcm) });
   }
 
   private interromper(): void {

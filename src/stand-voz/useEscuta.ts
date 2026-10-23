@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { abrirAudio, type AudioStand } from './audioStand';
+import { microfonePermitido } from './portaMicrofone';
 import { criarDespertador, pausaAposFalsos, PRE_ROLAGEM_BLOCOS } from './escuta';
 import type { Emprestimo } from './sessaoTurnos';
 import type { FimDeSessao } from './useSessaoVoz';
@@ -21,7 +22,7 @@ export type EstadoEscuta = 'desligada' | 'abrindo' | 'ajuda_microfone' | 'precis
 export interface UsoEscuta {
   estado: EstadoEscuta;
   /** Toque na tela: libera o áudio (se faltava) e devolve o empréstimo para uma conversa com saudação. */
-  aoTocar: () => Emprestimo | null;
+  aoTocar: (saudar?: boolean) => Emprestimo | null;
 }
 
 interface Opcoes {
@@ -73,6 +74,7 @@ export function useEscuta({ ativa, emConversa, fim, despertar }: Opcoes): UsoEsc
     guardados.current = [];
     acordada.current = false;
     a.ouvir((pcm, nivel) => {
+      if (!microfonePermitido()) { guardados.current = []; return; }
       const lista = guardados.current;
       lista.push(pcm);
       if (acordada.current) {
@@ -149,12 +151,12 @@ export function useEscuta({ ativa, emConversa, fim, despertar }: Opcoes): UsoEsc
     return () => window.clearTimeout(relogio);
   }, [estado]);
 
-  const aoTocar = useCallback((): Emprestimo | null => {
+  const aoTocar = useCallback((saudar = true): Emprestimo | null => {
     const a = audio.current;
     if (!a || conversaRef.current) return null;
     if (a.contexto.state === 'suspended') void a.contexto.resume();
     falsos.current = 0;
-    return emprestimo(true);
+    return emprestimo(saudar);
   }, [emprestimo]);
 
   return { estado, aoTocar };

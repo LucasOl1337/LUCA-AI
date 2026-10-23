@@ -31,6 +31,8 @@ import type { ResultadoPlano } from '@/components/stand/site/acaoDoStand';
 import { SeloCamera, useCameraTotem, WebcamCoruja } from '@/components/stand/CameraTotem';
 import { EVENTO_EM_USO as EVENTO_GAMEPLAY_EM_USO } from '@/components/gameplay/eventoEmUso';
 import { SimulacaoComGuia } from '@/components/stand/GuiaSimulacao';
+import { CorujaCabine } from '@/components/stand/CorujaCabine';
+import { useFalaCabine } from '@/components/gameplay/useFalaCabine';
 import '@/stand.css';
 
 /** Margem segura padrão (% de cada lado): a moldura de MDF come as bordas. */
@@ -107,6 +109,7 @@ export default function StandPage() {
     despacharModo({ tipo: 'atividade' });
     void iniciarVoz(emprestimo);
   }, [iniciarVoz]);
+  const segurandoFala = useFalaCabine(modo.modo === 'simulacao');
   const escuta = useEscuta({
     ativa: escutaLigada && estado.tela !== 'video' && MODOS_COM_ESCUTA.includes(modo.modo),
     emConversa: voz.ativa,
@@ -224,6 +227,10 @@ export default function StandPage() {
   /** Gesto do público ou da equipe: liga o microfone (precisa de clique ou tecla).
    * `voz.iniciar` já ignora quando há sessão; não ler `voz.ativa` aqui (fica velho no R). */
   const { aoTocar: tocouNaEscuta } = escuta;
+  useEffect(() => {
+    if (!segurandoFala || modoStub || voz.ativa || !escutaLigada) return;
+    void iniciarVoz(tocouNaEscuta(false) ?? undefined);
+  }, [segurandoFala, modoStub, voz.ativa, escutaLigada, iniciarVoz, tocouNaEscuta]);
   const iniciar = useCallback(() => {
     if (modoStub) demonstrar.current();
     // Com a escuta aberta, o toque libera o áudio do dia e usa o mesmo microfone.
@@ -455,7 +462,9 @@ export default function StandPage() {
       {modo.modo === 'vitrine' && (
         <VitrineStand aoPausar={() => despacharModo({ tipo: 'pausar' })} item={itemVitrine} pausado={modo.pausado} aoTerminar={terminarVitrine} telaApp={telaApp} pulos={descreverPulos(telas.prontidao)} />
       )}
-      {modo.modo === 'simulacao' && <SimulacaoComGuia comVoz={comVoz && !modoStub}><SimulacaoStand /></SimulacaoComGuia>}
+      {modo.modo === 'simulacao' && <><SimulacaoComGuia comVoz={comVoz && !modoStub}><SimulacaoStand /></SimulacaoComGuia>
+        <CorujaCabine voz={estado.voz} legenda={estado.legenda} nivel={nivel} segurando={segurandoFala} disponivel={comVoz && !modoStub} />
+      </>}
       {modo.modo === 'site' && modo.pagina && (
         <SiteStand pagina={modo.pagina} variante={variante} nivel={nivel} voz={estado.voz} legenda={estado.legenda} aoMexer={mexeuNoPad} />
       )}

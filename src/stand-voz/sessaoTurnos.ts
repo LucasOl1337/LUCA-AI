@@ -10,6 +10,7 @@ import type { EstadoStand } from '../../shared/stand/eventos.ts';
 import { abrirAudio, FilaDeVoz, HZ_STAND, type AudioStand } from './audioStand';
 import { assinarEventosPagina, emitirEventoStand } from './barramento';
 import { registrarVoz } from './diagnosticoVoz';
+import { microfonePermitido } from './portaMicrofone';
 import { ReferenciaEco } from './ecoPcm';
 import { SEM_FALA_MS } from './escuta';
 import { visaoTotem } from './visao';
@@ -221,7 +222,7 @@ export class SessaoTurnos implements SessaoDeVoz {
 
   private aoMicrofone(pcm: Int16Array, nivel: number): void {
     if (this.ws?.readyState !== WebSocket.OPEN) return;
-    if (this.videoTocando || this.alarmeTocando) {
+    if (this.videoTocando || this.alarmeTocando || !microfonePermitido()) {
       this.ws.send(mensagemAudioScribe(SILENCIO_50MS, HZ_STAND));
       return;
     }

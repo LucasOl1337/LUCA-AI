@@ -1,0 +1,8 @@
+.coruja-cabine { position: absolute; z-index: 40; right: 18px; bottom: 18px; width: 260px; display: flex; align-items: center; gap: 8px; padding: 12px; background: #0b1922ed; border: 1px solid #446372; border-radius: 16px; color: #eaf7fa; pointer-events: none; box-shadow: 0 8px 28px #0005; }
+.coruja-cabine-avatar { width: 66px; height: 84px; flex-shrink: 0; }
+.coruja-cabine > div { min-width: 0; }
+.coruja-cabine strong { display: block; font: 700 13px system-ui; }
+.coruja-cabine strong span { display: block; color: #a4e9cf; font-size: 11px; margin-top: 3px; }
+.coruja-cabine p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 7px 0; font: 12px/1.4 system-ui; }
+.coruja-cabine small { color: #aec5cf; font: 11px system-ui; }
+@media (max-width: 650px) { .coruja-cabine { width: 210px; right: 8px; bottom: 8px; padding: 8px; } .coruja-cabine-avatar { width: 44px; height: 60px; } }
