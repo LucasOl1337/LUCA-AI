@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { criarSomMotor } from './somMotor';
+import { COMANDOS_CABINE } from './comandosCabine';
+import { alternarVistaTrator, criarVistaExterna, lerVistaTrator } from './vistaTrator';
 import { CircuitoHud } from './CircuitoHud';
 import { criarSessaoCircuito, type RelatorioCircuito } from './sessaoCircuito';
 import { INICIO_CIRCUITO, ROTA_CIRCUITO } from './circuito';
@@ -83,6 +85,9 @@ export type ExperienciaGameplay = 'desafios' | 'percurso' | 'circuito';
 
 export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = createFirstPersonRig, seloFps = false, experiencia = 'desafios', mundo, aoAnalisarCircuito }: { criarCabine?: CriarCabineGameplay; modeloUrl?: string; criarCamera?: CriarCameraGameplay; seloFps?: boolean; experiencia?: ExperienciaGameplay; mundo?: MundoGameplay; aoAnalisarCircuito?(relatorio: RelatorioCircuito): void }) {
   const circuito = experiencia === 'circuito';
+  const [vista, setVista] = useState(lerVistaTrator);
+  const vistaRef = useRef(vista);
+  const trocarVista = useCallback(() => { vistaRef.current = alternarVistaTrator(); setVista(vistaRef.current); }, []);
   const [volta, setVolta] = useState(0);
   const [menu, setMenu] = useState(false);
   const pausado = useRef(false);
@@ -158,6 +163,8 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
     document.addEventListener('visibilitychange', silenciarOculto);
     let cabine: CabineGameplay | null = null;
     let reiniciarSegurado = false;
+    let cameraSegurada = false;
+    const externa = criarVistaExterna();
     let pulsoMotor = 0;
     let ultimoDt = 0;
     ultimoMonotono.current = performance.now();
@@ -167,6 +174,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
       active: () => true,
       update(camera: THREE.PerspectiveCamera, maquina: THREE.Object3D) {
         base.update(camera, maquina);
+        if (vistaRef.current === 'externa') externa(camera, maquina);
         if (!cabine && criarCabineRef.current) {
           try { cabine = criarCabineRef.current(); cabine.montar(maquina, camera); } catch (erro) { console.error('Cabine do gameplay falhou; segue sem ela.', erro); cabine = null; criarCabineRef.current = undefined; }
         }
@@ -185,7 +193,11 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
           if (circuito) alterarMenu(!pausado.current);
           else { setLivre(false); setRodada((n) => n + 1); }
         }
-        if (circuito && pausado.current && pad?.buttons[0]?.pressed) alterarMenu(false);
+        const cameraAgora = !!pad?.buttons[COMANDOS_CABINE.camera.botao]?.pressed;
+        const estavaPausado = pausado.current;
+        if (circuito && estavaPausado && cameraAgora) alterarMenu(false);
+        else if (cameraAgora && !cameraSegurada && motor.ler().fase === 'dirigindo') trocarVista();
+        cameraSegurada = cameraAgora;
         const olhar = pad ? { yaw: 0 - applyDeadZone(pad.axes[2] ?? 0), pitch: 0 - applyDeadZone(pad.axes[3] ?? 0) } : { yaw: 0, pitch: 0 };
         lookRef.current = stepLook(lookRef.current, olhar, dt, { recenter: !!pad });
         const congelado = circuito && (pausado.current || document.hidden || sessao.registro.resultado !== null);
@@ -238,11 +250,14 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
       cabine?.desmontar();
       stage?.dispose();
     };
-  }, [motor, modeloUrl, criarCamera, mundo, circuito, sessao, alterarMenu]);
+  }, [motor, modeloUrl, criarCamera, mundo, circuito, sessao, alterarMenu, trocarVista]);
 
   // Setas dirigem (Q9). Só as setas: as letras do stand (r, n, d, g, f) seguem com a equipe.
   useEffect(() => {
     const trocar = (evento: KeyboardEvent, valor: boolean) => {
+      if (valor && !evento.repeat && COMANDOS_CABINE.camera.teclas.some((t) => t === evento.key.toLowerCase()) && !pausado.current && motor.ler().fase === 'dirigindo') {
+        evento.preventDefault(); trocarVista(); return;
+      }
       const seta = setaDaTecla(evento.key);
       if (!seta) return;
       evento.preventDefault();
@@ -255,12 +270,12 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
     window.addEventListener('keyup', subir);
     window.addEventListener('blur', soltar);
     return () => { window.removeEventListener('keydown', descer); window.removeEventListener('keyup', subir); window.removeEventListener('blur', soltar); };
-  }, []);
+  }, [motor, trocarVista]);
 
   if (falhaWebgl) throw new Error('WebGL indisponível para o gameplay');
 
   return (
-    <div ref={raizRef} className="gameplay-kiosk" data-gameplay="" data-fase="pronto">
+    <div ref={raizRef} className="gameplay-kiosk" data-gameplay="" data-fase="pronto" data-vista={vista}>
       <div
         ref={palcoRef}
         className="gameplay-kiosk-palco"
@@ -275,6 +290,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
           alvo.addEventListener('pointercancel', parar);
         }}
       />
+      <div className="gameplay-vista" aria-live="polite">Vista {vista === 'externa' ? 'externa' : 'da cabine'} · {COMANDOS_CABINE.camera.ps}/{COMANDOS_CABINE.camera.xbox} · C</div>
       {experiencia === 'desafios' && <DesafioCabine key={rodada} canal={motor} />}
       {experiencia === 'percurso' && !livre && <PercursoCabine key={rodada} canal={motor} aoSair={() => setLivre(true)} />}
       {experiencia === 'percurso' && livre && <ConducaoLivre canal={motor} aoPercurso={() => { setLivre(false); setRodada((n) => n + 1); }} />}

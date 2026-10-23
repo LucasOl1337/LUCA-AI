@@ -2,6 +2,7 @@
 /* O HUD (painel, mapa, alerta, resultado) mede em cqh/cqw: escala pelo quadro do jogo,
    não pela janela. Em tela inteira dá o mesmo que vh/vw; embutido na página, o painel e
    o mapa ficam dentro do quadro em vez de crescer com a altura da janela. */
+.gameplay-vista { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); z-index:8; padding:5px 10px; border-radius:8px; background:#111e18df; color:#fff; font:12px system-ui; white-space:nowrap; pointer-events:none; }
 .gameplay-kiosk { position: absolute; inset: 0; overflow: hidden; background: #07100c; user-select: none; container-type: size; }
 .gameplay-kiosk-palco { position: absolute; inset: 0; cursor: grab; touch-action: none; }
 .gameplay-kiosk-palco:active { cursor: grabbing; }

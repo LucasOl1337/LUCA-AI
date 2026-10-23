@@ -61,7 +61,7 @@ export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, t
     {webcam && !fim && <Suspense fallback={null}><div className="circuito-webcam" data-config-aberta={menu}><Webcam /></div></Suspense>}
     {menu && !fim && <section className="circuito-dialogo" role="dialog" aria-modal="true" aria-label="Opções do circuito">
       <h2>Simulação pausada</h2><p>Um percurso: siga as estacas até a chegada. Desvie dos fenos e da água; reduza na encosta. Parar para decidir não encerra a missão.</p>
-      <p>↑/W acelera · ↓/S/espaço freia · ←/→ dirigem. R2/L2 e analógicos no controle. Options pausa; ✕ continua. Arraste para olhar.</p>
+      <p>↑/W acelera · ↓/S/espaço freia · ←/→ dirigem. R2/L2 e analógicos no controle. Options pausa; ✕/A continua na pausa. Durante a corrida, ✕/A ou C alterna a vista. Arraste para olhar.</p>
       <label><input type="checkbox" checked={som} onChange={(ev) => { setSom(ev.target.checked); if (ev.target.checked) void audio.liberar(); }} /> Sons de risco {som ? 'ligados' : 'desligados'} · tons curtos, sem voz</label>
       <p>Áudio liberado por toque, tecla ou Continuar. Sem som, os sensores e o mapa continuam ativos.</p>
       <label><input type="checkbox" checked={webcam} onChange={(ev) => setWebcam(ev.target.checked)} /> Ativar webcam de sonolência (opcional, imagem só neste navegador)</label>
