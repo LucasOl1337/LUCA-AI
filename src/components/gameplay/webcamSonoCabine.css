@@ -23,8 +23,6 @@
   pointer-events: auto; margin: 0 4px; min-height: 32px; border-radius: 8px; border: 1px solid #ffffff33;
   background: #1c2a24; color: #edf3ed; font: inherit; font-weight: 700; cursor: pointer;
 }
-.gameplay-webcam[hidden] { display:none; }
-.gameplay-webcam[data-sono='open'] { border-color:#4fbf7a; }
 .gameplay-webcam[data-sono='open'] .gameplay-webcam-ponto { background: #4fbf7a; }
 .gameplay-webcam[data-sono='closed'] { border-color: #f2c14e; }
 .gameplay-webcam[data-sono='closed'] .gameplay-webcam-ponto { background: #f2c14e; }

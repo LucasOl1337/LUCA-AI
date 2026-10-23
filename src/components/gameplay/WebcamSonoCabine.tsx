@@ -16,7 +16,7 @@ type Fase = 'abrindo' | 'rodando' | 'pausada' | 'erro';
  * do totem volta com a câmera); com a aba oculta, libera a câmera e reabre
  * na volta. A imagem não sai do navegador: só o status vai ao tablet.
  */
-export default function WebcamSonoCabine({ silenciosa = false }: { silenciosa?: boolean }) {
+export default function WebcamSonoCabine() {
   const video = useRef<HTMLVideoElement>(null);
   const monitor = useRef<MonitorSonolencia | null>(null);
   const [fase, setFaseEstado] = useState<Fase>('abrindo');
@@ -85,7 +85,7 @@ export default function WebcamSonoCabine({ silenciosa = false }: { silenciosa?: 
   const fechado = status === 'closed' || status === 'alarm';
   const progresso = Math.min(1, (sono?.closedMs ?? 0) / CLOSED_DURATION_MS);
   return (
-    <aside className="gameplay-webcam" hidden={silenciosa && fase !== 'rodando'} data-fase={fase} data-sono={fase === 'rodando' ? status : undefined} aria-label="Webcam de sonolência">
+    <aside className="gameplay-webcam" data-fase={fase} data-sono={fase === 'rodando' ? status : undefined} aria-label="Webcam de sonolência">
       <div className="gameplay-webcam-quadro">
         <video ref={video} muted playsInline aria-hidden="true" />
         {fase !== 'rodando' && (
