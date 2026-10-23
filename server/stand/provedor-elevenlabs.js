@@ -22,13 +22,16 @@ const VOZ_ID = /^[A-Za-z0-9]{20}$/;
  * Lucas) e já estão na conta; a Andrea segue na lista e volta sozinha quando a
  * dona religar o compartilhamento e ela for adicionada.
  */
-export const VOZ_STAND_PADRAO = 'lucas';
+export const VOZ_STAND_PADRAO = 'otto';
 export const VOZES_STAND = Object.freeze({
-  lucas: Object.freeze({ rotulo: 'Lucas Oliveira', voz: null }),
-  femea1: Object.freeze({ rotulo: 'Fêmea 1', voz: 'ohZOfA9iwlZ5nOsoY7LB' }),
-  otto: Object.freeze({ rotulo: 'Otto', voz: 'ycxdm1PRMs962FxyyuJ0' }),
-  locutor: Object.freeze({ rotulo: 'Locutor grave', voz: '4XmhZ74tBbUVCXIYNMMo' }),
-  andrea: Object.freeze({ rotulo: 'Andrea Lot', voz: 'HOfBIVLhom4mc9WvXfyH' }),
+  lucas: Object.freeze({ rotulo: 'Lucas Oliveira', detalhe: 'Voz original do LUCA', voz: null }),
+  femea1: Object.freeze({ rotulo: 'Fêmea 1', detalhe: 'Voz feminina, leve e clara', voz: 'ohZOfA9iwlZ5nOsoY7LB' }),
+  otto: Object.freeze({ rotulo: 'Otto', detalhe: 'Voz masculina intensa', voz: 'ycxdm1PRMs962FxyyuJ0' }),
+  locutor: Object.freeze({ rotulo: 'Locutor grave', detalhe: 'Voz masculina grave de narrador', voz: '4XmhZ74tBbUVCXIYNMMo' }),
+  thiago: Object.freeze({ rotulo: 'Thiago', detalhe: 'Voz masculina calorosa e direta', voz: 'dIwbXBNI0A6EpdIWTvvr' }),
+  vanessa: Object.freeze({ rotulo: 'Vanessa', detalhe: 'Voz feminina calma e confiante', voz: 'BQzELs93jJsUOf5rCb9p' }),
+  vander: Object.freeze({ rotulo: 'Vander', detalhe: 'Voz masculina jovem e explicativa', voz: 'uuRRBfx9C2chYfSRNn6t' }),
+  andrea: Object.freeze({ rotulo: 'Andrea Lot', detalhe: 'Voz feminina de narradora brasileira', voz: 'HOfBIVLhom4mc9WvXfyH' }),
 });
 
 /** Chave pedida pelo navegador → chave da lista branca (qualquer outra coisa vira o padrão). */

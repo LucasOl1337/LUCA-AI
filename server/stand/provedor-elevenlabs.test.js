@@ -50,15 +50,15 @@ test('token Scribe de uso único; recusa vira ok:false com status', async () => 
 });
 
 test('lista branca de vozes do Totem: chave conhecida passa, o resto vira lucas', () => {
-  assert.deepEqual(Object.keys(VOZES_STAND), ['lucas', 'femea1', 'otto', 'locutor', 'andrea']);
+  assert.deepEqual(Object.keys(VOZES_STAND), ['lucas', 'femea1', 'otto', 'locutor', 'thiago', 'vanessa', 'vander', 'andrea']);
   assert.equal(chaveVozStand('Locutor'), 'locutor');
   assert.equal(chaveVozStand('andrea'), 'andrea');
   assert.equal(chaveVozStand(' Andrea '), 'andrea');
-  for (const outro of [undefined, null, '', 'HOfBIVLhom4mc9WvXfyH', '4XmhZ74tBbUVCXIYNMMo', 'Fêmea 1', 'constructor', '__proto__', 'toString', 7]) assert.equal(chaveVozStand(outro), 'lucas', String(outro));
+  for (const outro of [undefined, null, '', 'HOfBIVLhom4mc9WvXfyH', '4XmhZ74tBbUVCXIYNMMo', 'Fêmea 1', 'constructor', '__proto__', 'toString', 7]) assert.equal(chaveVozStand(outro), 'otto', String(outro));
   assert.equal(vozDaChave('lucas', 'Lucas Oliveira'), 'Lucas Oliveira');
   assert.equal(vozDaChave('lucas', 'Outro Nome'), 'Outro Nome', 'lucas segue LUCA_STAND_VOZ');
   assert.equal(vozDaChave('andrea'), 'HOfBIVLhom4mc9WvXfyH');
-  assert.equal(vozDaChave('qualquer', 'Lucas Oliveira'), 'Lucas Oliveira');
+  assert.equal(vozDaChave('qualquer', 'Lucas Oliveira'), 'ycxdm1PRMs962FxyyuJ0');
 });
 
 test('verificarVoz: voice_id por GET /v1/voices, com cache de 10 min; erro de rede é indisponível', async () => {
