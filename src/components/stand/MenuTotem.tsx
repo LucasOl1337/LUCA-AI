@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type PointerEvent } from 'react';
-import { CATALOGO, type GrupoCatalogo, type ItemCatalogo } from '../../../shared/stand/catalogo.ts';
+import { GRUPOS_TOTEM, type GrupoCatalogo, type ItemCatalogo } from '../../../shared/stand/catalogo.ts';
 
 /**
  * Menu fixo do Totem (grill Totem interativo r1, Q1/Q2/Q5/Q6): grupo → itens do
@@ -26,11 +26,10 @@ interface Props {
 
 const parar = (evento: PointerEvent) => evento.stopPropagation();
 
-export function MenuTotem({ aberto, grupo, status, indisponivel, motivoSemTexto, aoAbrirGrupo, aoFechar, aoExecutar, aoPerguntar, catalogo = CATALOGO }: Props) {
+export function MenuTotem({ aberto, grupo, status, indisponivel, motivoSemTexto, aoAbrirGrupo, aoFechar, aoExecutar, aoPerguntar, catalogo = GRUPOS_TOTEM }: Props) {
   const [texto, setTexto] = useState('');
   if (!aberto) return null;
-  const visiveis = catalogo.filter((g) => g.id !== 'sonolencia');
-  const atual = grupo ? visiveis.find((g) => g.id === grupo) : undefined;
+  const atual = grupo ? catalogo.find((g) => g.id === grupo) : undefined;
   const ocupado = status?.fase === 'executando';
   const enviar = (evento: FormEvent) => {
     evento.preventDefault();
@@ -70,7 +69,7 @@ export function MenuTotem({ aberto, grupo, status, indisponivel, motivoSemTexto,
               </li>
             );
           })
-          : visiveis.map((g) => (
+          : catalogo.map((g) => (
             <li key={g.id}>
               <button type="button" className="stand-menu-item stand-menu-item-grupo" data-grupo={g.id} onClick={() => aoAbrirGrupo(g.id)}>
                 <span className="stand-menu-rotulo">{g.titulo}</span>

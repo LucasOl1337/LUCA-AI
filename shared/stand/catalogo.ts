@@ -142,6 +142,9 @@ export const CATALOGO: readonly GrupoCatalogo[] = Object.freeze(([
   },
 ] as GrupoCatalogo[]).map((g) => Object.freeze({ ...g, itens: Object.freeze(g.itens.map((i) => Object.freeze(i))) })));
 
+/** Grupos tocáveis no Totem: Sonolência segue no catálogo (voz) mas fica fora do menu e do painel. */
+export const GRUPOS_TOTEM: readonly GrupoCatalogo[] = Object.freeze(CATALOGO.filter((g) => g.id !== 'sonolencia'));
+
 /** Ações que ficam fora do menu, com motivo (o teste exige motivo para cada uma). */
 export const FORA_DO_MENU: Readonly<Record<string, string>> = Object.freeze({
   tour_iniciar: 'o menu roda o roteiro TOUR_STAND direto (item tour), com ou sem voz',
