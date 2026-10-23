@@ -41,6 +41,12 @@
 .circuito-sensores [data-nivel=critico] { color:#ffad9b; border-left:3px solid #fb806c; padding-left:7px; }
 .circuito-hud .gameplay-mapa { right:18px; bottom:auto; top:65px; width:200px; color:#dce6d5; }
 .circuito-hud .gameplay-mapa small { font-size:10px; line-height:1.5; }
+@media(max-width:600px) {
+  .circuito-estado { left:10px; right:10px; top:10px; gap:12px; }
+  .circuito-menu-botao { top:60px; left:10px; right:auto; }
+  .circuito-hud .gameplay-mapa { top:60px; right:10px; width:110px; }
+  .circuito-avisos { top:110px; left:10px; max-width:240px; }
+}
 .gameplay-mapa-rota { fill:none; stroke:#e5f4ab; stroke-width:1.1; stroke-dasharray:2 2; }
 .gameplay-mapa-fardo { fill:#ff7967; stroke:#ffd2c1; stroke-width:.6; }
 @media(max-height:800px) { .circuito-sensores { bottom:12px; padding:9px; width:250px; } .circuito-sensores>div { padding:6px 0; } .circuito-hud .gameplay-mapa { width:170px; } }

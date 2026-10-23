@@ -158,6 +158,26 @@ test('efeitos da cabine esperam a fala: chave mestre muda com a Coruja falando e
   assert.equal(som.destino(), mestre, 'uma chave só por contexto');
 });
 
+const { perigoCabine } = await loadFrontendModule('../../src/components/gameplay/perigoCabine.ts');
+test('perigo frontal interrompe voz e só libera quando perigo e sono cessam', () => {
+  const canal = criarBarramento(), sono = criarSonoCabine(), avisos = [], segurados = [];
+  const enviar = canal.enviar.bind(canal);
+  canal.enviar = (e) => { avisos.push(e); enviar(e); };
+  const desligar = ligarUmSomPorVez(canal, { sono, som: { segurar: v => segurados.push(v) } });
+  const fonte = Symbol('teste frontal');
+  canal.emitir({ tipo: 'estado', valor: 'falando' });
+  assert.equal(segurados.at(-1), true);
+  perigoCabine.definir(fonte, true);
+  assert.deepEqual(avisos.at(-1), { tipo: 'alarme_sono', ativo: true });
+  assert.equal(segurados.at(-1), false);
+  sono.definir({ status: 'alarm', closedMs: 1000 });
+  perigoCabine.definir(fonte, false);
+  assert.equal(avisos.length, 1, 'sono mantém corte após obstáculo');
+  sono.definir(null);
+  assert.deepEqual(avisos.at(-1), { tipo: 'alarme_sono', ativo: false });
+  desligar();
+});
+
 test('Totem: estado falando segura os efeitos; alarme de sono solta, avisa a sessão e manda na fala', () => {
   const canal = criarBarramento();
   const avisos = [];

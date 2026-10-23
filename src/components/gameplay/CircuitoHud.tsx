@@ -9,6 +9,9 @@ import { SensoresCircuito } from './SensoresCircuito';
 import { geofenceTalhao } from './geofenceTalhao';
 import { criarAudioCircuito } from './audioCircuito';
 import { somCompartilhado } from './somCompartilhado';
+import { alertaCabine } from './alertaCabine';
+import { useBipeCabine } from './bipeCabine';
+import { useSegurancaCabine } from './useSegurancaCabine';
 const Webcam = lazy(() => import('./WebcamSonoCabine'));
 const ROTULOS = { feno: 'Feno à frente · reduza e desvie', agua: 'Área alagada · contorne', encosta: 'Encosta · reduza a velocidade', sonolencia: 'Olhos fechados · pare em segurança' };
 export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, touch }: {
@@ -25,12 +28,20 @@ export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, t
   useEffect(() => () => audio.parar(), [audio]);
   useEffect(() => { audio.habilitar(som); }, [audio, som]);
   useEffect(() => {
-    const atualizar = () => audio.atualizar(motor.ler(), performance.now(), menu || document.hidden, sono?.status === 'alarm');
+    const atualizar = () => {
+      const estado = motor.ler();
+      // Um som por vez: proximidade usa o sensor progressivo, não o tom finito de feno.
+      audio.atualizar(estado, performance.now(), menu || document.hidden || estado.sensor.eco || estado.contato, sono?.status === 'alarm');
+    };
     atualizar();
     const cancelar = motor.assinar(atualizar);
     document.addEventListener('visibilitychange', atualizar);
     return () => { cancelar(); document.removeEventListener('visibilitychange', atualizar); audio.parar(); };
   }, [audio, motor, menu, sono]);
+  const painel = alertaCabine(e, sono);
+  const tocando = som && !menu && !document.hidden && !sessao.registro.resultado;
+  useBipeCabine(tocando && (e.sensor.eco || e.contato) ? painel.bipe : null);
+  useSegurancaCabine(tocando && e.fase === 'dirigindo' && (e.sensor.alerta || e.contato));
   const r = sessao.registro, m = metricasCircuito(r);
   const fim = r.resultado;
   useEffect(() => {

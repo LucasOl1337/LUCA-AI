@@ -1,5 +1,5 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react';
-import { perigoCabine } from './perigoCabine';
+import { useSyncExternalStore } from 'react';
+import { useSegurancaCabine } from './useSegurancaCabine';
 import { alertaCabine, type AlertaCabine } from './alertaCabine';
 import { useBipeCabine } from './bipeCabine';
 import { ComandosSimulacao } from './ComandosSimulacao';
@@ -23,13 +23,7 @@ export function PainelCabine({ canal, som = true }: { canal: CanalGameplay; som?
   // Webcam de sonolência (/gameplay?webcam=1); sem ela `sono` é null e nada muda.
   const sono = useSonoCabine();
   const painel = alertaCabine(estado, sono);
-  const fontePerigo = useRef(Symbol('sensor frontal'));
-  const perigo = som && estado.fase === 'dirigindo' && (estado.contato || estado.sensor.alerta);
-  useEffect(() => {
-    const fonte = fontePerigo.current;
-    perigoCabine.definir(fonte, perigo);
-    return () => perigoCabine.definir(fonte, false);
-  }, [perigo]);
+  useSegurancaCabine(som && estado.fase === 'dirigindo' && (estado.contato || estado.sensor.alerta));
   useBipeCabine(som ? painel.bipe : null);
   return <PainelCabineVista painel={painel} estado={estado} />;
 }
