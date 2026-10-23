@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { firstStandardPad } from '../sompo/gamepadLoop';
 import './painelCabine.css';
 
 /**
@@ -11,7 +12,7 @@ import './painelCabine.css';
 export function ComandosSimulacao() {
   const [controle, setControle] = useState(false);
   useEffect(() => {
-    const conferir = () => setControle(Array.from(navigator.getGamepads?.() ?? []).some((pad) => pad?.mapping === 'standard'));
+    const conferir = () => setControle(!!firstStandardPad());
     conferir();
     const timer = window.setInterval(conferir, 1000);
     window.addEventListener('gamepadconnected', conferir);

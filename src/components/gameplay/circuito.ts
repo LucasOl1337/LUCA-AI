@@ -37,7 +37,8 @@ export function riscosCircuito(e: EstadoGameplay, sono = false): Map<SensorCircu
   if (e.sensor.eco && e.maquina.velocidadeKph > 0.5) riscos.set('feno', e.sensor.alerta ? 'critico' : 'atencao');
   const agua = geofenceTalhao(e.maquina);
   if (agua.nivel !== 'fora') riscos.set('agua', agua.nivel === 'dentro' ? 'critico' : 'atencao');
-  if (Math.abs(e.atitude.rolagemGraus) >= 12) riscos.set('encosta', Math.abs(e.atitude.rolagemGraus) >= 20 ? 'critico' : 'atencao');
+  const rolagem = Math.abs(e.atitude.rolagemGraus);
+  if (rolagem >= 12) riscos.set('encosta', rolagem >= 20 ? 'critico' : 'atencao');
   if (sono) riscos.set('sonolencia', 'critico');
   return riscos;
 }
@@ -90,7 +91,8 @@ export function criarCircuito(runId: string, inicioIso: string) {
         }
       }
       anterior = { ...e.comandos };
-      aguaMs = geofenceTalhao(e.maquina).nivel === 'dentro' ? aguaMs + dtMs : 0;
+      // Água crítica = dentro da área alagada (mesma geofence já calculada em riscosCircuito).
+      aguaMs = riscos.get('agua') === 'critico' ? aguaMs + dtMs : 0;
       const roll = Math.abs(e.atitude.rolagemGraus);
       tomboMs = roll >= 30 || (roll >= 20 && e.maquina.velocidadeKph > 7) ? tomboMs + dtMs : 0;
       const corpo = INICIO_CIRCUITO.obstaculos?.some((o) => Math.hypot(e.maquina.x - o.x, e.maquina.z - o.z) < o.raioM + 1.05);
