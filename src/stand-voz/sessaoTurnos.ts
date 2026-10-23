@@ -11,6 +11,7 @@ import { abrirAudio, FilaDeVoz, HZ_STAND, type AudioStand } from './audioStand';
 import { assinarEventosPagina, emitirEventoStand } from './barramento';
 import { registrarVoz } from './diagnosticoVoz';
 import { microfonePermitido } from './portaMicrofone';
+import { contextoDaCorrida } from '../components/gameplay/contextoCorrida';
 import { ReferenciaEco } from './ecoPcm';
 import { SEM_FALA_MS } from './escuta';
 import { visaoTotem } from './visao';
@@ -358,8 +359,7 @@ export class SessaoTurnos implements SessaoDeVoz {
     let fimTurno: Extract<LinhaTurno, { t: 'fim' }> | null = null;
     // Pergunta nova leva a falha na linha Tela; a fala pronta não vem mais.
     if ('texto' in entrada) this.falhaPendente = false;
-    const tela = 'texto' in entrada ? this.tela : '';
-    if (tela) this.tela = '';
+    const tela = 'texto' in entrada ? contextoDaCorrida(this.tela) : '';
     // Webcam do Totem: só presença de rosto, detectada no navegador (visao.ts); nunca imagem.
     const camera = 'texto' in entrada ? visaoTotem.ler() : '';
     try {

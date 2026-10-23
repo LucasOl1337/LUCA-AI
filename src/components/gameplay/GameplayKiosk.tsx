@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { criarSomMotor } from './somMotor';
 import { COMANDOS_CABINE } from './comandosCabine';
 import { alternarVistaTrator, criarVistaExterna, lerVistaTrator } from './vistaTrator';
+import { registrarContextoCorrida } from './contextoCorrida';
 import { CircuitoHud } from './CircuitoHud';
 import { criarSessaoCircuito, type RelatorioCircuito } from './sessaoCircuito';
 import { INICIO_CIRCUITO, ROTA_CIRCUITO } from './circuito';
@@ -140,6 +141,15 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
     // Tablet do operador (inventário #3): sem sessão (StandSemLogin) não há /ws e isto não faz nada.
     aoVivo.enviar(estado);
   }), [motor, circuito, sessao]);
+
+  useEffect(() => {
+    if (!circuito) return;
+    return registrarContextoCorrida(() => {
+      const e = motor.ler();
+      return { velocidadeKph: e.maquina.velocidadeKph, distanciaCm: e.sensor.distanciaCm,
+        fase: sessao.registro.resultado ? 'fim' : pausado.current || document.hidden ? 'pausa' : 'dirigindo' };
+    });
+  }, [circuito, motor, sessao]);
 
   // Aba oculta (ensaio da feira, C3): o rAF para; o tablet troca "ao vivo" congelado por "jogo pausado".
   useEffect(() => {

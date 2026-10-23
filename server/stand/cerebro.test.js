@@ -51,6 +51,15 @@ async function rodar({ roteiros, entrada = { texto: 'o que é o LUCA?' }, conver
   return { linhas, sintetizadas, chamadas: modelo.chamadas, resultado, conversa, cobrado };
 }
 
+test('pergunta sobre freio na corrida recebe contexto de copiloto sem oferecer abertura', async () => {
+  const r = await rodar({ entrada: { texto: 'como eu faço pra frear', tela: 'Tela atual: simulacao. Corrida: dirigindo; velocidade 6.0 km/h; obstáculo frontal 230 cm.' }, roteiros: [[{ texto: 'Use L2, LT ou a tecla S para frear.' }, { fim: true }]], deps: { rotear: async () => null } });
+  const prompt = JSON.stringify(r.chamadas[0].mensagens);
+  assert.match(prompt, /velocidade 6.0/);
+  assert.match(prompt, /230 cm/);
+  assert.match(prompt, /Não ofereça abrir a simulação/);
+  assert.match(prompt, /Espaço/);
+});
+
 test('cortador solta frase no ponto e a primeira longa na vírgula', () => {
   const c = new CortadorDeFrases();
   assert.deepEqual(c.adicionar('O LUCA mede o trator'), []);

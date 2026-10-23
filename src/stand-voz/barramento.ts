@@ -6,8 +6,10 @@ import { ehEventoCerebro, ehEventoPagina, type EventoCerebro, type EventoPagina,
  */
 const alvo = new EventTarget();
 const NOME = 'luca-stand';
+let ultimaTela: Extract<EventoPagina, { tipo: 'tela' }> | null = null;
 
 export function emitirEventoStand(evento: EventoStand): void {
+  if (evento.tipo === 'tela') ultimaTela = evento;
   alvo.dispatchEvent(new CustomEvent(NOME, { detail: evento }));
 }
 
@@ -27,5 +29,7 @@ export function assinarEventosCerebro(cb: (evento: EventoCerebro) => void): () =
 
 /** O cérebro ouve a página: fim de vídeo, reiniciar e encerrar. */
 export function assinarEventosPagina(cb: (evento: EventoPagina) => void): () => void {
-  return assinar(ehEventoPagina, cb);
+  const parar = assinar(ehEventoPagina, cb);
+  if (ultimaTela) cb(ultimaTela);
+  return parar;
 }
