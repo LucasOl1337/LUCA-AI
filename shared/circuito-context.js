@@ -8,7 +8,7 @@ export function contextoCircuito(raw) {
   const sensores = ['feno', 'agua', 'encosta', 'sonolencia'];
   const episodios = [];
   for (const e of raw.episodios) {
-    if (!sensores.includes(e.sensor) || !numero(e.inicioMs) || e.inicioMs > raw.elapsedMs || (e.fimMs !== null && (!numero(e.fimMs) || e.fimMs < e.inicioMs || e.fimMs > raw.elapsedMs))) return null;
+    if (!e || typeof e !== 'object' || !sensores.includes(e.sensor) || !numero(e.inicioMs) || e.inicioMs > raw.elapsedMs || (e.fimMs !== null && (!numero(e.fimMs) || e.fimMs < e.inicioMs || e.fimMs > raw.elapsedMs))) return null;
     const resposta = e.resposta;
     if (resposta && (!numero(resposta.tempoMs) || resposta.tempoMs <= e.inicioMs || resposta.tempoMs > raw.elapsedMs || !['frenagem', 'esterco'].includes(resposta.acao))) return null;
     const evitado = e.evitado === true && !!resposta && e.fimMs !== null && e.sensor !== 'sonolencia';
@@ -18,7 +18,7 @@ export function contextoCircuito(raw) {
       resposta: resposta ? { tempoMs: resposta.tempoMs, latenciaMs: resposta.tempoMs - e.inicioMs, acao: resposta.acao } : null, evitado });
   }
   const respostas = episodios.flatMap((e) => e.resposta ? [e.resposta.latenciaMs] : []);
-  const pausas = Array.isArray(raw.pausas) ? raw.pausas.slice(0, 300).filter((p) => numero(p.inicioMs) && numero(p.duracaoMs) && ['menu', 'aba oculta'].includes(p.motivo)).map(({inicioMs,duracaoMs,motivo}) => ({inicioMs,duracaoMs,motivo})) : [];
+  const pausas = Array.isArray(raw.pausas) ? raw.pausas.slice(0, 300).filter((p) => p && numero(p.inicioMs) && numero(p.duracaoMs) && ['menu', 'aba oculta'].includes(p.motivo)).map(({inicioMs,duracaoMs,motivo}) => ({inicioMs,duracaoMs,motivo})) : [];
   return { origem: 'SIMULAÇÃO', runId: raw.runId, inicioIso: typeof raw.inicioIso === 'string' ? raw.inicioIso.slice(0, 40) : null,
     fimIso: typeof raw.fimIso === 'string' ? raw.fimIso.slice(0, 40) : null,
     resultado: { motivo: raw.resultado.motivo, tempoMs: raw.elapsedMs },

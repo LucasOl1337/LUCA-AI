@@ -17,7 +17,8 @@ export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, t
   touch(tecla: string, ligada: boolean): void;
 }) {
   const e = useSyncExternalStore(motor.assinar, motor.ler, motor.ler);
-  const sono = useSonoCabine();
+  // Só o alarme importa ao áudio; o objeto do sono muda a cada 100 ms de olhos fechados.
+  const alarme = useSonoCabine()?.status === 'alarm';
   const [webcam, setWebcam] = useState(false);
   const [som, setSom] = useState(true);
   const audio = useMemo(() => criarAudioCircuito(), [motor]);
@@ -25,12 +26,12 @@ export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, t
   useEffect(() => () => audio.parar(), [audio]);
   useEffect(() => { audio.habilitar(som); }, [audio, som]);
   useEffect(() => {
-    const atualizar = () => audio.atualizar(motor.ler(), performance.now(), menu || document.hidden, sono?.status === 'alarm');
+    const atualizar = () => audio.atualizar(motor.ler(), performance.now(), menu || document.hidden, alarme);
     atualizar();
     const cancelar = motor.assinar(atualizar);
     document.addEventListener('visibilitychange', atualizar);
     return () => { cancelar(); document.removeEventListener('visibilitychange', atualizar); audio.parar(); };
-  }, [audio, motor, menu, sono]);
+  }, [audio, motor, menu, alarme]);
   const r = sessao.registro, m = metricasCircuito(r);
   const fim = r.resultado;
   useEffect(() => {
@@ -45,7 +46,7 @@ export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, t
     </div>
     {!fim && <><SensoresCircuito estado={e} /><MapaTalhao estado={e} geofence={geofenceTalhao(e.maquina)} circuito /></>}
     <button className="circuito-menu-botao" onClick={() => aoMenu(!menu)}>Pausa / opções · Esc</button>
-    {!fim && <div className="circuito-avisos" aria-live="polite">{[...riscosCircuito(e, sono?.status === 'alarm')].map(([s, gravidade]) => <p key={s} data-gravidade={gravidade}>{ROTULOS[s]}</p>)}</div>}
+    {!fim && <div className="circuito-avisos" aria-live="polite">{[...riscosCircuito(e, alarme)].map(([s, gravidade]) => <p key={s} data-gravidade={gravidade}>{ROTULOS[s]}</p>)}</div>}
     {!menu && !fim && <div className="circuito-touch" aria-label="Controles de toque">{[['ArrowLeft', '←'], ['ArrowDown', 'Freio'], ['ArrowUp', 'Acelerar'], ['ArrowRight', '→']].map(([key, label]) => <button key={key} aria-label={label} onPointerDown={(ev) => { ev.currentTarget.setPointerCapture(ev.pointerId); touch(key, true); }} onPointerUp={() => touch(key, false)} onPointerCancel={() => touch(key, false)} onLostPointerCapture={() => touch(key, false)}>{label}</button>)}</div>}
     {webcam && !fim && <Suspense fallback={null}><div className="circuito-webcam" data-config-aberta={menu}><Webcam /></div></Suspense>}
     {menu && !fim && <section className="circuito-dialogo" role="dialog" aria-modal="true" aria-label="Opções do circuito">

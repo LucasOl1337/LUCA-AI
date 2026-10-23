@@ -22,6 +22,9 @@ function reduzir(pcm: ArrayLike<number>, escala: number): Float32Array {
 export class ReferenciaEco {
   private trechos: Trecho[] = [];
   private atrasoConfirmado: number | null = null;
+  // Reusados a cada bloco de 50 ms do microfone: evita ~2 MB/s de lixo para o GC durante a fala.
+  private referencia = new Float32Array(0);
+  private medias = new Float32Array(0);
 
   agendar(pcm: Float32Array, inicioSegundos: number): void {
     this.trechos.push({ inicio: Math.round(inicioSegundos * HZ), dados: pcm });
@@ -40,7 +43,11 @@ export class ReferenciaEco {
     const fim = Math.round(fimSegundos * HZ);
     const inicio = fim - pcm.length - ATRASO_MAX;
     this.trechos = this.trechos.filter((t) => t.inicio + t.dados.length > inicio);
-    const referencia = new Float32Array(ATRASO_MAX + pcm.length);
+    if (this.referencia.length !== ATRASO_MAX + pcm.length) {
+      this.referencia = new Float32Array(ATRASO_MAX + pcm.length);
+      this.medias = new Float32Array(this.referencia.length);
+    } else this.referencia.fill(0);
+    const referencia = this.referencia;
     let temReferencia = false;
     for (const t of this.trechos) {
       const de = Math.max(inicio, t.inicio);
@@ -55,7 +62,7 @@ export class ReferenciaEco {
     if (!temReferencia || !microfone.length || vazio.residual < 0.003) return vazio;
     // Médias móveis na referência preservam a fase de24kHz. A busca grossa
     // usa3kHz, depois refina o melhor atraso amostra a amostra (não só múltiplos de8).
-    const medias = new Float32Array(referencia.length);
+    const medias = this.medias;
     let soma = 0;
     for (let i = referencia.length - 1; i >= 0; i--) {
       soma += referencia[i] - (referencia[i + PASSO] || 0);

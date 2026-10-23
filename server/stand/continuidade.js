@@ -37,10 +37,7 @@ export function prepararJanela(conversa, { agora, limites, tetoS, permitir, diar
   return { ok: true, renovada: true };
 }
 
-export const TEXTOS_PAUSA = Object.freeze({
-  hora: 'Preciso pausar porque chegamos ao limite de uso por hora. Guardei sua pergunta sem executá-la. Quando houver uma vaga, diga continuar para retomá-la.',
-  diario: 'Preciso pausar porque o crédito de hoje acabou. Guardei sua pergunta sem executá-la. O crédito renova à meia-noite de Brasília; diga continuar quando estiver disponível.',
-});
+export const TEXTO_PAUSA_HORA = 'Preciso pausar porque chegamos ao limite de uso por hora. Guardei sua pergunta sem executá-la. Quando houver uma vaga, diga continuar para retomá-la.';
 
 export function idTurno(valor) {
   return typeof valor === 'string' && /^[a-zA-Z0-9_:-]{1,100}$/.test(valor) ? valor : null;

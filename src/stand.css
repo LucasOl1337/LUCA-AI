@@ -200,7 +200,6 @@
   /* Em pé o título desce uma linha e pode usar a largura toda. */
   .stand-vitrine-legenda { top: calc(var(--stand-margem) + 6vmin); max-width: 90%; }
 }
-.stand-aviso-mudo { right: var(--stand-margem); bottom: calc(var(--stand-margem) / 2); }
 /* Controle não reconhecido: mesmo canto, uma linha acima do aviso de som. */
 .stand-aviso-controle { pointer-events: none; bottom: 2.4vmin; }
 /* Stand sem login: o aviso da equipe fica no canto de cima, longe da barra e da legenda. */
@@ -215,7 +214,6 @@
 /* Cenários no meio da borda direita: embaixo ficam os botões de câmera e a barra de modos. */
 .stand-simulacao .is-kiosk .sompo-fp-scenarios { bottom: auto; top: 50%; transform: translateY(-50%); }
 /* Webcam de sonolência na Simulação do Totem: o quadro do /gameplay?webcam=1 dentro da área segura (a moldura come as bordas). */
-.stand-simulacao .stand-webcam-simulacao { top: var(--stand-margem); right: var(--stand-margem); width: clamp(150px, 15vw, 240px); font-size: clamp(11px, 1.4vh, 14px); }
 /* Coruja (Lucas, 21/10): a pessoa se vê no canto inferior esquerdo; a coluna da direita é o "Experimente pedir". */
 .stand-seguro .stand-webcam-coruja { top: auto; right: auto; left: 0; bottom: var(--stand-reserva-barra); width: clamp(170px, 17vw, 300px); font-size: clamp(12px, 1.6vh, 16px); }
 .stand-webcam-coruja[data-presenca='rosto'] { border-color: #4fbf7a99; }
@@ -358,8 +356,7 @@
 .stand-guia-simulacao h1 { margin: 0; font-size: clamp(28px, 4vmin, 64px); }
 .stand-guia-simulacao p { margin: 0; font-size: clamp(18px, 2.4vmin, 34px); }
 .stand-guia-simulacao .gameplay-comandos { position: static; font-size: clamp(18px, 2.2vmin, 30px); padding: 2vmin; }
-.stand-guia-simulacao button, .stand-ajuda-simulacao { padding: 1.4vmin 2vmin; border: 1px solid #64d2ff; border-radius: 1.5vmin; background: #12364c; color: #fff; font: 700 clamp(16px, 2.2vmin, 32px) system-ui; cursor: pointer; }
-.stand-ajuda-simulacao { position: absolute; top: 23%; left: var(--stand-margem); z-index: 6; }
+.stand-guia-simulacao button { padding: 1.4vmin 2vmin; border: 1px solid #64d2ff; border-radius: 1.5vmin; background: #12364c; color: #fff; font: 700 clamp(16px, 2.2vmin, 32px) system-ui; cursor: pointer; }
 /* Legenda com largura e altura para leitura; webcam do produto preservada. */
 .stand-site { grid-template-columns: minmax(0, 1fr) clamp(280px, 25vw, 560px); }
 .stand-site-coruja { align-self: stretch; justify-content: center; overflow: auto; padding: 1vmin; }

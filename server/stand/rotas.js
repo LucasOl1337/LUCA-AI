@@ -9,7 +9,7 @@
 //   com frases, áudio da voz do Lucas e eventos (cerebro.js).
 // - `xai`: Grok Voice Realtime, conversa inteira no navegador (reserva).
 import { executarTurno, FALAS, LIMITES_TURNO, criarChamadaDeModelo, limparTela, novaConversa } from './cerebro.js';
-import { idTurno, lembrarTurno, prepararJanela, TEXTOS_PAUSA } from './continuidade.js';
+import { idTurno, lembrarTurno, prepararJanela, TEXTO_PAUSA_HORA } from './continuidade.js';
 import { FERRAMENTAS_STAND, executarFerramentaStand, videoPublicado } from './ferramentas.js';
 import { buscarNoRepo, montarPromptBase } from './conhecimento.js';
 import { provedorXai } from './provedor-xai.js';
@@ -73,6 +73,11 @@ async function roteadorPadrao() {
 }
 
 /** Falas prontas (saudação, falha, teto) sintetizadas uma vez e guardadas em memória. */
+/** Resposta NDJSON de uma linha só: o turno termina sem frase, áudio ou evento. */
+function fimNdjson(res, linha) {
+  return res.type('application/x-ndjson').send(`${JSON.stringify({ t: 'fim', ...linha })}\n`);
+}
+
 function criarFalasProntas(sintetizar) {
   const guardadas = new Map();
   return async function* falaPronta(chave, sinal) {
@@ -276,7 +281,7 @@ export function registerStandRoutes(app, {
     const anterior = turnoId && conversa.turnosRecebidos?.get(turnoId);
     if (anterior === 'ativo') return res.status(409).json({ ok: false, error: 'turno_em_andamento' });
     if (anterior) {
-      return res.type('application/x-ndjson').send(`${JSON.stringify({ t: 'fim', motivo: 'ja_processado', turno_id: turnoId })}\n`);
+      return fimNdjson(res, { motivo: 'ja_processado', turno_id: turnoId });
     }
     if (evento === 'fim') {
       despejar(conversa.id, { estimado: false });
@@ -293,7 +298,7 @@ export function registerStandRoutes(app, {
           : { texto: String(texto || '').trim().slice(0, 500), tela: limparTela(tela), camera: limparTela(camera) };
     if (!entrada.evento && !entrada.texto) return res.status(400).json({ ok: false, error: 'texto_vazio' });
     if (evento === 'saudacao' && conversa.saudou) {
-      return res.type('application/x-ndjson').send(`${JSON.stringify({ t: 'fim', motivo: 'ja_processado' })}\n`);
+      return fimNdjson(res, { motivo: 'ja_processado' });
     }
     // Uma nova pergunta interrompe; retry com o mesmo id foi recusado acima.
     const fimAnterior = conversa.turnoFim;
@@ -317,20 +322,17 @@ export function registerStandRoutes(app, {
         agora: agora(), limites: LIMITES_TURNO, tetoS: LIMITES_STAND.teto_s,
         permitir: () => guarda.tentar(conta(req)), diario: () => teto.estourou(),
       });
+      // Crédito do dia acabou: encerra a sessão (microfone e STT) como antes, em vez de pausar cobrando STT.
+      if (janela.causa === 'diario') return res.status(503).json({ ok: false, error: 'stand_desligado', motivo: 'teto_diario' });
       if (!janela.ok) {
         if (entrada.texto) conversa.perguntaPendente = entrada;
-        lembrarTurno(conversa, turnoId, 'pausado');
         // Sem modelo, TTS, ferramenta ou cobrança extra em uma pausa de custo.
-        return res.type('application/x-ndjson').send(`${JSON.stringify({
-          t: 'fim', motivo: 'pausa_limite', causa: janela.causa,
-          texto: TEXTOS_PAUSA[janela.causa], turno_id: turnoId,
-        })}\n`);
+        return fimNdjson(res, { motivo: 'pausa_limite', causa: janela.causa, texto: TEXTO_PAUSA_HORA, turno_id: turnoId });
       }
       if (janela.renovada) console.info(`[stand] janela renovada total=${conversa.renovacoes} sessoes_hora=${guarda.usadas?.(conta(req)) ?? '-'}`);
       conversa.perguntaPendente = null;
       conversa.eventosJanela += 1;
       if (evento === 'saudacao') conversa.saudou = true;
-      lembrarTurno(conversa, turnoId, 'ativo');
       if (entrada.texto) {
         conversa.perguntas = (conversa.perguntas ?? 0) + 1;
         if (conversa.perguntas === 1) teto.contar('conversas');

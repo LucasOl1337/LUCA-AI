@@ -118,7 +118,6 @@ export class SessaoVoz implements SessaoDeVoz {
       if (evento.tipo === 'encerrar') this.encerrar();
       if (evento.tipo === 'video_iniciado') {
         this.videoTocando = true;
-        window.clearTimeout(this.relogioSilencio);
         this.interromper();
         window.clearTimeout(this.relogioSilencio);
         this.enviar({ type: 'input_audio_buffer.clear' });

@@ -1,5 +1,5 @@
-import { lazy, Suspense, useState } from 'react';
-import ChatCircuito, { guardarConversaCircuito, recuperarConversaCircuito } from '../gameplay/ChatCircuito';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import ChatCircuito, { descartarConversaCircuito, guardarConversaCircuito, recuperarConversaCircuito } from '../gameplay/ChatCircuito';
 import SompoTruckSimulator from '../SompoTruckSimulator';
 import { SOMPO_VEHICLE_SEED, type SompoVehicle } from '../../../shared/sompo-vehicles.js';
 import { ComandosSimulacao } from '../gameplay/ComandosSimulacao';
@@ -30,7 +30,9 @@ export function varianteSimulacao(busca: string): VarianteSimulacao {
 
 export default function SimuladorKiosk() {
   const [conversa, setConversa] = useState(recuperarConversaCircuito);
-  if (conversa) return <ChatCircuito inicial={conversa} aoNovo={() => { sessionStorage.removeItem('luca.circuito.chat.v1'); setConversa(null); }} />;
+  // Recarregar a aba mantém o chat; sair da Simulação o descarta, para o próximo visitante começar do zero.
+  useEffect(() => descartarConversaCircuito, []);
+  if (conversa) return <ChatCircuito inicial={conversa} aoNovo={() => { descartarConversaCircuito(); setConversa(null); }} />;
   const classico = (
     <>
       <SompoTruckSimulator source="simulation" vehicle={TRATOR_DO_STAND} kiosk />

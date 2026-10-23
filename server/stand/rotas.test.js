@@ -279,7 +279,7 @@ test('elevenlabs é o padrão: sessão devolve token Scribe, conversa e nunca a 
   assert.equal(pedidos.find((p) => p.url.endsWith('realtime_scribe')).init.headers['xi-api-key'], CHAVE_11);
 });
 
-test('renovação negada preserva pergunta; continuar explícito retoma uma vez, diário não chama TTS', async (t) => {
+test('renovação negada preserva pergunta; continuar explícito retoma uma vez, diário encerra sem chamar modelo', async (t) => {
   let permitir = false;
   let vagas = 0;
   const guarda = { tentar: () => ++vagas === 1 || permitir };
@@ -303,9 +303,10 @@ test('renovação negada preserva pergunta; continuar explícito retoma uma vez,
   assert.match(vistas.at(-1), /^Como funciona o LUCA/);
   assert.equal(vistas.length, 9);
   teto.somar(100000);
-  const diario = await linhasNdjson(await pedir('/api/stand/turno', { conversa_id, texto: 'Outra pergunta' }));
-  assert.equal(diario.at(-1).causa, 'diario');
-  assert.deepEqual(diario.map((l) => l.t), ['fim']);
+  const diario = await pedir('/api/stand/turno', { conversa_id, texto: 'Outra pergunta' });
+  // 503 é o que faz o navegador encerrar microfone e STT; uma pausa 200 deixaria o STT cobrando.
+  assert.equal(diario.status, 503);
+  assert.deepEqual(await diario.json(), { ok: false, error: 'stand_desligado', motivo: 'teto_diario' });
   assert.equal(vistas.length, 9);
 });
 
