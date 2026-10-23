@@ -73,3 +73,9 @@ test('frear após aviso produz uma reação/episódio; antecipação não vira z
   assert.equal(metricasCircuito(inicial.registro).reacaoMediaMs, null);
 });
 export { piloto };
+test('manifesto enviado com episódio ou pausa nulos é ignorado, sem derrubar a análise', async () => {
+  const { contextoCircuito } = await import('../shared/circuito-context.js');
+  const base = { versao: 1, origem: 'SIMULAÇÃO', runId: 'x', elapsedMs: 1, resultado: { motivo: 'chegada' }, episodios: [] };
+  assert.equal(contextoCircuito({ ...base, episodios: [null] }), null);
+  assert.deepEqual(contextoCircuito({ ...base, pausas: [null, { inicioMs: 0, duracaoMs: 1, motivo: 'menu' }] }).pausas, [{ inicioMs: 0, duracaoMs: 1, motivo: 'menu' }]);
+});
