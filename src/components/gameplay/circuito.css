@@ -14,9 +14,9 @@
 .circuito-touch { display:none; position:absolute; bottom:16px; left:20px; right:20px; justify-content:space-between; }
 .circuito-touch button { min-width:60px; min-height:48px; background:#172119b8; color:white; border:1px solid #d9e2c8aa; border-radius:10px; touch-action:none; }
 @media (pointer:coarse) { .circuito-touch { display:flex; } }
-.circuito-webcam .gameplay-webcam { top:64px; right:18px; width:140px; }
-.circuito-webcam[data-config-aberta=false] { display:none; }
-.circuito-webcam[data-config-aberta=true] { position:absolute; z-index:10; right:12px; top:80px; }
+.circuito-webcam .gameplay-webcam { top:64px; left:18px; right:auto; width:140px; }
+.circuito-webcam .gameplay-webcam[hidden] { display:none; }
+.circuito-webcam[data-config-aberta=true] { visibility:hidden; }
 .circuito-chat { position:absolute; inset:0; overflow:auto; background:#101a17; color:#e9efe4; padding:32px max(24px,calc((100vw - 1050px)/2)); font:16px/1.6 system-ui,sans-serif; user-select:text; }
 .circuito-chat header { border-bottom:1px solid #526050; padding-bottom:20px; }
 .circuito-chat h1 { font-size:32px; margin:8px 0; }
@@ -45,7 +45,8 @@
   .circuito-estado { left:10px; right:10px; top:10px; gap:12px; }
   .circuito-menu-botao { top:60px; left:10px; right:auto; }
   .gameplay-com-cabine .circuito-hud .gameplay-mapa { top:60px; right:10px; width:110px; transform:none; margin:0; }
-  .circuito-avisos { top:110px; left:10px; max-width:240px; }
+  .circuito-avisos { top:230px; left:10px; max-width:240px; }
+  .circuito-webcam .gameplay-webcam { top:110px; left:10px; width:120px; }
 }
 .gameplay-mapa-rota { fill:none; stroke:#e5f4ab; stroke-width:1.1; stroke-dasharray:2 2; }
 .gameplay-mapa-fardo { fill:#ff7967; stroke:#ffd2c1; stroke-width:.6; }
