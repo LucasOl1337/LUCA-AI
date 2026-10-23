@@ -96,6 +96,17 @@ export function passoTrator(estado: EstadoTrator, comando: ComandoVolante, dt: n
     const folga = distanciaSensorM({ x: estado.x, z: estado.z, rumo }, mundo.obstaculos);
     if (folga !== null && folga <= passo) { passo = folga; v = 0; contato = true; }
   }
+  // Props sólidos: corpo aproximado por círculo, também nas laterais e em ré.
+  // Fardos/estacas conservam a física original do percurso.
+  for (const item of mundo.obstaculos) {
+    if (item.tipo !== 'cenario') continue;
+    const nx = estado.x + Math.cos(rumo) * passo, nz = estado.z - Math.sin(rumo) * passo;
+    const atual = Math.hypot(estado.x - item.x, estado.z - item.z);
+    const proxima = Math.hypot(nx - item.x, nz - item.z);
+    if (proxima < item.raioM + TRATOR.bitolaM / 2 && proxima < atual) {
+      passo = 0; v = 0; contato = true;
+    }
+  }
   const livreX = estado.x + Math.cos(rumo) * passo, livreZ = estado.z - Math.sin(rumo) * passo;
   const x = limitar(livreX, -TRATOR.cercaM, TRATOR.cercaM), z = limitar(livreZ, -TRATOR.cercaM, TRATOR.cercaM);
   if (x !== livreX || z !== livreZ) v = 0;

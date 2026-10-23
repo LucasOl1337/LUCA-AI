@@ -1,0 +1,116 @@
+[
+  {
+    "index": 729,
+    "name": "barril",
+    "id": "scenario:asset_b8MkRgnSQA1CkimV96naFTf9",
+    "author": "Scenario Labs",
+    "license": "CC-BY-4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "sourceUrl": "https://huggingface.co/datasets/scenario-labs/3d-collection/resolve/55b4c002b4c1529fc48da3dff98516c3069bfa3f/assets/scenario_asset_b8MkRgnSQA1CkimV96naFTf9/output.glb",
+    "sourceSha256": "9af9ce9d90ace908aede20c49989997dbfb9289f74f093c5ec733d62e17ffa83",
+    "sourceBytes": 4579748,
+    "sourceTriangles": 36104,
+    "sourceMaterials": 1,
+    "assetUrl": "/models/scenario/barril.glb",
+    "triangles": 5000,
+    "materials": 1,
+    "textureSize": [
+      1024,
+      1024
+    ],
+    "changes": "Decimated mesh; 1K JPEG; emissive-to-diffuse PBR for barrel/cart; neutral non-emissive rock palette; pivot/metric size applied by runtime",
+    "files": [
+      {
+        "file": "barril.glb",
+        "bytes": 197020,
+        "sha256": "a199e63f08d463ff47e3c3e5e6ce57b00548d1c68c9622368eec376825e55dc1"
+      },
+      {
+        "file": "barril-albedo.jpg",
+        "bytes": 154619,
+        "sha256": "856bc5db77df7df0fa017b6b534140aae1a9bceb766740463309299ee661f53b"
+      },
+      {
+        "file": "barril.textures.json",
+        "bytes": 33,
+        "sha256": "717c450d59bea00229829623ee70a6430249d24cf3b59b5116de0ca364cfa0e6"
+      }
+    ]
+  },
+  {
+    "index": 834,
+    "name": "carroca",
+    "id": "scenario:asset_fNvPwp6Dazvggfeu6AoNBmS6",
+    "author": "Scenario Labs",
+    "license": "CC-BY-4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "sourceUrl": "https://huggingface.co/datasets/scenario-labs/3d-collection/resolve/55b4c002b4c1529fc48da3dff98516c3069bfa3f/assets/scenario_asset_fNvPwp6Dazvggfeu6AoNBmS6/output.glb",
+    "sourceSha256": "20b83466a37dc853b66050ec3801697bfab13afc5cd5b88ed44a46e509d01c96",
+    "sourceBytes": 5238756,
+    "sourceTriangles": 42750,
+    "sourceMaterials": 1,
+    "assetUrl": "/models/scenario/carroca.glb",
+    "triangles": 5000,
+    "materials": 1,
+    "textureSize": [
+      1024,
+      1024
+    ],
+    "changes": "Decimated mesh; 1K JPEG; emissive-to-diffuse PBR for barrel/cart; neutral non-emissive rock palette; pivot/metric size applied by runtime",
+    "files": [
+      {
+        "file": "carroca.glb",
+        "bytes": 229988,
+        "sha256": "29cf827c0ca1572eac6394446d0df076237e87403492134271c8f8f23e90578f"
+      },
+      {
+        "file": "carroca-albedo.jpg",
+        "bytes": 195971,
+        "sha256": "b6d49e260eaacfc82f68e13d5a18c604c854e31d7b35d02cddd73d8b00010fdd"
+      },
+      {
+        "file": "carroca.textures.json",
+        "bytes": 34,
+        "sha256": "034e4e87d8b2f6cec3136d5ba69276c7fe43fbae7f671fe0f7a407f3b5e5ed3a"
+      }
+    ]
+  },
+  {
+    "index": 354,
+    "name": "rochas",
+    "id": "scenario:asset_HfUCJYUTuJ3PC7ixRcuiqbHh",
+    "author": "Scenario Labs",
+    "license": "CC-BY-4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "sourceUrl": "https://huggingface.co/datasets/scenario-labs/3d-collection/resolve/55b4c002b4c1529fc48da3dff98516c3069bfa3f/assets/scenario_asset_HfUCJYUTuJ3PC7ixRcuiqbHh/output.glb",
+    "sourceSha256": "57a0d66a303c710a225032790bb496419d916050d9d87a629babdc3b6b457088",
+    "sourceBytes": 3097268,
+    "sourceTriangles": 9212,
+    "sourceMaterials": 1,
+    "assetUrl": "/models/scenario/rochas.glb",
+    "triangles": 782,
+    "materials": 1,
+    "textureSize": [
+      1024,
+      1024
+    ],
+    "changes": "Decimated mesh; 1K JPEG; emissive-to-diffuse PBR for barrel/cart; neutral non-emissive rock palette; pivot/metric size applied by runtime",
+    "files": [
+      {
+        "file": "rochas.glb",
+        "bytes": 54024,
+        "sha256": "7e8847bb8ae76ee24b9f41716100859273e62bb8b8037698361e90d7e9a9e3df"
+      },
+      {
+        "file": "rochas-albedo.jpg",
+        "bytes": 210136,
+        "sha256": "a853542030db6668df54102624989b56231845239ec473733169cd6f33aef398"
+      },
+      {
+        "file": "rochas.textures.json",
+        "bytes": 33,
+        "sha256": "9afd8c68775de88235ce9ab16c625b3c7ac1f0972e2e5dd0cd70ffc52229a4b3"
+      }
+    ]
+  }
+]
