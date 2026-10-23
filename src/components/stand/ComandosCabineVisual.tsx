@@ -12,11 +12,13 @@ export function ComandosCabineVisual({ entrada }: { entrada: EntradaCabine }) {
         <path className="cabine-pad-corpo" d="M110 62 Q145 45 240 48 Q335 45 370 62 Q410 90 427 191 Q438 245 399 238 Q377 233 337 180 H143 Q103 233 81 238 Q42 245 53 191 Q70 90 110 62Z" />
         <rect x="104" y="22" width="76" height="37" rx="12" /><text x="142" y="47">{C.frear[entrada]}</text>
         <rect x="300" y="22" width="76" height="37" rx="12" /><text x="338" y="47">{C.acelerar[entrada]}</text>
-        <path className="cabine-pad-detalhe" d="M105 111h42m-21-21v42" />
-        <circle cx="181" cy="157" r="29" /><text x="181" y="165">↔</text>
+        <path className="cabine-pad-detalhe" d={entrada === 'ps' ? 'M105 103h42m-21-21v42' : 'M151 157h42m-21-21v42'} />
+        <circle cx={entrada === 'ps' ? 181 : 126} cy={entrada === 'ps' ? 157 : 103} r="27" /><text x={entrada === 'ps' ? 181 : 126} y={entrada === 'ps' ? 165 : 111}>↔</text>
         <circle className="cabine-pad-detalhe" cx="292" cy="157" r="25" />
-        <circle cx="357" cy="123" r="20" /><text x="357" y="131">{C.camera[entrada]}</text>
-        <circle className="cabine-pad-detalhe" cx="333" cy="97" r="9" /><circle className="cabine-pad-detalhe" cx="381" cy="97" r="9" />
+        {(entrada === 'ps' ? ['△', '○', '□', '✕'] : ['Y', 'B', 'X', 'A']).map((rotulo, i) => {
+          const [x, y] = [[357, 77], [386, 106], [328, 106], [357, 135]][i];
+          return <g key={rotulo}><circle className={i === 3 ? undefined : 'cabine-pad-detalhe'} cx={x} cy={y} r="17" /><text x={x} y={y + 7} style={{ fontSize: 19 }}>{rotulo}</text></g>;
+        })}
         <rect x="215" y="124" width="50" height="29" rx="10" /><text className="cabine-svg-pequeno" x="240" y="144">{C.coruja[entrada]}</text>
         <rect x="267" y="73" width="53" height="26" rx="8" /><text className="cabine-svg-pequeno" x="293" y="91">{entrada === 'ps' ? '≡' : '☰'}</text>
       </svg> : <div className="cabine-teclado" aria-label="Teclas de direção">
@@ -28,6 +30,7 @@ export function ComandosCabineVisual({ entrada }: { entrada: EntradaCabine }) {
     </div>
     <dl className="cabine-mapa">{comandos.map(([id, nome]) => {
       const c = C[id];
+      if ('disponivel' in c && !c.disponivel) return null;
       let teclas: readonly string[] = c.teclas;
       if (id === 'esquerda') teclas = [...C.esquerda.teclas.slice(0, 1), ...C.direita.teclas.slice(0, 1)];
       return <div key={id}><dt>{nome}</dt><dd>{controle

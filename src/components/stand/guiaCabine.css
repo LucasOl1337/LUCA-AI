@@ -1,4 +1,4 @@
-.stand .stand-guia-simulacao { inset: 7% max(6%, calc((100% - 1080px)/2)); justify-content: start; gap: 22px; padding: clamp(24px, 3vw, 46px); text-align: left; overflow: auto; border-radius: 24px; background: #0b1922; border-color: #32515e; box-shadow: 0 24px 90px #0006; }
+.stand .stand-guia-simulacao { inset: 50% max(6%, calc((100% - 1080px)/2)) auto; transform: translateY(-50%); max-height: 88%; justify-content: start; gap: 22px; padding: clamp(24px, 3vw, 46px); text-align: left; overflow: auto; border-radius: 24px; background: #0b1922; border-color: #32515e; box-shadow: 0 24px 90px #0006; }
 .stand-guia-simulacao .cabine-sobretitulo { color: #8bd9d2; letter-spacing: .16em; font-size: 12px; font-weight: 700; }
 .stand .stand-guia-simulacao h1 { font-size: clamp(30px, 3.2vw, 48px); line-height: 1.1; margin: 10px 0 12px; }
 .stand .stand-guia-simulacao p { font-size: clamp(15px, 1.3vw, 19px); color: #b9cbd3; line-height: 1.5; }
@@ -12,7 +12,7 @@
 .cabine-desenho text { text-anchor: middle; fill: #e9fffc; font: 700 22px system-ui; }
 .cabine-desenho text.cabine-svg-pequeno { font-size: 13px; }
 .stand-guia-simulacao .cabine-mapa { margin: 0; padding: 0; display: grid; gap: 0; }
-.stand-guia-simulacao .cabine-comandos { min-height: 0; flex: 1 1 0; }
+.stand-guia-simulacao .cabine-comandos { min-height: 0; flex: none; }
 .stand-guia-simulacao .cabine-mapa > div { min-height: 0; }
 .stand-guia-simulacao .cabine-mapa dt, .stand-guia-simulacao .cabine-mapa dd { padding: 0; margin: 0; }
 .cabine-mapa > div { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 10px 0; border-bottom: 1px solid #28424f; }
@@ -37,7 +37,7 @@
   .stand-guia-simulacao footer { padding-top: 12px; }
 }
 @media (max-width: 650px) {
-  .stand .stand-guia-simulacao { inset: 2% 4%; padding: 18px; gap: 12px; }
+  .stand .stand-guia-simulacao { inset: 2% 4%; transform: none; max-height: none; padding: 18px; gap: 12px; }
   .cabine-sobretitulo { font-size: 10px; }
   .cabine-teclado .cabine-espaco { height: 30px; }
   .cabine-teclado .cabine-setas { display: none; }

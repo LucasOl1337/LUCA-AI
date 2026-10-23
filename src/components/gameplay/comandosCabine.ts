@@ -7,8 +7,8 @@ export const COMANDOS_CABINE = {
   pausa: { botao: 9, ps: 'Options', xbox: 'Menu', teclas: ['Escape', 'F1'] },
   confirmar: { botao: 0, ps: '✕', xbox: 'A', teclas: ['Enter'] },
   coruja: { botao: 16, ps: 'PS', xbox: 'Guia', teclas: [] },
-  camera: { botao: 0, ps: '✕', xbox: 'A', teclas: ['c'] },
-  falar: { botao: 4, ps: 'L1', xbox: 'LB', teclas: ['v'] },
+  camera: { disponivel: false, botao: 0, ps: '✕', xbox: 'A', teclas: ['c'] },
+  falar: { disponivel: false, botao: 4, ps: 'L1', xbox: 'LB', teclas: ['v'] },
 } as const;
 
 export type EntradaCabine = 'teclado' | 'ps' | 'xbox';
