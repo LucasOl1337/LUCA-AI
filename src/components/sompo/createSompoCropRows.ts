@@ -79,6 +79,17 @@ export function createSompoCropRows(groundHeight: (x: number, z: number) => numb
   const tiles: THREE.InstancedMesh[] = [];
   const dummy = new THREE.Object3D();
   const columns = compact ? 30 : 46, rows = compact ? 38 : 54;
+  // A rota e as clareiras são estáticas na montagem. Prepare uma vez, não
+  // slice + diferenças + denominador para cada pé. A caixa só rejeita pontos
+  // certamente fora; a decisão final mantém a distância/limiar originais.
+  const routeSegments = circuitRoute?.slice(1).map((end, i) => {
+    const start = circuitRoute[i], dx = end.x - start.x, dz = end.z - start.z;
+    return { x: start.x, z: start.z, dx, dz, lengthSq: dx * dx + dz * dz,
+      minX: Math.min(start.x, end.x) - 5, maxX: Math.max(start.x, end.x) + 5,
+      minZ: Math.min(start.z, end.z) - 5, maxZ: Math.max(start.z, end.z) + 5 };
+  });
+  const clearingBounds = clearings.map(p => ({ ...p,
+    minX: p.x - p.radius, maxX: p.x + p.radius, minZ: p.z - p.radius, maxZ: p.z + p.radius }));
   for (let tile = 0; tile < 8; tile++) {
     const tileGeometry = operation ? geometry.clone() : geometry;
     if (operation) tileGeometry.setAttribute('harvestAt', new THREE.InstancedBufferAttribute(new Float32Array(columns * rows).fill(1e9), 1));
@@ -89,13 +100,14 @@ export function createSompoCropRows(groundHeight: (x: number, z: number) => numb
       const x = operation ? -80 + tile * 20 + col * 20 / columns + Math.sin(seed * 1.7) * .1 : -64 + tile * 16 + col * 16 / columns + Math.sin(seed * 1.7) * .1;
       // A máquina deixa uma faixa de restolho; a lavoura começa inteira.
       const z = operation ? -50 + row * 96 / rows + Math.sin(seed * 2.1) * .09 : -12 + row * 24 / rows + Math.sin(seed * 2.1) * .09;
-      const pertoRota = circuitRoute?.slice(1).some((p, i) => {
-        const a = circuitRoute[i], dx = p.x - a.x, dz = p.z - a.z;
-        const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz)));
-        return Math.hypot(x - a.x - t * dx, z - a.z - t * dz) < 5;
+      const pertoRota = routeSegments?.some(s => {
+        if (x < s.minX || x > s.maxX || z < s.minZ || z > s.maxZ) return false;
+        const t = Math.max(0, Math.min(1, ((x - s.x) * s.dx + (z - s.z) * s.dz) / s.lengthSq));
+        return Math.hypot(x - s.x - t * s.dx, z - s.z - t * s.dz) < 5;
       });
       const girth = pertoRota ? 0.02 : 1.15 + (Math.sin(seed * 3.7) * .5 + .5) * .5;
-      const patio = clearings.some((p) => Math.hypot(x - p.x, z - p.z) < p.radius);
+      const patio = clearingBounds.some(p => x >= p.minX && x <= p.maxX && z >= p.minZ && z <= p.maxZ
+        && Math.hypot(x - p.x, z - p.z) < p.radius);
       dummy.position.set(x, groundHeight(x, z), z);
       dummy.rotation.set(0, 0, 0); dummy.scale.set(girth, height * (1.3 + (Math.sin(seed) * .5 + .5) * .6), girth); dummy.updateMatrix();
       if (patio) { dummy.scale.setScalar(0); dummy.updateMatrix(); }
