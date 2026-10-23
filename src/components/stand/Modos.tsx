@@ -13,59 +13,46 @@ export function preCarregarSimulador() {
   void carregarSimulador().then((m) => m.preCarregarGameplay()).catch(() => undefined);
 }
 
-/**
- * Vitrine: vídeos do stand intercalados com Telas do app (`telaApp`, já montada pela página).
- * `pulos` vai em `data-pulada` só para a equipe: o público nunca vê o motivo.
- * `semSom`: com a Escuta ligada o microfone fica aberto, então os vídeos tocam mudos
- * (a coruja não pode se ouvir). A fala fica na legenda, que já vem queimada nos vídeos.
- */
-export function VitrineStand({ item, pausado, aoTerminar, telaApp, pulos, semSom = false }: { item: ItemVitrine | undefined; pausado: boolean; aoTerminar(): void; telaApp?: ReactNode; pulos?: string; semSom?: boolean }) {
+/** Vitrine narrada. Escuta/TTS são suspensos pela página, nunca pelo player. */
+export function VitrineStand({ item, pausado, aoTerminar, aoPausar, telaApp, pulos }: { item: ItemVitrine | undefined; pausado: boolean; aoTerminar(): void; aoPausar?(): void; telaApp?: ReactNode; pulos?: string }) {
   const video = item?.tipo === 'video' ? item.video : undefined;
   const ref = useRef<HTMLVideoElement | null>(null);
   const [mudo, setMudo] = useState(false);
-
-  // Sem `--autoplay-policy=no-user-gesture-required` o Chrome recusa som: cai pro mudo e segue tocando.
+  const [bloqueado, setBloqueado] = useState(false);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    let vivo = true;
+    el.muted = mudo; el.volume = 1;
     if (pausado) { el.pause(); return; }
-    el.muted = semSom;
-    el.play().then(() => setMudo(false)).catch(() => {
-      el.muted = true;
-      setMudo(!semSom);
+    void el.play().then(() => { if (vivo) setBloqueado(false); }).catch(() => {
+      if (!vivo) return;
+      setBloqueado(true); el.muted = true;
       void el.play().catch(() => undefined);
     });
-  }, [video?.arquivo, pausado, semSom]);
-
-  // Um toque na tela dá ativação ao documento; dali em diante o som é liberado.
-  useEffect(() => {
-    if (!mudo || semSom) return undefined;
-    const liberar = () => {
-      const el = ref.current;
-      if (!el) return;
-      el.muted = false;
-      setMudo(false);
-    };
-    window.addEventListener('pointerdown', liberar, { once: true, capture: true });
-    return () => window.removeEventListener('pointerdown', liberar, { capture: true });
-  }, [mudo]);
-
+    return () => { vivo = false; el.pause(); };
+  }, [video?.arquivo, pausado, mudo]);
+  const som = () => {
+    const el = ref.current;
+    if (!el) return;
+    const silenciar = !bloqueado && !mudo;
+    setMudo(silenciar); el.muted = silenciar; el.volume = 1;
+    if (!pausado) void el.play().then(() => setBloqueado(false)).catch(() => setBloqueado(true));
+    else setBloqueado(false);
+  };
   if (!item) return <section className="stand-vitrine stand-vitrine-vazia" aria-label="Vitrine" data-pulada={pulos}><p>Vitrine sem vídeos</p></section>;
-  return (
-    <section className="stand-vitrine" aria-label={`Vitrine: ${item.titulo}`} data-item={item.tipo} data-pausado={pausado || undefined} data-pulada={pulos} data-som={semSom ? 'mudo_escuta' : undefined}>
-      {video
-        ? <video key={video.arquivo} ref={ref} className="stand-video-player" src={video.arquivo} muted={semSom} playsInline preload="auto" onEnded={aoTerminar} onError={aoTerminar} />
-        : telaApp}
-      <p className="stand-vitrine-legenda">{item.titulo}</p>
-      {pausado && <p className="stand-vitrine-pausa" role="status">Pausado · ✕ continua</p>}
-      {mudo && !semSom && video && <p className="stand-aviso-equipe stand-aviso-mudo">sem som até um toque (kiosk sem --autoplay-policy)</p>}
-    </section>
-  );
+  return <section className="stand-vitrine" aria-label={`Vitrine: ${item.titulo}`} data-item={item.tipo} data-pausado={pausado || undefined} data-pulada={pulos} data-som={bloqueado ? 'aguardando_gesto' : mudo ? 'desligado' : 'narracao'}>
+    {video ? <video key={video.arquivo} ref={ref} className="stand-video-player" src={video.arquivo} playsInline preload="auto" onEnded={aoTerminar} onError={aoTerminar} /> : telaApp}
+    <p className="stand-vitrine-legenda">{item.titulo}</p>
+    {pausado && <p className="stand-vitrine-pausa" role="status">Pausado · ✕ continua</p>}
+    {video && aoPausar && <button type="button" className="stand-vitrine-controle" onPointerDown={ev => ev.stopPropagation()} onKeyDown={ev => { if (ev.key === 'Enter' || ev.key === ' ') ev.stopPropagation(); }} onClick={aoPausar}>{pausado ? 'Retomar vídeo' : 'Pausar vídeo'}</button>}
+    {video && <button type="button" className="stand-vitrine-som" aria-label={bloqueado || mudo ? 'Ativar som da Vitrine' : 'Desligar som da Vitrine'} onPointerDown={(ev) => ev.stopPropagation()} onKeyDown={ev => { if (ev.key === 'Enter' || ev.key === ' ') ev.stopPropagation(); }} onClick={som}>{bloqueado ? '▶ Ativar som · toque ou Enter' : mudo ? 'Som desligado · ativar' : 'Som ligado · silenciar'}</button>}
+  </section>;
 }
 
 /**
  * Simulação: o simulador do Trator MAX direto, na cabine, sem cabeçalho nem painel.
- * A webcam do Totem aparece no canto: olhos fechados por 1 s acendem o alarme da cabine.
+ * Sonolência é opcional na pausa, desligada por padrão; nenhum painel de câmera no HUD.
  * Memo: o relógio da página não re-renderiza o 3D.
  */
 export const SimulacaoStand = memo(function SimulacaoStand() {

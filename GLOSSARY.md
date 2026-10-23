@@ -43,7 +43,7 @@ O Modo do stand em que o Avatar LUCA atende o público por voz, com as telas Atr
 _Evitar_: Modo voz, assistente.
 
 **Vitrine**:
-O Modo do stand que toca em carrossel os Vídeos do stand intercalados com Telas do app (vídeo, Lab, vídeo, Trator agora, vídeos restantes), com o título numa linha. No controle, setas trocam o item e ✕ pausa (o replay congela). Com a Escuta ligada, os vídeos tocam mudos e a fala fica na legenda, que já vem queimada neles (`.srt` ao lado de cada vídeo). Com a Escuta desligada, tocam com som. Ordem e pulos em `src/components/stand/vitrineStand.ts`.
+O Modo do stand que toca em carrossel os Vídeos do stand intercalados com Telas do app (vídeo, Lab, vídeo, Trator agora, vídeos restantes), com o título numa linha. No controle, setas trocam o item e ✕ pausa (o replay congela). Os vídeos tocam com a narração aprovada. Durante a Vitrine a Escuta e a sessão anterior são encerradas para não ouvir a própria narração. Se o navegador bloquear autoplay com som, o botão "Ativar som da Vitrine" libera por gesto; também permite silenciar explicitamente. Legendas queimadas e `.srt` permanecem disponíveis. Ordem e pulos em `src/components/stand/vitrineStand.ts`.
 _Evitar_: Playlist, demo.
 
 **Tela do app**:

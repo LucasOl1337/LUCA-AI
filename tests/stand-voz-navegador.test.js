@@ -362,47 +362,25 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
     }
   });
 
-  it('escuta na Vitrine: despertar falso não corta o vídeo; palavra leva à Coruja na Conversa', async () => {
-    modoSessao = 'ok';
-    escutaNoServidor = true;
-    const antes = scribe.conexoes;
+  it('Vitrine narrada suspende Escuta e só volta a capturar na Coruja', async () => {
+    modoSessao = 'ok'; escutaNoServidor = true;
     const pagina = await browserEscuta.newPage();
     try {
-      // Relógio falso correndo em tempo real, para o teste poder adiantar a barra (abaixo).
-      await pagina.clock.install();
       await pagina.goto(`${base}/stand`);
-      const main = pagina.locator('main.stand');
-      await pagina.locator('main.stand[data-escuta="ouvindo"]').waitFor({ timeout: 15000 });
-      // Botão da barra direto: não passa pelo toque da Atração (que abriria a conversa).
-      await pagina.evaluate(() => {
-        const botao = [...document.querySelectorAll('.stand-barra button')].find((b) => b.textContent.includes('Vitrine'));
-        botao.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-      });
-      await pagina.locator('main.stand[data-modo="vitrine"][data-escuta="ouvindo"]').waitFor({ timeout: 5000 });
-      // Barra apagada (5 s): a linha fixa aparece. O relógio da página pula os 5 s da barra;
-      // esperar em tempo real disputava com o despertar do WAV (5 s de silêncio desde a
-      // abertura do microfone): sob carga a voz chegava antes e a linha some na conversa.
-      await pagina.clock.fastForward(5_500);
-      await pagina.locator('.stand-linha-escuta', { hasText: 'O LUCA só ouve quando você fala com ele.' }).waitFor({ timeout: 3000 });
-      // 1º despertar sem palavra: a sessão abre e fecha sem tirar a Vitrine.
-      await pagina.locator('main.stand[data-escuta="conversa"]').waitFor({ timeout: 15000 });
-      assert.equal(await main.getAttribute('data-modo'), 'vitrine', 'despertar sem palavra não corta a Vitrine');
-      await pagina.waitForFunction(() => document.querySelector('main.stand')?.dataset.sessao === 'silencio', null, { timeout: 12000 });
-      assert.equal(await main.getAttribute('data-modo'), 'vitrine');
-      assert.ok(scribe.conexoes > antes);
-      // 2º despertar com palavra: a Coruja assume já na Conversa, com a pergunta na legenda.
-      parcialDoScribe = 'como o trator avisa';
-      await pagina.locator('main.stand[data-modo="coruja"][data-tela="conversa"]').waitFor({ timeout: 20000 });
-      await pagina.getByText('como o trator avisa').waitFor({ timeout: 3000 });
-      assert.equal(await pagina.locator('.stand-linha-escuta').count(), 0, 'a linha some na Conversa');
-    } finally {
-      escutaNoServidor = false;
-      parcialDoScribe = '';
-      await pagina.close();
-    }
+      await pagina.locator('main.stand[data-escuta="ouvindo"]').waitFor({ timeout:15000 });
+      await pagina.evaluate(() => [...document.querySelectorAll('.stand-barra button')].find(b=>b.textContent.includes('Vitrine')).dispatchEvent(new PointerEvent('pointerdown',{bubbles:true})));
+      await pagina.locator('main.stand[data-modo="vitrine"][data-escuta="desligada"]').waitFor({ timeout:5000 });
+      const depois=scribe.conexoes;
+      await pagina.waitForTimeout(1500);
+      assert.equal(scribe.conexoes,depois,'não reabre captura durante narração');
+      const v=await pagina.locator('video').evaluate(v=>({muted:v.muted,volume:v.volume}));
+      assert.equal(v.muted,false);assert.ok(v.volume>0);
+      await pagina.evaluate(() => [...document.querySelectorAll('.stand-barra button')].find(b=>b.textContent.includes('Coruja')).dispatchEvent(new PointerEvent('pointerdown',{bubbles:true})));
+      await pagina.locator('main.stand[data-modo="coruja"][data-escuta="ouvindo"]').waitFor({timeout:15000});
+    } finally { escutaNoServidor=false;parcialDoScribe='';await pagina.close(); }
   });
 
-  it('permissão pendente: ajuda aos 10 s, Vitrine disponível e resposta tardia volta a ouvir', async () => {
+  it('permissão pendente: Vitrine cancela captura e ignora resposta tardia até retornar à Coruja', async () => {
     escutaNoServidor = true;
     const pagina = await browser.newPage();
     try {
@@ -436,9 +414,10 @@ describe('voz do stand no navegador', { skip: navegador ? false : 'sem Chromium 
         const botao = [...document.querySelectorAll('.stand-barra button')].find((b) => b.textContent.includes('Vitrine'));
         botao.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
       });
-      await pagina.locator('main.stand[data-modo="vitrine"][data-escuta="ajuda_microfone"]').waitFor();
+      await pagina.locator('main.stand[data-modo="vitrine"][data-escuta="desligada"]').waitFor();
       await pagina.evaluate(() => { window.__permitirMicrofone(); });
-      await pagina.locator('main.stand[data-modo="vitrine"][data-escuta="ouvindo"]').waitFor({ timeout: 8000 });
+      await pagina.waitForTimeout(500);
+      await pagina.locator('main.stand[data-modo="vitrine"][data-escuta="desligada"]').waitFor({timeout:8000});
       assert.equal(await pagina.getByText('Permita o microfone pra conversar com o LUCA.').count(), 0);
     } finally {
       escutaNoServidor = false;

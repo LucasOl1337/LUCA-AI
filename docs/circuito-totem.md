@@ -7,6 +7,12 @@ O modo Simulação do `/stand` dirige uma única run desde a partida até a cheg
 - Colisão por contato ou corpo do trator próximo ao feno; atolamento por 2s contínuos dentro da água; tombamento por 1s em rolagem≥30° ou≥20° a mais de7km/h. São regras cinemáticas didáticas, não física certificada.
 - Sonolência é opt-in dentro da pausa, OFF em cada run. O monitor existente processa a webcam local; erro/negação só aparece nas configurações e não pede permissão repetidamente. A captura da Coruja é desligada enquanto o simulador está aberto.
 
+## Instrumentos e áudio
+
+Leituras simuladas à esquerda mostram distância frontal em metros, ausência de eco acima de4m, rolagem em graus e seus limiares12/20/30°, velocidade cinemática emkm/h e previsão de entrada na água em3s. O mapa à direita usa os polígonos de água/encosta do mundo e a mesma rota/fardos do circuito. Área100×100m, +X para cima, +Z para direita, rumo da física convertido em rotação do ponteiro. Fora dos limites o ponteiro sai do mapa e aparece aviso, nunca é reposicionado.
+
+Sons ligados por padrão, liberados por gesto. Quatro tons distintos curtos usam o mesmo riscosCircuito do aviso/registro: obstáculo880Hz, encosta660Hz, água990Hz, sono520Hz. Envelope200ms,pico0.12,cooldown1s crítico/1.8s atenção, rearmamento600ms fora. Pausa, aba oculta, fim, mute e desmontagem param áudio; nenhuma medição física é prometida. Controle explícito na pausa mantém telemetria/visual ativos mesmo sem som. Vitrine toca narração aprovada, fecha Escuta e sessão anterior, e oferece botão de som quando autoplay é recusado.
+
 ## Registro e métricas
 
 `circuito.ts` controla runId, horários, tempo ativo monotônico, pausas declaradas, marcos e episódios por sensor. Um episódio só conta como evitado quando houve exposição real, mudança de frenagem/esterço **depois** do aviso e saída segura por1s. Antecipação e comando já mantido não são reação zero. Ausência de reação é N/A. Contagem não é por frame. O resultado é sempre rotulado SIMULAÇÃO e não representa risco de seguro ou acidente físico evitado.

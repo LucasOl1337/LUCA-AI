@@ -8,7 +8,7 @@
 .gameplay-mapa svg { display: block; width: 100%; height: auto; }
 .gameplay-mapa figcaption { font-size: clamp(11px, 1.4cqh, 15px); font-weight: 700; color: #b9cdbf; text-align: center; white-space: nowrap; }
 .gameplay-mapa-talhao { fill: #2f5a2b; stroke: #9fc9ad66; stroke-width: 1; }
-.gameplay-mapa-encosta { fill: #8a6d3b88; }
+.gameplay-mapa-encosta { fill: #e2a85c55; stroke:#e2a85c; stroke-width:.8; }
 .gameplay-mapa-zona { fill: #e5483b55; stroke: #e5483b; stroke-width: 1.2; stroke-dasharray: 3 2; }
 .gameplay-mapa-zona[data-ativa='true'] { fill: #e5483baa; }
 .gameplay-mapa-maquina path { fill: #f6f3e8; stroke: #07110e; stroke-width: .8; }
