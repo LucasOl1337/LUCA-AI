@@ -23,13 +23,21 @@ class GameplayBoundary extends Component<{ children: ReactNode }, { failed: bool
 }
 
 function Cabine({ seloFps = false, webcam = false }: { seloFps?: boolean; webcam?: boolean }) {
+  const [cameraDisponivel, setCameraDisponivel] = useState(false);
+  useEffect(() => {
+    let viva = true;
+    void navigator.mediaDevices?.enumerateDevices().then((devices) => {
+      if (viva) setCameraDisponivel(devices.some((d) => d.kind === 'videoinput'));
+    }).catch(() => { /* Sem câmera ou acesso: continua dirigindo sem aviso. */ });
+    return () => { viva = false; };
+  }, []);
   return (
     <GameplayBoundary>
       <Suspense fallback={<p className="experience-game-status" role="status">Carregando a cabine do Trator MAX…</p>}>
         <GameplayComCabine seloFps={seloFps} />
       </Suspense>
       {/* Fora do Suspense da cabine: a webcam abre enquanto o GLB carrega e não derruba a cabine se falhar. */}
-      {webcam && <Suspense fallback={null}><WebcamSonoCabine /></Suspense>}
+      {(webcam || cameraDisponivel) && <Suspense fallback={null}><WebcamSonoCabine silenciosa={!webcam} /></Suspense>}
     </GameplayBoundary>
   );
 }
