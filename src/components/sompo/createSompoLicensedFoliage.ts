@@ -164,9 +164,9 @@ export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Ca
   // cartões cruzados mantêm volume em qualquer rumo de câmera por 6 tri/árvore,
   // usando os billboards e provenance já existentes das espécies brasileiras.
   const treeCard = new THREE.PlaneGeometry(1, 1); treeCard.translate(0, .5, 0);
-  const treeCross = mergeGeometries([
-    treeCard.clone(), treeCard.clone().rotateY(Math.PI / 2), treeCard.clone().rotateY(Math.PI / 4),
-  ], false)!;
+  const treeCards = [treeCard.clone(), treeCard.clone().rotateY(Math.PI / 2), treeCard.clone().rotateY(Math.PI / 4)];
+  const treeCross = mergeGeometries(treeCards, false)!;
+  treeCards.forEach(card => card.dispose());
   treeCard.dispose(); geometries.add(treeCross);
   const treeBillboards: { mesh: THREE.InstancedMesh; slots: FoliageSlot[]; height: number }[] = [];
   const treeSpecies = [
@@ -220,9 +220,11 @@ export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Ca
   const cameraPosition = new THREE.Vector3(), transform = new THREE.Object3D(), matrix = new THREE.Matrix4();
   const frustum = new THREE.Frustum(), clip = new THREE.Matrix4(), sphere = new THREE.Sphere();
   const groundCache = new WeakMap<FoliageSlot, { x: number; y: number; lake: boolean }>();
+  let disposed = false;
   return {
     ready: Promise.all(pending),
     update(_wet: boolean, truckX = 0, focus = new THREE.Vector3(truckX, 1.5, 0)) {
+      if (disposed) return;
       camera.getWorldPosition(cameraPosition); parent.worldToLocal(cameraPosition);
       clip.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).multiply(parent.matrixWorld);
       frustum.setFromProjectionMatrix(clip);
@@ -314,8 +316,12 @@ export function createSompoLicensedFoliage(parent: THREE.Group, camera: THREE.Ca
       treeAo.count = aoCount; treeAo.instanceMatrix.needsUpdate = true;
     },
     dispose() {
+      if (disposed) return;
+      disposed = true;
       abort.abort(); root.removeFromParent();
       treeAo.dispose(); aoGeometry.dispose(); aoMaterial.alphaMap?.dispose(); aoMaterial.dispose();
+      // Geometry disposal does not release per-instance GPU matrix/color buffers.
+      for (const { mesh } of treeBillboards) mesh.dispose();
       for (const batch of batches) for (const mesh of batch.meshes) mesh.dispose();
       for (const g of geometries) g.dispose(); for (const m of materials) m.dispose(); for (const t of textures) t.dispose();
     },
