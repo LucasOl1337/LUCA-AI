@@ -14,9 +14,10 @@ import { FERRAMENTAS_STAND, executarFerramentaStand, videoPublicado } from './fe
 import { buscarNoRepo, montarPromptBase } from './conhecimento.js';
 import { provedorXai } from './provedor-xai.js';
 import {
-  CREDITOS_STT_POR_MINUTO, VERIFICACAO_VOZ_MS, VOZES_STAND, VOZ_STAND_PADRAO, chaveVozStand, fatorCreditosTts, modeloTtsStand,
+  CREDITOS_STT_POR_MINUTO, VERIFICACAO_VOZ_MS, VOZES_STAND, fatorCreditosTts, modeloTtsStand,
   provedorElevenlabs, resolverVoz, sintetizarElevenlabs, verificarVoz, vozDaChave,
 } from './provedor-elevenlabs.js';
+import { criarConfigTotem } from './config-totem.js';
 import { arquivoPadrao, criarTetoDiario, tetoDiarioDoEnv } from './teto-diario.js';
 
 export const LIMITES_STAND = Object.freeze({ silencio_s: 20, teto_s: 240, sessoes_por_hora: 30 });
@@ -101,6 +102,8 @@ export function registerStandRoutes(app, {
   chamarModelo = criarChamadaDeModelo({ fetchImpl }),
   executarFerramenta = executarFerramentaStand,
   agora = () => Date.now(),
+  configTotem = criarConfigTotem(),
+  requireAdmin = (req, res, next) => req.auth?.user?.role === 'admin' ? next() : res.status(403).json({ ok: false, error: 'admin_required' }),
 } = {}) {
   const conta = (req) => String(req.auth?.user?.id || '');
   let roteador = null;
@@ -170,22 +173,32 @@ export function registerStandRoutes(app, {
    * adicionar) também cai no padrão, com `aviso`, para a conversa não ficar muda.
    */
   const escolherVoz = async (config, pedido) => {
-    const chave = chaveVozStand(pedido);
-    if (chave === VOZ_STAND_PADRAO) return { chave, voz: config.voz };
+    const padrao = configTotem.obter();
+    const chave = typeof pedido === 'string' && Object.hasOwn(VOZES_STAND, pedido) ? pedido : padrao;
     const voz = vozDaChave(chave, config.voz);
+    if (chave === padrao) return { chave, voz };
     const ok = await verificarVoz({ chave: config.chave, voz, fetchImpl, cache: vozesOk, agora: agora() });
-    return ok ? { chave, voz } : { chave: VOZ_STAND_PADRAO, voz: config.voz, aviso: { pedida: chave, motivo: 'voz_indisponivel' } };
+    return ok ? { chave, voz } : { chave: padrao, voz: vozDaChave(padrao, config.voz), aviso: { pedida: chave, motivo: 'voz_indisponivel' } };
   };
 
   /** Vozes do seletor do Totem; `disponivel:null` enquanto a 1ª conferência não volta. */
-  const vozesDoStatus = (config) => Object.entries(VOZES_STAND).map(([chave, { rotulo }]) => {
-    if (chave === VOZ_STAND_PADRAO) return { chave, rotulo, padrao: true, disponivel: true };
+  const vozesDoStatus = (config) => Object.entries(VOZES_STAND).map(([chave, { rotulo, detalhe }]) => {
     const voz = vozDaChave(chave, config.voz);
     const salvo = vozesOk.get(voz);
     if (config.chave && (!salvo || agora() - salvo.em >= VERIFICACAO_VOZ_MS)) {
       verificarVoz({ chave: config.chave, voz, fetchImpl, cache: vozesOk, agora: agora() }).catch(() => {});
     }
-    return { chave, rotulo, padrao: false, disponivel: salvo ? salvo.ok : null };
+    return { chave, rotulo, detalhe, padrao: chave === configTotem.obter(), disponivel: salvo ? salvo.ok : null };
+  });
+
+  app.put('/api/stand/voz-padrao', requireAdmin, (req, res) => {
+    const chave = req.body?.totemDefaultVoice;
+    if (typeof chave !== 'string' || !Object.hasOwn(VOZES_STAND, chave)) return res.status(400).json({ ok: false, error: 'voz_invalida' });
+    try {
+      res.json({ ok: true, totemDefaultVoice: configTotem.salvar(chave) });
+    } catch {
+      res.status(500).json({ ok: false, error: 'config_nao_salva' });
+    }
   });
 
   app.get('/api/stand/status', (req, res) => {
@@ -197,7 +210,8 @@ export function registerStandRoutes(app, {
       ligado: !motivo,
       provedor: config.nome,
       motivo,
-      voz: config.voz ?? null,
+      voz: config.provedor?.turnos ? vozDaChave(configTotem.obter(), config.voz) : config.voz ?? null,
+      totemDefaultVoice: configTotem.obter(),
       escuta: !motivo && escutaLigada(env, config),
       limites: config.provedor?.turnos ? { ...LIMITES_STAND, ...LIMITES_TURNO } : LIMITES_STAND,
       sessoes_na_hora: guarda.usadas(conta(req)),

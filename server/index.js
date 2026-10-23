@@ -387,7 +387,7 @@ app.use('/api', (req, res, next) => {
 });
 registerLabCaseRoutes(app);
 registerSompoVehicleRoutes(app);
-registerStandRoutes(app);
+registerStandRoutes(app, { requireAdmin: authService.requireAdmin });
 authService.registerAdminRoutes(app, {
   getUserChatLibrary: getChatLibrarySnapshotForUser,
   getUserChatSession: getChatSessionForUser,

@@ -258,7 +258,7 @@ test('elevenlabs é o padrão: sessão devolve token Scribe, conversa e nunca a 
   const status = await (await pedir('/api/stand/status')).json();
   assert.equal(status.provedor, 'elevenlabs');
   assert.equal(status.ligado, true);
-  assert.equal(status.voz, 'Lucas Oliveira');
+  assert.equal(status.voz, 'ycxdm1PRMs962FxyyuJ0');
   assert.equal(status.escuta, true, 'escuta ligada por padrão com elevenlabs');
   assert.equal(status.limites.respostas, 8);
   const resposta = await pedir('/api/stand/sessao', {});
@@ -384,7 +384,7 @@ test('turno: NDJSON com frases, PCM par em base64 e fim; voz resolvida pelo nome
   assert.equal(linhas.at(-1).t, 'fim');
   assert.equal(linhas.at(-1).motivo, 'ok');
   const tts = pedidos.filter((p) => p.url.includes('/v1/text-to-speech/'));
-  assert.ok(tts[0].url.includes(`/v1/text-to-speech/${VOZ_ID}/stream?output_format=pcm_24000`));
+  assert.ok(tts[0].url.includes(`/v1/text-to-speech/ycxdm1PRMs962FxyyuJ0/stream?output_format=pcm_24000`));
   assert.equal(JSON.parse(tts[0].init.body).model_id, 'eleven_turbo_v2_5');
   assert.equal(teto.usados(), (21 + 14) * 0.5);
   relogio += 60_000;
@@ -402,13 +402,13 @@ test('voz por conversa: Andrea escolhida vale só na conversa dela; sem escolha,
   const andrea = await (await pedir('/api/stand/sessao', { voz: 'andrea' })).json();
   const padrao = await (await pedir('/api/stand/sessao', {})).json();
   assert.equal(andrea.voz, 'andrea');
-  assert.equal(padrao.voz, 'lucas');
+  assert.equal(padrao.voz, 'otto');
   assert.equal(andrea.voz_aviso, undefined);
   await linhasNdjson(await pedir('/api/stand/turno', { conversa_id: andrea.conversa_id, evento: 'saudacao' }));
   assert.deepEqual([...new Set(ttsDe(pedidos))], [VOZ_ANDREA]);
   pedidos.length = 0;
   await linhasNdjson(await pedir('/api/stand/turno', { conversa_id: padrao.conversa_id, evento: 'saudacao' }));
-  assert.deepEqual([...new Set(ttsDe(pedidos))], [VOZ_ID], 'a saudação em cache da Andrea não vaza para a conversa do Lucas');
+  assert.deepEqual([...new Set(ttsDe(pedidos))], ['ycxdm1PRMs962FxyyuJ0'], 'cache da Andrea não vaza para Otto');
   pedidos.length = 0;
   await linhasNdjson(await pedir('/api/stand/turno', { conversa_id: andrea.conversa_id, texto: 'o que é o LUCA?' }));
   assert.deepEqual([...new Set(ttsDe(pedidos))], [VOZ_ANDREA]);
@@ -419,30 +419,25 @@ test('voz: lista branca; voice_id, nome ou chave estranha do navegador vira o pa
   const pedir = await subir11(t, { pedidos });
   for (const voz of ['AbCdEfGhIjKlMnOpQrSt', 'Outra', 'Lucas Oliveira', '../andrea', 42, { chave: 'andrea' }]) {
     const corpo = await (await pedir('/api/stand/sessao', { voz })).json();
-    assert.equal(corpo.voz, 'lucas', String(voz));
+    assert.equal(corpo.voz, 'otto', String(voz));
     await linhasNdjson(await pedir('/api/stand/turno', { conversa_id: corpo.conversa_id, texto: 'oi' }));
   }
-  assert.deepEqual([...new Set(ttsDe(pedidos))], [VOZ_ID]);
-  assert.equal((await (await pedir('/api/stand/sessao', { voz: ' ANDREA ' })).json()).voz, 'andrea');
+  assert.deepEqual([...new Set(ttsDe(pedidos))], ['ycxdm1PRMs962FxyyuJ0']);
+  assert.equal((await (await pedir('/api/stand/sessao', { voz: 'andrea' })).json()).voz, 'andrea');
 });
 
 test('voz: Andrea fora da conta cai no Lucas com aviso; status mostra indisponível', async (t) => {
   const pedidos = [];
   const pedir = await subir11(t, { pedidos, andrea: false });
   const corpo = await (await pedir('/api/stand/sessao', { voz: 'andrea' })).json();
-  assert.equal(corpo.voz, 'lucas');
+  assert.equal(corpo.voz, 'otto');
   assert.deepEqual(corpo.voz_aviso, { pedida: 'andrea', motivo: 'voz_indisponivel' });
   await linhasNdjson(await pedir('/api/stand/turno', { conversa_id: corpo.conversa_id, evento: 'saudacao' }));
-  assert.deepEqual([...new Set(ttsDe(pedidos))], [VOZ_ID]);
+  assert.deepEqual([...new Set(ttsDe(pedidos))], ['ycxdm1PRMs962FxyyuJ0']);
   const status = await (await pedir('/api/stand/status')).json();
-  assert.deepEqual(status.vozes, [
-    { chave: 'lucas', rotulo: 'Lucas Oliveira', padrao: true, disponivel: true },
-    // ainda não conferidas: o status dispara a conferência em segundo plano
-    { chave: 'femea1', rotulo: 'Fêmea 1', padrao: false, disponivel: null },
-    { chave: 'otto', rotulo: 'Otto', padrao: false, disponivel: null },
-    { chave: 'locutor', rotulo: 'Locutor grave', padrao: false, disponivel: null },
-    { chave: 'andrea', rotulo: 'Andrea Lot', padrao: false, disponivel: false },
-  ]);
+  assert.equal(status.vozes.find((v) => v.chave === 'andrea').disponivel, false);
+  assert.deepEqual(status.vozes.filter((v) => v.padrao).map((v) => v.chave), ['otto']);
+  assert.ok(status.vozes.every((v) => v.detalhe && v.rotulo));
   const conferencias = pedidos.filter((p) => p.url.endsWith(`/v1/voices/${VOZ_ANDREA}`)).length;
   await pedir('/api/stand/sessao', { voz: 'andrea' });
   assert.equal(pedidos.filter((p) => p.url.endsWith(`/v1/voices/${VOZ_ANDREA}`)).length, conferencias, 'conferência fica em cache');

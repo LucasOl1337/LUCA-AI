@@ -2,7 +2,7 @@
 
 Gerada por `npm run cli:docs` a partir de `cli/catalog.js`. Não editar à mão.
 
-124 comandos; 102 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
+125 comandos; 103 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
 
 IDs são argumentos posicionais. Campos comuns podem ser flags; corpos completos usam `--data @arquivo.json`. Flags prevalecem sobre o corpo; objetos aninhados não são mesclados. Campos string são literais; apenas campos JSON e `--data` interpretam `@arquivo`/`-`.
 
@@ -726,13 +726,21 @@ Estado do cérebro de voz do stand: provedor, ligado ou motivo, escuta, limites,
 
 Nenhum; consulte a descrição para entradas por `--data`.
 
+### `stand voz-padrao`
+
+Admin: salvar a voz padrão global do Totem.
+
+`PUT /api/stand/voz-padrao`; autenticação: **session**.
+
+`--totem-default-voice` (string, obrigatório): Chave do catálogo devolvido por stand status
+
 ### `stand sessao`
 
 Abrir sessão de voz: token efêmero, conexão, configuração e conversa_id no modo em turnos (503 stand_desligado sem credencial ou no teto diário).
 
 `POST /api/stand/sessao`; autenticação: **session**.
 
-`--origem` (string): toque (padrão) ou escuta; só entra na contagem do dia<br>`--voz` (string): lucas (padrão), femea1, otto, locutor ou andrea; fora da lista branca vira lucas, voz fora da conta volta com voz_aviso
+`--origem` (string): toque (padrão) ou escuta; só entra na contagem do dia<br>`--voz` (string): Chave do catálogo em stand status; omitida ou inválida segue o padrão global (inicial Otto), voz fora da conta volta com voz_aviso
 
 ### `stand turno`
 
