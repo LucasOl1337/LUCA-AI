@@ -116,6 +116,13 @@ export class SessaoVoz implements SessaoDeVoz {
     this.armarSilencio();
     this.desligarPagina = assinarEventosPagina((evento) => {
       if (evento.tipo === 'encerrar') this.encerrar();
+      if (evento.tipo === 'video_iniciado') {
+        this.videoTocando = true;
+        window.clearTimeout(this.relogioSilencio);
+        this.interromper();
+        window.clearTimeout(this.relogioSilencio);
+        this.enviar({ type: 'input_audio_buffer.clear' });
+      }
       if (evento.tipo === 'video_terminou') {
         this.videoTocando = false;
         this.enviar({ type: 'input_audio_buffer.clear' });
@@ -272,6 +279,11 @@ export class SessaoVoz implements SessaoDeVoz {
   }
 
   private aoEvento(m: EventoProvedor): void {
+    // Eventos já em trânsito não podem reabrir fala/TTS sobre o vídeo do menu.
+    if (this.videoTocando && m.type !== 'error') {
+      if (m.type === 'response.created') this.enviar({ type: 'response.cancel' });
+      return;
+    }
     const idResposta: string | undefined = m.response_id ?? m.response?.id;
     const ignorada = Boolean(idResposta && this.canceladas.has(idResposta));
     switch (m.type) {

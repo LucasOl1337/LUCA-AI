@@ -21,7 +21,7 @@ test('Escuta ligada só com voz ligada e escuta no status, nunca no stub', () =>
 test('a página usa o mesmo sinal para a Escuta e para a Vitrine muda', async () => {
   const pagina = await ler('src/pages/StandPage.tsx');
   assert.match(pagina, /const escutaLigada = escutaNoStand\(status, vozStand, modoStub\)/);
-  assert.match(pagina, /ativa: escutaLigada && MODOS_COM_ESCUTA/);
+  assert.match(pagina, /ativa: escutaLigada && estado\.tela !== 'video' && MODOS_COM_ESCUTA/);
   assert.match(pagina, /<VitrineStand [^>]*semSom=\{escutaLigada\}/);
 });
 

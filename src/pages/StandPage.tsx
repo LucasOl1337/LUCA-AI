@@ -107,7 +107,7 @@ export default function StandPage() {
     void iniciarVoz(emprestimo);
   }, [iniciarVoz]);
   const escuta = useEscuta({
-    ativa: escutaLigada && MODOS_COM_ESCUTA.includes(modo.modo),
+    ativa: escutaLigada && estado.tela !== 'video' && MODOS_COM_ESCUTA.includes(modo.modo),
     emConversa: voz.ativa,
     fim: voz.fim,
     despertar,
@@ -301,6 +301,8 @@ export default function StandPage() {
     if (alvo.tipo === 'pergunta') { perguntar(alvo.texto); return; }
     if (alvo.tipo === 'video') {
       if (modoAtual.current !== 'coruja') despacharModo({ tipo: 'voltar_coruja' });
+      // O menu não passa pelo turno que normalmente suspende a voz antes do vídeo.
+      canal.current.enviar({ tipo: 'video_iniciado', id: alvo.id });
       despachar({ tipo: 'tocar_video', id: alvo.id });
       setStatusMenu({ item: item.id, fase: 'ok', mensagem: `tocando “${item.rotulo}”.` });
       fecharMenu();

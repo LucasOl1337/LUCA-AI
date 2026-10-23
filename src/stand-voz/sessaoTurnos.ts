@@ -120,6 +120,15 @@ export class SessaoTurnos implements SessaoDeVoz {
     // Timer absoluto local cortava a pessoa/áudio ativos; inatividade segue20s.
     this.desligarPagina = assinarEventosPagina((evento) => {
       if (evento.tipo === 'encerrar' || evento.tipo === 'reiniciar') this.encerrar();
+      if (evento.tipo === 'video_iniciado') {
+        // Vídeo escolhido no menu tem a mesma exclusividade do vídeo vindo da voz.
+        this.videoTocando = true;
+        this.turno?.abort();
+        this.turno = null;
+        window.clearTimeout(this.relogioSilencio);
+        this.cortarFala();
+        this.mudarEstado('ouvindo');
+      }
       if (evento.tipo === 'video_terminou') {
         this.videoTocando = false;
         void this.perguntar({ evento: 'video_terminou', id: evento.id });
