@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { criarSomMotor } from './somMotor';
 import { CircuitoHud } from './CircuitoHud';
 import { criarSessaoCircuito, type RelatorioCircuito } from './sessaoCircuito';
 import { INICIO_CIRCUITO, ROTA_CIRCUITO } from './circuito';
@@ -151,6 +152,10 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
   useEffect(() => {
     const mount = palcoRef.current;
     if (!mount) return undefined;
+    const somMotor = criarSomMotor();
+    void somMotor.carregar();
+    const silenciarOculto = () => { if (document.hidden) somMotor.parar(); };
+    document.addEventListener('visibilitychange', silenciarOculto);
     let cabine: CabineGameplay | null = null;
     let reiniciarSegurado = false;
     let pulsoMotor = 0;
@@ -190,6 +195,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
           sessao.registrar(estado);
           if (sessao.registro.resultado) motor.encerrar(sessao.registro.resultado.motivo);
         }
+        somMotor.atualizar(motor.ler(), congelado || document.hidden);
         const agora = performance.now();
         if (!congelado && agora >= pulsoMotor && agora >= zumbidoPausaAteRef.current) { pulsoMotor = agora + MOTOR_PULSO_MS; zumbidoMotor(estado.comandos.acelerador, estado.maquina.velocidadeKph); }
         const trator = motor.trator();
@@ -227,6 +233,8 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
       ...(circuito ? { circuitRoute: ROTA_CIRCUITO } : {}),
     });
     return () => {
+      document.removeEventListener('visibilitychange', silenciarOculto);
+      somMotor.desmontar();
       cabine?.desmontar();
       stage?.dispose();
     };
