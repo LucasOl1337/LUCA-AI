@@ -3,7 +3,7 @@ import { useAppLocation } from '@/hooks/useAppLocation';
 import '@/experience-pages.css';
 
 const GameplayComCabine = lazy(() => import('@/components/gameplay/visual/GameplayComCabine'));
-// Só baixa com ?webcam=1: sem o parâmetro o gameplay não carrega câmera nem detector.
+// Detector sob demanda: câmera disponível ou opt-in explícito ?webcam=1.
 const WebcamSonoCabine = lazy(() => import('@/components/gameplay/WebcamSonoCabine'));
 
 class GameplayBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
@@ -36,7 +36,7 @@ function Cabine({ seloFps = false, webcam = false }: { seloFps?: boolean; webcam
       <Suspense fallback={<p className="experience-game-status" role="status">Carregando a cabine do Trator MAX…</p>}>
         <GameplayComCabine seloFps={seloFps} />
       </Suspense>
-      {/* Fora do Suspense da cabine: a webcam abre enquanto o GLB carrega e não derruba a cabine se falhar. */}
+      {/* Fora do Suspense da cabine: detector não bloqueia o GLB; falha automática é silenciosa. */}
       {(webcam || cameraDisponivel) && <Suspense fallback={null}><WebcamSonoCabine silenciosa={!webcam} /></Suspense>}
     </GameplayBoundary>
   );
