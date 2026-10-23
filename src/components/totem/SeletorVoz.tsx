@@ -95,7 +95,7 @@ export function SeletorVoz({ abrirTotem }: { abrirTotem: () => void }) {
       </div>
       <div className="totem-voz-acoes">
         <button type="button" className="experience-primary" onClick={abrirTotem}>Abrir Totem</button>
-        {user?.role === 'admin' && <button type="button" className="experience-secondary" disabled={salvando || !ativa || vozes.find((v) => v.chave === ativa)?.disponivel === false}
+        {user?.role === 'admin' && <button type="button" className="experience-secondary" disabled={salvando || !ativa || ativa === padrao || vozes.find((v) => v.chave === ativa)?.disponivel === false}
           onClick={salvarPadrao}>{salvando ? 'Salvando…' : 'Definir como padrão'}</button>}
         {escolhida && <button type="button" className="totem-voz-seguir" onClick={() => escolher(null)}>Seguir o padrão do LUCA</button>}
       </div>
