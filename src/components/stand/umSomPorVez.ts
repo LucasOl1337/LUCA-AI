@@ -13,20 +13,20 @@ type LeituraSono = Pick<typeof sonoDaCabine, 'ler' | 'assinar'>;
  * - Alarme de sono (olhos fechados há 1 s na Simulação): corta a fala da Coruja
  *   e toca sozinho; desligado, ela volta a ouvir.
  */
-export function ligarUmSomPorVez(canal: CanalStand, { som = somCompartilhado, sono = sonoDaCabine }: { som?: SomCompartilhado; sono?: LeituraSono } = {}): () => void {
+export function ligarUmSomPorVez(canal: CanalStand, { som = somCompartilhado, sono = sonoDaCabine, perigo = perigoCabine }: { som?: SomCompartilhado; sono?: LeituraSono; perigo?: Pick<typeof perigoCabine, 'ler' | 'assinar'> } = {}): () => void {
   let alarme = false;
   const soltarEstado = canal.assinar((evento) => {
     if (evento.tipo === 'estado') som.segurar?.(evento.valor === 'falando' && !alarme);
   });
   const atualizarAlarme = () => {
-    const agora = sono.ler()?.status === 'alarm' || perigoCabine.ler();
+    const agora = sono.ler()?.status === 'alarm' || perigo.ler();
     if (agora === alarme) return;
     alarme = agora;
     if (agora) som.segurar?.(false);
     canal.enviar({ tipo: 'alarme_sono', ativo: agora });
   };
   const soltarSono = sono.assinar(atualizarAlarme);
-  const soltarPerigo = perigoCabine.assinar(atualizarAlarme);
+  const soltarPerigo = perigo.assinar(atualizarAlarme);
   atualizarAlarme();
   return () => {
     soltarEstado();
