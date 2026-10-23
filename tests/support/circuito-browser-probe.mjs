@@ -1,0 +1,14 @@
+import { chromium } from 'playwright';
+import fs from 'node:fs';
+const b=await chromium.connectOverCDP('http://127.0.0.1:19081');
+const pages=await Promise.all(b.contexts().flatMap(c=>c.pages()).map(async p=>({p,id:(await (await p.context().newCDPSession(p)).send('Target.getTargetInfo')).targetInfo.targetId})));
+const p=pages.find(x=>x.id==='1A717D4D15BEE547DB4357EE315790EC')?.p;
+if(!p)throw new Error('Mission target missing');
+const errors=[];p.on('pageerror',e=>errors.push(e.message));
+await p.setViewportSize({width:1920,height:1080});
+console.log(await p.locator('body').innerText());
+console.log('canvas',await p.locator('canvas').count());
+console.log('errors',errors);
+await p.screenshot({path:'/home/lol/relatorios/luca-circuito-20261022/hud-1920-inicial.png'});
+console.log(await p.locator('[data-gameplay]').evaluate(e=>({...e.dataset})));
+await b.close();

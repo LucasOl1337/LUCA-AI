@@ -16,7 +16,7 @@ export function PainelComandos({ grupos = CATALOGO, voz = true, aoEscolher }: { 
     <aside className="stand-comandos" aria-label="O que fazer no LUCA" onPointerDown={parar}>
       <p className="stand-comandos-titulo">{voz ? 'Toque ou peça' : 'Toque para ver'}</p>
       <ul className="stand-comandos-lista">
-        {grupos.map((g) => (
+        {grupos.filter((g) => g.id !== 'sonolencia').map((g) => (
           <li key={g.id}>
             <button type="button" className="stand-comando" data-comando={g.id} onClick={() => aoEscolher(g.id)}>
               <span className="stand-comando-exemplo">{g.titulo}</span>

@@ -1,0 +1,20 @@
+import express from 'express';
+import { createServer as createVite } from 'vite';
+import fs from 'node:fs';
+import path from 'node:path';
+import { registerLabCaseRoutes } from '../../server/lab-cases.js';
+const app = express(); app.use(express.json({ limit:'6mb' }));
+app.use((req,res,next) => { req.auth={user:{id:'circuito-fixture-local'}}; next(); });
+const dir = process.env.LUCA_CIRCUITO_FIXTURE_DIR;
+if (!dir || !dir.startsWith('/home/lol/relatorios/luca-circuito-20261022/')) throw new Error('Diretório isolado obrigatório');
+fs.mkdirSync(dir,{recursive:true});
+registerLabCaseRoutes(app,{dataDir:path.join(dir,'data'),chat:async request => {
+  fs.appendFileSync(path.join(dir,'agent-payloads.jsonl'),JSON.stringify(request)+'\n');
+  const telemetry=JSON.parse(request.user).telemetry;
+  if (!telemetry.circuito) throw new Error('Registro de circuito ausente');
+  return {content:JSON.stringify({summary:`FIXTURE LOCAL — agente de teste recebeu run ${telemetry.circuito.runId}, ${telemetry.circuito.metricas.elapsedMs} ms ativos, ${telemetry.circuito.resultado.motivo}. Não é parecer real.`, limitations:['Agente mock local, não avaliação física/real.'],additionalInformation:[],hypotheses:[]}),finishReason:'stop'};
+}});
+const vite=await createVite({server:{middlewareMode:true},appType:'custom'});
+app.get('/circuito-fixture',async(req,res)=>res.type('html').send(await vite.transformIndexHtml(req.url,'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0"><div id="root"></div><script type="module" src="/tests/support/circuito-ui-entry.tsx"></script></body></html>')));
+app.use(vite.middlewares);
+app.listen(4317,'127.0.0.1',()=>console.log('circuito fixture ready http://127.0.0.1:4317/circuito-fixture'));

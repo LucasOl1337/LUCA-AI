@@ -1,0 +1,32 @@
+.circuito-hud { position:absolute; inset:0; pointer-events:none; color:#faf8eb; font:14px/1.45 system-ui,sans-serif; z-index:5; }
+.circuito-hud button,.circuito-hud input,.circuito-hud summary { pointer-events:auto; }
+.circuito-estado { position:absolute; left:18px; top:14px; display:flex; gap:16px; align-items:center; padding:7px 12px; border-radius:9px; background:#142018d9; font-size:12px; }
+.circuito-estado b { font-size:17px; }
+.circuito-menu-botao { position:absolute; top:14px; right:18px; background:#142018db; color:#fff; border:1px solid #b8c2ad66; border-radius:8px; padding:9px 12px; }
+.circuito-avisos { position:absolute; top:65px; left:18px; max-width:290px; }
+.circuito-avisos p { margin:5px 0; border-left:3px solid #efd17c; background:#172119dc; padding:5px 10px; font-size:12px; }
+.circuito-avisos [data-gravidade=critico] { border-color:#ff9478; }
+.circuito-dialogo { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:min(620px,90%); max-height:88%; overflow:auto; padding:26px; border-radius:15px; border:1px solid #a3b99a66; background:#111e18f5; box-shadow:0 20px 80px #000a; pointer-events:auto; }
+.circuito-dialogo h2 { margin:0 0 12px; font-size:26px; }
+.circuito-dialogo p { margin:12px 0; }
+.circuito-dialogo button,.circuito-chat button { border:1px solid #adc6a7; border-radius:7px; padding:10px 14px; background:#d8edc0; color:#14231b; margin:10px 10px 0 0; font-weight:650; cursor:pointer; }
+.circuito-dialogo small { overflow-wrap:anywhere; }
+.circuito-touch { display:none; position:absolute; bottom:16px; left:20px; right:20px; justify-content:space-between; }
+.circuito-touch button { min-width:60px; min-height:48px; background:#172119b8; color:white; border:1px solid #d9e2c8aa; border-radius:10px; touch-action:none; }
+@media (pointer:coarse) { .circuito-touch { display:flex; } }
+.circuito-webcam .gameplay-webcam { top:64px; right:18px; width:140px; }
+.circuito-webcam[data-config-aberta=false] { display:none; }
+.circuito-webcam[data-config-aberta=true] { position:absolute; z-index:10; right:12px; top:80px; }
+.circuito-chat { position:absolute; inset:0; overflow:auto; background:#101a17; color:#e9efe4; padding:32px max(24px,calc((100vw - 1050px)/2)); font:16px/1.6 system-ui,sans-serif; user-select:text; }
+.circuito-chat header { border-bottom:1px solid #526050; padding-bottom:20px; }
+.circuito-chat h1 { font-size:32px; margin:8px 0; }
+.circuito-chat a { color:#d8edc0; margin-left:16px; }
+.circuito-chat textarea { scroll-margin-top:24px; }
+.circuito-relatorio,.circuito-turno { background:#1b2922; border:1px solid #455545; border-radius:12px; padding:22px; margin:24px 0; }
+.circuito-chat pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; }
+.circuito-chat dl { display:grid; grid-template-columns:1fr 1fr; }
+.circuito-chat dd { margin:0; font-weight:700; }
+.circuito-chat form { display:grid; gap:10px; margin:28px 0; }
+.circuito-chat textarea { min-height:100px; color:#edf2e6; background:#111d16; border:1px solid #8ea28b; border-radius:7px; padding:12px; }
+.circuito-chat button:disabled { opacity:.6; cursor:wait; }
+@media(max-height:800px) { .circuito-dialogo { padding:18px; font-size:13px; } .circuito-dialogo h2 { font-size:22px; } }

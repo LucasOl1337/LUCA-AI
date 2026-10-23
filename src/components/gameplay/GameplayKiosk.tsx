@@ -1,4 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CircuitoHud } from './CircuitoHud';
+import { criarSessaoCircuito, type RelatorioCircuito } from './sessaoCircuito';
+import { INICIO_CIRCUITO, ROTA_CIRCUITO } from './circuito';
+import { sonoCabine } from './sonoCabine';
 import type * as THREE from 'three';
 import { getSompoAgriOutcomes } from '../../../shared/sompo-agri-brief.js';
 import { mountSompoAgriStage, type SompoLook, type SompoLookContexto } from '../sompo/createSompoAgriStage';
@@ -74,10 +78,26 @@ function zumbidoMotor(acelerador: number, velocidadeKph: number) {
  * `seloFps` (/gameplay?fps=1) mostra o selo de FPS no canto; sem ele nada é montado.
  */
 /** `desafios`: rodadas alternadas (/gameplay). `percurso`: percurso guiado do totem, com condução livre a um toque. */
-export type ExperienciaGameplay = 'desafios' | 'percurso';
+export type ExperienciaGameplay = 'desafios' | 'percurso' | 'circuito';
 
-export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = createFirstPersonRig, seloFps = false, experiencia = 'desafios', mundo }: { criarCabine?: CriarCabineGameplay; modeloUrl?: string; criarCamera?: CriarCameraGameplay; seloFps?: boolean; experiencia?: ExperienciaGameplay; mundo?: MundoGameplay }) {
-  const motor = useMemo(() => criarMotorGameplay(), []);
+export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = createFirstPersonRig, seloFps = false, experiencia = 'desafios', mundo, aoAnalisarCircuito }: { criarCabine?: CriarCabineGameplay; modeloUrl?: string; criarCamera?: CriarCameraGameplay; seloFps?: boolean; experiencia?: ExperienciaGameplay; mundo?: MundoGameplay; aoAnalisarCircuito?(relatorio: RelatorioCircuito): void }) {
+  const circuito = experiencia === 'circuito';
+  const [volta, setVolta] = useState(0);
+  const [menu, setMenu] = useState(false);
+  const pausado = useRef(false);
+  const pausaInicio = useRef<number | null>(null);
+  const ultimoMonotono = useRef(performance.now());
+  const sessao = useMemo(() => criarSessaoCircuito(), [volta]);
+  const alterarMenu = useCallback((aberto: boolean) => {
+    pausado.current = aberto; setMenu(aberto);
+    ultimoMonotono.current = performance.now();
+    if (aberto) pausaInicio.current = performance.now();
+    else if (pausaInicio.current !== null) {
+      sessao.pausa(sessao.registro.elapsedMs, performance.now() - pausaInicio.current, 'menu'); pausaInicio.current = null;
+    }
+  }, [sessao]);
+  const motor = useMemo(() => criarMotorGameplay(), [volta]);
+  useEffect(() => { if (circuito) { motor.reiniciar(INICIO_CIRCUITO); sessao.registrar(motor.ler()); } }, [motor, circuito, sessao]);
   const raizRef = useRef<HTMLDivElement>(null);
   const palcoRef = useRef<HTMLDivElement>(null);
   const setasRef = useRef<SetasVolante>({ ...SETAS_SOLTAS });
@@ -109,16 +129,24 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
     raiz.dataset.contato = String(estado.contato);
     raiz.dataset.rumoGraus = estado.maquina.rumoGraus.toFixed(1);
     raiz.dataset.esterco = estado.comandos.esterco.toFixed(2);
+    raiz.dataset.xM = String(estado.maquina.x); raiz.dataset.zM = String(estado.maquina.z);
+    if (circuito) raiz.dataset.marco = String(sessao.registro.proximoMarco);
     // Tablet do operador (inventário #3): sem sessão (StandSemLogin) não há /ws e isto não faz nada.
     aoVivo.enviar(estado);
-  }), [motor]);
+  }), [motor, circuito, sessao]);
 
   // Aba oculta (ensaio da feira, C3): o rAF para; o tablet troca "ao vivo" congelado por "jogo pausado".
   useEffect(() => {
-    const trocar = () => aoVivo.marcarOculto(document.hidden);
+    let inicioOculto: number | null = null;
+    const trocar = () => {
+      aoVivo.marcarOculto(document.hidden);
+      ultimoMonotono.current = performance.now();
+      if (document.hidden) { inicioOculto = performance.now(); setasRef.current = { ...SETAS_SOLTAS }; }
+      else if (circuito && inicioOculto !== null) { sessao.pausa(sessao.registro.elapsedMs, performance.now() - inicioOculto, 'aba oculta'); inicioOculto = null; }
+    };
     document.addEventListener('visibilitychange', trocar);
     return () => { document.removeEventListener('visibilitychange', trocar); aoVivo.esquecer(); };
-  }, []);
+  }, [circuito, sessao]);
 
   useEffect(() => {
     const mount = palcoRef.current;
@@ -127,6 +155,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
     let reiniciarSegurado = false;
     let pulsoMotor = 0;
     let ultimoDt = 0;
+    ultimoMonotono.current = performance.now();
     const ativo = { current: true };
     const base = criarCamera(ativo, lookRef);
     const rig: SompoCameraRig = {
@@ -141,15 +170,28 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
       // O laço único: pad e setas → volante → física → retrato → eventos, dentro do rAF do palco.
       drive(dt, cena): SompoDrivePose {
         ultimoDt = dt;
+        const agoraMonotono = performance.now();
+        const passoMonotonoMs = Math.max(0, agoraMonotono - ultimoMonotono.current);
+        ultimoMonotono.current = agoraMonotono;
         const pad = firstStandardPad() as GamepadLike | null;
         const borda = bordaReiniciar(pad, reiniciarSegurado);
         reiniciarSegurado = borda.segurado;
-        if (borda.reiniciar) { setLivre(false); setRodada((n) => n + 1); }
+        if (borda.reiniciar) {
+          if (circuito) alterarMenu(!pausado.current);
+          else { setLivre(false); setRodada((n) => n + 1); }
+        }
+        if (circuito && pausado.current && pad?.buttons[0]?.pressed) alterarMenu(false);
         const olhar = pad ? { yaw: 0 - applyDeadZone(pad.axes[2] ?? 0), pitch: 0 - applyDeadZone(pad.axes[3] ?? 0) } : { yaw: 0, pitch: 0 };
         lookRef.current = stepLook(lookRef.current, olhar, dt, { recenter: !!pad });
-        const estado = motor.quadro(dt, comandoDesejado(pad, setasRef.current), cena.ground);
+        const congelado = circuito && (pausado.current || document.hidden || sessao.registro.resultado !== null);
+        const estado = congelado ? motor.ler() : motor.quadro(dt, comandoDesejado(pad, setasRef.current), cena.ground);
+        if (circuito && !congelado) {
+          sessao.quadro(estado, passoMonotonoMs, new Date().toISOString(), sonoCabine.ler()?.status === 'alarm');
+          sessao.registrar(estado);
+          if (sessao.registro.resultado) motor.encerrar(sessao.registro.resultado.motivo);
+        }
         const agora = performance.now();
-        if (agora >= pulsoMotor && agora >= zumbidoPausaAteRef.current) { pulsoMotor = agora + MOTOR_PULSO_MS; zumbidoMotor(estado.comandos.acelerador, estado.maquina.velocidadeKph); }
+        if (!congelado && agora >= pulsoMotor && agora >= zumbidoPausaAteRef.current) { pulsoMotor = agora + MOTOR_PULSO_MS; zumbidoMotor(estado.comandos.acelerador, estado.maquina.velocidadeKph); }
         const trator = motor.trator();
         return {
           x: trator.x, z: trator.z, heading: trator.rumo, travel: trator.percurso,
@@ -182,12 +224,13 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
       look: mundo?.look,
       cropHeight: mundo?.alturaLavoura,
       waterZones: AGUA_DO_TALHAO,
+      ...(circuito ? { circuitRoute: ROTA_CIRCUITO } : {}),
     });
     return () => {
       cabine?.desmontar();
       stage?.dispose();
     };
-  }, [motor, modeloUrl, criarCamera, mundo]);
+  }, [motor, modeloUrl, criarCamera, mundo, circuito, sessao, alterarMenu]);
 
   // Setas dirigem (Q9). Só as setas: as letras do stand (r, n, d, g, f) seguem com a equipe.
   useEffect(() => {
@@ -227,6 +270,9 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
       {experiencia === 'desafios' && <DesafioCabine key={rodada} canal={motor} />}
       {experiencia === 'percurso' && !livre && <PercursoCabine key={rodada} canal={motor} aoSair={() => setLivre(true)} />}
       {experiencia === 'percurso' && livre && <ConducaoLivre canal={motor} aoPercurso={() => { setLivre(false); setRodada((n) => n + 1); }} />}
+      {circuito && <CircuitoHud key={volta} motor={motor} sessao={sessao} menu={menu} aoMenu={alterarMenu}
+        aoAnalisar={(relatorio) => aoAnalisarCircuito?.(relatorio)} aoNovo={() => { alterarMenu(false); setVolta((n) => n + 1); }}
+        touch={(key, ligada) => { const seta = setaDaTecla(key); if (seta) setasRef.current = { ...setasRef.current, [seta]: ligada }; }} />}
       {seloFps && <SeloFps palcoRef={palcoRef} />}
     </div>
   );

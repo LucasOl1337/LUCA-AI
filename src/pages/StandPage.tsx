@@ -326,6 +326,11 @@ export default function StandPage() {
   }, [falhaSite]);
   const { conectado: controleConectado, desconhecido: controleDesconhecido } = usePadStand({ modo: modo.modo, aoAgir: agirNoPad, aoMexer: mexeuNoPad });
   const avisoControle = avisoDeControle(controleDesconhecido);
+  useEffect(() => {
+    const sairCircuito = () => despacharModo({ tipo: 'voltar_coruja' });
+    window.addEventListener('luca:circuito-sair', sairCircuito);
+    return () => window.removeEventListener('luca:circuito-sair', sairCircuito);
+  }, []);
 
   /** Toque na tela: acende a barra; na Atração, conversa (com voz) ou mostra a Vitrine (sem voz). */
   const tocar = useCallback(() => {
@@ -363,7 +368,7 @@ export default function StandPage() {
       despacharModo({ tipo: 'atividade' });
       if (modoAtual.current === 'simulacao') {
         if (evento.key === 'Escape') {
-          despacharModo({ tipo: 'voltar_coruja' });
+          // Esc pertence à pausa do circuito; não abandona a run.
           evento.preventDefault();
         }
         // WASD, espaço e R pertencem ao jogo, sem acionar atalhos de voz.
@@ -450,7 +455,7 @@ export default function StandPage() {
       {modo.modo === 'site' && modo.pagina && (
         <SiteStand pagina={modo.pagina} variante={variante} nivel={nivel} voz={estado.voz} legenda={estado.legenda} aoMexer={mexeuNoPad} />
       )}
-      <div className="stand-seguro stand-camada">
+      {modo.modo !== 'simulacao' && <div className="stand-seguro stand-camada">
         <SeloCamera estado={webcam.camera} />
         {segundosParaSair !== null && <AvisoSaida segundos={segundosParaSair} />}
         {avisoControle && <p className="stand-aviso-equipe stand-aviso-controle">{avisoControle}</p>}
@@ -482,15 +487,9 @@ export default function StandPage() {
             rotulo: 'Menu',
             ativo: menu.aberto,
             aoEscolher: () => (menu.aberto ? fecharMenu() : abrirMenu(null)),
-          }, {
-            // Sonolência como função do Totem: a /sonolencia inteira no modo Site, com a mesma webcam.
-            id: 'sonolencia',
-            rotulo: 'Sonolência',
-            ativo: modo.modo === 'site' && modo.pagina === 'sonolencia',
-            aoEscolher: () => { despacharModo({ tipo: 'atividade', toque: true }); despacharModo({ tipo: 'abrir_pagina', pagina: 'sonolencia' }); },
           }]}
         />
-      </div>
+      </div>}
     </main>
   );
 }

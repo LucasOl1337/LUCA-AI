@@ -29,6 +29,32 @@ const validResponse = {
   }],
 };
 
+test('circuito conserva run e trace integral para agentes sem confiar em métricas declaradas', async (t) => {
+  const calls = [];
+  const { request, register } = await fixture(t, { chat: async (args) => {
+    calls.push(args); return { content: JSON.stringify(validResponse), finishReason: 'stop' };
+  } });
+  const cookie = await register('circuito'); const input = source();
+  input.metadata.circuito = { versao:1, origem:'SIMULAÇÃO', runId:'run-circuito-1', elapsedMs:5000,
+    inicioIso:'2026-10-22T22:00:00Z',fimIso:'2026-10-22T22:00:05Z',resultado:{motivo:'chegada'},
+    metricas:{sinistrosEvitados:999},episodios:[{sensor:'feno',inicioMs:1000,fimMs:3000,gravidade:'critico',
+      velocidadeKph:6,distanciaCm:140,rolagemGraus:0,resposta:{tempoMs:1600,latenciaMs:0,acao:'frenagem'},evitado:true}] };
+  const saved = await request('/api/lab/cases', { cookie, body:input });
+  assert.equal(saved.status,201);
+  const root = `/api/lab/cases/${saved.body.case.id}`;
+  const result = await request(`${root}/analyses`, { cookie, body:{focus:'Avalie minha run'} });
+  assert.equal(result.status,201); assert.equal(calls.length,4);
+  for (const call of calls) {
+    const c = JSON.parse(call.user).telemetry.circuito;
+    assert.equal(c.runId,'run-circuito-1'); assert.equal(c.metricas.sinistrosEvitados,1);
+    assert.equal(c.metricas.reacaoMediaMs,600); assert.equal(c.episodios[0].resposta.latenciaMs,600);
+    assert.match(c.limitacoes,/não robô real/); assert.match(call.system,/não-respostas/);
+  }
+  const restored = await request(root,{cookie});
+  assert.equal(restored.body.case.metadata.circuito.runId,'run-circuito-1');
+  assert.equal(restored.body.case.analyses.length,1);
+});
+
 test('ESP32 JSON conversion survives Lab save/reload and supplies sensor evidence to analysis', async (t) => {
   const samples = [0, 1, 2].map(i => ({
     tractorId: 'ESP32-001', sourceKind: 'firebase', observedAt: `2026-09-09T12:00:0${i * 2}.000Z`,

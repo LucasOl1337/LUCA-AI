@@ -29,7 +29,8 @@ const parar = (evento: PointerEvent) => evento.stopPropagation();
 export function MenuTotem({ aberto, grupo, status, indisponivel, motivoSemTexto, aoAbrirGrupo, aoFechar, aoExecutar, aoPerguntar, catalogo = CATALOGO }: Props) {
   const [texto, setTexto] = useState('');
   if (!aberto) return null;
-  const atual = grupo ? catalogo.find((g) => g.id === grupo) : undefined;
+  const visiveis = catalogo.filter((g) => g.id !== 'sonolencia');
+  const atual = grupo ? visiveis.find((g) => g.id === grupo) : undefined;
   const ocupado = status?.fase === 'executando';
   const enviar = (evento: FormEvent) => {
     evento.preventDefault();
@@ -69,7 +70,7 @@ export function MenuTotem({ aberto, grupo, status, indisponivel, motivoSemTexto,
               </li>
             );
           })
-          : catalogo.map((g) => (
+          : visiveis.map((g) => (
             <li key={g.id}>
               <button type="button" className="stand-menu-item stand-menu-item-grupo" data-grupo={g.id} onClick={() => aoAbrirGrupo(g.id)}>
                 <span className="stand-menu-rotulo">{g.titulo}</span>
