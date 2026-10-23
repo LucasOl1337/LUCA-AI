@@ -113,7 +113,9 @@ export class SessaoTurnos implements SessaoDeVoz {
 
     audio.ouvir((pcm, nivel) => this.aoMicrofone(pcm, nivel));
     // Despertada pela voz: manda ao Scribe o começo da frase, ouvido enquanto a sessão abria.
-    for (const pcm of emprestimo?.drenar() ?? []) ws.send(mensagemAudioScribe(base64DePcm16(pcm), HZ_STAND));
+    for (const pcm of emprestimo?.drenar() ?? []) {
+      ws.send(mensagemAudioScribe(microfonePermitido() ? base64DePcm16(pcm) : SILENCIO_50MS, HZ_STAND));
+    }
     this.pararNivel = audio.medirNivel((nivel) => emitirEventoStand({ tipo: 'nivel_audio', valor: this.estado === 'falando' ? nivel : 0 }));
     // ElevenLabs: servidor renova a janela com guarda de sessão e orçamento.
     // Timer absoluto local cortava a pessoa/áudio ativos; inatividade segue20s.
@@ -223,6 +225,7 @@ export class SessaoTurnos implements SessaoDeVoz {
   private aoMicrofone(pcm: Int16Array, nivel: number): void {
     if (this.ws?.readyState !== WebSocket.OPEN) return;
     if (this.videoTocando || this.alarmeTocando || !microfonePermitido()) {
+      this.falaIndependenteAte = 0;
       this.ws.send(mensagemAudioScribe(SILENCIO_50MS, HZ_STAND));
       return;
     }

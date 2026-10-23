@@ -5,4 +5,4 @@
 .coruja-cabine strong span { display: block; color: #a4e9cf; font-size: 11px; margin-top: 3px; }
 .coruja-cabine p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 7px 0; font: 12px/1.4 system-ui; }
 .coruja-cabine small { color: #aec5cf; font: 11px system-ui; }
-@media (max-width: 650px) { .coruja-cabine { width: 210px; right: 8px; bottom: 8px; padding: 8px; } .coruja-cabine-avatar { width: 44px; height: 60px; } }
+@media (max-width: 650px) { .coruja-cabine { width: 210px; right: 8px; bottom: 330px; padding: 8px; } .coruja-cabine-avatar { width: 44px; height: 60px; } }

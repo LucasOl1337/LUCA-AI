@@ -228,9 +228,9 @@ export default function StandPage() {
    * `voz.iniciar` já ignora quando há sessão; não ler `voz.ativa` aqui (fica velho no R). */
   const { aoTocar: tocouNaEscuta } = escuta;
   useEffect(() => {
-    if (!segurandoFala || modoStub || voz.ativa || !escutaLigada) return;
+    if (!segurandoFala || modoStub || voz.ativa || vozStand !== 'ligada') return;
     void iniciarVoz(tocouNaEscuta(false) ?? undefined);
-  }, [segurandoFala, modoStub, voz.ativa, escutaLigada, iniciarVoz, tocouNaEscuta]);
+  }, [segurandoFala, modoStub, voz.ativa, vozStand, iniciarVoz, tocouNaEscuta]);
   const iniciar = useCallback(() => {
     if (modoStub) demonstrar.current();
     // Com a escuta aberta, o toque libera o áudio do dia e usa o mesmo microfone.
