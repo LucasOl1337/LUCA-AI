@@ -35,7 +35,9 @@ export type EventoPagina =
   /** A Ação do site falhou na tela: a coruja diz isso na hora, com fala pronta. */
   | { tipo: 'acao_falhou' }
   /** Pergunta tocada ou escrita no menu do Totem: vale como fala do visitante (até 500 caracteres). */
-  | { tipo: 'pergunta_texto'; texto: string };
+  | { tipo: 'pergunta_texto'; texto: string }
+  /** Alarme de sono da Simulação: ligado corta a fala da Coruja e toca sozinho; desligado ela volta a ouvir. */
+  | { tipo: 'alarme_sono'; ativo: boolean };
 
 export type EventoStand = EventoCerebro | EventoPagina;
 
@@ -70,6 +72,7 @@ export function ehEventoPagina(valor: unknown): valor is EventoPagina {
   if (valor.tipo === 'video_iniciado' || valor.tipo === 'video_terminou') return textoNaoVazio(valor.id);
   if (valor.tipo === 'tela') return typeof valor.texto === 'string';
   if (valor.tipo === 'pergunta_texto') return textoNaoVazio(valor.texto) && valor.texto.length <= 500;
+  if (valor.tipo === 'alarme_sono') return typeof valor.ativo === 'boolean';
   return valor.tipo === 'reiniciar' || valor.tipo === 'encerrar' || valor.tipo === 'acao_falhou';
 }
 

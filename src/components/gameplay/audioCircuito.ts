@@ -1,6 +1,6 @@
 import type { EstadoGameplay } from './estadoGameplay';
 import { riscosCircuito, type SensorCircuito } from './circuito';
-import { somCompartilhado, type SomCompartilhado } from './somCompartilhado';
+import { saidaEfeito, somCompartilhado, type SomCompartilhado } from './somCompartilhado';
 
 /** Tons curtos por exposição, nunca um oscilador contínuo. A mesma classificação
  * alimenta registro, avisos, mapa e áudio. Limites são didáticos, não físicos. */
@@ -18,7 +18,7 @@ export function criarAudioCircuito(som: SomCompartilhado = somCompartilhado) {
     if (critico) osc.frequency.linearRampToValueAtTime(hz * 1.35, t + .13);
     ganho.gain.setValueAtTime(0, t); ganho.gain.linearRampToValueAtTime(.12, t + .012);
     ganho.gain.exponentialRampToValueAtTime(.001, t + .17); ganho.gain.setValueAtTime(0, t + .19);
-    osc.connect(ganho).connect(ctx.destination); ativos.add(osc);
+    osc.connect(ganho).connect(saidaEfeito(som, ctx)); ativos.add(osc);
     osc.onended = () => { ativos.delete(osc); osc.disconnect(); ganho.disconnect(); };
     osc.start(t); osc.stop(t + .2); return true;
   };

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { BipeCabine } from './alertaCabine';
-import { somCompartilhado, type SomCompartilhado } from './somCompartilhado';
+import { saidaEfeito, somCompartilhado, type SomCompartilhado } from './somCompartilhado';
 
 /**
  * Bipe em Web Audio, no contexto compartilhado da página (`somCompartilhado`).
@@ -52,7 +52,7 @@ export function criarMotorBipe(som: SomCompartilhado = somCompartilhado): MotorB
     ganho.gain.linearRampToValueAtTime(VOLUME, agora + 0.005);
     ganho.gain.setValueAtTime(VOLUME, agora + DURACAO_BIPE_S - 0.01);
     ganho.gain.linearRampToValueAtTime(0, agora + DURACAO_BIPE_S);
-    osc.connect(ganho).connect(ctx.destination);
+    osc.connect(ganho).connect(saidaEfeito(som, ctx));
     osc.start(agora);
     osc.stop(agora + DURACAO_BIPE_S + 0.02);
   };
@@ -63,7 +63,7 @@ export function criarMotorBipe(som: SomCompartilhado = somCompartilhado): MotorB
     osc.type = 'square';
     osc.frequency.value = hz;
     ganho.gain.value = VOLUME * 0.8;
-    osc.connect(ganho).connect(ctx.destination);
+    osc.connect(ganho).connect(saidaEfeito(som, ctx));
     osc.start();
     continuo = { osc, ganho };
   };

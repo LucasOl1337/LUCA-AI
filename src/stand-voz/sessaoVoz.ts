@@ -122,6 +122,8 @@ export class SessaoVoz implements SessaoDeVoz {
         window.clearTimeout(this.relogioSilencio);
         this.enviar({ type: 'input_audio_buffer.clear' });
       }
+      // Alarme de sono corta a fala e toca sozinho (a reserva não volta a falar por cima).
+      if (evento.tipo === 'alarme_sono' && evento.ativo && this.estado === 'falando') this.interromper();
       if (evento.tipo === 'video_terminou') {
         this.videoTocando = false;
         this.enviar({ type: 'input_audio_buffer.clear' });

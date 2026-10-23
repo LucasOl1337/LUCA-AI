@@ -32,10 +32,25 @@ export interface SomCompartilhado {
   destravar(): Promise<boolean>;
   /** Gesto na página e aba visível de novo destravam o som. Devolve quem desliga. */
   ligarDestravas(janela: Alvo, documento: Alvo & { hidden: boolean }): () => void;
+  /** Onde os efeitos ligam a saída (bipe, tons): passa pela chave de `segurar`. */
+  destino?(): AudioNode | null;
+  /**
+   * Um som por vez no Totem (Lucas, 23/10): com a Coruja falando os efeitos
+   * ficam mudos e voltam quando ela termina. O alarme de sono não espera: ele
+   * corta a fala, e quem o toca liga direto no destino.
+   */
+  segurar?(sim: boolean): void;
+}
+
+/** Saída de um efeito: a chave mestre do contexto compartilhado, ou o destino direto. */
+export function saidaEfeito(som: SomCompartilhado, ctx: AudioContext): AudioNode {
+  return som.destino?.() ?? ctx.destination;
 }
 
 export function criarSomCompartilhado(Contexto: ConstrutorContexto | undefined = globalThis.AudioContext): SomCompartilhado {
   let contexto: AudioContext | null = null;
+  let mestre: GainNode | null = null;
+  let segurado = false;
 
   const obter = (): AudioContext | null => {
     if (!Contexto) return null;
@@ -68,7 +83,26 @@ export function criarSomCompartilhado(Contexto: ConstrutorContexto | undefined =
     };
   };
 
-  return { obter, destravar, ligarDestravas };
+  const destino = (): AudioNode | null => {
+    const ctx = obter();
+    if (!ctx) return null;
+    if (mestre?.context !== ctx) {
+      mestre = ctx.createGain();
+      mestre.gain.value = segurado ? 0 : 1;
+      mestre.connect(ctx.destination);
+    }
+    return mestre;
+  };
+
+  const segurar = (sim: boolean): void => {
+    segurado = sim;
+    if (!mestre || mestre.context.state === 'closed') return;
+    const agora = mestre.context.currentTime;
+    mestre.gain.cancelScheduledValues(agora);
+    mestre.gain.setValueAtTime(sim ? 0 : 1, agora);
+  };
+
+  return { obter, destravar, ligarDestravas, destino, segurar };
 }
 
 export const somCompartilhado = criarSomCompartilhado(typeof AudioContext === 'undefined' ? undefined : AudioContext);

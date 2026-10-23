@@ -6,6 +6,7 @@ import { useEscuta } from '@/stand-voz/useEscuta';
 import type { Emprestimo } from '@/stand-voz/sessaoTurnos';
 import { VARIANTE_PADRAO, VARIANTES_AVATAR } from '@/components/stand/AvatarLuca';
 import { canalReal, type CanalStand } from '@/components/stand/canal';
+import { ligarUmSomPorVez } from '@/components/stand/umSomPorVez';
 import { criarCanalStub } from '@/components/stand/canalStub';
 import { reduzirTela, telaInicial, type EntradaTela, type EstadoTela } from '@/components/stand/telaStand';
 import { Atracao, Conversa, PlayerVideo } from '@/components/stand/Telas';
@@ -210,6 +211,9 @@ export default function StandPage() {
     }, 500);
     return () => { cancelar(); window.clearInterval(relogio); stub?.parar(); };
   }, [modoStub, rodarAcao]);
+
+  // Um som por vez: efeitos esperam a fala; alarme de sono corta a fala e toca sozinho.
+  useEffect(() => ligarUmSomPorVez(canal.current), [modoStub]);
 
   // Baixa o simulador (Three.js) em segundo plano, pra Simulação abrir sem espera.
   useEffect(() => {

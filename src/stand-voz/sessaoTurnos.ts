@@ -64,6 +64,8 @@ export class SessaoTurnos implements SessaoDeVoz {
   private fimDaFala = 0;
   private legendas: number[] = [];
   private videoTocando = false;
+  /** Alarme de sono tocando: a fala foi cortada e nenhuma outra entra até ele parar. */
+  private alarmeTocando = false;
   private relogioSilencio = 0;
   private pararNivel: (() => void) | null = null;
   private desligarPagina: (() => void) | null = null;
@@ -125,6 +127,7 @@ export class SessaoTurnos implements SessaoDeVoz {
         this.cortarFala();
         this.mudarEstado('ouvindo');
       }
+      if (evento.tipo === 'alarme_sono') this.aoAlarme(evento.ativo);
       if (evento.tipo === 'video_terminou') {
         this.videoTocando = false;
         void this.perguntar({ evento: 'video_terminou', id: evento.id });
@@ -132,7 +135,7 @@ export class SessaoTurnos implements SessaoDeVoz {
       // Guardar a tela não mexe no estado da sessão.
       if (evento.tipo === 'tela') this.tela = evento.texto;
       // Pergunta do menu (toque ou texto): mesmo turno que a fala transcrita.
-      if (evento.tipo === 'pergunta_texto' && !this.videoTocando) {
+      if (evento.tipo === 'pergunta_texto' && !this.videoTocando && !this.alarmeTocando) {
         emitirEventoStand({ tipo: 'legenda', texto: evento.texto });
         void this.perguntar({ texto: evento.texto });
       }
@@ -196,15 +199,13 @@ export class SessaoTurnos implements SessaoDeVoz {
     this.aoTerminar(motivo, detalhe);
   }
 
-  /** Fecha o áudio próprio; o emprestado só deixa de ser ouvido e volta ao volume cheio. */
+  /** Fecha o áudio próprio; o emprestado só deixa de ser ouvido (o ganho nunca sai de 1). */
   private soltarAudio(): void {
     const audio = this.audio;
     this.audio = null;
     if (!audio) return;
     if (!this.emprestado) return audio.fechar();
     audio.ouvir(() => {});
-    audio.saida.gain.cancelScheduledValues(audio.contexto.currentTime);
-    audio.saida.gain.value = 1;
   }
 
   private mudarEstado(valor: EstadoStand): void {
@@ -220,7 +221,7 @@ export class SessaoTurnos implements SessaoDeVoz {
 
   private aoMicrofone(pcm: Int16Array, nivel: number): void {
     if (this.ws?.readyState !== WebSocket.OPEN) return;
-    if (this.videoTocando) {
+    if (this.videoTocando || this.alarmeTocando) {
       this.ws.send(mensagemAudioScribe(SILENCIO_50MS, HZ_STAND));
       return;
     }
@@ -255,7 +256,7 @@ export class SessaoTurnos implements SessaoDeVoz {
       if (evento.fatal) this.terminar('erro', evento.codigo);
       return;
     }
-    if (evento.tipo === 'outro' || this.videoTocando || !evento.texto) return;
+    if (evento.tipo === 'outro' || this.videoTocando || this.alarmeTocando || !evento.texto) return;
     const durante = this.emFalaOuCauda();
     // Na fala e na cauda o PCM não decide: numa sala com caixa de som o eco da
     // própria voz quase nunca bate 96% com a referência e passava por "fala
@@ -286,6 +287,21 @@ export class SessaoTurnos implements SessaoDeVoz {
     if (!vaiAoCerebro(evento.texto)) return;
     emitirEventoStand({ tipo: 'legenda', texto: evento.texto });
     void this.perguntar({ texto: evento.texto });
+  }
+
+  /** Alarme de sono tem prioridade: para a fala (não abaixa) e o turno; o alarme toca sozinho. */
+  private aoAlarme(ativo: boolean): void {
+    if (ativo === this.alarmeTocando) return;
+    this.alarmeTocando = ativo;
+    if (!ativo) {
+      if (this.estado !== 'ocioso' && !this.turno && !this.fila?.tocando) this.armarSilencio();
+      return;
+    }
+    this.turno?.abort();
+    this.turno = null;
+    window.clearTimeout(this.relogioSilencio);
+    this.cortarFala();
+    if (this.estado !== 'ocioso') this.mudarEstado('ouvindo');
   }
 
   private interromper(): void {
@@ -388,6 +404,7 @@ export class SessaoTurnos implements SessaoDeVoz {
         registrarVoz('resposta', { turno: this.idsTurno.get(controle), texto: linha.texto });
         return linha.texto;
       case 'audio': {
+        if (this.alarmeTocando) return legendaPendente;
         const inicio = this.fila?.tocar(linha.pcm);
         if (inicio == null || !this.fila) return legendaPendente;
         this.mudarEstado('falando');
