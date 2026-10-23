@@ -24,6 +24,9 @@ export function setaDoComando(tecla: string): 'cima' | 'baixo' | 'esquerda' | 'd
   if (inclui(COMANDOS_CABINE.direita.teclas)) return 'direita';
   return null;
 }
+export function atalhoFalaCabine(entrada: EntradaCabine) {
+  return entrada === 'teclado' ? COMANDOS_CABINE.falar.teclas[0].toUpperCase() : COMANDOS_CABINE.falar[entrada];
+}
 export function rotuloTecla(tecla: string) {
   return ({ ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', ' ': 'Espaço', Escape: 'Esc' } as Record<string, string>)[tecla] ?? tecla.toUpperCase();
 }
