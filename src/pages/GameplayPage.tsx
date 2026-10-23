@@ -24,6 +24,7 @@ class GameplayBoundary extends Component<{ children: ReactNode }, { failed: bool
 
 function Cabine({ seloFps = false, webcam = false }: { seloFps?: boolean; webcam?: boolean }) {
   const [cameraDisponivel, setCameraDisponivel] = useState(false);
+  const [cameraDesligada, setCameraDesligada] = useState(false);
   useEffect(() => {
     let viva = true;
     void navigator.mediaDevices?.enumerateDevices().then((devices) => {
@@ -37,7 +38,7 @@ function Cabine({ seloFps = false, webcam = false }: { seloFps?: boolean; webcam
         <GameplayComCabine seloFps={seloFps} />
       </Suspense>
       {/* Fora do Suspense da cabine: detector não bloqueia o GLB; falha automática é silenciosa. */}
-      {(webcam || cameraDisponivel) && <Suspense fallback={null}><WebcamSonoCabine silenciosa={!webcam} /></Suspense>}
+      {!cameraDesligada && (webcam || cameraDisponivel) && <Suspense fallback={null}><WebcamSonoCabine silenciosa={!webcam} aoDesligar={() => setCameraDesligada(true)} /></Suspense>}
     </GameplayBoundary>
   );
 }
