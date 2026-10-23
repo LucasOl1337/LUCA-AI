@@ -15,8 +15,7 @@ export default function TotemPage() {
         <h2>Coruja, Vitrine e Simulação</h2>
         <p>No Totem, toque na tela para mostrar a barra de modos e escolha um deles, ou peça pela voz. Pressione Shift+Q para voltar ao painel.</p>
         <p>A conversa depende da sessão, da disponibilidade da voz e da permissão de microfone. Sem voz, a Vitrine e a Simulação continuam disponíveis.</p>
-        <SeletorVoz />
-        <button type="button" className="experience-primary" onClick={() => navigate({ page: 'stand' }, 'push')}>Abrir Totem</button>
+        <SeletorVoz abrirTotem={() => navigate({ page: 'stand' }, 'push')} />
       </div>
       <div className="experience-card">
         <h2>Quer testar a direção livre?</h2>

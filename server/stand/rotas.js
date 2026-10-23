@@ -17,6 +17,7 @@ import {
   CREDITOS_STT_POR_MINUTO, VERIFICACAO_VOZ_MS, VOZES_STAND, fatorCreditosTts, modeloTtsStand,
   provedorElevenlabs, resolverVoz, sintetizarElevenlabs, verificarVoz, vozDaChave,
 } from './provedor-elevenlabs.js';
+import { criarAmostras } from './voz-amostras.js';
 import { criarConfigTotem } from './config-totem.js';
 import { arquivoPadrao, criarTetoDiario, tetoDiarioDoEnv } from './teto-diario.js';
 
@@ -103,6 +104,7 @@ export function registerStandRoutes(app, {
   executarFerramenta = executarFerramentaStand,
   agora = () => Date.now(),
   configTotem = criarConfigTotem(),
+  amostras = criarAmostras(),
   requireAdmin = (req, res, next) => req.auth?.user?.role === 'admin' ? next() : res.status(403).json({ ok: false, error: 'admin_required' }),
 } = {}) {
   const conta = (req) => String(req.auth?.user?.id || '');
@@ -189,6 +191,22 @@ export function registerStandRoutes(app, {
       verificarVoz({ chave: config.chave, voz, fetchImpl, cache: vozesOk, agora: agora() }).catch(() => {});
     }
     return { chave, rotulo, detalhe, padrao: chave === configTotem.obter(), disponivel: salvo ? salvo.ok : null };
+  });
+
+  app.get('/api/stand/voz-amostra/:voz', async (req, res) => {
+    if (!req.auth?.user) return res.status(401).json({ ok: false, error: 'auth_required' });
+    const chave = req.params.voz;
+    if (!Object.hasOwn(VOZES_STAND, chave)) return res.status(400).json({ ok: false, error: 'voz_invalida' });
+    const config = configStand(env, provedores);
+    if (!config.chave || !config.provedor?.turnos) return res.status(503).json({ ok: false, error: 'stand_desligado' });
+    const voz = vozDaChave(chave, config.voz);
+    try {
+      const audio = await amostras(chave, `${voz}:${modeloTtsStand(env)}`, sintetizarCom(config, voz));
+      res.setHeader('Cache-Control', 'private, max-age=86400');
+      res.type('audio/mpeg').send(audio);
+    } catch {
+      res.status(502).json({ ok: false, error: 'amostra_indisponivel' });
+    }
   });
 
   app.put('/api/stand/voz-padrao', requireAdmin, (req, res) => {

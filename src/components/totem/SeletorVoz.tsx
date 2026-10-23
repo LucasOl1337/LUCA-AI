@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { gravarVozEscolhida, lerVozEscolhida } from '@/stand-voz/vozEscolhida';
 import './seletor-voz.css';
@@ -6,13 +6,31 @@ import './seletor-voz.css';
 type VozStatus = { chave: string; rotulo: string; detalhe: string; padrao: boolean; disponivel: boolean | null };
 
 /** Catálogo e padrão pertencem ao servidor; só um clique cria preferência local. */
-export function SeletorVoz() {
+export function SeletorVoz({ abrirTotem }: { abrirTotem: () => void }) {
   const { user } = useAuth();
   const [escolhida, setEscolhida] = useState(() => lerVozEscolhida());
   const [vozes, setVozes] = useState<VozStatus[]>([]);
   const [padrao, setPadrao] = useState('');
   const [mensagem, setMensagem] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const [preview, setPreview] = useState<{ chave: string; estado: 'carregando' | 'tocando' } | null>(null);
+  useEffect(() => () => { audio.current?.pause(); audio.current = null; }, []);
+  const ouvir = (chave: string) => {
+    const anterior = audio.current;
+    anterior?.pause();
+    audio.current = null;
+    if (preview?.chave === chave) { setPreview(null); return; }
+    const atual = new Audio(`/api/stand/voz-amostra/${encodeURIComponent(chave)}`);
+    audio.current = atual;
+    setPreview({ chave, estado: 'carregando' });
+    atual.onplaying = () => { if (audio.current === atual) setPreview({ chave, estado: 'tocando' }); };
+    atual.onended = () => { if (audio.current === atual) { audio.current = null; setPreview(null); } };
+    atual.play().catch(() => {
+      if (audio.current !== atual) return;
+      audio.current = null; setPreview(null); setMensagem('Não foi possível ouvir esta amostra. Tente novamente.');
+    });
+  };
 
   useEffect(() => {
     let vivo = true;
@@ -57,18 +75,30 @@ export function SeletorVoz() {
         {vozes.map((voz) => {
           const fora = voz.disponivel === false;
           return (
-            <label key={voz.chave} className="totem-voz-opcao" data-indisponivel={fora || undefined}>
-              <input type="radio" name="totem-voz" value={voz.chave} checked={ativa === voz.chave}
-                disabled={fora} onChange={() => escolher(voz.chave)} />
-              <span className="totem-voz-nome">{voz.rotulo}{voz.chave === padrao ? ' · Padrão do LUCA' : ''}</span>
-              <span className="totem-voz-detalhe">{fora ? 'Indisponível agora: a conversa usa a voz padrão' : voz.detalhe}</span>
-            </label>
+            <div key={voz.chave} className="totem-voz-opcao" data-indisponivel={fora || undefined}>
+              <label className="totem-voz-selecao">
+                <input type="radio" name="totem-voz" value={voz.chave} checked={ativa === voz.chave}
+                  disabled={fora} onChange={() => escolher(voz.chave)} />
+                <span className="totem-voz-textos">
+                  <span className="totem-voz-nome">{voz.rotulo}</span>
+                  <span className="totem-voz-selo">{voz.chave === padrao ? 'Padrão do LUCA' : '\u00a0'}</span>
+                  <span className="totem-voz-detalhe">{fora ? 'Indisponível agora' : voz.detalhe}</span>
+                </span>
+              </label>
+              <button type="button" className="totem-voz-ouvir" disabled={fora} aria-label={`${preview?.chave === voz.chave ? 'Parar' : 'Ouvir'} ${voz.rotulo}`}
+                onClick={() => ouvir(voz.chave)}>
+                {preview?.chave === voz.chave ? (preview.estado === 'carregando' ? '◌ Carregando…' : '■ Parar') : '▶ Ouvir'}
+              </button>
+            </div>
           );
         })}
       </div>
-      {escolhida && <button type="button" onClick={() => escolher(null)}>Seguir o padrão do LUCA</button>}
-      {user?.role === 'admin' && <button type="button" disabled={salvando || !ativa || vozes.find((v) => v.chave === ativa)?.disponivel === false}
-        onClick={salvarPadrao}>{salvando ? 'Salvando…' : 'Definir voz selecionada como padrão do LUCA'}</button>}
+      <div className="totem-voz-acoes">
+        <button type="button" className="experience-primary" onClick={abrirTotem}>Abrir Totem</button>
+        {user?.role === 'admin' && <button type="button" className="experience-secondary" disabled={salvando || !ativa || vozes.find((v) => v.chave === ativa)?.disponivel === false}
+          onClick={salvarPadrao}>{salvando ? 'Salvando…' : 'Definir como padrão'}</button>}
+        {escolhida && <button type="button" className="totem-voz-seguir" onClick={() => escolher(null)}>Seguir o padrão do LUCA</button>}
+      </div>
       <p role="status">{mensagem}</p>
     </fieldset>
   );

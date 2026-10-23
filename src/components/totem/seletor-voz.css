@@ -1,14 +1,21 @@
-.totem-voz { border: 0; padding: 0; margin: 4px 0 8px; }
+.totem-voz { border: 0; padding: 0; margin: 4px 0 8px; min-width: 0; }
 .totem-voz legend { font-size: 13px; font-weight: 600; color: #53d4ff; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 10px; }
-.totem-voz-opcoes { display: flex; flex-wrap: wrap; gap: 12px; }
-.totem-voz-opcao { position: relative; display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: center; flex: 1 1 220px; max-width: 360px; min-height: 44px; padding: 12px 16px; border: 1px solid #ffffff26; border-radius: 12px; background: #0b131c; cursor: pointer; }
+.totem-voz-opcoes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; grid-auto-rows: 176px; }
+.totem-voz-opcao { display: flex; flex-direction: column; min-width: 0; padding: 14px; border: 1px solid #ffffff26; border-radius: 12px; background: #0b131c; }
 .totem-voz-opcao:has(input:checked) { border-color: #53d4ff; background: #0f2233; }
 .totem-voz-opcao:has(input:focus-visible) { outline: 3px solid #53d4ff; outline-offset: 3px; }
-.totem-voz-opcao[data-indisponivel] { opacity: .55; cursor: not-allowed; }
-.totem-voz-opcao input { grid-row: span 2; width: 18px; height: 18px; accent-color: #53d4ff; margin: 0; }
-.totem-voz-nome { font-weight: 650; color: #e8edf3; }
-.totem-voz-detalhe { font-size: 13px; color: #9fb0c2; }
-.totem-voz > button { display: inline-flex; margin: 12px 12px 0 0; padding: 10px 14px; border: 1px solid #53d4ff80; border-radius: 10px; background: #0f2233; color: #e8edf3; cursor: pointer; }
-.totem-voz > button:disabled { opacity: .55; cursor: not-allowed; }
-.totem-voz > button:focus-visible { outline: 3px solid #53d4ff; outline-offset: 3px; }
+.totem-voz-opcao[data-indisponivel] { opacity: .55; }
+.totem-voz-selecao { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; flex: 1; min-height: 0; }
+.totem-voz-opcao input { flex: 0 0 18px; width: 18px; height: 18px; accent-color: #53d4ff; margin: 2px 0 0; }
+.totem-voz-textos { display: flex; flex-direction: column; min-width: 0; }
+.totem-voz-nome { font-weight: 650; color: #e8edf3; line-height: 20px; }
+.totem-voz-selo { font-size: 11px; color: #53d4ff; line-height: 18px; }
+.totem-voz-detalhe { font-size: 13px; line-height: 18px; color: #9fb0c2; }
+.totem-voz-ouvir { align-self: flex-start; padding: 6px 10px; min-height: 32px; margin-top: 8px; border: 1px solid #ffffff40; border-radius: 8px; color: #e8edf3; background: #152534; cursor: pointer; }
+.totem-voz button:disabled { opacity: .55; cursor: not-allowed; }
+.totem-voz button:focus-visible { outline: 3px solid #53d4ff; outline-offset: 3px; }
+.totem-voz-acoes { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 18px; }
+.totem-voz-seguir { color: #9fb0c2; text-decoration: underline; text-underline-offset: 3px; padding: 10px 0; cursor: pointer; }
 .totem-voz > p { margin: 10px 0; color: #9fb0c2; font-size: 13px; }
+@media (max-width: 1450px) { .totem-voz-opcoes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .totem-voz-opcoes { grid-template-columns: minmax(0, 1fr); } }

@@ -2,7 +2,7 @@
 
 Gerada por `npm run cli:docs` a partir de `cli/catalog.js`. Não editar à mão.
 
-125 comandos; 103 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
+126 comandos; 104 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
 
 IDs são argumentos posicionais. Campos comuns podem ser flags; corpos completos usam `--data @arquivo.json`. Flags prevalecem sobre o corpo; objetos aninhados não são mesclados. Campos string são literais; apenas campos JSON e `--data` interpretam `@arquivo`/`-`.
 
@@ -725,6 +725,14 @@ Estado do cérebro de voz do stand: provedor, ligado ou motivo, escuta, limites,
 `GET /api/stand/status`; autenticação: **session**.
 
 Nenhum; consulte a descrição para entradas por `--data`.
+
+### `stand voz-amostra <voz>`
+
+Ouvir amostra MP3 em português; autenticado, lista branca e cache persistente.
+
+`GET /api/stand/voz-amostra/:voz`; autenticação: **session**.
+
+`--voz` (string, obrigatório): Chave do catálogo de vozes
 
 ### `stand voz-padrao`
 
