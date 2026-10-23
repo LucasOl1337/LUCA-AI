@@ -22,7 +22,8 @@ test('sons são finitos, silenciosos fora do risco e interrompidos por pausa/mut
 });
 test('água aproximação/entrada e tom usam a mesma geometria dirigindo desde a partida',()=>{
  const m=criarMotorGameplay();m.reiniciar(INICIO_CIRCUITO);const c=criarCircuito('agua-real','2026-10-22');const {scheduled,motor:a}=audioFixture();
- const targets=[{x:0,z:5},{x:15,z:15},{x:30,z:15}];let target=0;const niveis=new Set();
+ // Contorna a estaca em (0,5); o objetivo deste caso é o alerta de água.
+ const targets=[{x:-4,z:10},{x:15,z:15},{x:30,z:15}];let target=0;const niveis=new Set();
  for(let i=0;i<4000&&!c.registro.resultado;i++){const e0=m.ler();if(target<2&&Math.hypot(e0.maquina.x-targets[target].x,e0.maquina.z-targets[target].z)<3)target++;
  const e=m.quadro(1/60,pilot(m,targets[target]),relevoRampaLateral);const g=geofenceTalhao(e.maquina);niveis.add(g.nivel);a.atualizar(e,i*1000/60);c.quadro(e,1000/60,'2026-10-22');}
  assert.ok(niveis.has('rumo'));assert.ok(niveis.has('dentro'));assert.ok(scheduled.some(o=>o.hz===990));assert.equal(c.registro.resultado.motivo,'atolamento');

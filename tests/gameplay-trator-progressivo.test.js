@@ -21,6 +21,21 @@ test('todas as placas verticais compartilham posição física e chegada não é
   assert.ok(!placas.some((p) => p.x === 78 && p.z === 13));
 });
 
+test('linha ideal inteira tem largura do trator e margem livre das estacas', () => {
+  // Distância exata ponto-segmento: não amostragem nem fuzz.
+  const placas = estacasCircuito(ROTA_CIRCUITO);
+  const larguraTrator = 2.087;
+  for (let i = 1; i < ROTA_CIRCUITO.length; i++) {
+    const a = ROTA_CIRCUITO[i - 1], b = ROTA_CIRCUITO[i];
+    const dx = b.x - a.x, dz = b.z - a.z;
+    for (const p of placas) {
+      const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / (dx * dx + dz * dz)));
+      const folga = Math.hypot(p.x - a.x - t * dx, p.z - a.z - t * dz) - p.raioM;
+      assert.ok(folga >= larguraTrator / 2 + 0.5, `trecho ${i}, placa (${p.x},${p.z}), folga ${folga}`);
+    }
+  }
+});
+
 const ACELERA = { acelerador: 1, freio: 0, esterco: 0 };
 function dirigir(z) {
   let agora = 0;

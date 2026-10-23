@@ -42,7 +42,8 @@ test('não há idle/90s/240s durante observação do circuito', () => {
 });
 test('água e tombamento usam posição/atitude do motor e limiares declarados', () => {
   const m = criarMotorGameplay(); m.reiniciar(INICIO_CIRCUITO); const c = criarCircuito('agua', iso);
-  const alvos = [{ x: 0, z: 5 }, { x: 15, z: 15 }, { x: 30, z: 15 }]; let alvo = 0;
+  // Contorna a placa em (0,5), agora física, antes de entrar na água.
+  const alvos = [{ x: -4, z: 10 }, { x: 15, z: 15 }, { x: 30, z: 15 }]; let alvo = 0;
   for (let i = 0; i < 4000 && !c.registro.resultado; i++) {
     const p = m.ler().maquina;
     if (alvo < alvos.length - 1 && Math.hypot(p.x - alvos[alvo].x, p.z - alvos[alvo].z) < 3) alvo++;
