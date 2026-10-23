@@ -226,9 +226,13 @@ export default function StandPage() {
     else void iniciarVoz(tocouNaEscuta() ?? undefined);
   }, [modoStub, iniciarVoz, tocouNaEscuta]);
 
+  // Experiências abertas valem para uma visita: a conversa que acabou não passa a lista ao próximo visitante.
+  useEffect(() => { if (voz.fim) experienciasAbertas.current.clear(); }, [voz.fim]);
+
   // Vitrine encerra a conversa anterior. Site e Simulação preservam a mesma sessão.
   useEffect(() => {
     if (modo.modo === 'coruja' || modo.modo === 'site' || modo.modo === 'simulacao') return;
+    experienciasAbertas.current.clear();
     nivel.current = 0;
     despachar({ tipo: 'encerrar' });
     canal.current.enviar({ tipo: 'encerrar' });
