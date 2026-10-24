@@ -30,6 +30,7 @@ import { createSompoPostProcessing } from './createSompoPostProcessing';
 import { createSompoRenderMeter } from './sompoStage';
 import { soltarLutCompartilhada } from './soltarLutCompartilhada';
 import { soltarOrbit } from './soltarOrbit';
+import { criarPreparoDeSombras, prepararDegrau } from './prepararDegrau';
 import { PERFIL_PADRAO, criarPortaoDeAquecimento, pixelRatioDoDegrau, qualidadeInicial, regularQualidade, type PerfilQualidade } from './qualidadeAdaptativa';
 import { exportSompoModel } from './refineSompoTruck';
 import { SOMPO_STUDIO_DEFAULT, type SompoStudioConfig, type SompoRenderStats } from './sompoStudioConfig';
@@ -257,12 +258,30 @@ export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, out
   };
   // O regulador só começa a julgar com o modelo na cena e depois do aquecimento.
   const aquecimento = criarPortaoDeAquecimento();
+  // Shaders compilados antes de serem pedidos: o degrau seguinte do regulador e as sombras com
+  // textura. Sem isso, a descida de degrau e o silo entrando na sombra param um quadro de 70–180 ms.
+  const preparoSombras = criarPreparoDeSombras(renderer, scene, camera);
+  let leiturasDePreparo = 0;
+  // O regulador só desce depois de SEGUNDOS_PARA_DESCER leituras lentas: a primeira já dispara a
+  // compilação paralela do degrau de baixo (programas já compilados saem do cache, custo ~0).
+  const preparadoEm = new Map<number, number>();
+  const prepararSeguinte = () => {
+    const seguinte = qualidade.degrau + 1, agora = performance.now();
+    if (!adaptiveQuality || disposed || qualidade.travado || seguinte >= degraus.length) return;
+    // Texturas novas mudam programas; refaz no máximo a cada 20 s por degrau.
+    if (agora - (preparadoEm.get(seguinte) ?? -Infinity) < 20_000) return;
+    preparadoEm.set(seguinte, agora);
+    void prepararDegrau(renderer, scene, camera, degraus[seguinte]);
+  };
   const meter = createSompoRenderMeter(renderer, (stats) => {
     onStats?.(stats);
+    // Texturas chegam aos poucos depois do modelo; cada uma pode pedir uma variante de sombra.
+    if (model && leiturasDePreparo < 10) { leiturasDePreparo += 1; preparoSombras.atualizar(); }
     if (!adaptiveQuality || !aquecimento.passa()) return;
-    const anterior = qualidade.degrau;
+    const anterior = qualidade.degrau, lentos = qualidade.lentos;
     qualidade = regularQualidade(qualidade, stats.fps, performance.now(), qualityProfile);
     if (qualidade.degrau !== anterior) aplicarDegrau();
+    else if (lentos === 0 && qualidade.lentos === 1) prepararSeguinte();
   });
   if (adaptiveQuality) aplicarDegrau();
   // Sonda da bancada (só com `window.__sondaPalco = true` antes de montar, e qualidade automática): fixa pixel ratio, pós e sombras para medir o que pesa.
@@ -658,6 +677,7 @@ export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, out
     dispose() {
       disposed = true;
       propsRurais?.dispose();
+      preparoSombras.dispose();
       cercaTalhao?.dispose(); rastro?.dispose();
       soltarLutCompartilhada(renderer, scene);
       pasture.dispose();
