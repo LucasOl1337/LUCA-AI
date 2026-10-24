@@ -99,3 +99,10 @@ test('resultado da corrida em PT-BR por motivo, sem UUID, run ou N/A', () => {
   const comReacao = { ...c.registro, episodios: [{ ...c.registro.episodios[0], resposta: { tempoMs: 0, latenciaMs: 770, acao: 'frenagem' } }] };
   assert.match(textoResultadoCircuito(comReacao).resumo, /Avisos respondidos: 1 de 1 · Reação média: 0,77 s$/);
 });
+
+test('regras da tela repetem os números do REGRAS_CIRCUITO, sem termo técnico cru', () => {
+  const tela = mod.REGRAS_CIRCUITO_TELA.join(' ');
+  for (const n of ['1,05 m', '2 s', '30°', '20°', '7 km/h', '1 s']) assert.ok(tela.includes(n), n);
+  for (const n of ['1,05m', '2s', '≥30°', '7km/h']) assert.ok(mod.REGRAS_CIRCUITO.includes(n), n);
+  assert.doesNotMatch(tela, /monotônico|cinemática|exposição→|run\b/);
+});

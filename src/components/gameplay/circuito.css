@@ -61,6 +61,7 @@
 .circuito-dialogo button kbd { margin-left:6px; padding:1px 6px; border:1px solid #5d7a5b; border-radius:4px; font:inherit; font-size:.9em; }
 .circuito-dialogo label { display:block; margin:10px 0; }
 .circuito-dialogo details p { font-size:13px; color:#cfdcc8; }
+.circuito-dialogo details ul { margin:6px 0 0; padding-left:18px; font-size:13px; line-height:1.45; color:#cfdcc8; }
 /* Dica de partida: só enquanto o motor está em `pronto`; some no primeiro R2. */
 .circuito-partida { position:absolute; left:50%; top:22%; transform:translateX(-50%); margin:0; padding:10px 18px; border-radius:12px; background:#111e18e6; border:1px solid #a9be9b66; font-size:18px; font-weight:650; white-space:nowrap; }
 .circuito-partida kbd { display:inline-block; margin-right:6px; padding:2px 10px; border:1px solid #a4e9cf; border-bottom-width:3px; border-radius:6px; color:#a4e9cf; font:inherit; }

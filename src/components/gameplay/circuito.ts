@@ -31,6 +31,15 @@ export interface RegistroCircuito {
   origem: 'SIMULAÇÃO'; regras: string;
 }
 export const REGRAS_CIRCUITO = 'SIMULAÇÃO cinemática, não risco de seguro. Colisão: contato frontal ou corpo a menos de raio do fardo +1,05m. Atolamento: 2s dentro da água. Tombamento: rolagem≥30° ou ≥20° acima de 7km/h durante 1s. Evitado: exposição→nova frenagem/esterço após aviso→saída segura durante 1s. Antecipação não é reação. Tempo: relógio monotônico ativo; pausas explícitas excluídas.';
+/** As mesmas regras de `REGRAS_CIRCUITO`, em frases para a tela. O registro e o relatório aos agentes seguem com o texto técnico. */
+export const REGRAS_CIRCUITO_TELA = [
+  'Colisão: encostar a frente no obstáculo ou passar a menos de 1,05 m dele.',
+  'Atolamento: ficar 2 s dentro da área alagada.',
+  'Tombamento: ficar 1 s inclinado 30° ou mais, ou 20° acima de 7 km/h.',
+  'Risco evitado: depois do aviso, frear ou virar e sair da situação por 1 s. Frear antes do aviso não conta como reação.',
+  'O tempo conta só com o trator andando; pausas ficam de fora.',
+  'Simulação: não avalia risco de seguro nem máquina real.',
+] as const;
 export function novoRegistroCircuito(runId: string, inicioIso: string): RegistroCircuito {
   return { versao: 1, runId, inicioIso, fimIso: null, elapsedMs: 0, progresso: 0, proximoMarco: 1, resultado: null, episodios: [], pausas: [], origem: 'SIMULAÇÃO', regras: REGRAS_CIRCUITO };
 }
