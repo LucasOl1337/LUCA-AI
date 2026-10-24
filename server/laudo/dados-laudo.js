@@ -15,7 +15,7 @@ const corta = (texto, max) => {
   if (t.length <= max) return t;
   const cortado = t.slice(0, max);
   const ponto = Math.max(cortado.lastIndexOf('. '), cortado.lastIndexOf('; '));
-  return ponto > max * 0.55 ? cortado.slice(0, ponto + 1) : `${cortado.slice(0, cortado.lastIndexOf(' ')).trim()}…`;
+  return ponto > max * 0.55 ? cortado.slice(0, ponto).trim() + '.' : `${cortado.slice(0, cortado.lastIndexOf(' ')).trim()}…`;
 };
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 export const dataBrasilia = (iso, comHora = true) => {

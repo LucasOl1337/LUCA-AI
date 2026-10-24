@@ -13,7 +13,35 @@ const COR = {
 };
 const BASE_RODAPE = A4.altura - 30;
 
+/** Texto em no máximo `max` linhas: corta na última frase inteira que cabe, senão na palavra, com reticências. */
+function linhasLimitadas(texto, tamanho, largura, max, estilo) {
+  const linhas = quebrarLinhas(texto, tamanho, largura, estilo);
+  if (linhas.length <= max) return linhas;
+  // Frase termina em . ! ? ; seguido de espaço (não quebra "9.616,67" nem "1,5").
+  const frases = String(texto).split(/(?<=[.!?;])\s+/);
+  for (let n = frases.length - 1; n > 0; n--) {
+    const parcial = quebrarLinhas(frases.slice(0, n).join(' ').trim().replace(/;$/, '.'), tamanho, largura, estilo);
+    if (parcial.length <= max && parcial.length >= Math.ceil(max / 2)) return parcial;
+  }
+  const corte = linhas.slice(0, max);
+  let ultima = corte[max - 1];
+  while (ultima && larguraTexto(`${ultima} …`, tamanho, estilo) > largura) ultima = ultima.replace(/\s*\S+$/, '');
+  corte[max - 1] = `${ultima.replace(/[,;:\s]+$/, '')}…`;
+  return corte;
+}
+
+/** Laudo em 1 página: se transbordar, tenta de novo com menos evidências e ações (mínimo 3); só então usa a 2ª. */
 export function desenharLaudo(d) {
+  const tentativas = [[5, 4], [4, 4], [4, 3], [3, 3]];
+  let pdf = null;
+  for (const [ev, prev] of tentativas) {
+    pdf = desenharUmaVez({ ...d, evidencias: d.evidencias.slice(0, ev), prevencao: d.prevencao.slice(0, prev) });
+    if (pdf.paginas === 1) break;
+  }
+  return pdf.gerar();
+}
+
+function desenharUmaVez(d) {
   const pdf = criarPdf({ titulo: `Laudo LUCA-AI · ${d.titulo}`, autor: 'LUCA-AI' });
   let y = 0;
   const paginaNova = () => { pdf.novaPagina(); y = cabecalho(pdf, d, pdf.paginas > 0 && y > 0); };
@@ -22,10 +50,10 @@ export function desenharLaudo(d) {
 
   // Linha 1: hipótese (esquerda) + veredicto (direita)
   const colV = 196; const colH = L - colV - 14;
-  const linhasH = quebrarLinhas(d.hipotese, 10.5, colH);
+  const linhasH = linhasLimitadas(d.hipotese, 10.5, colH, 9);
   titulo(pdf, M, y, 'O que provavelmente aconteceu');
   let yh = y + 16;
-  for (const linha of linhasH.slice(0, 9)) { pdf.texto(M, yh + 9, linha, { tamanho: 10.5 }); yh += 13.6; }
+  for (const linha of linhasH) { pdf.texto(M, yh + 9, linha, { tamanho: 10.5 }); yh += 13.6; }
   const fonte = { veredicto: 'Hipótese do veredicto final dos agentes de IA.', revisao: 'Hipótese da revisão dos agentes (análise anterior ao veredicto).', eventos: 'Sem análise dos agentes: só eventos calculados.' }[d.origemHipotese];
   pdf.texto(M, yh + 8, fonte, { tamanho: 7.5, rgb: COR.suave }); yh += 14;
   const yv = caixaVeredicto(pdf, M + colH + 14, y, colV, d.veredicto);
@@ -61,7 +89,7 @@ export function desenharLaudo(d) {
 
   // Evidências
   if (d.evidencias.length) {
-    const blocos = d.evidencias.map((e) => quebrarLinhas(e.texto, 9.2, L - 52));
+    const blocos = d.evidencias.map((e) => linhasLimitadas(e.texto, 9.2, L - 52, 2));
     cabe(20 + blocos.reduce((s, b) => s + b.length * 11.6 + 3, 0));
     titulo(pdf, M, y, 'Evidências');
     y += 16;
@@ -76,7 +104,7 @@ export function desenharLaudo(d) {
 
   // Prevenção + impacto financeiro, lado a lado
   const meia = (L - 14) / 2;
-  const prevLinhas = d.prevencao.map((p) => quebrarLinhas(`${p.acao} (${p.responsavel}${p.prazo ? `, ${p.prazo}` : ''})`, 9, meia - 12));
+  const prevLinhas = d.prevencao.map((p) => linhasLimitadas(`${p.acao} (${p.responsavel}${p.prazo ? `, ${p.prazo}` : ''})`, 9, meia - 12, 4));
   const altPrev = 18 + (prevLinhas.length ? prevLinhas.reduce((s, l) => s + l.length * 11.2 + 3, 0) : 14);
   const altImp = d.impacto ? 46 + d.impacto.componentes.length * 22 + d.impacto.premissas.reduce((s, p) => s + quebrarLinhas(p, 7.4, meia - 16).length * 9, 0) : 32;
   cabe(Math.max(altPrev, altImp) + 6);
@@ -104,7 +132,7 @@ export function desenharLaudo(d) {
   }
   y = Math.max(yp, yf) + 6;
   rodape(pdf, d);
-  return pdf.gerar();
+  return pdf;
 }
 
 function titulo(pdf, x, y, texto) {
@@ -129,8 +157,14 @@ function cabecalho(pdf, d, continuacao) {
 }
 
 function caixaVeredicto(pdf, x, y, l, v) {
-  const porque = quebrarLinhas(v.porque, 8.4, l - 20);
-  const fatores = v.fatores.flatMap((f) => quebrarLinhas(`• ${f}`, 7.8, l - 20)).slice(0, 5);
+  const porque = linhasLimitadas(v.porque, 8.4, l - 20, 8);
+  // Só fatores inteiros (até 5 linhas no total): item cortado no meio confunde mais do que ajuda.
+  const fatores = [];
+  for (const f of v.fatores) {
+    const linhas = quebrarLinhas(`• ${f}`, 7.8, l - 20);
+    if (fatores.length + linhas.length > 5) break;
+    fatores.push(...linhas);
+  }
   const altura = 74 + porque.length * 10.4 + (fatores.length ? 6 + fatores.length * 9.6 : 0);
   pdf.retangulo(x, y, l, altura, { preencher: COR.marinho });
   pdf.retangulo(x, y, 4, altura, { preencher: COR.ouro });
@@ -195,7 +229,7 @@ function grafico(pdf, d, x, y, l, a) {
   const t = d.critico.elapsedMs;
   if (t != null) {
     const xc = area.x + (t / Math.max(1, duracaoMs)) * area.l;
-    pdf.linha([[xc, area.y - 4], [xc, area.y + area.a]], { rgb: COR.alerta, espessura: 1, tracejado: [3, 2] });
+    pdf.linha([[xc, area.y - 4], [xc, area.y + area.a]], { rgb: COR.alerta, espessura: 1.6 });
   }
   pdf.texto(area.x, y + a - 13, '0:00', { tamanho: 6.6, rgb: COR.suave });
   pdf.texto(area.x + area.l - 22, y + a - 13, formatLabTime(duracaoMs).slice(0, 5), { tamanho: 6.6, rgb: COR.suave });
