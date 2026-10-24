@@ -9,8 +9,7 @@ export function microfonePermitido() { return !simulacao || pressionado; }
 
 /**
  * PTT no Totem inteiro (Lucas, 24/10, feira com música e gente falando em volta):
- * só L1 apertado deixa o áudio sair, e o microfone é o do DualSense, perto da
- * boca. Liga em `/stand?ptt=1` ou no /totem e fica guardado no quiosque;
+ * só L1 apertado deixa o áudio sair. Liga em `/stand?ptt=1` ou no /totem e fica guardado no quiosque;
  * `?ptt=0` desliga.
  */
 export const CHAVE_PTT = 'luca:totem:ptt';
@@ -28,14 +27,11 @@ export function guardarPtt(ligado: boolean): void {
   try { localStorage.setItem(CHAVE_PTT, ligado ? '1' : '0'); } catch { /* quiosque sem armazenamento: vale a URL */ }
 }
 
-/** Microfone do DualSense (só no cabo USB; pelo Bluetooth o PC não recebe o áudio dele). */
+/**
+ * Microfone do DualSense, só para o rótulo no /totem. Não é mais o automático:
+ * pelo Bluetooth ele chia e perde pacote (Lucas, 24/10); quem quiser, escolhe.
+ */
 export const MICROFONE_DO_CONTROLE = /dualsense|wireless controller|sony interactive/i;
-
-export function microfoneDoControle(dispositivos: readonly Pick<MediaDeviceInfo, 'kind' | 'label' | 'deviceId'>[]): string | null {
-  // O Chrome no Windows repete o padrão como "default"/"communications": prefere o id do aparelho.
-  const doControle = dispositivos.filter((d) => d.kind === 'audioinput' && MICROFONE_DO_CONTROLE.test(d.label));
-  return (doControle.find((d) => d.deviceId !== 'default' && d.deviceId !== 'communications') ?? doControle[0])?.deviceId ?? null;
-}
 
 /** Botões que podem virar o PTT: nenhum deles dirige a Simulação nem troca de modo. */
 export const BOTOES_PTT = [
@@ -59,7 +55,7 @@ export function nomeBotaoPtt(botao = botaoPtt()): string {
   return BOTOES_PTT.find((b) => b.botao === botao)?.nome ?? 'L1';
 }
 
-/** Microfone escolhido no /totem (`deviceId`); vazio é automático: DualSense no PTT, senão o padrão. */
+/** Microfone escolhido no /totem (`deviceId`); vazio é automático: o padrão da máquina. */
 export const CHAVE_MICROFONE = 'luca:totem:microfone';
 export function microfoneEscolhido(): string {
   try { return localStorage.getItem(CHAVE_MICROFONE) ?? ''; } catch { return ''; }

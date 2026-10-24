@@ -23,7 +23,7 @@ export default function TotemPage() {
           <input type="checkbox" checked={ptt} onChange={(e) => { setPtt(e.target.checked); guardarPtt(e.target.checked); }} />
           <span>
             <strong>Falar segurando um botão do controle (push to talk)</strong>
-            Para lugar barulhento: o LUCA só ouve com o botão escolhido abaixo apertado, pelo microfone do DualSense (no cabo USB). Sem controle conectado, volta a ouvir sozinho.
+            Para lugar barulhento: o LUCA só ouve com o botão escolhido abaixo apertado, pelo microfone padrão da máquina (ou o escolhido abaixo). Sem controle conectado, volta a ouvir sozinho.
           </span>
         </label>
         <SeletorMicrofone />

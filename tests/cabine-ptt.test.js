@@ -92,16 +92,8 @@ test('PTT do Totem: ?ptt=1 liga e fica guardado; ?ptt=0 desliga', () => {
   delete globalThis.localStorage;
   assert.equal(pttDoTotem(''), false, 'sem armazenamento, desligado');
 });
-test('microfone do DualSense: pega o aparelho, não o padrão nem a saída', () => {
-  const lista = [
-    { kind: 'audioinput', label: 'Padrão - Microfone (Wireless Controller)', deviceId: 'default' },
-    { kind: 'audioinput', label: 'Webcam C920', deviceId: 'cam' },
-    { kind: 'audiooutput', label: 'DualSense wireless controller (PS5) Estéreo analógico', deviceId: 'saida' },
-    { kind: 'audioinput', label: 'DualSense wireless controller (PS5) Mono', deviceId: 'ds' },
-  ];
-  assert.equal(microfoneDoControle(lista), 'ds');
-  assert.equal(microfoneDoControle(lista.slice(0, 1)), 'default');
-  assert.equal(microfoneDoControle([lista[1]]), null);
+test('microfone automático é o padrão da máquina: não existe mais busca pelo DualSense', () => {
+  assert.equal(microfoneDoControle, undefined);
 });
 
 test("PTT do Totem: botão escolhido fica guardado e só aceita os livres", () => {

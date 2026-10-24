@@ -4,7 +4,7 @@
  * toca os pedaços de PCM em sequência.
  */
 import { registrarVoz } from './diagnosticoVoz';
-import { microfoneDoControle, microfoneEscolhido, pttDoTotem } from './portaMicrofone';
+import { microfoneEscolhido } from './portaMicrofone';
 import { floatDeBase64Pcm16, nivelNormalizado, rms } from './protocolo';
 
 export const HZ_STAND = 24000;
@@ -85,24 +85,22 @@ function comPrazo<T>(promessa: Promise<T>, ms: number): Promise<T> {
 const AJUSTES_MICROFONE = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } as const;
 
 /**
- * Microfone escolhido no /totem; no automático, com PTT, o do DualSense. Se o
- * escolhido sumir (controle desplugado), cai no padrão do sistema.
+ * Microfone escolhido no /totem; no automático (ou se o escolhido sumir), o padrão
+ * da máquina, com ou sem PTT. O do DualSense pelo Bluetooth chia e perde pacote
+ * (Lucas, 24/10): só entra se alguém o escolher de propósito no /totem.
  */
 async function abrirMicrofone(): Promise<MediaStream> {
   const escolhido = microfoneEscolhido();
-  const ptt = pttDoTotem();
-  if (escolhido || ptt) {
+  if (escolhido) {
     const dispositivos = await navigator.mediaDevices.enumerateDevices().catch(() => []);
-    const presente = escolhido && dispositivos.some((d) => d.kind === 'audioinput' && d.deviceId === escolhido);
-    const id = presente ? escolhido : ptt ? microfoneDoControle(dispositivos) : null;
-    if (id) {
+    if (dispositivos.some((d) => d.kind === 'audioinput' && d.deviceId === escolhido)) {
       try {
-        return await navigator.mediaDevices.getUserMedia({ audio: { ...AJUSTES_MICROFONE, deviceId: { exact: id } } });
+        return await navigator.mediaDevices.getUserMedia({ audio: { ...AJUSTES_MICROFONE, deviceId: { exact: escolhido } } });
       } catch (erro) {
         console.warn('[stand] microfone escolhido falhou, uso o padrão:', erro instanceof Error ? erro.message : erro);
       }
     } else {
-      console.warn('[stand] microfone escolhido ou do DualSense ausente (o do controle precisa do cabo USB); uso o padrão.');
+      console.warn('[stand] microfone escolhido ausente; uso o padrão da máquina.');
     }
   }
   return navigator.mediaDevices.getUserMedia({ audio: AJUSTES_MICROFONE });

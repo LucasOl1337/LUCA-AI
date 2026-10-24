@@ -42,7 +42,7 @@ export function SeletorMicrofone() {
       <label>
         <span>Microfone</span>
         <select value={microfone} onChange={(e) => { setMicrofone(e.target.value); guardarMicrofone(e.target.value); }}>
-          <option value="">Automático (DualSense com o PTT ligado, senão o padrão)</option>
+          <option value="">Padrão da máquina (automático)</option>
           {entradas.map((d, i) => (
             <option key={d.deviceId} value={d.deviceId}>
               {MICROFONE_DO_CONTROLE.test(d.label) ? `🎮 Controle PS5 · ${d.label}` : d.label || `Microfone ${i + 1}`}
@@ -52,9 +52,6 @@ export function SeletorMicrofone() {
         </select>
       </label>
       {semNomes && <button type="button" className="experience-secondary" onClick={() => void liberar()}>Mostrar nomes dos microfones</button>}
-      {!entradas.some((d) => MICROFONE_DO_CONTROLE.test(d.label)) && !semNomes && (
-        <small>Controle PS5 não aparece? Ligue o DualSense pelo cabo USB: pelo Bluetooth o PC não recebe o microfone dele.</small>
-      )}
       <label>
         <span>Botão para falar (PTT)</span>
         <select value={botao} onChange={(e) => { const n = Number(e.target.value); setBotao(n); guardarBotaoPtt(n); }}>
