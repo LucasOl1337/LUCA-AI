@@ -58,7 +58,11 @@ export function diaBrasilia(iso: string) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
 }
 
-const MOTIVOS: Record<string, string> = { chegada: 'Chegou', colisao: 'Colisão', atolamento: 'Atolou', tombamento: 'Tombou', abandono: 'Abandonou' };
+const MOTIVOS: Record<string, string> = {
+  chegada: 'Chegou', colisao: 'Colisão', atolamento: 'Atolou', tombamento: 'Tombou', abandono: 'Abandonou',
+  // Caminhão na serra (Pista).
+  saida_pista: 'Saiu da pista', area_escape: 'Parou na área de escape',
+};
 /** Desfecho curto para a tabela: título enviado pela tela, ou o motivo validado do registro. */
 export function textoDesfecho(c: CorridaFila) {
   return c.desfechoTitulo || (c.desfecho ? MOTIVOS[c.desfecho] ?? c.desfecho : '—');

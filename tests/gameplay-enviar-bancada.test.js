@@ -92,3 +92,12 @@ test('tabela: link PDF do laudo só em item pronto da própria conta, pela urlLa
   const { urlLaudo } = await loadFrontendModule('../../src/components/laudo/BaixarLaudo.tsx');
   assert.equal(urlLaudo('lab_x', 'a/1'), '/api/lab/cases/lab_x/laudo.pdf?analise=a%2F1');
 });
+
+test('tabela: caminhão na serra e desfechos novos da Pista têm rótulo', async () => {
+  const { textoDesfecho } = await loadFrontendModule('../../src/lib/bancada-fila.ts');
+  const c = (desfecho) => ({ desfecho, desfechoTitulo: null });
+  assert.equal(textoDesfecho(c('saida_pista')), 'Saiu da pista');
+  assert.equal(textoDesfecho(c('area_escape')), 'Parou na área de escape');
+  const tela = fs.readFileSync(new URL('../src/pages/FilaBancadaPage.tsx', import.meta.url), 'utf8');
+  assert.match(tela, /caminhao: 'Caminhão'/); assert.match(tela, /'serra-sem-freio': 'Serra sem freio'/);
+});

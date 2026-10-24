@@ -42,8 +42,9 @@ export function resumoDaCorrida(caso, corrida = {}) {
   const c = contextoCircuito(caso?.metadata?.circuito);
   const bruto = corrida && typeof corrida === 'object' && !Array.isArray(corrida) ? corrida : {};
   return {
-    veiculo: textoCurto(bruto.veiculo, 40) ?? 'trator',
-    cenario: textoCurto(bruto.cenario, 60) ?? (c ? 'circuito' : 'percurso'),
+    // O registro validado traz veiculo/cenario quando a corrida é da Pista; senão vale o rótulo da tela.
+    veiculo: c?.veiculo ?? textoCurto(bruto.veiculo, 40) ?? 'trator',
+    cenario: c?.cenario ?? textoCurto(bruto.cenario, 60) ?? (c ? 'circuito' : 'percurso'),
     desfecho: c?.resultado.motivo ?? textoCurto(bruto.desfecho, 40),
     desfechoTitulo: textoCurto(bruto.desfechoTitulo, 80),
     tempoMs: c ? Math.round(c.metricas.elapsedMs) : numero(bruto.tempoMs),
