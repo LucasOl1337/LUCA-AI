@@ -4,6 +4,8 @@
    o mapa ficam dentro do quadro em vez de crescer com a altura da janela. */
 .gameplay-vista { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); z-index:8; padding:5px 10px; border-radius:8px; background:#111e18df; color:#fff; font:12px system-ui; white-space:nowrap; pointer-events:none; }
 @media(max-width:600px) { .gameplay-vista { bottom:auto; top:310px; left:10px; transform:none; max-width:230px; white-space:normal; } }
+/* Placar de abertura/resultado do desafio fica no centro: a pílula da vista sai enquanto ele está na tela. */
+.gameplay-kiosk:has(.gameplay-abertura, .gameplay-resultado) .gameplay-vista { display:none; }
 .gameplay-kiosk { position: absolute; inset: 0; overflow: hidden; background: #07100c; user-select: none; container-type: size; }
 .gameplay-kiosk-palco { position: absolute; inset: 0; cursor: grab; touch-action: none; }
 .gameplay-kiosk-palco:active { cursor: grabbing; }
