@@ -140,10 +140,30 @@ function apertar(el: HTMLElement) {
   el.click();
 }
 
+/**
+ * Acende o item com foco do diálogo, ou o primeiro que não seja o voltar/fechar (menu aberto pelo △,
+ * grupo novo do menu): quem chega pelo controle já cai na primeira opção.
+ */
+export function acenderPrimeiroPad(doc: Document = document, exigeDialogo = false): boolean {
+  const itens = itensDoFoco(doc, exigeDialogo)?.filter((i) => !i.el.hasAttribute('data-pad-voltar'));
+  if (!itens?.length) return false;
+  // O diálogo que já escolheu o próprio foco (autoFocus: "Sim, sair") manda.
+  const ativo = itens.findIndex((i) => i.el === doc.activeElement);
+  const primeiro = ativo >= 0 ? ativo : primeiroItem(itens.map((i) => i.caixa));
+  marcar(itens[primeiro ?? 0].el);
+  return true;
+}
+
 /** ✕ com foco do D-pad: aperta o item focado. Sem foco explícito, devolve false (o modo decide). */
 export function confirmarFocoPad(doc: Document = document, exigeDialogo = false): boolean {
   if (!atual || !focoPadExplicito(doc, exigeDialogo)) return false;
-  apertar(atual);
+  const apertado = atual;
+  apertar(apertado);
+  // O item sumiu e o diálogo ficou (entrou num grupo, trocou de passo): o foco segue no primeiro item novo.
+  const view = doc.defaultView ?? window;
+  view.requestAnimationFrame(() => view.requestAnimationFrame(() => {
+    if (atual === apertado && !apertado.isConnected && escopoDe(doc)) acenderPrimeiroPad(doc, exigeDialogo);
+  }));
   return true;
 }
 

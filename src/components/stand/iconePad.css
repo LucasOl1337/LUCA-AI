@@ -6,8 +6,9 @@
 .stand:not([data-controle]) .stand-vitrine-dica-pad { display: none; }
 
 .stand-dicas-pad {
-  position: absolute; left: 0; bottom: calc(var(--stand-reserva-barra, 10vmin) + 4vmin); margin: 0; padding: 1vmin 1.4vmin;
-  list-style: none; display: grid; gap: 0.6vmin; border-radius: 1.4vmin; background: rgba(9, 12, 17, 0.6);
+  /* Canto de baixo à direita, na altura da barra (o canto esquerdo é do selo da câmera). */
+  position: absolute; right: 0; bottom: 0; margin: 0; padding: 0.9vmin 1.4vmin;
+  list-style: none; display: grid; grid-template-columns: auto auto; gap: 0.5vmin 2vmin; border-radius: 1.4vmin; background: rgba(9, 12, 17, 0.6);
   font: 600 clamp(12px, 1.7vmin, 26px) 'Stand Outfit', system-ui, sans-serif; color: rgba(255, 255, 255, 0.82);
   pointer-events: none !important;
 }
@@ -18,3 +19,5 @@
 }
 .circuito-confirma-saida { display: grid; gap: 8px; padding: 10px; border-radius: 10px; border: 1px solid rgba(255, 159, 10, 0.6); }
 .circuito-confirma-saida p { margin: 0; font-weight: 700; }
+/* Retrato (celular, totem em pé): a barra ocupa a largura; as dicas saem. */
+@media (max-aspect-ratio: 1/1) { .stand-dicas-pad { display: none; } }

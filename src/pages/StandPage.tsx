@@ -22,7 +22,7 @@ import { SiteStand } from '@/components/stand/site/SiteStand';
 import { avisoDeSaida, barraVisivel, modoInicial, modosDisponiveis, palcoAfkDaUrl, reduzirModo, type EntradaModo, type EstadoModo } from '@/components/stand/modoStand';
 import type { AcaoNavegacao } from '@/components/stand/navegacaoPad';
 import { usePadStand } from '@/components/stand/usePadStand';
-import { confirmarFocoPad, focoPadExplicito, limparFocoPad, moverFocoPad, voltarNoEscopoPad } from '@/components/stand/focoPadDom';
+import { acenderPrimeiroPad, confirmarFocoPad, focoPadExplicito, limparFocoPad, moverFocoPad, voltarNoEscopoPad } from '@/components/stand/focoPadDom';
 import type { Direcao } from '@/components/stand/focoPad';
 import { DicasControle } from '@/components/stand/IconePad';
 import { AvisoSaida, BarraModos, preCarregarSimulador, SimulacaoStand, VitrineStand } from '@/components/stand/Modos';
@@ -388,7 +388,7 @@ export default function StandPage() {
       if (menu.aberto) { fecharMenu(); return; }
       abrirMenu(null);
       // Menu aberto pelo controle já chega com o primeiro item aceso.
-      window.requestAnimationFrame(() => window.requestAnimationFrame(() => moverFocoPad('baixo')));
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => acenderPrimeiroPad()));
       return;
     }
     if (acao.tipo === 'tela_cheia') { alternarPalco(); return; }

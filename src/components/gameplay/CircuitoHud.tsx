@@ -106,12 +106,12 @@ export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, t
         <p>Controle: R2 acelera · L2 freia e dá ré · analógico esquerdo vira · ✕ troca a câmera · Options pausa · PS volta à Coruja. Teclado: W/↑ acelera · S/↓/espaço freia · A D/← → viram · C troca a câmera · Esc pausa.</p>
         <p>Sons de risco são tons curtos, sem voz. A imagem da webcam fica só neste navegador; o alerta de sonolência é experimental, não é sistema de segurança.</p>
       </details>
-      <button data-pad-voltar="" onClick={() => { void audio.liberar(); aoMenu(false); }} autoFocus>Continuar <kbd>{confirmar}</kbd> <IconePad botao="bola" /></button>
+      <button data-pad-voltar={confirmaSaida ? undefined : ''} onClick={() => { void audio.liberar(); aoMenu(false); }} autoFocus>Continuar <kbd>{confirmar}</kbd> <IconePad botao="bola" /></button>
       <button onClick={() => { sessao.terminar('abandono', new Date().toISOString()); motor.encerrar('abandono'); aoMenu(false); }}>Abandonar esta corrida</button>
       {confirmaSaida
         ? <div className="circuito-confirma-saida" role="group" aria-label="Confirmar saída"><p>Abandonar a corrida e sair da simulação?</p>
           <button data-acao="confirmar-saida" onClick={() => window.dispatchEvent(new Event('luca:circuito-sair'))} autoFocus>Sim, sair pra Coruja</button>
-          <button onClick={() => setConfirmaSaida(false)}>Não, ficar</button></div>
+          <button data-pad-voltar="" onClick={() => setConfirmaSaida(false)}><IconePad botao="bola" />Não, ficar</button></div>
         : <button data-acao="sair-simulacao" onClick={() => setConfirmaSaida(true)}><IconePad botao="ps" />Sair da simulação</button>}
     </section>}
     {fim && <section className="circuito-dialogo circuito-resultado" role="region" aria-label="Resultado da corrida" data-motivo={fim.motivo} data-foco-escopo="">
