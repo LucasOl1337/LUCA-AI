@@ -93,8 +93,13 @@ export function passoTrator(estado: EstadoTrator, comando: ComandoVolante, dt: n
   const freioParadoS = parado && freando ? (estado.freioParadoS ?? 0) + segundos : 0;
   const reLiberada = v < -0.05 || reArmada || freioParadoS >= TRATOR.esperaReS;
   if (v > 0.05 || (acelerador > 0 && v >= -0.05)) {
-    // Arrasto só rolando sem pedal (TRATOR.arrasto): com ele junto do acelerador, meio R2 não tirava o trator do lugar.
-    v += (acelerador * TRATOR.aceleracao - freio * TRATOR.frenagem - (acelerador > 0 ? 0 : TRATOR.arrasto)) * segundos;
+    // R2 é velocidade-alvo (Lupa D3): a pressão escolhe a fração do teto; abaixo dela acelera a 1,2 m/s²,
+    // acima dela rola pelo arrasto até o alvo (antes meio R2 segurado chegava ao teto igual ao cheio).
+    const alvo = acelerador * vMax;
+    const puxa = acelerador > 0 && v < alvo;
+    v += ((puxa ? TRATOR.aceleracao : -TRATOR.arrasto) - freio * TRATOR.frenagem) * segundos;
+    if (puxa && freio === 0) v = Math.min(v, alvo);
+    else if (acelerador > 0 && estado.velocidade >= alvo && freio === 0) v = Math.max(v, Math.min(alvo, estado.velocidade));
     // Acima do teto (o desafio baixou para 6 km/h): desacelera no ritmo do freio, sem teleporte.
     v = limitar(v, 0, Math.max(vMax, estado.velocidade - TRATOR.frenagem * segundos));
   } else if (freando && !reLiberada) {

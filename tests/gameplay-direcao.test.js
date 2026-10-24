@@ -51,11 +51,48 @@ test('analógico (Lupa D1): 30% e 50% do curso já viram; batente igual', () => 
   assert.ok(Math.abs(r100 - fisica.TRATOR.entreEixosM / Math.tan(fisica.TRATOR.estercoMaxRad)) < 0.01, `100%: ${r100}`);
 });
 
-test('gatilho: corte de ruído e curva x^1,5', () => {
+test('gatilho: L2 com corte de ruído e curva x^1,5; R2 linear acima do corte', () => {
+  assert.equal(volante.curvaAcelerador(0.03), 0);
+  assert.equal(volante.curvaAcelerador(0.04), 0);
+  assert.equal(volante.curvaAcelerador(0.52).toFixed(6), '0.500000');
+  assert.equal(volante.curvaAcelerador(1), 1);
+  assert.equal(volante.curvaAcelerador(Number.NaN), 0);
   assert.equal(volante.curvaGatilho(0.03), 0);
   assert.equal(volante.curvaGatilho(0.5).toFixed(6), '0.353553');
   assert.equal(volante.curvaGatilho(1), 1);
   assert.equal(volante.curvaGatilho(Number.NaN), 0);
+});
+
+/** Velocidade (km/h) depois de `s` segundos com o R2 cru em `r2`, partindo parado, pela física real. */
+function velocidadeComR2(r2, s, tetoKph = 12) {
+  const mundo = { obstaculos: [], tetoKph };
+  let estado = fisica.criarTrator(0), comando = volante.COMANDO_PARADO;
+  for (let i = 0; i < Math.round(s * 60); i += 1) {
+    comando = volante.passoVolante(comando, volante.comandoDesejado(pad({ r2 })), 1 / 60);
+    estado = fisica.passoTrator(estado, comando, 1 / 60, mundo);
+  }
+  return estado.velocidade * 3.6;
+}
+
+test('R2 (Lupa D3): pressão é velocidade-alvo; meio R2 estabiliza na metade do teto', () => {
+  // Antes: R2 50% segurado 10 s → 12,0 km/h (o teto); R2 25% após 3 s → 1,6 km/h.
+  assert.ok(Math.abs(velocidadeComR2(0.52, 10) - 6) < 0.01, 'meio R2 → 6 km/h');
+  assert.ok(Math.abs(velocidadeComR2(1, 10) - 12) < 1e-9, 'R2 cheio → teto');
+  assert.ok(velocidadeComR2(0.28, 3) > 2.9, 'um quarto do R2 já anda a ~3 km/h em 3 s');
+  // Mesma rampa de 1,2 m/s² até o alvo: R2 cheio chega a 12 km/h em ~2,8 s, como antes.
+  assert.ok(velocidadeComR2(1, 2.7) < 12 && velocidadeComR2(1, 2.9) > 11.99);
+  // No desafio (teto 6), meio R2 → 3 km/h.
+  assert.ok(Math.abs(velocidadeComR2(0.52, 10, 6) - 3) < 0.01);
+});
+
+test('R2 (Lupa D3): aliviar o pedal desacelera pelo arrasto até o novo alvo, sem passar dele', () => {
+  const mundo = { obstaculos: [], tetoKph: 12 };
+  let estado = { ...fisica.criarTrator(0), velocidade: 12 / 3.6 };
+  const meio = { esterco: 0, acelerador: 0.5, freio: 0 };
+  estado = fisica.passoTrator(estado, meio, 1, mundo);
+  assert.ok(Math.abs(estado.velocidade - (12 / 3.6 - fisica.TRATOR.arrasto * 0.1)) < 1e-9, 'rola, não freia');
+  for (let i = 0; i < 600; i += 1) estado = fisica.passoTrator(estado, meio, 1 / 60, mundo);
+  assert.ok(Math.abs(estado.velocidade * 3.6 - 6) < 1e-9);
 });
 
 test('volante gira a no máximo 2,5/s: do centro ao batente em 0,4 s', () => {

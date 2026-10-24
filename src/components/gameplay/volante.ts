@@ -3,7 +3,8 @@
  * pad (Gamepad API, mapping standard) e as setas; sai o comando que a física usa.
  * Esterço: zona morta 0,12, curva sinal·|x|^1,35 (Lupa 24/10: 1,8 dava raio de 25 m
  * com meio curso) e volante com taxa limitada
- * (2,5/s: do centro ao batente em 0,4 s). R2/L2: curva x^1,5.
+ * (2,5/s: do centro ao batente em 0,4 s). L2: curva x^1,5. R2: linear acima do corte
+ * de ruído (Lupa D3: o R2 é velocidade-alvo, pressão × teto).
  */
 import { applyDeadZone, type GamepadLike } from '../sompo/gamepadMapping';
 import { COMANDOS_CABINE, setaDoComando } from './comandosCabine';
@@ -11,11 +12,12 @@ import { COMANDOS_CABINE, setaDoComando } from './comandosCabine';
 export const VOLANTE = Object.freeze({
   zonaMorta: 0.12,
   expoenteEsterco: 1.35,
-  expoenteGatilho: 1.5,
   /** Unidades de esterço (-1..1) por segundo. */
   taxaEsterco: 2.5,
   /** Gatilho abaixo disso é ruído do DualSense em repouso. */
   corteGatilho: 0.04,
+  /** Só o L2: o R2 é linear (velocidade-alvo). */
+  expoenteFreio: 1.5,
 });
 
 /**
@@ -56,16 +58,22 @@ export function curvaEsterco(eixo: number) {
   return semZeroNegativo(Math.sign(fora) * Math.abs(fora) ** VOLANTE.expoenteEsterco);
 }
 
-/** Gatilho cru (0..1) → pedal, com corte de ruído e curva. */
+/** Gatilho cru (0..1) → pedal do freio, com corte de ruído e curva x^1,5. */
 export function curvaGatilho(valor: number) {
   if (!Number.isFinite(valor) || valor <= VOLANTE.corteGatilho) return 0;
-  return Math.min(1, valor) ** VOLANTE.expoenteGatilho;
+  return Math.min(1, valor) ** VOLANTE.expoenteFreio;
 }
 
-const gatilho = (pad: GamepadLike, indice: number) => {
+/** R2 cru (0..1) → fração do teto de velocidade: corte de ruído e linear acima dele (0 no corte, 1 no fim). */
+export function curvaAcelerador(valor: number) {
+  if (!Number.isFinite(valor) || valor <= VOLANTE.corteGatilho) return 0;
+  return (Math.min(1, valor) - VOLANTE.corteGatilho) / (1 - VOLANTE.corteGatilho);
+}
+
+const gatilho = (pad: GamepadLike, indice: number, curva: (valor: number) => number) => {
   const botao = pad.buttons[indice];
   if (!botao) return 0;
-  return curvaGatilho(Number.isFinite(botao.value) ? botao.value : botao.pressed ? 1 : 0);
+  return curva(Number.isFinite(botao.value) ? botao.value : botao.pressed ? 1 : 0);
 };
 
 /**
@@ -74,7 +82,7 @@ const gatilho = (pad: GamepadLike, indice: number) => {
  */
 export function comandoDesejado(pad: GamepadLike | null | undefined, setas: SetasVolante = SETAS_SOLTAS): ComandoVolante {
   const doPad = pad && pad.mapping === 'standard'
-    ? { esterco: curvaEsterco(pad.axes[COMANDOS_CABINE.esquerda.eixo] ?? 0), acelerador: gatilho(pad, R2), freio: gatilho(pad, L2) }
+    ? { esterco: curvaEsterco(pad.axes[COMANDOS_CABINE.esquerda.eixo] ?? 0), acelerador: gatilho(pad, R2, curvaAcelerador), freio: gatilho(pad, L2, curvaGatilho) }
     : COMANDO_PARADO;
   const estercoSetas = (setas.direita ? 1 : 0) - (setas.esquerda ? 1 : 0);
   return {
