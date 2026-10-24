@@ -81,7 +81,7 @@ async function main() {
   try {
     await esperar(`${base}/api/auth/session`);
     ctx = await chromium.launchPersistentContext(perfil, {
-      executablePath: '/usr/bin/chromium', headless: SECO, env: ENV_X, viewport: SECO ? {width: W, height: H} : null, deviceScaleFactor: 1, locale: 'pt-BR', colorScheme: 'dark',
+      executablePath: '/usr/bin/chromium', headless: SECO, env: ENV_X, ...(SECO ? {viewport: {width: W, height: H}, deviceScaleFactor: 1} : {viewport: null}), locale: 'pt-BR', colorScheme: 'dark',
       ignoreDefaultArgs: ['--enable-automation'],
       args: [...(SECO ? [] : ['--ozone-platform=x11', '--kiosk']), `--window-size=${W},${H}`, '--window-position=0,0', '--force-device-scale-factor=1', '--hide-scrollbars',
         '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', `--use-file-for-fake-video-capture=${Y4M}`, '--autoplay-policy=no-user-gesture-required',
