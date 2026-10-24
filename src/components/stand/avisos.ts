@@ -61,15 +61,20 @@ export function chamadaSemVoz(controleConectado: boolean): { titulo: string; sub
  * Linha de baixo da chamada, para o público. Nunca mostra erro técnico.
  * O estado distingue a abertura automática do bloqueio que exige toque.
  */
-export function chamadaDeInicio(ativa: boolean, fim: Fim, escuta: EstadoEscuta = 'desligada'): string {
+export function chamadaDeInicio(ativa: boolean, fim: Fim, escuta: EstadoEscuta = 'desligada', ptt: string | false = false): string {
   if (escuta === 'ajuda_microfone') return 'Permita o microfone pra conversar com o LUCA.';
   if (escuta === 'abrindo') return 'Ligando o microfone…';
+  if (ptt && fim?.motivo !== 'desligado') return linhaPtt(ptt);
   const escutando = escuta === 'ouvindo' || escuta === 'conversa';
   if (ativa) return escutando ? 'Pode falar, tô ouvindo.' : 'Ligando o microfone…';
   if (escutando) return 'É só falar que eu escuto.';
   if (fim?.motivo === 'desligado') return 'Ele explica como a IA acompanha o trator no campo.';
   return 'Toca na tela pra começar a conversa.';
 }
+
+/** PTT do Totem: o público fala segurando o botão (L1 por padrão), com o controle perto da boca. */
+export const linhaPtt = (botao = 'L1') => `Segure ${botao} no controle e fale perto dele.`;
+export const linhaPttSegurando = (botao = 'L1') => `Ouvindo… solte o ${botao} quando terminar.`;
 
 /** Estados da Escuta com o microfone aberto (o público precisa saber). */
 const ESCUTA_ABERTA = ['ouvindo', 'pausada', 'conversa'];

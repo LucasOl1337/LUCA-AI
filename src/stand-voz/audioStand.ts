@@ -4,6 +4,7 @@
  * toca os pedaços de PCM em sequência.
  */
 import { registrarVoz } from './diagnosticoVoz';
+import { microfoneDoControle, microfoneEscolhido, pttDoTotem } from './portaMicrofone';
 import { floatDeBase64Pcm16, nivelNormalizado, rms } from './protocolo';
 
 export const HZ_STAND = 24000;
@@ -81,6 +82,32 @@ function comPrazo<T>(promessa: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+const AJUSTES_MICROFONE = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } as const;
+
+/**
+ * Microfone escolhido no /totem; no automático, com PTT, o do DualSense. Se o
+ * escolhido sumir (controle desplugado), cai no padrão do sistema.
+ */
+async function abrirMicrofone(): Promise<MediaStream> {
+  const escolhido = microfoneEscolhido();
+  const ptt = pttDoTotem();
+  if (escolhido || ptt) {
+    const dispositivos = await navigator.mediaDevices.enumerateDevices().catch(() => []);
+    const presente = escolhido && dispositivos.some((d) => d.kind === 'audioinput' && d.deviceId === escolhido);
+    const id = presente ? escolhido : ptt ? microfoneDoControle(dispositivos) : null;
+    if (id) {
+      try {
+        return await navigator.mediaDevices.getUserMedia({ audio: { ...AJUSTES_MICROFONE, deviceId: { exact: id } } });
+      } catch (erro) {
+        console.warn('[stand] microfone escolhido falhou, uso o padrão:', erro instanceof Error ? erro.message : erro);
+      }
+    } else {
+      console.warn('[stand] microfone escolhido ou do DualSense ausente (o do controle precisa do cabo USB); uso o padrão.');
+    }
+  }
+  return navigator.mediaDevices.getUserMedia({ audio: AJUSTES_MICROFONE });
+}
+
 /**
  * Abre o microfone e só depois cria o AudioContext: com a captura já ativa, o
  * Chrome deixa o contexto nascer `running` sem gesto (permissão do microfone
@@ -88,11 +115,11 @@ function comPrazo<T>(promessa: Promise<T>, ms: number): Promise<T> {
  * ficaria esperando um toque, com ou sem `--autoplay-policy` (prova de 19/10).
  */
 export async function abrirAudio({ prazoWorkletMs = PRAZO_WORKLET_MS } = {}): Promise<AudioStand> {
-  const microfone = await navigator.mediaDevices.getUserMedia({
-    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
-  });
-  const ajustes = microfone.getAudioTracks()[0]?.getSettings();
+  const microfone = await abrirMicrofone();
+  const trilha = microfone.getAudioTracks()[0];
+  const ajustes = trilha?.getSettings();
   registrarVoz('captura', {
+    microfone: trilha?.label || 'nao_informado',
     echoCancellation: ajustes?.echoCancellation ?? 'nao_informado',
     noiseSuppression: ajustes?.noiseSuppression ?? 'nao_informado',
     autoGainControl: ajustes?.autoGainControl ?? 'nao_informado',

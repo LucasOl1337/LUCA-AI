@@ -171,6 +171,18 @@ stateDiagram-v2
 
 O CLI tem `stand sessao` e `stand turno` (NDJSON em stdout); veja [`cli-reference.md`](./cli-reference.md).
 
+## PTT do Totem: falar segurando L1 (24/10)
+
+Pedido do Lucas na feira de 24/10: música alta e gente falando em volta despertavam a escuta e cortavam o LUCA. O despertador mede só volume (3× o piso), e batida de música ou voz de quem passa fica acima disso. Com o PTT do Totem, a pessoa fala segurando **L1** do DualSense, com o controle perto da boca, e o microfone usado é o do próprio controle.
+
+- **Ligar.** Na página `/totem`, a opção "Falar segurando L1 do controle", ou `/stand?ptt=1` (`?ptt=0` desliga). A escolha fica no `localStorage` do quiosque (`luca:totem:ptt`) e vale até ser trocada. Desligado (padrão), nada muda.
+- **Portão.** É o mesmo `microfonePermitido()` da Simulação (`src/stand-voz/portaMicrofone.ts`), agora em todos os modos: com L1 solto, a escuta não aprende nem desperta, e a sessão manda silêncio ao Scribe. Apertar L1 abre a conversa sem saudação, como na Simulação. A tecla V faz o mesmo (equipe), menos com o foco num campo de texto.
+- **Sem controle, voz livre.** O portão só fecha com um controle `standard` conectado. Se o DualSense cair, o Totem volta à escuta normal em vez de ficar surdo. `data-ptt` no `<main>` mostra `solto`, `segurando` ou `sem_controle`.
+- **Microfone do controle.** Com o PTT ligado, `abrirAudio` procura uma entrada com `DualSense`, `Wireless Controller` ou `Sony Interactive` no nome. Se não achar ou ela falhar, usa o padrão do sistema. O áudio do DualSense só chega ao PC **pelo cabo USB**, porque no Bluetooth o PC não recebe o microfone. O nome escolhido aparece no diagnóstico `captura.microfone`. Ligue o controle antes de abrir o `/stand`: a escuta abre o microfone uma vez.
+- **Saída de som.** Ao ligar o DualSense no USB, o sistema pode passar a tocar o áudio pelo alto-falante do controle. Confira se a voz do LUCA continua saindo nas caixas do stand.
+- **Gestos.** Apertar L1 com o LUCA falando corta a fala na hora (`ptt_corta_fala`). Soltar com frase aberta manda `commit:true` ao Scribe no mesmo bloco (`commit_ptt`), sem esperar os 0,6 s do VAD.
+- **Texto na tela.** A Atração mostra "Segure L1 no controle e fale perto dele." Enquanto a pessoa segura, o rodapé mostra "Ouvindo… solte o L1 quando terminar." Os testes estão em `tests/cabine-ptt.test.js`.
+
 ## Limites e custo
 
 | Limite | Valor | Onde |

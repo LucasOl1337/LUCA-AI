@@ -88,6 +88,8 @@ export class SessaoTurnos implements SessaoDeVoz {
   private parcial = '';
   private parcialMudouEm = 0;
   private parcialFechada = false;
+  /** Último estado do gesto PTT visto pelo microfone (sem PTT fica sempre aberto). */
+  private portaAberta = true;
 
   constructor(private aoTerminar: (motivo: FimSessao, detalhe?: string) => void = () => {}) {}
 
@@ -234,9 +236,10 @@ export class SessaoTurnos implements SessaoDeVoz {
 
   private aoMicrofone(pcm: Int16Array, nivel: number): void {
     if (this.ws?.readyState !== WebSocket.OPEN) return;
+    const soltou = this.aoGesto(microfonePermitido());
     if (this.videoTocando || this.alarmeTocando || !microfonePermitido()) {
       this.falaIndependenteAte = 0;
-      this.ws.send(mensagemAudioScribe(SILENCIO_50MS, HZ_STAND));
+      this.ws.send(mensagemAudioScribe(SILENCIO_50MS, HZ_STAND, soltou));
       return;
     }
     const eco = this.referenciaEco.analisar(pcm, this.audio?.contexto.currentTime ?? 0);
@@ -256,6 +259,26 @@ export class SessaoTurnos implements SessaoDeVoz {
     if (fechar) registrarVoz('commit_forcado', { texto: this.parcial });
     // Mantém o relógio/VAD do Scribe vivo sem reenviar a própria voz como entrada.
     this.ws.send(mensagemAudioScribe(eco.eco ? SILENCIO_50MS : base64DePcm16(pcm), HZ_STAND, fechar));
+  }
+
+  /**
+   * PTT: apertar corta a fala do LUCA na hora (o gesto já diz que a pessoa vai
+   * falar); soltar fecha a frase sem esperar o VAD. Devolve se é para mandar o commit.
+   */
+  private aoGesto(aberta: boolean): boolean {
+    if (aberta === this.portaAberta) return false;
+    this.portaAberta = aberta;
+    if (aberta) {
+      if (!this.videoTocando && !this.alarmeTocando && (this.estado === 'falando' || this.fila?.tocando)) {
+        registrarVoz('ptt_corta_fala', {});
+        this.interromper();
+      }
+      return false;
+    }
+    if (!this.parcial || this.parcialFechada) return false;
+    this.parcialFechada = true;
+    registrarVoz('commit_ptt', { texto: this.parcial });
+    return true;
   }
 
   private parcialParada(): boolean {

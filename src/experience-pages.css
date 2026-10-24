@@ -41,3 +41,13 @@
 @media (max-height: 560px) and (min-width: 701px) {
   .gameplay-page[data-jogando] .gameplay-page-topo .experience-eyebrow { display: none; }
 }
+
+.experience-ptt { display: flex; gap: 12px; align-items: flex-start; margin: 16px 0; cursor: pointer; }
+.experience-ptt input { width: 20px; height: 20px; margin-top: 2px; flex: none; accent-color: currentColor; }
+.experience-ptt strong { display: block; margin-bottom: 4px; }
+.experience-ptt span { opacity: .85; }
+.experience-som { display: grid; gap: 10px; margin: 0 0 16px; }
+.experience-som label { display: grid; gap: 4px; }
+.experience-som label span { font-weight: 600; }
+.experience-som select { max-width: 100%; padding: 8px; font: inherit; }
+.experience-som small { opacity: .8; }
