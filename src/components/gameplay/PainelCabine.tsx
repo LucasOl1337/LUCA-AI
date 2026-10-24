@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { useSegurancaCabine } from './useSegurancaCabine';
-import { alertaCabine, type AlertaCabine } from './alertaCabine';
+import { alertaCabine, rotuloCerca, ROTULO_CERCA_CABINE, type AlertaCabine } from './alertaCabine';
+import { useEntradaCabine } from './useEntradaCabine';
 import { useBipeCabine } from './bipeCabine';
 import { ComandosSimulacao } from './ComandosSimulacao';
 import type { CanalGameplay, EstadoGameplay } from './estadoGameplay';
@@ -22,7 +23,10 @@ export function PainelCabine({ canal, som = true }: { canal: CanalGameplay; som?
   const estado = useSyncExternalStore(canal.assinar, canal.ler, canal.ler);
   // Webcam de sonolência (/gameplay?webcam=1); sem ela `sono` é null e nada muda.
   const sono = useSonoCabine();
-  const painel = alertaCabine(estado, sono);
+  const base = alertaCabine(estado, sono);
+  // A frase da cerca diz o comando de ré de quem joga (teclado não tem L2).
+  const entrada = useEntradaCabine();
+  const painel = base.rotuloAlerta === ROTULO_CERCA_CABINE ? { ...base, rotuloAlerta: rotuloCerca(entrada) } : base;
   useSegurancaCabine(som && estado.fase === 'dirigindo' && (estado.contato || estado.sensor.alerta));
   useBipeCabine(som ? painel.bipe : null);
   return <PainelCabineVista painel={painel} estado={estado} />;

@@ -166,3 +166,10 @@ test('cerca do talhão (Lupa, obs. da Lixa 05:39): preso de frente na cerca, a f
   assert.equal(alertaCabine({ ...e, sensor: { distanciaCm: 120, eco: true, alerta: true } }).rotuloAlerta, ROTULO_ALERTA_CABINE);
   assert.equal(alertaCabine({ ...e, fase: 'fim' }).cerca, false);
 });
+
+test('aviso da cerca no HUD da corrida usa o comando de ré de quem joga (Lixa): teclado não lê "L2"', async () => {
+  const { rotuloCerca, ROTULO_CERCA_CABINE } = await loadFrontendModule('../../src/components/gameplay/alertaCabine.ts');
+  assert.equal(rotuloCerca('ps'), ROTULO_CERCA_CABINE);
+  assert.equal(rotuloCerca('xbox'), 'Cerca do talhão · dê ré com LT');
+  assert.equal(rotuloCerca('teclado'), 'Cerca do talhão · dê ré com S / ↓');
+});

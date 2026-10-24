@@ -10,6 +10,7 @@
  */
 import { physicalRiskBands } from '../../../shared/sompo-physical-interactions.js';
 import type { EstadoGameplay } from './estadoGameplay';
+import { COMANDOS_CABINE, type EntradaCabine } from './comandosCabine';
 import { cercaAFrente } from './fisicaTrator';
 import { geofenceTalhao, type GeofenceTalhao } from './geofenceTalhao';
 import { ROTULO_ALERTA_SONO, type SonoCabine } from './sonoCabine';
@@ -52,6 +53,10 @@ export interface AlertaCabine {
 export const ROTULO_ALERTA_CABINE = 'Obstáculo a 1,5 m · freie';
 /** Trator preso de frente na cerca do talhão (Lupa, observação da Lixa 24/10). */
 export const ROTULO_CERCA_CABINE = 'Cerca do talhão · dê ré com L2';
+/** Mesma frase com o comando de ré de quem está jogando (Lixa): teclado não tem L2. */
+export function rotuloCerca(entrada: EntradaCabine) {
+  return ROTULO_CERCA_CABINE.replace('L2', entrada === 'teclado' ? 'S / ↓' : COMANDOS_CABINE.frear[entrada]);
+}
 /** Faixa vermelha do risco de tombamento: rolagem ou arfagem a partir de 20°. */
 export const rotuloInclinacaoCabine = (graus: number) => `Inclinação de ${graus}° · freie`;
 /** Faixa da zona de risco do talhão (geofence). */
