@@ -7,8 +7,10 @@
 .gameplay-kiosk { position: absolute; inset: 0; overflow: hidden; background: #07100c; user-select: none; container-type: size; }
 .gameplay-kiosk-palco { position: absolute; inset: 0; cursor: grab; touch-action: none; }
 .gameplay-kiosk-palco:active { cursor: grabbing; }
-.gameplay-creditos-rurais { position: absolute; z-index: 8; top: 10px; right: 10px; padding: 4px 8px; border-radius: 5px; color: #e0ddcf; background: #142019dd; font: 11px system-ui; }
+/* Crédito CC-BY no topo central: os cantos são do selo de FPS, do status e do botão de pausa do circuito. */
+.gameplay-creditos-rurais { position: absolute; z-index: 8; top: 10px; left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 4px 8px; border-radius: 5px; color: #e0ddcf; background: #142019dd; font: 11px system-ui; }
 .gameplay-creditos-rurais:focus-visible { outline: 2px solid #f4d17d; }
+@media (max-width: 600px) { .gameplay-creditos-rurais { top: auto; bottom: 6px; left: auto; right: 6px; transform: none; } }
 .gameplay-kiosk-palco canvas { display: block; width: 100%; height: 100%; }
 .gameplay-kiosk .gameplay-desafio { position: absolute; inset: 0; pointer-events: none; }
 /* Selo de FPS (/gameplay?fps=1): canto superior esquerdo, sobre o teto da cabine, longe do painel e do mapa, sem pegar clique. */
