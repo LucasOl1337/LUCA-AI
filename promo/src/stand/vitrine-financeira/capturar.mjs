@@ -83,7 +83,7 @@ async function main() {
     ctx = await chromium.launchPersistentContext(perfil, {
       executablePath: '/usr/bin/chromium', headless: SECO, env: ENV_X, ...(SECO ? {viewport: {width: W, height: H}, deviceScaleFactor: 1} : {viewport: null}), locale: 'pt-BR', colorScheme: 'dark',
       ignoreDefaultArgs: ['--enable-automation'],
-      args: [...(SECO ? [] : ['--ozone-platform=x11', '--kiosk']), `--window-size=${W},${H}`, '--window-position=0,0', '--force-device-scale-factor=1', '--hide-scrollbars',
+      args: [...(SECO ? [] : ['--ozone-platform=x11', '--kiosk', '--use-angle=vulkan']), `--window-size=${W},${H}`, '--window-position=0,0', '--force-device-scale-factor=1', '--hide-scrollbars',
         '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', `--use-file-for-fake-video-capture=${Y4M}`, '--autoplay-policy=no-user-gesture-required',
         '--no-first-run', '--no-default-browser-check', '--password-store=basic', '--disable-features=Translate', '--lang=pt-BR'],
     });
@@ -99,6 +99,13 @@ async function main() {
     await cenas.rodar({page, base, so: SO, gravar, parar, marcar, sleep, log, info, saida});
   } catch (e) {
     info.erros.push(String(e?.stack || e)); log('ERRO', e?.message);
+    try {
+      const pg = ctx?.pages()[0];
+      if (pg) {
+        await pg.screenshot({path: path.join(saida, 'prints', 'erro.png')});
+        info.erroDom = await pg.evaluate(() => ({url: location.href, modelo: [...document.querySelectorAll('[data-sompo-model]')].map((n) => n.getAttribute('data-sompo-model')), texto: document.body.innerText.slice(0, 1500)}));
+      }
+    } catch {}
   } finally {
     await parar().catch(() => {});
     await ctx?.close().catch(() => {});
