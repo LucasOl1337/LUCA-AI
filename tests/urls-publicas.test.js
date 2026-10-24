@@ -23,6 +23,9 @@ test('mapa: todo GLB, textura, HDR e manifesto do gameplay ganha nome com hash d
   for (const pasta of PASTAS_COM_HASH) assert.ok(Object.keys(MAPA).some(k => k.startsWith(`/${pasta}/`)), pasta);
   assert.ok(MAPA['/environments/sompo/kloofendal_48d_partly_cloudy_puresky_2k.hdr'], 'HDR do céu');
   assert.ok(MAPA['/sompo/gen/pasto-albedo.webp'], 'textura do pasto');
+  // Props rurais do Scenario: GLB, manifesto e textura saem imutáveis; os créditos (HTML) ficam no nome fixo.
+  for (const nome of ['barril.glb', 'barril.textures.json', 'barril-albedo.jpg']) assert.ok(MAPA[`/models/scenario/${nome}`], nome);
+  assert.ok(!MAPA['/models/scenario/CREDITOS.html']);
   // Coruja 3D fica com o ?url do #44; licenças e .md ficam fora.
   assert.ok(!Object.keys(MAPA).some(k => k.includes('/stand/') || /\.(txt|md)$/.test(k)));
   for (const comHash of Object.values(MAPA)) assert.equal(cacheDoArquivo(comHash.slice(1)), CACHE_IMUTAVEL, comHash);

@@ -7,7 +7,7 @@ import path from 'node:path';
 // cliente traduz o caminho lógico por um mapa embutido no bundle (urlsPublicas.ts).
 // A cópia de nome fixo continua no dist: URL antiga segue servida por pelo menos
 // uma publicação (aba aberta de release anterior, cache de borda).
-export const PASTAS_COM_HASH = Object.freeze(['models/gameplay', 'models/sompo', 'environments/sompo', 'sompo/gen']);
+export const PASTAS_COM_HASH = Object.freeze(['models/gameplay', 'models/scenario', 'models/sompo', 'environments/sompo', 'sompo/gen']);
 const EXTENSOES = /\.(?:glb|jpe?g|png|webp|hdr|json)$/i;
 
 export function hashDoConteudo(conteudo) {
