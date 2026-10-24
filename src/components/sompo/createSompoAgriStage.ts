@@ -1,6 +1,7 @@
 import { createSompoFloodSheets } from './createSompoFloodSheet';
 import { createSompoFieldFence } from './createSompoFieldFence';
 import { createSompoTireTracks } from './createSompoTireTracks';
+import { createUltrasonicBeam } from './createSompoUltrasonicBeam';
 import { TRATOR } from '../gameplay/fisicaTrator';
 import * as THREE from 'three';
 import { criarPropsRurais } from '../gameplay/criarPropsRurais';
@@ -106,44 +107,6 @@ function createHayBale() {
   }
   group.traverse((node) => { const mesh = node as THREE.Mesh; if (mesh.isMesh) mesh.castShadow = mesh.receiveShadow = true; });
   return group;
-}
-
-/** Feixe do HC-SR04: duas linhas divergentes e um cone translúcido; verde em operação, vermelho em alerta. */
-function createUltrasonicBeam(origin: readonly [number, number, number]) {
-  const group = new THREE.Group(); group.name = 'agri-max-ultrasonic-range';
-  group.position.fromArray(origin);
-  const lineMaterial = new THREE.LineBasicMaterial({ color: 0x7dff9a, transparent: true, opacity: .78 });
-  for (const z of [-.12, .12]) {
-    const ray = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, z), new THREE.Vector3(1, 0, z + Math.sign(z) * .26)]), lineMaterial);
-    ray.name = `ultrasonic-ray-${z > 0 ? 'left' : 'right'}`; group.add(ray);
-  }
-  // Cone de ~30° (abertura nominal do HC-SR04), com o vértice no emissor.
-  const coneGeometry = new THREE.ConeGeometry(Math.tan(THREE.MathUtils.degToRad(15)), 1, 28, 1, true);
-  coneGeometry.translate(0, -.5, 0); coneGeometry.rotateZ(Math.PI / 2);
-  const coneMaterial = new THREE.MeshBasicMaterial({ color: 0x7dff9a, transparent: true, opacity: .16, side: THREE.DoubleSide, depthWrite: false });
-  const cone = new THREE.Mesh(coneGeometry, coneMaterial); cone.name = 'ultrasonic-cone'; group.add(cone);
-  const pulse = new THREE.Mesh(new THREE.TorusGeometry(1, .012, 6, 36), new THREE.MeshBasicMaterial({ color: 0x7dff9a, transparent: true, opacity: .5, depthWrite: false }));
-  pulse.rotation.y = Math.PI / 2; pulse.name = 'ultrasonic-pulse'; group.add(pulse);
-  return {
-    group,
-    update(distanceCm: number, alert: boolean, elapsedMs: number, uncertain = false) {
-      // 400 cm é "sem eco": feixe no alcance máximo e mais apagado.
-      const echo = distanceCm < 395;
-      const length = Math.max(.02, Math.min(4, distanceCm / 100));
-      for (const child of group.children) if (child !== pulse) child.scale.set(length, 1, 1);
-      cone.scale.set(length, length, length);
-      // Leitura física velha ou desconhecida: âmbar, como o feixe do caminhão.
-      const color = uncertain ? 0xc9ad74 : alert ? 0xff5d52 : 0x7dff9a;
-      lineMaterial.color.set(color); coneMaterial.color.set(color); (pulse.material as THREE.MeshBasicMaterial).color.set(color);
-      lineMaterial.opacity = echo ? (alert ? 1 : .78) : .4;
-      coneMaterial.opacity = echo ? (alert ? .26 : .16) : .07;
-      const phase = (elapsedMs / 600) % 1;
-      pulse.position.x = phase * length;
-      const ring = Math.max(.04, Math.tan(THREE.MathUtils.degToRad(15)) * phase * length);
-      pulse.scale.set(ring, ring, ring);
-      (pulse.material as THREE.MeshBasicMaterial).opacity = (1 - phase) * (echo ? .55 : .25);
-    },
-  };
 }
 
 /**
@@ -380,7 +343,7 @@ export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, out
   const beaconX = scenario.equipmentId === 'harvester' ? 0.6 : -0.1, beaconZ = scenario.equipmentId === 'harvester' ? 0.2 : 0.25;
   // HC-SR04 do Trator MAX: feixe e cone saem do emissor na frente, como no caminhão.
   // Aqui a régua é métrica (cm/100), e o obstáculo é fixo no mundo.
-  const sensorBeam = max ? createUltrasonicBeam(SOMPO_AGRI_RIG_LAYOUT['max-tractor'].sensor) : null;
+  const sensorBeam = max ? createUltrasonicBeam(SOMPO_AGRI_RIG_LAYOUT['max-tractor'].sensor, ruralProps ? TRATOR.bitolaM / 2 : 0) : null;
   if (sensorBeam) machine.add(sensorBeam.group);
   const obstacle = max && scenario.obstacle?.kind === 'hay-bale' && !physical && !obstaclesRef ? createHayBale() : null;
   if (obstacle && scenario.obstacle) {
