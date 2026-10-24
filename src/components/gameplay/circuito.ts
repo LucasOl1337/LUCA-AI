@@ -126,13 +126,17 @@ const TITULOS_CORRIDA: Record<MotivoCircuito, string> = {
   tombamento: 'Tombou na encosta', abandono: 'Corrida abandonada',
   saida_pista: 'Saiu da pista', area_escape: 'Parou na área de escape',
 };
+/** Caminhão na serra: mesmos motivos, títulos do que aconteceu lá. */
+const TITULOS_SERRA: Partial<Record<MotivoCircuito, string>> = {
+  chegada: 'Desceu a serra inteiro', colisao: 'Atropelou o animal na pista', tombamento: 'Tombou na curva',
+};
 const decimal = (valor: number, casas = 1) => valor.toFixed(casas).replace('.', ',');
 /** Texto do resultado da Corrida na tela; o relatório dos agentes segue com o registro cru. */
 export function textoResultadoCircuito(r: RegistroCircuito) {
   const m = metricasCircuito(r);
   const avisos = r.episodios.length;
   return {
-    titulo: r.resultado ? TITULOS_CORRIDA[r.resultado.motivo] : 'Corrida em andamento',
+    titulo: r.resultado ? (r.veiculo === 'caminhao' && TITULOS_SERRA[r.resultado.motivo]) || TITULOS_CORRIDA[r.resultado.motivo] : 'Corrida em andamento',
     resumo: `Tempo: ${decimal(m.elapsedMs / 1000)} s · Avisos respondidos: ${avisos - m.semResposta} de ${avisos} · Reação média: ${m.reacaoMediaMs === null ? 'sem reação medida' : `${decimal(m.reacaoMediaMs / 1000, 2)} s`}`,
   };
 }

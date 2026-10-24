@@ -1,0 +1,39 @@
+/* Caminhão na serra (Pista): reaproveita o HUD do circuito; aqui só o que é da serra. */
+.pista-kiosk { position:absolute; inset:0; overflow:hidden; background:#0b1310; user-select:none; container-type:size; }
+.pista-kiosk-palco { position:absolute; inset:0; touch-action:none; }
+.pista-kiosk-palco canvas { display:block; width:100%; height:100%; }
+.pista-freio-falhou { position:absolute; left:50%; top:16%; transform:translateX(-50%); margin:0; padding:10px 20px; border-radius:12px; background:#5a0f0ae6; border:2px solid #ff7a5c; color:#fff; font-weight:800; font-size:24px; letter-spacing:.04em; text-align:center; white-space:nowrap; animation:pista-pisca 0.9s steps(2,end) infinite; }
+.pista-freio-falhou small { display:block; font-size:13px; font-weight:600; letter-spacing:0; color:#ffe1d8; }
+@keyframes pista-pisca { 50% { background:#8a1a10f0; } }
+@media (prefers-reduced-motion: reduce) { .pista-freio-falhou { animation:none; } }
+.pista-hud .circuito-sensores { width:270px; }
+.pista-hud [data-sensor=freio][data-nivel=atencao] strong,.pista-hud [data-sensor=freio][data-nivel=critico] strong { color:#ff9c86; }
+.pista-mapa { position:absolute; padding:9px 10px; border-radius:10px; background:#111e18e6; border:1px solid #a9be9b55; }
+.pista-perfil { display:block; width:100%; height:auto; margin-top:4px; }
+.pista-perfil path { fill:none; stroke:#cfd9c4; stroke-width:1.4; }
+.pista-perfil [data-escape] { fill:#8ad08f; opacity:.75; }
+.pista-perfil [data-animal] { fill:#f4c21b; }
+.pista-perfil [data-caminhao] { fill:#ff8a6e; stroke:#fff; stroke-width:.8; }
+.pista-vista { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); z-index:8; padding:5px 10px; border-radius:8px; background:#111e18df; color:#fff; font:12px system-ui; white-space:nowrap; pointer-events:none; }
+.pista-kiosk:has(.circuito-dialogo) .pista-vista { display:none; }
+.pista-kiosk[data-impacto=sim] .pista-kiosk-palco { animation:pista-tranco .45s ease-out; }
+@keyframes pista-tranco { 20% { transform:translate(-6px,4px); } 45% { transform:translate(5px,-3px); } 70% { transform:translate(-2px,1px); } }
+@media (prefers-reduced-motion: reduce) { .pista-kiosk[data-impacto=sim] .pista-kiosk-palco { animation:none; } }
+@media (max-width:600px) {
+  .pista-freio-falhou { top:auto; bottom:38%; font-size:17px; white-space:normal; width:min(330px,88%); }
+  .pista-hud .circuito-sensores { width:auto; right:10px; left:10px; bottom:72px; display:grid; grid-template-columns:1fr 1fr; gap:0 10px; padding:8px; }
+  .pista-hud .circuito-sensores>small { grid-column:1/-1; }
+  .pista-hud .circuito-sensores div small { display:none; }
+  .pista-mapa { top:60px; right:10px; width:120px; }
+  .pista-vista { display:none; }
+}
+/* Seletor Trator | Caminhão (só antes de partir): canto superior, longe do HUD do circuito. */
+.simulacao-veiculo { position:absolute; z-index:9; top:58px; left:50%; transform:translateX(-50%); display:flex; gap:6px; padding:5px; border-radius:11px; background:#111e18e8; border:1px solid #a9be9b66; font:600 14px system-ui,sans-serif; }
+.simulacao-veiculo button { min-height:40px; padding:6px 14px; border-radius:8px; border:1px solid transparent; background:transparent; color:#e6eee0; cursor:pointer; }
+.simulacao-veiculo button[aria-pressed=true] { background:#d8edc0; color:#14231b; }
+.simulacao-veiculo kbd { margin-left:6px; padding:0 5px; border:1px solid #6d866a; border-radius:4px; font:inherit; font-size:.85em; }
+.simulacao-com-veiculo:has([data-fase=dirigindo]) .simulacao-veiculo,
+.simulacao-com-veiculo:has(.circuito-dialogo) .simulacao-veiculo { display:none; }
+@media (max-width:600px) { .simulacao-veiculo { top:auto; bottom:84px; } }
+.simulacao-com-veiculo { position:absolute; inset:0; }
+.simulacao-veiculo > kbd { align-self:center; color:#c3d5bb; }

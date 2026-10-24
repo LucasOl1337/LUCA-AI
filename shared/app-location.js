@@ -259,6 +259,8 @@ export function formatAppUrl(location) {
   if (page === 'gameplay' && loc.quiosque === '1') params.set('quiosque', '1');
   if (page === 'gameplay' && loc.fps === '1') params.set('fps', '1');
   if (page === 'gameplay' && loc.webcam === '1') params.set('webcam', '1');
+  // ?veiculo=caminhao: Simulação abre no caminhão da serra (Pista, 24/10), no stand e no /gameplay.
+  if ((page === 'gameplay' || page === 'stand') && loc.veiculo === 'caminhao') params.set('veiculo', 'caminhao');
 
   if (page === 'stand') {
     setIfPresent(params, 'margem', parseMargem(String(loc.margem || '')));
