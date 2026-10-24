@@ -61,7 +61,8 @@ export function criarCircuito(runId: string, inicioIso: string) {
     pausa(inicioMs: number, duracaoMs: number, motivo: PausaCircuito['motivo']) { registro.pausas.push({ inicioMs, duracaoMs, motivo }); },
     quadro(e: EstadoGameplay, dtMs: number, agoraIso: string, sono = false) {
       if (registro.resultado || e.fase === 'fim') return;
-      registro.elapsedMs += Math.max(0, dtMs);
+      // Relógio da Corrida: só anda dirigindo (contrato do motor: 0 enquanto `pronto`); as regras valem sempre.
+      if (e.fase === 'dirigindo') registro.elapsedMs += Math.max(0, dtMs);
       const t = registro.elapsedMs;
       const alvo = ROTA_CIRCUITO[registro.proximoMarco];
       // Marcos são áreas geométricas largas em sequência; nenhum marco teleporta ou troca o mundo.
@@ -105,6 +106,21 @@ export function criarCircuito(runId: string, inicioIso: string) {
     },
   };
 }
+const TITULOS_CORRIDA: Record<MotivoCircuito, string> = {
+  chegada: 'Percurso concluído', colisao: 'Colisão com obstáculo', atolamento: 'Atolou na área alagada',
+  tombamento: 'Tombou na encosta', abandono: 'Corrida abandonada',
+};
+const decimal = (valor: number, casas = 1) => valor.toFixed(casas).replace('.', ',');
+/** Texto do resultado da Corrida na tela; o relatório dos agentes segue com o registro cru. */
+export function textoResultadoCircuito(r: RegistroCircuito) {
+  const m = metricasCircuito(r);
+  const avisos = r.episodios.length;
+  return {
+    titulo: r.resultado ? TITULOS_CORRIDA[r.resultado.motivo] : 'Corrida em andamento',
+    resumo: `Tempo: ${decimal(m.elapsedMs / 1000)} s · Avisos respondidos: ${avisos - m.semResposta} de ${avisos} · Reação média: ${m.reacaoMediaMs === null ? 'sem reação medida' : `${decimal(m.reacaoMediaMs / 1000, 2)} s`}`,
+  };
+}
+export { decimal as decimalCircuito };
 export function metricasCircuito(r: RegistroCircuito) {
   const respostas = r.episodios.flatMap((e) => e.resposta ? [e.resposta.latenciaMs] : []);
   return { elapsedMs: Math.round(r.elapsedMs), sinistrosEvitados: r.episodios.filter((e) => e.evitado).length,

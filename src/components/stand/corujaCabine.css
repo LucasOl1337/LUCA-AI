@@ -6,3 +6,16 @@
 .coruja-cabine p { display: block; max-height: 2.8em; overflow: hidden; scroll-behavior: auto; margin: 7px 0; font: 12px/1.4 system-ui; }
 .coruja-cabine small { color: #aec5cf; font: 11px system-ui; }
 @media (max-width: 650px) { .coruja-cabine { width: 210px; right: 8px; bottom: 330px; padding: 8px; } .coruja-cabine-avatar { width: 44px; height: 60px; } }
+/* Compacta (avatar + estado): com pausa/resultado abertos e no celular. Nunca tapa clique nem leitura (grill r1 Q4). */
+.stand:has(.circuito-dialogo, .stand-guia-simulacao) .coruja-cabine { width: auto; max-width: 190px; padding: 8px 12px 8px 8px; }
+.stand:has(.circuito-dialogo, .stand-guia-simulacao) .coruja-cabine-avatar { width: 40px; height: 52px; }
+.stand:has(.circuito-dialogo, .stand-guia-simulacao) .coruja-cabine p,
+.stand:has(.circuito-dialogo, .stand-guia-simulacao) .coruja-cabine small { display: none; }
+/* Guia, pausa e resultado ficam por cima do cartão. */
+.stand .stand-guia-simulacao { z-index: 41; }
+@media (max-width: 650px) {
+  .coruja-cabine { width: 112px; right: 8px; bottom: 40px; flex-direction: column; gap: 4px; padding: 8px; text-align: center; }
+  .coruja-cabine-avatar { width: 40px; height: 52px; }
+  .coruja-cabine p, .coruja-cabine small { display: none; }
+  .stand:has(.circuito-dialogo, .stand-guia-simulacao) .coruja-cabine { width: 112px; padding: 8px; }
+}

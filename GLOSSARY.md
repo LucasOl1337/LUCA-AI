@@ -139,6 +139,10 @@ Um trecho curto da Simulação, de até 90 s, com começo, objetivo e fim, jogad
 O fardo termina ao parar perto do obstáculo, ao encostar nele ou ao estourar o tempo. O pendente termina ao parar depois do alerta, ao atravessar, ao Tombar ou ao estourar o tempo. Não grava episódio. Lista em `src/components/gameplay/desafios.ts`.
 _Evitar_: Missão, fase, nível.
 
+**Corrida**:
+Uma passada do circuito de estacas no Modo Simulação do `/stand`, do primeiro R2 até a chegada, colisão, atolamento, tombamento ou abandono. O relógio só anda a partir da primeira aceleração, e as pausas ficam de fora. O resultado mostra o desfecho em português ("Percurso concluído", "Colisão com obstáculo", "Atolou na área alagada", "Tombou na encosta", "Corrida abandonada"), o tempo, os avisos respondidos e a reação média. ✕/A começa outra corrida; "Analisar relatório" só no toque. Lógica em `src/components/gameplay/circuito.ts`.
+_Evitar_: Run, missão, Desafio (o Desafio é o trecho curto do `/gameplay`).
+
 **Painel da cabine**:
 O que o operador vê do sistema LUCA-AI dentro da cabine durante a Simulação: distância do sensor frontal na cor da faixa (verde a partir de 200 cm, amarelo abaixo, vermelho até 100 cm ou com alerta), a faixa vermelha "Obstáculo a 1,5 m · freie" no alto do para-brisa quando o alerta de 150 cm acende, o bipe e o selo SIMULADO sempre visível. A regra de cor é a mesma do `/sompo` (`physicalRiskBands` em `shared/sompo-physical-interactions.js`); a tradução do estado em cor, rótulo e bipe está em `src/components/gameplay/alertaCabine.ts`.
 _Evitar_: HUD (só no código antigo `firstPersonHud`), dashboard.

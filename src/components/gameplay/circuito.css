@@ -51,3 +51,10 @@
 .gameplay-mapa-rota { fill:none; stroke:#e5f4ab; stroke-width:1.1; stroke-dasharray:2 2; }
 .gameplay-mapa-fardo { fill:#ff7967; stroke:#ffd2c1; stroke-width:.6; }
 @media(max-height:800px) { .circuito-sensores { bottom:12px; padding:9px; width:250px; } .circuito-sensores>div { padding:6px 0; } .circuito-hud .gameplay-mapa { width:170px; } }
+/* Pausa/resultado abertos: a pílula da vista sai; no celular o diálogo fica acima do cartão compacto da Coruja. */
+.gameplay-kiosk:has(.circuito-dialogo) .gameplay-vista { display:none; }
+@media(max-width:650px) {
+  .circuito-dialogo { top:64px; transform:translateX(-50%); max-height:calc(100% - 64px - 150px); padding:18px; }
+  .circuito-dialogo h2 { font-size:22px; }
+  .circuito-hud:has(.circuito-dialogo) :is(.circuito-sensores,.gameplay-mapa,.circuito-menu-botao,.circuito-avisos) { visibility:hidden; }
+}

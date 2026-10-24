@@ -24,7 +24,7 @@ for(const [width,height] of [[1920,1080],[1366,768]]){
  await p.keyboard.down('Space');await new Promise(r=>setTimeout(r,500));await p.keyboard.up('Space');
  if(await p.locator('.gameplay-webcam').isVisible())throw Error('webcam negada encobre pista');
  await p.evaluate(()=>window.__pad.buttons[9]={value:1,pressed:true});await p.getByRole('dialog').waitFor();await p.evaluate(()=>window.__pad.buttons[9]={value:0,pressed:false});
- await p.getByRole('button',{name:'Abandonar esta run',exact:true}).click();await p.getByRole('button',{name:/Analisar relatório/}).click();
+ await p.getByRole('button',{name:'Abandonar esta corrida',exact:true}).click();await p.getByRole('button',{name:/Analisar relatório/}).click();
  await p.locator('[data-chat-circuito]').waitFor();
  const r=JSON.parse(await p.evaluate(()=>sessionStorage.getItem('luca.circuito.chat.v1'))).relatorio.registro;
  const calls=await p.evaluate(()=>window.__cameraCalls);
@@ -32,7 +32,7 @@ for(const [width,height] of [[1920,1080],[1366,768]]){
  if(!r.pausas.length)throw Error('pausas ausentes');
  if(await p.locator('canvas').count())throw Error('canvas vivo');
  results.push({width,height,before,denied,calls,registro:r});
- await p.getByRole('button',{name:'Voltar · iniciar nova run'}).click();await p.locator('[data-gameplay]').waitFor();
+ await p.getByRole('button',{name:'Voltar · nova corrida'}).click();await p.locator('[data-gameplay]').waitFor();
  await p.goto('about:blank');
 }
 fs.writeFileSync(`${dir}/stand-browser.json`,JSON.stringify(results,null,2));console.log(JSON.stringify(results,null,2));await b.close();

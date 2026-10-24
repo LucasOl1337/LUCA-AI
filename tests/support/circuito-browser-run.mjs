@@ -54,7 +54,7 @@ for(const [width,height,kind] of [[1920,1080,'chegada'],[1366,768,'colisao']]) {
  const after=JSON.parse(await p.evaluate(()=>sessionStorage.getItem('luca.circuito.chat.v1')));
  if(before.casoId!==after.casoId)throw Error('Case id changed');
  results.push({width,height,kind,ended,disposal,chat,trace,caseId:after.casoId});
- await p.getByRole('button',{name:'Voltar · iniciar nova run'}).click();
+ await p.getByRole('button',{name:'Voltar · nova corrida'}).click();
  await p.locator('[data-gameplay]').waitFor();
  await p.goto('about:blank');
 }

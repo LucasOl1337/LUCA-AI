@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadFrontendModule } from './support/load-frontend-module.js';
-const { criarCircuito, INICIO_CIRCUITO, ROTA_CIRCUITO, metricasCircuito } = await loadFrontendModule('../../src/components/gameplay/circuito.ts');
+const mod = await loadFrontendModule('../../src/components/gameplay/circuito.ts');
+const { criarCircuito, INICIO_CIRCUITO, ROTA_CIRCUITO, metricasCircuito } = mod;
 const { criarMotorGameplay } = await loadFrontendModule('../../src/components/gameplay/motorGameplay.ts');
 const { relevoRampaLateral } = await loadFrontendModule('../../src/components/gameplay/rampaLateral.ts');
 const { reduzirModo, modoInicial, avisoDeSaida } = await loadFrontendModule('../../src/components/stand/modoStand.ts');
@@ -74,3 +75,27 @@ test('frear após aviso produz uma reação/episódio; antecipação não vira z
   assert.equal(metricasCircuito(inicial.registro).reacaoMediaMs, null);
 });
 export { piloto };
+test('relógio da corrida fica em 0 enquanto pronto e só anda dirigindo (caso do stand: 49 s parado)', () => {
+  const m = criarMotorGameplay(); m.reiniciar(INICIO_CIRCUITO); const c = criarCircuito('relogio', iso);
+  // 49 s com a cena montada e ninguém no R2: mesmo passo do kiosk (monotônico por quadro).
+  for (let i = 0; i < 49 * 60; i++) c.quadro(m.quadro(1 / 60, { acelerador: 0, freio: 0, esterco: 0 }, relevoRampaLateral), 1000 / 60, iso);
+  assert.equal(m.ler().fase, 'pronto');
+  assert.equal(c.registro.elapsedMs, 0);
+  for (let i = 0; i < 60; i++) c.quadro(m.quadro(1 / 60, { acelerador: 1, freio: 0, esterco: 0 }, relevoRampaLateral), 1000 / 60, iso);
+  assert.equal(m.ler().fase, 'dirigindo');
+  assert.ok(c.registro.elapsedMs > 900 && c.registro.elapsedMs <= 1000, String(c.registro.elapsedMs));
+});
+test('resultado da corrida em PT-BR por motivo, sem UUID, run ou N/A', () => {
+  const { textoResultadoCircuito } = mod;
+  const m = criarMotorGameplay(); m.reiniciar(INICIO_CIRCUITO); const c = criarCircuito('uuid-que-nao-aparece', iso);
+  for (let i = 0; i < 1800 && !c.registro.resultado; i++) c.quadro(m.quadro(1 / 60, { acelerador: 1, freio: 0, esterco: 0 }, relevoRampaLateral), 1000 / 60, iso);
+  const t = textoResultadoCircuito(c.registro);
+  assert.equal(t.titulo, 'Colisão com obstáculo');
+  const avisos = c.registro.episodios.length, sem = metricasCircuito(c.registro).semResposta;
+  assert.match(t.resumo, new RegExp(`^Tempo: \\d+,\\d s · Avisos respondidos: ${avisos - sem} de ${avisos} · Reação média: sem reação medida$`));
+  assert.doesNotMatch(`${t.titulo} ${t.resumo}`, /uuid|run|N\/A|\d\.\d/);
+  const titulos = Object.fromEntries(['chegada', 'atolamento', 'tombamento', 'abandono'].map((motivo) => [motivo, textoResultadoCircuito({ ...c.registro, resultado: { motivo, tempoMs: 0 } }).titulo]));
+  assert.deepEqual(titulos, { chegada: 'Percurso concluído', atolamento: 'Atolou na área alagada', tombamento: 'Tombou na encosta', abandono: 'Corrida abandonada' });
+  const comReacao = { ...c.registro, episodios: [{ ...c.registro.episodios[0], resposta: { tempoMs: 0, latenciaMs: 770, acao: 'frenagem' } }] };
+  assert.match(textoResultadoCircuito(comReacao).resumo, /Avisos respondidos: 1 de 1 · Reação média: 0,77 s$/);
+});

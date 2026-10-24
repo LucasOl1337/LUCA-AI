@@ -47,6 +47,8 @@ const CENARIO = 'max-front-obstacle' as const;
 const DESFECHO = getSompoAgriOutcomes(CENARIO)[0].id;
 /** Zumbido do motor no DualSense: um pulso curto a cada intervalo, mais forte com R2. */
 const MOTOR_PULSO_MS = 240;
+/** Respiro antes de ✕/A recomeçar a partir do resultado da Corrida: quem bateu apertando ✕ não pula a tela. */
+const ESPERA_RESULTADO_MS = 800;
 
 type ObstaculoPalco = { x: number; z: number; radius: number };
 export type CriarCameraGameplay = typeof createFirstPersonRig;
@@ -104,6 +106,9 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
     }
   }, [sessao]);
   const motor = useMemo(() => criarMotorGameplay(), [volta]);
+  const novaCorrida = useCallback(() => { alterarMenu(false); setVolta((n) => n + 1); }, [alterarMenu]);
+  const novaCorridaRef = useRef(novaCorrida);
+  novaCorridaRef.current = novaCorrida;
   useEffect(() => { if (circuito) { motor.reiniciar(INICIO_CIRCUITO); sessao.registrar(motor.ler()); } }, [motor, circuito, sessao]);
   const raizRef = useRef<HTMLDivElement>(null);
   const palcoRef = useRef<HTMLDivElement>(null);
@@ -174,6 +179,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
     let cabine: CabineGameplay | null = null;
     let reiniciarSegurado = false;
     let cameraSegurada = false;
+    let fimAte: number | null = null;
     const externa = criarVistaExterna();
     let pulsoMotor = 0;
     let ultimoDt = 0;
@@ -199,13 +205,19 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
         const pad = firstStandardPad() as GamepadLike | null;
         const borda = bordaReiniciar(pad, reiniciarSegurado);
         reiniciarSegurado = borda.segurado;
+        const fimCorrida = circuito ? sessao.registro.resultado : null;
+        if (fimCorrida && fimAte === null) fimAte = performance.now() + ESPERA_RESULTADO_MS;
         if (borda.reiniciar) {
-          if (circuito) alterarMenu(!pausado.current);
+          if (fimCorrida) { /* No resultado, Options não abre a pausa (ficava invisível). */ }
+          else if (circuito) alterarMenu(!pausado.current);
           else { setLivre(false); setRodada((n) => n + 1); }
         }
         const cameraAgora = !!pad?.buttons[COMANDOS_CABINE.camera.botao]?.pressed;
         const estavaPausado = pausado.current;
-        if (circuito && estavaPausado && cameraAgora) alterarMenu(false);
+        if (fimCorrida) {
+          // Resultado da Corrida: ✕/A recomeça (borda nova, depois de um respiro para não pular o resultado).
+          if (cameraAgora && !cameraSegurada && fimAte !== null && performance.now() >= fimAte) novaCorridaRef.current();
+        } else if (circuito && estavaPausado && cameraAgora) alterarMenu(false);
         else if (cameraAgora && !cameraSegurada && motor.ler().fase === 'dirigindo') trocarVista();
         cameraSegurada = cameraAgora;
         const olhar = pad ? { yaw: 0 - applyDeadZone(pad.axes[2] ?? 0), pitch: 0 - applyDeadZone(pad.axes[3] ?? 0) } : { yaw: 0, pitch: 0 };
@@ -306,7 +318,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
       {experiencia === 'percurso' && !livre && <PercursoCabine key={rodada} canal={motor} aoSair={() => setLivre(true)} />}
       {experiencia === 'percurso' && livre && <ConducaoLivre canal={motor} aoPercurso={() => { setLivre(false); setRodada((n) => n + 1); }} />}
       {circuito && <CircuitoHud key={volta} motor={motor} sessao={sessao} menu={menu} aoMenu={alterarMenu}
-        aoAnalisar={(relatorio) => aoAnalisarCircuito?.(relatorio)} aoNovo={() => { alterarMenu(false); setVolta((n) => n + 1); }}
+        aoAnalisar={(relatorio) => aoAnalisarCircuito?.(relatorio)} aoNovo={novaCorrida}
         touch={(key, ligada) => { const seta = setaDaTecla(key); if (seta) setasRef.current = { ...setasRef.current, [seta]: ligada }; }} />}
       {seloFps && <SeloFps palcoRef={palcoRef} />}
       <a className="gameplay-creditos-rurais" href="/models/scenario/CREDITOS.html" target="_blank" rel="noreferrer">Créditos 3D · Scenario</a>
