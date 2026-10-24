@@ -21,6 +21,12 @@ export const PREMISSAS_IMPACTO: Readonly<Record<string, { item: string; min: num
 export function veredictoIndeterminado(motivo: string, opts?: { modelo?: string; sintetico?: boolean }): Veredicto;
 export function calcularImpacto(itens: unknown, opts?: { premissas?: unknown; sintetico?: boolean }): ImpactoFinanceiro;
 export function instrucoesVeredicto(opts?: { evidenciaPorAmostra?: boolean }): string;
-export function lerVeredicto(obj: unknown, opts?: { resolverAmostra?: ((i: number) => { elapsedMs: number } | null) | null; duracaoMs?: number; frames?: Set<number> | null; modelo?: string; sintetico?: boolean; exigeInstante?: boolean }): Veredicto;
+export function lerVeredicto(obj: unknown, opts?: { resolverAmostra?: ((i: number) => { elapsedMs: number } | null) | null; duracaoMs?: number; frames?: Set<number> | null; modelo?: string; sintetico?: boolean; exigeInstante?: boolean; inicioMs?: number | null }): Veredicto;
 export function resumoVeredicto(v: Veredicto | null | undefined): { culpado: Culpado; rotulo: string; confianca: number; faixaMinBrl: number | null; faixaMaxBrl: number | null } | null;
 export function textoFaixa(f: ImpactoFinanceiro | null | undefined): string;
+/** Segundos com 1 casa ("3 s", "0,8 s"). */
+export function segundos(ms: number): string;
+/** Texto para leigo: ms → s, horário do caso → "aos X s" (com inicioMs), decimais arredondados, jargão trocado. */
+export function paraLeigo(texto: string, opts?: { inicioMs?: number | null }): string;
+/** paraLeigo em todos os textos de um veredicto já gravado. Idempotente. */
+export function veredictoEmLeigo<T extends Veredicto | null | undefined>(v: T, opts?: { inicioMs?: number | null }): T;

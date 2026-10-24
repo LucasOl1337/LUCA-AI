@@ -338,6 +338,7 @@ ${instrucoesVeredicto({ evidenciaPorAmostra: true })}`,
       if (result.toolCalls?.length || ['length', 'timeout'].includes(result.finishReason)) throw new Error('incomplete_response');
       return lerVeredicto(extractJsonObject(result.content), {
         resolverAmostra: (i) => (context.allowedIndices.has(i) ? parsed.samples[i] : null), modelo: ROUTER_MODEL, sintetico,
+        inicioMs: Date.parse(parsed.startedAt),
       });
     } catch (error) {
       console.error('[lab] verdict failed', error?.message || error);

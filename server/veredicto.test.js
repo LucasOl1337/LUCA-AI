@@ -62,3 +62,37 @@ test('indeterminado nunca carrega confiança acima de 0.3', () => {
   const v = lerVeredicto({ culpado: 'indeterminado', confianca: 0.6, porque: 'Inconclusivo.', evidencias: [{ descricao: 'x', elapsedMs: 1 }] });
   assert.equal(v.confianca, 0.3);
 });
+
+test('texto para leigo: caso "dormiu" real (ms com decimal, horário do relógio, heurística/amostra) sai em segundos', async () => {
+  const { paraLeigo, veredictoEmLeigo } = await import('../shared/veredicto.js');
+  const inicioMs = Date.parse('2026-10-24T11:40:00.000Z');
+  // Trechos literais do veredicto "dormiu" da 1ª prova (prova/v1/analise-dormiu.json).
+  const bruto = {
+    culpado: 'operador', confianca: 0.9,
+    porque: 'O alarme de sono permaneceu ativo antes do desfecho, sem resposta registrada.',
+    hipotese: 'A corrida durou 9616,67 ms de tempo ativo, aproximadamente 9,62 segundos, sem pausas registradas, e terminou em colisão declarada pelo simulador.\nForam registrados dois episódios sem resposta reconhecida: sonolência, iniciado em 3033,33 ms, e feno, iniciado em 7616,67 ms.\nA heurística contabilizou zero sinistros evitados.',
+    evidencias: [
+      { descricao: 'Às 11:40:03.217, durante o episódio de sonolência registrado no circuito, o trator seguia a 7,2 km/h.', sampleIndex: 1 },
+      { descricao: 'Aos 9.000 ms da série amostrada, o aviso de colisão estava ativo a 119 cm, com brake_pressed false.', sampleIndex: 2 },
+    ],
+    fatores_contribuintes: ['Janelas de 6583,33 ms e 2000 ms são durações de exposição.'],
+    prevencao: [{ acao: 'Parar ao primeiro alarme (reação esperada < 1500 ms).', responsavel: 'operador' }],
+    impacto: { itens: [{ chave: 'reparo_frontal_leve' }], premissas: ['Diferença de 16,67 ms entre as amostras.'] },
+  };
+  const v = lerVeredicto(bruto, { resolverAmostra: (i) => ({ elapsedMs: [0, 3200, 9000][i] }), inicioMs, sintetico: true });
+  const tudo = [v.porque, v.hipotese, ...v.evidencias.map((e) => e.descricao), ...v.fatores_contribuintes, ...v.prevencao.map((p) => p.acao), ...v.impacto_financeiro.premissas].join('\n');
+  assert.doesNotMatch(tudo, /\bms\b|milissegundo|\d{2}:\d{2}:\d{2}|heur[íi]stica|amostra|\d+,\d{2}|brake_pressed/i, tudo);
+  assert.match(v.hipotese, /durou 9,6 s de tempo ativo/);
+  assert.match(v.hipotese, /iniciado em 3 s/);
+  assert.match(v.hipotese, /iniciado em 7,6 s/);
+  assert.match(v.evidencias[0].descricao, /^Aos 3,2 s, durante/);
+  assert.match(v.evidencias[1].descricao, /^Aos 9 s da série registrada.*freio solto/);
+  assert.match(v.prevencao[0].acao, /< 1,5 s/);
+  // Instantes estruturados continuam em ms (o bloco/laudo pula para eles).
+  assert.deepEqual(v.evidencias.map((e) => e.elapsedMs), [3200, 9000]);
+  // Idempotente e aplicável a veredicto já gravado.
+  assert.deepEqual(veredictoEmLeigo(v, { inicioMs }), v);
+  assert.equal(paraLeigo('reação de 766,67 ms'), 'reação de 0,8 s');
+  assert.equal(paraLeigo('às 11:40:03.217 sem início conhecido'), 'às 11:40:03 sem início conhecido');
+  assert.equal(paraLeigo('Velocidade de 12 km/h a 158 cm.'), 'Velocidade de 12 km/h a 158 cm.');
+});

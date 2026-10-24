@@ -1,4 +1,4 @@
-import { textoFaixa, type Veredicto } from '../../../shared/veredicto.js';
+import { textoFaixa, veredictoEmLeigo, type Veredicto } from '../../../shared/veredicto.js';
 import './veredicto.css';
 
 const tempo = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
@@ -10,7 +10,8 @@ const nivel = (c: number) => (c >= 0.75 ? 'forte' : c >= 0.5 ? 'moderada' : c > 
  */
 export function VeredictoBloco({ veredicto, compacto = false, aoBuscar }: { veredicto: Veredicto | null | undefined; compacto?: boolean; aoBuscar?: (ms: number) => void }) {
   if (!veredicto) return null;
-  const v = veredicto;
+  // Veredictos gravados antes da regra de texto para leigo também saem sem 'ms' na tela.
+  const v = veredictoEmLeigo(veredicto);
   const f = v.impacto_financeiro;
   const pct = Math.round(v.confianca * 100);
   return (
