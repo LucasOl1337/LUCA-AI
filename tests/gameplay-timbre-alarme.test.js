@@ -41,13 +41,13 @@ test('nenhum alarme é senoide: buzzer e buzina têm harmônicos; sensor agudo d
   assert.notEqual(T.ALARMES.sono.hz, T.ALARMES.proximidade.hz, 'sono não se confunde com o sensor');
 });
 
-test('rajada: um pulso por item do padrão, ataque e soltura sem estalo, pico abaixo de 0,5', () => {
+test('rajada: um pulso por item do padrão, ataque e soltura sem estalo, pico abaixo de 1', () => {
   const { ctx, fontes } = contexto();
   const def = T.ALARMES.sono;
   const r = T.agendarRajada(ctx, def, ctx.destination, 1);
   const subidas = r.ganho.gain.eventos.filter(([k, v]) => k === 'ramp' && v > 0);
   assert.equal(subidas.length, def.padrao.length);
-  for (const [, v] of subidas) assert.ok(v > 0.1 && v < 0.5);
+  for (const [, v] of subidas) assert.ok(v > 0.3 && v < 1);
   assert.equal(fontes.length, 1, 'uma fonte por rajada');
   assert.ok(Math.abs(fontes[0].fim - (1 + 0.495 + 0.01)) < 1e-9, 'a fonte para logo depois do último pulso');
   assert.deepEqual(r.ganho.gain.eventos[0], ['set', 0, 1]);

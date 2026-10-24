@@ -38,8 +38,13 @@ const HARMONICOS: Record<Exclude<VozAlarme, 'ruido'>, readonly number[]> = {
   // Buzina de ré: quase quadrada, ímpares fortes e um pouco de par (o "rasgado").
   buzina: [0, 1, 0.12, 0.62, 0.08, 0.45, 0.05, 0.32, 0.03, 0.22, 0, 0.15, 0, 0.1],
 };
-/** Ganho por voz, calibrado no render offline: RMS parecido entre as vozes, pico abaixo de 0,5. */
-export const VOLUME_VOZ: Record<VozAlarme, number> = { piezo: 0.3, buzina: 0.24, ruido: 0.5 };
+/**
+ * Ganho por voz: RMS parecido entre as vozes e pico abaixo de 1 em cada uma
+ * sozinha (render offline, sem limitador). Era 0,3/0,24/0,5, pico < 0,5;
+ * triplicou em 24/10 (evento com muita caixa de som, alarmes inaudíveis). A
+ * soma com o motor passa pelo limitador mestre de `somCompartilhado`.
+ */
+export const VOLUME_VOZ: Record<VozAlarme, number> = { piezo: 0.9, buzina: 0.72, ruido: 0.95 };
 
 const pulsoSensor = (hz: number): DefinicaoAlarme => ({ voz: 'piezo', hz, periodoMs: 0, padrao: [[0, 80, 1]] });
 
@@ -169,7 +174,7 @@ export function ligarTom(ctx: BaseAudioContext, def: DefinicaoAlarme, destino: A
   const ganho = ctx.createGain();
   const t = ctx.currentTime, v = VOLUME_VOZ[def.voz] * escala;
   ganho.gain.setValueAtTime(0, t);
-  // Entra depois da soltura do último pulso: os dois não somam (pico do render < 0,35).
+  // Entra depois da soltura do último pulso: os dois não somam (pico do render < 1).
   ganho.gain.setValueAtTime(0, t + SOLTURA_S);
   ganho.gain.linearRampToValueAtTime(v, t + SOLTURA_S + ATAQUE_S);
   const { no } = fonte(ctx, def, ganho);

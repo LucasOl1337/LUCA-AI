@@ -35,6 +35,13 @@ export interface SomCompartilhado {
   /** Onde os efeitos ligam a saída (bipe, tons): passa pela chave de `segurar`. */
   destino?(): AudioNode | null;
   /**
+   * Saída mestre do contexto, com o limitador na frente (Lucas, 24/10: evento
+   * com muita caixa de som, "aumentar o máximo possível sem estourar").
+   * Motor e efeitos ligam aqui, não em `ctx.destination`: cada um pode chegar
+   * perto de 0 dBFS sozinho e a soma deles nunca clipa.
+   */
+  saida?(): AudioNode | null;
+  /**
    * Um som por vez no Totem (Lucas, 23/10): com a Coruja falando os efeitos
    * ficam mudos e voltam quando ela termina. O alarme de sono não espera: ele
    * corta a fala, e quem o toca liga direto no destino.
@@ -44,12 +51,27 @@ export interface SomCompartilhado {
 
 /** Saída de um efeito: a chave mestre do contexto compartilhado, ou o destino direto. */
 export function saidaEfeito(som: SomCompartilhado, ctx: AudioContext): AudioNode {
-  return som.destino?.() ?? ctx.destination;
+  return som.destino?.() ?? saidaMestre(som, ctx);
 }
+
+/** Saída de quem não passa pela chave (motor): o limitador mestre, ou o destino direto. */
+export function saidaMestre(som: SomCompartilhado, ctx: AudioContext): AudioNode {
+  return som.saida?.() ?? ctx.destination;
+}
+
+/**
+ * Limitador mestre: 20:1 acima de -12 dBFS, joelho curto, ataque 3 ms. O
+ * compressor da Web Audio aplica ganho de compensação sozinho (full-range
+ * makeup): o que fica abaixo do limiar sobe ~7 dB e o pico de saída para em
+ * cerca de -4,6 dBFS por mais fontes que somem. Release de 250 ms: o pulso do
+ * motor é mais rápido que isso e não bombeia.
+ */
+export const LIMITADOR = { threshold: -12, knee: 4, ratio: 20, attack: 0.003, release: 0.25 } as const;
 
 export function criarSomCompartilhado(Contexto: ConstrutorContexto | undefined = globalThis.AudioContext): SomCompartilhado {
   let contexto: AudioContext | null = null;
   let mestre: GainNode | null = null;
+  let limitador: AudioNode | null = null;
   let segurado = false;
 
   const obter = (): AudioContext | null => {
@@ -83,13 +105,27 @@ export function criarSomCompartilhado(Contexto: ConstrutorContexto | undefined =
     };
   };
 
+  const saida = (): AudioNode | null => {
+    const ctx = obter();
+    if (!ctx) return null;
+    if (limitador?.context !== ctx) {
+      // Sem compressor (contexto mínimo de teste): direto no destino.
+      const c = ctx.createDynamicsCompressor?.();
+      if (!c) return ctx.destination;
+      for (const [k, v] of Object.entries(LIMITADOR)) c[k as keyof typeof LIMITADOR].value = v;
+      c.connect(ctx.destination);
+      limitador = c;
+    }
+    return limitador;
+  };
+
   const destino = (): AudioNode | null => {
     const ctx = obter();
     if (!ctx) return null;
     if (mestre?.context !== ctx) {
       mestre = ctx.createGain();
       mestre.gain.value = segurado ? 0 : 1;
-      mestre.connect(ctx.destination);
+      mestre.connect(saida() ?? ctx.destination);
     }
     return mestre;
   };
@@ -102,7 +138,7 @@ export function criarSomCompartilhado(Contexto: ConstrutorContexto | undefined =
     mestre.gain.setValueAtTime(sim ? 0 : 1, agora);
   };
 
-  return { obter, destravar, ligarDestravas, destino, segurar };
+  return { obter, destravar, ligarDestravas, destino, saida, segurar };
 }
 
 export const somCompartilhado = criarSomCompartilhado(typeof AudioContext === 'undefined' ? undefined : AudioContext);

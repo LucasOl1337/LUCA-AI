@@ -1,13 +1,19 @@
 import type { EstadoGameplay } from './estadoGameplay';
-import { somCompartilhado, type SomCompartilhado } from './somCompartilhado';
+import { saidaMestre, somCompartilhado, type SomCompartilhado } from './somCompartilhado';
 
 const limitar = (n: number) => Math.max(0, Math.min(1, n));
-/** Mix de fundo fixo: não depende do estado de fala da Coruja. */
+/**
+ * Mix de fundo fixo: não depende do estado de fala da Coruja. Ganho de 0,6
+ * (lenta) a 1,0 (carga cheia): os loops têm pico de -0,7/-3,2 dBFS, então o
+ * motor sozinho chega perto do fundo de escala e o limitador mestre
+ * (`LIMITADOR` em somCompartilhado) segura a soma com os alarmes. Era
+ * 0,10–0,22 e não dava pra ouvir no evento (Lucas, 24/10).
+ */
 export function parametrosMotor(e: EstadoGameplay) {
   const acelerador = limitar(e.comandos.acelerador);
   const velocidade = limitar(e.maquina.velocidadeKph / Math.max(1, e.tetoKph));
   const carga = limitar((0.65 * acelerador + 0.35 * velocidade) * (1 - limitar(e.comandos.freio) * 0.8));
-  return { carga, rate: 0.85 + 0.45 * carga, ganho: 0.1 + 0.12 * carga };
+  return { carga, rate: 0.85 + 0.45 * carga, ganho: 0.6 + 0.4 * carga };
 }
 
 /** Sobrepõe cauda/início em 150ms: a emenda não depende do padding MP3. */
@@ -73,8 +79,8 @@ export function criarSomMotor(som: SomCompartilhado = somCompartilhado) {
       camadas = buffers.map((buffer) => {
         const fonte = ctx.createBufferSource(), ganho = ctx.createGain();
         fonte.buffer = buffer; fonte.loop = true; ganho.gain.value = 0;
-        // Fundo contínuo fora do portão dos efeitos: nunca ducking da fala/motor.
-        fonte.connect(ganho); ganho.connect(ctx.destination); fonte.start();
+        // Fundo contínuo fora do portão dos efeitos (nunca ducking da fala/motor), mas dentro do limitador mestre.
+        fonte.connect(ganho); ganho.connect(saidaMestre(som, ctx)); fonte.start();
         return { fonte, ganho };
       });
     }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
 const origem = fs.readFileSync(new URL('../src/components/gameplay/somMotor.ts', import.meta.url), 'utf8');
-const js = ts.transpileModule(origem.replace("import { somCompartilhado, type SomCompartilhado } from './somCompartilhado';", 'const somCompartilhado = {};'), { compilerOptions: { module: ts.ModuleKind.ES2022 } }).outputText;
+const js = ts.transpileModule(origem.replace("import { saidaMestre, somCompartilhado, type SomCompartilhado } from './somCompartilhado';", 'const somCompartilhado = {}; const saidaMestre = (som, ctx) => som.saida?.() ?? ctx.destination;'), { compilerOptions: { module: ts.ModuleKind.ES2022 } }).outputText;
 const { parametrosMotor, fecharLoop, criarSomMotor } = await import('data:text/javascript;base64,' + Buffer.from(js).toString('base64'));
 const estado = (acelerador = 0, velocidadeKph = 0, freio = 0, fase = 'dirigindo') => ({ comandos: { acelerador, freio }, maquina: { velocidadeKph }, tetoKph: 12, fase });
 
