@@ -40,6 +40,8 @@ export interface EstadoTrator {
   freioParadoS?: number;
   /** L2 solto com o trator parado: a próxima pressão engata a ré na hora. */
   reArmada?: boolean;
+  /** Bateu ou está apoiado na cerca do talhão neste passo (Lupa D8). Não é `contato`: não encerra desafio nem corrida. */
+  cerca?: boolean;
 }
 
 export interface MundoTrator { obstaculos: readonly ObstaculoGameplay[]; tetoKph: number }
@@ -135,9 +137,11 @@ export function passoTrator(estado: EstadoTrator, comando: ComandoVolante, dt: n
   }
   const livreX = estado.x + Math.cos(rumo) * passo, livreZ = estado.z - Math.sin(rumo) * passo;
   const x = limitar(livreX, -TRATOR.cercaM, TRATOR.cercaM), z = limitar(livreZ, -TRATOR.cercaM, TRATOR.cercaM);
-  if (x !== livreX || z !== livreZ) v = 0;
+  const naCerca = x !== livreX || z !== livreZ;
+  if (naCerca) v = 0;
   return {
     x, z, rumo, velocidade: v, percurso: estado.percurso + passo, guinada: v === 0 ? 0 : guinada, freioParadoS, reArmada,
+    cerca: naCerca,
     // Continua encostado enquanto empurra o fardo parado.
     contato: contato || (estado.contato && v === 0 && acelerador > 0),
   };

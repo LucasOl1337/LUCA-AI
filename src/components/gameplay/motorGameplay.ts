@@ -37,13 +37,16 @@ export interface MotorGameplay extends CanalGameplay {
 
 const arredondar = (valor: number, casas = 2) => { const f = 10 ** casas; const r = Math.round(valor * f) / f; return r === 0 ? 0 : r; };
 
+/** Encostar na cerca abaixo disso (apoiado, empurrando) não dá batida. */
+export const CERCA_MIN_KPH = 0.8;
+
 export function criarMotorGameplay(agora: () => number = () => performance.now()): MotorGameplay {
   let inicio: Required<InicioGameplay> = INICIO_LIVRE;
   let trator = criarTrator(0);
   let comando: ComandoVolante = COMANDO_PARADO;
   let fase: EstadoGameplay['fase'] = 'pronto';
   let tempoMs = 0;
-  let alerta = false, contato = false, inclinado = false;
+  let alerta = false, contato = false, inclinado = false, naCerca = false;
   let ultimoAviso = -Infinity;
   let atitude = { rolagemGraus: 0, arfagemGraus: 0 };
   const assinantes = new Set<() => void>();
@@ -85,7 +88,7 @@ export function criarMotorGameplay(agora: () => number = () => performance.now()
     trator = criarTrator(Math.max(-limite, Math.min(limite, inicio.x)), Math.max(-limite, Math.min(limite, inicio.z)), inicio.rumoGraus * Math.PI / 180);
     comando = COMANDO_PARADO;
     fase = 'pronto'; tempoMs = 0;
-    alerta = contato = inclinado = false;
+    alerta = contato = inclinado = naCerca = false;
     atitude = { rolagemGraus: 0, arfagemGraus: 0 };
     retrato = montarRetrato();
     avisar();
@@ -118,6 +121,10 @@ export function criarMotorGameplay(agora: () => number = () => performance.now()
     if (retrato.sensor.alerta !== alerta) { alerta = retrato.sensor.alerta; eventos.push({ tipo: 'alerta', ligado: alerta, tempoMs: retrato.tempoMs }); }
     if (trator.contato && !contato) eventos.push({ tipo: 'contato', tempoMs: retrato.tempoMs, velocidadeKph: arredondar(Math.abs(antes.velocidade) * 3.6, 2) });
     contato = trator.contato;
+    // Cerca do talhão (Lupa D8): antes parava seco sem nada; agora uma borda por batida, com a velocidade de entrada.
+    const kphCerca = arredondar(Math.abs(antes.velocidade) * 3.6, 2);
+    if (trator.cerca && !naCerca && kphCerca >= CERCA_MIN_KPH) eventos.push({ tipo: 'cerca', tempoMs: retrato.tempoMs, velocidadeKph: kphCerca });
+    naCerca = !!trator.cerca;
     const bandas = physicalRiskBands({ pitch: retrato.atitude.arfagemGraus, roll: retrato.atitude.rolagemGraus });
     if (bandas.inclination !== inclinado) { inclinado = bandas.inclination; eventos.push({ tipo: 'inclinacao', ligado: inclinado, tempoMs: retrato.tempoMs, graus: bandas.angle }); }
     for (const evento of eventos) emitir(evento);
@@ -142,6 +149,6 @@ export function criarMotorGameplay(agora: () => number = () => performance.now()
 export type PedidoVibracao = 'alerta' | 'contato';
 export function vibracaoDoEvento(evento: EventoGameplay): PedidoVibracao | null {
   if (evento.tipo === 'alerta' && evento.ligado) return 'alerta';
-  if (evento.tipo === 'contato') return 'contato';
+  if (evento.tipo === 'contato' || evento.tipo === 'cerca') return 'contato';
   return null;
 }

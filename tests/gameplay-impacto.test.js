@@ -81,3 +81,40 @@ test('trepidação da cabine (Lupa D6): parado não treme; a 12 km/h treme pouco
   assert.equal(impacto.trepidacaoCabine(12, 0.3, true).arfagemGraus, 0, 'movimento reduzido');
   assert.equal(impacto.trepidacaoCabine(Number.NaN, 0.3).alturaM, 0);
 });
+
+const { vibracaoDoEvento, CERCA_MIN_KPH } = await loadFrontendModule('../../src/components/gameplay/motorGameplay.ts');
+const { TRATOR } = await loadFrontendModule('../../src/components/gameplay/fisicaTrator.ts');
+
+test('cerca do talhão (Lupa D8): bater a 12 km/h dá uma borda com vibração; apoiado empurrando não repete; não vira colisão', () => {
+  const motor = criarMotorGameplay(() => 0);
+  motor.reiniciar({ x: TRATOR.cercaM - 20, z: 0, rumoGraus: 0, tetoKph: 12, obstaculos: [] });
+  const eventos = [];
+  motor.aoEvento((e) => eventos.push(e));
+  let e = motor.ler();
+  for (let i = 0; i < 60 * 15; i += 1) e = motor.quadro(1 / 60, { esterco: 0, acelerador: 1, freio: 0 });
+  const cercas = eventos.filter((ev) => ev.tipo === 'cerca');
+  assert.equal(cercas.length, 1, 'uma batida, não uma por quadro');
+  assert.ok(cercas[0].velocidadeKph > 11.9, `entrada ${cercas[0].velocidadeKph}`);
+  assert.equal(vibracaoDoEvento(cercas[0]), 'contato');
+  assert.ok(impacto.volumeBaque(cercas[0].velocidadeKph) > 0.3);
+  assert.equal(eventos.some((ev) => ev.tipo === 'contato'), false, 'cerca não é contato de obstáculo');
+  assert.equal(e.contato, false);
+  assert.equal(e.maquina.x, TRATOR.cercaM);
+  // Recua com L2 e volta a bater: rearma.
+  for (let i = 0; i < 60 * 3; i += 1) motor.quadro(1 / 60, { esterco: 0, acelerador: 0, freio: 1 });
+  for (let i = 0; i < 60 * 6; i += 1) motor.quadro(1 / 60, { esterco: 0, acelerador: 1, freio: 0 });
+  assert.equal(eventos.filter((ev) => ev.tipo === 'cerca').length, 2);
+});
+
+test('cerca do talhão (Lupa D8): encostar devagar (abaixo de 0,8 km/h) não dá batida', () => {
+  const motor = criarMotorGameplay(() => 0);
+  motor.reiniciar({ x: TRATOR.cercaM - 1, z: 0, rumoGraus: 0, tetoKph: 12, obstaculos: [] });
+  const eventos = [];
+  motor.aoEvento((e) => eventos.push(e));
+  // R2 leve = alvo 0,7 km/h (D3): chega à cerca devagar.
+  let e = motor.ler();
+  for (let i = 0; i < 60 * 10; i += 1) e = motor.quadro(1 / 60, { esterco: 0, acelerador: 0.06, freio: 0 });
+  assert.equal(e.maquina.x, TRATOR.cercaM, 'chegou na cerca');
+  assert.ok(CERCA_MIN_KPH > 0);
+  assert.equal(eventos.filter((ev) => ev.tipo === 'cerca').length, 0);
+});

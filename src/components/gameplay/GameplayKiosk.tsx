@@ -148,7 +148,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
   const trancoRef = useRef<Tranco | null>(null);
   const baque = useMemo(() => criarBaque(), []);
   useEffect(() => motor.aoEvento((evento) => {
-    if (evento.tipo === 'contato') {
+    if (evento.tipo === 'contato' || evento.tipo === 'cerca') {
       trancoRef.current = { velocidadeKph: evento.velocidadeKph, inicioMs: performance.now() };
       baque.tocar(evento.velocidadeKph);
     }

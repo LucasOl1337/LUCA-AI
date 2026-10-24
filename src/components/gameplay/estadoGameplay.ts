@@ -43,7 +43,9 @@ export type EventoGameplay =
   | { tipo: 'contato'; tempoMs: number; velocidadeKph: number }
   /** Borda do classificador de inclinação da Operador (shared/); só a partir do item 3. */
   | { tipo: 'inclinacao'; ligado: boolean; tempoMs: number; graus: number }
-  | { tipo: 'fim'; tempoMs: number; motivo: string };
+  | { tipo: 'fim'; tempoMs: number; motivo: string }
+  /** Encostou na cerca do talhão (Lupa D8): só retorno ao piloto (baque, tranco e vibração); não conta como colisão. */
+  | { tipo: 'cerca'; tempoMs: number; velocidadeKph: number };
 
 /** Pose e mundo de partida que o desafio passa ao `reiniciar`. Tudo opcional: sem nada, volta ao começo da condução livre. */
 export interface InicioGameplay {
