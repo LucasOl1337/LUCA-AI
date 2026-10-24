@@ -40,6 +40,16 @@ test('mourões e fios seguem o relevo, 2 draw calls, dispose solta tudo', () => 
   fios.getMatrixAt(0, m); pos.setFromMatrixPosition(m);
   mouroes.getMatrixAt(0, m); const base = new THREE.Vector3().setFromMatrixPosition(m);
   assert.ok(Math.abs(pos.y - (base.y + CERCA_FIOS_M[0])) < 1e-5);
+  // O fio de comprimento 1 (eixo +x local) termina no mourão seguinte.
+  mouroes.getMatrixAt(1, m); const prox = new THREE.Vector3().setFromMatrixPosition(m);
+  fios.getMatrixAt(0, m); const ponta = new THREE.Vector3(1, 0, 0).applyMatrix4(m);
+  assert.ok(Math.abs(ponta.x - prox.x) < 1e-4 && Math.abs(ponta.z - prox.z) < 1e-4 && Math.abs(ponta.y - (prox.y + CERCA_FIOS_M[0])) < 1e-4);
+  const bb = fios.geometry.boundingBox ?? (fios.geometry.computeBoundingBox(), fios.geometry.boundingBox);
+  assert.ok(Math.abs(bb.min.x) < 1e-6 && Math.abs(bb.max.x - 1) < 1e-6 && bb.max.y - bb.min.y < 0.03);
+  // Orçamento: cerca real (248 mourões) abaixo de 12k triângulos por passada.
+  const tri = (g) => (g.index ? g.index.count : g.attributes.position.count) / 3;
+  const real = mouroesDaCerca(92.6).length;
+  assert.ok(real * (tri(mouroes.geometry) + CERCA_FIOS_M.length * tri(fios.geometry)) < 12000);
   let soltos = 0;
   for (const obj of [mouroes, fios]) { obj.geometry.addEventListener('dispose', () => soltos++); obj.material.addEventListener('dispose', () => soltos++); }
   cerca.dispose();

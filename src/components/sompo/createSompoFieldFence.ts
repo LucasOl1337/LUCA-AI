@@ -20,17 +20,19 @@ export function mouroesDaCerca(meio: number, vao = CERCA_VAO_M) {
 /**
  * Cerca do limite físico do trator (TRATOR.cercaM): antes o trator parava numa
  * parede invisível. Só visual, sem colisor nem eco: o limite continua sendo o
- * da física. Mourões de eucalipto instanciados (1 draw call + sombra) e três
- * fios de arame instanciados (1 draw call), seguindo o relevo.
+ * da física. Mourões de eucalipto instanciados (4 faces; 1 draw call + sombra) e
+ * três fios de arame instanciados (1 draw call), seguindo o relevo. ~12k triângulos
+ * por quadro com a sombra (eram ~21k com mourão de 6 faces e fio em caixa).
  */
 export function createSompoFieldFence(parent: THREE.Object3D, meio: number, ground: (x: number, z: number) => number) {
   const root = new THREE.Group(); root.name = 'sompo-cerca-talhao';
   const pontos = mouroesDaCerca(meio);
-  const mouraoGeo = new THREE.CylinderGeometry(0.055, 0.075, CERCA_ALTURA_M + 0.25, 6); mouraoGeo.translate(0, (CERCA_ALTURA_M + 0.25) / 2 - 0.25, 0);
+  const mouraoGeo = new THREE.CylinderGeometry(0.055, 0.075, CERCA_ALTURA_M + 0.25, 4); mouraoGeo.translate(0, (CERCA_ALTURA_M + 0.25) / 2 - 0.25, 0);
   const madeira = new THREE.MeshStandardMaterial({ color: 0x6b5638, roughness: 0.95 });
   const mouroes = new THREE.InstancedMesh(mouraoGeo, madeira, pontos.length);
   mouroes.name = 'cerca-mouroes'; mouroes.castShadow = true; mouroes.receiveShadow = true;
-  const fioGeo = new THREE.BoxGeometry(1, 0.018, 0.018); fioGeo.translate(0.5, 0, 0);
+  // Arame: prisma de 3 faces sem tampa (6 triângulos) em vez de caixa (12); de 1 cm não se distingue.
+  const fioGeo = new THREE.CylinderGeometry(0.009, 0.009, 1, 3, 1, true); fioGeo.rotateZ(-Math.PI / 2); fioGeo.translate(0.5, 0, 0);
   const arame = new THREE.MeshStandardMaterial({ color: 0x5d5f5c, roughness: 0.55, metalness: 0.6 });
   const fios = new THREE.InstancedMesh(fioGeo, arame, pontos.length * CERCA_FIOS_M.length);
   fios.name = 'cerca-fios';
