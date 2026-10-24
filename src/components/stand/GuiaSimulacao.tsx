@@ -6,6 +6,7 @@ import { ComandosCabineVisual } from './ComandosCabineVisual';
 import { criarContagemGuia, GUIA_AUTOINICIO_MS, type ContagemGuia } from './contagemGuia';
 import './guiaCabine.css';
 import { padConsumiuConfirmar } from './focoPadDom';
+import { Atalho } from './IconePad';
 
 /**
  * Guia antes de dirigir: mostra os comandos e começa sozinha em 5 s (Lucas, 24/10).
@@ -49,7 +50,7 @@ export function GuiaSimulacao({ aoComecar, comVoz, autoInicioMs = GUIA_AUTOINICI
     <ComandosCabineVisual entrada={entrada} />
     <footer><div><strong className="cabine-contagem" role="timer" aria-live="polite" data-segundos={segundos}>Começando em <b>{segundos}</b>…</strong><p>Começa sozinha. A pausa reúne ajuda, saída e sonolência opcional.</p>
       {!comVoz && <small>Assistente de voz indisponível agora.</small>}</div>
-      <button type="button" onClick={agora}>Começar já <kbd>{entrada === 'teclado' ? 'Enter' : C.confirmar[entrada]}</kbd></button>
+      <button type="button" onClick={agora}>Começar já <Atalho entrada={entrada} botao="cruz" tecla="Enter" xbox={C.confirmar.xbox} /></button>
     </footer>
   </section>;
 }

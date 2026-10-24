@@ -19,29 +19,32 @@ export const REPETE_CADA_MS = 160;
 /** Analógico vale como seta só bem inclinado (não disputa com o olhar da cabine). */
 export const LIMIAR_ANALOGICO = 0.6;
 
-export interface EstadoSetas { direcao: Direcao | null; desde: number; ultimo: number }
-export const SETAS_SOLTAS: EstadoSetas = { direcao: null, desde: 0, ultimo: 0 };
+/** De onde veio a seta: na Simulação o analógico é o volante, só o D-pad anda o foco do HUD. */
+export type OrigemSeta = 'dpad' | 'analogico';
+export interface EstadoSetas { direcao: Direcao | null; origem: OrigemSeta; desde: number; ultimo: number }
+export const SETAS_SOLTAS: EstadoSetas = { direcao: null, origem: 'dpad', desde: 0, ultimo: 0 };
 
-function direcaoSegurada(pad: GamepadLike): Direcao | null {
+function direcaoSegurada(pad: GamepadLike): { direcao: Direcao; origem: OrigemSeta } | null {
   for (const [direcao, indice] of Object.entries(BOTOES_DPAD) as [Direcao, number][]) {
-    if (pad.buttons[indice]?.pressed) return direcao;
+    if (pad.buttons[indice]?.pressed) return { direcao, origem: 'dpad' };
   }
   const x = applyDeadZone(pad.axes[0] ?? 0);
   const y = applyDeadZone(pad.axes[1] ?? 0);
   if (Math.max(Math.abs(x), Math.abs(y)) < LIMIAR_ANALOGICO) return null;
-  if (Math.abs(x) > Math.abs(y)) return x > 0 ? 'direita' : 'esquerda';
-  return y > 0 ? 'baixo' : 'cima';
+  const direcao: Direcao = Math.abs(x) > Math.abs(y) ? (x > 0 ? 'direita' : 'esquerda') : (y > 0 ? 'baixo' : 'cima');
+  return { direcao, origem: 'analogico' };
 }
 
 /** Um passo por toque e repetição ao segurar; trocar de direção conta como toque novo. */
-export function lerSetas(pad: GamepadLike | null | undefined, prev: EstadoSetas, agora: number): { passo: Direcao | null; next: EstadoSetas } {
-  const direcao = pad && pad.mapping === 'standard' ? direcaoSegurada(pad) : null;
-  if (!direcao) return { passo: null, next: SETAS_SOLTAS };
-  if (direcao !== prev.direcao) return { passo: direcao, next: { direcao, desde: agora, ultimo: agora } };
+export function lerSetas(pad: GamepadLike | null | undefined, prev: EstadoSetas, agora: number): { passo: Direcao | null; origem: OrigemSeta; next: EstadoSetas } {
+  const segurada = pad && pad.mapping === 'standard' ? direcaoSegurada(pad) : null;
+  if (!segurada) return { passo: null, origem: 'dpad', next: SETAS_SOLTAS };
+  const { direcao, origem } = segurada;
+  if (direcao !== prev.direcao || origem !== prev.origem) return { passo: direcao, origem, next: { direcao, origem, desde: agora, ultimo: agora } };
   if (agora - prev.desde >= REPETE_APOS_MS && agora - prev.ultimo >= REPETE_CADA_MS) {
-    return { passo: direcao, next: { ...prev, ultimo: agora } };
+    return { passo: direcao, origem, next: { ...prev, ultimo: agora } };
   }
-  return { passo: null, next: prev };
+  return { passo: null, origem, next: prev };
 }
 
 export interface Caixa { x: number; y: number; w: number; h: number }

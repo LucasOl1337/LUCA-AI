@@ -32,6 +32,7 @@ import type { ObstaculoGameplay } from './estadoGameplay';
 import { aoVivo } from '@/lib/gameplayAoVivo';
 import './gameplayKiosk.css';
 import { focoPadExplicito, padConsumiuConfirmar } from '../stand/focoPadDom';
+import { AtalhoCabine, RotuloCamera } from './AtalhoCabine';
 
 /** Look do mundo vindo da Visual; constante de módulo (não remonta o palco). */
 export interface MundoGameplay {
@@ -267,7 +268,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
         }
         const cameraCrua = !!pad?.buttons[COMANDOS_CABINE.camera.botao]?.pressed;
         // ✕ com item aceso pelo D-pad (pausa, resultado) é do foco: o jogo não troca câmera nem fecha a pausa.
-        const cameraAgora = cameraCrua && !padConsumiuConfirmar() && !focoPadExplicito(document, true);
+        const cameraAgora = cameraCrua && !padConsumiuConfirmar() && !focoPadExplicito();
         const estavaPausado = pausado.current;
         if (fimCorrida) {
           // Resultado da Corrida: ✕/A recomeça (borda nova, depois de um respiro para não pular o resultado).
@@ -376,7 +377,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
           alvo.addEventListener('pointercancel', parar);
         }}
       />
-      <div className="gameplay-vista" aria-live="polite">Vista {vista === 'externa' ? 'externa' : 'da cabine'} · {COMANDOS_CABINE.camera.ps}/{COMANDOS_CABINE.camera.xbox} · C</div>
+      <div className="gameplay-vista" aria-live="polite">Vista {vista === 'externa' ? 'externa' : 'da cabine'} · <RotuloCamera /></div>
       {experiencia === 'desafios' && <DesafioCabine key={rodada} canal={motor} />}
       {experiencia === 'percurso' && !livre && <PercursoCabine key={rodada} canal={motor} aoSair={() => setLivre(true)} />}
       {experiencia === 'percurso' && livre && <ConducaoLivre canal={motor} aoPercurso={() => { setLivre(false); setRodada((n) => n + 1); }} />}
@@ -386,7 +387,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
         webcam={webcam} aoWebcam={setWebcam} />}
       {circuito && <WebcamCircuito motor={motor} sessao={sessao} menu={menu} ligada={webcam} />}
       {seloFps && <SeloFps palcoRef={palcoRef} />}
-      <a className="gameplay-creditos-rurais" href="/models/scenario/CREDITOS.html" target="_blank" rel="noreferrer">Créditos 3D · Scenario</a>
+      <a className="gameplay-creditos-rurais" data-foco-pular="" href="/models/scenario/CREDITOS.html" target="_blank" rel="noreferrer">Créditos 3D · Scenario</a>
     </div>
   );
 }
@@ -398,7 +399,7 @@ function ConducaoLivre({ canal, aoPercurso }: { canal: MotorGameplay; aoPercurso
     <div className="gameplay-desafio gameplay-percurso" data-etapa="livre">
       <PainelCabine canal={canal} />
       <div className="gameplay-percurso-acoes gameplay-percurso-livre">
-        <button type="button" data-acao="percurso" onClick={aoPercurso}><kbd>Options</kbd> Percurso guiado</button>
+        <button type="button" data-acao="percurso" onClick={aoPercurso}><AtalhoCabine botao="options" tecla="Options" xbox="Menu" /> Percurso guiado</button>
       </div>
     </div>
   );

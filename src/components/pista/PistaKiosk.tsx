@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { comandoDesejado, setaDaTecla, SETAS_SOLTAS, bordaReiniciar, type SetasVolante } from '../gameplay/volante';
 import { COMANDOS_CABINE } from '../gameplay/comandosCabine';
+import { RotuloCamera } from '../gameplay/AtalhoCabine';
+import { focoPadExplicito, padConsumiuConfirmar } from '../stand/focoPadDom';
 import { applyDeadZone, type GamepadLike } from '../sompo/gamepadMapping';
 import { firstStandardPad, rumble } from '../sompo/gamepadLoop';
 import { stepLook } from '../sompo/firstPersonLook';
@@ -85,11 +87,13 @@ export default function PistaKiosk({ seloFps = false, aoAnalisar, aoTrocar }: { 
         const fim = s.registro.resultado;
         if (fim && fimAte === null) fimAte = performance.now() + ESPERA_RESULTADO_MS;
         if (opcoes.reiniciar && !fim) alterarMenu(!e.menu);
-        const cameraAgora = !!pad?.buttons[COMANDOS_CABINE.camera.botao]?.pressed;
+        const cameraCrua = !!pad?.buttons[COMANDOS_CABINE.camera.botao]?.pressed;
+        // ✕ com item aceso pelo D-pad (HUD, pausa, resultado) é do foco: o jogo não troca câmera nem fecha a pausa.
+        const cameraAgora = cameraCrua && !padConsumiuConfirmar() && !focoPadExplicito();
         if (fim) { if (cameraAgora && !cameraSegura && fimAte !== null && performance.now() >= fimAte) novaRef.current(); }
         else if (e.menu && cameraAgora && !cameraSegura) alterarMenu(false);
         else if (cameraAgora && !cameraSegura && c.ler().fase === 'dirigindo') trocarVista();
-        cameraSegura = cameraAgora;
+        cameraSegura = cameraCrua;
         const fmPad = !!pad && pad.mapping === 'standard' && (!!pad.buttons[BOTAO_FREIO_MOTOR.botao]?.pressed || !!pad.buttons[BOTAO_FREIO_MOTOR.botaoAlt]?.pressed);
         const freioMotor = fmPad || freioMotorTecla.current;
         if (freioMotor && !fmSeguro && !fim) rumble('alert');
@@ -156,6 +160,6 @@ export default function PistaKiosk({ seloFps = false, aoAnalisar, aoTrocar }: { 
     <div ref={palcoRef} className="pista-kiosk-palco" />
     {seloFps && <SeloFps palcoRef={raizRef} />}
     <PistaHud key={volta} r={retrato} sessao={sessao} menu={menu} aoMenu={alterarMenu} aoNovo={novaCorrida} aoAnalisar={(rel) => aoAnalisar?.(rel)} aoTrocar={() => aoTrocar?.()} touch={touch} />
-    {retrato.fase === 'dirigindo' && <p className="pista-vista">{vista === 'externa' ? 'Câmera externa' : 'Cabine'} · ✕/A ou C troca</p>}
+    {retrato.fase === 'dirigindo' && <p className="pista-vista">{vista === 'externa' ? 'Câmera externa' : 'Cabine'} · <RotuloCamera /> troca</p>}
   </div>;
 }

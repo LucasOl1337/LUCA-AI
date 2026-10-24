@@ -5,11 +5,11 @@
 
 import './iconePad.css';
 
-export type BotaoPad = 'cruz' | 'bola' | 'triangulo' | 'quadrado' | 'ps' | 'options' | 'dpad' | 'l1';
+export type BotaoPad = 'cruz' | 'bola' | 'triangulo' | 'quadrado' | 'ps' | 'options' | 'dpad' | 'l1' | 'r1' | 'l2' | 'r2';
 
 const NOME: Record<BotaoPad, string> = {
   cruz: 'botão X', bola: 'botão bola', triangulo: 'botão triângulo', quadrado: 'botão quadrado',
-  ps: 'botão PS', options: 'botão Options', dpad: 'setas', l1: 'botão L1',
+  ps: 'botão PS', options: 'botão Options', dpad: 'setas', l1: 'botão L1', r1: 'botão R1', l2: 'gatilho L2', r2: 'gatilho R2',
 };
 
 function Simbolo({ botao }: { botao: BotaoPad }) {
@@ -20,7 +20,8 @@ function Simbolo({ botao }: { botao: BotaoPad }) {
     case 'quadrado': return <rect x="6.6" y="6.6" width="10.8" height="10.8" rx="0.6" stroke="#ff85dc" />;
     case 'dpad': return <path d="M9.5 4.5h5v5h5v5h-5v5h-5v-5h-5v-5h5z" stroke="#e8edf5" strokeLinejoin="round" strokeWidth="1.6" />;
     case 'ps': return <text x="12" y="15.6" textAnchor="middle" fontSize="9.5" fontWeight="800" fill="#e8edf5" stroke="none">PS</text>;
-    case 'l1': return <text x="12" y="15.6" textAnchor="middle" fontSize="9" fontWeight="800" fill="#e8edf5" stroke="none">L1</text>;
+    case 'l1': case 'r1': case 'l2': case 'r2':
+      return <text x="12" y="15.6" textAnchor="middle" fontSize="9" fontWeight="800" fill="#e8edf5" stroke="none">{botao.toUpperCase()}</text>;
     case 'options': return <path d="M7.5 9h9M7.5 12h9M7.5 15h9" stroke="#e8edf5" strokeLinecap="round" strokeWidth="1.8" />;
   }
 }
@@ -34,6 +35,15 @@ export function IconePad({ botao, rotulo }: { botao: BotaoPad; rotulo?: string }
       </svg>
     </span>
   );
+}
+
+/**
+ * Atalho do jogo: com o DualSense em uso, o ícone do botão; no teclado ou no Xbox, o nome
+ * escrito (Lucas, 24/10: nada de "tecla de PC" quando quem joga está no controle).
+ */
+export function Atalho({ entrada, botao, tecla, xbox }: { entrada: 'teclado' | 'ps' | 'xbox'; botao: BotaoPad; tecla: string; xbox?: string }) {
+  if (entrada === 'ps') return <IconePad botao={botao} />;
+  return <kbd>{entrada === 'xbox' && xbox ? xbox : tecla}</kbd>;
 }
 
 /** Faixa de dicas do Totem quando há controle: o que cada botão faz fora da corrida. */

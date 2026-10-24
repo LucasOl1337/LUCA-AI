@@ -6,7 +6,8 @@ import { primeiroItem, proximoNaDirecao, type Caixa, type Direcao } from './foco
  * Escopo: o diálogo de cima (menu do Totem, pausa e resultado da corrida, chat da
  * corrida: `[aria-modal]`, `[role=dialog]` ou `[data-foco-escopo]`); sem diálogo,
  * a tela inteira do stand, incluindo a página do Site no iframe (mesma origem).
- * Na Simulação, sem diálogo não há foco: o D-pad e o ✕ ficam com o jogo.
+ * Na Simulação, sem diálogo só o D-pad anda pelos botões do HUD (o analógico é o volante);
+ * o foco do HUD apaga sozinho depois de uns segundos sem seta.
  *
  * Marcações nos componentes:
  * - `data-pad-voltar`: o que ○ aperta naquele escopo (fechar, voltar, continuar);
@@ -59,6 +60,9 @@ function itensDoSite(frame: HTMLIFrameElement): Item[] {
   const r = frame.getBoundingClientRect();
   return itensDe(escopoDe(doc) ?? doc, { x: r.left, y: r.top });
 }
+
+/** Há diálogo aberto (menu, pausa, resultado, chat, guia)? */
+export function temEscopoPad(doc: Document = document): boolean { return escopoDe(doc) !== null; }
 
 /** Itens navegáveis agora; `null` = não há o que focar (Simulação sem diálogo). */
 export function itensDoFoco(doc: Document = document, exigeDialogo = false): Item[] | null {

@@ -13,6 +13,7 @@ import { BaixarLaudo } from '@/components/laudo/BaixarLaudo';
 import { analisarPercurso, FOCO_ANALISE, type CasoPercurso, type EstadoAnalise } from './analisePercurso';
 import { EnviarBancada } from './EnviarBancada';
 import { EVENTO_EM_USO } from './eventoEmUso';
+import { AtalhoCabine } from './AtalhoCabine';
 
 type Etapa =
   | { tipo: 'abertura'; trecho: number }
@@ -171,9 +172,9 @@ export function PercursoCabine({ canal, som = true, aoSair }: { canal: CanalGame
           <AnaliseAgentes analise={analise} />
           <div className="gameplay-percurso-acoes">
             <button type="button" data-acao="analisar" onClick={analisar} disabled={analise.tipo === 'enviando' || analise.tipo === 'analisando'}>
-              <kbd>✕</kbd> {analise.tipo === 'pronta' || analise.tipo === 'falha' ? 'Analisar de novo' : 'Analisar com os agentes'}
+              <AtalhoCabine botao="cruz" tecla="✕" xbox="A" /> {analise.tipo === 'pronta' || analise.tipo === 'falha' ? 'Analisar de novo' : 'Analisar com os agentes'}
             </button>
-            <button type="button" data-acao="repetir" onClick={recomecar}><kbd>Options</kbd> Repetir percurso</button>
+            <button type="button" data-acao="repetir" onClick={recomecar}><AtalhoCabine botao="options" tecla="Options" xbox="Menu" /> Repetir percurso</button>
             {/* key: percurso novo começa com o botão limpo. */}
             <EnviarBancada key={inicioIso.current} montar={() => {
               const caso = casoDoPercurso();

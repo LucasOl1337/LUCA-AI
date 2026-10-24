@@ -22,8 +22,8 @@ import { SiteStand } from '@/components/stand/site/SiteStand';
 import { avisoDeSaida, barraVisivel, modoInicial, modosDisponiveis, palcoAfkDaUrl, reduzirModo, type EntradaModo, type EstadoModo } from '@/components/stand/modoStand';
 import type { AcaoNavegacao } from '@/components/stand/navegacaoPad';
 import { usePadStand } from '@/components/stand/usePadStand';
-import { acenderPrimeiroPad, confirmarFocoPad, focoPadExplicito, limparFocoPad, moverFocoPad, voltarNoEscopoPad } from '@/components/stand/focoPadDom';
-import type { Direcao } from '@/components/stand/focoPad';
+import { acenderPrimeiroPad, confirmarFocoPad, focoPadExplicito, limparFocoPad, moverFocoPad, temEscopoPad, voltarNoEscopoPad } from '@/components/stand/focoPadDom';
+import type { Direcao, OrigemSeta } from '@/components/stand/focoPad';
 import { DicasControle } from '@/components/stand/IconePad';
 import { AvisoSaida, BarraModos, preCarregarSimulador, SimulacaoStand, VitrineStand } from '@/components/stand/Modos';
 import { PainelComandos } from '@/components/stand/PainelComandos';
@@ -56,6 +56,8 @@ const ITENS_VITRINE = montarItens(VIDEOS_VITRINE);
 
 /** Status da voz no servidor: o texto da Atração segue `ligado` + `motivo` (inclusive `teto_diario`). */
 const STATUS_A_CADA_MS = 60_000;
+/** Foco do D-pad no HUD da corrida apaga sozinho: o ✕ volta a trocar a câmera. */
+const FOCO_HUD_MS = 5000;
 /**
  * Onde a escuta fica aberta: Coruja e Site. Vitrine narrada é exclusiva, sem microfone.
  * Simulação usa a mesma sessão: pedidos de ajuda e retorno continuam chegando ao LUCA.
@@ -380,8 +382,7 @@ export default function StandPage() {
     if (estado.tela === 'conversa' || voz.ativa) encerrarConversa();
   }, [estado.tela, voz.ativa, terminarVideo, encerrarConversa]);
   const agirNoPad = useCallback((acao: AcaoNavegacao) => {
-    const simulacao = modoAtual.current === 'simulacao';
-    if (acao.tipo === 'escolher') { confirmarFocoPad(document, simulacao); return; }
+    if (acao.tipo === 'escolher') { confirmarFocoPad(); return; }
     if (acao.tipo === 'voltar') { voltarNoPad(); return; }
     if (acao.tipo === 'menu') {
       despacharModo({ tipo: 'atividade', toque: true });
@@ -405,13 +406,22 @@ export default function StandPage() {
     if (acao.tipo === 'ir') { limparFocoPad(); fecharMenu(); }
     despacharModo(acao);
   }, [vozStand, estado.tela, iniciar, voltarNoPad, menu.aberto, abrirMenu, fecharMenu, alternarPalco]);
-  const moverNoPad = useCallback((direcao: Direcao) => {
+  const apagarFocoHud = useRef(0);
+  const moverNoPad = useCallback((direcao: Direcao, origem: OrigemSeta) => {
     const simulacao = modoAtual.current === 'simulacao';
     // Mexer acende a barra (os modos entram no foco); no palco o primeiro aperto só acorda a Coruja.
     despacharModo({ tipo: 'atividade', toque: !simulacao });
     if (!simulacao && palcoAtual.current) return;
     // Vitrine: ←/→ trocam o vídeo até alguém acender um item com ↑/↓.
     if (modoAtual.current === 'vitrine' && (direcao === 'esquerda' || direcao === 'direita') && !focoPadExplicito()) return;
+    if (simulacao && !temEscopoPad()) {
+      // HUD da corrida (veículo, pausa, percurso): só o D-pad, que o jogo não usa; o analógico é o volante.
+      if (origem !== 'dpad') return;
+      moverFocoPad(direcao);
+      window.clearTimeout(apagarFocoHud.current);
+      apagarFocoHud.current = window.setTimeout(() => { if (!temEscopoPad()) limparFocoPad(); }, FOCO_HUD_MS);
+      return;
+    }
     moverFocoPad(direcao, document, simulacao);
   }, []);
   const { conectado: controleConectado, desconhecido: controleDesconhecido } = usePadStand({ modo: modo.modo, aoAgir: agirNoPad, aoMexer: mexeuNoPad, aoMover: moverNoPad });

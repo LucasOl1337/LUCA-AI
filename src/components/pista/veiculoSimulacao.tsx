@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { AtalhoCabine } from '../gameplay/AtalhoCabine';
 import './pista.css';
 
 export type VeiculoSimulacao = 'trator' | 'caminhao';
@@ -61,6 +62,6 @@ export function SeletorVeiculo({ veiculo, escolher }: { veiculo: VeiculoSimulaca
   return <div className="simulacao-veiculo" role="group" aria-label="Escolha o veículo">
     <button aria-pressed={veiculo === 'trator'} data-veiculo="trator" onClick={() => escolher('trator')}>Trator no talhão</button>
     <button aria-pressed={veiculo === 'caminhao'} data-veiculo="caminhao" onClick={() => escolher('caminhao')}>Caminhão na serra</button>
-    <kbd aria-hidden="true">△ / T</kbd>
+    <span aria-hidden="true"><AtalhoCabine botao="triangulo" tecla="△ / T" xbox="Y / T" /></span>
   </div>;
 }

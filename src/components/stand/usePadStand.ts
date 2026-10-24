@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { firstStandardPad, unmappedPadId } from '../sompo/gamepadLoop';
 import type { GamepadLike } from '../sompo/gamepadMapping';
 import { lerNavegacao, type AcaoNavegacao } from './navegacaoPad';
-import { lerSetas, SETAS_SOLTAS, type Direcao } from './focoPad';
+import { lerSetas, SETAS_SOLTAS, type Direcao, type OrigemSeta } from './focoPad';
 import type { Modo } from './modoStand';
 
 /** Atividade do controle vira no máximo um aviso por segundo (evita render a cada quadro). */
@@ -19,7 +19,7 @@ export function usePadStand({ modo, aoAgir, aoMexer, aoMover }: {
   aoAgir: (acao: AcaoNavegacao) => void;
   aoMexer: () => void;
   /** D-pad ou analógico esquerdo (com repetição ao segurar): anda o foco. */
-  aoMover: (direcao: Direcao) => void;
+  aoMover: (direcao: Direcao, origem: OrigemSeta) => void;
 }) {
   const [conectado, setConectado] = useState(false);
   const [desconhecido, setDesconhecido] = useState<string | null>(null);
@@ -48,7 +48,7 @@ export function usePadStand({ modo, aoAgir, aoMexer, aoMover }: {
       // Depois dos botões: ✕/○ do mesmo quadro ainda veem o foco de antes do passo.
       const passo = lerSetas(pad as GamepadLike | null, setas, agora);
       setas = passo.next;
-      if (passo.passo) ref.current.aoMover(passo.passo);
+      if (passo.passo) ref.current.aoMover(passo.passo, passo.origem);
       quadro = window.requestAnimationFrame(tick);
     };
     quadro = window.requestAnimationFrame(tick);

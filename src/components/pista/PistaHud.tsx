@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import { Atalho, IconePad } from '../stand/IconePad';
 import { decimalCircuito as d, metricasCircuito, textoResultadoCircuito } from '../gameplay/circuito';
 import { COMANDOS_CABINE } from '../gameplay/comandosCabine';
 import { EnviarBancada, envioDoCircuito } from '../gameplay/EnviarBancada';
@@ -34,6 +36,9 @@ export function PistaHud({ r, sessao, menu, aoMenu, aoNovo, aoAnalisar, aoTrocar
   const c = r.caminhao, kph = c.velocidade * 3.6;
   const confirmar = entrada === 'teclado' ? 'Enter' : COMANDOS_CABINE.confirmar[entrada];
   const freioMotor = entrada === 'teclado' ? 'E' : BOTAO_FREIO_MOTOR[entrada];
+  // Sair pede confirmação na própria pausa (window.confirm travava o controle).
+  const [confirmaSaida, setConfirmaSaida] = useState(false);
+  useEffect(() => { if (!menu) setConfirmaSaida(false); }, [menu]);
   return <div className="circuito-hud pista-hud" data-circuito-hud data-pista-hud data-run-id={reg.runId} data-resultado={fim?.motivo ?? 'dirigindo'} data-freio={r.falhaFreio ? 'falhou' : 'ok'}>
     <div className="circuito-estado" aria-label="Estado da corrida">
       <span>SIMULAÇÃO · CAMINHÃO</span><b>{kph.toFixed(0)} km/h</b>
@@ -60,30 +65,35 @@ export function PistaHud({ r, sessao, menu, aoMenu, aoNovo, aoAnalisar, aoTrocar
       </div>
     </section>}
     {!fim && <aside className="gameplay-mapa pista-mapa"><small>SERRA SEM FREIO · {Math.round(c.s)} / {SERRA.chegadaS} m</small><PerfilSerra r={r} /></aside>}
-    {!fim && <button className="circuito-menu-botao" onClick={() => aoMenu(!menu)}>Pausa / opções · Esc</button>}
+    {!fim && <button className="circuito-menu-botao" data-pad-voltar="" onClick={() => aoMenu(!menu)}><Atalho entrada={entrada} botao="bola" tecla="Esc" xbox="Menu" />Pausa / opções</button>}
     {!fim && !menu && r.fase === 'pronto' && <p className="circuito-partida" role="status">
-      <kbd>{entrada === 'teclado' ? 'W / ↑' : COMANDOS_CABINE.acelerar[entrada]}</kbd> para partir · desça a serra até o pé</p>}
+      <Atalho entrada={entrada} botao="r2" tecla="W / ↑" xbox={COMANDOS_CABINE.acelerar.xbox} /> para partir · desça a serra até o pé</p>}
     {!fim && <div className="circuito-avisos" aria-live="polite">{[...r.riscos].map(([s, g]) => <p key={s} data-gravidade={g}>{ROTULOS[s]}</p>)}</div>}
-    {!menu && !fim && <div className="circuito-touch" aria-label="Controles de toque">{[['ArrowLeft', '←'], ['ArrowDown', 'Freio'], ['e', 'Freio-motor'], ['ArrowUp', 'Acelerar'], ['ArrowRight', '→']].map(([key, label]) => <button key={key} aria-label={label} onPointerDown={(ev) => { ev.currentTarget.setPointerCapture(ev.pointerId); touch(key, true); }} onPointerUp={() => touch(key, false)} onPointerCancel={() => touch(key, false)} onLostPointerCapture={() => touch(key, false)}>{label}</button>)}</div>}
+    {!menu && !fim && <div className="circuito-touch" aria-label="Controles de toque" data-foco-pular="">{[['ArrowLeft', '←'], ['ArrowDown', 'Freio'], ['e', 'Freio-motor'], ['ArrowUp', 'Acelerar'], ['ArrowRight', '→']].map(([key, label]) => <button key={key} aria-label={label} onPointerDown={(ev) => { ev.currentTarget.setPointerCapture(ev.pointerId); touch(key, true); }} onPointerUp={() => touch(key, false)} onPointerCancel={() => touch(key, false)} onLostPointerCapture={() => touch(key, false)}>{label}</button>)}</div>}
     {menu && !fim && <section className="circuito-dialogo" role="dialog" aria-modal="true" aria-label="Opções da corrida">
       <h2>Corrida pausada</h2>
       <p>Desça a serra até o pé. O freio vai falhar na descida forte: use o freio-motor e, se precisar, a área de escape à direita. Cuidado com o animal na reta.</p>
       <details open><summary>Comandos</summary>
         <p>Controle: R2 acelera · L2 freia · analógico esquerdo vira · ○/B ou R1/RB freio-motor · ✕ troca a câmera · Options pausa · PS volta à Coruja. Teclado: W/↑ acelera · S/↓/espaço freia · A D/← → viram · E freio-motor · C câmera · Esc pausa.</p>
       </details>
-      <button onClick={() => aoMenu(false)} autoFocus>Continuar <kbd>{confirmar}</kbd></button>
+      <button data-pad-voltar={confirmaSaida ? undefined : ''} onClick={() => aoMenu(false)} autoFocus>Continuar <Atalho entrada={entrada} botao="cruz" tecla={confirmar} xbox={confirmar} />{entrada === 'ps' && <IconePad botao="bola" />}</button>
       <button data-acao="trocar-veiculo" onClick={aoTrocar}>Trocar para o trator</button>
       <button onClick={() => { sessao.terminar('abandono', new Date().toISOString()); aoMenu(false); }}>Abandonar esta corrida</button>
-      <button onClick={() => { if (window.confirm('Abandonar a corrida e sair da simulação?')) window.dispatchEvent(new Event('luca:circuito-sair')); }}>Sair da simulação</button>
+      {confirmaSaida
+        ? <div className="circuito-confirma-saida" role="group" aria-label="Confirmar saída"><p>Abandonar a corrida e sair da simulação?</p>
+          <button data-acao="confirmar-saida" onClick={() => window.dispatchEvent(new Event('luca:circuito-sair'))} autoFocus>Sim, sair pra Coruja</button>
+          <button data-pad-voltar="" onClick={() => setConfirmaSaida(false)}><IconePad botao="bola" />Não, ficar</button></div>
+        : <button data-acao="sair-simulacao" onClick={() => setConfirmaSaida(true)}><IconePad botao="ps" />Sair da simulação</button>}
     </section>}
-    {fim && <section className="circuito-dialogo circuito-resultado" role="region" aria-label="Resultado da corrida" data-motivo={fim.motivo}>
+    {fim && <section className="circuito-dialogo circuito-resultado" role="region" aria-label="Resultado da corrida" data-motivo={fim.motivo} data-foco-escopo="">
       <small>SIMULAÇÃO · CAMINHÃO NA SERRA</small><h2>{textoResultadoCircuito(reg).titulo}</h2>
       <p>{textoResultadoCircuito(reg).resumo}</p>
       <details><summary>Como a corrida é avaliada</summary><ul>{REGRAS_PISTA_TELA.map((t) => <li key={t}>{t}</li>)}</ul>{reg.pausas.length > 0 && <p>Pausas nesta corrida: {reg.pausas.length}.</p>}</details>
-      <button data-acao="nova-corrida" onClick={aoNovo} autoFocus>Nova corrida <kbd>{confirmar}</kbd></button>
+      <button data-acao="nova-corrida" onClick={aoNovo} autoFocus>Nova corrida <Atalho entrada={entrada} botao="cruz" tecla={confirmar} xbox={confirmar} /></button>
       <button data-acao="analisar-circuito" onClick={() => aoAnalisar(sessao.relatorio())}>Analisar relatório · abrir chat dos agentes</button>
       <EnviarBancada montar={() => envioDoCircuito(sessao.relatorio(), { veiculo: 'caminhao', cenario: 'serra-sem-freio' })} />
       <button data-acao="trocar-veiculo" onClick={aoTrocar}>Dirigir o trator</button>
+      <button data-acao="voltar-coruja" data-pad-voltar="" onClick={() => window.dispatchEvent(new Event('luca:circuito-sair'))}><IconePad botao="bola" />Voltar pra Coruja</button>
     </section>}
   </div>;
 }
