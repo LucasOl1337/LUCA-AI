@@ -90,7 +90,7 @@ export function PistaHud({ r, sessao, menu, aoMenu, aoNovo, aoAnalisar, aoTrocar
       <p>{textoResultadoCircuito(reg).resumo}</p>
       <details><summary>Como a corrida é avaliada</summary><ul>{REGRAS_PISTA_TELA.map((t) => <li key={t}>{t}</li>)}</ul>{reg.pausas.length > 0 && <p>Pausas nesta corrida: {reg.pausas.length}.</p>}</details>
       <button data-acao="nova-corrida" onClick={aoNovo} autoFocus>Nova corrida <Atalho entrada={entrada} botao="cruz" tecla={confirmar} xbox={confirmar} /></button>
-      <button data-acao="analisar-circuito" onClick={() => aoAnalisar(sessao.relatorio())}>Analisar relatório · abrir chat dos agentes</button>
+      <button data-acao="analisar-circuito" onClick={() => aoAnalisar(sessao.relatorio())}>Analisar na bancada de agentes</button>
       <EnviarBancada montar={() => envioDoCircuito(sessao.relatorio(), { veiculo: 'caminhao', cenario: 'serra-sem-freio' })} />
       <button data-acao="trocar-veiculo" onClick={aoTrocar}>Dirigir o trator</button>
       <button data-acao="voltar-coruja" data-pad-voltar="" onClick={() => window.dispatchEvent(new Event('luca:circuito-sair'))}><IconePad botao="bola" />Voltar pra Coruja</button>

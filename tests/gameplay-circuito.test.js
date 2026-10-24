@@ -108,9 +108,34 @@ test('regras da tela repetem os números do REGRAS_CIRCUITO, sem termo técnico 
 });
 
 test('chat da corrida: campo do visitante diz "riscos evitados"; instrução aos agentes segue igual', async () => {
-  const chat = await loadFrontendModule('../../src/components/gameplay/ChatCircuito.tsx');
+  const chat = await loadFrontendModule('../../src/components/gameplay/missaoCircuito.ts');
   assert.equal(chat.PERGUNTA_PADRAO_CIRCUITO, 'Avalie minha corrida: tempo, desfecho, riscos evitados e resposta aos sensores.');
   const sessao = (await loadFrontendModule('../../src/components/gameplay/sessaoCircuito.ts')).criarSessaoCircuito();
   const foco = chat.focoCircuito(sessao.relatorio(), 'x');
   assert.match(foco, /^Circuito contínuo SIMULAÇÃO, sem reposicionamentos\. Avalie tempo ativo em ms, desfecho, sinistros evitados por heurística \(não acidentes reais\)/);
+});
+
+test('missão da bancada: cabe no limite, cita a corrida e o anexo leva o registro sem prints', async () => {
+  const bancada = await loadFrontendModule('../../src/components/gameplay/missaoCircuito.ts');
+  const sessao = (await loadFrontendModule('../../src/components/gameplay/sessaoCircuito.ts')).criarSessaoCircuito();
+  const relatorio = sessao.relatorio();
+  relatorio.caso.prints = ['data:image/png;base64,AAAA'];
+  const { caseId, mission, anexo } = bancada.missaoDaCorrida(relatorio);
+  assert.equal(caseId, `totem-corrida-trator-${relatorio.registro.runId}`);
+  assert.ok(mission.length <= bancada.LIMITE_MISSAO);
+  assert.match(mission, /Corrida SIMULAÇÃO no totem LUCA-AI/);
+  assert.match(mission, /relatório da bancada/);
+  assert.doesNotMatch(mission, /Laboratório/);
+  assert.equal(anexo.nome, `corrida-${relatorio.registro.runId}.json`);
+  const conteudo = JSON.parse(anexo.conteudo);
+  assert.equal(conteudo.origem, 'SIMULAÇÃO');
+  assert.equal(conteudo.registro.runId, relatorio.registro.runId);
+  assert.ok(!('prints' in conteudo.caso), 'prints ficam fora do anexo');
+  const armazem = new Map();
+  const fake = { setItem: (k, v) => armazem.set(k, v), getItem: (k) => armazem.get(k) ?? null, removeItem: (k) => armazem.delete(k) };
+  bancada.guardarBancadaCircuito({ sessao: 's1', runId: 'r1' }, fake);
+  assert.deepEqual(bancada.recuperarBancadaCircuito(fake), { sessao: 's1', runId: 'r1' });
+  assert.ok(armazem.has('luca.circuito.chat.v1'));
+  bancada.esquecerBancadaCircuito(fake);
+  assert.equal(bancada.recuperarBancadaCircuito(fake), null);
 });

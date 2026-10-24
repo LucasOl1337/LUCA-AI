@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { enviarParaFila, lerItemFila, textoPosicao, type EnvioFila, type ItemFila } from '@/lib/bancada-fila';
 import { metricasCircuito, textoResultadoCircuito } from './circuito';
-import { focoCircuito, PERGUNTA_PADRAO_CIRCUITO } from './ChatCircuito';
+import { focoCircuito, PERGUNTA_PADRAO_CIRCUITO } from './missaoCircuito';
 import type { RelatorioCircuito } from './sessaoCircuito';
 import './circuito.css';
 

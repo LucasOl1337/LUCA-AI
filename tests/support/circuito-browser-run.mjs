@@ -39,7 +39,7 @@ for(const [width,height,kind] of [[1920,1080,'chegada'],[1366,768,'colisao']]) {
  await p.evaluate(()=>{window.__input.buttons[7]={value:0,pressed:false};window.__input.axes[0]=0});
  await p.screenshot({path:`${dir}/resultado-${kind}-${width}.png`});
  if(ended!==kind)throw Error(`desfecho esperado ${kind}, veio ${ended}: ${JSON.stringify(trace.at(-1))}`);
- await p.getByRole('button',{name:'Analisar relatório · abrir chat dos agentes'}).click();
+ await p.getByRole('button',{name:'Analisar na bancada de agentes'}).click();
  await p.locator('[data-chat-circuito]').waitFor();
  await new Promise(r=>setTimeout(r,100));
  const disposal=await p.evaluate(()=>({canvas:document.querySelectorAll('canvas').length,raf:window.__raf.size,cameraCalls:window.__cameraCalls,run:JSON.parse(sessionStorage.getItem('luca.circuito.chat.v1')).relatorio.registro}));

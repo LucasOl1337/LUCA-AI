@@ -119,7 +119,7 @@ export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, t
       <p>{textoResultadoCircuito(r).resumo}</p>
       <details><summary>Como a corrida é avaliada</summary><ul>{REGRAS_CIRCUITO_TELA.map((t) => <li key={t}>{t}</li>)}</ul>{r.pausas.length > 0 && <p>Pausas nesta corrida: {r.pausas.length}.</p>}</details>
       <button data-acao="nova-corrida" onClick={aoNovo} autoFocus>Nova corrida <Atalho entrada={entrada} botao="cruz" tecla={confirmar} xbox={confirmar} /></button>
-      <button data-acao="analisar-circuito" onClick={() => { aoWebcam(false); aoAnalisar(sessao.relatorio()); }}>Analisar relatório · abrir chat dos agentes</button>
+      <button data-acao="analisar-circuito" onClick={() => { aoWebcam(false); aoAnalisar(sessao.relatorio()); }}>Analisar na bancada de agentes</button>
       <EnviarBancada montar={() => envioDoCircuito(sessao.relatorio())} />
       <button data-acao="voltar-coruja" data-pad-voltar="" onClick={() => window.dispatchEvent(new Event('luca:circuito-sair'))}><IconePad botao="bola" />Voltar pra Coruja</button>
     </section>}

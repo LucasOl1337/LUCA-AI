@@ -10,7 +10,7 @@ test('fim de visita apaga o chat da corrida do visitante anterior e só ele', ()
   encerrarVisita({ removeItem: (k) => guardado.delete(k) });
   assert.equal(guardado.has(CHAVE_CHAT_CIRCUITO), false);
   assert.equal(guardado.get('luca:voz:diagnostico'), '1');
-  assert.equal(CHAVE_CHAT_CIRCUITO, 'luca.circuito.chat.v1', 'mesma chave que o ChatCircuito grava');
+  assert.equal(CHAVE_CHAT_CIRCUITO, 'luca.circuito.chat.v1', 'mesma chave que missaoCircuito.ts grava');
 });
 
 test('próximo visitante começa na vista da cabine, mesmo que o anterior tenha trocado', () => {

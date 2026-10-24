@@ -12,7 +12,7 @@ export function aoFimDeVisita(tarefa: () => void) {
   return () => { tarefas.delete(tarefa); };
 }
 export function encerrarVisita(armazem: Pick<Storage, 'removeItem'> | null = typeof sessionStorage === 'undefined' ? null : sessionStorage) {
-  // O chat do relatório da corrida fica na aba para sobreviver a recarga; não para o próximo visitante.
+  // A sessão da bancada aberta pela corrida fica na aba para sobreviver a recarga; não para o próximo visitante.
   try { armazem?.removeItem(CHAVE_CHAT_CIRCUITO); } catch { /* armazenamento bloqueado: nada a apagar */ }
   for (const tarefa of [...tarefas]) tarefa();
 }

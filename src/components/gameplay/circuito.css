@@ -9,28 +9,17 @@
 .circuito-dialogo { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:min(620px,90%); max-height:88%; overflow:auto; padding:26px; border-radius:15px; border:1px solid #a3b99a66; background:#111e18f5; box-shadow:0 20px 80px #000a; pointer-events:auto; }
 .circuito-dialogo h2 { margin:0 0 12px; font-size:26px; }
 .circuito-dialogo p { margin:12px 0; }
-.circuito-dialogo button,.circuito-chat button { border:1px solid #adc6a7; border-radius:7px; padding:10px 14px; background:#d8edc0; color:#14231b; margin:10px 10px 0 0; font-weight:650; cursor:pointer; }
+.circuito-dialogo button,.circuito-bancada button { border:1px solid #adc6a7; border-radius:7px; padding:10px 14px; background:#d8edc0; color:#14231b; margin:10px 10px 0 0; font-weight:650; cursor:pointer; }
 .circuito-dialogo small { overflow-wrap:anywhere; }
 .circuito-touch { display:none; position:absolute; bottom:16px; left:20px; right:20px; justify-content:space-between; }
 .circuito-touch button { min-width:60px; min-height:48px; background:#172119b8; color:white; border:1px solid #d9e2c8aa; border-radius:10px; touch-action:none; }
 @media (pointer:coarse) { .circuito-touch { display:flex; } }
 /* Fora do HUD da corrida (vive entre corridas): mesmo lugar e camada de antes, sem pegar o arraste do olhar. */
 .circuito-webcam { pointer-events:none; }
-.circuito-webcam .gameplay-webcam { top:64px; left:18px; right:auto; width:140px; }
+.circuito-webcam .gameplay-webcam { top:84px; left:18px; right:auto; width:140px; }
 .circuito-webcam .gameplay-webcam[hidden] { display:none; }
 .circuito-webcam[data-config-aberta=true] { visibility:hidden; }
-.circuito-chat { position:absolute; inset:0; overflow:auto; background:#101a17; color:#e9efe4; padding:32px max(24px,calc((100vw - 1050px)/2)); font:16px/1.6 system-ui,sans-serif; user-select:text; }
-.circuito-chat header { border-bottom:1px solid #526050; padding-bottom:20px; }
-.circuito-chat h1 { font-size:32px; margin:8px 0; }
-.circuito-chat a { color:#d8edc0; margin-left:16px; }
-.circuito-chat textarea { scroll-margin-top:24px; }
 .circuito-relatorio,.circuito-turno { background:#1b2922; border:1px solid #455545; border-radius:12px; padding:22px; margin:24px 0; }
-.circuito-chat pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; }
-.circuito-chat dl { display:grid; grid-template-columns:1fr 1fr; }
-.circuito-chat dd { margin:0; font-weight:700; }
-.circuito-chat form { display:grid; gap:10px; margin:28px 0; }
-.circuito-chat textarea { min-height:100px; color:#edf2e6; background:#111d16; border:1px solid #8ea28b; border-radius:7px; padding:12px; }
-.circuito-chat button:disabled { opacity:.6; cursor:wait; }
 @media(max-height:800px) { .circuito-dialogo { padding:18px; font-size:13px; } .circuito-dialogo h2 { font-size:22px; } }
 
 .circuito-sensores { position:absolute; left:18px; bottom:20px; width:250px; padding:12px; border-radius:12px; background:#111e18ec; border:1px solid #a9be9b66; }
@@ -48,7 +37,7 @@
   .circuito-menu-botao { top:60px; left:10px; right:auto; }
   .gameplay-com-cabine .circuito-hud .gameplay-mapa { top:60px; right:10px; width:110px; transform:none; margin:0; }
   .circuito-avisos { top:230px; left:10px; max-width:240px; }
-  .circuito-webcam .gameplay-webcam { top:110px; left:10px; width:120px; }
+  .circuito-webcam .gameplay-webcam { top:130px; left:10px; width:120px; }
 }
 .gameplay-mapa-rota { fill:none; stroke:#e5f4ab; stroke-width:1.1; stroke-dasharray:2 2; }
 .gameplay-mapa-fardo { fill:#ff7967; stroke:#ffd2c1; stroke-width:.6; }
@@ -69,7 +58,6 @@
 .circuito-partida kbd { display:inline-block; margin-right:6px; padding:2px 10px; border:1px solid #a4e9cf; border-bottom-width:3px; border-radius:6px; color:#a4e9cf; font:inherit; }
 @media(max-width:650px) { .circuito-partida { top:auto; bottom:44%; font-size:14px; white-space:normal; width:min(320px,86%); text-align:center; } }
 /* Coruja compacta fica no canto inferior direito: o fim do chat rola para fora dela. */
-.circuito-chat { padding-bottom: 180px; }
 /* Batida (Lupa D4): o resultado da colisão espera o tranco da máquina (0,45 s) para não cobrir o baque. */
 .circuito-resultado[data-motivo='colisao'] { animation:circuito-resultado-apos-baque .25s ease-out .45s both; }
 @keyframes circuito-resultado-apos-baque { from { opacity:0; } to { opacity:1; } }
@@ -81,3 +69,14 @@
 .gameplay-enviar-bancada button[data-acao='enviar-bancada'] { background:#1d3b2c; color:#edf3ed; border-color:#7fc795; }
 .gameplay-enviar-bancada button:disabled { opacity:.7; cursor:default; }
 .gameplay-percurso-acoes .gameplay-enviar-bancada { align-items:center; text-align:center; }
+/* Bancada de agentes do LUCA-AI dentro do totem (iframe da mesma origem), no lugar do chat do Laboratório. */
+.circuito-bancada { position:absolute; inset:0; display:flex; flex-direction:column; background:#101a17; color:#e9efe4; font:16px/1.6 system-ui,sans-serif; user-select:text; }
+.circuito-bancada header { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:12px 24px; border-bottom:1px solid #526050; }
+.circuito-bancada header small { letter-spacing:.08em; text-transform:uppercase; color:#b7c7b0; }
+.circuito-bancada h1 { font-size:24px; margin:2px 0; }
+.circuito-bancada header p { margin:0; font-size:13px; color:#c9d4c3; }
+.circuito-bancada button { margin:0; white-space:nowrap; display:inline-flex; align-items:center; gap:8px; }
+.circuito-bancada-frame { flex:1; width:100%; border:0; background:#fff; }
+.circuito-bancada-aviso { position:absolute; left:50%; bottom:24px; transform:translateX(-50%); z-index:6; margin:0; padding:12px 18px; border-radius:10px; background:#142018ee; color:#faf8eb; font:15px/1.4 system-ui,sans-serif; box-shadow:0 10px 40px #0008; }
+.circuito-bancada-aviso[data-falha] { border-left:4px solid #ff9478; }
+.circuito-bancada-aviso button { margin-left:12px; border:1px solid #adc6a7; border-radius:7px; padding:6px 10px; background:#d8edc0; color:#14231b; cursor:pointer; }
