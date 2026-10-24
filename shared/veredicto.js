@@ -114,7 +114,9 @@ export function lerVeredicto(obj, { resolverAmostra = null, duracaoMs = Infinity
   let confianca = Math.min(sintetico ? 0.9 : 0.95, Math.max(0, conf));
   // Sem evidência (temporal, quando há série) válida não há culpado estimado.
   const sustentado = exigeInstante ? evidencias.some((e) => e.elapsedMs != null || e.frame != null) : evidencias.length > 0;
-  if (culpado !== 'indeterminado' && !sustentado) { culpado = 'indeterminado'; confianca = Math.min(confianca, 0.3); }
+  if (culpado !== 'indeterminado' && !sustentado) culpado = 'indeterminado';
+  // Confiança é no culpado escolhido: indeterminado nunca passa de 0.3.
+  if (culpado === 'indeterminado') confianca = Math.min(confianca, 0.3);
   const prevencao = (Array.isArray(obj.prevencao) ? obj.prevencao : []).slice(0, 5).map((p) => ({
     acao: limpa(p?.acao, 300), responsavel: limpa(p?.responsavel, 80) || 'gestor da operação', ...(limpa(p?.prazo, 80) ? { prazo: limpa(p.prazo, 80) } : {}),
   })).filter((p) => p.acao);

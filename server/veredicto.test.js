@@ -57,3 +57,8 @@ test('SOMPO: missão reconhecida, veredicto validado, falha do modelo vira indet
   assert.equal(final.verdict.culpado, 'ambiente');
   assert.equal(finalEntryFromPersonaRun({ traceId: 't1', finalDisplay: { slug: 's', content: 'ok' } }).verdict, undefined);
 });
+
+test('indeterminado nunca carrega confiança acima de 0.3', () => {
+  const v = lerVeredicto({ culpado: 'indeterminado', confianca: 0.6, porque: 'Inconclusivo.', evidencias: [{ descricao: 'x', elapsedMs: 1 }] });
+  assert.equal(v.confianca, 0.3);
+});
