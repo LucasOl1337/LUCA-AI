@@ -201,7 +201,8 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
       active: () => true,
       update(camera: THREE.PerspectiveCamera, maquina: THREE.Object3D) {
         base.update(camera, maquina);
-        if (vistaRef.current === 'externa') externa(camera, maquina);
+        if (vistaRef.current === 'externa') externa(camera, maquina, ultimoDt);
+        else externa.reiniciar();
         if (!cabine && criarCabineRef.current) {
           try { cabine = criarCabineRef.current(); cabine.montar(maquina, camera); } catch (erro) { console.error('Cabine do gameplay falhou; segue sem ela.', erro); cabine = null; criarCabineRef.current = undefined; }
         }
