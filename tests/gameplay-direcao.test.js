@@ -130,6 +130,39 @@ test('sensor: só enxerga o que está na linha da frente e até 400 cm', () => {
   assert.equal(fisica.leituraSensor(pose, [deLado]).eco, false);
 });
 
+// Reto a 6 km/h contra obstáculo deslocado `desvio` do eixo; batida = contato frontal ou corpo do circuito (raio + 1,05 m, circuito.ts).
+function rasparDeLado(raioM, desvio, tipo) {
+  const obstaculos = [{ x: 12, z: desvio, raioM, ...(tipo ? { tipo } : {}) }];
+  let estado = fisica.criarTrator(0), avisouEmM = null;
+  for (let i = 0; i < 2000; i++) {
+    estado = fisica.passoTrator(estado, { esterco: 0, acelerador: 0.5, freio: 0 }, 1 / 60, { obstaculos, tetoKph: 6 });
+    if (avisouEmM === null && fisica.leituraSensor(estado, obstaculos).alerta) avisouEmM = estado.x;
+    if (estado.contato || Math.hypot(estado.x - 12, estado.z - desvio) < raioM + 1.05) return { bateu: true, avisouAntes: avisouEmM !== null };
+    if (estado.x > 16) return { bateu: false, avisou: avisouEmM !== null };
+  }
+  throw new Error('não terminou');
+}
+
+test('sensor: corredor da largura do trator avisa antes de raspar a lateral (sonda do Verniz, 24/10)', () => {
+  for (const [nome, raioM, tipo] of [['fardo', fisica.RAIO_FARDO_M], ['estaca', 0.33, 'estaca'], ['barril', 0.54, 'cenario']]) {
+    for (const desvio of [0.8, 1.3]) {
+      assert.deepEqual(rasparDeLado(raioM, desvio, tipo), { bateu: true, avisouAntes: true }, `${nome} a ${desvio} m do eixo`);
+    }
+    assert.deepEqual(rasparDeLado(raioM, 2.5, tipo), { bateu: false, avisou: false }, `${nome} a 2,5 m passa sem aviso falso`);
+  }
+});
+
+test('sensor: corredor não muda o contato frontal da física nem o formato da leitura', () => {
+  const pose = fisica.criarTrator(0);
+  const fardo = { ...fisica.fardoAFrente({ x: 0, z: 0, rumoGraus: 0 }, 1.2), z: 0.9 };
+  assert.equal(fisica.distanciaSensorM(pose, [fardo]), null);
+  const leitura = fisica.leituraSensor(pose, [fardo]);
+  assert.deepEqual(Object.keys(leitura), ['distanciaCm', 'eco', 'alerta']);
+  assert.equal(leitura.eco, true);
+  assert.ok(leitura.distanciaCm >= 2 && leitura.distanciaCm <= 150 && leitura.alerta);
+  assert.equal(fisica.leituraSensor(pose, [{ ...fardo, x: -4 }]).eco, false, 'atrás não ecoa');
+});
+
 test('guinada: entra progressivamente e conserva brevemente o giro ao centralizar o volante', () => {
   const mundo = { obstaculos: [], tetoKph: 6 };
   const comando = { esterco: 1, acelerador: 1, freio: 0 };

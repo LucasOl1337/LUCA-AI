@@ -45,17 +45,23 @@ export function criarTrator(x: number, z = 0, rumo = 0): EstadoTrator {
 const limitar = (valor: number, min: number, max: number) => Math.max(min, Math.min(max, valor));
 
 /** Distância do emissor até a superfície do obstáculo na linha da frente, ou null fora do alcance/eixo. */
-export function distanciaSensorM(estado: Pick<EstadoTrator, 'x' | 'z' | 'rumo'>, obstaculos: readonly ObstaculoGameplay[]) {
+/**
+ * Folga à frente até o obstáculo mais próximo. `meiaLarguraM` = 0 é um raio no
+ * eixo (contato frontal da física); a leitura do sensor usa a meia bitola, o
+ * corredor da largura do trator, como sensor de ré: o que vai raspar a lateral
+ * também ecoa antes de bater.
+ */
+export function distanciaSensorM(estado: Pick<EstadoTrator, 'x' | 'z' | 'rumo'>, obstaculos: readonly ObstaculoGameplay[], meiaLarguraM = 0) {
   const fx = Math.cos(estado.rumo), fz = -Math.sin(estado.rumo);
   const sx = estado.x + fx * TRATOR.sensorFrenteM, sz = estado.z + fz * TRATOR.sensorFrenteM;
   let melhor: number | null = null;
   for (const item of obstaculos) {
     const ox = item.x - sx, oz = item.z - sz;
     const aoLongo = ox * fx + oz * fz;
-    const lado2 = ox * ox + oz * oz - aoLongo * aoLongo;
+    const lado = Math.max(0, Math.abs(ox * fz - oz * fx) - meiaLarguraM);
     const r2 = item.raioM * item.raioM;
-    if (lado2 > r2) continue;
-    const batida = aoLongo - Math.sqrt(r2 - lado2);
+    if (lado * lado > r2) continue;
+    const batida = aoLongo - Math.sqrt(r2 - lado * lado);
     if (batida < -item.raioM) continue;
     const distancia = Math.max(0, batida);
     if (distancia * 100 <= GAMEPLAY_ECO_MAXIMO_CM && (melhor === null || distancia < melhor)) melhor = distancia;
@@ -126,9 +132,9 @@ export function fardoAFrente(pose: { x: number; z: number; rumoGraus: number }, 
   return { x: pose.x + Math.cos(rumo) * alcance, z: pose.z - Math.sin(rumo) * alcance, raioM };
 }
 
-/** HC-SR04 simulado, no formato do painel: 2..400 cm, alerta <= 150 cm. */
+/** HC-SR04 simulado, no formato do painel: 2..400 cm, alerta <= 150 cm, corredor da largura do trator. */
 export function leituraSensor(estado: EstadoTrator, obstaculos: readonly ObstaculoGameplay[]) {
-  const folga = distanciaSensorM(estado, obstaculos);
+  const folga = distanciaSensorM(estado, obstaculos, TRATOR.bitolaM / 2);
   const distanciaCm = folga === null ? GAMEPLAY_ECO_MAXIMO_CM : Math.max(2, Math.round(folga * 100));
   return { distanciaCm, eco: folga !== null, alerta: distanciaCm <= GAMEPLAY_ALERTA_CM };
 }
