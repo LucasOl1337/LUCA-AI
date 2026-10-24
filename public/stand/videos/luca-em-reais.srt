@@ -1,0 +1,67 @@
+1
+00:00:00,300 --> 00:00:03,609
+Um trator como este vale cerca de quatrocentos mil reais.
+
+2
+00:00:03,725 --> 00:00:06,883
+Quando ele bate ou tomba, o prejuízo vai além do conserto.
+
+3
+00:00:06,964 --> 00:00:12,328
+A máquina para no meio da safra, o seguro paga a conta, e quem está no volante corre risco de vida.
+
+4
+00:00:13,400 --> 00:00:15,594
+O LUCA coloca um sensor no trator.
+
+5
+00:00:15,710 --> 00:00:19,890
+Ele mede a distância até o que vem pela frente e a inclinação da máquina.
+
+6
+00:00:19,994 --> 00:00:25,544
+Nesta simulação, o alerta acende a um metro e meio do fardo, e o operador para a tempo.
+
+7
+00:00:26,567 --> 00:00:28,308
+O cansaço também entra na conta.
+
+8
+00:00:28,413 --> 00:00:32,546
+Se o operador fecha os olhos por um segundo, a câmera de sono dispara o alarme.
+
+9
+00:00:32,627 --> 00:00:35,170
+A imagem fica no computador e não é gravada.
+
+10
+00:00:36,150 --> 00:00:40,492
+Cada susto vira um registro, com os dados e as imagens de cada momento.
+
+11
+00:00:40,608 --> 00:00:45,461
+Se acontecer um acidente, a seguradora vê o que houve, e não só a versão de quem conta.
+
+12
+00:00:46,633 --> 00:00:51,707
+Na prática, acidente evitado é conserto, indenização e máquina parada que ninguém paga.
+
+13
+00:00:51,776 --> 00:00:54,574
+O produtor ganha a prova de que trabalha com cuidado.
+
+14
+00:00:54,621 --> 00:00:58,359
+E a seguradora, a SOMPO, enxerga o risco antes do acidente.
+
+15
+00:00:59,400 --> 00:01:02,732
+Hoje o LUCA é um protótipo, com dados de demonstração.
+
+16
+00:01:02,802 --> 00:01:05,797
+Preço e desconto no seguro ainda não estão definidos.
+
+17
+00:01:05,925 --> 00:01:08,258
+Quer ver funcionando? Pergunte para a coruja.
