@@ -11,6 +11,7 @@ import { createSompoScenarioEffects } from '../sompo/createSompoScenarioEffects'
 import { getSompoAnimalPose, type SompoEffectCue, type SompoVisualEffect } from '../../../shared/sompo-scenario-effects.js';
 import { pontoLateral, SERRA, type PistaSerra } from './pistaSerra';
 import { CAMINHAO } from './fisicaCaminhao';
+import { criarCabineCaminhao, ENCAIXE_CAMINHAO } from './cabineCaminhao';
 import type { RetratoPista } from './corridaPista';
 
 export type VistaPista = 'externa' | 'cabine';
@@ -22,6 +23,7 @@ export function criarAtoresSerra(scene: THREE.Scene, camera: THREE.PerspectiveCa
   const aborta = new AbortController();
   void loadSompoTruckAsset(modelo, aborta.signal).then((ok) => aoModelo(ok ? 'gltf' : 'fallback')).catch(() => aoModelo('fallback'));
   const efeitos = createSompoScenarioEffects(scene, modelo, camera);
+  const cabine = criarCabineCaminhao(); pose.add(cabine.grupo);
 
   // Animal: grupo com +z = direita da pista no ponto do cruzamento (o bovino anda em +z).
   const pAnimal = pontoLateral(pista, SERRA.animalS, 0);
@@ -32,6 +34,8 @@ export function criarAtoresSerra(scene: THREE.Scene, camera: THREE.PerspectiveCa
   const eixoRoda = new THREE.Vector3(0, 1, 0), eixoX = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
   const qEsterco = new THREE.Quaternion(), qGiro = new THREE.Quaternion();
   const olho = new THREE.Vector3(), alvo = new THREE.Vector3(), olhoSuave = new THREE.Vector3(), alvoSuave = new THREE.Vector3();
+  const OLHO_CABINE = new THREE.Vector3(ENCAIXE_CAMINHAO.olho[0], ENCAIXE_CAMINHAO.olho[1] - SOMPO_TRUCK_PIVOT_Y, ENCAIXE_CAMINHAO.olho[2]);
+  const CIMA = new THREE.Vector3(0, 1, 0), direcao = new THREE.Vector3();
   let percurso = 0, inicioMs = 0, inicioFalha: number | null = null, impactoMs: number | null = null, primeira = true, relogio = 0;
   const cues = new Map<SompoVisualEffect, number>();
 
@@ -82,24 +86,30 @@ export function criarAtoresSerra(scene: THREE.Scene, camera: THREE.PerspectiveCa
       ].filter((x): x is SompoEffectCue => !!x);
       efeitos.update({ surface: c.noCascalho ? 'gravel' : 'asphalt', setting: 'road', focusX: 0, cues: lista }, relogio - inicioMs, 'serra-sem-freio', kph, reduzido, 0, '', 0, 1);
 
-      // Câmera: externa atrás e acima (amortecida) ou cabine no banco do motorista (esquerda).
-      const cosR = Math.cos(c.rumo), sinR = Math.sin(c.rumo);
-      if (vista === 'externa') {
+      // Câmera: externa atrás e acima (amortecida) ou no banco do motorista, presa à cabine
+      // (arfagem, rolagem e tombo passam para a vista). Por dentro, a carroceria some e entra o interior.
+      const dentro = vista === 'cabine';
+      if (!dentro) {
+        const cosR = Math.cos(c.rumo), sinR = Math.sin(c.rumo);
         olho.set(c.x - cosR * 15.5, c.y + 6.2, c.z + sinR * 15.5); alvo.set(c.x + cosR * 8, c.y + 1.6, c.z - sinR * 8);
+        camera.up.copy(CIMA);
       } else {
-        const fx = 2.9, lz = -0.55;
-        olho.set(c.x + cosR * fx + sinR * lz, c.y + 2.95 + Math.atan(c.rampa) * fx, c.z - sinR * fx + cosR * lz);
-        const yaw = c.rumo + olhar.yaw * 1.1;
-        alvo.set(olho.x + Math.cos(yaw) * 20, olho.y - 1.2 + Math.atan(c.rampa) * 20 + olhar.pitch * 6, olho.z - Math.sin(yaw) * 20);
+        pose.updateMatrixWorld(true);
+        const yaw = olhar.yaw * 1.1, pitch = ENCAIXE_CAMINHAO.inclinacaoOlhar + olhar.pitch * 0.3;
+        direcao.set(Math.cos(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.sin(yaw) * Math.cos(pitch)).multiplyScalar(20).add(OLHO_CABINE);
+        olho.copy(OLHO_CABINE); pose.localToWorld(olho);
+        alvo.copy(direcao); pose.localToWorld(alvo);
+        camera.up.copy(CIMA).applyQuaternion(pose.quaternion);
+        cabine.quadro(r, relogio);
       }
-      const k = primeira || vista === 'cabine' ? 1 : 1 - Math.exp(-dt * 6);
-      olhoSuave.lerp(olho, k); alvoSuave.lerp(alvo, primeira || vista === 'cabine' ? 1 : 1 - Math.exp(-dt * 10)); primeira = false;
+      const k = primeira || dentro ? 1 : 1 - Math.exp(-dt * 6);
+      olhoSuave.lerp(olho, k); alvoSuave.lerp(alvo, primeira || dentro ? 1 : 1 - Math.exp(-dt * 10)); primeira = false;
       camera.position.copy(olhoSuave); camera.lookAt(alvoSuave);
-      camera.fov = vista === 'cabine' ? 68 : 55; camera.near = vista === 'cabine' ? 0.1 : 0.3; camera.updateProjectionMatrix();
-      modelo.root.visible = true;
+      camera.fov = dentro ? ENCAIXE_CAMINHAO.fov : 55; camera.near = dentro ? 0.05 : 0.3; camera.updateProjectionMatrix();
+      modelo.root.visible = !dentro; cabine.grupo.visible = dentro;
     },
     reiniciar() { percurso = 0; inicioFalha = null; impactoMs = null; primeira = true; cues.clear(); },
     posicao: () => pose.position,
-    dispose() { aborta.abort(); efeitos.dispose(); animal.dispose(); scene.remove(pose, grupoAnimal); },
+    dispose() { aborta.abort(); cabine.dispose(); efeitos.dispose(); animal.dispose(); scene.remove(pose, grupoAnimal); },
   };
 }
