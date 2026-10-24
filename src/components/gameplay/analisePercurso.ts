@@ -1,8 +1,9 @@
 import { formatLabTime } from '../../../shared/lab-telemetry.js';
+import type { Veredicto } from '../../../shared/veredicto.js';
 
 /**
  * Cliente da análise do percurso: salva o caso no Laboratório e pede a investigação
- * EXISTENTE (3 eixos + revisão, server/lab-cases.js). A resposta do POST pode levar
+ * EXISTENTE (3 eixos + revisão + veredicto final, server/lab-cases.js). A resposta do POST pode levar
  * ~3 min e passar do corte do proxy; por isso o progresso vem do GET do caso, que o
  * servidor grava como 'running' antes de chamar os agentes. Nada é inventado: sem
  * resposta válida, mostra a mensagem do servidor ou o prazo vencido.
@@ -11,7 +12,7 @@ export type EstadoAnalise =
   | { tipo: 'parada' }
   | { tipo: 'enviando' }
   | { tipo: 'analisando'; segundos: number; amostras: number }
-  | { tipo: 'pronta'; titulo: string; resumo: string; achados: string[]; caso: string }
+  | { tipo: 'pronta'; titulo: string; resumo: string; achados: string[]; caso: string; veredicto?: Veredicto }
   | { tipo: 'falha'; mensagem: string };
 
 export interface CasoPercurso {
@@ -25,7 +26,7 @@ export interface CasoPercurso {
 interface Evidencia { elapsedMs: number; description: string }
 interface Hipotese { title: string; evidence: Evidencia[] }
 interface Eixo { id: string; title: string; status: string; summary: string; hypotheses: Hipotese[] }
-export interface AnaliseLab { id: string; status: string; createdAt: string; error?: string; axes: Eixo[]; hypotheses: Hipotese[] }
+export interface AnaliseLab { id: string; status: string; createdAt: string; error?: string; axes: Eixo[]; hypotheses: Hipotese[]; verdict?: Veredicto }
 interface CasoLab { id: string; name: string; sampleCount: number; analyses: AnaliseLab[] }
 
 /** Orientação dos agentes: descreve a montagem do registro para não lerem o reposicionamento entre trechos como evento. */
@@ -66,6 +67,7 @@ export function textoDaAnalise(analise: AnaliseLab, nomeCaso: string): Extract<E
     resumo: revisao?.summary || analise.error || 'Os agentes não devolveram resumo.',
     achados: achados.length ? achados : ['Nenhuma hipótese com evidência suficiente neste registro.'],
     caso: nomeCaso,
+    ...(analise.verdict ? { veredicto: analise.verdict } : {}),
   };
 }
 

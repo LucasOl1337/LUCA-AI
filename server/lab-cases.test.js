@@ -43,8 +43,8 @@ test('circuito conserva run e trace integral para agentes sem confiar em métric
   assert.equal(saved.status,201);
   const root = `/api/lab/cases/${saved.body.case.id}`;
   const result = await request(`${root}/analyses`, { cookie, body:{focus:'Avalie minha run'} });
-  assert.equal(result.status,201); assert.equal(calls.length,4);
-  for (const call of calls) {
+  assert.equal(result.status,201); assert.equal(calls.length,5);
+  for (const call of calls.filter((c) => c.agentId !== 'lab-verdict')) {
     const c = JSON.parse(call.user).telemetry.circuito;
     assert.equal(c.runId,'run-circuito-1'); assert.equal(c.metricas.sinistrosEvitados,1);
     assert.equal(c.metricas.reacaoMediaMs,600); assert.equal(c.episodios[0].resposta.latenciaMs,600);
@@ -88,7 +88,7 @@ test('ESP32 JSON conversion survives Lab save/reload and supplies sensor evidenc
   assert.ok(parsed.samples.every(s => s.coolant_temp_c === null && s.x === null));
   const result = await request(`${root}/analyses`, { cookie, body: {} });
   assert.equal(result.status, 201);
-  assert.equal(calls.length, 4);
+  assert.equal(calls.length, 5);
   const evidence = JSON.parse(calls[0].user).telemetry;
   assert.equal(evidence.sensorProfile, 'esp32');
   assert.equal(evidence.units.acceleration_x_raw, 'unidade de origem');
@@ -318,7 +318,7 @@ test('lab AI uses four real call boundaries, validates temporal references and p
   const root = `/api/lab/cases/${saved.body.case.id}`;
   const result = await request(`${root}/analyses`, { cookie, body: { focus: 'Verifique o arrefecimento.' } });
   assert.equal(result.status, 201);
-  assert.equal(calls.length, 4);
+  assert.equal(calls.length, 5);
   assert.deepEqual(result.body.analysis.axes.map((axis) => axis.id), ['operation', 'mechanical', 'environment', 'review']);
   assert.equal(result.body.analysis.hypotheses.length, 4);
   assert.ok(calls.every((call) => call.tools === null && !call.user.includes('SECRET_')));
@@ -433,4 +433,55 @@ test('an in-flight analysis cannot duplicate and does not overwrite a concurrent
   const completed = await pending;
   assert.equal(completed.status, 201);
   assert.equal(completed.body.case.conclusions.length, 1);
+});
+
+test('veredicto final: 5º passo valida culpado, presa evidência à amostra e calcula impacto só pela tabela', async (t) => {
+  const calls = [];
+  let veredicto = {
+    culpado: 'operador', confianca: 0.99, porque: 'Não frenou depois do aviso.', hipotese: 'O condutor seguiu sem frear até o fardo.',
+    evidencias: [{ descricao: 'Aviso sem resposta.', sampleIndex: 0 }, { descricao: 'Instante inventado.', sampleIndex: 999999 }],
+    fatores_contribuintes: ['Velocidade alta'], prevencao: [{ acao: 'Treinar frenagem ao aviso', responsavel: 'gestor da frota', prazo: '30 dias' }],
+    impacto: { itens: [{ chave: 'reparo_frontal_leve' }, { chave: 'parada_maquina_dia', quantidade: 2 }, { chave: 'inventado', valor: 9e9 }], premissas: ['Contato leve.'] },
+    valor_brl: 123456789,
+  };
+  const chat = async (args) => {
+    calls.push(args);
+    if (args.agentId === 'lab-verdict') return typeof veredicto === 'string' ? { content: veredicto, finishReason: 'stop' } : { content: JSON.stringify(veredicto), finishReason: 'stop' };
+    return { content: JSON.stringify(validResponse), toolCalls: [], finishReason: 'stop' };
+  };
+  const { request, register } = await fixture(t, { chat });
+  const cookie = await register('veredicto');
+  const saved = await request('/api/lab/cases', { cookie, body: source() });
+  const root = `/api/lab/cases/${saved.body.case.id}`;
+  const ok = await request(`${root}/analyses`, { cookie, body: {} });
+  assert.equal(ok.status, 201);
+  assert.equal(calls.at(-1).agentId, 'lab-verdict');
+  assert.equal(JSON.parse(calls.at(-1).user).axes.length, 4);
+  assert.match(calls.at(-1).system, /nunca como acusação/);
+  const v = ok.body.analysis.verdict;
+  assert.equal(v.culpado, 'operador'); assert.equal(v.culpadoRotulo, 'Operador humano');
+  assert.equal(v.confianca, 0.9, 'dados sintéticos: confiança limitada a 0.9');
+  assert.deepEqual(v.evidencias, [{ descricao: 'Aviso sem resposta.', elapsedMs: 0 }]);
+  assert.deepEqual(v.impacto_financeiro.componentes.map((c) => c.chave), ['reparo_frontal_leve', 'parada_maquina_dia']);
+  assert.equal(v.impacto_financeiro.faixa_min_brl, 8000 + 2000);
+  assert.equal(v.impacto_financeiro.faixa_max_brl, 32000 + 6000);
+  assert.equal(v.impacto_financeiro.rotulo, 'estimativa');
+  assert.ok(v.impacto_financeiro.premissas.some((p) => /R\$ 400 mil/.test(p)));
+  assert.ok(!JSON.stringify(v).includes('123456789'));
+  // Sem evidência temporal válida, não há culpado.
+  veredicto = { ...veredicto, evidencias: [{ descricao: 'Sem instante', sampleIndex: 999999 }] };
+  const fraco = await request(`${root}/analyses`, { cookie, body: {} });
+  assert.equal(fraco.body.analysis.verdict.culpado, 'indeterminado');
+  assert.ok(fraco.body.analysis.verdict.confianca <= 0.3);
+  // Modelo falha: indeterminado, análise segue concluída com os eixos.
+  veredicto = 'não é json';
+  const falha = await request(`${root}/analyses`, { cookie, body: {} });
+  assert.equal(falha.status, 201);
+  assert.equal(falha.body.analysis.status, 'completed');
+  assert.equal(falha.body.analysis.verdict.status, 'indeterminado_por_falha');
+  assert.equal(falha.body.analysis.verdict.culpado, 'indeterminado');
+  assert.equal(falha.body.analysis.verdict.impacto_financeiro.faixa_min_brl, null);
+  // Caso antigo (sem verdict) continua lendo.
+  const restored = await request(root, { cookie });
+  assert.equal(restored.body.case.analyses.length, 3);
 });

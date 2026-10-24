@@ -101,6 +101,8 @@ import {
   type MissionLedger,
 } from '../../shared/mission-ledger.js';
 import { SOMPO_MISSION_DOSSIER_DELIMITER } from '../../shared/sompo-telemetry.js';
+import type { Veredicto } from '../../shared/veredicto.js';
+import { VeredictoBloco } from '@/components/veredicto/VeredictoBloco';
 
 const LUCA_AI_CLEAN_UI_VERSION = 'session-isolation-v2';
 const LUCA_AI_CLEAN_UI_STORAGE_KEY = 'luca.lucaAi.cleanUiVersion';
@@ -175,6 +177,8 @@ export interface TeamTranscriptEntry {
   completedAt?: string;
   durationMs?: number;
   attachments?: LucaAiChatAttachment[];
+  /** Veredicto final das análises SOMPO (shared/veredicto.js). */
+  verdict?: Veredicto;
 }
 
 const WORKFLOW_ROLE_ICONS: Record<WorkflowRoleId, LucideIcon> = {
@@ -3517,6 +3521,8 @@ export function LucaMissionCanvas({
             final
           />
         )}
+
+        {finalResult?.verdict && <VeredictoBloco veredicto={finalResult.verdict} />}
 
         {visualPack && (
           visualPack.status !== 'skipped'

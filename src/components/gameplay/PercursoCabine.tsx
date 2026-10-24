@@ -8,6 +8,7 @@ import { ENCOSTA_TALHAO, TALHAO, ZONAS_TALHAO } from './geofenceTalhao';
 import { PainelCabine } from './PainelCabine';
 import { REGRAS_NOTA, TRANSICAO_MS, TRECHOS_PERCURSO, resumoPercurso } from './percurso';
 import { AberturaDesafio } from './ResultadoDesafio';
+import { VeredictoBloco } from '@/components/veredicto/VeredictoBloco';
 import { analisarPercurso, FOCO_ANALISE, type CasoPercurso, type EstadoAnalise } from './analisePercurso';
 import { EnviarBancada } from './EnviarBancada';
 import { EVENTO_EM_USO } from './eventoEmUso';
@@ -192,7 +193,7 @@ export function AnaliseAgentes({ analise }: { analise: EstadoAnalise }) {
   if (analise.tipo === 'analisando') {
     return (
       <div className="gameplay-percurso-analise" role="status">
-        <p>Agentes analisando há {analise.segundos} s ({analise.amostras} amostras). Operação, Mecânica e Ambiente em paralelo; depois a Revisão.</p>
+        <p>Agentes analisando há {analise.segundos} s ({analise.amostras} amostras). Operação, Mecânica e Ambiente em paralelo; depois a Revisão e o Veredicto final.</p>
       </div>
     );
   }
@@ -200,6 +201,7 @@ export function AnaliseAgentes({ analise }: { analise: EstadoAnalise }) {
     <div className="gameplay-percurso-analise" data-pronta="">
       <p><b>{analise.titulo}</b> {analise.resumo}</p>
       <ul>{analise.achados.map((a) => <li key={a}>{a}</li>)}</ul>
+      <VeredictoBloco veredicto={analise.veredicto} compacto />
       <p className="gameplay-percurso-caso">Caso completo no Laboratório: {analise.caso}</p>
     </div>
   );

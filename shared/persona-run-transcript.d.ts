@@ -1,3 +1,5 @@
+import type { Veredicto } from './veredicto.js';
+
 export interface PersonaRunTranscriptEntry {
   id: string;
   role: 'persona';
@@ -12,6 +14,8 @@ export interface PersonaRunTranscriptEntry {
   startedAt?: string;
   completedAt?: string;
   durationMs?: number;
+  /** Veredicto final das análises SOMPO (contrato shared/veredicto.js). */
+  verdict?: Veredicto;
 }
 
 export function personaRunTraceId(run?: Record<string, any>): string;

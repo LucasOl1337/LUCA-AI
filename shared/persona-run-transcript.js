@@ -107,6 +107,7 @@ export function finalEntryFromPersonaRun(run = {}) {
       startedAt: run.judge.startedAt || undefined,
       completedAt: run.judge.completedAt || undefined,
       durationMs: Number.isFinite(run.judge.durationMs) ? Math.max(0, run.judge.durationMs) : undefined,
+      ...(run.verdict ? { verdict: run.verdict } : {}),
     };
   }
   if (!run.finalDisplay?.content) return null;
@@ -133,5 +134,6 @@ export function finalEntryFromPersonaRun(run = {}) {
     startedAt: finalReply?.startedAt || undefined,
     completedAt: finalReply?.completedAt || undefined,
     durationMs: Number.isFinite(finalReply?.durationMs) ? Math.max(0, finalReply.durationMs) : undefined,
+    ...(run.verdict ? { verdict: run.verdict } : {}),
   };
 }

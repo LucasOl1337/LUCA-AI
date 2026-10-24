@@ -218,6 +218,7 @@ import {
 } from './sompo-telemetry-history.js';
 import { registerSompoRiskRoutes } from './sompo-risk.js';
 import { registerLabCaseRoutes } from './lab-cases.js';
+import { missaoSompo, veredictoDaBancada } from './veredicto-bancada.js';
 import { registerBancadaFilaRoutes } from './bancada-fila.js';
 import { registerSompoVehicleRoutes } from './sompo-vehicles.js';
 import { lerMaxPorConta, recusarAcimaDoLimite } from './ws-limites.js';
@@ -3883,6 +3884,10 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true, onProgr
   const finalDisplayReply = input.mode === 'individual'
     ? judgeReply?.ok ? judgeReply : null
     : finalDisplayStep?.replies.find((reply) => reply.ok) || null;
+  // Análises SOMPO ganham o veredicto final (culpado provável, prevenção, impacto) em paralelo ao visual.
+  const verdictPromise = missaoSompo(input.mission) && finalDisplayReply?.content
+    ? veredictoDaBancada({ mission: input.mission, entrega: finalDisplayReply.content })
+    : Promise.resolve(null);
 
   let visualPack = null;
   if (input.mode === 'workflow') {
@@ -4006,6 +4011,14 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true, onProgr
     });
   }
 
+  const verdict = await verdictPromise;
+  if (verdict) {
+    appendLucaAiTraceEvent(input.traceId, 'luca_ai.workflow.step_completed', {
+      roleId: 'verdict', roleLabel: 'Veredicto final', durationMs: 0, okCount: verdict.status === 'concluido' ? 1 : 0, errorCount: verdict.status === 'concluido' ? 0 : 1,
+      outputSummary: summarizeLucaAiTraceText(`${verdict.culpadoRotulo} (${Math.round(verdict.confianca * 100)}%) · ${verdict.porque}`, 520),
+    });
+  }
+
   const generatedAt = new Date().toISOString();
   const durationMs = Date.now() - runStartedMs;
   const runOk = input.mode === 'individual'
@@ -4056,6 +4069,7 @@ async function executeLucaAiPersonaTeamRun(input, { toolsEnabled = true, onProgr
       content: finalDisplayReply.content,
     } : null,
     visualPack,
+    ...(verdict ? { verdict } : {}),
     missionLedger,
     consensus: consensusResult
       ? {

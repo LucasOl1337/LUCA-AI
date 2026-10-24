@@ -1,3 +1,4 @@
+import type { Veredicto } from '../../shared/veredicto.js';
 import { LAB_CONCLUSION_CATEGORIES, renderLabReport } from '../../shared/lab-report.js';
 import { parseLabSite, type LabCase } from '../../shared/lab-telemetry.js';
 
@@ -34,7 +35,7 @@ export interface HypothesisReview { analysisId: string; hypothesisId: string; st
 export interface ConclusionDraft { observations: string; category: Category; action: string; hypothesisReviews: HypothesisReview[] }
 export interface Conclusion extends ConclusionDraft { id: string; version: number; createdAt: string; [key: string]: unknown }
 export interface Hypothesis { id: string; axis: string; title: string; explanation: string; evidence: { elapsedMs: number; description: string; values: Record<string, unknown> }[]; limitations: string[]; additionalInformation: string[] }
-export interface LabAnalysis { id: string; version: number; status: string; createdAt: string; error?: string; focus?: string; hypotheses: Hypothesis[]; axes: { id: string; title: string; status: string; summary: string; limitations: string[]; additionalInformation: string[]; hypotheses: Hypothesis[]; error?: string }[] }
+export interface LabAnalysis { id: string; version: number; status: string; createdAt: string; error?: string; focus?: string; verdict?: Veredicto; hypotheses: Hypothesis[]; axes: { id: string; title: string; status: string; summary: string; limitations: string[]; additionalInformation: string[]; hypotheses: Hypothesis[]; error?: string }[] }
 export interface SavedCase { id: string; name: string; sourceName: string; rawCsv: string; metadata: Record<string, unknown> | null; map: Record<string, unknown> | null; schema?: Record<string, unknown> | null; createdAt: string; updatedAt: string; analyses: LabAnalysis[]; conclusions: Conclusion[] }
 export interface CaseSummary { id: string; name: string; sourceName: string; updatedAt: string; analysisCount: number; conclusionCount: number }
 

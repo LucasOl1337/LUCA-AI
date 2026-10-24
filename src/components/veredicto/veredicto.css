@@ -1,0 +1,24 @@
+.veredicto-bloco { --vd-tinta:#24382b; --vd-suave:#5d7262; --vd-fundo:#fbf8ef; --vd-borda:#d9cfae; --vd-destaque:#9a5a12;
+  background:var(--vd-fundo); color:var(--vd-tinta); border:1px solid var(--vd-borda); border-left:4px solid var(--vd-destaque);
+  border-radius:10px; padding:14px 16px; margin:14px 0; font-size:13px; line-height:1.45; text-align:left; }
+.veredicto-bloco[data-veredicto="indeterminado"] { --vd-destaque:#7c8a80; }
+.veredicto-bloco header small { letter-spacing:.08em; font-size:10px; color:var(--vd-suave); font-weight:600; }
+.veredicto-bloco h3 { margin:4px 0 8px; font-size:18px; font-weight:500; }
+.veredicto-bloco h3 b { color:var(--vd-destaque); font-weight:700; }
+.veredicto-confianca { position:relative; height:20px; border-radius:10px; background:#ece6d3; overflow:hidden; }
+.veredicto-confianca i { position:absolute; inset:0 auto 0 0; background:var(--vd-destaque); opacity:.28; }
+.veredicto-confianca span { position:relative; padding:0 10px; font-size:11px; line-height:20px; font-weight:600; }
+.veredicto-porque { margin:10px 0 6px; font-weight:500; }
+.veredicto-hipotese { margin:6px 0; color:var(--vd-suave); }
+.veredicto-bloco ul { margin:6px 0; padding-left:18px; }
+.veredicto-bloco li { margin:3px 0; }
+.veredicto-bloco li small,.veredicto-bloco h4 small { color:var(--vd-suave); font-weight:400; }
+.veredicto-evidencias b,.veredicto-evidencias button { font-variant-numeric:tabular-nums; margin-right:4px; }
+.veredicto-evidencias button { background:none; border:0; padding:0; color:var(--vd-destaque); text-decoration:underline; cursor:pointer; font:inherit; font-weight:600; }
+.veredicto-secao { margin-top:10px; }
+.veredicto-secao h4 { margin:0 0 2px; font-size:13px; }
+.veredicto-impacto strong { display:block; font-size:16px; color:var(--vd-destaque); }
+.veredicto-bloco details { margin-top:6px; color:var(--vd-suave); }
+.veredicto-bloco details p { margin:3px 0; }
+.veredicto-aviso { margin:10px 0 0; font-size:11px; color:var(--vd-suave); font-style:italic; }
+@media (max-width: 480px) { .veredicto-bloco { padding:12px; font-size:12.5px; } .veredicto-bloco h3 { font-size:16px; } }
