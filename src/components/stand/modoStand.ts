@@ -16,7 +16,9 @@
  * em volta. Principalmente se ele tiver AFK"): sub-estado da Coruja com só a
  * coruja em tela inteira. Entra sozinho após `palcoAfkMs` sem ninguém (padrão
  * `PALCO_AFK_MS`) ou de propósito (botão "Tela cheia", tecla F). Sai com
- * qualquer atividade: toque, tecla, controle, voz ou rosto chegando. Com o
+ * toque, tecla, controle, alguém falando com a Coruja ou rosto chegando. Ligado
+ * de propósito, só gesto tira: conversa em andamento e rosto na frente seguem no
+ * palco (24/10: cada passo da voz derrubava a tela cheia no totem). Com o
  * palco ligado ele é o repouso: a Coruja não cai mais sozinha na Vitrine
  * (Vitrine segue pelo botão e pela voz). `palcoAfkMs: null` mantém o repouso
  * antigo (Coruja → Vitrine em 60 s), usado no Stand sem login.
@@ -62,13 +64,19 @@ export interface EstadoModo {
   pagina: PaginaSite | null;
   /** Coruja sozinha em tela inteira (só com `modo === 'coruja'`). */
   palco: boolean;
+  /** Palco ligado de propósito (botão, F, □): presença não o tira, só gesto. */
+  palcoFixo?: boolean;
   /** Tempo sem ninguém até o palco; `null` = repouso antigo na Vitrine. */
   palcoAfkMs: number | null;
 }
 
 export type EntradaModo =
   | { tipo: 'ir'; modo: Modo }
-  | { tipo: 'atividade'; toque?: boolean }
+  /**
+   * Gente na frente. `presenca`: sinal sem gesto (passo da conversa, rosto chegando):
+   * segura o tempo e tira o palco por tempo, mas não o palco ligado de propósito.
+   */
+  | { tipo: 'atividade'; toque?: boolean; presenca?: boolean }
   | { tipo: 'trocar_video'; direcao: 1 | -1 }
   | { tipo: 'pausar' }
   | { tipo: 'video_terminou' }
@@ -117,29 +125,31 @@ const mascara = (itens: number | readonly boolean[]): readonly boolean[] => (typ
 export function reduzirModo(atual: EstadoModo, entrada: EntradaModo, agora: number, itens: number | readonly boolean[]): EstadoModo {
   const novo = passoModo(atual, entrada, agora, mascara(itens));
   // Palco só existe na Coruja: qualquer troca de modo o desliga.
-  return novo.palco && novo.modo !== 'coruja' ? { ...novo, palco: false } : novo;
+  return novo.palco && novo.modo !== 'coruja' ? { ...novo, palco: false, palcoFixo: false } : novo;
 }
 
 function passoModo(atual: EstadoModo, entrada: EntradaModo, agora: number, disponivel: readonly boolean[]): EstadoModo {
   switch (entrada.tipo) {
     case 'ir':
       // PS e a Coruja da barra fecham a página (solta a webcam da sonolência).
-      if (entrada.modo === 'coruja') return { ...atual, modo: 'coruja', marco: agora, pausado: false, pagina: null, palco: false };
+      if (entrada.modo === 'coruja') return { ...atual, modo: 'coruja', marco: agora, pausado: false, pagina: null, palco: false, palcoFixo: false };
       if (entrada.modo === 'site' && !atual.pagina) return { ...atual, marco: agora };
       if (entrada.modo === atual.modo) return { ...atual, marco: agora };
       return { ...atual, modo: entrada.modo, marco: agora, pausado: false };
     case 'abrir_pagina':
       return { ...atual, modo: 'site', pagina: entrada.pagina, marco: agora, pausado: false };
     case 'voltar_coruja':
-      return { ...atual, modo: 'coruja', pagina: null, marco: agora, pausado: false, palco: false };
+      return { ...atual, modo: 'coruja', pagina: null, marco: agora, pausado: false, palco: false, palcoFixo: false };
     case 'palco': {
       const ligado = entrada.ligado ?? !(atual.modo === 'coruja' && atual.palco);
-      if (!ligado) return { ...atual, palco: false, marco: agora };
-      return { ...atual, modo: 'coruja', pagina: null, pausado: false, palco: true, marco: agora };
+      if (!ligado) return { ...atual, palco: false, palcoFixo: false, marco: agora };
+      return { ...atual, modo: 'coruja', pagina: null, pausado: false, palco: true, palcoFixo: true, marco: agora };
     }
     case 'atividade':
+      // Presença sem gesto (voz em andamento, rosto) não derruba o palco que alguém ligou de propósito.
+      if (entrada.presenca && atual.palco && atual.palcoFixo) return { ...atual, marco: agora };
       // Gente na frente (toque, tecla, controle, voz, rosto): o palco sai e a Coruja volta com tudo.
-      return { ...atual, palco: false, marco: agora, barraAte: entrada.toque ? agora + BARRA_MS : atual.barraAte };
+      return { ...atual, palco: false, palcoFixo: false, marco: agora, barraAte: entrada.toque ? agora + BARRA_MS : atual.barraAte };
     case 'trocar_video':
       if (atual.modo !== 'vitrine') return { ...atual, marco: agora };
       return { ...atual, video: proximoItem(atual.video, entrada.direcao, disponivel).indice, pausado: false, marco: agora };
@@ -159,7 +169,7 @@ function passoModo(atual: EstadoModo, entrada: EntradaModo, agora: number, dispo
         if (atual.palcoAfkMs !== null) {
           // Palco é o repouso: fica até alguém chegar; não cai na Vitrine.
           if (atual.palco || entrada.corujaOcupada || parado < atual.palcoAfkMs) return atual;
-          return { ...atual, palco: true, marco: agora };
+          return { ...atual, palco: true, palcoFixo: false, marco: agora };
         }
         if (entrada.corujaOcupada || parado < REPOUSO_MS) return atual;
         return { ...atual, modo: 'vitrine', video: 0, pausado: false, marco: agora, pagina: null };

@@ -217,8 +217,8 @@ export default function StandPage() {
         void rodarAcao(evento.acao, evento.args).then((r) => { if (!r.ok) setFalhaSite(r.mensagem); });
       }
       else despachar(evento);
-      // Voz em andamento é gente na frente do totem.
-      if (evento.tipo === 'estado' && evento.valor !== 'ocioso') despacharModo({ tipo: 'atividade' });
+      // Voz em andamento é gente na frente do totem (presença: o palco ligado de propósito fica, a Coruja fala nele).
+      if (evento.tipo === 'estado' && evento.valor !== 'ocioso') despacharModo({ tipo: 'atividade', presenca: true });
       // Despertar na Vitrine é discreto: o vídeo segue até a 1ª palavra, e aí a Coruja assume já na Conversa.
       if (evento.tipo === 'estado' && evento.valor !== 'ocioso' && modoAtual.current === 'vitrine') despacharModo({ tipo: 'ir', modo: 'coruja' });
     });
@@ -478,8 +478,8 @@ export default function StandPage() {
     return () => window.removeEventListener('keydown', aoTeclar);
   }, [sair, terminarVideo, iniciar, encerrarVoz, alternarPalco]);
 
-  // Rosto chegando na frente do totem tira a Coruja do palco (só na chegada, não a cada leitura).
-  useEffect(() => { if (webcam.presenca === 'rosto') despacharModo({ tipo: 'atividade' }); }, [webcam.presenca]);
+  // Rosto chegando na frente do totem tira a Coruja do palco por tempo (só na chegada, não a cada leitura).
+  useEffect(() => { if (webcam.presenca === 'rosto') despacharModo({ tipo: 'atividade', presenca: true }); }, [webcam.presenca]);
   // Entrou no palco: menu aberto fecha (ninguém está usando).
   useEffect(() => { if (modo.palco) setMenu({ aberto: false, grupo: null }); }, [modo.palco]);
 

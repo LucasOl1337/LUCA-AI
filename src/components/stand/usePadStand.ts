@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { firstStandardPad, unmappedPadId } from '../sompo/gamepadLoop';
 import type { GamepadLike } from '../sompo/gamepadMapping';
-import { lerNavegacao, type AcaoNavegacao } from './navegacaoPad';
+import { lerNavegacao, type AcaoNavegacao, type EstadoNavegacao } from './navegacaoPad';
 import { lerSetas, SETAS_SOLTAS, type Direcao, type OrigemSeta } from './focoPad';
 import type { Modo } from './modoStand';
 
@@ -28,7 +28,7 @@ export function usePadStand({ modo, aoAgir, aoMexer, aoMover }: {
 
   useEffect(() => {
     let quadro = 0;
-    let anterior = { pressed: [] as readonly number[] };
+    let anterior: EstadoNavegacao = { pressed: [] };
     let setas = SETAS_SOLTAS;
     let estava = false;
     let idDesconhecido: string | null = null;

@@ -40,6 +40,27 @@ test('sai do palco com toque, tecla, voz ou rosto (atividade) e o tempo recomeç
   assert.equal(e.palco, true);
 });
 
+test('palco de propósito fica com conversa e rosto na frente; gesto tira (24/10: a voz derrubava a tela cheia)', () => {
+  let e = passo(totem(), { tipo: 'palco', ligado: true }, 1000);
+  for (const [i, agora] of [2000, 2500, 9000].entries()) {
+    e = passo(e, { tipo: 'atividade', presenca: true }, agora);
+    assert.equal(e.palco, true, `passo ${i} da voz/rosto mantém o palco`);
+  }
+  assert.equal(e.marco, 9000, 'presença segura o tempo');
+  e = passo(e, { tipo: 'atividade' }, 10_000);
+  assert.equal(e.palco, false, 'controle, tecla ou toque tiram');
+  // Palco por tempo: presença (rosto chegando, alguém falando) tira, como antes.
+  let afk = passo(totem(), { tipo: 'relogio' }, PALCO_AFK_MS);
+  assert.equal(afk.palco, true);
+  afk = passo(afk, { tipo: 'atividade', presenca: true }, PALCO_AFK_MS + 1);
+  assert.equal(afk.palco, false);
+  // De propósito, desligado e depois por tempo: o novo palco não herda o "de propósito".
+  let ciclo = passo(passo(totem(), { tipo: 'palco', ligado: true }, 10), { tipo: 'palco', ligado: false }, 20);
+  ciclo = passo(ciclo, { tipo: 'relogio' }, 20 + PALCO_AFK_MS);
+  ciclo = passo(ciclo, { tipo: 'atividade', presenca: true }, 30 + PALCO_AFK_MS);
+  assert.equal(ciclo.palco, false);
+});
+
 test('palco de propósito (botão / F): liga na hora, de qualquer modo, e F de novo desliga', () => {
   let e = passo(totem(), { tipo: 'palco', ligado: true }, 1000);
   assert.deepEqual([e.modo, e.palco], ['coruja', true]);

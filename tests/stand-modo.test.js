@@ -124,6 +124,21 @@ test('controle: analógico conta como atividade; parado ou sem mapping standard,
   assert.deepEqual([generico.acoes, generico.ativo], [[], false]);
 });
 
+test('controle parado com analógico torto ou gatilho meio apertado não é gente mexendo (palco no totem, 24/10)', () => {
+  const torto = pad([], [0.3, -0.25, 0, 0]);
+  torto.buttons[6] = { pressed: false, value: 0.2 };
+  let leitura = lerNavegacao(torto, { pressed: [] }, 'coruja');
+  assert.equal(leitura.ativo, true, 'o primeiro quadro vê a mudança');
+  for (let i = 0; i < 5; i += 1) {
+    leitura = lerNavegacao(torto, leitura.next, 'coruja');
+    assert.equal(leitura.ativo, false, `parado no quadro ${i}`);
+  }
+  assert.equal(lerNavegacao(pad([], [0.9, -0.25, 0, 0]), leitura.next, 'coruja').ativo, true, 'mexer o analógico conta');
+  const segurando = lerNavegacao(pad([4]), { pressed: [] }, 'coruja');
+  assert.equal(lerNavegacao(pad([4]), segurando.next, 'coruja').ativo, false, 'segurar o mesmo botão não repete');
+  assert.equal(lerNavegacao(pad([]), segurando.next, 'coruja').ativo, true, 'soltar conta');
+});
+
 test('voz do stand segue /api/stand/status e a última sessão', () => {
   assert.equal(vozDoStand(null, null), 'carregando');
   assert.equal(vozDoStand({ ligado: true }, null), 'ligada');

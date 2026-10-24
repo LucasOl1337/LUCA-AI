@@ -24,14 +24,22 @@ export type AcaoNavegacao =
 
 export const BOTOES_NAVEGACAO = { cruz: 0, bola: 1, quadrado: 2, triangulo: 3, esquerda: 14, direita: 15, ps: 16 } as const;
 
+/** Leitura anterior: botões apertados e, pra ver mudança, analógicos e gatilhos. */
+export interface EstadoNavegacao extends PadState { eixos?: readonly number[]; valores?: readonly number[] }
+
 export interface LeituraNavegacao {
   acoes: AcaoNavegacao[];
-  /** Alguém mexeu no controle neste quadro (qualquer botão, gatilho ou analógico). */
+  /** Alguém mexeu no controle neste quadro: apertou/soltou botão, moveu gatilho ou analógico. */
   ativo: boolean;
-  next: PadState;
+  next: EstadoNavegacao;
 }
 
 const VAZIA: LeituraNavegacao = { acoes: [], ativo: false, next: { pressed: [] } };
+/**
+ * Atividade é mudança, não posição (24/10): analógico com drift ou gatilho meio apertado,
+ * parados, liam como gente mexendo a cada segundo e o palco nunca ficava no totem.
+ */
+const MUDANCA = 0.15;
 
 function acaoDoBotao(indice: number, modo: Modo): AcaoNavegacao | null {
   const b = BOTOES_NAVEGACAO;
@@ -49,22 +57,21 @@ function acaoDoBotao(indice: number, modo: Modo): AcaoNavegacao | null {
   return null;
 }
 
-export function lerNavegacao(pad: GamepadLike | null | undefined, prev: PadState, modo: Modo): LeituraNavegacao {
+export function lerNavegacao(pad: GamepadLike | null | undefined, prev: EstadoNavegacao, modo: Modo): LeituraNavegacao {
   if (!pad || pad.mapping !== 'standard') return VAZIA;
   const pressed: number[] = [];
   const acoes: AcaoNavegacao[] = [];
-  let ativo = false;
+  const valores = pad.buttons.map((botao) => botao?.value ?? 0);
+  const eixos = pad.axes.map((valor) => applyDeadZone(valor));
   pad.buttons.forEach((botao, indice) => {
-    if (!botao?.pressed) {
-      if ((botao?.value ?? 0) > 0.04) ativo = true;
-      return;
-    }
-    ativo = true;
+    if (!botao?.pressed) return;
     pressed.push(indice);
     if (prev.pressed.includes(indice)) return;
     const acao = acaoDoBotao(indice, modo);
     if (acao) acoes.push(acao);
   });
-  if (pad.axes.some((valor) => applyDeadZone(valor) !== 0)) ativo = true;
-  return { acoes, ativo, next: { pressed } };
+  const mudou = (agora: readonly number[], antes: readonly number[] | undefined) => agora.some((v, i) => Math.abs(v - (antes?.[i] ?? 0)) > MUDANCA);
+  const ativo = pressed.length !== prev.pressed.length || pressed.some((i) => !prev.pressed.includes(i))
+    || mudou(eixos, prev.eixos) || mudou(valores, prev.valores);
+  return { acoes, ativo, next: { pressed, eixos, valores } };
 }
