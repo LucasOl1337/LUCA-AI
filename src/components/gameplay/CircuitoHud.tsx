@@ -15,6 +15,7 @@ import { somCompartilhado } from './somCompartilhado';
 import { alertaCabine, rotuloCerca } from './alertaCabine';
 import { useBipeCabine } from './bipeCabine';
 import { useSegurancaCabine } from './useSegurancaCabine';
+import { IconePad } from '../stand/IconePad';
 const Webcam = lazy(() => import('./WebcamSonoCabine'));
 const ROTULOS = { feno: 'Obstáculo à frente · reduza e desvie', agua: 'Área alagada · contorne', encosta: 'Encosta · reduza a velocidade', sonolencia: 'Olhos fechados · pare em segurança' };
 /**
@@ -52,6 +53,9 @@ export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, t
   const e = useSyncExternalStore(motor.assinar, motor.ler, motor.ler);
   const sono = useSonoCabine();
   const [som, setSom] = useState(true);
+  // Sair da simulação pede confirmação dentro da pausa (o window.confirm travava o controle).
+  const [confirmaSaida, setConfirmaSaida] = useState(false);
+  useEffect(() => { if (!menu) setConfirmaSaida(false); }, [menu]);
   const audio = useMemo(() => criarAudioCircuito(), [motor]);
   useEffect(() => somCompartilhado.ligarDestravas(window, document), []);
   useEffect(() => () => audio.parar(), [audio]);
@@ -86,13 +90,13 @@ export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, t
       <span>{Math.round(r.progresso * 100)}% · {decimalCircuito(m.elapsedMs / 1000)} s</span>
     </div>
     {!fim && <><SensoresCircuito estado={e} /><MapaTalhao estado={e} geofence={geofenceTalhao(e.maquina)} circuito /></>}
-    {!fim && <button className="circuito-menu-botao" onClick={() => aoMenu(!menu)}>Pausa / opções · Esc</button>}
+    {!fim && <button className="circuito-menu-botao" data-pad-voltar="" onClick={() => aoMenu(!menu)}><IconePad botao="bola" />Pausa / opções · Esc</button>}
     {!fim && !menu && e.fase === 'pronto' && <p className="circuito-partida" role="status">
       <kbd>{entrada === 'teclado' ? 'W / ↑' : COMANDOS_CABINE.acelerar[entrada]}</kbd> para partir · siga as estacas até a chegada</p>}
     {!fim && <div className="circuito-avisos" aria-live="polite">{[...riscosCircuito(e, sono?.status === 'alarm')].map(([s, gravidade]) => <p key={s} data-gravidade={gravidade}>{ROTULOS[s]}</p>)}
       {/* Preso na cerca (Lupa, observação da Lixa): só texto; não é risco, não entra nas métricas nem toca. */}
       {painel.cerca && <p data-gravidade="atencao" data-cerca="">{rotuloCerca(entrada)}</p>}</div>}
-    {!menu && !fim && <div className="circuito-touch" aria-label="Controles de toque">{[['ArrowLeft', '←'], ['ArrowDown', 'Freio'], ['ArrowUp', 'Acelerar'], ['ArrowRight', '→']].map(([key, label]) => <button key={key} aria-label={label} onPointerDown={(ev) => { ev.currentTarget.setPointerCapture(ev.pointerId); touch(key, true); }} onPointerUp={() => touch(key, false)} onPointerCancel={() => touch(key, false)} onLostPointerCapture={() => touch(key, false)}>{label}</button>)}</div>}
+    {!menu && !fim && <div className="circuito-touch" aria-label="Controles de toque" data-foco-pular="">{[['ArrowLeft', '←'], ['ArrowDown', 'Freio'], ['ArrowUp', 'Acelerar'], ['ArrowRight', '→']].map(([key, label]) => <button key={key} aria-label={label} onPointerDown={(ev) => { ev.currentTarget.setPointerCapture(ev.pointerId); touch(key, true); }} onPointerUp={() => touch(key, false)} onPointerCancel={() => touch(key, false)} onLostPointerCapture={() => touch(key, false)}>{label}</button>)}</div>}
     {menu && !fim && <section className="circuito-dialogo" role="dialog" aria-modal="true" aria-label="Opções do circuito">
       <h2>Corrida pausada</h2>
       <p>Siga as estacas até a chegada, desviando dos obstáculos e da água; reduza na encosta. O tempo parado não conta.</p>
@@ -102,17 +106,22 @@ export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, t
         <p>Controle: R2 acelera · L2 freia e dá ré · analógico esquerdo vira · ✕ troca a câmera · Options pausa · PS volta à Coruja. Teclado: W/↑ acelera · S/↓/espaço freia · A D/← → viram · C troca a câmera · Esc pausa.</p>
         <p>Sons de risco são tons curtos, sem voz. A imagem da webcam fica só neste navegador; o alerta de sonolência é experimental, não é sistema de segurança.</p>
       </details>
-      <button onClick={() => { void audio.liberar(); aoMenu(false); }} autoFocus>Continuar <kbd>{confirmar}</kbd></button>
+      <button data-pad-voltar="" onClick={() => { void audio.liberar(); aoMenu(false); }} autoFocus>Continuar <kbd>{confirmar}</kbd> <IconePad botao="bola" /></button>
       <button onClick={() => { sessao.terminar('abandono', new Date().toISOString()); motor.encerrar('abandono'); aoMenu(false); }}>Abandonar esta corrida</button>
-      <button onClick={() => { if (window.confirm('Abandonar a corrida e sair da simulação?')) window.dispatchEvent(new Event('luca:circuito-sair')); }}>Sair da simulação</button>
+      {confirmaSaida
+        ? <div className="circuito-confirma-saida" role="group" aria-label="Confirmar saída"><p>Abandonar a corrida e sair da simulação?</p>
+          <button data-acao="confirmar-saida" onClick={() => window.dispatchEvent(new Event('luca:circuito-sair'))} autoFocus>Sim, sair pra Coruja</button>
+          <button onClick={() => setConfirmaSaida(false)}>Não, ficar</button></div>
+        : <button data-acao="sair-simulacao" onClick={() => setConfirmaSaida(true)}><IconePad botao="ps" />Sair da simulação</button>}
     </section>}
-    {fim && <section className="circuito-dialogo circuito-resultado" role="region" aria-label="Resultado da corrida" data-motivo={fim.motivo}>
+    {fim && <section className="circuito-dialogo circuito-resultado" role="region" aria-label="Resultado da corrida" data-motivo={fim.motivo} data-foco-escopo="">
       <small>SIMULAÇÃO · CORRIDA</small><h2>{textoResultadoCircuito(r).titulo}</h2>
       <p>{textoResultadoCircuito(r).resumo}</p>
       <details><summary>Como a corrida é avaliada</summary><ul>{REGRAS_CIRCUITO_TELA.map((t) => <li key={t}>{t}</li>)}</ul>{r.pausas.length > 0 && <p>Pausas nesta corrida: {r.pausas.length}.</p>}</details>
       <button data-acao="nova-corrida" onClick={aoNovo} autoFocus>Nova corrida <kbd>{confirmar}</kbd></button>
       <button data-acao="analisar-circuito" onClick={() => { aoWebcam(false); aoAnalisar(sessao.relatorio()); }}>Analisar relatório · abrir chat dos agentes</button>
       <EnviarBancada montar={() => envioDoCircuito(sessao.relatorio())} />
+      <button data-acao="voltar-coruja" data-pad-voltar="" onClick={() => window.dispatchEvent(new Event('luca:circuito-sair'))}><IconePad botao="bola" />Voltar pra Coruja</button>
     </section>}
   </div>;
 }

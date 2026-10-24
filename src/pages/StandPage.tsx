@@ -22,6 +22,9 @@ import { SiteStand } from '@/components/stand/site/SiteStand';
 import { avisoDeSaida, barraVisivel, modoInicial, modosDisponiveis, palcoAfkDaUrl, reduzirModo, type EntradaModo, type EstadoModo } from '@/components/stand/modoStand';
 import type { AcaoNavegacao } from '@/components/stand/navegacaoPad';
 import { usePadStand } from '@/components/stand/usePadStand';
+import { confirmarFocoPad, focoPadExplicito, limparFocoPad, moverFocoPad, voltarNoEscopoPad } from '@/components/stand/focoPadDom';
+import type { Direcao } from '@/components/stand/focoPad';
+import { DicasControle } from '@/components/stand/IconePad';
 import { AvisoSaida, BarraModos, preCarregarSimulador, SimulacaoStand, VitrineStand } from '@/components/stand/Modos';
 import { PainelComandos } from '@/components/stand/PainelComandos';
 import { MenuTotem, type EstadoItem } from '@/components/stand/MenuTotem';
@@ -263,16 +266,6 @@ export default function StandPage() {
     encerrarVisita();
   }, [repouso, encerrarVoz]);
 
-  const agirNoPad = useCallback((acao: AcaoNavegacao) => {
-    if (acao.tipo === 'conversar') {
-      // ✕ na Coruja conversa quando há voz; sem voz mostra a Vitrine (igual ao toque).
-      if (vozStand === 'ligada' && estado.tela === 'atracao') iniciar();
-      else if (vozStand === 'desligada' && estado.tela === 'atracao') despacharModo({ tipo: 'ir', modo: 'vitrine' });
-      despacharModo({ tipo: 'atividade' });
-      return;
-    }
-    despacharModo(acao);
-  }, [vozStand, estado.tela, iniciar]);
   const mexeuNoPad = useCallback(() => despacharModo({ tipo: 'atividade' }), []);
   // Quem espera a análise dos agentes do percurso está usando o totem (estande aberto: nada expulsa usuário ativo).
   useEffect(() => {
@@ -352,7 +345,78 @@ export default function StandPage() {
     const timer = window.setTimeout(() => setFalhaSite(''), 8000);
     return () => window.clearTimeout(timer);
   }, [falhaSite]);
-  const { conectado: controleConectado, desconhecido: controleDesconhecido } = usePadStand({ modo: modo.modo, aoAgir: agirNoPad, aoMexer: mexeuNoPad });
+  const terminarVideo = useCallback(() => {
+    const id = videoRef.current;
+    if (!id) return;
+    despachar({ tipo: 'video_terminou' });
+    canal.current.enviar({ tipo: 'video_terminou', id });
+  }, []);
+
+  /** Liga/desliga o palco (coruja sozinha) junto com a tela cheia do navegador: F, □ e o botão da barra. */
+  const alternarPalco = useCallback(() => {
+    const ligar = !palcoAtual.current;
+    if (ligar) setMenu({ aberto: false, grupo: null });
+    despacharModo({ tipo: 'palco', ligado: ligar });
+    pedirTelaCheia(ligar);
+  }, []);
+  const encerrarConversa = useCallback(() => {
+    nivel.current = 0;
+    despachar({ tipo: 'encerrar' });
+    canal.current.enviar({ tipo: 'encerrar' });
+    encerrarVoz();
+  }, [encerrarVoz]);
+  /**
+   * ○ volta um nível (Lucas, 24/10: ida e volta em tudo): primeiro o `data-pad-voltar` do
+   * diálogo de cima (menu, pausa, resultado, chat); sem ele, o vídeo pedido, o palco, a
+   * conversa, e Site/Vitrine/Simulação voltam pra Coruja.
+   */
+  const voltarNoPad = useCallback(() => {
+    if (voltarNoEscopoPad()) return;
+    limparFocoPad();
+    if (modoAtual.current === 'simulacao') { despacharModo({ tipo: 'voltar_coruja' }); return; }
+    if (modoAtual.current !== 'coruja') { despacharModo({ tipo: 'voltar_coruja' }); return; }
+    if (estado.tela === 'video') { terminarVideo(); return; }
+    if (palcoAtual.current) { despacharModo({ tipo: 'palco', ligado: false }); return; }
+    if (estado.tela === 'conversa' || voz.ativa) encerrarConversa();
+  }, [estado.tela, voz.ativa, terminarVideo, encerrarConversa]);
+  const agirNoPad = useCallback((acao: AcaoNavegacao) => {
+    const simulacao = modoAtual.current === 'simulacao';
+    if (acao.tipo === 'escolher') { confirmarFocoPad(document, simulacao); return; }
+    if (acao.tipo === 'voltar') { voltarNoPad(); return; }
+    if (acao.tipo === 'menu') {
+      despacharModo({ tipo: 'atividade', toque: true });
+      if (menu.aberto) { fecharMenu(); return; }
+      abrirMenu(null);
+      // Menu aberto pelo controle já chega com o primeiro item aceso.
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => moverFocoPad('baixo')));
+      return;
+    }
+    if (acao.tipo === 'tela_cheia') { alternarPalco(); return; }
+    // ✕ com item aceso pelo D-pad aperta o item; sem foco, segue o sentido do modo.
+    if ((acao.tipo === 'conversar' || acao.tipo === 'pausar') && confirmarFocoPad()) { despacharModo({ tipo: 'atividade' }); return; }
+    if (acao.tipo === 'trocar_video' && focoPadExplicito()) return;
+    if (acao.tipo === 'conversar') {
+      // ✕ na Coruja conversa quando há voz; sem voz mostra a Vitrine (igual ao toque).
+      if (vozStand === 'ligada' && estado.tela === 'atracao') iniciar();
+      else if (vozStand === 'desligada' && estado.tela === 'atracao') despacharModo({ tipo: 'ir', modo: 'vitrine' });
+      despacharModo({ tipo: 'atividade' });
+      return;
+    }
+    if (acao.tipo === 'ir') { limparFocoPad(); fecharMenu(); }
+    despacharModo(acao);
+  }, [vozStand, estado.tela, iniciar, voltarNoPad, menu.aberto, abrirMenu, fecharMenu, alternarPalco]);
+  const moverNoPad = useCallback((direcao: Direcao) => {
+    const simulacao = modoAtual.current === 'simulacao';
+    // Mexer acende a barra (os modos entram no foco); no palco o primeiro aperto só acorda a Coruja.
+    despacharModo({ tipo: 'atividade', toque: !simulacao });
+    if (!simulacao && palcoAtual.current) return;
+    // Vitrine: ←/→ trocam o vídeo até alguém acender um item com ↑/↓.
+    if (modoAtual.current === 'vitrine' && (direcao === 'esquerda' || direcao === 'direita') && !focoPadExplicito()) return;
+    moverFocoPad(direcao, document, simulacao);
+  }, []);
+  const { conectado: controleConectado, desconhecido: controleDesconhecido } = usePadStand({ modo: modo.modo, aoAgir: agirNoPad, aoMexer: mexeuNoPad, aoMover: moverNoPad });
+  // Trocou de modo ou abriu/fechou o menu: o foco antigo não vale mais.
+  useEffect(() => { limparFocoPad(); }, [modo.modo, menu.aberto, modo.palco]);
   const avisoControle = avisoDeControle(controleDesconhecido);
   useEffect(() => {
     const sairCircuito = () => despacharModo({ tipo: 'voltar_coruja' });
@@ -370,13 +434,6 @@ export default function StandPage() {
     else if (vozStand === 'desligada') despacharModo({ tipo: 'ir', modo: 'vitrine' });
   }, [modo.modo, estado.tela, vozStand, iniciar]);
 
-  const terminarVideo = useCallback(() => {
-    const id = videoRef.current;
-    if (!id) return;
-    despachar({ tipo: 'video_terminou' });
-    canal.current.enviar({ tipo: 'video_terminou', id });
-  }, []);
-
   useEffect(() => {
     const mandar = (tipo: 'encerrar' | 'reiniciar') => {
       nivel.current = 0;
@@ -392,11 +449,7 @@ export default function StandPage() {
       demonstrar: iniciar,
       alternarGrade: () => setGrade((g) => !g),
       // F: liga/desliga o palco (coruja sozinha) junto com a tela cheia do navegador.
-      alternarTelaCheia: () => {
-        const ligar = !palcoAtual.current;
-        despacharModo({ tipo: 'palco', ligado: ligar });
-        pedirTelaCheia(ligar);
-      },
+      alternarTelaCheia: alternarPalco,
       sair,
     };
     const aoTeclar = (evento: KeyboardEvent) => {
@@ -413,7 +466,7 @@ export default function StandPage() {
     };
     window.addEventListener('keydown', aoTeclar);
     return () => window.removeEventListener('keydown', aoTeclar);
-  }, [sair, terminarVideo, iniciar, encerrarVoz]);
+  }, [sair, terminarVideo, iniciar, encerrarVoz, alternarPalco]);
 
   // Rosto chegando na frente do totem tira a Coruja do palco (só na chegada, não a cada leitura).
   useEffect(() => { if (webcam.presenca === 'rosto') despacharModo({ tipo: 'atividade' }); }, [webcam.presenca]);
@@ -474,6 +527,7 @@ export default function StandPage() {
       data-motivo={motivoVoz || undefined}
       data-escuta={escuta.estado}
       data-ptt={ptt ? (!controleConectado ? 'sem_controle' : segurandoFala ? 'segurando' : 'solto') : undefined}
+      data-controle={controleConectado || undefined}
       data-camera={webcam.camera.fase}
       data-presenca={webcam.presenca}
       onPointerDown={tocar}
@@ -530,6 +584,7 @@ export default function StandPage() {
           </p>
         )}
         {linhaEscuta && <p className="stand-linha-escuta">{linhaEscuta}</p>}
+        {controleConectado && modo.modo !== 'vitrine' && <DicasControle />}
         <BarraModos
           modo={modo.modo}
           modos={modosDisponiveis(modo)}
@@ -538,11 +593,13 @@ export default function StandPage() {
           atalhos={[{
             id: 'menu',
             rotulo: 'Menu',
+            icone: 'triangulo',
             ativo: menu.aberto,
             aoEscolher: () => (menu.aberto ? fecharMenu() : abrirMenu(null)),
           }, {
             id: 'palco',
             rotulo: 'Tela cheia',
+            icone: 'quadrado',
             ativo: modo.palco,
             aoEscolher: () => { fecharMenu(); despacharModo({ tipo: 'palco', ligado: true }); pedirTelaCheia(true); },
           }]}

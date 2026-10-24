@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type PointerEvent } from 'react';
 import { CATALOGO, type GrupoCatalogo, type ItemCatalogo } from '../../../shared/stand/catalogo.ts';
+import { IconePad } from './IconePad';
 
 /**
  * Menu fixo do Totem (grill Totem interativo r1, Q1/Q2/Q5/Q6): grupo → itens do
@@ -43,9 +44,9 @@ export function MenuTotem({ aberto, grupo, status, indisponivel, motivoSemTexto,
     <section className="stand-menu" role="dialog" aria-label="Menu do totem" data-grupo={atual?.id} onPointerDown={parar}>
       <header className="stand-menu-topo">
         {atual
-          ? <button type="button" className="stand-menu-voltar" onClick={() => aoAbrirGrupo(null)}>‹ Todas as opções</button>
+          ? <button type="button" className="stand-menu-voltar" data-pad-voltar="" onClick={() => aoAbrirGrupo(null)}><IconePad botao="bola" />‹ Todas as opções</button>
           : <p className="stand-menu-titulo">O que você quer ver?</p>}
-        <button type="button" className="stand-menu-fechar" aria-label="Fechar o menu" onClick={aoFechar}>✕</button>
+        <button type="button" className="stand-menu-fechar" aria-label="Fechar o menu" data-pad-voltar="" onClick={aoFechar}>{atual ? '✕' : <><IconePad botao="bola" />✕</>}</button>
       </header>
       {atual && <p className="stand-menu-grupo">{atual.titulo} <span>· {atual.faz}</span></p>}
       <ul className="stand-menu-lista" data-nivel={atual ? 2 : 1}>

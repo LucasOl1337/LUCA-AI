@@ -27,6 +27,9 @@ test('pad sem login: ✕ na Coruja abre a Vitrine e Simulação/Site não entram
   assert.deepEqual(entradaSemLogin({ tipo: 'ir', modo: 'site' }, 'coruja'), { tipo: 'atividade' });
   assert.deepEqual(entradaSemLogin({ tipo: 'ir', modo: 'coruja' }, 'vitrine'), { tipo: 'ir', modo: 'coruja' });
   assert.deepEqual(entradaSemLogin({ tipo: 'pausar' }, 'vitrine'), { tipo: 'pausar' });
+  assert.deepEqual(entradaSemLogin({ tipo: 'voltar' }, 'vitrine'), { tipo: 'voltar_coruja' });
+  assert.deepEqual(entradaSemLogin({ tipo: 'voltar' }, 'coruja'), { tipo: 'atividade' });
+  assert.deepEqual(entradaSemLogin({ tipo: 'menu' }, 'coruja'), { tipo: 'atividade' }, 'sem login não há menu');
 });
 
 test('o fallback não chama a API nem importa voz, escuta ou Telas do app', async () => {

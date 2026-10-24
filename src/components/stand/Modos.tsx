@@ -1,6 +1,7 @@
 import { lazy, memo, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { MODOS, ROTULO_MODO, type Modo } from './modoStand';
 import type { ItemVitrine } from './vitrineStand';
+import { IconePad, type BotaoPad } from './IconePad';
 
 
 /** Vitrine, Simulação e a barra de modos do totem (grill r1, Q1–Q7). */
@@ -44,8 +45,9 @@ export function VitrineStand({ item, pausado, aoTerminar, aoPausar, telaApp, pul
   return <section className="stand-vitrine" aria-label={`Vitrine: ${item.titulo}`} data-item={item.tipo} data-pausado={pausado || undefined} data-pulada={pulos} data-som={bloqueado ? 'aguardando_gesto' : mudo ? 'desligado' : 'narracao'}>
     {video ? <video key={video.arquivo} ref={ref} className="stand-video-player" src={video.arquivo} playsInline preload="auto" onEnded={aoTerminar} onError={aoTerminar} /> : telaApp}
     <p className="stand-vitrine-legenda">{item.titulo}</p>
-    {pausado && <p className="stand-vitrine-pausa" role="status">Pausado · ✕ continua</p>}
-    {video && aoPausar && <button type="button" className="stand-vitrine-controle" onPointerDown={ev => ev.stopPropagation()} onKeyDown={ev => { if (ev.key === 'Enter' || ev.key === ' ') ev.stopPropagation(); }} onClick={aoPausar}>{pausado ? 'Retomar vídeo' : 'Pausar vídeo'}</button>}
+    {pausado && <p className="stand-vitrine-pausa" role="status">Pausado · <IconePad botao="cruz" /> continua</p>}
+    {video && <p className="stand-vitrine-dica-pad" aria-hidden="true"><IconePad botao="dpad" /> troca o vídeo</p>}
+    {video && aoPausar && <button type="button" className="stand-vitrine-controle" onPointerDown={ev => ev.stopPropagation()} onKeyDown={ev => { if (ev.key === 'Enter' || ev.key === ' ') ev.stopPropagation(); }} onClick={aoPausar}><IconePad botao="cruz" />{pausado ? 'Retomar vídeo' : 'Pausar vídeo'}</button>}
     {video && <button type="button" className="stand-vitrine-som" aria-label={bloqueado || mudo ? 'Ativar som da Vitrine' : 'Desligar som da Vitrine'} onPointerDown={(ev) => ev.stopPropagation()} onKeyDown={ev => { if (ev.key === 'Enter' || ev.key === ' ') ev.stopPropagation(); }} onClick={som}>{bloqueado ? '▶ Ativar som · toque ou Enter' : mudo ? 'Som desligado · ativar' : 'Som ligado · silenciar'}</button>}
   </section>;
 }
@@ -67,7 +69,10 @@ export const SimulacaoStand = memo(function SimulacaoStand() {
 });
 
 /** Atalho da barra que não é modo (ex.: Sonolência abre a página no modo Site). */
-export interface AtalhoBarra { id: string; rotulo: string; ativo: boolean; aoEscolher(): void }
+export interface AtalhoBarra { id: string; rotulo: string; ativo: boolean; aoEscolher(): void; icone?: BotaoPad }
+
+/** Botão do DualSense que leva direto a cada modo (só a Coruja tem um: PS). */
+const ICONE_MODO: Partial<Record<Modo, BotaoPad>> = { coruja: 'ps' };
 
 export function BarraModos({ modo, modos = MODOS, visivel, aoEscolher, atalhos = [] }: { modo: Modo; modos?: readonly Modo[]; visivel: boolean; aoEscolher(modo: Modo): void; atalhos?: readonly AtalhoBarra[] }) {
   return (
@@ -79,9 +84,10 @@ export function BarraModos({ modo, modos = MODOS, visivel, aoEscolher, atalhos =
           data-modo={m}
           aria-pressed={m === modo}
           tabIndex={visivel ? 0 : -1}
+          data-pad-pointer=""
           onPointerDown={(evento) => { evento.stopPropagation(); aoEscolher(m); }}
         >
-          {ROTULO_MODO[m]}
+          {ICONE_MODO[m] && <IconePad botao={ICONE_MODO[m]} />}{ROTULO_MODO[m]}
         </button>
       ))}
       {atalhos.map((a) => (
@@ -91,9 +97,10 @@ export function BarraModos({ modo, modos = MODOS, visivel, aoEscolher, atalhos =
           data-atalho={a.id}
           aria-pressed={a.ativo}
           tabIndex={visivel ? 0 : -1}
+          data-pad-pointer=""
           onPointerDown={(evento) => { evento.stopPropagation(); a.aoEscolher(); }}
         >
-          {a.rotulo}
+          {a.icone && <IconePad botao={a.icone} />}{a.rotulo}
         </button>
       ))}
     </nav>

@@ -31,6 +31,7 @@ import type { CabineGameplay, CriarCabineGameplay } from './cabineGameplay';
 import type { ObstaculoGameplay } from './estadoGameplay';
 import { aoVivo } from '@/lib/gameplayAoVivo';
 import './gameplayKiosk.css';
+import { focoPadExplicito, padConsumiuConfirmar } from '../stand/focoPadDom';
 
 /** Look do mundo vindo da Visual; constante de módulo (não remonta o palco). */
 export interface MundoGameplay {
@@ -264,14 +265,16 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
           else if (circuito) alterarMenu(!pausado.current);
           else { setLivre(false); setRodada((n) => n + 1); }
         }
-        const cameraAgora = !!pad?.buttons[COMANDOS_CABINE.camera.botao]?.pressed;
+        const cameraCrua = !!pad?.buttons[COMANDOS_CABINE.camera.botao]?.pressed;
+        // ✕ com item aceso pelo D-pad (pausa, resultado) é do foco: o jogo não troca câmera nem fecha a pausa.
+        const cameraAgora = cameraCrua && !padConsumiuConfirmar() && !focoPadExplicito(document, true);
         const estavaPausado = pausado.current;
         if (fimCorrida) {
           // Resultado da Corrida: ✕/A recomeça (borda nova, depois de um respiro para não pular o resultado).
           if (cameraAgora && !cameraSegurada && fimAte !== null && performance.now() >= fimAte) novaCorridaRef.current();
-        } else if (circuito && estavaPausado && cameraAgora) alterarMenu(false);
+        } else if (circuito && estavaPausado && cameraAgora && !cameraSegurada) alterarMenu(false);
         else if (cameraAgora && !cameraSegurada && motor.ler().fase === 'dirigindo') trocarVista();
-        cameraSegurada = cameraAgora;
+        cameraSegurada = cameraCrua;
         const olhar = pad ? { yaw: 0 - applyDeadZone(pad.axes[2] ?? 0), pitch: 0 - applyDeadZone(pad.axes[3] ?? 0) } : { yaw: 0, pitch: 0 };
         lookRef.current = stepLook(lookRef.current, olhar, dt, { recenter: !!pad });
         const congelado = circuito && (pausado.current || document.hidden || sessao.registro.resultado !== null);

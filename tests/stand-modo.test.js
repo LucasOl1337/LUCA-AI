@@ -86,7 +86,7 @@ test('controle: L1/R1 não trocam de aba em modo nenhum (quem joga apertava sem 
     }
   }
   const ambos = lerNavegacao(pad([4, 5, 0, 7]), { pressed: [] }, 'simulacao');
-  assert.deepEqual(ambos.acoes, [], 'jogando com L1/R1 + ✕ + R2 a Simulação fica');
+  assert.deepEqual(ambos.acoes, [{ tipo: 'escolher' }], 'jogando com L1/R1 + ✕ + R2 a Simulação fica (✕ só aperta item aceso pelo D-pad)');
 });
 
 test('controle: PS volta à Coruja, por borda', () => {
@@ -100,8 +100,21 @@ test('controle: ✕ e D-pad mudam de sentido conforme o modo; na Simulação fic
   assert.deepEqual(lerNavegacao(pad([15]), { pressed: [] }, 'vitrine').acoes, [{ tipo: 'trocar_video', direcao: 1 }]);
   assert.deepEqual(lerNavegacao(pad([0]), { pressed: [] }, 'coruja').acoes, [{ tipo: 'conversar' }]);
   const sim = lerNavegacao(pad([0, 1, 2, 3, 9, 14]), { pressed: [] }, 'simulacao');
-  assert.deepEqual(sim.acoes, []);
+  // △ □ Options e D-pad ficam com o simulador; ✕ só aperta item aceso e ○ abre a pausa (a página decide).
+  assert.deepEqual(sim.acoes, [{ tipo: 'escolher' }, { tipo: 'voltar' }]);
   assert.equal(sim.ativo, true, 'botão do simulador ainda conta como gente por perto');
+});
+
+test('controle: ida e volta em tudo (24/10): ○ volta, △ menu, □ tela cheia, ✕ escolhe no Site', () => {
+  for (const modo of ['coruja', 'vitrine', 'site']) {
+    assert.deepEqual(lerNavegacao(pad([1]), { pressed: [] }, modo).acoes, [{ tipo: 'voltar' }], `${modo}: ○`);
+    assert.deepEqual(lerNavegacao(pad([3]), { pressed: [] }, modo).acoes, [{ tipo: 'menu' }], `${modo}: △`);
+    assert.deepEqual(lerNavegacao(pad([2]), { pressed: [] }, modo).acoes, [{ tipo: 'tela_cheia' }], `${modo}: □`);
+  }
+  assert.deepEqual(lerNavegacao(pad([0]), { pressed: [] }, 'site').acoes, [{ tipo: 'escolher' }]);
+  assert.deepEqual(lerNavegacao(pad([12, 13]), { pressed: [] }, 'coruja').acoes, [], 'setas ↑↓ andam pelo foco, não viram ação');
+  const segurando = lerNavegacao(pad([1]), { pressed: [] }, 'coruja');
+  assert.deepEqual(lerNavegacao(pad([1]), segurando.next, 'coruja').acoes, [], 'segurar ○ não volta duas vezes');
 });
 
 test('controle: analógico conta como atividade; parado ou sem mapping standard, não', () => {

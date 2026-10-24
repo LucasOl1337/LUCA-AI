@@ -6,6 +6,7 @@ import './circuito.css';
 import { VeredictoBloco } from '@/components/veredicto/VeredictoBloco';
 import { BaixarLaudo } from '@/components/laudo/BaixarLaudo';
 import { CHAVE_CHAT_CIRCUITO } from '../stand/fimDeVisita';
+import { IconePad } from '../stand/IconePad';
 export { CHAVE_CHAT_CIRCUITO };
 interface Turno { pergunta: string; analiseId: string }
 interface ConversaCircuito { relatorio: RelatorioCircuito; casoId: string | null; turnos: Turno[] }
@@ -81,8 +82,8 @@ export default function ChatCircuito({ inicial, aoNovo }: { inicial: ConversaCir
     }, 1500);
   }
   const analises = caso?.analyses ?? [];
-  return <section className="circuito-chat" data-chat-circuito data-run-id={r.runId} aria-label="Chat dos agentes do Laboratório">
-    <header><small>LUCA · Laboratório / SIMULAÇÃO</small><h1>Converse sobre sua corrida</h1><p>O simulador foi encerrado. O registro e a conversa ficam nesta aba; os pareceres são salvos na sua conta.</p><button onClick={aoNovo}>Voltar · nova corrida</button><a href="#circuito-pergunta">Perguntar aos agentes ↓</a></header>
+  return <section className="circuito-chat" data-chat-circuito data-run-id={r.runId} aria-label="Chat dos agentes do Laboratório" data-foco-escopo="">
+    <header><small>LUCA · Laboratório / SIMULAÇÃO</small><h1>Converse sobre sua corrida</h1><p>O simulador foi encerrado. O registro e a conversa ficam nesta aba; os pareceres são salvos na sua conta.</p><button data-pad-voltar="" onClick={aoNovo}><IconePad botao="bola" />Voltar · nova corrida</button><a href="#circuito-pergunta">Perguntar aos agentes ↓</a></header>
     <article className="circuito-relatorio"><h2>Relatório da corrida</h2><p>{textoResultadoCircuito(r).titulo}</p>
       <dl><dt>Tempo dirigindo</dt><dd>{decimalCircuito(m.elapsedMs / 1000)} s</dd><dt>Riscos evitados (estimativa)</dt><dd>{m.sinistrosEvitados}</dd><dt>Reação média após aviso</dt><dd>{m.reacaoMediaMs === null ? 'sem reação medida' : `${decimalCircuito(m.reacaoMediaMs / 1000, 2)} s`}</dd><dt>Avisos sem resposta</dt><dd>{m.semResposta}</dd></dl>
       <p>Reação: nova frenagem ou esterço após o aviso. Evitado: exposição, resposta e saída segura por 1 s — estimativa do jogo, não acidente real.</p>

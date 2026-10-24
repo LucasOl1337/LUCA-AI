@@ -8,6 +8,8 @@ import { montarItens } from '@/components/stand/vitrineStand';
 import { modoInicial, reduzirModo, type EntradaModo, type EstadoModo, type Modo } from '@/components/stand/modoStand';
 import type { AcaoNavegacao } from '@/components/stand/navegacaoPad';
 import { usePadStand } from '@/components/stand/usePadStand';
+import { confirmarFocoPad, focoPadExplicito, limparFocoPad, moverFocoPad } from '@/components/stand/focoPadDom';
+import type { Direcao } from '@/components/stand/focoPad';
 import { BarraModos, VitrineStand } from '@/components/stand/Modos';
 import AuthPage from '@/pages/AuthPage';
 import '@/stand.css';
@@ -28,10 +30,15 @@ export const AVISO_SEM_LOGIN = 'sem login · equipe: Shift+Q e entre com a conta
 
 const reduzirAgora = (atual: EstadoModo, entrada: EntradaModo) => reduzirModo(atual, entrada, Date.now(), ITENS_SEM_LOGIN.length);
 
-/** Pad e barra só alternam entre Coruja e Vitrine; ✕ na Coruja mostra a Vitrine (não há voz). */
+/**
+ * Pad e barra só alternam entre Coruja e Vitrine; ✕ na Coruja mostra a Vitrine (não há voz)
+ * e ○ volta pra Coruja. Menu e tela cheia não existem sem login. ✕ com item aceso fica com o foco.
+ */
 export function entradaSemLogin(acao: AcaoNavegacao, modo: Modo): EntradaModo | null {
   if (acao.tipo === 'conversar') return modo === 'coruja' ? { tipo: 'ir', modo: 'vitrine' } : { tipo: 'atividade' };
   if (acao.tipo === 'ir') return MODOS_SEM_LOGIN.includes(acao.modo) ? acao : { tipo: 'atividade' };
+  if (acao.tipo === 'voltar') return modo === 'coruja' ? { tipo: 'atividade' } : { tipo: 'voltar_coruja' };
+  if (acao.tipo === 'escolher' || acao.tipo === 'menu' || acao.tipo === 'tela_cheia') return { tipo: 'atividade' };
   return acao;
 }
 
@@ -67,12 +74,21 @@ export default function StandSemLogin({ offline = false }: { offline?: boolean }
   }, []);
 
   const agirNoPad = useCallback((acao: AcaoNavegacao) => {
+    if ((acao.tipo === 'escolher' || acao.tipo === 'pausar' || acao.tipo === 'conversar') && confirmarFocoPad()) return;
+    if (acao.tipo === 'trocar_video' && focoPadExplicito()) return;
+    if (acao.tipo === 'voltar' || acao.tipo === 'ir') limparFocoPad();
     const entrada = entradaSemLogin(acao, modoAtual.current);
     if (entrada) despachar(entrada);
     despachar({ tipo: 'atividade' });
   }, []);
   const mexeuNoPad = useCallback(() => despachar({ tipo: 'atividade' }), []);
-  const { conectado } = usePadStand({ modo: modo.modo, aoAgir: agirNoPad, aoMexer: mexeuNoPad });
+  const moverNoPad = useCallback((direcao: Direcao) => {
+    despachar({ tipo: 'atividade', toque: true });
+    if (modoAtual.current === 'vitrine' && (direcao === 'esquerda' || direcao === 'direita') && !focoPadExplicito()) return;
+    moverFocoPad(direcao);
+  }, []);
+  const { conectado } = usePadStand({ modo: modo.modo, aoAgir: agirNoPad, aoMexer: mexeuNoPad, aoMover: moverNoPad });
+  useEffect(() => { limparFocoPad(); }, [modo.modo]);
   const chamada = chamadaSemVoz(conectado);
   const nivel = useRef(0);
   // Barra permanente (grill Totem interativo r1, Q6): o primeiro toque já troca o modo.
@@ -96,6 +112,7 @@ export default function StandSemLogin({ offline = false }: { offline?: boolean }
       data-voz-stand="desligada"
       data-motivo="sem_login"
       data-sem-login
+      data-controle={conectado || undefined}
       data-offline={offline || undefined}
       onPointerDown={tocar}
     >

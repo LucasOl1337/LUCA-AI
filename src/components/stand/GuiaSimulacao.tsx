@@ -5,6 +5,7 @@ import { useEntradaCabine } from '../gameplay/useEntradaCabine';
 import { ComandosCabineVisual } from './ComandosCabineVisual';
 import { criarContagemGuia, GUIA_AUTOINICIO_MS, type ContagemGuia } from './contagemGuia';
 import './guiaCabine.css';
+import { padConsumiuConfirmar } from './focoPadDom';
 
 /**
  * Guia antes de dirigir: mostra os comandos e começa sozinha em 5 s (Lucas, 24/10).
@@ -32,13 +33,14 @@ export function GuiaSimulacao({ aoComecar, comVoz, autoInicioMs = GUIA_AUTOINICI
     const timer = window.setInterval(() => {
       const pad = Array.from(navigator.getGamepads?.() ?? []).find(p => p?.mapping === 'standard');
       const agora = !!pad?.buttons[C.confirmar.botao]?.pressed;
-      if (agora && !pressionado) contagem.current?.comecarAgora();
+      // ✕ que o foco do D-pad já usou (apertou o "Começar já") não conta duas vezes.
+      if (agora && !pressionado && !padConsumiuConfirmar()) contagem.current?.comecarAgora();
       pressionado = agora;
     }, 100);
     window.addEventListener('keydown', tecla, true);
     return () => { window.clearInterval(timer); window.removeEventListener('keydown', tecla, true); };
   }, []);
-  return <section className="stand-guia-simulacao" aria-label="Antes de dirigir">
+  return <section className="stand-guia-simulacao" aria-label="Antes de dirigir" data-foco-escopo="">
     <header><span className="cabine-sobretitulo">SIMULAÇÃO · NO SEU RITMO</span>
       <h1>Antes de dirigir</h1>
       <p>Siga as estacas até a chegada, desviando dos obstáculos e da água.</p>
