@@ -118,3 +118,30 @@ test('cerca do talhão (Lupa D8): encostar devagar (abaixo de 0,8 km/h) não dá
   assert.ok(CERCA_MIN_KPH > 0);
   assert.equal(eventos.filter((ev) => ev.tipo === 'cerca').length, 0);
 });
+
+test('arfagem de carga (Lupa fila vazia 1): frear cheio de 12 km/h baixa o nariz ~0,8°; arrancar sobe ~0,3°; cruzeiro 0; antes 0° em tudo', () => {
+  const motor = criarMotorGameplay(() => 0);
+  motor.reiniciar({ x: 0, z: 0, rumoGraus: 0, tetoKph: 12, obstaculos: [] });
+  const carga = impacto.criarArfagemCarga(), dt = 1 / 60;
+  let maxSobe = 0, a = 0;
+  for (let i = 0; i < 600; i += 1) { motor.quadro(dt, { esterco: 0, acelerador: 1, freio: 0 }); a = carga.passo(motor.trator().velocidade, dt); maxSobe = Math.max(maxSobe, a); }
+  assert.ok(maxSobe > 0.25 && maxSobe < 0.35, `arrancada ${maxSobe}`);
+  assert.ok(Math.abs(a) < 0.01, `cruzeiro ${a}`);
+  let maxDesce = 0;
+  for (let i = 0; i < 60; i += 1) { motor.quadro(dt, { esterco: 0, acelerador: 0, freio: 1 }); a = carga.passo(motor.trator().velocidade, dt); maxDesce = Math.min(maxDesce, a); }
+  assert.ok(maxDesce < -0.7 && maxDesce >= -impacto.CARGA.maxGraus, `frenagem ${maxDesce}`);
+  // Parado: volta ao neutro.
+  for (let i = 0; i < 30; i += 1) { motor.quadro(dt, { esterco: 0, acelerador: 0, freio: 0 }); a = carga.passo(motor.trator().velocidade, dt); }
+  assert.ok(Math.abs(a) < 0.03, `parado ${a}`);
+});
+
+test('arfagem de carga: batida/reinício (salto de velocidade) não vira mergulho; reduced-motion e pausa', () => {
+  const c = impacto.criarArfagemCarga();
+  c.passo(3.33, 1 / 60);
+  assert.equal(c.passo(0, 1 / 60), 0, 'parar seco no fardo é tranco do D4, não carga');
+  c.passo(0, 1 / 60); const pausado = c.passo(-1, 0);
+  assert.equal(pausado, 0);
+  for (let i = 0; i < 30; i += 1) c.passo(3.33 * (1 - i / 30), 1 / 60);
+  assert.equal(c.passo(1, 1 / 60, true), 0);
+  assert.equal(c.passo(Number.NaN, 1 / 60), 0);
+});

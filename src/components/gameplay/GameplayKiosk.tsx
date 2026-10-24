@@ -24,7 +24,7 @@ import { PainelCabine } from './PainelCabine';
 import SeloFps from './SeloFps';
 import { criarMotorGameplay, vibracaoDoEvento, type MotorGameplay } from './motorGameplay';
 import { relevoRampaLateral } from './rampaLateral';
-import { arfagemDoTranco, criarBaque, trepidacaoCabine, type Tranco } from './impactoTrator';
+import { arfagemDoTranco, criarArfagemCarga, criarBaque, trepidacaoCabine, type Tranco } from './impactoTrator';
 import { ZONAS_TALHAO } from './geofenceTalhao';
 import { anguloAroRad, bordaReiniciar, comandoDesejado, setaDaTecla, SETAS_SOLTAS, type SetasVolante } from './volante';
 import type { CabineGameplay, CriarCabineGameplay } from './cabineGameplay';
@@ -209,6 +209,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
     const externa = criarVistaExterna();
     const tremorEuler = new Euler(), tremorQuat = new Quaternion();
     const cabeca = criarCabecaCabine(), cabecaEuler = new Euler(), cabecaQuat = new Quaternion();
+    const carga = criarArfagemCarga();
     let pulsoMotor = 0;
     let ultimoDt = 0;
     ultimoMonotono.current = performance.now();
@@ -289,7 +290,9 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
           yawRateDeg: trator.guinada * 180 / Math.PI,
           distanceCm: estado.sensor.distanciaCm, collision: estado.sensor.alerta, braking: estado.comandos.freio > 0.05,
           rollDeg: estado.atitude.rolagemGraus,
-          pitchDeg: estado.atitude.arfagemGraus + arfagemDoTranco(trancoRef.current, agora, movimentoReduzido()),
+          pitchDeg: estado.atitude.arfagemGraus + arfagemDoTranco(trancoRef.current, agora, movimentoReduzido())
+            // Arfagem de carga (Lupa): nariz desce ao frear e sobe ao arrancar; congelado mantém a pose.
+            + carga.passo(trator.velocidade, congelado ? 0 : dt, movimentoReduzido()),
           beacon: estado.sensor.alerta || estado.contato ? 1 : 0,
         };
       },

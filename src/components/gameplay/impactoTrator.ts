@@ -96,3 +96,42 @@ export function trepidacaoCabine(velocidadeKph: number, tS: number, reduzirMovim
     alturaM: k * TREPIDACAO.alturaM * altura,
   };
 }
+
+/**
+ * Arfagem de carga (Lupa, fila vazia item 1, 24/10). No plano, frear forte (3,5 m/s²) e arrancar
+ * davam arfagem 0°: o freio só aparecia no velocímetro. Agora a suspensão/pneus cedem: o nariz
+ * desce ao frear e sobe um pouco ao acelerar, proporcional à aceleração longitudinal, amortecido.
+ * Só pose (pitchDeg do drive); a física não muda.
+ */
+export const CARGA = Object.freeze({
+  /** graus por m/s² (negativo = nariz para baixo na desaceleração). */
+  grausPorMs2: 0.25,
+  maxGraus: 1.2,
+  tauS: 0.15,
+  /** Acima disso (m/s²) é salto de estado, não frenagem: freio cheio é 3,5. */
+  descontinuidadeMs2: 20,
+});
+
+/** Estado amortecido; `passo(velocidade m/s com sinal, dt)` devolve a arfagem extra em graus (positivo = nariz para cima). */
+export function criarArfagemCarga() {
+  let anterior: number | null = null, arfagem = 0;
+  return {
+    passo(velocidade: number, dt: number, reduzirMovimento = false) {
+      if (!Number.isFinite(velocidade) || !(dt > 0) || !Number.isFinite(dt) || reduzirMovimento) {
+        anterior = Number.isFinite(velocidade) ? velocidade : null;
+        if (reduzirMovimento) arfagem = 0;
+        return arfagem;
+      }
+      const passoS = Math.min(dt, 0.1);
+      // Aceleração com sinal do referencial da máquina: frear de frente ou acelerar de ré afundam o nariz (inércia para a frente).
+      let acel = anterior === null ? 0 : (velocidade - anterior) / passoS;
+      anterior = velocidade;
+      // Descontinuidade (batida, reinício, teleporte) não é carga: a batida já tem o tranco do D4.
+      if (Math.abs(acel) > CARGA.descontinuidadeMs2) acel = 0;
+      const alvo = Math.max(-CARGA.maxGraus, Math.min(CARGA.maxGraus, acel * CARGA.grausPorMs2));
+      arfagem += (alvo - arfagem) * (1 - Math.exp(-passoS / CARGA.tauS));
+      return arfagem;
+    },
+    reiniciar() { anterior = null; arfagem = 0; },
+  };
+}
