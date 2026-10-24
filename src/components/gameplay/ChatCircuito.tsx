@@ -3,7 +3,8 @@ import { labRequest, type SavedCase } from '@/lib/lab-client';
 import { decimalCircuito, metricasCircuito, textoResultadoCircuito } from './circuito';
 import type { RelatorioCircuito } from './sessaoCircuito';
 import './circuito.css';
-export const CHAVE_CHAT_CIRCUITO = 'luca.circuito.chat.v1';
+import { CHAVE_CHAT_CIRCUITO } from '../stand/fimDeVisita';
+export { CHAVE_CHAT_CIRCUITO };
 interface Turno { pergunta: string; analiseId: string }
 interface ConversaCircuito { relatorio: RelatorioCircuito; casoId: string | null; turnos: Turno[] }
 export function guardarConversaCircuito(conversa: ConversaCircuito) {

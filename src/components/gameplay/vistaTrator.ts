@@ -1,7 +1,10 @@
 import * as THREE from 'three';
+import { aoFimDeVisita } from '../stand/fimDeVisita';
 
 export type VistaTrator = 'cabine' | 'externa';
 let vistaSessao: VistaTrator = 'cabine';
+// A vista escolhida vale para a visita; o próximo visitante começa na cabine.
+aoFimDeVisita(() => { vistaSessao = 'cabine'; });
 export const lerVistaTrator = () => vistaSessao;
 export function alternarVistaTrator() {
   vistaSessao = vistaSessao === 'cabine' ? 'externa' : 'cabine';

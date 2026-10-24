@@ -31,6 +31,7 @@ import type { ResultadoPlano } from '@/components/stand/site/acaoDoStand';
 import { SeloCamera, useCameraTotem, WebcamCoruja } from '@/components/stand/CameraTotem';
 import { EVENTO_EM_USO as EVENTO_GAMEPLAY_EM_USO } from '@/components/gameplay/eventoEmUso';
 import { SimulacaoComGuia } from '@/components/stand/GuiaSimulacao';
+import { encerrarVisita } from '@/components/stand/fimDeVisita';
 import { CorujaCabine } from '@/components/stand/CorujaCabine';
 import { useFalaCabine } from '@/components/gameplay/useFalaCabine';
 import '@/stand.css';
@@ -244,6 +245,9 @@ export default function StandPage() {
     despachar({ tipo: 'encerrar' });
     canal.current.enviar({ tipo: 'encerrar' });
     encerrarVoz();
+    // Fim de visita: a próxima pessoa não herda experiências, chat da corrida nem vista do trator.
+    experienciasAbertas.current.clear();
+    encerrarVisita();
   }, [modo.modo, encerrarVoz]);
 
   const agirNoPad = useCallback((acao: AcaoNavegacao) => {

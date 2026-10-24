@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from 'react';
-import ChatCircuito, { guardarConversaCircuito, recuperarConversaCircuito } from '../gameplay/ChatCircuito';
+import ChatCircuito, { CHAVE_CHAT_CIRCUITO, guardarConversaCircuito, recuperarConversaCircuito } from '../gameplay/ChatCircuito';
 import SompoTruckSimulator from '../SompoTruckSimulator';
 import { SOMPO_VEHICLE_SEED, type SompoVehicle } from '../../../shared/sompo-vehicles.js';
 import { ComandosSimulacao } from '../gameplay/ComandosSimulacao';
@@ -30,7 +30,7 @@ export function varianteSimulacao(busca: string): VarianteSimulacao {
 
 export default function SimuladorKiosk() {
   const [conversa, setConversa] = useState(recuperarConversaCircuito);
-  if (conversa) return <ChatCircuito inicial={conversa} aoNovo={() => { sessionStorage.removeItem('luca.circuito.chat.v1'); setConversa(null); }} />;
+  if (conversa) return <ChatCircuito inicial={conversa} aoNovo={() => { sessionStorage.removeItem(CHAVE_CHAT_CIRCUITO); setConversa(null); }} />;
   const classico = (
     <>
       <SompoTruckSimulator source="simulation" vehicle={TRATOR_DO_STAND} kiosk />
