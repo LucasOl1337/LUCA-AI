@@ -147,3 +147,20 @@ test('tabela de avaliação com vetores reais congelados: ≥90% de acerto e 0 f
   assert.equal(r.falsosPositivos, 0, erros.join('\n'));
   assert.ok(r.acerto >= 0.9, `acerto ${(r.acerto * 100).toFixed(1)}%\n${erros.join('\n')}`);
 });
+
+test('STAND_EMBEDDING_BASE_URL/API_KEY apontam só o roteador para outro 9Router (Railway sem embeddings, 24/10)', async () => {
+  const antes = { url: process.env.STAND_EMBEDDING_BASE_URL, chave: process.env.STAND_EMBEDDING_API_KEY };
+  process.env.STAND_EMBEDDING_BASE_URL = 'http://127.0.0.1:20129/v1';
+  process.env.STAND_EMBEDDING_API_KEY = 'hostinger';
+  try {
+    let pedido;
+    const embed = criarEmbedder({ fetchImpl: async (url, init) => { pedido = { url, init }; return { ok: true, json: async () => ({ data: [{ index: 0, embedding: [1] }] }) }; } });
+    await embed(['oi']);
+    assert.equal(pedido.url, 'http://127.0.0.1:20129/v1/embeddings');
+    assert.equal(pedido.init.headers.Authorization, 'Bearer hostinger');
+  } finally {
+    for (const [k, v] of [['STAND_EMBEDDING_BASE_URL', antes.url], ['STAND_EMBEDDING_API_KEY', antes.chave]]) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
+});

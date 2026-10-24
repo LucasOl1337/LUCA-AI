@@ -76,8 +76,11 @@ export function carregarManifesto(caminho = CAMINHO_MANIFESTO) {
 }
 
 export function criarEmbedder({
-  baseUrl = ROUTER_BASE_URL,
-  apiKey = ROUTER_API_KEY,
+  // O 9Router Railway não tem provedor de embeddings (24/10: 'No credentials
+  // for provider: openrouter'); estas envs apontam só o roteador de vídeo para
+  // outro 9Router sem mexer no chat.
+  baseUrl = process.env.STAND_EMBEDDING_BASE_URL || ROUTER_BASE_URL,
+  apiKey = process.env.STAND_EMBEDDING_API_KEY || ROUTER_API_KEY,
   modelo = process.env.STAND_EMBEDDING_MODEL || MODELO_PADRAO,
   dimensoes = DIMENSOES,
   fetchImpl = globalThis.fetch,
