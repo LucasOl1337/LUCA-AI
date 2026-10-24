@@ -26,11 +26,14 @@ test('tarefa inscrita roda uma vez por fim de visita e sai ao soltar', () => {
   assert.equal(n, 2);
 });
 
-test('StandPage encerra a visita no mesmo ponto em que encerra a conversa (ida para a Vitrine)', () => {
+test('StandPage encerra a visita no mesmo ponto em que encerra a conversa (ida para a Vitrine ou o palco)', () => {
   const fonte = fs.readFileSync(new URL('../src/pages/StandPage.tsx', import.meta.url), 'utf8');
-  const bloco = fonte.slice(fonte.indexOf("Vitrine encerra a conversa anterior"), fonte.indexOf('const agirNoPad'));
+  const bloco = fonte.slice(fonte.indexOf('Vitrine e palco (o repouso) encerram a conversa anterior'), fonte.indexOf('const agirNoPad'));
   assert.match(bloco, /experienciasAbertas\.current\.clear\(\)/);
   assert.match(bloco, /encerrarVisita\(\)/);
-  assert.match(bloco, /modo\.modo === 'simulacao'\) return/, 'Simulação e Site seguem preservando a visita');
+  // Site e Simulação não são repouso: seguem preservando a visita.
+  assert.match(bloco, /const repouso = modo\.modo === 'vitrine' \|\| modo\.palco;/);
+  // Palco ligado de propósito (F, botão) no meio de uma conversa não a corta.
+  assert.match(bloco, /modo\.modo !== 'vitrine' && vozAtiva\.current\)\) return/);
 });
 
