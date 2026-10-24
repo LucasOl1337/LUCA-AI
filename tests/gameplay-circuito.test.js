@@ -106,3 +106,11 @@ test('regras da tela repetem os números do REGRAS_CIRCUITO, sem termo técnico 
   for (const n of ['1,05m', '2s', '≥30°', '7km/h']) assert.ok(mod.REGRAS_CIRCUITO.includes(n), n);
   assert.doesNotMatch(tela, /monotônico|cinemática|exposição→|run\b/);
 });
+
+test('chat da corrida: campo do visitante diz "riscos evitados"; instrução aos agentes segue igual', async () => {
+  const chat = await loadFrontendModule('../../src/components/gameplay/ChatCircuito.tsx');
+  assert.equal(chat.PERGUNTA_PADRAO_CIRCUITO, 'Avalie minha corrida: tempo, desfecho, riscos evitados e resposta aos sensores.');
+  const sessao = (await loadFrontendModule('../../src/components/gameplay/sessaoCircuito.ts')).criarSessaoCircuito();
+  const foco = chat.focoCircuito(sessao.relatorio(), 'x');
+  assert.match(foco, /^Circuito contínuo SIMULAÇÃO, sem reposicionamentos\. Avalie tempo ativo em ms, desfecho, sinistros evitados por heurística \(não acidentes reais\)/);
+});

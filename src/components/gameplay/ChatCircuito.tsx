@@ -17,6 +17,8 @@ export function recuperarConversaCircuito(): ConversaCircuito | null {
     return c?.relatorio?.registro?.versao === 1 && typeof c.relatorio.caso?.rawCsv === 'string' && Array.isArray(c.turnos) ? c : null;
   } catch { return null; }
 }
+/** Texto inicial do campo que o visitante vê; a instrução técnica aos agentes fica em `focoCircuito`. */
+export const PERGUNTA_PADRAO_CIRCUITO = 'Avalie minha corrida: tempo, desfecho, riscos evitados e resposta aos sensores.';
 export function focoCircuito(relatorio: RelatorioCircuito, pergunta: string) {
   const r = relatorio.registro;
   return `Circuito contínuo SIMULAÇÃO, sem reposicionamentos. Avalie tempo ativo em ms, desfecho, sinistros evitados por heurística (não acidentes reais), reações pós-aviso e ausências. Não inferir risco de seguro, culpa ou lesão. Trace integral no campo telemetry.circuito, derivado do manifesto validado.\n${JSON.stringify({ runId: r.runId, resultado: r.resultado, metricas: metricasCircuito(r) })}\nPergunta do visitante: ${pergunta}`;
@@ -25,7 +27,7 @@ export function focoCircuito(relatorio: RelatorioCircuito, pergunta: string) {
 export default function ChatCircuito({ inicial, aoNovo }: { inicial: ConversaCircuito; aoNovo(): void }) {
   const [conversa, setConversa] = useState(inicial);
   const [caso, setCaso] = useState<SavedCase | null>(null);
-  const [texto, setTexto] = useState('Avalie minha corrida: tempo, desfecho, sinistros evitados e resposta aos sensores.');
+  const [texto, setTexto] = useState(PERGUNTA_PADRAO_CIRCUITO);
   const [ocupado, setOcupado] = useState(!!inicial.casoId);
   const [erro, setErro] = useState('');
   const vivo = useRef(true);
