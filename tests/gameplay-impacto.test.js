@@ -59,3 +59,25 @@ test('baque: um oscilador finito na chave dos efeitos; sem contexto tocando não
   const mudo = impacto.criarBaque({ obter: () => ({ ...ctx, state: 'suspended' }), destravar: async () => false, ligarDestravas: () => () => {} });
   assert.equal(mudo.tocar(12), false);
 });
+
+test('trepidação da cabine (Lupa D6): parado não treme; a 12 km/h treme pouco e rápido; antes era zero em qualquer velocidade', () => {
+  const amostra = (kph) => {
+    let pico = 0, cruzamentos = 0, ant = null;
+    for (let i = 0; i < 600; i += 1) {
+      const t = impacto.trepidacaoCabine(kph, i / 600);
+      pico = Math.max(pico, Math.abs(t.arfagemGraus));
+      if (ant !== null && Math.sign(t.arfagemGraus) !== Math.sign(ant)) cruzamentos += 1;
+      ant = t.arfagemGraus;
+    }
+    return { pico, hz: cruzamentos / 2 };
+  };
+  assert.deepEqual(impacto.trepidacaoCabine(0, 1.23), { arfagemGraus: 0, rolagemGraus: 0, alturaM: 0 });
+  const cheio = amostra(12), meio = amostra(6);
+  assert.ok(cheio.pico > 0.15 && cheio.pico <= impacto.TREPIDACAO.arfagemGraus + 1e-9, `pico ${cheio.pico}`);
+  assert.ok(Math.abs(meio.pico - cheio.pico / 2) < 0.02, 'proporcional à velocidade');
+  assert.ok(cheio.hz >= 7, `tremor, não balanço: ${cheio.hz} Hz`);
+  assert.equal(amostra(30).pico, cheio.pico, 'teto na velocidade cheia');
+  assert.ok(Math.abs(impacto.trepidacaoCabine(-4, 0.3).arfagemGraus - impacto.trepidacaoCabine(4, 0.3).arfagemGraus) < 1e-12, 'ré treme igual');
+  assert.equal(impacto.trepidacaoCabine(12, 0.3, true).arfagemGraus, 0, 'movimento reduzido');
+  assert.equal(impacto.trepidacaoCabine(Number.NaN, 0.3).alturaM, 0);
+});

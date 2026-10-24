@@ -8,6 +8,7 @@ import { contextoDoCircuito, criarSessaoCircuito, largarCircuito, type Relatorio
 import { INICIO_CIRCUITO, ROTA_CIRCUITO } from './circuito';
 import { sonoCabine } from './sonoCabine';
 import type * as THREE from 'three';
+import { Euler, Quaternion } from 'three';
 import { getSompoAgriOutcomes } from '../../../shared/sompo-agri-brief.js';
 import { mountSompoAgriStage, type SompoLook, type SompoLookContexto } from '../sompo/createSompoAgriStage';
 import { PERFIL_GAMEPLAY } from '../sompo/qualidadeAdaptativa';
@@ -23,7 +24,7 @@ import { PainelCabine } from './PainelCabine';
 import SeloFps from './SeloFps';
 import { criarMotorGameplay, vibracaoDoEvento, type MotorGameplay } from './motorGameplay';
 import { relevoRampaLateral } from './rampaLateral';
-import { arfagemDoTranco, criarBaque, type Tranco } from './impactoTrator';
+import { arfagemDoTranco, criarBaque, trepidacaoCabine, type Tranco } from './impactoTrator';
 import { ZONAS_TALHAO } from './geofenceTalhao';
 import { anguloAroRad, bordaReiniciar, comandoDesejado, setaDaTecla, SETAS_SOLTAS, type SetasVolante } from './volante';
 import type { CabineGameplay, CriarCabineGameplay } from './cabineGameplay';
@@ -206,6 +207,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
     let fimAte: number | null = null;
     let sessaoDoFim: SessaoCircuito | null = null;
     const externa = criarVistaExterna();
+    const tremorEuler = new Euler(), tremorQuat = new Quaternion();
     let pulsoMotor = 0;
     let ultimoDt = 0;
     ultimoMonotono.current = performance.now();
@@ -216,7 +218,16 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
       update(camera: THREE.PerspectiveCamera, maquina: THREE.Object3D) {
         base.update(camera, maquina);
         if (vistaRef.current === 'externa') externa(camera, maquina, ultimoDt);
-        else externa.reiniciar();
+        else {
+          externa.reiniciar();
+          // Sensação de velocidade (Lupa D6): o olho treme pouco e rápido, na proporção da velocidade.
+          const t = trepidacaoCabine(pausado.current ? 0 : motor.ler().maquina.velocidadeKph, performance.now() / 1000, movimentoReduzido());
+          if (t.arfagemGraus || t.rolagemGraus || t.alturaM) {
+            tremorEuler.set(t.arfagemGraus * Math.PI / 180, 0, t.rolagemGraus * Math.PI / 180);
+            camera.quaternion.multiply(tremorQuat.setFromEuler(tremorEuler));
+            camera.position.y += t.alturaM;
+          }
+        }
         if (!cabine && criarCabineRef.current) {
           try { cabine = criarCabineRef.current(); cabine.montar(maquina, camera); } catch (erro) { console.error('Cabine do gameplay falhou; segue sem ela.', erro); cabine = null; criarCabineRef.current = undefined; }
         }

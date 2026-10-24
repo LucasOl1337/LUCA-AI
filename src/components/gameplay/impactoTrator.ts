@@ -65,3 +65,34 @@ export function criarBaque(som: SomCompartilhado = somCompartilhado) {
     },
   };
 }
+
+/**
+ * Trepidação da cabine pela velocidade (Lupa D6, 24/10). No modo dirigir o palco
+ * zera aspereza e trepidação do roteiro, então a cabine a 12 km/h era tão imóvel
+ * quanto parada e a velocidade só aparecia no número. Aqui o olho treme pouco e
+ * rápido (motor e rodado no chão arado), com amplitude proporcional à velocidade
+ * em relação ao teto livre. Só a câmera de cabine; a física e a vista externa não mudam.
+ */
+export const TREPIDACAO = Object.freeze({
+  /** Velocidade de amplitude cheia (teto livre). */
+  cheiaKph: 12,
+  arfagemGraus: 0.22,
+  rolagemGraus: 0.14,
+  alturaM: 0.012,
+});
+
+/** Deslocamento do olho em `tS` segundos a `velocidadeKph` (ré conta igual). Determinístico. */
+export function trepidacaoCabine(velocidadeKph: number, tS: number, reduzirMovimento = false) {
+  const k = reduzirMovimento || !Number.isFinite(velocidadeKph) || !Number.isFinite(tS) ? 0 : Math.min(1, Math.abs(velocidadeKph) / TREPIDACAO.cheiaKph);
+  if (k === 0) return { arfagemGraus: 0, rolagemGraus: 0, alturaM: 0 };
+  const dois = 2 * Math.PI;
+  // Somas de senos em frequências não harmônicas: tremor que não vira balanço regular.
+  const arfagem = (Math.sin(dois * 8.7 * tS) + 0.6 * Math.sin(dois * 13.3 * tS + 1.1)) / 1.6;
+  const rolagem = (Math.sin(dois * 6.1 * tS + 0.4) + 0.5 * Math.sin(dois * 11.9 * tS + 2.3)) / 1.5;
+  const altura = (Math.sin(dois * 2.3 * tS) + 0.4 * Math.sin(dois * 9.1 * tS + 0.8)) / 1.4;
+  return {
+    arfagemGraus: k * TREPIDACAO.arfagemGraus * arfagem,
+    rolagemGraus: k * TREPIDACAO.rolagemGraus * rolagem,
+    alturaM: k * TREPIDACAO.alturaM * altura,
+  };
+}
