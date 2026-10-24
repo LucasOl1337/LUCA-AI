@@ -1,0 +1,47 @@
+/* Mapa do operador (tablet). Unidades do SVG em metros. Sem animação: o retrato chega a 4 Hz. */
+.mapa-operador {
+  --mo-perigo: #e5483b; --mo-atencao: #f2c14e; --mo-trator: #f6f3e8;
+  margin: 0; width: 100%; height: 100%; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 8px;
+  padding: 10px; border-radius: 16px; background: #07110e; border: 3px solid #ffffff22;
+}
+.mapa-operador svg { display: block; width: 100%; height: 100%; min-height: 0; }
+.mapa-operador[data-geofence='rumo'] { border-color: var(--mo-atencao); }
+.mapa-operador[data-geofence='dentro'] { border-color: var(--mo-perigo); }
+.mapa-operador[data-situacao='velho'] { border-style: dashed; border-color: #f2c14e99; }
+.mapa-operador-talhao { fill: #2f5a2b; stroke: #9fc9ad66; stroke-width: .4; }
+.mapa-operador-grade { fill: none; stroke: #ffffff14; stroke-width: .15; }
+.mapa-operador-rota { fill: none; stroke: #e8edf380; stroke-width: .5; stroke-dasharray: 1.6 1.2; }
+.mapa-operador-atencao { fill: #f2c14e40; stroke: none; }
+.mapa-operador-perigo { fill: #e5483b70; stroke: none; }
+path.mapa-operador-perigo[data-zona='alagado'] { stroke: var(--mo-perigo); stroke-width: .6; stroke-dasharray: 1.6 1; }
+path.mapa-operador-perigo[data-ativa='dentro'] { fill: #e5483bc0; }
+.mapa-operador-obstaculo { fill: #c9b27e; stroke: #3d3220; stroke-width: .2; }
+.mapa-operador-rotulo { fill: #fff; font-size: 3px; font-weight: 800; text-anchor: middle; paint-order: stroke; stroke: #07110e; stroke-width: .6px; }
+.mapa-operador-projecao { stroke: var(--mo-atencao); stroke-width: .5; stroke-dasharray: 1 .8; }
+.mapa-operador-halo { fill: #ffffff10; stroke: #ffffffa0; stroke-width: .25; }
+.mapa-operador-sensor { fill: #53d4ff26; stroke: #53d4ff80; stroke-width: .12; }
+.mapa-operador-eco { stroke: var(--mo-atencao); stroke-width: .35; }
+.mapa-operador-eco[data-alerta='true'] { stroke: var(--mo-perigo); }
+.mapa-operador-roda { fill: #1b1f22; stroke: #000; stroke-width: .08; }
+.mapa-operador-corpo { fill: var(--mo-trator); stroke: #07110e; stroke-width: .2; }
+.mapa-operador-frente { fill: #1d4ed8; }
+.mapa-operador-emissor { fill: #53d4ff; stroke: #07110e; stroke-width: .1; }
+.mapa-operador[data-situacao='velho'] .mapa-operador-corpo { fill: none; stroke: var(--mo-trator); stroke-dasharray: .6 .4; }
+.mapa-operador[data-situacao='velho'] .mapa-operador-frente,
+.mapa-operador[data-situacao='velho'] .mapa-operador-roda,
+.mapa-operador[data-situacao='velho'] .mapa-operador-sensor,
+.mapa-operador[data-situacao='velho'] .mapa-operador-eco { opacity: .35; }
+.mapa-operador-velho { pointer-events: none; }
+.mapa-operador-hachura { stroke: #07110e99; stroke-width: 1.2; }
+.mapa-operador-escala rect { fill: #07110ecc; }
+.mapa-operador-escala path { fill: none; stroke: #fff; stroke-width: .35; }
+.mapa-operador-escala text { fill: #fff; font-size: 2.4px; font-weight: 700; }
+.mapa-operador figcaption { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; font-size: 14px; color: #b9cdbf; }
+.mapa-operador figcaption > span:first-child { font-weight: 700; color: #e8edf3; }
+.mapa-operador figcaption b { color: var(--mo-atencao); }
+.mapa-operador figcaption small { flex-basis: 100%; font-size: 12px; color: #9fb5a8; }
+.mapa-operador-legenda { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mapa-operador-legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-left: 6px; }
+.mapa-operador-legenda i[data-cor='perigo'] { background: var(--mo-perigo); }
+.mapa-operador-legenda i[data-cor='atencao'] { background: var(--mo-atencao); }
+.mapa-operador-legenda i[data-cor='trator'] { background: var(--mo-trator); }

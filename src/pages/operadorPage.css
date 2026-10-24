@@ -1,57 +1,92 @@
-/* Painel do operador no tablet: mapa grande + cards. Paisagem lado a lado, retrato empilhado. */
+/*
+ * Painel do operador no tablet (mockup do Linz, 24/10): horizontal com o mapa e os
+ * sensores lado a lado é o recomendado; em pé, mapa em cima e sensores embaixo.
+ * Cabe na tela sem rolar a página; se faltar altura, rola só o painel.
+ */
 .operador {
-  --gp-livre: #4fbf7a; --gp-atencao: #f2c14e; --gp-perigo: #e5483b;
-  min-height: 100%; padding: clamp(14px, 2.4vw, 32px); color: #e8edf3; background: #07110e;
-  display: flex; flex-direction: column; gap: clamp(12px, 2vh, 22px); font-variant-numeric: tabular-nums;
+  --gp-livre: #4fbf7a; --gp-atencao: #f2c14e; --gp-perigo: #e5483b; --gp-info: #53d4ff;
+  height: 100%; overflow: auto; padding: clamp(10px, 1.6vw, 22px); color: #e8edf3; background: #07110e; border-radius: 18px;
+  display: flex; flex-direction: column; gap: clamp(10px, 1.4vh, 16px); font-variant-numeric: tabular-nums;
 }
-.operador-topo { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
-.operador-olho { margin: 0 0 4px; color: #8fd3a8; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
-.operador h1 { margin: 0; font-size: clamp(24px, 3.2vw, 38px); font-weight: 700; }
+.operador-topo { flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.operador-titulo { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.operador-olho { margin: 0 0 2px; color: #8fd3a8; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+.operador h1 { margin: 0; font-size: clamp(22px, 2.6vw, 32px); font-weight: 700; }
 .operador-selos { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.operador-sinal, .operador-simulado, .operador-som {
-  min-height: 40px; padding: 8px 14px; border-radius: 999px; font-size: 15px; font-weight: 700;
+.operador-selo, .operador-botao {
+  min-height: 44px; padding: 8px 14px; border-radius: 999px; font-size: 15px; font-weight: 700; color: #e8edf3;
   display: inline-flex; align-items: center; gap: 8px; border: 2px solid #ffffff26; background: #10201a;
 }
-.operador-sinal::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: #6b7a72; }
+.operador-botao { border-radius: 12px; padding: 8px 10px; cursor: pointer; }
+.operador-selo svg, .operador-botao svg { width: 20px; height: 20px; }
+.operador-conexao::before, .operador-sinal::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: #6b7a72; }
+.operador-conexao[data-estado='online']::before { background: var(--gp-livre); }
+.operador-conexao[data-estado='offline'] { border-color: var(--gp-perigo); color: #ffb3aa; }
+.operador-conexao[data-estado='offline']::before { background: var(--gp-perigo); }
 .operador[data-sinal='ao-vivo'] .operador-sinal { border-color: var(--gp-livre); }
 /* Ponto fixo, sem pulso infinito: com o /gameplay no mesmo navegador o pulso derrubava o FPS (luca-coruja item 4). */
 .operador[data-sinal='ao-vivo'] .operador-sinal::before { background: var(--gp-livre); }
 .operador[data-sinal='sem-sinal'] .operador-sinal { border-color: var(--gp-atencao); color: #ffd98a; }
 .operador[data-sinal='sem-sinal'] .operador-sinal::before { background: var(--gp-atencao); }
-/* Aba do totem oculta: azul neutro, não é falha de rede. */
-.operador[data-sinal='pausado'] .operador-sinal { border-color: #53d4ff; color: #bfeaff; }
-.operador[data-sinal='pausado'] .operador-sinal::before { background: #53d4ff; }
+/* Totem pausado (aba oculta, menu ou resultado): azul neutro, não é falha de rede. */
+.operador[data-sinal='pausado'] .operador-sinal { border-color: var(--gp-info); color: #bfeaff; }
+.operador[data-sinal='pausado'] .operador-sinal::before { background: var(--gp-info); }
 .operador-simulado { color: #ffd98a; letter-spacing: .08em; }
-.operador-som { color: #e8edf3; cursor: pointer; }
-.operador-som[aria-pressed='true'] { border-color: #53d4ff; }
-.operador-som:focus-visible { outline: 3px solid #53d4ff; outline-offset: 3px; }
+.operador-som, .operador-tela-cheia { cursor: pointer; }
+.operador-som[aria-pressed='true'] { border-color: var(--gp-info); }
+.operador-tela-cheia { border-color: var(--gp-info); color: #bfeaff; }
+.operador button:focus-visible { outline: 3px solid var(--gp-info); outline-offset: 3px; }
 
 .operador-vazio { margin: auto; max-width: 520px; text-align: center; padding: 32px; border-radius: 18px; border: 1px dashed #ffffff30; }
 .operador-vazio h2 { margin: 0 0 10px; font-size: 22px; }
 .operador-vazio p { margin: 0; color: #b9cdbf; line-height: 1.6; }
+.operador-vazio .operador-vazio-rede { margin-top: 12px; color: #ffb3aa; }
 
-/* Paisagem: mapa à esquerda ocupando a altura, cards à direita. */
-.operador-corpo { flex: 1; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(280px, 1fr); gap: clamp(12px, 2vw, 24px); align-items: start; }
-/* Só opacidade (sem filter): esmaecer não obriga a repintar a área inteira por filtro. */
-.operador[data-sinal='sem-sinal'] .operador-corpo { opacity: .5; }
-.operador[data-sinal='pausado'] .operador-corpo { opacity: .6; }
-/* Contenção: o retrato a 4 Hz só repinta dentro de cada caixa, sem layout da página. */
-.operador-mapa { display: flex; justify-content: center; contain: layout paint; }
-/* O minimapa da cabine vira o mapa principal: sai do canto e cresce. */
-.operador .gameplay-mapa { position: static; width: min(100%, calc(100vh - 170px)); padding: 12px 12px 10px; border-width: 3px; }
-.operador .gameplay-mapa figcaption { font-size: clamp(14px, 2vh, 20px); }
-.operador-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.operador-card { padding: 14px 16px; border-radius: 14px; background: #0f1d18; border: 2px solid #ffffff1c; display: grid; gap: 4px; min-width: 0; contain: layout paint; }
-.operador-card span { font-size: 13px; color: #9fb5a8; text-transform: uppercase; letter-spacing: .06em; }
-.operador-card strong { font-size: clamp(22px, 3vh, 32px); font-weight: 800; overflow-wrap: anywhere; }
-.operador-card small { font-size: 14px; color: #b9cdbf; }
+/* Horizontal: mapa quadrado na altura disponível à esquerda, sensores à direita. */
+.operador-corpo {
+  flex: 1 1 auto; min-height: 520px; display: grid; gap: clamp(10px, 1.4vw, 18px);
+  grid-template-columns: auto minmax(300px, 1fr); grid-template-rows: minmax(0, 1fr);
+}
+.operador-mapa { height: 100%; aspect-ratio: 1; max-width: 62vw; min-height: 0; display: flex; flex-direction: column; gap: 8px; contain: layout paint; }
+.operador-mapa > .mapa-operador { flex: 1; }
+.operador-velho {
+  flex: none; padding: 10px 14px; border-radius: 12px; border: 2px solid var(--gp-atencao); background: #2b2410;
+  display: grid; gap: 2px; color: #ffe7a8; font-size: 14px; line-height: 1.35;
+}
+.operador-velho strong { font-size: 16px; text-transform: uppercase; letter-spacing: .03em; }
+.operador-velho[data-pausado] { border-color: var(--gp-info); background: #0e2230; color: #cfefff; }
+
+.operador-cards { min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: min-content; gap: 10px; align-content: start; }
+.operador-card { padding: 10px 14px; border-radius: 14px; background: #0f1d18; border: 2px solid #ffffff1c; display: grid; gap: 2px; min-width: 0; position: relative; contain: layout paint; }
+.operador-card span { font-size: 12px; color: #9fb5a8; text-transform: uppercase; letter-spacing: .06em; }
+.operador-card strong { font-size: clamp(20px, 2.8vh, 30px); font-weight: 800; overflow-wrap: anywhere; line-height: 1.15; }
+.operador-card small { font-size: 13px; color: #b9cdbf; }
 .operador-card[data-destaque='true'] { grid-column: 1 / -1; }
-.operador-corpo[data-faixa='atencao'] .operador-card[data-destaque='true'] { border-color: var(--gp-atencao); }
-.operador-corpo[data-faixa='perigo'] .operador-card[data-destaque='true'] { border-color: var(--gp-perigo); }
+.operador-card[data-velho] { grid-column: 1 / -1; grid-template-columns: auto auto 1fr; align-items: baseline; column-gap: 12px; }
+.operador-card[data-velho] strong { font-size: 18px; }
+.operador-card[data-velho='true'] { border-color: var(--gp-atencao); }
+.operador-card[data-faixa='atencao'] { border-color: var(--gp-atencao); }
+.operador-card[data-faixa='perigo'] { border-color: var(--gp-perigo); }
+.operador-card[data-zona-nivel='atencao'] { border-color: var(--gp-atencao); background: #2b2410; }
 .operador-card[data-alerta='true'] { border-color: var(--gp-perigo); background: #2a1210; }
+/* Sem retrato atual, os valores ficam visíveis mas apagados ("última leitura"). Só opacidade, sem filter. */
+.operador-cards[data-atual='false'] .operador-card:not([data-velho]) strong { opacity: .55; }
+
+/* Régua do HC-SR04: 0 a 4 m, vermelho até 1 m e amarelo até 2 m (SOMPO_PANEL_BANDS). */
+.operador-regua { position: relative; height: 10px; margin: 6px 0 2px; border-radius: 5px;
+  background: linear-gradient(90deg, var(--gp-perigo) 0 25%, var(--gp-atencao) 25% 50%, #2f7a4c 50% 100%); }
+.operador-regua i { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #07110e; }
+.operador-regua b, .operador-barra b { position: absolute; top: -5px; width: 4px; height: 20px; margin-left: -2px; border-radius: 2px; background: #fff; box-shadow: 0 0 0 2px #07110e; }
+.operador-regua-escala { font-size: 12px !important; color: #9fb5a8 !important; }
+.operador-cards[data-atual='false'] .operador-regua b { opacity: .45; }
+.operador-barra { position: relative; height: 8px; margin-top: 6px; border-radius: 4px; background: #ffffff1a; }
+.operador-barra b { position: static; display: block; height: 100%; margin: 0; width: 0; box-shadow: none; background: var(--gp-livre); border-radius: 4px; }
+.operador-card[data-alerta='true'] .operador-barra b { background: var(--gp-perigo); }
+.operador-barra i { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--gp-perigo); }
+
 .operador-alerta {
-  grid-column: 1 / -1; padding: 12px 16px; border-radius: 12px; background: #c4291ff0; color: #fff;
-  font-size: clamp(18px, 2.6vh, 26px); font-weight: 800; text-align: center;
+  grid-column: 1 / -1; padding: 10px 14px; border-radius: 12px; background: #c4291ff0; color: #fff;
+  font-size: clamp(18px, 2.4vh, 24px); font-weight: 800; text-align: center;
   contain: layout paint;
   /* Entrada curta (3 piscadas) ao aparecer, em vez de piscar sem parar. */
   animation: operador-entra .3s ease-out 3 alternate both;
@@ -60,12 +95,45 @@
 .operador-alerta[hidden] { display: none; }
 .operador[data-oculto] * { animation-play-state: paused !important; }
 
-/* Retrato (tablet em pé): mapa em cima com a largura toda, cards embaixo. */
+/* Em pé: mapa em cima com a largura toda, sensores embaixo em três colunas. */
 @media (orientation: portrait) {
-  .operador-corpo { grid-template-columns: minmax(0, 1fr); }
-  /* 46vh deixa os cinco cards visíveis sem rolar num tablet 800x1280. */
-  .operador .gameplay-mapa { width: min(100%, 46vh); }
+  /* O mapa leva a altura que sobra (o SVG encolhe sem distorcer); abaixo de 420 px a página rola. */
+  .operador-corpo { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(420px, 1fr) auto; min-height: 0; }
+  .operador-mapa { height: 100%; width: 100%; max-width: none; aspect-ratio: auto; }
+  .operador-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .operador-card[data-destaque='true'] { grid-column: span 2; }
+}
+@media (orientation: portrait) and (max-width: 560px) {
+  .operador-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .operador-card[data-destaque='true'] { grid-column: 1 / -1; }
+}
+/* Tablet deitado com o menu do site aberto (800 px de altura): cards mais baixos para caber sem rolar. */
+@media (orientation: landscape) and (max-height: 860px) {
+  .operador-cards { gap: 8px; }
+  .operador-card { padding: 7px 12px; }
+  .operador-card strong { font-size: 21px; }
+  .operador-card small { font-size: 12px; }
+  .operador-alerta { padding: 8px 12px; font-size: 18px; }
+  .operador-card[data-velho] small { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .operador-alerta { animation: none; }
 }
+
+/*
+ * Tela cheia do operador (`html[data-operador-expandido]`, OperadorPage): com ou sem a
+ * Fullscreen API, some o menu lateral, o cabeçalho e o dock do site; o ☰ da página
+ * abre a mesma gaveta do celular em qualquer largura.
+ */
+html[data-operador-expandido] .luca-sidebar-desktop,
+html[data-operador-expandido] .luca-mobile-header,
+html[data-operador-expandido] .luca-dock-anchor,
+html[data-operador-expandido] .luca-topbar { display: none !important; }
+html[data-operador-expandido] .luca-stage { height: 100%; padding: 0; gap: 0; }
+html[data-operador-expandido] .operador { border-radius: 0; }
+html[data-operador-expandido] .luca-drawer-scrim { display: block; position: fixed; inset: 0; z-index: 100; border: 0; background: rgba(0, 0, 0, .66); }
+html[data-operador-expandido] .luca-drawer {
+  display: flex; position: fixed; z-index: 110; inset: 0 auto 0 0; width: min(320px, 88vw);
+  padding: 10px; transform: none; pointer-events: auto;
+}
+html[data-operador-expandido] .luca-drawer .luca-sidebar { width: 100% !important; height: 100%; border-radius: 0 18px 18px 0; background: rgba(12, 16, 22, .96); }

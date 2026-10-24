@@ -18,6 +18,10 @@ export const PAUSADO_MAX_MS = 15 * 60_000;
 
 const FASES = new Set(['pronto', 'dirigindo', 'fim']);
 const STATUS_SONO = new Set(['unknown', 'open', 'closed', 'alarm']);
+/** Experiência do gameplay no totem (o tablet escolhe os obstáculos do mapa por ela). */
+export const CENARIOS_RETRATO = new Set(['circuito', 'desafios', 'percurso']);
+/** Corrida congelada com a aba visível: menu de pausa ou resultado (o motor não roda). */
+export const PAUSAS_RETRATO = new Set(['menu', 'resultado']);
 
 const numero = (v, min, max) => (typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? v : undefined);
 const booleano = (v) => (typeof v === 'boolean' ? v : undefined);
@@ -86,7 +90,7 @@ export function criarGameplayAoVivo({ agora = Date.now, cameraHabilitada = proce
   const enviar = (socket, ultimo) => {
     if (socket.readyState !== 1) return;
     const idadeMs = Math.max(0, agora() - ultimo.recebidoEm);
-    socket.send(JSON.stringify({ kind: TIPO_RETRATO, estado: ultimo.estado, idadeMs, ...(ultimo.oculto ? { oculto: true } : {}), ...(ultimo.sono ? { sono: ultimo.sono } : {}) }));
+    socket.send(JSON.stringify({ kind: TIPO_RETRATO, estado: ultimo.estado, idadeMs, ...(ultimo.oculto ? { oculto: true } : {}), ...(ultimo.sono ? { sono: ultimo.sono } : {}), ...(ultimo.cenario ? { cenario: ultimo.cenario } : {}), ...(ultimo.pausa ? { pausa: ultimo.pausa } : {}) }));
   };
 
   return {
@@ -111,7 +115,10 @@ export function criarGameplayAoVivo({ agora = Date.now, cameraHabilitada = proce
       if (mensagem.oculto !== undefined && typeof mensagem.oculto !== 'boolean') return 'descartado:formato';
       const sono = cameraHabilitada ? normalizarSono(mensagem.sono) : undefined;
       if (sono === null) return 'descartado:formato';
-      const ultimo = { estado, recebidoEm: instante, oculto: mensagem.oculto === true, ...(sono ? { sono } : {}) };
+      // `cenario` e `pausa` (opcionais): só valores conhecidos; outro valor derruba o retrato.
+      if (mensagem.cenario !== undefined && !CENARIOS_RETRATO.has(mensagem.cenario)) return 'descartado:formato';
+      if (mensagem.pausa !== undefined && !PAUSAS_RETRATO.has(mensagem.pausa)) return 'descartado:formato';
+      const ultimo = { estado, recebidoEm: instante, oculto: mensagem.oculto === true, ...(sono ? { sono } : {}), ...(mensagem.cenario ? { cenario: mensagem.cenario } : {}), ...(mensagem.pausa ? { pausa: mensagem.pausa } : {}) };
       ultimos.set(userId, ultimo);
       for (const outro of clientes) {
         if (outro !== socket && outro.userId === userId) enviar(outro, ultimo);

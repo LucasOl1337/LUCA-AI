@@ -23,6 +23,7 @@ import { useLuca } from '@/hooks/useLucaState';
 import { useAuth } from '@/hooks/useAuth';
 import { useDeferredFlag } from '@/hooks/useDeferredFlag';
 import SidebarSessionsRail from '@/components/SidebarSessionsRail';
+import { EVENTO_ABRIR_MENU } from '@/lib/menuGaveta';
 
 export type PageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'laboratorio' | 'sensor' | 'sonolencia' | 'admin' | 'stand' | 'totem' | 'gameplay' | 'operador' | 'fila';
 
@@ -73,6 +74,13 @@ export default function Layout({ activePage, onPageChange, children }: LayoutPro
     sync();
     media.addEventListener('change', sync);
     return () => media.removeEventListener('change', sync);
+  }, []);
+
+  // Painel do operador em tela cheia (menu e cabeçalho escondidos): o ☰ da página abre a mesma gaveta do celular.
+  useEffect(() => {
+    const abrir = () => setMobileNavOpen(true);
+    window.addEventListener(EVENTO_ABRIR_MENU, abrir);
+    return () => window.removeEventListener(EVENTO_ABRIR_MENU, abrir);
   }, []);
 
   useEffect(() => {

@@ -175,8 +175,10 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
     raiz.dataset.xM = String(estado.maquina.x); raiz.dataset.zM = String(estado.maquina.z);
     if (circuito) raiz.dataset.marco = String(sessao.registro.proximoMarco);
     // Tablet do operador (inventário #3): sem sessão (StandSemLogin) não há /ws e isto não faz nada.
+    // O tablet escolhe os obstáculos do mapa pela experiência (fardos e estacas só no circuito).
+    aoVivo.marcarCenario(experiencia);
     aoVivo.enviar(estado);
-  }), [motor, circuito, sessao]);
+  }), [motor, circuito, sessao, experiencia]);
 
   useEffect(() => {
     if (!circuito) return;
@@ -280,6 +282,10 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
         lookRef.current = stepLook(lookRef.current, olhar, dt, { recenter: !!pad });
         const congelado = circuito && (pausado.current || document.hidden || sessao.registro.resultado !== null);
         const estado = congelado ? motor.ler() : motor.quadro(dt, comandoDesejado(pad, setasRef.current), cena.ground);
+        // Tablet do operador: menu/resultado congelam o motor (sem `assinar`); o retrato parado segue a 4 Hz com o motivo,
+        // para o tablet dizer "pausado" e não "sem dados" (Linz, 24/10). Aba oculta já tem o `oculto`.
+        if (circuito) aoVivo.marcarPausa(document.hidden ? null : pausado.current ? 'menu' : sessao.registro.resultado !== null ? 'resultado' : null);
+        if (congelado && !document.hidden) aoVivo.enviar(estado);
         if (circuito && !congelado) {
           sessao.quadro(estado, passoMonotonoMs, new Date().toISOString(), sonoCabine.ler()?.status === 'alarm');
           sessao.registrar(estado);

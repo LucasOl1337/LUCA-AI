@@ -84,7 +84,7 @@ test('tablet: pausado mostra há quanto tempo; depois de PAUSADO_MAX_MS volta a 
   const t = 100_000;
   const ao = criarAoVivo(() => t);
   ao.receber(estado(), 30_000, true);
-  assert.deepEqual(sinalAoVivo(ao.ler(), t), { nivel: 'pausado', segundos: 30 });
+  assert.deepEqual(sinalAoVivo(ao.ler(), t), { nivel: 'pausado', segundos: 30, motivo: 'aba' });
   assert.equal(sinalAoVivo(ao.ler(), t + PAUSADO_MAX_MS).nivel, 'sem-sinal');
   ao.receber(estado());
   assert.deepEqual(sinalAoVivo(ao.ler(), t), { nivel: 'ao-vivo' });
@@ -113,4 +113,34 @@ test('totem leva o sono no retrato só com a webcam ligada; tablet guarda e esqu
   assert.deepEqual(ao.ler().sono, { status: 'closed', closedMs: 400 });
   ao.receber(estado(6));
   assert.equal('sono' in ao.ler(), false);
+});
+
+// Linz 24/10: menu de pausa e resultado congelam o motor; antes o totem parava de mandar e o tablet dizia "sem sinal".
+test('totem manda cenário e pausa (menu/resultado); tablet mostra pausado e, se parar de chegar, sem sinal', () => {
+  let t = 0;
+  const ao = criarAoVivo(() => t);
+  const enviados = [];
+  ao.ligar((texto) => enviados.push(JSON.parse(texto)));
+  ao.marcarCenario('circuito');
+  ao.enviar(estado(1));
+  assert.deepEqual(enviados.at(-1), { kind: TIPO_RETRATO, estado: estado(1), cenario: 'circuito' });
+  ao.marcarPausa('menu');
+  t += ENVIO_INTERVALO_MS; ao.enviar(estado(1));
+  assert.equal(enviados.at(-1).pausa, 'menu');
+  ao.marcarPausa(null);
+  t += ENVIO_INTERVALO_MS; ao.enviar(estado(2));
+  assert.equal('pausa' in enviados.at(-1), false);
+  ao.esquecer();
+  t += ENVIO_INTERVALO_MS; ao.enviar(estado(3));
+  assert.deepEqual(Object.keys(enviados.at(-1)), ['kind', 'estado'], 'gameplay desmontado não leva cenário velho');
+
+  const tablet = criarAoVivo(() => 10_000);
+  tablet.receber(estado(), 500, false, null, { cenario: 'circuito', pausa: 'resultado' });
+  assert.deepEqual(sinalAoVivo(tablet.ler(), 10_000), { nivel: 'pausado', segundos: 0, motivo: 'resultado' });
+  assert.equal(tablet.ler().cenario, 'circuito');
+  assert.equal(sinalAoVivo(tablet.ler(), 10_000 + SEM_SINAL_MS).nivel, 'sem-sinal', 'retrato pausado que parou de chegar não fica pausado para sempre');
+  tablet.receber(estado(), 0, false, null, { cenario: 'pista', pausa: 'talvez' });
+  assert.equal(tablet.ler().cenario, undefined);
+  assert.equal(tablet.ler().pausa, undefined);
+  assert.deepEqual(sinalAoVivo(tablet.ler(), 10_000), { nivel: 'ao-vivo' });
 });

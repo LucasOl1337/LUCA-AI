@@ -161,3 +161,26 @@ test('normalizarSono: ausente fica ausente, inválido vira null', () => {
   assert.equal(normalizarSono({ status: 'unknown', closedMs: 0 }).status, 'unknown');
   assert.equal(normalizarSono({ status: 'closed', closedMs: Infinity }), null);
 });
+
+// Linz 24/10: o tablet precisa saber o cenário (fardos só no circuito) e se a corrida está no menu ou no resultado.
+test('campos opcionais cenario e pausa: só os valores conhecidos passam, chegam ao par e ao tablet que abre depois', () => {
+  let t = 0;
+  const ao = criarGameplayAoVivo({ agora: () => t });
+  const totem = socket('A'), tablet = socket('A');
+  const env = (extra) => { t += RETRATO_INTERVALO_MIN_MS; return ao.receber(totem, JSON.stringify({ kind: TIPO_RETRATO, estado: retratoValido(), ...extra }), { clientes: [totem, tablet] }); };
+  assert.equal(env({ cenario: 'pista' }), 'descartado:formato');
+  assert.equal(env({ cenario: 1 }), 'descartado:formato');
+  assert.equal(env({ pausa: 'quase' }), 'descartado:formato');
+  assert.equal(env({ pausa: true }), 'descartado:formato');
+  assert.equal(env({ cenario: 'circuito', pausa: 'menu' }), 'repassado');
+  assert.equal(tablet.recebidas.at(-1).cenario, 'circuito');
+  assert.equal(tablet.recebidas.at(-1).pausa, 'menu');
+  const tarde = socket('A');
+  ao.aoConectar(tarde);
+  assert.equal(tarde.recebidas[0].cenario, 'circuito');
+  assert.equal(tarde.recebidas[0].pausa, 'menu');
+  assert.equal(env({ cenario: 'desafios' }), 'repassado');
+  assert.equal(tablet.recebidas.at(-1).cenario, 'desafios');
+  assert.equal('pausa' in tablet.recebidas.at(-1), false, 'corrida seguiu: a pausa some');
+  assert.equal(env({ cenario: 'percurso', pausa: 'resultado' }), 'repassado');
+});
