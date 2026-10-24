@@ -75,11 +75,11 @@ test('risco de tombamento acende a faixa vermelha e bipa mais grave; obstáculo 
   assert.equal(inclinado.alerta, true);
   assert.equal(inclinado.rotuloAlerta, 'Inclinação de 21° · freie');
   assert.equal(inclinado.rotulo, 'Risco de tombamento');
-  assert.deepEqual(inclinado.bipe, { intervaloMs: BIPE_RAPIDO_MS, frequenciaHz: 660 });
+  assert.deepEqual(inclinado.bipe, { intervaloMs: BIPE_RAPIDO_MS, som: 'inclinacao' });
   assert.equal(inclinado.faixa, 'livre', 'a cor segue a distância; a faixa vermelha avisa a inclinação');
   const os2 = alertaCabine(estado({ cm: 140, arfagem: 25 }));
   assert.equal(os2.rotuloAlerta, ROTULO_ALERTA_CABINE);
-  assert.equal(os2.bipe.frequenciaHz, 1180);
+  assert.equal(os2.bipe.som, 'proximidade');
   assert.equal(alertaCabine(estado({ rolagem: -25, fase: 'fim' })).bipe.intervaloMs, null);
 });
 
@@ -130,7 +130,7 @@ test('painel desenha a vinheta com o nível do alerta', () => {
 test('alarme de ré (Lupa fila vazia 2): andando de ré apita lento e agudo; antes mudo; nunca cobre alerta nem toca parado ou fora da corrida', async () => {
   const { BIPE_RE } = await loadFrontendModule('../../src/components/gameplay/alertaCabine.ts');
   assert.deepEqual(alertaCabine(estado({ re: true, kph: 1.5 })).bipe, BIPE_RE);
-  assert.deepEqual(BIPE_RE, { intervaloMs: 600, frequenciaHz: 1040 });
+  assert.deepEqual(BIPE_RE, { intervaloMs: 1000, som: 're' }, 'buzina de ré: meio segundo ligado, meio desligado');
   assert.equal(alertaCabine(estado({ re: false, kph: 1.5 })).bipe.intervaloMs, null, 'de frente sem nada: mudo');
   assert.equal(alertaCabine(estado({ re: true, kph: 0.1 })).bipe.intervaloMs, null, 'parado: mudo');
   assert.equal(alertaCabine(estado({ re: true, kph: 1.5, fase: 'fim' })).bipe.intervaloMs, null);

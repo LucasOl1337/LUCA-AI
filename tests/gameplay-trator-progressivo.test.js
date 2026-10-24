@@ -10,7 +10,7 @@ test('cadência aperta continuamente de 400 cm até a iminência, sem trocar tim
   const sons = [400, 250, 150, 80, 30, 0].map(bipeProximidade);
   for (let i = 1; i < sons.length; i++) assert.ok(sons[i].intervaloMs < sons[i - 1].intervaloMs);
   assert.equal(sons.at(-1).intervaloMs, 0);
-  assert.equal(new Set(sons.map((s) => s.frequenciaHz)).size, 1);
+  assert.equal(new Set(sons.map((s) => s.som)).size, 1);
   assert.ok(Math.abs(bipeProximidade(151).intervaloMs - bipeProximidade(150).intervaloMs) < 2);
 });
 

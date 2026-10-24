@@ -71,7 +71,7 @@ test('na rampa: o painel acende faixa vermelha e bipe grave a partir de 20°; fr
   assert.ok(Math.abs(estadoNoAlerta.atitude.arfagemGraus) < 20, 'o aviso vem da rolagem lateral');
   assert.match(painelNoAlerta.rotuloAlerta, /^Inclinação de 2\d° · freie$/);
   assert.equal(painelNoAlerta.rotulo, 'Risco de tombamento');
-  assert.deepEqual(painelNoAlerta.bipe, { intervaloMs: BIPE_RAPIDO_MS, frequenciaHz: 660 });
+  assert.deepEqual(painelNoAlerta.bipe, { intervaloMs: BIPE_RAPIDO_MS, som: 'inclinacao' });
   assert.equal(resultado.desafio, 'pendente-lateral');
   assert.equal(resultado.desfecho, 'parou');
   assert.ok(resultado.alertaGraus >= 20 && resultado.alertaGraus < 21, `alerta ${resultado.alertaGraus}`);

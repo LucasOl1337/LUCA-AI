@@ -14,6 +14,7 @@ import { COMANDOS_CABINE, type EntradaCabine } from './comandosCabine';
 import { cercaAFrente } from './fisicaTrator';
 import { geofenceTalhao, type GeofenceTalhao } from './geofenceTalhao';
 import { ROTULO_ALERTA_SONO, type SonoCabine } from './sonoCabine';
+import { ALARMES, type SomAlarme } from './timbreAlarme';
 
 export type FaixaCabine = 'livre' | 'atencao' | 'perigo';
 
@@ -23,8 +24,8 @@ export type FaixaCabine = 'livre' | 'atencao' | 'perigo';
  */
 export type VinhetaCabine = 'nenhuma' | 'alerta' | 'critica';
 
-/** Cadência do bipe: `null` mudo, `0` tom contínuo, senão um bipe a cada `intervaloMs`. */
-export interface BipeCabine { intervaloMs: number | null; frequenciaHz: number }
+/** Cadência do bipe: `null` mudo, `0` tom contínuo, senão um bipe a cada `intervaloMs`; `som` escolhe o timbre (`timbreAlarme`). */
+export interface BipeCabine { intervaloMs: number | null; som: SomAlarme }
 
 export interface AlertaCabine {
   faixa: FaixaCabine;
@@ -63,18 +64,18 @@ export const rotuloInclinacaoCabine = (graus: number) => `Inclinação de ${grau
 export const rotuloGeofenceCabine = (g: GeofenceTalhao) => g.nivel === 'dentro' ? `Dentro da ${g.zona!.rotulo.toLowerCase()} · saia` : g.nivel === 'rumo' ? `Rumo à ${g.zona!.rotulo.toLowerCase()} · desvie` : '';
 export const BIPE_LENTO_MS = 600;
 export const BIPE_RAPIDO_MS = 200;
-/** Bipe da sonolência: grave e insistente, diferente dos tons do sensor e da zona. */
-export const BIPE_SONO: BipeCabine = { intervaloMs: 300, frequenciaHz: 520 };
-/** Alarme de ré de máquina: lento e agudo, diferente de todos os alertas (Lupa, 24/10). */
-export const BIPE_RE: BipeCabine = { intervaloMs: 600, frequenciaHz: 1040 };
+/** Alarme de fadiga: dois tons alternados sem pausa, insistente, diferente do sensor e da zona. */
+export const BIPE_SONO: BipeCabine = { intervaloMs: ALARMES.sono.periodoMs, som: 'sono' };
+/** Alarme de ré de máquina: buzina lenta, meio segundo ligado e meio desligado (Lupa, 24/10). */
+export const BIPE_RE: BipeCabine = { intervaloMs: ALARMES.re.periodoMs, som: 're' };
 /** Abaixo disso (trator parado com a ré engatada) não apita. */
 export const RE_BIPE_MIN_KPH = 0.3;
 
-const MUDO: BipeCabine = { intervaloMs: null, frequenciaHz: 0 };
+const MUDO: BipeCabine = { intervaloMs: null, som: 'proximidade' };
 
 /** Mesmo timbre, intervalo contínuo até a iminência (10 cm). */
 export function bipeProximidade(cm: number): BipeCabine {
-  return { intervaloMs: cm <= 10 ? 0 : 100 + 700 * (Math.min(400, cm) - 10) / 390, frequenciaHz: 1180 };
+  return { intervaloMs: cm <= 10 ? 0 : 100 + 700 * (Math.min(400, cm) - 10) / 390, som: 'proximidade' };
 }
 
 const metros = (cm: number) => `${(cm / 100).toFixed(1).replace('.', ',')} m`;
@@ -107,9 +108,9 @@ export function alertaCabine(estado: EstadoGameplay, sono: SonoCabine | null = n
     else if (sensor.alerta) bipe = bipeProximidade(sensor.distanciaCm);
     else if (dormindo) bipe = BIPE_SONO;
     // Tom do meio, só da zona de risco: rápido dentro, ritmo do alerta a caminho.
-    else if (zona) bipe = { intervaloMs: geofence.nivel === 'dentro' ? 120 : BIPE_RAPIDO_MS, frequenciaHz: 990 };
+    else if (zona) bipe = { intervaloMs: geofence.nivel === 'dentro' ? 120 : BIPE_RAPIDO_MS, som: 'zona' };
     // Mesmo ritmo do alerta, tom mais grave: dá para saber qual dos dois sem olhar.
-    else if (faixas.inclination) bipe = { intervaloMs: BIPE_RAPIDO_MS, frequenciaHz: 660 };
+    else if (faixas.inclination) bipe = { intervaloMs: BIPE_RAPIDO_MS, som: 'inclinacao' };
     else if (sensor.eco) bipe = bipeProximidade(sensor.distanciaCm);
     // Alarme de ré (Lupa, fila vazia 2): antes a ré engatava muda; prioridade mais baixa, nunca cobre um alerta.
     else if (maquina.re && maquina.velocidadeKph >= RE_BIPE_MIN_KPH) bipe = BIPE_RE;

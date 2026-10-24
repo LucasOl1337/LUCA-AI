@@ -25,10 +25,11 @@ function navegador() {
     async close() { this.state = 'closed'; this.fechado += 1; }
     createOscillator() {
       const ctx = this;
-      const no = { type: '', frequency: { value: 0 }, connect: (g) => g, start() { if (ctx.state === 'running') ctx.tocados += 1; }, stop() {}, disconnect() {} };
+      const no = { type: '', frequency: { value: 0, setValueAtTime() {} }, setPeriodicWave() {}, connect: (g) => g, start() { if (ctx.state === 'running') ctx.tocados += 1; }, stop() {}, disconnect() {} };
       return no;
     }
-    createGain() { return { gain: { value: 0, setValueAtTime() {}, linearRampToValueAtTime() {} }, connect: (d) => d }; }
+    createPeriodicWave() { return {}; }
+    createGain() { return { gain: { value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, cancelScheduledValues() {} }, connect: (d) => d, disconnect() {} }; }
   }
   return { politica, criados, ContextoFalso };
 }
@@ -43,7 +44,7 @@ test('Simulação aberta pelo controle, sem gesto e sem captura: o bipe fica mud
   const documento = Object.assign(new EventTarget(), { hidden: false });
   som.ligarDestravas(janela, documento);
   const motor = criarMotorBipe(som);
-  motor.tocar(0, 520); // sono: tom contínuo
+  motor.tocar(0, 'sono'); // tom contínuo
   await tique();
   assert.equal(criados.length, 1);
   assert.equal(criados[0].state, 'suspended');
@@ -66,7 +67,7 @@ test('troca de aba do Totem: sair da Simulação não fecha o contexto e a volta
   const som = criarSomCompartilhado(ContextoFalso);
   politica.liberado = true;
   const primeiro = criarMotorBipe(som);
-  primeiro.tocar(0, 660);
+  primeiro.tocar(0, 'inclinacao');
   await tique();
   assert.equal(criados[0].tocados, 1, 'o primeiro bipe espera o resume em vez de sumir');
   primeiro.fechar(); // Simulação → Vitrine (o PainelCabine desmonta)
@@ -74,7 +75,7 @@ test('troca de aba do Totem: sair da Simulação não fecha o contexto e a volta
   // Volta pelo controle: sem gesto novo. Antes nascia um contexto novo e travado.
   politica.liberado = false;
   const segundo = criarMotorBipe(som);
-  segundo.tocar(0, 660);
+  segundo.tocar(0, 'inclinacao');
   assert.equal(criados.length, 1, 'continua o mesmo contexto');
   assert.equal(criados[0].tocados, 2, 'toca na hora, sem gesto novo');
   segundo.fechar();
@@ -103,7 +104,7 @@ test('bipe intermitente: o primeiro bipe sai quando o contexto recém-criado des
   const { politica, criados, ContextoFalso } = navegador();
   politica.liberado = true;
   const motor = criarMotorBipe(criarSomCompartilhado(ContextoFalso));
-  motor.tocar(300, 520);
+  motor.tocar(300, 'sono');
   await tique();
   assert.equal(criados[0].tocados, 1);
   t.mock.timers.tick(300);
@@ -118,10 +119,10 @@ test('atualizar distância não reinicia o relógio nem emite um bipe por render
   const { politica, criados, ContextoFalso } = navegador();
   politica.liberado = true;
   const motor = criarMotorBipe(criarSomCompartilhado(ContextoFalso));
-  motor.tocar(800, 1180);
+  motor.tocar(800, 'proximidade');
   await tique();
-  motor.tocar(600, 1180);
-  motor.tocar(400, 1180);
+  motor.tocar(600, 'proximidade');
+  motor.tocar(400, 'proximidade');
   assert.equal(criados[0].tocados, 1, 'atualização não bipa');
   t.mock.timers.tick(410);
   assert.equal(criados[0].tocados, 2, 'cadência nova passa a valer sem reinício');

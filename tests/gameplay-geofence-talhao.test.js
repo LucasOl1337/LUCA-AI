@@ -47,14 +47,14 @@ test('painel: zona acende faixa, bipe e vinheta; contato e obstáculo vêm antes
   assert.equal(rumo.alerta, true);
   assert.equal(rumo.rotuloAlerta, 'Rumo à área alagada · desvie');
   assert.equal(rumo.vinheta, 'alerta');
-  assert.equal(rumo.bipe.frequenciaHz, 990);
+  assert.equal(rumo.bipe.som, 'zona');
   const dentro = alertaCabine(estado({ x: 30, z: 15 }));
   assert.equal(dentro.rotuloAlerta, 'Dentro da área alagada · saia');
   assert.equal(dentro.vinheta, 'critica');
   assert.equal(dentro.rotulo, 'Zona de risco: Área alagada');
   const comObstaculo = alertaCabine(estado({ x: 30, z: 15, cm: 140 }));
   assert.equal(comObstaculo.rotuloAlerta, ROTULO_ALERTA_CABINE);
-  assert.equal(comObstaculo.bipe.frequenciaHz, 1180);
+  assert.equal(comObstaculo.bipe.som, 'proximidade');
   assert.equal(alertaCabine(estado({ x: 30, z: 15, contato: true, cm: 120 })).rotulo, 'Contato com o obstáculo');
   const comInclinacao = alertaCabine(estado({ x: 30, z: 15, rolagem: 22 }));
   assert.equal(comInclinacao.rotuloAlerta, 'Dentro da área alagada · saia');

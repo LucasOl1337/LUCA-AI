@@ -1,38 +1,43 @@
 import { useEffect, useRef } from 'react';
 import type { BipeCabine } from './alertaCabine';
 import { saidaEfeito, somCompartilhado, type SomCompartilhado } from './somCompartilhado';
+import { agendarRajada, ALARMES, ligarTom, type DefinicaoAlarme, type Rajada, type SomAlarme } from './timbreAlarme';
 
 /**
- * Bipe em Web Audio, no contexto compartilhado da página (`somCompartilhado`).
- * Sem permissão de áudio (nenhum gesto e nenhuma captura ativa) fica mudo, sem
- * erro na tela, e volta a tocar no primeiro gesto.
+ * Alarme da cabine em Web Audio, no contexto compartilhado da página
+ * (`somCompartilhado`). O timbre vem de `timbreAlarme` (buzzer piezo, buzina de
+ * ré, dois tons do sono); aqui fica só a cadência. Sem permissão de áudio
+ * (nenhum gesto e nenhuma captura ativa) fica mudo, sem erro na tela, e volta
+ * a tocar no primeiro gesto.
  */
 export function useBipeCabine(bipe: BipeCabine | null) {
   const motor = useRef<MotorBipe | null>(null);
   const intervalo = bipe?.intervaloMs ?? null;
-  const frequencia = bipe?.frequenciaHz ?? 0;
+  const som = bipe?.som ?? 'proximidade';
   useEffect(() => () => { motor.current?.fechar(); motor.current = null; }, []);
   useEffect(() => {
     if (intervalo === null) { motor.current?.parar(); return; }
     motor.current ??= criarMotorBipe();
-    motor.current.tocar(intervalo, frequencia);
-  }, [intervalo, frequencia]);
+    motor.current.tocar(intervalo, som);
+  }, [intervalo, som]);
 }
 
-export interface MotorBipe { tocar(intervaloMs: number, frequenciaHz: number): void; parar(): void; fechar(): void }
+export interface MotorBipe { tocar(intervaloMs: number, som: SomAlarme): void; parar(): void; fechar(): void }
 
-const DURACAO_BIPE_S = 0.09;
-const VOLUME = 0.18;
 /** Contexto ainda travado: tenta de novo a cada meio segundo. */
 const RETENTATIVA_MS = 500;
 
-export function criarMotorBipe(som: SomCompartilhado = somCompartilhado): MotorBipe {
+/** `alarmes` só muda no render de audição das opções (`scripts/render-alarmes.mjs`). */
+export function criarMotorBipe(som: SomCompartilhado = somCompartilhado, alarmes: Record<SomAlarme, DefinicaoAlarme> = ALARMES): MotorBipe {
   let relogio: number | null = null;
   let retentativa: number | null = null;
-  let continuo: { osc: OscillatorNode; ganho: GainNode } | null = null;
+  let continuo: Rajada | null = null;
+  /** Rajadas ainda soando: `parar` corta todas (a buzina de ré dura meio segundo). */
+  const soando = new Set<Rajada>();
   /** Muda a cada `tocar`/`parar`: um resume que chega atrasado não toca o pedido velho. */
   let geracao = 0;
-  let intervaloAtual = 0, hzAtual = 0, fase = 0;
+  let intervaloAtual = 0, fase = 0;
+  let somAtual: SomAlarme = 'proximidade';
 
   /** Contexto tocando agora, ou `null` (e pede o resume para a próxima vez). */
   const pronto = (): AudioContext | null => {
@@ -43,65 +48,52 @@ export function criarMotorBipe(som: SomCompartilhado = somCompartilhado): MotorB
     return null;
   };
 
-  const bipar = (ctx: AudioContext, hz: number) => {
-    const osc = ctx.createOscillator();
-    const ganho = ctx.createGain();
-    const agora = ctx.currentTime;
-    osc.type = 'square';
-    osc.frequency.value = hz;
-    ganho.gain.setValueAtTime(0, agora);
-    ganho.gain.linearRampToValueAtTime(VOLUME, agora + 0.005);
-    ganho.gain.setValueAtTime(VOLUME, agora + DURACAO_BIPE_S - 0.01);
-    ganho.gain.linearRampToValueAtTime(0, agora + DURACAO_BIPE_S);
-    osc.connect(ganho).connect(saidaEfeito(som, ctx));
-    osc.start(agora);
-    osc.stop(agora + DURACAO_BIPE_S + 0.02);
+  const bipar = (ctx: AudioContext, qual: SomAlarme) => {
+    const r = agendarRajada(ctx, alarmes[qual], saidaEfeito(som, ctx));
+    soando.add(r);
+    const fim = r.fonte.onended;
+    r.fonte.onended = (ev) => { soando.delete(r); fim?.call(r.fonte, ev); };
   };
 
-  const ligarContinuo = (ctx: AudioContext, hz: number) => {
-    const osc = ctx.createOscillator();
-    const ganho = ctx.createGain();
-    osc.type = 'square';
-    osc.frequency.value = hz;
-    ganho.gain.value = VOLUME * 0.8;
-    osc.connect(ganho).connect(saidaEfeito(som, ctx));
-    osc.start();
-    continuo = { osc, ganho };
+  const ligarContinuo = (ctx: AudioContext, qual: SomAlarme) => {
+    continuo = ligarTom(ctx, alarmes[qual], saidaEfeito(som, ctx));
   };
 
   const parar = () => {
     geracao += 1;
     if (relogio !== null) { window.clearInterval(relogio); relogio = null; }
     if (retentativa !== null) { window.clearInterval(retentativa); retentativa = null; }
-    if (continuo) {
-      try { continuo.osc.stop(); } catch { /* já parado */ }
-      try { continuo.osc.disconnect(); } catch { /* já solto */ }
-      continuo = null;
-    }
+    continuo?.parar();
+    continuo = null;
+    for (const r of soando) r.parar();
+    soando.clear();
   };
 
   const motor: MotorBipe = {
-    tocar(intervaloMs, hz) {
+    tocar(intervaloMs, qual) {
       // Distância chega ~15 vezes/s. Atualizar a curva não reinicia o pulso:
       // mantém a fase, em vez de bipar a cada retrato do sensor.
-      intervaloAtual = intervaloMs; hzAtual = hz;
+      // Trocar de som no meio (zona → obstáculo) também mantém a fase: o próximo pulso já sai no timbre novo.
+      const mesmoSom = qual === somAtual;
+      intervaloAtual = intervaloMs; somAtual = qual;
       if (intervaloMs > 0 && relogio !== null) return;
-      if (intervaloMs === 0 && continuo) { continuo.osc.frequency.value = hz; return; }
+      // Tom contínuo de outro som: religa (parar + caminho normal abaixo).
+      if (intervaloMs === 0 && continuo && mesmoSom) return;
       parar();
       fase = 0;
       const minha = geracao;
       if (intervaloMs === 0) {
         const ctx = pronto();
-        if (ctx) { ligarContinuo(ctx, hz); return; }
+        if (ctx) { ligarContinuo(ctx, qual); return; }
         // Contexto ainda travado: o tom liga assim que destravar (resume ou gesto).
         void som.destravar().then((ok) => {
-          if (ok && minha === geracao && !continuo) { const c = som.obter(); if (c) ligarContinuo(c, hz); }
+          if (ok && minha === geracao && !continuo) { const c = som.obter(); if (c) ligarContinuo(c, qual); }
         });
         retentativa = window.setInterval(() => {
           const c = pronto();
           if (!c || minha !== geracao) return;
           if (retentativa !== null) { window.clearInterval(retentativa); retentativa = null; }
-          if (!continuo) ligarContinuo(c, hz);
+          if (!continuo) ligarContinuo(c, qual);
         }, RETENTATIVA_MS);
         return;
       }
@@ -109,12 +101,12 @@ export function criarMotorBipe(som: SomCompartilhado = somCompartilhado): MotorB
         fase += 10 / intervaloAtual;
         if (fase < 1 - 1e-9) return;
         fase = Math.max(0, fase - 1);
-        const ctx = pronto(); if (ctx) bipar(ctx, hzAtual);
+        const ctx = pronto(); if (ctx) bipar(ctx, somAtual);
       };
       const ctx = pronto();
-      if (ctx) bipar(ctx, hz);
+      if (ctx) bipar(ctx, qual);
       // Recém-criado o contexto fica `suspended` por um instante: o 1º bipe sai quando ele destravar.
-      else void som.destravar().then((ok) => { if (ok && minha === geracao) { const c = som.obter(); if (c) bipar(c, hz); } });
+      else void som.destravar().then((ok) => { if (ok && minha === geracao) { const c = som.obter(); if (c) bipar(c, qual); } });
       relogio = window.setInterval(tique, 10);
     },
     parar,

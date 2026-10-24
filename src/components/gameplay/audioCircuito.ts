@@ -1,26 +1,36 @@
 import type { EstadoGameplay } from './estadoGameplay';
 import { riscosCircuito, type SensorCircuito } from './circuito';
 import { saidaEfeito, somCompartilhado, type SomCompartilhado } from './somCompartilhado';
+import { agendarRajada, ALARMES, type DefinicaoAlarme, type Rajada, type SomAlarme } from './timbreAlarme';
 
-/** Tons curtos por exposição, nunca um oscilador contínuo. A mesma classificação
- * alimenta registro, avisos, mapa e áudio. Limites são didáticos, não físicos. */
-export const TONS_CIRCUITO: Record<SensorCircuito, number> = { feno: 880, encosta: 660, agua: 990, sonolencia: 520 };
+/** Rajadas curtas por exposição, nunca um oscilador contínuo. A mesma classificação
+ * alimenta registro, avisos, mapa e áudio. Limites são didáticos, não físicos.
+ * O timbre é o mesmo da cabine (`timbreAlarme`): obstáculo = buzzer do sensor,
+ * água = zona, encosta = inclinação, sonolência = o alarme de fadiga inteiro. */
+export const SONS_CIRCUITO: Record<SensorCircuito, SomAlarme> = { feno: 'proximidade', encosta: 'inclinacao', agua: 'zona', sonolencia: 'sono' };
+/** Atenção: um pulso. Crítico: pulso duplo, mais rápido. O sono toca o próprio padrão. */
+export function rajadaCircuito(sensor: SensorCircuito, critico: boolean): DefinicaoAlarme {
+  const def = ALARMES[SONS_CIRCUITO[sensor]];
+  if (sensor === 'sonolencia' || !critico) return def;
+  const [, dur, mult] = def.padrao[0];
+  return { ...def, padrao: [[0, dur, mult], [dur + 50, dur, mult]] };
+}
+/** Sonolência repete o padrão sem pausa (insistente, como no /sonolencia); os outros seguem o cooldown. */
+const intervaloDe = (sensor: SensorCircuito, critico: boolean) =>
+  sensor === 'sonolencia' ? ALARMES.sono.periodoMs : critico ? 1000 : 1800;
 export function criarAudioCircuito(som: SomCompartilhado = somCompartilhado) {
   const exposicoes = new Map<SensorCircuito, { nivel: string; ultimo: number; ausente: number | null }>();
-  const ativos = new Set<OscillatorNode>();
+  const ativos = new Set<Rajada>();
   let habilitado = true;
-  const parar = () => { for (const o of ativos) { try { o.stop(); } catch { /* já encerrado */ } o.disconnect(); } ativos.clear(); };
-  const tocar = (hz: number, critico: boolean) => {
+  const parar = () => { for (const r of ativos) r.parar(); ativos.clear(); };
+  const tocar = (sensor: SensorCircuito, critico: boolean) => {
     const ctx = som.obter();
     if (!ctx || ctx.state !== 'running') return false;
-    const osc = ctx.createOscillator(), ganho = ctx.createGain(), t = ctx.currentTime;
-    osc.type = 'sine'; osc.frequency.setValueAtTime(hz, t);
-    if (critico) osc.frequency.linearRampToValueAtTime(hz * 1.35, t + .13);
-    ganho.gain.setValueAtTime(0, t); ganho.gain.linearRampToValueAtTime(.12, t + .012);
-    ganho.gain.exponentialRampToValueAtTime(.001, t + .17); ganho.gain.setValueAtTime(0, t + .19);
-    osc.connect(ganho).connect(saidaEfeito(som, ctx)); ativos.add(osc);
-    osc.onended = () => { ativos.delete(osc); osc.disconnect(); ganho.disconnect(); };
-    osc.start(t); osc.stop(t + .2); return true;
+    const r = agendarRajada(ctx, rajadaCircuito(sensor, critico), saidaEfeito(som, ctx));
+    ativos.add(r);
+    const fim = r.fonte.onended;
+    r.fonte.onended = (ev) => { ativos.delete(r); fim?.call(r.fonte, ev); };
+    return true;
   };
   return {
     liberar: () => som.destravar(),
@@ -37,10 +47,10 @@ export function criarAudioCircuito(som: SomCompartilhado = somCompartilhado) {
       for (const [sensor, nivel] of riscos) {
         const exp = exposicoes.get(sensor);
         if (exp) exp.ausente = null;
-        const intervalo = nivel === 'critico' ? 1000 : 1800;
+        const intervalo = intervaloDe(sensor, nivel === 'critico');
         const subiu = nivel === 'critico' && exp?.nivel !== 'critico';
         if (!exp || (subiu && agoraMs - exp.ultimo >= 350) || agoraMs - exp.ultimo >= intervalo) {
-          if (tocar(TONS_CIRCUITO[sensor], nivel === 'critico')) exposicoes.set(sensor, { nivel, ultimo: agoraMs, ausente: null });
+          if (tocar(sensor, nivel === 'critico')) exposicoes.set(sensor, { nivel, ultimo: agoraMs, ausente: null });
         }
       }
     },
