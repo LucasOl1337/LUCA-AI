@@ -5,7 +5,7 @@
  * Mesmo referencial do trator: frente = (cos h, -sin h), rumo + = esquerda.
  */
 import type { ComandoVolante } from '../gameplay/volante';
-import { MEIA_PISTA_M, GUARD_RAIL_M, naAreaDeEscape, projetarNaPista, type PistaSerra } from './pistaSerra';
+import { MEIA_PISTA_M, GUARD_RAIL_M, naAreaDeEscape, projetarNaPista, SERRA, type PistaSerra } from './pistaSerra';
 
 const G = 9.81;
 export const CAMINHAO = Object.freeze({
@@ -22,10 +22,10 @@ export const CAMINHAO = Object.freeze({
   rolagem: 0.012 * G,
   ar: 0.00042,
   /** Freio-motor no topo; some abaixo de ~25 km/h (rotação baixa). */
-  freioMotor: 0.95,
+  freioMotor: 0.6,
   freioMotorVRef: 7.5,
   /** Leito de cascalho da área de escape. */
-  cascalho: 5.2,
+  cascalho: 6.5,
   /** Aceleração lateral: aviso, perigo e tombo (sustentado). */
   latAvisoG: 0.28, latPerigoG: 0.4, latTomboG: 0.52, tomboS: 0.5,
   /** Velocidade normal ao guard-rail que rompe a barreira. */
@@ -85,8 +85,9 @@ export function passoCaminhao(e: EstadoCaminhao, comando: ComandoVolante, freioM
   let p = projetarNaPista(pista, x, z, e.indice);
   let raspou = false, rompeu = e.rompeu;
   const limite = GUARD_RAIL_M - CAMINHAO.meiaLarguraM;
-  const noEscape = naAreaDeEscape(p.s, p.lateral);
-  if (!rompeu && Math.abs(p.lateral) > limite && !(noEscape || (p.lateral > 0 && e.noCascalho))) {
+  // Na boca da área de escape não há guard-rail do lado direito.
+  const bocaEscape = p.lateral > 0 && p.s >= SERRA.escape.s0 && p.s <= SERRA.escape.s1;
+  if (!rompeu && Math.abs(p.lateral) > limite && !bocaEscape) {
     // Batida no guard-rail: velocidade normal à barreira decide se rompe ou raspa.
     const erro = rumo - p.rumo;
     const normal = Math.abs(v * Math.sin(erro));
@@ -94,7 +95,7 @@ export function passoCaminhao(e: EstadoCaminhao, comando: ComandoVolante, freioM
     else {
       const lado = Math.sign(p.lateral), volta = (Math.abs(p.lateral) - limite) * lado;
       x -= Math.sin(p.rumo) * volta; z -= Math.cos(p.rumo) * volta;
-      rumo = p.rumo + erro * 0.3; v *= 0.9; raspou = true;
+      rumo = p.rumo + erro * 0.3; v = Math.max(0, v - 2.5 * sg - normal * 0.25); raspou = true;
       p = projetarNaPista(pista, x, z, p.indice);
     }
   }
@@ -102,5 +103,5 @@ export function passoCaminhao(e: EstadoCaminhao, comando: ComandoVolante, freioM
   const tomboS = aLatG >= CAMINHAO.latTomboG ? e.tomboS + sg : Math.max(0, e.tomboS - sg * 2);
   const { marcha, rpm } = marchaPara(v * 3.6, freioMotor);
   return { x, z, y: p.y, rumo, velocidade: v, guinada, s: p.s, lateral: p.lateral, indice: p.indice, rampa: p.rampa, curvatura: p.curvatura,
-    aLatG, tomboS, marcha, rpm, freioMotor, noCascalho: naAreaDeEscape(p.s, p.lateral) && p.lateral > MEIA_PISTA_M + 2.4, raspou, rompeu };
+    aLatG, tomboS, marcha, rpm, freioMotor, noCascalho: naAreaDeEscape(p.s, p.lateral) && p.lateral > MEIA_PISTA_M + 2.2, raspou, rompeu };
 }

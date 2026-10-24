@@ -37,14 +37,14 @@ export const SERRA = Object.freeze({
   /** Onde o Nelore atravessa (reta antes da curva à direita). */
   animalS: 400,
   /** O animal começa a andar quando o caminhão chega a esta distância dele. */
-  animalGatilhoM: 120,
+  animalGatilhoM: 130,
   /** O freio começa a falhar aqui (início da descida forte). */
   falhaFreioS: 620,
   /** Tempo da eficiência do freio cair de 1 a 0. */
   falhaFreioS_duracao: 1.5,
   /** Área de escape: leito de cascalho à direita, sem guard-rail. */
-  escape: Object.freeze({ s0: 850, s1: 975, lateral0: GUARD_RAIL_M, lateral1: 15 }),
-  chegadaS: 1520,
+  escape: Object.freeze({ s0: 830, s1: 975, lateral0: GUARD_RAIL_M, lateral1: 15 }),
+  chegadaS: 1440,
   /** Trecho de descida forte (hazard slope no mapa do Laboratório). */
   descida: Object.freeze({ s0: 580, s1: 1230 }),
 });

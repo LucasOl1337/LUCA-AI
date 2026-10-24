@@ -8,6 +8,8 @@
 export const PERCURSO_ORIGEM = Object.freeze([-47.0, -22.0]);
 export const PERCURSO_MAQUINA = 'trator-simulador';
 export const PERCURSO_HZ = 5;
+/** Caminhão da serra (Pista): mesmo CSV, outro machine_id, rpm e carga do motor preenchidos. */
+export const PERCURSO_CAMINHAO = 'caminhao-simulador';
 
 const EARTH_RADIUS_M = 6378137;
 const RAD = Math.PI / 180;
@@ -52,15 +54,15 @@ export function amostraDoPercurso(estado, { inclinado = false } = {}) {
 }
 
 /** CSV no formato do Laboratório + quantas linhas e quanto tempo ele cobre (o manifesto confere os dois). */
-export function registroDoPercurso(amostras, inicioIso) {
-  const csv = csvDoPercurso(amostras, inicioIso);
+export function registroDoPercurso(amostras, inicioIso, maquina = PERCURSO_MAQUINA) {
+  const csv = csvDoPercurso(amostras, inicioIso, maquina);
   const linhas = csv.trim().split('\n').slice(1);
   const ms = (linha) => Date.parse(linha.slice(0, linha.indexOf(',')));
   return { csv, amostras: linhas.length, duracaoMs: linhas.length ? ms(linhas.at(-1)) - ms(linhas[0]) : 0 };
 }
 
 /** CSV no formato do Laboratório. Amostras em ordem de tempo; repetidas no mesmo ms são descartadas. */
-export function csvDoPercurso(amostras, inicioIso) {
+export function csvDoPercurso(amostras, inicioIso, maquina = PERCURSO_MAQUINA) {
   const inicio = Date.parse(inicioIso);
   if (!Number.isFinite(inicio)) throw new Error('inicioIso inválido');
   const linhas = [COLUNAS.join(',')];
@@ -73,7 +75,7 @@ export function csvDoPercurso(amostras, inicioIso) {
     const rumo = ((90 - a.rumoGraus) % 360 + 360) % 360;
     const valores = {
       timestamp: new Date(inicio + ms).toISOString(),
-      machine_id: PERCURSO_MAQUINA,
+      machine_id: maquina,
       synthetic: 'true',
       latitude_deg: num(lat, 8),
       longitude_deg: num(lon, 8),
@@ -83,6 +85,8 @@ export function csvDoPercurso(amostras, inicioIso) {
       heading_deg: num(rumo === 360 ? 0 : rumo, 1),
       roll_deg: num(a.rolagem, 1),
       pitch_deg: num(a.arfagem, 1),
+      engine_rpm: num(a.rpm, 0),
+      engine_load_pct: num(a.cargaMotor, 0),
       brake_pressed: bool(a.freio),
       obstacle_distance_cm: a.eco ? num(a.distanciaCm, 0) : '',
       ultrasonic_echo_valid: bool(a.eco),

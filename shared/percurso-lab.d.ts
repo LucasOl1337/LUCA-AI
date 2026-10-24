@@ -1,11 +1,14 @@
 export const PERCURSO_ORIGEM: readonly [number, number];
 export const PERCURSO_MAQUINA: string;
 export const PERCURSO_HZ: number;
+export const PERCURSO_CAMINHAO: string;
 
 export interface AmostraPercurso {
   tempoMs: number; x: number; z: number; rumoGraus: number; kph: number;
-  rolagem: number; arfagem: number; distanciaCm: number; eco: boolean;
+  rolagem: number; arfagem: number; distanciaCm: number | null; eco: boolean;
   alertaColisao: boolean; alertaInclinacao: boolean; freio: boolean;
+  /** Só o caminhão: rpm e carga do motor (%). */
+  rpm?: number; cargaMotor?: number;
 }
 export interface EstadoParaAmostra {
   tempoMs: number;
@@ -19,8 +22,8 @@ export interface PontoLocal { x: number; z: number }
 
 export function percursoParaLonLat(x: number, z: number, origem?: readonly [number, number]): [number, number];
 export function amostraDoPercurso(estado: EstadoParaAmostra, opcoes?: { inclinado?: boolean }): AmostraPercurso;
-export function csvDoPercurso(amostras: readonly AmostraPercurso[], inicioIso: string): string;
-export function registroDoPercurso(amostras: readonly AmostraPercurso[], inicioIso: string): { csv: string; amostras: number; duracaoMs: number };
+export function csvDoPercurso(amostras: readonly AmostraPercurso[], inicioIso: string, maquina?: string): string;
+export function registroDoPercurso(amostras: readonly AmostraPercurso[], inicioIso: string, maquina?: string): { csv: string; amostras: number; duracaoMs: number };
 export function mapaDoPercurso(zonas: {
   talhao: { x0: number; x1: number; z0: number; z1: number };
   alagado: readonly PontoLocal[];

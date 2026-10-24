@@ -14,12 +14,15 @@ export const INICIO_CIRCUITO: InicioGameplay = {
     ...estacasCircuito(ROTA_CIRCUITO)],
 };
 export type SensorCircuito = 'feno' | 'agua' | 'encosta' | 'sonolencia';
-export type MotivoCircuito = 'chegada' | 'colisao' | 'atolamento' | 'tombamento' | 'abandono';
+/** Sensores do caminhão na serra (Pista): mesmo formato de episódio, para a Fila ler os dois. */
+export type SensorPista = 'animal' | 'freio' | 'curva';
+/** `saida_pista` e `area_escape` só acontecem no caminhão (`serra-sem-freio`). */
+export type MotivoCircuito = 'chegada' | 'colisao' | 'atolamento' | 'tombamento' | 'abandono' | 'saida_pista' | 'area_escape';
 export interface EpisodioCircuito {
-  sensor: SensorCircuito; inicioMs: number; fimMs: number | null; gravidade: 'atencao' | 'critico';
+  sensor: SensorCircuito | SensorPista; inicioMs: number; fimMs: number | null; gravidade: 'atencao' | 'critico';
   velocidadeKph: number; distanciaCm: number | null; rolagemGraus: number;
   comandoInicial: EstadoGameplay['comandos'];
-  resposta: { tempoMs: number; latenciaMs: number; acao: 'frenagem' | 'esterco' } | null;
+  resposta: { tempoMs: number; latenciaMs: number; acao: 'frenagem' | 'esterco' | 'freio_motor' } | null;
   evitado: boolean;
 }
 export interface PausaCircuito { inicioMs: number; duracaoMs: number; motivo: 'aba oculta' | 'menu' }
@@ -29,6 +32,8 @@ export interface RegistroCircuito {
   resultado: { motivo: MotivoCircuito; tempoMs: number } | null;
   episodios: EpisodioCircuito[]; pausas: PausaCircuito[];
   origem: 'SIMULAÇÃO'; regras: string;
+  /** Ausente = trator no circuito do talhão (registros antigos). */
+  veiculo?: 'trator' | 'caminhao'; cenario?: 'circuito' | 'serra-sem-freio';
 }
 export const REGRAS_CIRCUITO = 'SIMULAÇÃO cinemática, não risco de seguro. Colisão: contato frontal ou corpo a menos de raio do fardo +1,05m. Atolamento: 2s dentro da água. Tombamento: rolagem≥30° ou ≥20° acima de 7km/h durante 1s. Evitado: exposição→nova frenagem/esterço após aviso→saída segura durante 1s. Antecipação não é reação. Tempo: relógio monotônico ativo; pausas explícitas excluídas.';
 /** As mesmas regras de `REGRAS_CIRCUITO`, em frases para a tela. O registro e o relatório aos agentes seguem com o texto técnico. */
@@ -90,12 +95,13 @@ export function criarCircuito(runId: string, inicioIso: string) {
         saidas.delete(ep);
       }
       for (const ep of registro.episodios) {
+        const sensor = ep.sensor as SensorCircuito;
         // Conta também o comando que removeu o risco neste mesmo quadro.
         const freou = e.comandos.freio >= 0.2 && anterior.freio < 0.2 && ep.comandoInicial.freio < 0.2;
         const virou = Math.abs(e.comandos.esterco - ep.comandoInicial.esterco) >= 0.25
           && Math.abs(anterior.esterco - ep.comandoInicial.esterco) < 0.25;
-        if (ep.fimMs === null && (riscos.has(ep.sensor) || !saidas.has(ep)) && t > ep.inicioMs && !ep.resposta && (freou || virou)) ep.resposta = { tempoMs: t, latenciaMs: t - ep.inicioMs, acao: freou ? 'frenagem' : 'esterco' };
-        if (ep.fimMs !== null || riscos.has(ep.sensor)) continue;
+        if (ep.fimMs === null && (riscos.has(sensor) || !saidas.has(ep)) && t > ep.inicioMs && !ep.resposta && (freou || virou)) ep.resposta = { tempoMs: t, latenciaMs: t - ep.inicioMs, acao: freou ? 'frenagem' : 'esterco' };
+        if (ep.fimMs !== null || riscos.has(sensor)) continue;
         if (!saidas.has(ep)) saidas.set(ep, t);
         if (t - (saidas.get(ep) ?? t) >= 1000) {
           ep.fimMs = t; ep.evitado = ep.sensor !== 'sonolencia' && ep.resposta !== null;
@@ -118,6 +124,7 @@ export function criarCircuito(runId: string, inicioIso: string) {
 const TITULOS_CORRIDA: Record<MotivoCircuito, string> = {
   chegada: 'Percurso concluído', colisao: 'Colisão com obstáculo', atolamento: 'Atolou na área alagada',
   tombamento: 'Tombou na encosta', abandono: 'Corrida abandonada',
+  saida_pista: 'Saiu da pista', area_escape: 'Parou na área de escape',
 };
 const decimal = (valor: number, casas = 1) => valor.toFixed(casas).replace('.', ',');
 /** Texto do resultado da Corrida na tela; o relatório dos agentes segue com o registro cru. */
