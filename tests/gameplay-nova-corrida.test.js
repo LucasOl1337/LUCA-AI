@@ -75,12 +75,16 @@ test('a corrida seguinte no motor vivo dá o mesmo resultado que a primeira com 
   for (const atual of resultados) assert.equal(atual, referencia);
 });
 
-test('palco vivo: a troca de sessão zera os amortecedores de câmera (externa e cabeça da cabine)', async () => {
+test('palco vivo: a troca de sessão zera amortecedores (câmera externa, cabeça, arfagem de carga) e o rastro das rodas', async () => {
   const fs = await import('node:fs');
   const fonte = fs.readFileSync(new URL('../src/components/gameplay/GameplayKiosk.tsx', import.meta.url), 'utf8');
   const linha = fonte.split('\n').find((l) => l.includes('sessaoDoFim !== sessao'));
   assert.ok(linha, 'laço do palco detecta corrida nova');
   assert.match(linha, /externa\.reiniciar\(\)/); assert.match(linha, /cabeca\.reiniciar\(\)/);
+  assert.match(linha, /carga\.reiniciar\(\)/); assert.match(linha, /corrida \+= 1/);
+  assert.match(fonte, /run: corrida,/, 'palco recebe a corrida para apagar o rastro');
+  const palco = fs.readFileSync(new URL('../src/components/sompo/createSompoAgriStage.ts', import.meta.url), 'utf8');
+  assert.match(palco, /drive\.run !== driveRun\) \{ driveRun = drive\.run; rastro\?\.limpar\(\); \}/);
   const { criarCabecaCabine } = await loadFrontendModule('../../src/components/gameplay/vistaTrator.ts');
   const cabeca = criarCabecaCabine();
   for (let i = 0; i < 30; i++) cabeca.passo(0.8, 3, 1 / 30);

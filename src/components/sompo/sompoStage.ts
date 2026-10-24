@@ -29,6 +29,8 @@ export interface SompoDrivePose {
   rollDeg?: number; pitchDeg?: number;
   /** Giroflex 0..1; sem ele, segue o roteiro do case. */
   beacon?: number;
+  /** Corrida atual: quando muda, o palco apaga o que a anterior deixou no chão (rastro das rodas). */
+  run?: number;
 }
 
 /** A bounded rendering budget, shared by both stages; selected at mount. */

@@ -206,6 +206,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
     let cameraSegurada = false;
     let fimAte: number | null = null;
     let sessaoDoFim: SessaoCircuito | null = null;
+    let corrida = 0;
     const externa = criarVistaExterna();
     const tremorEuler = new Euler(), tremorQuat = new Quaternion();
     const cabeca = criarCabecaCabine(), cabecaEuler = new Euler(), cabecaQuat = new Quaternion();
@@ -255,7 +256,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
         const sessao = sessaoRef.current;
         // O respiro do resultado é de cada corrida: corrida nova começa sem o fim da anterior.
         // Câmera externa e cabeça da cabine também largam sem o amortecimento da corrida anterior.
-        if (sessaoDoFim !== sessao) { sessaoDoFim = sessao; fimAte = null; externa.reiniciar(); cabeca.reiniciar(); }
+        if (sessaoDoFim !== sessao) { sessaoDoFim = sessao; corrida += 1; fimAte = null; externa.reiniciar(); cabeca.reiniciar(); carga.reiniciar(); }
         const fimCorrida = circuito ? sessao.registro.resultado : null;
         if (fimCorrida && fimAte === null) fimAte = performance.now() + ESPERA_RESULTADO_MS;
         if (borda.reiniciar) {
@@ -294,6 +295,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
             // Arfagem de carga (Lupa): nariz desce ao frear e sobe ao arrancar; congelado mantém a pose.
             + carga.passo(trator.velocidade, congelado ? 0 : dt, movimentoReduzido()),
           beacon: estado.sensor.alerta || estado.contato ? 1 : 0,
+          run: corrida,
         };
       },
     };

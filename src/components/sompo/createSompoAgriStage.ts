@@ -491,6 +491,7 @@ export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, out
   let physicalHeading = 0;
   let previousTime = performance.now();
   let rigWasActive = false;
+  let driveRun: number | undefined;
 
   function render(time: number) {
     meter.begin();
@@ -564,6 +565,8 @@ export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, out
     const contactHeight = rig?.supportHeight(machine.rotation, x, z, field.groundHeight) ?? 0;
     machine.position.set(x, field.groundHeight(x, z) + contactHeight + THREE.MathUtils.clamp(frame.vertical, -0.6, 1) - frame.sink * .5, z);
     if (effort > 0.02) machine.position.y += effort * .014 * (0.5 + 0.5 * Math.sin(shakeT * 51));
+    // Corrida nova no palco vivo: o rastro da anterior some mesmo sem salto de posição (abandono perto da largada).
+    if (drive?.run !== undefined && drive.run !== driveRun) { driveRun = drive.run; rastro?.limpar(); }
     rastro?.update(machine);
     const studio = studioRef?.current ?? SOMPO_STUDIO_DEFAULT;
     field.update(frame, machine.position, camera.position, reduceMotion.matches, studio.wind, elapsed);
