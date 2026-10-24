@@ -1,4 +1,6 @@
 import { createSompoFloodSheets } from './createSompoFloodSheet';
+import { createSompoFieldFence } from './createSompoFieldFence';
+import { TRATOR } from '../gameplay/fisicaTrator';
 import * as THREE from 'three';
 import { criarPropsRurais } from '../gameplay/criarPropsRurais';
 import { COLISORES_RURAIS } from '../gameplay/propsRurais';
@@ -229,6 +231,8 @@ export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, out
   const clearings = ruralProps ? COLISORES_RURAIS.map((p) => ({ x: p.x, z: p.z, radius: p.raioM + 1.7 })) : [];
   const field = createSompoAgriScene(worldRoot, scenario.environmentId, budget.compact, scenario.equipmentId, terrainRelief, cropHeight, circuitRoute, clearings);
   const propsRurais = ruralProps ? criarPropsRurais(worldRoot, field.groundHeight) : null;
+  // Limite físico do trator vira cerca de verdade: o bico (≈2,6 m à frente do centro) encosta no arame.
+  const cercaTalhao = ruralProps ? createSompoFieldFence(worldRoot, TRATOR.cercaM + 2.6, field.groundHeight) : null;
   if (circuitRoute) criarSinalizacaoCircuito(worldRoot, circuitRoute, field.groundHeight);
   const atmosphere = createSompoAtmosphere(scene, renderer, field.sun);
   const post = createSompoPostProcessing(renderer, scene, camera);
@@ -650,6 +654,7 @@ export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, out
     dispose() {
       disposed = true;
       propsRurais?.dispose();
+      cercaTalhao?.dispose();
       soltarLutCompartilhada(renderer, scene);
       pasture.dispose();
       lookAtivo?.dispose();
