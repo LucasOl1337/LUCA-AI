@@ -7,6 +7,8 @@ import { call9RouterChat } from './router-client.js';
 import { ROUTER_MODEL } from './config.js';
 import { requireWorkspaceUserId, runWithWorkspaceUser } from './workspace-context.js';
 import { instrucoesVeredicto, lerVeredicto, veredictoIndeterminado } from '../shared/veredicto.js';
+import { gerarLaudo } from './laudo/gerar-laudo.js';
+import { gravarPrints, lerPrints } from './laudo/prints-caso.js';
 
 const AXES = [
   { id: 'operation', title: 'Operação e utilização da máquina', scope: 'Uso, velocidade, carga e comandos registrados; não atribua culpa ao operador.' },
@@ -198,7 +200,7 @@ function readAxis(content, axis, parsed, allowedIndices) {
   };
 }
 
-export function registerLabCaseRoutes(app, { dataDir = process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'), chat = call9RouterChat } = {}) {
+export function registerLabCaseRoutes(app, { dataDir = process.env.LUCA_DATA_DIR || path.resolve(process.cwd(), '.luca'), chat = call9RouterChat, episodio = () => null } = {}) {
   const inFlight = new Set();
   const root = path.resolve(dataDir, 'workspaces');
   const directory = () => path.join(root, digest(requireWorkspaceUserId()).slice(0, 32), 'lab-cases');
@@ -269,7 +271,13 @@ export function registerLabCaseRoutes(app, { dataDir = process.env.LUCA_DATA_DIR
     const schema = object(body.schema, 'Schema', 128 * 1024);
     const source = { rawCsv, metadata, map, schema };
     const id = `lab_${digest(JSON.stringify(canonical(source))).slice(0, 32)}`;
-    if (fs.existsSync(file(id))) return { created: false, case: read(id) };
+    // Prints da corrida ficam fora do hash: só ilustram o laudo em PDF, nunca entram no prompt.
+    const prints = lerPrints(body.prints, (message) => new LabError(message));
+    if (fs.existsSync(file(id))) {
+      const existing = read(id);
+      if (prints.length && !existing.prints?.length) { existing.prints = gravarPrints(directory(), id, prints); save(existing); }
+      return { created: false, case: existing };
+    }
     if (fs.existsSync(directory()) && fs.readdirSync(directory()).filter((name) => name.endsWith('.json')).length >= 100) throw new LabError('Limite de 100 casos por conta atingido.', 409, 'lab_case_limit');
     const parsed = parseCase({ ...source, sourceName });
     const now = new Date().toISOString();
@@ -277,7 +285,7 @@ export function registerLabCaseRoutes(app, { dataDir = process.env.LUCA_DATA_DIR
       id, name, sourceName, ...source, createdAt: now, updatedAt: now,
       sampleCount: parsed.samples.length, durationMs: parsed.durationMs, machineId: parsed.machineId,
       synthetic: parsed.synthetic, events: parsed.events, warnings: parsed.warnings,
-      analyses: [], conclusions: [],
+      analyses: [], conclusions: [], ...(prints.length ? { prints: gravarPrints(directory(), id, prints) } : {}),
     });
     return { created: true, case: record };
   };
@@ -288,6 +296,23 @@ export function registerLabCaseRoutes(app, { dataDir = process.env.LUCA_DATA_DIR
   }));
 
   app.get('/api/lab/cases/:id', route((req, res) => res.json({ ok: true, case: read(req.params.id) })));
+
+  /** Laudo em PDF (1 página, 2 no máximo) para mandar no WhatsApp. Sem chamada de modelo: usa o que já foi gravado. */
+  app.get('/api/lab/cases/:id/laudo.pdf', route((req, res) => {
+    const record = read(req.params.id);
+    const analiseId = typeof req.query.analise === 'string' && req.query.analise ? req.query.analise : null;
+    if (analiseId && !record.analyses.some((a) => a.id === analiseId)) throw new LabError('Versão de investigação não encontrada.', 404, 'lab_analysis_not_found');
+    const history = episodio();
+    const { pdf, nome } = gerarLaudo({
+      record, parsed: parseCase(record), analiseId, directory: directory(),
+      episodio: history ? { listar: (publicId) => history.getEpisode(publicId), ler: (publicId, seq) => history.readEpisodeFrame(publicId, seq) } : null,
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('Content-Length', String(pdf.length));
+    res.end(pdf);
+  }));
 
   /** 5º passo: veredicto final (culpado provável, prevenção, impacto pela tabela). Nunca lança: falha vira 'indeterminado'. */
   const concludeVerdict = async (axes, parsed, context, focus) => {

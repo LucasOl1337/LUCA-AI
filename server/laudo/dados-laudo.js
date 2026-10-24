@@ -2,7 +2,7 @@
 // a partir do caso do Laboratório e da análise escolhida. Não chama modelo nenhum: com
 // veredicto (analysis.verdict, contrato veredicto v1) usa a hipótese dele; caso antigo
 // usa o resumo da revisão já gravado. O desenho fica em desenhar-laudo.js.
-import { formatLabTime, labCaseVehicle } from '../../shared/lab-telemetry.js';
+import { formatLabTime, hasPosition, labCaseVehicle, polygonDistance } from '../../shared/lab-telemetry.js';
 
 const CULPADOS = { operador: 'Operador humano', maquina: 'Máquina', manutencao: 'Manutenção', ambiente: 'Ambiente', terceiro: 'Terceiro', indeterminado: 'Indeterminado' };
 const DESFECHOS = { chegada: 'Percurso concluído', colisao: 'Colisão com obstáculo', atolamento: 'Atolou na área alagada', tombamento: 'Tombou na encosta', abandono: 'Corrida abandonada' };
@@ -18,10 +18,17 @@ const corta = (texto, max) => {
   return ponto > max * 0.55 ? cortado.slice(0, ponto + 1) : `${cortado.slice(0, cortado.lastIndexOf(' ')).trim()}…`;
 };
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
-export const dataBrasilia = (iso, comHora = true) => new Intl.DateTimeFormat('pt-BR', {
-  timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', ...(comHora ? { hour: '2-digit', minute: '2-digit' } : {}),
-}).format(new Date(iso));
-const diaArquivo = (iso) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
+export const dataBrasilia = (iso, comHora = true) => {
+  const data = new Date(iso);
+  if (!iso || Number.isNaN(data.getTime())) return '';
+  return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', ...(comHora ? { hour: '2-digit', minute: '2-digit' } : {}),
+  }).format(data);
+};
+const diaArquivo = (iso) => {
+  const data = Number.isNaN(new Date(iso).getTime()) ? new Date() : new Date(iso);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(data);
+};
 
 /** Nome legível para o WhatsApp: LUCA-laudo-<data>-<caso>.pdf, só ASCII. */
 export function nomeArquivoLaudo(record, agora = new Date()) {
@@ -62,6 +69,40 @@ function serie(parsed, campo, maximo = 240) {
   return pontos.some(([, v]) => v !== null) ? pontos : null;
 }
 
+/** Distância calculada até a água (m) a cada amostra, pelas mesmas regras dos eventos near_water. */
+function serieAgua(parsed, maximo = 240) {
+  const agua = parsed.polygons.filter((p) => p.role === 'water');
+  if (!agua.length) return null;
+  const passo = Math.max(1, Math.ceil(parsed.samples.length / maximo));
+  const pontos = [];
+  for (let i = 0; i < parsed.samples.length; i += passo) {
+    const a = parsed.samples[i];
+    pontos.push([a.elapsedMs, hasPosition(a) ? Math.round(Math.min(...agua.map((p) => polygonDistance(a, p))) * 10) / 10 : null]);
+  }
+  return pontos.some(([, v]) => v !== null) ? pontos : null;
+}
+
+/**
+ * Segunda série do gráfico, a que conta a história do caso (título, evidência e gráfico do mesmo caso):
+ * água → distância até a água; obstáculo/feno → distância ao obstáculo; superaquecimento → temperatura;
+ * encosta/tombamento → inclinação. Sem tema, a primeira série disponível.
+ */
+function serieDoCaso(parsed, v) {
+  const tipos = new Set(parsed.events.map((e) => e.type));
+  const circuito = parsed.manifest?.circuito;
+  const texto = `${v?.hipotese ?? ''} ${v?.porque ?? ''} ${circuito?.resultado?.motivo ?? ''} ${(circuito?.episodios ?? []).map((e) => e.sensor).join(' ')}`.toLowerCase();
+  const candidatos = [];
+  if (tipos.has('near_water') || /água|agua|alag|atol/.test(texto)) candidatos.push(['__agua', 'Distância até a água', 'm']);
+  if (tipos.has('device_collision_warning') || /obst|fardo|feno|colis/.test(texto)) candidatos.push(SERIES_SECUNDARIAS[0]);
+  if (tipos.has('coolant_warning') || /temperatura|aquec/.test(texto)) candidatos.push(SERIES_SECUNDARIAS[2]);
+  if (tipos.has('device_inclination_warning') || /encosta|tomb|inclina/.test(texto)) candidatos.push(SERIES_SECUNDARIAS[1]);
+  for (const [campo, rotulo, unidade] of [...candidatos, ...SERIES_SECUNDARIAS]) {
+    const pontos = campo === '__agua' ? serieAgua(parsed) : serie(parsed, campo);
+    if (pontos) return { campo, rotulo, unidade, pontos };
+  }
+  return null;
+}
+
 /** Tudo o que o PDF mostra, em texto final (pt-BR) e séries numéricas. */
 export function dadosDoLaudo(record, parsed, analise, agora = new Date()) {
   const v = analise?.verdict ?? null;
@@ -73,7 +114,7 @@ export function dadosDoLaudo(record, parsed, analise, agora = new Date()) {
   const evidenciasHipoteses = (analise?.hypotheses ?? []).filter((h) => h.evidence?.length).map((h) => ({ tempo: formatLabTime(h.evidence[0].elapsedMs), texto: corta(`${h.title}: ${h.evidence[0].description}`, 230) }));
   const evidenciasEventos = parsed.events.filter((e) => e.transition !== 'end').map((e) => ({ tempo: formatLabTime(e.elapsedMs), texto: corta(`${e.title}. ${e.description}`, 230) }));
   const evidencias = [...evidenciasVeredicto, ...(evidenciasVeredicto.length >= 3 ? [] : evidenciasHipoteses), ...(evidenciasVeredicto.length + evidenciasHipoteses.length >= 3 ? [] : evidenciasEventos)].slice(0, 5);
-  const secundaria = SERIES_SECUNDARIAS.map(([campo, rotulo, unidade]) => ({ campo, rotulo, unidade, pontos: serie(parsed, campo) })).find((s) => s.pontos);
+  const secundaria = serieDoCaso(parsed, v);
   const impacto = v?.impacto_financeiro;
   const situacao = !analise ? 'sem_analise' : v ? (v.status === 'concluido' ? 'veredicto' : 'veredicto_indeterminado') : 'sem_veredicto';
   return {
@@ -97,8 +138,8 @@ export function dadosDoLaudo(record, parsed, analise, agora = new Date()) {
     impacto: impacto ? {
       faixa: impacto.faixa_min_brl == null ? 'Sem estimativa' : impacto.faixa_max_brl === 0 ? 'Sem dano material estimado'
         : impacto.faixa_min_brl === impacto.faixa_max_brl ? brl.format(impacto.faixa_min_brl) : `${brl.format(impacto.faixa_min_brl)} a ${brl.format(impacto.faixa_max_brl)}`,
-      componentes: (impacto.componentes ?? []).slice(0, 3).map((c) => ({ item: corta(c.item, 60), valor: c.valor_min_brl === c.valor_max_brl ? brl.format(c.valor_min_brl) : `${brl.format(c.valor_min_brl)}–${brl.format(c.valor_max_brl)}`, base: corta(c.base, 90) })),
-      premissas: (impacto.premissas ?? []).slice(0, 3).map((p) => corta(p, 150)),
+      componentes: (Array.isArray(impacto.componentes) ? impacto.componentes : []).slice(0, 3).map((c) => ({ item: corta(c.item, 60), valor: c.valor_min_brl === c.valor_max_brl ? brl.format(c.valor_min_brl) : `${brl.format(c.valor_min_brl)}–${brl.format(c.valor_max_brl)}`, base: corta(c.base, 90) })),
+      premissas: (Array.isArray(impacto.premissas) ? impacto.premissas : []).slice(0, 3).map((p) => corta(p, 150)),
     } : null,
     aviso: v?.aviso || 'Estimativa dos agentes de IA, não acusação nem laudo pericial.',
     modelo: v?.modelo || analise?.model || null,

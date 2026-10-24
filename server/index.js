@@ -390,7 +390,8 @@ app.use('/api', (req, res, next) => {
   runWithWorkspaceUser(userId, () => next(), req.auth?.user?.role);
 });
 // Fila da bancada: corridas enviadas do resultado vão para a investigação do Laboratório em segundo plano.
-registerBancadaFilaRoutes(app, { lab: registerLabCaseRoutes(app) });
+// O laudo em PDF lê frames do episódio SOMPO de origem; o histórico nasce mais abaixo, por isso o getter.
+registerBancadaFilaRoutes(app, { lab: registerLabCaseRoutes(app, { episodio: () => sompoTelemetryHistory }) });
 registerSompoVehicleRoutes(app);
 registerStandRoutes(app, { requireAdmin: authService.requireAdmin });
 authService.registerAdminRoutes(app, {

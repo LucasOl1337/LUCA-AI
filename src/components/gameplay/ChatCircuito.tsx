@@ -4,6 +4,7 @@ import { decimalCircuito, metricasCircuito, textoResultadoCircuito } from './cir
 import type { RelatorioCircuito } from './sessaoCircuito';
 import './circuito.css';
 import { VeredictoBloco } from '@/components/veredicto/VeredictoBloco';
+import { BaixarLaudo } from '@/components/laudo/BaixarLaudo';
 import { CHAVE_CHAT_CIRCUITO } from '../stand/fimDeVisita';
 export { CHAVE_CHAT_CIRCUITO };
 interface Turno { pergunta: string; analiseId: string }
@@ -91,6 +92,7 @@ export default function ChatCircuito({ inicial, aoNovo }: { inicial: ConversaCir
     <div role="log" aria-live="polite" aria-label="Diálogo com os agentes">{analises.map((a) => <article key={a.id} className="circuito-turno"><p><b>Você:</b> {conversa.turnos.find((t) => t.analiseId === a.id)?.pergunta ?? a.focus?.split('Pergunta do visitante: ')[1] ?? 'Avaliar corrida'}</p>
       {a.axes.map((eixo) => <section key={eixo.id}><h3>{eixo.title}</h3><p>{eixo.summary || (eixo.status === 'completed' ? 'Sem hipótese sustentada.' : 'Resposta indisponível.')}</p>{eixo.hypotheses.map((h) => <div key={h.id}><b>{h.title}</b><p>{h.explanation}</p>{h.evidence.map((e, i) => <p key={i}>{(e.elapsedMs / 1000).toFixed(1)} s — {e.description}</p>)}</div>)}{eixo.limitations.map((l, i) => <p key={i}>Limite: {l}</p>)}</section>)}
       <VeredictoBloco veredicto={a.verdict} />
+      {caso && a.status !== 'running' && <BaixarLaudo casoId={caso.id} analiseId={a.id} compacto />}
       {a.status === 'running' && <p>Agentes investigando o registro…</p>}{a.error && <p role="status">{a.error}</p>}
     </article>)}</div>
     {!analises.length && <p>Nenhuma resposta gerada ainda. Enviar consulta os agentes reais do Laboratório; sem resposta válida não mostramos avaliação inventada.</p>}

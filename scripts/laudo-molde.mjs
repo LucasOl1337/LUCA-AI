@@ -15,7 +15,7 @@ const parsed = parseLabCase(record.rawCsv, { fileName: record.sourceName, manife
 const analise = {
   id: 'a1', version: 1, status: 'completed', model: 'exemplo', createdAt: record.createdAt, completedAt: record.createdAt,
   axes: [{ id: 'review', status: 'completed', summary: 'Revisão de exemplo: a telemetria mostra saída da cerca no início e aproximação da água sem entrada.' }],
-  hypotheses: [], ...(semVeredicto ? {} : { verdict: veredictoExemplo({ elapsedMs: parsed.events.find((e) => e.type === 'near_water')?.elapsedMs ?? 60_000 }) }),
+  hypotheses: [], ...(semVeredicto ? {} : { verdict: veredictoExemplo({ tema: /agua/.test(csv) ? 'agua' : 'fardo', elapsedMs: parsed.events.find((e) => e.type === 'near_water')?.elapsedMs ?? 60_000 }) }),
 };
 const pdf = desenharLaudo(dadosDoLaudo(record, parsed, analise));
 fs.writeFileSync(saida, pdf);

@@ -13,6 +13,7 @@ import { hazardsOf } from '@/geofencing/lab/labBands';
 import { LAB_EXAMPLES, exampleMetadata, loadDefaultLabSite, categories, labRequest, downloadFile, exportLabReport, type CaseSummary, type SavedCase, type LabAnalysis, type ConclusionDraft, type Category, type Hypothesis, type LabExample } from '@/lib/lab-client';
 import '@/laboratorio-page.css';
 import { VeredictoBloco } from '@/components/veredicto/VeredictoBloco';
+import { BaixarLaudo } from '@/components/laudo/BaixarLaudo';
 
 const LabScene = lazy(() => import('@/components/lab/LabScene'));
 const STEPS = ['Carregar caso', 'Explorar incidente', 'Investigar causas', 'Registrar conclusão'];
@@ -337,6 +338,7 @@ export default function LaboratorioPage() {
             {currentAnalysis?.status === 'unavailable' && <div className="lab-empty"><WifiOff /><strong>Serviço de IA indisponível</strong><p>A tentativa foi registrada. Nenhuma resposta simulada substitui a análise. Você pode tentar novamente ou registrar uma conclusão inconclusiva.</p></div>}
             {currentAnalysis?.axes.filter((axis: LabAnalysis['axes'][number]) => axis.status === 'completed').map((axis: LabAnalysis['axes'][number]) => <section className="lab-analysis-axis" key={axis.id}><h3>{axis.title}</h3><p>{axis.summary}</p>{axis.hypotheses.map((hypothesis: Hypothesis) => <article className="lab-hypothesis" key={hypothesis.id}><h4>{hypothesis.title}</h4><p>{hypothesis.explanation}</p><div className="lab-evidence-links">{hypothesis.evidence.map((evidence: Hypothesis['evidence'][number], i: number) => <button key={i} onClick={() => seek(evidence.elapsedMs)}><Play size={12} /><span>{formatLabTime(evidence.elapsedMs)} · {evidence.description}</span></button>)}</div><details className="lab-details"><summary>Limitações e informações necessárias</summary>{hypothesis.limitations.map((text: string, i: number) => <p key={`l${i}`}>{text}</p>)}{hypothesis.additionalInformation.map((text: string, i: number) => <p key={`a${i}`}>{text}</p>)}</details></article>)}<details className="lab-details"><summary>Cobertura desta análise</summary>{[...axis.limitations, ...axis.additionalInformation].map((text: string, i: number) => <p key={i}>{text}</p>)}</details></section>)}
             {currentAnalysis?.verdict && <VeredictoBloco veredicto={currentAnalysis.verdict} aoBuscar={(ms) => seek(ms)} />}
+            {record && currentAnalysis && currentAnalysis.status !== 'running' && <BaixarLaudo casoId={record.id} analiseId={currentAnalysis.id} />}
           </>}
           {step === 3 && labCase && <>
             {!record?.analyses.some(analysis => analysis.status === 'completed') && <p className="lab-inline-note">Não há investigação de IA concluída. Você pode registrar sua avaliação humana e as pendências.</p>}

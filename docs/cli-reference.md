@@ -2,7 +2,7 @@
 
 Gerada por `npm run cli:docs` a partir de `cli/catalog.js`. Não editar à mão.
 
-129 comandos; 107 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
+130 comandos; 108 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
 
 IDs são argumentos posicionais. Campos comuns podem ser flags; corpos completos usam `--data @arquivo.json`. Flags prevalecem sobre o corpo; objetos aninhados não são mesclados. Campos string são literais; apenas campos JSON e `--data` interpretam `@arquivo`/`-`.
 
@@ -821,6 +821,14 @@ Ler caso, versões de análises e conclusões.
 `GET /api/lab/cases/:id`; autenticação: **session**.
 
 Nenhum; consulte a descrição para entradas por `--data`.
+
+### `lab cases laudo <id>`
+
+Baixar laudo em PDF (1 página; hipótese, veredicto, print, evidências); sem chamada de IA.
+
+`GET /api/lab/cases/:id/laudo.pdf`; autenticação: **session**.
+
+`--analise` (string): ID da versão da investigação; padrão a última concluída
 
 ### `lab cases analyze <id>`
 

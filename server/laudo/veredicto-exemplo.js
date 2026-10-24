@@ -1,6 +1,8 @@
 // Veredicto de exemplo no contrato veredicto v1 (veredicto/CONTRATO.md da rodada 24/10).
 // Só para o molde e os testes do laudo; o veredicto real vem de analysis.verdict.
-export function veredictoExemplo({ culpado = 'operador', confianca = 0.72, elapsedMs = 61_000 } = {}) {
+// `tema: 'agua'` casa com o caso 02-cerca-e-agua (título, evidências e gráfico do mesmo caso).
+export function veredictoExemplo({ culpado = 'operador', confianca = 0.72, elapsedMs = 61_000, tema = 'fardo' } = {}) {
+  if (tema === 'agua') return veredictoAgua({ confianca, elapsedMs });
   return {
     versao: 1, status: 'concluido', culpado,
     culpadoRotulo: { operador: 'Operador humano', maquina: 'Máquina', manutencao: 'Manutenção', ambiente: 'Ambiente', terceiro: 'Terceiro', indeterminado: 'Indeterminado' }[culpado],
@@ -29,5 +31,31 @@ export function veredictoExemplo({ culpado = 'operador', confianca = 0.72, elaps
     },
     aviso: 'Estimativa com confiança, não acusação nem laudo pericial.',
     geradoEm: '2026-10-24T11:40:00.000Z', modelo: 'exemplo',
+  };
+}
+
+function veredictoAgua({ confianca, elapsedMs }) {
+  const base = veredictoExemplo({ confianca, elapsedMs });
+  return {
+    ...base, culpado: 'operador', culpadoRotulo: 'Operador humano',
+    porque: 'A rota saiu da cerca e chegou a 20 m da água várias vezes, sempre no mesmo trecho; a velocidade subiu antes de cada aproximação e não há falha de GPS ou de máquina registrada.',
+    hipotese: 'O trator deixou a área permitida no início e voltou a encostar no limite de 20 m da água em ciclos repetidos, acelerando antes de cada aproximação. O padrão aponta trajeto planejado rente demais à borda, não defeito: a máquina respondeu normal e o GPS manteve fix 3D. Não há indício de entrada na água.',
+    evidencias: [
+      { descricao: 'Distância até a água chegou a 20,0 m (limite de aviso); não comprova entrada.', elapsedMs },
+      { descricao: 'Posição fora do polígono permitido logo no início da operação.', elapsedMs: 0 },
+      { descricao: 'Nova saída da cerca 6 s depois do aviso de água.', elapsedMs: elapsedMs + 6_400 },
+    ],
+    fatores_contribuintes: ['Rota planejada rente à borda da área', 'Velocidade crescente perto do limite'],
+    prevencao: [
+      { acao: 'Afastar a rota planejada 10 m da borda da água.', responsavel: 'Gestor da fazenda', prazo: '7 dias' },
+      { acao: 'Alerta sonoro na cabine a 30 m da água.', responsavel: 'Manutenção' },
+      { acao: 'Revisar as saídas de cerca do turno com o operador.', responsavel: 'Supervisor' },
+    ],
+    impacto_financeiro: {
+      faixa_min_brl: 0, faixa_max_brl: 2_000,
+      componentes: [{ chave: 'parada_operacional', item: 'Parada para reposicionar a máquina', valor_min_brl: 0, valor_max_brl: 2_000, valor_brl: 800, base: 'até 2 h de operação parada (estimativa ilustrativa)' }],
+      premissas: ['Caso sintético: valores ilustrativos, não sinistro real.', 'Sem entrada na água e sem dano registrado.', 'Danos pessoais não são estimados.'],
+      rotulo: 'estimativa', tabela: 'premissas-v1',
+    },
   };
 }

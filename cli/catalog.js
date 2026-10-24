@@ -113,6 +113,7 @@ export const commands = [
   cmd('lab cases create', 'POST', '/api/lab/cases', 'Importar caso JSON com rawCsv e sourceName', [s('name'), s('source-name', '', true), s('raw-csv', '', true), j('metadata'), j('map'), j('schema')]),
   cmd('lab cases import', 'POST', '/api/lab/cases', 'Importar diretamente de arquivo CSV', [...labFiles, s('name')], { csvImport: true }),
   cmd('lab cases get', 'GET', '/api/lab/cases/:id', 'Ler caso, versões de análises e conclusões'),
+  cmd('lab cases laudo', 'GET', '/api/lab/cases/:id/laudo.pdf', 'Baixar laudo em PDF (1 página; hipótese, veredicto, print, evidências); sem chamada de IA', [s('analise', 'ID da versão da investigação; padrão a última concluída')], { binary: true }),
   cmd('lab cases analyze', 'POST', '/api/lab/cases/:id/analyses', 'Investigar caso com IA (síncrono; timeout ajustável)', [s('focus')], { timeout: 600000 }),
   cmd('bancada fila list', 'GET', '/api/bancada/fila', 'Corridas enviadas à fila da bancada, com estado, posição e parecer; limites do dia', [s('estado', 'na_fila, processando, pronto ou falhou'), s('dia', 'YYYY-MM-DD (Brasília)')]),
   cmd('bancada fila send', 'POST', '/api/bancada/fila', 'Enfileirar o caso de uma corrida para a investigação do Laboratório (assíncrono; teto diário)', [j('caso', 'Caso do Laboratório: rawCsv, sourceName, name, metadata, map', true), j('corrida', 'Rótulos da corrida: veiculo, cenario, nota, desfechoTitulo'), s('foco', 'Orientação aos agentes')]),

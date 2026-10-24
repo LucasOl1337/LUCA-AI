@@ -279,6 +279,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
         if (circuito && !congelado) {
           sessao.quadro(estado, passoMonotonoMs, new Date().toISOString(), sonoCabine.ler()?.status === 'alarm');
           sessao.registrar(estado);
+          sessao.prints.observar(sessao.registro);
           if (sessao.registro.resultado) motor.encerrar(sessao.registro.resultado.motivo);
         }
         somMotor.atualizar(motor.ler(), congelado || document.hidden);
@@ -309,6 +310,8 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
       startedAtRef: inicio,
       onModelStatus: (status) => { mount.dataset.modelo = status; },
       onWebglError: () => setFalhaWebgl(true),
+      // Print do momento crítico para o laudo em PDF (mesmo rAF do render).
+      onAfterRender: (canvas) => { if (circuito) sessaoRef.current.prints.aposRender(canvas); },
       onStats: (stats: SompoRenderStats) => {
         mount.dataset.fps = String(stats.fps); mount.dataset.calls = String(stats.calls);
         mount.dataset.cpuMs = stats.cpuMs.toFixed(1); mount.dataset.triangulos = String(stats.triangles);

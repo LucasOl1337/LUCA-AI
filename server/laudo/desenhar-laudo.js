@@ -31,17 +31,33 @@ export function desenharLaudo(d) {
   const yv = caixaVeredicto(pdf, M + colH + 14, y, colV, d.veredicto);
   y = Math.max(yh, yv) + 12;
 
-  // Linha 2: imagens
-  const alturaImg = 150; const largImg = (L - 12) / 2;
-  cabe(alturaImg + 24);
-  titulo(pdf, M, y, d.frame ? 'Momento crítico (frame do episódio)' : 'Trajeto no mapa');
-  titulo(pdf, M + largImg + 12, y, 'Velocidade ao longo do tempo');
-  const yi = y + 16;
-  pdf.retangulo(M, yi, largImg, alturaImg, { preencher: COR.fundo, contorno: COR.linha });
-  if (!(d.frame && pdf.jpeg(d.frame.buffer, M + 2, yi + 2, largImg - 4, alturaImg - 4))) mapa(pdf, d, M, yi, largImg, alturaImg);
-  if (d.frame) pdf.texto(M + 4, yi + alturaImg + 9, `${d.frame.rotulo}`, { tamanho: 7, rgb: COR.suave });
-  grafico(pdf, d, M + largImg + 12, yi, largImg, alturaImg);
-  y = yi + alturaImg + 18;
+  // Linha 2: imagens. Com print/frame do momento crítico, ele é a imagem principal (Lucas, 24/10)
+  // e mapa + gráfico ficam empilhados ao lado; sem print, mapa e gráfico lado a lado.
+  if (d.frame) {
+    const largF = L * 0.56; const altF = largF * 9 / 16; const xD = M + largF + 12; const largD = L - largF - 12;
+    const altD = (altF - 18) / 2;
+    cabe(altF + 30);
+    titulo(pdf, M, y, 'Momento crítico');
+    const yi = y + 16;
+    pdf.retangulo(M, yi, largF, altF, { preencher: [12, 16, 22] });
+    if (!pdf.jpeg(d.frame.buffer, M, yi, largF, altF)) mapa(pdf, d, M, yi, largF, altF);
+    pdf.texto(M, yi + altF + 9, quebrarLinhas(d.frame.rotulo, 7, largF)[0] ?? '', { tamanho: 7, rgb: COR.suave });
+    titulo(pdf, xD, y, 'Trajeto e velocidade');
+    pdf.retangulo(xD, yi, largD, altD, { preencher: COR.fundo, contorno: COR.linha });
+    mapa(pdf, d, xD, yi, largD, altD);
+    grafico(pdf, d, xD, yi + altD + 18 - 0, largD, altD);
+    y = yi + altF + 18;
+  } else {
+    const alturaImg = 150; const largImg = (L - 12) / 2;
+    cabe(alturaImg + 24);
+    titulo(pdf, M, y, 'Trajeto no mapa');
+    titulo(pdf, M + largImg + 12, y, d.graficos.secundaria ? `Velocidade e ${d.graficos.secundaria.rotulo.toLowerCase()}` : 'Velocidade ao longo do tempo');
+    const yi = y + 16;
+    pdf.retangulo(M, yi, largImg, alturaImg, { preencher: COR.fundo, contorno: COR.linha });
+    mapa(pdf, d, M, yi, largImg, alturaImg);
+    grafico(pdf, d, M + largImg + 12, yi, largImg, alturaImg);
+    y = yi + alturaImg + 18;
+  }
 
   // Evidências
   if (d.evidencias.length) {

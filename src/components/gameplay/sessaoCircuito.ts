@@ -4,14 +4,18 @@ import { criarCircuito, INICIO_CIRCUITO, metricasCircuito, type RegistroCircuito
 import type { CanalGameplay, EstadoGameplay } from './estadoGameplay';
 import type { CasoPercurso } from './analisePercurso';
 import type { ContextoCorrida } from './contextoCorrida';
+import { criarPrintsCorrida } from './printsCorrida';
 
 export interface RelatorioCircuito { registro: RegistroCircuito; caso: CasoPercurso }
 export function criarSessaoCircuito(runId = crypto.randomUUID(), inicioIso = new Date().toISOString()) {
   const circuito = criarCircuito(runId, inicioIso);
   const amostras: ReturnType<typeof amostraDoPercurso>[] = [];
   let ultima = -Infinity;
+  // Prints do momento crítico (avisos e desfecho) para o laudo em PDF; o palco entrega o canvas.
+  const prints = criarPrintsCorrida();
   return {
     ...circuito,
+    prints,
     registrar(e: EstadoGameplay) {
       const t = Math.round(circuito.registro.elapsedMs);
       if (t - ultima < 200 && !circuito.registro.resultado) return;
@@ -26,6 +30,7 @@ export function criarSessaoCircuito(runId = crypto.randomUUID(), inicioIso = new
         rawCsv: csv.csv, sourceName: 'percurso-totem.csv', name: `Circuito · ${runId}`,
         metadata: { ...manifestoDoPercurso({ amostras: csv.amostras, duracaoMs: csv.duracaoMs }), circuito: r, metricas: metricasCircuito(r) },
         map: mapaDoPercurso({ talhao: TALHAO, alagado: ZONAS_TALHAO[0].poligono.rings[0], encosta: ENCOSTA_TALHAO.rings[0] }),
+        prints: prints.lista(),
       } };
     },
   };

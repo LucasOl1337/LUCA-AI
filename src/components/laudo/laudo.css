@@ -1,0 +1,8 @@
+.laudo-acoes { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:10px 0; }
+.laudo-botao { display:inline-flex; align-items:center; gap:6px; min-height:40px; padding:0 14px; border-radius:8px;
+  border:1px solid #c49624; background:#0e223a; color:#fff; font:inherit; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer; }
+.laudo-botao:hover { background:#16304f; }
+.laudo-botao:focus-visible { outline:3px solid #e8d296; outline-offset:2px; }
+.laudo-botao[disabled] { opacity:.6; cursor:progress; }
+.laudo-acoes[data-compacto] .laudo-botao { min-height:34px; padding:0 10px; font-size:13px; }
+.laudo-acoes p { margin:0; font-size:12px; color:#b3412b; flex-basis:100%; }

@@ -9,6 +9,7 @@ import { PainelCabine } from './PainelCabine';
 import { REGRAS_NOTA, TRANSICAO_MS, TRECHOS_PERCURSO, resumoPercurso } from './percurso';
 import { AberturaDesafio } from './ResultadoDesafio';
 import { VeredictoBloco } from '@/components/veredicto/VeredictoBloco';
+import { BaixarLaudo } from '@/components/laudo/BaixarLaudo';
 import { analisarPercurso, FOCO_ANALISE, type CasoPercurso, type EstadoAnalise } from './analisePercurso';
 import { EnviarBancada } from './EnviarBancada';
 import { EVENTO_EM_USO } from './eventoEmUso';
@@ -202,6 +203,7 @@ export function AnaliseAgentes({ analise }: { analise: EstadoAnalise }) {
       <p><b>{analise.titulo}</b> {analise.resumo}</p>
       <ul>{analise.achados.map((a) => <li key={a}>{a}</li>)}</ul>
       <VeredictoBloco veredicto={analise.veredicto} compacto />
+      {analise.casoId && <BaixarLaudo casoId={analise.casoId} analiseId={analise.analiseId} />}
       <p className="gameplay-percurso-caso">Caso completo no Laboratório: {analise.caso}</p>
     </div>
   );

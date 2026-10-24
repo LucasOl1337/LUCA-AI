@@ -12,7 +12,7 @@ export type EstadoAnalise =
   | { tipo: 'parada' }
   | { tipo: 'enviando' }
   | { tipo: 'analisando'; segundos: number; amostras: number }
-  | { tipo: 'pronta'; titulo: string; resumo: string; achados: string[]; caso: string; veredicto?: Veredicto }
+  | { tipo: 'pronta'; titulo: string; resumo: string; achados: string[]; caso: string; veredicto?: Veredicto; casoId?: string; analiseId?: string }
   | { tipo: 'falha'; mensagem: string };
 
 export interface CasoPercurso {
@@ -21,6 +21,8 @@ export interface CasoPercurso {
   name: string;
   metadata: Record<string, unknown>;
   map: Record<string, unknown>;
+  /** Prints do momento crítico (só ilustram o laudo em PDF; fora do hash do caso e do prompt). */
+  prints?: { dataUrl: string; elapsedMs: number; rotulo: string; momento: 'aviso' | 'desfecho' }[];
 }
 
 interface Evidencia { elapsedMs: number; description: string }
@@ -53,7 +55,7 @@ const mensagemDoServidor = (status: number, dados: { message?: string }) =>
   dados.message || (status === 401 ? 'O totem precisa estar com a conta entrada para usar o Laboratório.' : `O Laboratório respondeu ${status}.`);
 
 /** Texto curto da análise: resumo da revisão (ou do primeiro eixo concluído) e até 4 hipóteses com o instante da evidência. */
-export function textoDaAnalise(analise: AnaliseLab, nomeCaso: string): Extract<EstadoAnalise, { tipo: 'pronta' }> {
+export function textoDaAnalise(analise: AnaliseLab, nomeCaso: string, casoId?: string): Extract<EstadoAnalise, { tipo: 'pronta' }> {
   const concluidos = analise.axes.filter((eixo) => eixo.status === 'completed');
   const revisao = concluidos.find((eixo) => eixo.id === 'review') ?? concluidos[0];
   const achados = analise.hypotheses.slice(0, 4).map((h) => {
@@ -68,6 +70,7 @@ export function textoDaAnalise(analise: AnaliseLab, nomeCaso: string): Extract<E
     achados: achados.length ? achados : ['Nenhuma hipótese com evidência suficiente neste registro.'],
     caso: nomeCaso,
     ...(analise.verdict ? { veredicto: analise.verdict } : {}),
+    ...(casoId ? { casoId, analiseId: analise.id } : {}),
   };
 }
 
@@ -102,7 +105,7 @@ export function analisarPercurso(caso: CasoPercurso, aoMudar: (estado: EstadoAna
           const { status, dados } = await pedir<{ case: CasoLab }>(`/${encodeURIComponent(registro.id)}`);
           if (status >= 400 || !dados.case) throw new Error(mensagemDoServidor(status, dados));
           const nova = dados.case.analyses.find((a) => !antes.has(a.id));
-          if (nova && nova.status !== 'running') { avisar(textoDaAnalise(nova, dados.case.name)); return; }
+          if (nova && nova.status !== 'running') { avisar(textoDaAnalise(nova, dados.case.name, dados.case.id)); return; }
         } catch (erro) {
           if (Date.now() - inicio > PRAZO_ANALISE_MS) { avisar({ tipo: 'falha', mensagem: `Sem contato com o Laboratório: ${(erro as Error).message}` }); return; }
         }
