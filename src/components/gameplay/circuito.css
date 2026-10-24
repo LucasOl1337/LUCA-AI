@@ -6,6 +6,10 @@
 .circuito-avisos { position:absolute; top:65px; left:18px; max-width:290px; }
 .circuito-avisos p { margin:5px 0; border-left:3px solid #efd17c; background:#172119dc; padding:5px 10px; font-size:12px; }
 .circuito-avisos [data-gravidade=critico] { border-color:#ff9478; }
+/* Motivo do apito (Lucas, 24/10): vermelho, legível, centrado abaixo dos 15% tampados do totem; some em ~2,6 s (MotivoBipe). */
+.circuito-motivo-bipe { position:absolute; left:50%; top:calc(15vh + 84px); transform:translateX(-50%); margin:0; padding:6px 14px; border-radius:8px; background:#1a0906b8; color:#ff5a45; font-size:18px; font-weight:700; letter-spacing:.01em; text-shadow:0 1px 3px #000c; white-space:nowrap; animation:circuito-motivo-bipe 2.6s ease-out forwards; }
+@keyframes circuito-motivo-bipe { 0% { opacity:0; transform:translate(-50%,-6px); } 10% { opacity:1; transform:translate(-50%,0); } 75% { opacity:1; } 100% { opacity:0; } }
+@media (prefers-reduced-motion: reduce) { .circuito-motivo-bipe { animation:none; } }
 .circuito-dialogo { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:min(620px,90%); max-height:88%; overflow:auto; padding:26px; border-radius:15px; border:1px solid #a3b99a66; background:#111e18f5; box-shadow:0 20px 80px #000a; pointer-events:auto; }
 .circuito-dialogo h2 { margin:0 0 12px; font-size:26px; }
 .circuito-dialogo p { margin:12px 0; }
@@ -38,6 +42,7 @@
   .circuito-menu-botao { top:60px; left:10px; right:auto; }
   .gameplay-com-cabine .circuito-hud .gameplay-mapa { top:calc(15vh + 12px); right:10px; width:110px; transform:none; margin:0; }
   .circuito-avisos { top:230px; left:10px; max-width:240px; }
+  .circuito-motivo-bipe { top:calc(15vh + 60px); font-size:14px; white-space:normal; width:min(320px,86%); text-align:center; }
   .circuito-webcam .gameplay-webcam { top:calc(15vh + 70px); left:10px; width:120px; }
 }
 .gameplay-mapa-rota { fill:none; stroke:#e5f4ab; stroke-width:1.1; stroke-dasharray:2 2; }

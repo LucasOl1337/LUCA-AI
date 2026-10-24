@@ -16,7 +16,7 @@ export { criarMotorBipe, useBipeCabine } from './bipeCabine';
 /**
  * Painel da cabine: o que o operador vê do LUCA-AI no gameplay.
  * Faixa de baixo no centro (altura do capô), faixa vermelha no alto do
- * para-brisa quando o alerta de 150 cm acende, selo SIMULADO sempre à vista.
+ * para-brisa quando o alerta de 225 cm acende, selo SIMULADO sempre à vista.
  * Quem monta é o GameplayKiosk da Direção; o painel só lê o canal.
  */
 export function PainelCabine({ canal, som = true }: { canal: CanalGameplay; som?: boolean }) {

@@ -4,6 +4,9 @@ import { decimalCircuito as d, metricasCircuito, textoResultadoCircuito } from '
 import { COMANDOS_CABINE } from '../gameplay/comandosCabine';
 import { EnviarBancada, envioDoCircuito } from '../gameplay/EnviarBancada';
 import { useEntradaCabine } from '../gameplay/useEntradaCabine';
+import { MotivoBipe } from '../gameplay/MotivoBipe';
+import { ANIMAL } from './animalNaPista';
+import { alarmeDaPista } from './audioPista';
 import type { RelatorioCircuito } from '../gameplay/sessaoCircuito';
 import { CAMINHAO } from './fisicaCaminhao';
 import { SERRA } from './pistaSerra';
@@ -14,6 +17,8 @@ import './pista.css';
 
 const ROTULOS = { animal: 'Animal na pista · freie ou desvie', freio: 'FREIO SEM RESPOSTA · freio-motor e área de escape', curva: 'Curva rápida · reduza ou o caminhão tomba', sonolencia: 'Olhos fechados · pare em segurança' } as const;
 const nivel = (r: RetratoPista, s: keyof typeof ROTULOS) => r.riscos.get(s) ?? 'livre';
+/** Motivo do apito do caminhão (texto vermelho discreto, Lucas 24/10), pelo mesmo alarme que o áudio toca. */
+const MOTIVOS_BIPE = { animal: 'Apitando: animal na pista à frente · freie ou desvie', freio: 'Apitando: freio sem resposta · freio-motor e área de escape', curva: 'Apitando: curva rápida demais · reduza' } as const;
 export const BOTAO_FREIO_MOTOR = { botao: 1, botaoAlt: 5, ps: '○ ou R1', xbox: 'B ou RB', teclas: ['e', 'shift'] } as const;
 
 /** Mapinha da serra: traçado em perfil (descida) com o caminhão, o animal e a área de escape. */
@@ -48,7 +53,7 @@ export function PistaHud({ r, sessao, menu, aoMenu, aoNovo, aoAnalisar, aoTrocar
     {!fim && <section className="circuito-sensores" aria-label="Sensores simulados">
       <small>LEITURAS SIMULADAS</small>
       <div data-sensor="colisao" data-nivel={nivel(r, 'animal')}>
-        <span>◉ Radar frontal</span><strong>{r.radar ? `${d(r.radar.distanciaM)} m` : `> ${70} m`}</strong>
+        <span>◉ Radar frontal</span><strong>{r.radar ? `${d(r.radar.distanciaM)} m` : `> ${ANIMAL.radarM} m`}</strong>
         <small>{r.radar ? `Animal · colisão em ${Number.isFinite(r.radar.ttcS) ? d(r.radar.ttcS) : '–'} s` : 'Sem obstáculo no alcance'}</small>
       </div>
       <div data-sensor="freio" data-nivel={r.falhaFreio ? (r.riscos.get('freio') ?? 'atencao') : 'livre'}>
@@ -68,6 +73,7 @@ export function PistaHud({ r, sessao, menu, aoMenu, aoNovo, aoAnalisar, aoTrocar
     {!fim && <button className="circuito-menu-botao" data-pad-voltar="" onClick={() => aoMenu(!menu)}><Atalho entrada={entrada} botao="bola" tecla="Esc" xbox="Menu" />Pausa / opções</button>}
     {!fim && !menu && r.fase === 'pronto' && <p className="circuito-partida" role="status">
       <Atalho entrada={entrada} botao="r2" tecla="W / ↑" xbox={COMANDOS_CABINE.acelerar.xbox} /> para partir · desça a serra até o pé</p>}
+    {!fim && !menu && <MotivoBipe motivo={(() => { const q = alarmeDaPista(r).qual; return q ? MOTIVOS_BIPE[q] : null; })()} />}
     {!fim && <div className="circuito-avisos" aria-live="polite">{[...r.riscos].map(([s, g]) => <p key={s} data-gravidade={g}>{ROTULOS[s]}</p>)}</div>}
     {!menu && !fim && <div className="circuito-touch" aria-label="Controles de toque" data-foco-pular="">{[['ArrowLeft', '←'], ['ArrowDown', 'Freio'], ['e', 'Freio-motor'], ['ArrowUp', 'Acelerar'], ['ArrowRight', '→']].map(([key, label]) => <button key={key} aria-label={label} onPointerDown={(ev) => { ev.currentTarget.setPointerCapture(ev.pointerId); touch(key, true); }} onPointerUp={() => touch(key, false)} onPointerCancel={() => touch(key, false)} onLostPointerCapture={() => touch(key, false)}>{label}</button>)}</div>}
     {menu && !fim && <section className="circuito-dialogo" role="dialog" aria-modal="true" aria-label="Opções da corrida">

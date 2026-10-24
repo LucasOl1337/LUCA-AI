@@ -29,11 +29,14 @@ export type EventoPista = { tipo: 'falha-freio' } | { tipo: 'animal' } | { tipo:
 /** Velocidade (km/h) acima da qual o freio sem resposta é risco; acima de `criticoKph`, crítico. */
 export const FREIO_RISCO = Object.freeze({ atencaoKph: 25, criticoKph: 55 });
 
+/** Tempo até a colisão (s) que acende o aviso e o crítico do animal: 50% mais cedo que os 4,5/2,2 s originais (Lucas, 24/10). */
+export const RADAR_ANIMAL = { avisoS: 6.75, criticoS: 3.3, continuoS: 1.8 } as const;
+
 export function riscosDaPista(c: EstadoCaminhao, radar: RetratoPista['radar'], falhaFreio: boolean, curva: RetratoPista['curva'], sono = false) {
   const riscos = new Map<SensorPista, Gravidade>();
   // Webcam de sonolência do totem (mesma leitura do trator): olhos fechados há 1 s é crítico.
   if (sono) riscos.set('sonolencia', 'critico');
-  if (radar && radar.ttcS < 4.5) riscos.set('animal', radar.ttcS < 2.2 ? 'critico' : 'atencao');
+  if (radar && radar.ttcS < RADAR_ANIMAL.avisoS) riscos.set('animal', radar.ttcS < RADAR_ANIMAL.criticoS ? 'critico' : 'atencao');
   const kph = c.velocidade * 3.6;
   if (falhaFreio && !c.noCascalho && kph > FREIO_RISCO.atencaoKph) riscos.set('freio', kph > FREIO_RISCO.criticoKph ? 'critico' : 'atencao');
   if (c.aLatG >= CAMINHAO.latPerigoG || c.derrapando) riscos.set('curva', 'critico');

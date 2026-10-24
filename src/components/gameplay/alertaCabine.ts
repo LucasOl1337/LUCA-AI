@@ -5,11 +5,12 @@
  * Duas regras com papéis diferentes (grill r1, Operador Q1):
  * - a cor vem das faixas do `/sompo` (`physicalRiskBands`): amarelo abaixo de
  *   200 cm, vermelho até 100 cm ou com o flag de alerta;
- * - o alerta (faixa vermelha e bipe rápido) é o flag do ESP32 a 150 cm,
- *   que a física da Direção já entrega em `sensor.alerta`.
+ * - o alerta (faixa vermelha e bipe rápido) é o flag a `GAMEPLAY_ALERTA_CM`
+ *   (225 cm desde 24/10, 50% além dos 150 cm do ESP32), que a física da
+ *   Direção já entrega em `sensor.alerta`; o eco vai até 600 cm.
  */
 import { physicalRiskBands } from '../../../shared/sompo-physical-interactions.js';
-import type { EstadoGameplay } from './estadoGameplay';
+import { GAMEPLAY_ALERTA_CM, GAMEPLAY_ECO_MAXIMO_CM, type EstadoGameplay } from './estadoGameplay';
 import { COMANDOS_CABINE, type EntradaCabine } from './comandosCabine';
 import { cercaAFrente } from './fisicaTrator';
 import { geofenceTalhao, type GeofenceTalhao } from './geofenceTalhao';
@@ -20,7 +21,7 @@ export type FaixaCabine = 'livre' | 'atencao' | 'perigo';
 
 /**
  * Bordas vermelhas da tela, como o "dano" do Call of Duty (pedido do Linz, 20/10):
- * `alerta` com o flag de 150 cm ou a inclinação, `critica` a até 100 cm ou no contato.
+ * `alerta` com o flag de 225 cm ou a inclinação, `critica` a até 100 cm ou no contato.
  */
 export type VinhetaCabine = 'nenhuma' | 'alerta' | 'critica';
 
@@ -31,7 +32,7 @@ export interface AlertaCabine {
   faixa: FaixaCabine;
   /** "2,4 m", ou "+4 m" sem eco. */
   distanciaTexto: string;
-  /** Faixa vermelha no alto do para-brisa: alerta de 150 cm ou inclinação a partir de 20°. */
+  /** Faixa vermelha no alto do para-brisa: alerta de 225 cm ou inclinação a partir de 20°. */
   alerta: boolean;
   /** Texto da faixa vermelha; vazio sem alerta. */
   rotuloAlerta: string;
@@ -49,9 +50,24 @@ export interface AlertaCabine {
   sono: boolean;
   /** De frente para a cerca do talhão, encostado: o sensor não a vê; a faixa diz para dar ré (sem bipe nem vinheta). */
   cerca: boolean;
+  /** Por que está apitando, em uma linha curta (texto vermelho discreto do HUD, Lucas 24/10); `null` mudo. Estável enquanto a causa é a mesma. */
+  motivoBipe: string | null;
 }
 
-export const ROTULO_ALERTA_CABINE = 'Obstáculo a 1,5 m · freie';
+const metros = (cm: number) => `${(cm / 100).toFixed(1).replace('.', ',')} m`;
+
+export const ROTULO_ALERTA_CABINE = `Obstáculo a ${metros(GAMEPLAY_ALERTA_CM)} · freie`;
+/** Motivos do apito, um por causa (sem a distância ao vivo, para o texto não piscar a cada quadro). */
+export const MOTIVOS_BIPE = {
+  contato: 'Apitando: contato com o obstáculo',
+  alerta: `Apitando: obstáculo a menos de ${metros(GAMEPLAY_ALERTA_CM)} · freie`,
+  sono: 'Apitando: olhos fechados · pare em segurança',
+  zonaDentro: 'Apitando: dentro da zona de risco · saia',
+  zonaRumo: 'Apitando: rumo à zona de risco · desvie',
+  inclinacao: 'Apitando: inclinação alta · risco de tombar',
+  eco: `Apitando: obstáculo no alcance de ${metros(GAMEPLAY_ECO_MAXIMO_CM)} · reduza`,
+  re: 'Apitando: ré engatada',
+} as const;
 /** Trator preso de frente na cerca do talhão (Lupa, observação da Lixa 24/10). */
 export const ROTULO_CERCA_CABINE = 'Cerca do talhão · dê ré com L2';
 /** Mesma frase com o comando de ré de quem está jogando (Lixa): teclado não tem L2. */
@@ -73,12 +89,16 @@ export const RE_BIPE_MIN_KPH = 0.3;
 
 const MUDO: BipeCabine = { intervaloMs: null, som: 'proximidade' };
 
-/** Mesmo timbre, intervalo contínuo até a iminência (10 cm). */
+/**
+ * Mesmo timbre, cadência que acelera até o tom contínuo na iminência (10 cm).
+ * Curva côncava (expoente 1,3): no limite do alcance o bipe é espaçado (~700 ms)
+ * e a aceleração fica nítida ao cruzar o alerta (~260 ms a 225 cm, ~150 ms a 1 m).
+ */
 export function bipeProximidade(cm: number): BipeCabine {
-  return { intervaloMs: cm <= 10 ? 0 : 100 + 700 * (Math.min(400, cm) - 10) / 390, som: 'proximidade' };
+  if (cm <= 10) return { intervaloMs: 0, som: 'proximidade' };
+  const t = (Math.min(GAMEPLAY_ECO_MAXIMO_CM, cm) - 10) / (GAMEPLAY_ECO_MAXIMO_CM - 10);
+  return { intervaloMs: Math.round(100 + 600 * t ** 1.3), som: 'proximidade' };
 }
-
-const metros = (cm: number) => `${(cm / 100).toFixed(1).replace('.', ',')} m`;
 
 /**
  * `sono` vem da webcam da cabine (`sonoCabine`); sem webcam (`null`) o painel
@@ -102,19 +122,19 @@ export function alertaCabine(estado: EstadoGameplay, sono: SonoCabine | null = n
   const geofence = geofenceTalhao(maquina);
   const zona = geofence.nivel !== 'fora';
 
-  let bipe: BipeCabine = MUDO;
+  let bipe: BipeCabine = MUDO, motivoBipe: string | null = null;
   if (fase === 'dirigindo') {
-    if (contato) bipe = bipeProximidade(0);
-    else if (sensor.alerta) bipe = bipeProximidade(sensor.distanciaCm);
-    else if (dormindo) bipe = BIPE_SONO;
+    if (contato) { bipe = bipeProximidade(0); motivoBipe = MOTIVOS_BIPE.contato; }
+    else if (sensor.alerta) { bipe = bipeProximidade(sensor.distanciaCm); motivoBipe = MOTIVOS_BIPE.alerta; }
+    else if (dormindo) { bipe = BIPE_SONO; motivoBipe = MOTIVOS_BIPE.sono; }
     // Tom do meio, só da zona de risco: rápido dentro, ritmo do alerta a caminho.
-    else if (zona) bipe = { intervaloMs: geofence.nivel === 'dentro' ? 120 : BIPE_RAPIDO_MS, som: 'zona' };
+    else if (zona) { bipe = { intervaloMs: geofence.nivel === 'dentro' ? 120 : BIPE_RAPIDO_MS, som: 'zona' }; motivoBipe = geofence.nivel === 'dentro' ? MOTIVOS_BIPE.zonaDentro : MOTIVOS_BIPE.zonaRumo; }
     // Mesmo ritmo do alerta, tom mais grave: dá para saber qual dos dois sem olhar.
-    else if (faixas.inclination) bipe = { intervaloMs: BIPE_RAPIDO_MS, som: 'inclinacao' };
-    else if (sensor.eco) bipe = bipeProximidade(sensor.distanciaCm);
+    else if (faixas.inclination) { bipe = { intervaloMs: BIPE_RAPIDO_MS, som: 'inclinacao' }; motivoBipe = MOTIVOS_BIPE.inclinacao; }
+    else if (sensor.eco) { bipe = bipeProximidade(sensor.distanciaCm); motivoBipe = MOTIVOS_BIPE.eco; }
     // Alarme de ré (Lupa, fila vazia 2): antes a ré engatava muda; prioridade mais baixa, nunca cobre um alerta.
-    else if (maquina.re && maquina.velocidadeKph >= RE_BIPE_MIN_KPH) bipe = BIPE_RE;
-  } else if (dormindo) bipe = BIPE_SONO;
+    else if (maquina.re && maquina.velocidadeKph >= RE_BIPE_MIN_KPH) { bipe = BIPE_RE; motivoBipe = MOTIVOS_BIPE.re; }
+  } else if (dormindo) { bipe = BIPE_SONO; motivoBipe = MOTIVOS_BIPE.sono; }
 
   const vinheta: VinhetaCabine = dormindo ? 'critica'
     : fase !== 'dirigindo' ? 'nenhuma'
@@ -131,7 +151,7 @@ export function alertaCabine(estado: EstadoGameplay, sono: SonoCabine | null = n
 
   return {
     faixa,
-    distanciaTexto: sensor.eco ? metros(sensor.distanciaCm) : '+4 m',
+    distanciaTexto: sensor.eco ? metros(sensor.distanciaCm) : `+${GAMEPLAY_ECO_MAXIMO_CM / 100} m`,
     alerta: sensor.alerta || dormindo || zona || faixas.inclination,
     // Os dois juntos: o obstáculo vem primeiro, é o que pede freio mais rápido.
     rotuloAlerta: sensor.alerta ? ROTULO_ALERTA_CABINE : dormindo ? ROTULO_ALERTA_SONO : zona ? rotuloGeofenceCabine(geofence) : faixas.inclination ? rotuloInclinacaoCabine(graus) : cerca ? ROTULO_CERCA_CABINE : '',
@@ -143,5 +163,6 @@ export function alertaCabine(estado: EstadoGameplay, sono: SonoCabine | null = n
     geofence,
     sono: dormindo,
     cerca,
+    motivoBipe,
   };
 }

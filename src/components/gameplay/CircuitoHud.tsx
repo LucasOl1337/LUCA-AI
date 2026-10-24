@@ -14,6 +14,7 @@ import { criarAudioCircuito } from './audioCircuito';
 import { somCompartilhado } from './somCompartilhado';
 import { alertaCabine, rotuloCerca } from './alertaCabine';
 import { useBipeCabine } from './bipeCabine';
+import { MotivoBipe } from './MotivoBipe';
 import { useSegurancaCabine } from './useSegurancaCabine';
 import { Atalho, IconePad } from '../stand/IconePad';
 const Webcam = lazy(() => import('./WebcamSonoCabine'));
@@ -93,6 +94,7 @@ export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, t
     {!fim && <button className="circuito-menu-botao" data-pad-voltar="" onClick={() => aoMenu(!menu)}><Atalho entrada={entrada} botao="bola" tecla="Esc" xbox="Menu" />Pausa / opções</button>}
     {!fim && !menu && e.fase === 'pronto' && <p className="circuito-partida" role="status">
       <Atalho entrada={entrada} botao="r2" tecla="W / ↑" xbox={COMANDOS_CABINE.acelerar.xbox} /> para partir · siga as estacas até a chegada</p>}
+    {!fim && !menu && <MotivoBipe motivo={tocando ? painel.motivoBipe : null} />}
     {!fim && <div className="circuito-avisos" aria-live="polite">{[...riscosCircuito(e, sono?.status === 'alarm')].map(([s, gravidade]) => <p key={s} data-gravidade={gravidade}>{ROTULOS[s]}</p>)}
       {/* Preso na cerca (Lupa, observação da Lixa): só texto; não é risco, não entra nas métricas nem toca. */}
       {painel.cerca && <p data-gravidade="atencao" data-cerca="">{rotuloCerca(entrada)}</p>}</div>}

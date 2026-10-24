@@ -11,7 +11,8 @@ export const ANIMAL = Object.freeze({
   lateralInicio: -8.5, lateralParada: 1.8, lateralFim: 10,
   velocidadeMs: 1.6, paradaS: 3, raioM: 0.75,
   /** Alcance do radar frontal do caminhão (m) e meia largura do feixe (m). */
-  radarM: 70, radarMeiaLarguraM: 1.9,
+  // Radar 50% mais longe (Lucas, 24/10): 70 -> 105 m, junto com o TTC de RADAR_ANIMAL em corridaPista.
+  radarM: 105, radarMeiaLarguraM: 1.9,
 });
 
 export interface EstadoAnimal { ativo: boolean; t: number; lateral: number; andando: boolean; atingido: boolean; x: number; z: number; rumo: number }

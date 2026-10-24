@@ -139,10 +139,11 @@ function corrida(tetoKph, reacaoS) {
 test('fardo a 20 m: a 6 km/h dá para parar mesmo com 0,5 s de reação; a 12 km/h, não', () => {
   const imediata = corrida(6, 0);
   assert.equal(imediata.contato, false);
-  assert.ok(imediata.distanciaCm > 100 && imediata.distanciaCm <= 150, `${imediata.distanciaCm}`);
+  assert.ok(imediata.distanciaCm > 150 && imediata.distanciaCm <= 225, `${imediata.distanciaCm}`);
   const atrasada = corrida(6, 0.5);
   assert.equal(atrasada.contato, false);
-  assert.ok(atrasada.distanciaCm > 20 && atrasada.distanciaCm < 60, `${atrasada.distanciaCm}`);
+  // Alerta a 225 cm (24/10): mesmo com 0,5 s de reação sobra mais de 80 cm.
+  assert.ok(atrasada.distanciaCm > 80 && atrasada.distanciaCm < 135, `${atrasada.distanciaCm}`);
   const rapida = corrida(12, 0.5);
   assert.equal(rapida.contato, true);
   assert.equal(rapida.distanciaCm, 2);
@@ -206,10 +207,10 @@ test('L2 parado engata ré até 4 km/h; cerca de ±90 m segura o trator', () => 
   assert.equal(cerca.velocidade, 0);
 });
 
-test('sensor: só enxerga o que está na linha da frente e até 400 cm', () => {
+test('sensor: só enxerga o que está na linha da frente e até 600 cm', () => {
   const pose = fisica.criarTrator(0);
-  const longe = fisica.fardoAFrente({ x: 0, z: 0, rumoGraus: 0 }, 4.5);
-  assert.deepEqual(fisica.leituraSensor(pose, [longe]), { distanciaCm: 400, eco: false, alerta: false });
+  const longe = fisica.fardoAFrente({ x: 0, z: 0, rumoGraus: 0 }, 6.5);
+  assert.deepEqual(fisica.leituraSensor(pose, [longe]), { distanciaCm: 600, eco: false, alerta: false });
   const perto = fisica.fardoAFrente({ x: 0, z: 0, rumoGraus: 0 }, 1.2);
   assert.deepEqual(fisica.leituraSensor(pose, [perto]), { distanciaCm: 120, eco: true, alerta: true });
   const deLado = { ...perto, z: 2 };
@@ -245,7 +246,7 @@ test('sensor: corredor não muda o contato frontal da física nem o formato da l
   const leitura = fisica.leituraSensor(pose, [fardo]);
   assert.deepEqual(Object.keys(leitura), ['distanciaCm', 'eco', 'alerta']);
   assert.equal(leitura.eco, true);
-  assert.ok(leitura.distanciaCm >= 2 && leitura.distanciaCm <= 150 && leitura.alerta);
+  assert.ok(leitura.distanciaCm >= 2 && leitura.distanciaCm <= 225 && leitura.alerta);
   assert.equal(fisica.leituraSensor(pose, [{ ...fardo, x: -4 }]).eco, false, 'atrás não ecoa');
 });
 

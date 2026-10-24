@@ -5,21 +5,21 @@ import { loadFrontendModule } from './support/load-frontend-module.js';
 const { alertaCabine, bipeProximidade, ROTULO_ALERTA_CABINE, BIPE_LENTO_MS, BIPE_RAPIDO_MS } =
   await loadFrontendModule('../../src/components/gameplay/alertaCabine.ts');
 
-/** Estado da Direção com o sensor como a física entrega: eco até 400 cm, alerta a 150 cm. */
-const estado = ({ cm = 400, eco = cm < 400, fase = 'dirigindo', contato = false, kph = 6, re = false, rolagem = 0, arfagem = 0 } = {}) => ({
+/** Estado da Direção com o sensor como a física entrega: eco até 600 cm, alerta a 225 cm (+50%, 24/10). */
+const estado = ({ cm = 600, eco = cm < 600, fase = 'dirigindo', contato = false, kph = 6, re = false, rolagem = 0, arfagem = 0 } = {}) => ({
   versao: 1, fase, tempoMs: 1000,
   maquina: { x: 0, z: 0, rumoGraus: 0, velocidadeKph: kph, re },
   comandos: { esterco: 0, acelerador: 0, freio: 0 },
-  sensor: { distanciaCm: cm, eco, alerta: eco && cm <= 150 },
+  sensor: { distanciaCm: cm, eco, alerta: eco && cm <= 225 },
   atitude: { rolagemGraus: rolagem, arfagemGraus: arfagem },
   contato, tetoKph: 6,
 });
 
-test('faixa de cor segue o /sompo e o alerta segue o flag de 150 cm', () => {
+test('faixa de cor segue o /sompo e o alerta segue o flag de 225 cm', () => {
   const casos = [
-    [201, 'atencao', false], [200, 'atencao', false],
-    [199, 'atencao', false], [151, 'atencao', false],
-    [150, 'perigo', true], [101, 'perigo', true],
+    [300, 'atencao', false], [251, 'atencao', false],
+    [250, 'atencao', false], [226, 'atencao', false],
+    [225, 'perigo', true], [200, 'perigo', true], [101, 'perigo', true],
     [100, 'perigo', true], [2, 'perigo', true],
   ];
   for (const [cm, faixa, alerta] of casos) {
@@ -31,10 +31,11 @@ test('faixa de cor segue o /sompo e o alerta segue o flag de 150 cm', () => {
   }
 });
 
-test('sem eco: verde, "+4 m", mudo, sem inventar obstáculo', () => {
-  const a = alertaCabine(estado({ cm: 400 }));
+test('sem eco: verde, "+6 m", mudo, sem inventar obstáculo', () => {
+  const a = alertaCabine(estado({ cm: 600 }));
   assert.equal(a.faixa, 'livre');
-  assert.equal(a.distanciaTexto, '+4 m');
+  assert.equal(a.distanciaTexto, '+6 m');
+  assert.equal(a.motivoBipe, null);
   assert.equal(a.rotulo, 'Sem obstáculo no alcance');
   assert.equal(a.bipe.intervaloMs, null);
 });
@@ -90,16 +91,16 @@ const { renderToStaticMarkup } = require('react-dom/server');
 const { PainelCabine, PainelCabineVista } = await loadFrontendModule('../../src/components/gameplay/PainelCabine.tsx');
 
 test('painel mostra distância, cor e selo SIMULADO; faixa vermelha só com alerta', () => {
-  const longe = estado({ cm: 180 });
+  const longe = estado({ cm: 300 });
   const html = renderToStaticMarkup(createElement(PainelCabineVista, { painel: alertaCabine(longe), estado: longe }));
   assert.match(html, /data-faixa="atencao"/);
   assert.match(html, /SIMULADO/);
-  assert.match(html, /1,8 m/);
+  assert.match(html, /3,0 m/);
   assert.match(html, /role="alert" hidden=""/);
   const perto = estado({ cm: 140 });
   const alerta = renderToStaticMarkup(createElement(PainelCabineVista, { painel: alertaCabine(perto), estado: perto }));
   assert.match(alerta, /data-alerta="true"/);
-  assert.match(alerta, /Obstáculo a 1,5 m · freie/);
+  assert.match(alerta, /Obstáculo a 2,3 m · freie/);
   assert.doesNotMatch(alerta, /role="alert" hidden/);
 });
 
@@ -111,8 +112,8 @@ test('PainelCabine lê o canal da Direção e renderiza sem áudio no servidor',
   assert.match(html, /0,9 m/);
 });
 
-test('vinheta de dano: alerta a 150 cm e na inclinação, crítica a 100 cm e no contato, só dirigindo', () => {
-  const casos = [[400, 'nenhuma'], [199, 'nenhuma'], [150, 'alerta'], [101, 'alerta'], [100, 'critica'], [2, 'critica']];
+test('vinheta de dano: alerta a 225 cm e na inclinação, crítica a 100 cm e no contato, só dirigindo', () => {
+  const casos = [[600, 'nenhuma'], [300, 'nenhuma'], [225, 'alerta'], [101, 'alerta'], [100, 'critica'], [2, 'critica']];
   for (const [cm, nivel] of casos) assert.equal(alertaCabine(estado({ cm })).vinheta, nivel, `${cm} cm`);
   assert.equal(alertaCabine(estado({ rolagem: 22 })).vinheta, 'alerta');
   assert.equal(alertaCabine(estado({ cm: 120, contato: true })).vinheta, 'critica');
@@ -172,4 +173,17 @@ test('aviso da cerca no HUD da corrida usa o comando de ré de quem joga (Lixa):
   assert.equal(rotuloCerca('ps'), ROTULO_CERCA_CABINE);
   assert.equal(rotuloCerca('xbox'), 'Cerca do talhão · dê ré com LT');
   assert.equal(rotuloCerca('teclado'), 'Cerca do talhão · dê ré com S / ↓');
+});
+
+test('motivo do apito: uma frase estável por causa, +50% de alcance e cadência que acelera no alerta', () => {
+  assert.equal(alertaCabine(estado({ cm: 500 })).motivoBipe, 'Apitando: obstáculo no alcance de 6,0 m · reduza');
+  assert.equal(alertaCabine(estado({ cm: 225 })).motivoBipe, alertaCabine(estado({ cm: 120 })).motivoBipe);
+  assert.match(alertaCabine(estado({ cm: 225 })).motivoBipe, /menos de 2,3 m/);
+  assert.equal(alertaCabine(estado({ cm: 120, contato: true })).motivoBipe, 'Apitando: contato com o obstáculo');
+  assert.equal(alertaCabine(estado({ cm: 600, re: true })).motivoBipe, 'Apitando: ré engatada');
+  assert.equal(alertaCabine(estado({ cm: 60, fase: 'pronto' })).motivoBipe, null);
+  const [longe, alerta, perto, colado] = [600, 225, 100, 10].map((cm) => bipeProximidade(cm).intervaloMs);
+  assert.equal(longe, 700); assert.equal(colado, 0);
+  assert.ok(alerta > 240 && alerta < 280, `${alerta}`);
+  assert.ok(perto > 140 && perto < 165, `${perto}`);
 });

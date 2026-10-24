@@ -156,7 +156,7 @@ export function fardoAFrente(pose: { x: number; z: number; rumoGraus: number }, 
   return { x: pose.x + Math.cos(rumo) * alcance, z: pose.z - Math.sin(rumo) * alcance, raioM };
 }
 
-/** HC-SR04 simulado, no formato do painel: 2..400 cm, alerta <= 150 cm, corredor da largura do trator. */
+/** Sensor simulado no formato do painel: 2..GAMEPLAY_ECO_MAXIMO_CM (600 cm), alerta <= GAMEPLAY_ALERTA_CM (225 cm), corredor da largura do trator. */
 export function leituraSensor(estado: EstadoTrator, obstaculos: readonly ObstaculoGameplay[]) {
   const folga = distanciaSensorM(estado, obstaculos, TRATOR.bitolaM / 2);
   const distanciaCm = folga === null ? GAMEPLAY_ECO_MAXIMO_CM : Math.max(2, Math.round(folga * 100));

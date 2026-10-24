@@ -73,5 +73,6 @@ export interface CanalGameplay {
 
 export const GAMEPLAY_TETO_LIVRE_KPH = 12;
 export const GAMEPLAY_TETO_DESAFIO_KPH = 6;
-export const GAMEPLAY_ALERTA_CM = 150;
-export const GAMEPLAY_ECO_MAXIMO_CM = 400;
+/** Sensor de distância 50% mais longe (Lucas, 24/10): antes 150/400 cm, o apito chegava tarde demais no totem. */
+export const GAMEPLAY_ALERTA_CM = 225;
+export const GAMEPLAY_ECO_MAXIMO_CM = 600;

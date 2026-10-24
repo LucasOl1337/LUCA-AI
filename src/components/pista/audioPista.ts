@@ -9,7 +9,7 @@ import { criarSomMotor } from '../gameplay/somMotor';
 import { saidaEfeito, somCompartilhado } from '../gameplay/somCompartilhado';
 import { agendarRajada, type DefinicaoAlarme, type Rajada } from '../gameplay/timbreAlarme';
 import type { EstadoGameplay } from '../gameplay/estadoGameplay';
-import type { RetratoPista } from './corridaPista';
+import { RADAR_ANIMAL, type RetratoPista } from './corridaPista';
 
 /** Freio sem resposta: buzina 620 Hz, três toques curtos a cada 1,4 s (alta prioridade, não confunde com o sensor). */
 export const ALARME_FREIO: DefinicaoAlarme = { voz: 'buzina', hz: 620, periodoMs: 1400, padrao: [[0, 140, 1], [200, 140, 1], [400, 220, 0.82]] };
@@ -19,7 +19,8 @@ export type AlarmePista = 'animal' | 'freio' | 'curva' | null;
 /** Qual alarme toca agora e com que cadência (ms; 0 = tom contínuo). */
 export function alarmeDaPista(r: RetratoPista): { qual: AlarmePista; intervaloMs: number | null } {
   if (r.fase !== 'dirigindo') return { qual: null, intervaloMs: null };
-  if (r.radar && r.radar.ttcS < 4.5) return { qual: 'animal', intervaloMs: r.radar.ttcS < 1.2 ? 0 : Math.round(Math.max(90, Math.min(600, r.radar.ttcS * 130))) };
+  // Cadência pelo TTC: ~600 ms ao acender, ~300 ms no crítico, contínuo na iminência.
+  if (r.radar && r.radar.ttcS < RADAR_ANIMAL.avisoS) return { qual: 'animal', intervaloMs: r.radar.ttcS < RADAR_ANIMAL.continuoS ? 0 : Math.round(Math.max(90, Math.min(600, r.radar.ttcS * 90))) };
   if (r.riscos.has('freio')) return { qual: 'freio', intervaloMs: ALARME_FREIO.periodoMs };
   const curva = r.riscos.get('curva');
   if (curva) return { qual: 'curva', intervaloMs: curva === 'critico' ? 160 : 380 };
