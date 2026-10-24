@@ -100,3 +100,18 @@ test('casos antigos, veredicto indeterminado e texto longo: hipótese sem modelo
   const n = paginas(desenharLaudo({ ...dadosDoLaudo(record, parsed, { ...antigo, verdict: longo }), frame: { buffer: JPEG, rotulo: 'Print' } }));
   assert.ok(n >= 1 && n <= 2, `páginas: ${n}`);
 });
+
+test('veredicto gravado antes do 9b5b354 sai em linguagem de leigo no laudo (ms → s, horário → "aos X s")', () => {
+  const s = source();
+  const parsed = parseLabCase(s.rawCsv, { fileName: s.sourceName, manifest: s.metadata, map: s.map });
+  const inicio = new Date(Date.parse(parsed.startedAt) + 3_217).toISOString().slice(11, 23);
+  const antigo = veredictoExemplo({ elapsedMs: 3_200 });
+  antigo.hipotese = 'A corrida durou 9.616,67 ms de tempo ativo e o alarme de sono começou aos 3.033,33 ms.';
+  antigo.evidencias = [{ descricao: `Às ${inicio}, a velocidade era 6,86 km/h e o freio não estava pressionado.`, elapsedMs: 3_217 }];
+  const d = dadosDoLaudo({ ...s, id: 'lab_x', name: 'Dormiu' }, parsed, { id: 'a', status: 'completed', axes: [], hypotheses: [], verdict: antigo });
+  assert.doesNotMatch(d.hipotese, /\d ms\b|9\.616/);
+  assert.match(d.hipotese, /9,6 s/);
+  assert.doesNotMatch(d.evidencias[0].texto, /\d{2}:\d{2}:\d{2}/);
+  assert.match(d.evidencias[0].texto, /3,2 s/);
+  assert.equal(d.evidencias[0].tempo, '00:03.2', 'o carimbo de tempo continua vindo de elapsedMs');
+});

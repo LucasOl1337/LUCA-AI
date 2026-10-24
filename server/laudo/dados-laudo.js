@@ -3,6 +3,7 @@
 // veredicto (analysis.verdict, contrato veredicto v1) usa a hipótese dele; caso antigo
 // usa o resumo da revisão já gravado. O desenho fica em desenhar-laudo.js.
 import { formatLabTime, hasPosition, labCaseVehicle, polygonDistance } from '../../shared/lab-telemetry.js';
+import { paraLeigo, veredictoEmLeigo } from '../../shared/veredicto.js';
 
 const CULPADOS = { operador: 'Operador humano', maquina: 'Máquina', manutencao: 'Manutenção', ambiente: 'Ambiente', terceiro: 'Terceiro', indeterminado: 'Indeterminado' };
 const DESFECHOS = { chegada: 'Percurso concluído', colisao: 'Colisão com obstáculo', atolamento: 'Atolou na área alagada', tombamento: 'Tombou na encosta', abandono: 'Corrida abandonada' };
@@ -105,13 +106,16 @@ function serieDoCaso(parsed, v) {
 
 /** Tudo o que o PDF mostra, em texto final (pt-BR) e séries numéricas. */
 export function dadosDoLaudo(record, parsed, analise, agora = new Date()) {
-  const v = analise?.verdict ?? null;
+  // Linguagem de leigo (contrato do Veredicto, 9b5b354): idempotente, também para veredicto gravado antes.
+  const inicioMs = Date.parse(parsed.startedAt);
+  const leigo = { inicioMs: Number.isFinite(inicioMs) ? inicioMs : null };
+  const v = analise?.verdict ? veredictoEmLeigo(analise.verdict, leigo) : null;
   const circuito = parsed.manifest?.circuito ?? null;
   const veiculo = labCaseVehicle(parsed.manifest);
   const revisao = analise?.axes?.find((e) => e.id === 'review' && e.status === 'completed') ?? analise?.axes?.find((e) => e.status === 'completed');
-  const hipoteseTexto = v?.hipotese || v?.porque || revisao?.summary || '';
+  const hipoteseTexto = v?.hipotese || v?.porque || paraLeigo(revisao?.summary || '', leigo);
   const evidenciasVeredicto = (v?.evidencias ?? []).map((e) => ({ tempo: Number.isFinite(e.elapsedMs) ? formatLabTime(e.elapsedMs) : null, texto: corta(e.descricao, 230) }));
-  const evidenciasHipoteses = (analise?.hypotheses ?? []).filter((h) => h.evidence?.length).map((h) => ({ tempo: formatLabTime(h.evidence[0].elapsedMs), texto: corta(`${h.title}: ${h.evidence[0].description}`, 230) }));
+  const evidenciasHipoteses = (analise?.hypotheses ?? []).filter((h) => h.evidence?.length).map((h) => ({ tempo: formatLabTime(h.evidence[0].elapsedMs), texto: corta(paraLeigo(`${h.title}: ${h.evidence[0].description}`, leigo), 230) }));
   const evidenciasEventos = parsed.events.filter((e) => e.transition !== 'end').map((e) => ({ tempo: formatLabTime(e.elapsedMs), texto: corta(`${e.title}. ${e.description}`, 230) }));
   const evidencias = [...evidenciasVeredicto, ...(evidenciasVeredicto.length >= 3 ? [] : evidenciasHipoteses), ...(evidenciasVeredicto.length + evidenciasHipoteses.length >= 3 ? [] : evidenciasEventos)].slice(0, 5);
   const secundaria = serieDoCaso(parsed, v);
