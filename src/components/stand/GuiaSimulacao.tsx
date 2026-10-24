@@ -25,7 +25,7 @@ export function GuiaSimulacao({ aoComecar, comVoz }: { aoComecar(): void; comVoz
   return <section className="stand-guia-simulacao" aria-label="Antes de dirigir">
     <header><span className="cabine-sobretitulo">SIMULAÇÃO · NO SEU RITMO</span>
       <h1>Antes de dirigir</h1>
-      <p>Siga as estacas até a chegada, desviando do feno e da água.</p>
+      <p>Siga as estacas até a chegada, desviando dos obstáculos e da água.</p>
     </header>
     <div className="cabine-dispositivo">{entrada === 'teclado' ? 'TECLADO' : entrada === 'ps' ? 'CONTROLE PLAYSTATION' : 'CONTROLE XBOX'}<span>Troca automática ao usar os comandos</span></div>
     <ComandosCabineVisual entrada={entrada} />
