@@ -9,7 +9,7 @@ import type { RelatorioCircuito } from '../gameplay/sessaoCircuito';
 import { PISTA_SERRA, pontoLateral, SERRA, GUARD_RAIL_M, type PistaSerra } from './pistaSerra';
 import type { RetratoPista } from './corridaPista';
 
-export const REGRAS_PISTA = 'SIMULAÇÃO cinemática do caminhão na serra (serra-sem-freio), não risco de seguro. Freio de serviço falha em s=620 m (eficiência 1→0 em 1,5 s); freio-motor e área de escape seguem funcionando. Animal: radar frontal 70 m, aviso com TTC<4,5 s, crítico <2,2 s. Curva: aceleração lateral ≥0,28 g aviso, ≥0,40 g crítico, ≥0,52 g por 0,5 s tomba. Saída de pista: rompe o guard-rail (>4,5 m/s normal). Evitado: exposição→nova resposta (frenagem, esterço ou freio-motor) após aviso→saída durante 1 s. Tempo: relógio ativo; pausas excluídas.';
+export const REGRAS_PISTA = 'SIMULAÇÃO cinemática do caminhão na serra (serra-sem-freio), não risco de seguro. Freio de serviço falha em s=620 m (eficiência 1→0 em 1,5 s); freio-motor e área de escape seguem funcionando. Animal: radar frontal 70 m, aviso com TTC<4,5 s, crítico <2,2 s. Curva: aceleração lateral ≥0,28 g aviso, ≥0,40 g ou derrapagem crítico, ≥0,52 g por 0,5 s tomba; aderência 0,62 g no asfalto e 0,35 g no cascalho (acima, a frente escorrega e a lateral não passa daí). Saída de pista: rompe o guard-rail (>4,5 m/s normal). Evitado: exposição→nova resposta (frenagem, esterço ou freio-motor) após aviso→saída durante 1 s. Tempo: relógio ativo; pausas excluídas.';
 export const REGRAS_PISTA_TELA = [
   'O freio falha no início da descida forte: o pedal deixa de funcionar.',
   'Saída: segure o freio-motor (○/B, R1/RB ou E) e entre na área de escape à direita.',
@@ -27,8 +27,8 @@ export function amostraDaPista(r: RetratoPista): AmostraPista {
   const c = r.caminhao;
   return {
     tempoMs: r.tempoMs, x: c.x, z: c.z, rumoGraus: c.rumo * 180 / Math.PI, kph: c.velocidade * 3.6,
-    // Rolagem da carroceria pela aceleração lateral (≈ 12° por g, didático); arfagem = rampa da pista.
-    rolagem: Math.sign(c.guinada) * c.aLatG * 12, arfagem: Math.atan(c.rampa) * 180 / Math.PI,
+    // Rolagem da carroceria na suspensão (fisicaCaminhao); arfagem = rampa da pista.
+    rolagem: c.rolagem * 180 / Math.PI, arfagem: Math.atan(c.rampa) * 180 / Math.PI,
     distanciaCm: r.radar ? Math.round(r.radar.distanciaM * 100) : null, eco: !!r.radar,
     alertaColisao: r.riscos.has('animal'), alertaInclinacao: r.riscos.has('curva'),
     freio: r.comandos.freio >= 0.1, rpm: c.rpm, cargaMotor: Math.round(100 * r.comandos.acelerador),
@@ -97,7 +97,7 @@ export function criarSessaoPista(runId = crypto.randomUUID(), inicioIso = new Da
         if (!ep) {
           ep = { sensor, inicioMs: t, fimMs: null, gravidade, velocidadeKph: r.caminhao.velocidade * 3.6,
             distanciaCm: sensor === 'animal' && r.radar ? Math.round(r.radar.distanciaM * 100) : null,
-            rolagemGraus: r.caminhao.aLatG * 12, comandoInicial: { ...c }, resposta: null, evitado: false };
+            rolagemGraus: Math.abs(r.caminhao.rolagem) * 180 / Math.PI, comandoInicial: { ...c }, resposta: null, evitado: false };
           registro.episodios.push(ep);
         }
         if (gravidade === 'critico') ep.gravidade = gravidade;

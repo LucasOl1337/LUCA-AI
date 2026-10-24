@@ -56,7 +56,7 @@ export function PistaHud({ r, sessao, menu, aoMenu, aoNovo, aoAnalisar, aoTrocar
         <small>{r.falhaFreio ? `Sem resposta · freio-motor ${c.freioMotor ? 'LIGADO' : 'desligado'}` : 'Pressão normal'}</small>
       </div>
       <div data-sensor="inclinacao" data-nivel={nivel(r, 'curva')}>
-        <span>◴ Força lateral</span><strong>{d(c.aLatG, 2)} g</strong>
+        <span>◴ Força lateral</span><strong>{d(c.aLatG, 2)} g{c.derrapando ? " · derrapando" : ""}</strong>
         <small>Atenção {d(CAMINHAO.latAvisoG, 2)} · perigo {d(CAMINHAO.latPerigoG, 2)} · tombo {d(CAMINHAO.latTomboG, 2)}{r.curva && r.curva.distanciaM < 150 ? ` · curva em ${Math.round(r.curva.distanciaM)} m, ${Math.round(r.curva.seguraKph)} km/h` : ''}</small>
       </div>
       <div data-sensor="velocidade" data-nivel={kph > 75 ? 'critico' : 'livre'}>

@@ -2,6 +2,8 @@
  * Física do `caminhao` na serra. Pura, cinemática (bicicleta) com dinâmica
  * longitudinal: gravidade pela rampa da pista, rolagem + ar, motor, freio de
  * serviço com eficiência (cai a 0 na falha) e freio-motor (desce marcha).
+ * Lateral: a guinada é limitada pela aderência (além dela a frente escorrega) e
+ * a carroceria rola na suspensão (mola + amortecedor) antes de tombar.
  * Mesmo referencial do trator: frente = (cos h, -sin h), rumo + = esquerda.
  */
 import type { ComandoVolante } from '../gameplay/volante';
@@ -14,7 +16,7 @@ export const CAMINHAO = Object.freeze({
   frenteM: 4.6,
   /** Esterço máximo parado; encolhe com a velocidade (teclado não fica nervoso a 80 km/h). */
   estercoMaxRad: 0.55,
-  estercoVRef: 9,
+  estercoVRef: 8,
   guinadaTauS: 0.22,
   tetoMotorKph: 80,
   aceleracao: 1.5,
@@ -28,6 +30,16 @@ export const CAMINHAO = Object.freeze({
   cascalho: 6.5,
   /** Aceleração lateral: aviso, perigo e tombo (sustentado). */
   latAvisoG: 0.28, latPerigoG: 0.4, latTomboG: 0.52, tomboS: 0.5,
+  /**
+   * Aderência dos pneus (g): acima disso a frente escorrega (derrapagem) e a
+   * aceleração lateral não passa daí. Caminhão carregado tomba (0,52 g) antes de
+   * escorregar no asfalto seco; no cascalho da escape escorrega e não tomba.
+   */
+  aderenciaG: 0.62, aderenciaCascalhoG: 0.35,
+  /** Perda de velocidade arrastando a frente na derrapagem (m/s²). */
+  arrastoDerrapagem: 1.8,
+  /** Rolagem da carroceria na suspensão: rad por g, mola (rad/s) e amortecimento (ζ). */
+  rolagemPorG: 0.3, rolagemOmega: 7, rolagemZeta: 0.7,
   /** Velocidade normal ao guard-rail que rompe a barreira. */
   rompeRailMs: 4.5,
 });
@@ -37,14 +49,18 @@ export interface EstadoCaminhao {
   x: number; z: number; y: number; rumo: number; velocidade: number; guinada: number;
   s: number; lateral: number; indice: number; rampa: number; curvatura: number;
   aLatG: number; tomboS: number; marcha: number; rpm: number;
+  /** Rolagem da carroceria (rad, positivo = lado direito para baixo) e sua velocidade. */
+  rolagem: number; rolagemVel: number;
   freioMotor: boolean; noCascalho: boolean; raspou: boolean; rompeu: boolean;
+  /** Pediu mais curva do que a aderência dá: a frente escorrega. */
+  derrapando: boolean;
 }
 
 export function criarCaminhao(pista: PistaSerra, s = 12, lateral = 1.8): EstadoCaminhao {
   const p = pista.amostras[Math.round(s / 2)];
   const x = p.x + Math.sin(p.rumo) * lateral, z = p.z + Math.cos(p.rumo) * lateral;
   return { x, z, y: p.y, rumo: p.rumo, velocidade: 0, guinada: 0, s, lateral, indice: Math.round(s / 2), rampa: p.rampa, curvatura: p.curvatura,
-    aLatG: 0, tomboS: 0, marcha: 1, rpm: 650, freioMotor: false, noCascalho: false, raspou: false, rompeu: false };
+    aLatG: 0, tomboS: 0, marcha: 1, rpm: 650, rolagem: 0, rolagemVel: 0, freioMotor: false, noCascalho: false, raspou: false, rompeu: false, derrapando: false };
 }
 
 const limitar = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -76,7 +92,13 @@ export function passoCaminhao(e: EstadoCaminhao, comando: ComandoVolante, freioM
   if (v <= 0.05 && motor + gravidade <= freios) v = 0;
   else v = Math.max(0, v + (motor + gravidade - freios) * sg);
   const maxRad = CAMINHAO.estercoMaxRad / (1 + (v / CAMINHAO.estercoVRef) ** 2);
-  const alvo = -(v / CAMINHAO.entreEixosM) * Math.tan(esterco * maxRad);
+  const pedido = -(v / CAMINHAO.entreEixosM) * Math.tan(esterco * maxRad);
+  // Aderência: a guinada que os pneus seguram é a_lat/v; além disso a frente escorrega (sub-esterço).
+  const aderencia = (e.noCascalho ? CAMINHAO.aderenciaCascalhoG : CAMINHAO.aderenciaG) * G;
+  const guinadaMax = aderencia / Math.max(v, 1);
+  const derrapando = v > 3 && Math.abs(pedido) > guinadaMax;
+  const alvo = derrapando ? Math.sign(pedido) * guinadaMax : pedido;
+  if (derrapando) v = Math.max(0, v - CAMINHAO.arrastoDerrapagem * sg);
   const ret = Math.exp(-sg / CAMINHAO.guinadaTauS);
   const guinada = v === 0 ? 0 : alvo + (e.guinada - alvo) * ret;
   const giro = v === 0 ? 0 : alvo * sg + (e.guinada - alvo) * CAMINHAO.guinadaTauS * (1 - ret);
@@ -101,7 +123,12 @@ export function passoCaminhao(e: EstadoCaminhao, comando: ComandoVolante, freioM
   }
   const aLatG = Math.abs(v * guinada) / G;
   const tomboS = aLatG >= CAMINHAO.latTomboG ? e.tomboS + sg : Math.max(0, e.tomboS - sg * 2);
+  // Carroceria na suspensão (mola + amortecedor): curva à esquerda (guinada > 0) joga o corpo para a direita.
+  const alvoRolagem = (v * guinada / G) * CAMINHAO.rolagemPorG;
+  const w = CAMINHAO.rolagemOmega;
+  const rolagemVel = e.rolagemVel + (w * w * (alvoRolagem - e.rolagem) - 2 * CAMINHAO.rolagemZeta * w * e.rolagemVel) * sg;
+  const rolagem = e.rolagem + rolagemVel * sg;
   const { marcha, rpm } = marchaPara(v * 3.6, freioMotor);
   return { x, z, y: p.y, rumo, velocidade: v, guinada, s: p.s, lateral: p.lateral, indice: p.indice, rampa: p.rampa, curvatura: p.curvatura,
-    aLatG, tomboS, marcha, rpm, freioMotor, noCascalho: naAreaDeEscape(p.s, p.lateral) && p.lateral > MEIA_PISTA_M + 2.2, raspou, rompeu };
+    aLatG, tomboS, marcha, rpm, rolagem, rolagemVel, freioMotor, noCascalho: naAreaDeEscape(p.s, p.lateral) && p.lateral > MEIA_PISTA_M + 2.2, raspou, rompeu, derrapando };
 }

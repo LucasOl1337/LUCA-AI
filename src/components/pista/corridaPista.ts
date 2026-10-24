@@ -34,7 +34,7 @@ export function riscosDaPista(c: EstadoCaminhao, radar: RetratoPista['radar'], f
   if (radar && radar.ttcS < 4.5) riscos.set('animal', radar.ttcS < 2.2 ? 'critico' : 'atencao');
   const kph = c.velocidade * 3.6;
   if (falhaFreio && !c.noCascalho && kph > FREIO_RISCO.atencaoKph) riscos.set('freio', kph > FREIO_RISCO.criticoKph ? 'critico' : 'atencao');
-  if (c.aLatG >= CAMINHAO.latPerigoG) riscos.set('curva', 'critico');
+  if (c.aLatG >= CAMINHAO.latPerigoG || c.derrapando) riscos.set('curva', 'critico');
   else if (c.aLatG >= CAMINHAO.latAvisoG || (curva && curva.distanciaM < 90 && kph > curva.seguraKph + 8)) riscos.set('curva', 'atencao');
   return riscos;
 }
