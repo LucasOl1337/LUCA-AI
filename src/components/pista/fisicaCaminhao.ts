@@ -12,8 +12,10 @@ import { MEIA_PISTA_M, GUARD_RAIL_M, naAreaDeEscape, projetarNaPista, SERRA, typ
 const G = 9.81;
 export const CAMINHAO = Object.freeze({
   entreEixosM: 5.2,
-  meiaLarguraM: 1.3,
-  frenteM: 4.6,
+  // Mesmo envoltório dos modelos SOMPO, em metros a partir do pivô.
+  meiaLarguraM: 1.38,
+  frenteM: 4.62,
+  trasM: 4.48,
   /** Esterço máximo parado; encolhe com a velocidade (teclado não fica nervoso a 80 km/h). */
   estercoMaxRad: 0.55,
   estercoVRef: 8,

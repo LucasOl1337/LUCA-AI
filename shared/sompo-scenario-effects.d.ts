@@ -23,6 +23,7 @@ export interface SompoEffectFrame {
 export const SOMPO_SCENARIO_EFFECTS: Readonly<Record<SompoSimulationScenarioId, SompoEffectScene>>;
 export const SOMPO_SCENARIO_OUTCOME_EFFECTS: Readonly<Partial<Record<SompoSimulationScenarioId, Readonly<Record<string, SompoEffectScene>>>>>;
 export function getSompoScenarioEffects(scenarioId: string, elapsedMs?: number, outcomeId?: string): SompoEffectFrame;
+export const SOMPO_ANIMAL_SIZE: Readonly<{ length: number; height: number; width: number }>;
 export function getSompoAnimalPose(animalZ: number, elapsedMs?: number, visibleUntilMs?: number | null): {
   x: number; z: number; yaw: number; visible: boolean; length: number; height: number; width: number;
 };

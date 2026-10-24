@@ -5,8 +5,8 @@
  */
 import { COMANDO_PARADO, passoVolante, type ComandoVolante } from '../gameplay/volante';
 import { CAMINHAO, criarCaminhao, passoCaminhao, type EstadoCaminhao } from './fisicaCaminhao';
-import { bateuNoAnimal, criarAnimal, passoAnimal, radarAnimal, type EstadoAnimal } from './animalNaPista';
-import { PISTA_SERRA, proximaCurva, SERRA, GUARD_RAIL_M, type PistaSerra } from './pistaSerra';
+import { bateuNoAnimal, criarAnimal, instanteDoContato, passoAnimal, radarAnimal, type EstadoAnimal } from './animalNaPista';
+import { PISTA_SERRA, projetarNaPista, proximaCurva, SERRA, GUARD_RAIL_M, type PistaSerra } from './pistaSerra';
 import type { MotivoCircuito, SensorPista } from '../gameplay/circuito';
 
 export type FasePista = 'pronto' | 'dirigindo' | 'fim';
@@ -81,11 +81,23 @@ export function criarCorridaPista(pista: PistaSerra = PISTA_SERRA) {
       if (inicioFalha === null && caminhao.s >= SERRA.falhaFreioS) { inicioFalha = tempoMs; eventos.push({ tipo: 'falha-freio' }); }
       if (inicioFalha !== null) eficiencia = Math.max(0, 1 - (tempoMs - inicioFalha) / 1000 / SERRA.falhaFreioS_duracao);
       const antes = animal.ativo;
+      const anterior = { animal, caminhao };
       caminhao = passoCaminhao(caminhao, comandos, freioMotor, eficiencia, seg, pista);
       animal = passoAnimal(animal, caminhao, seg, pista);
+      const contato = instanteDoContato(animal, caminhao, anterior);
+      if (contato !== null) {
+        // O palco e a telemetria partem do contato, não de uma pose já dentro do bovino.
+        for (const chave of ['x', 'z', 'y', 'rumo', 's', 'lateral', 'rolagem'] as const)
+          caminhao[chave] = anterior.caminhao[chave] + (caminhao[chave] - anterior.caminhao[chave]) * contato;
+        const p = projetarNaPista(pista, caminhao.x, caminhao.z, caminhao.indice);
+        caminhao = { ...caminhao, y: p.y, s: p.s, lateral: p.lateral, indice: p.indice };
+        for (const chave of ['x', 'z', 'lateral', 't'] as const)
+          animal[chave] = anterior.animal[chave] + (animal[chave] - anterior.animal[chave]) * contato;
+        tempoMs -= seg * (1 - contato) * 1000;
+      }
       if (!antes && animal.ativo) eventos.push({ tipo: 'animal' });
       if (caminhao.raspou) eventos.push({ tipo: 'raspou' });
-      const motivo = motivoDoFim(caminhao, animal, pista);
+      const motivo = contato !== null ? 'colisao' : motivoDoFim(caminhao, animal, pista);
       if (motivo) {
         if (motivo === 'colisao') animal = { ...animal, atingido: true };
         eventos.push({ tipo: 'fim', motivo, velocidadeKph: caminhao.velocidade * 3.6 });

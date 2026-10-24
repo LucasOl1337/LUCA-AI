@@ -148,6 +148,8 @@ export function getSompoScenarioEffects(scenarioId, elapsedMs = 0, outcomeId) {
 /** Metres, +X along the road and +Z across it. After clearing the shoulder the
  * Nelore turns into the pasture, away from the inspection camera, then exits.
  * This only controls staging; the telemetric script and snapshot remain intact. */
+export const SOMPO_ANIMAL_SIZE = Object.freeze({ length: 2.35, height: 1.65, width: 0.95 });
+
 export function getSompoAnimalPose(animalZ, elapsedMs = 0, visibleUntilMs = 13000) {
   const atMs = Number.isFinite(elapsedMs) ? Math.max(0, elapsedMs) : 0;
   const z = Number.isFinite(animalZ) ? animalZ : -6;
@@ -157,8 +159,6 @@ export function getSompoAnimalPose(animalZ, elapsedMs = 0, visibleUntilMs = 1300
     z,
     yaw: -Math.atan2(1, 36 * departure / 4.2),
     visible: atMs < (Number.isFinite(visibleUntilMs) ? visibleUntilMs : Infinity),
-    length: 2.35,
-    height: 1.65,
-    width: 0.95,
+    ...SOMPO_ANIMAL_SIZE,
   };
 }

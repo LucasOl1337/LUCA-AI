@@ -76,7 +76,15 @@ export function criarAtoresSerra(scene: THREE.Scene, camera: THREE.PerspectiveCa
       // Animal: pose do createSompoAnimal com âncora que cancela a curva roteirizada (o jogo manda na posição).
       const a = r.animal;
       const z = a.lateral, posePadrao = getSompoAnimalPose(z);
-      animal.update(a.ativo || a.atingido, z, relogio, reduzido, 7 - posePadrao.x, a.andando ? 1 : 0, a.atingido && impactoMs !== null ? relogio - impactoMs : null);
+      const rumoLocal = c.rumo - pAnimal.rumo;
+      animal.update(a.ativo || a.atingido, z, relogio, reduzido, 7 - posePadrao.x, a.andando ? 1 : 0,
+        a.atingido && impactoMs !== null ? relogio - impactoMs : null, {
+          // O motor atravessa em linha reta; não herdar a curva do roteiro SOMPO.
+          yaw: -Math.PI / 2,
+          impacto: a.atingido ? { velocidadeMs: c.velocidade, avancoX: Math.cos(rumoLocal) * avanco,
+            avancoZ: -Math.sin(rumoLocal) * avanco, avancoY: c.rampa * avanco,
+            lado: Math.cos(rumoLocal) >= 0 ? -1 : 1 } : undefined,
+        });
 
       // Efeitos: freio em brasa e fumaça depois da falha, pisca-alerta, luz de freio, fumaça de pneu na curva e cascalho.
       if (r.falhaFreio && inicioFalha === null) inicioFalha = relogio;
