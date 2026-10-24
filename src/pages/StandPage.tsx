@@ -103,6 +103,8 @@ export default function StandPage() {
   const [modo, despacharModo] = useReducer(reduzirModoAgora, undefined, () => modoInicial(Date.now(), { palcoAfkMs: palcoAfkDaUrl(window.location.search) }));
   const palcoAtual = useRef(modo.palco);
   palcoAtual.current = modo.palco;
+  const palcoFixoAtual = useRef(modo.palco && modo.palcoFixo);
+  palcoFixoAtual.current = modo.palco && modo.palcoFixo;
   const telas = useTelasDoApp(modo.modo === 'vitrine');
   // Webcam sempre ligada no Totem: um stream para todas as abas (presença para a coruja, sono na Simulação).
   const webcam = useCameraTotem(modo.modo);
@@ -378,10 +380,12 @@ export default function StandPage() {
     if (modoAtual.current === 'simulacao') { despacharModo({ tipo: 'voltar_coruja' }); return; }
     if (modoAtual.current !== 'coruja') { despacharModo({ tipo: 'voltar_coruja' }); return; }
     if (estado.tela === 'video') { terminarVideo(); return; }
-    if (palcoAtual.current) { despacharModo({ tipo: 'palco', ligado: false }); return; }
+    // ○ encerra a conversa; só □ / F / botão de tela cheia tira o palco fixo.
     if (estado.tela === 'conversa' || voz.ativa) encerrarConversa();
   }, [estado.tela, voz.ativa, terminarVideo, encerrarConversa]);
   const agirNoPad = useCallback((acao: AcaoNavegacao) => {
+    // No palco fixo, conversar/encerrar mantém a coruja grande; □ é a saída.
+    if (palcoFixoAtual.current && !['conversar', 'voltar', 'tela_cheia'].includes(acao.tipo)) return;
     if (acao.tipo === 'escolher') { confirmarFocoPad(); return; }
     if (acao.tipo === 'voltar') { voltarNoPad(); return; }
     if (acao.tipo === 'menu') {
@@ -437,12 +441,12 @@ export default function StandPage() {
   /** Toque na tela: acende a barra; na Atração, conversa (com voz) ou mostra a Vitrine (sem voz). */
   const tocar = useCallback(() => {
     despacharModo({ tipo: 'atividade', toque: true });
-    // No palco o primeiro toque só acorda a Coruja (a tela volta com tudo); o seguinte conversa.
-    if (palcoAtual.current) return;
+    // No palco fixo o toque já conversa, mantendo a coruja em tela cheia.
+    if (palcoAtual.current && !modo.palcoFixo) return;
     if (modo.modo !== 'coruja' || estado.tela !== 'atracao') return;
     if (vozStand === 'ligada') iniciar();
     else if (vozStand === 'desligada') despacharModo({ tipo: 'ir', modo: 'vitrine' });
-  }, [modo.modo, estado.tela, vozStand, iniciar]);
+  }, [modo.modo, modo.palcoFixo, estado.tela, vozStand, iniciar]);
 
   useEffect(() => {
     const mandar = (tipo: 'encerrar' | 'reiniciar') => {

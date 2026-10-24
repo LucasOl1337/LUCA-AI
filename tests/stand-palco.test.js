@@ -40,7 +40,7 @@ test('sai do palco com toque, tecla, voz ou rosto (atividade) e o tempo recomeç
   assert.equal(e.palco, true);
 });
 
-test('palco de propósito fica com conversa e rosto na frente; gesto tira (24/10: a voz derrubava a tela cheia)', () => {
+test('palco de propósito mantém conversa, PTT, toque e teclas; só o comando de tela cheia desliga', () => {
   let e = passo(totem(), { tipo: 'palco', ligado: true }, 1000);
   for (const [i, agora] of [2000, 2500, 9000].entries()) {
     e = passo(e, { tipo: 'atividade', presenca: true }, agora);
@@ -48,7 +48,11 @@ test('palco de propósito fica com conversa e rosto na frente; gesto tira (24/10
   }
   assert.equal(e.marco, 9000, 'presença segura o tempo');
   e = passo(e, { tipo: 'atividade' }, 10_000);
-  assert.equal(e.palco, false, 'controle, tecla ou toque tiram');
+  assert.equal(e.palco, true, 'iniciar a conversa e apertar o PTT mantêm a coruja grande');
+  e = passo(e, { tipo: 'atividade', toque: true }, 10_100);
+  assert.equal(e.palco, true, 'toque também mantém a coruja grande');
+  e = passo(e, { tipo: 'palco', ligado: false }, 10_200);
+  assert.equal(e.palco, false, 'o botão de tela cheia desliga');
   // Palco por tempo: presença (rosto chegando, alguém falando) tira, como antes.
   let afk = passo(totem(), { tipo: 'relogio' }, PALCO_AFK_MS);
   assert.equal(afk.palco, true);

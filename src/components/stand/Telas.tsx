@@ -26,7 +26,7 @@ export function Atracao({ variante, nivel, chamada, titulo }: BaseTela & { chama
  * Palco (24/10): a coruja sozinha, em tela inteira, como alguém dentro do
  * monitor. Sem texto em volta: nem chamada, marca, painel, selo ou webcam.
  * Viva no repouso (respira, pisca e olha de lado pelo próprio rig; flutua de leve).
- * Fala tira do palco (atividade), então legenda aqui nunca é necessária.
+ * No palco fixo a conversa continua com a coruja grande, sem texto em volta.
  */
 export function Palco({ variante, nivel, voz }: BaseTela & { voz: EstadoVoz }) {
   return (

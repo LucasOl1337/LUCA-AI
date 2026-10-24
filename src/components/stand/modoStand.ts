@@ -17,7 +17,7 @@
  * coruja em tela inteira. Entra sozinho após `palcoAfkMs` sem ninguém (padrão
  * `PALCO_AFK_MS`) ou de propósito (botão "Tela cheia", tecla F). Sai com
  * toque, tecla, controle, alguém falando com a Coruja ou rosto chegando. Ligado
- * de propósito, só gesto tira: conversa em andamento e rosto na frente seguem no
+ * de propósito, só o comando de tela cheia tira: conversa, toque, PTT e rosto seguem no
  * palco (24/10: cada passo da voz derrubava a tela cheia no totem). Com o
  * palco ligado ele é o repouso: a Coruja não cai mais sozinha na Vitrine
  * (Vitrine segue pelo botão e pela voz). `palcoAfkMs: null` mantém o repouso
@@ -64,7 +64,7 @@ export interface EstadoModo {
   pagina: PaginaSite | null;
   /** Coruja sozinha em tela inteira (só com `modo === 'coruja'`). */
   palco: boolean;
-  /** Palco ligado de propósito (botão, F, □): presença não o tira, só gesto. */
+  /** Palco ligado de propósito (botão, F, □): só o comando de tela cheia o tira. */
   palcoFixo?: boolean;
   /** Tempo sem ninguém até o palco; `null` = repouso antigo na Vitrine. */
   palcoAfkMs: number | null;
@@ -146,8 +146,8 @@ function passoModo(atual: EstadoModo, entrada: EntradaModo, agora: number, dispo
       return { ...atual, modo: 'coruja', pagina: null, pausado: false, palco: true, palcoFixo: true, marco: agora };
     }
     case 'atividade':
-      // Presença sem gesto (voz em andamento, rosto) não derruba o palco que alguém ligou de propósito.
-      if (entrada.presenca && atual.palco && atual.palcoFixo) return { ...atual, marco: agora };
+      // Conversar (inclusive iniciar por toque, teclado ou PTT) mantém a coruja grande.
+      if (atual.palco && atual.palcoFixo) return { ...atual, marco: agora };
       // Gente na frente (toque, tecla, controle, voz, rosto): o palco sai e a Coruja volta com tudo.
       return { ...atual, palco: false, palcoFixo: false, marco: agora, barraAte: entrada.toque ? agora + BARRA_MS : atual.barraAte };
     case 'trocar_video':
