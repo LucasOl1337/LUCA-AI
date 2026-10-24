@@ -93,6 +93,7 @@ test('relatório no formato do circuito: servidor aceita, Laboratório lê o CSV
   assert.equal(resumo.veiculo, 'caminhao'); assert.equal(resumo.cenario, 'serra-sem-freio'); assert.equal(resumo.desfecho, 'chegada');
 });
 
-test('trator antigo segue aceito com veículo trator', () => {
-  assert.equal(contextoCircuito({ versao: 1, origem: 'SIMULAÇÃO', runId: 'x', elapsedMs: 10, episodios: [], resultado: { motivo: 'chegada' } }).veiculo, 'trator');
+test('trator antigo segue aceito sem veículo declarado (a Fila assume trator)', () => {
+  const ctx = contextoCircuito({ versao: 1, origem: 'SIMULAÇÃO', runId: 'x', elapsedMs: 10, episodios: [], resultado: { motivo: 'chegada' } });
+  assert.ok(ctx); assert.equal(ctx.veiculo, undefined); assert.equal(ctx.cenario, undefined);
 });

@@ -20,8 +20,10 @@ export function contextoCircuito(raw) {
   }
   const respostas = episodios.flatMap((e) => e.resposta ? [e.resposta.latenciaMs] : []);
   const pausas = Array.isArray(raw.pausas) ? raw.pausas.slice(0, 300).filter((p) => numero(p.inicioMs) && numero(p.duracaoMs) && ['menu', 'aba oculta'].includes(p.motivo)).map(({inicioMs,duracaoMs,motivo}) => ({inicioMs,duracaoMs,motivo})) : [];
-  const veiculo = raw.veiculo === 'caminhao' ? 'caminhao' : 'trator';
-  return { origem: 'SIMULAÇÃO', runId: raw.runId, veiculo, cenario: veiculo === 'caminhao' ? 'serra-sem-freio' : 'circuito', inicioIso: typeof raw.inicioIso === 'string' ? raw.inicioIso.slice(0, 40) : null,
+  // Só registros da Pista declaram veículo/cenário; registro antigo do trator fica sem (quem lê decide o padrão).
+  const veiculo = raw.veiculo === 'caminhao' || raw.veiculo === 'trator' ? raw.veiculo : undefined;
+  const cenario = veiculo === 'caminhao' ? 'serra-sem-freio' : veiculo === 'trator' ? 'circuito' : undefined;
+  return { origem: 'SIMULAÇÃO', runId: raw.runId, veiculo, cenario, inicioIso: typeof raw.inicioIso === 'string' ? raw.inicioIso.slice(0, 40) : null,
     fimIso: typeof raw.fimIso === 'string' ? raw.fimIso.slice(0, 40) : null,
     resultado: { motivo: raw.resultado.motivo, tempoMs: raw.elapsedMs },
     unidades: { tempo: 'ms ativos monotônicos, pausas excluídas', velocidade: 'km/h', distancia: 'cm', rolagem: 'graus' },
