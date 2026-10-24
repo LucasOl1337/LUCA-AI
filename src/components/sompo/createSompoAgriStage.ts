@@ -1,3 +1,4 @@
+import { createSompoFloodSheets } from './createSompoFloodSheet';
 import * as THREE from 'three';
 import { criarPropsRurais } from '../gameplay/criarPropsRurais';
 import { COLISORES_RURAIS } from '../gameplay/propsRurais';
@@ -397,19 +398,8 @@ export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, out
       bale.position.set(item.x, field.groundHeight(item.x, item.z), item.z);
     });
   };
-  // Área alagada: lâmina plana, um pouco acima do chão, sem asset novo.
-  const waterMaterial = waterZones?.length ? new THREE.MeshStandardMaterial({ color: 0x2f6f9a, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.82 }) : null;
-  const waterGeometries: THREE.PlaneGeometry[] = [];
-  for (const zone of waterZones ?? []) {
-    const geometry = new THREE.PlaneGeometry(zone.x1 - zone.x0, zone.z1 - zone.z0);
-    waterGeometries.push(geometry);
-    const sheet = new THREE.Mesh(geometry, waterMaterial!);
-    sheet.rotation.x = -Math.PI / 2;
-    const cx = (zone.x0 + zone.x1) / 2, cz = (zone.z0 + zone.z1) / 2;
-    sheet.position.set(cx, field.groundHeight(cx, cz) + 0.04, cz);
-    sheet.name = 'area-alagada';
-    worldRoot.add(sheet);
-  }
+  // Área alagada: lâmina com margem rasa irregular, no mesmo retângulo do geofence.
+  const flood = createSompoFloodSheets(worldRoot, waterZones ?? [], field.groundHeight);
   beacon.position.set(beaconX, beaconTop, beaconZ);
   machine.add(beacon);
   // Giroflex de verdade varre o campo: um feixe estreito girando no topo.
@@ -671,8 +661,7 @@ export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, out
       resizeObserver.disconnect();
       soltarOrbit(orbit);
       field.dispose();
-      for (const geometry of waterGeometries) geometry.dispose();
-      waterMaterial?.dispose();
+      flood.dispose();
       if (model) disposeSompoAgriAsset(model);
       assets.dispose();
       skyMap.dispose();
