@@ -65,7 +65,12 @@ export class SompoDepthAOPass extends Pass {
           sum += texture2D(tAO, uv).r * w; weight += w;
         }
         color.rgb *= mix(1.0, sum / max(weight, 1e-4), strength);
-        gl_FragColor = color;
+        // Match the former post-AO sanitize pass before invalid HDR hits bloom.
+        // Half-float storage overflow also used to become Inf on the next read.
+        if(isnan(color.r)||isinf(color.r)||abs(color.r)>=65520.)color.r=0.;
+        if(isnan(color.g)||isinf(color.g)||abs(color.g)>=65520.)color.g=0.;
+        if(isnan(color.b)||isinf(color.b)||abs(color.b)>=65520.)color.b=0.;
+        gl_FragColor = vec4(color.rgb, 1.);
       }`,
   });
   private readonly aoQuad = new FullScreenQuad(this.aoMaterial);

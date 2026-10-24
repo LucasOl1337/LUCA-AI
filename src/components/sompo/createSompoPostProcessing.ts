@@ -31,21 +31,7 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
   composer.addPass(new RenderPass(scene, camera));
   const ambientOcclusion = new SompoDepthAOPass(camera);
   composer.addPass(ambientOcclusion);
-  // Um texel NaN/Inf contaminaria todos os mips do bloom e apagaria o frame
-  // inteiro. O passe zera qualquer valor inválido antes da extração de altas.
-  const sanitize = new ShaderPass({
-    uniforms: { tDiffuse: { value: null } },
-    vertexShader: 'varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-    fragmentShader: `varying vec2 vUv; uniform sampler2D tDiffuse;
-      void main(){
-        vec4 c=texture2D(tDiffuse,vUv);
-        if(isnan(c.r)||isinf(c.r))c.r=0.;
-        if(isnan(c.g)||isinf(c.g))c.g=0.;
-        if(isnan(c.b)||isinf(c.b))c.b=0.;
-        gl_FragColor=vec4(c.rgb,1.);
-      }`,
-  });
-  composer.addPass(sanitize);
+  // The AO composite sanitizes its HDR output before bloom in the same draw.
   // Limiar acima do teto branco do baú ao sol: em 1.1 ele florescia num halo
   // leitoso sobre a carroceria e os aros; farol, sol e reflexo seguem acima.
   const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.2, 0.35, 1.6);
@@ -82,6 +68,7 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
   composer.addPass(grade);
   // Totem com FPS baixo desliga a cadeia inteira e cai no render direto.
   let enabled = true;
+  let disposed = false;
   return {
     resize(width: number, height: number) {
       composer.setSize(Math.max(1, width), Math.max(1, height));
@@ -92,6 +79,14 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
     /** Quem já gradua no tone mapping (look do gameplay) desliga este passe para não graduar duas vezes. */
     setGrade(value: boolean) { grade.enabled = value; },
     render(_delta: number) { if (enabled) composer.render(); else renderer.render(scene, camera); },
-    dispose() { ambientOcclusion.dispose(); composer.dispose(); target.dispose(); },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      // EffectComposer owns its two buffers, not the passes (including disabled ones).
+      for (const pass of composer.passes) pass.dispose();
+      // Three r185's bloom.dispose() omits this extraction material.
+      bloom.materialHighPassFilter.dispose();
+      composer.dispose();
+    },
   };
 }
