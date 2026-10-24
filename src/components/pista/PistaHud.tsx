@@ -12,7 +12,7 @@ import type { RetratoPista } from './corridaPista';
 import '../gameplay/circuito.css';
 import './pista.css';
 
-const ROTULOS = { animal: 'Animal na pista · freie ou desvie', freio: 'FREIO SEM RESPOSTA · freio-motor e área de escape', curva: 'Curva rápida · reduza ou o caminhão tomba' } as const;
+const ROTULOS = { animal: 'Animal na pista · freie ou desvie', freio: 'FREIO SEM RESPOSTA · freio-motor e área de escape', curva: 'Curva rápida · reduza ou o caminhão tomba', sonolencia: 'Olhos fechados · pare em segurança' } as const;
 const nivel = (r: RetratoPista, s: keyof typeof ROTULOS) => r.riscos.get(s) ?? 'livre';
 export const BOTAO_FREIO_MOTOR = { botao: 1, botaoAlt: 5, ps: '○ ou R1', xbox: 'B ou RB', teclas: ['e', 'shift'] } as const;
 

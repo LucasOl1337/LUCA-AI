@@ -15,7 +15,7 @@ export const INICIO_CIRCUITO: InicioGameplay = {
 };
 export type SensorCircuito = 'feno' | 'agua' | 'encosta' | 'sonolencia';
 /** Sensores do caminhão na serra (Pista): mesmo formato de episódio, para a Fila ler os dois. */
-export type SensorPista = 'animal' | 'freio' | 'curva';
+export type SensorPista = 'animal' | 'freio' | 'curva' | 'sonolencia';
 /** `saida_pista` e `area_escape` só acontecem no caminhão (`serra-sem-freio`). */
 export type MotivoCircuito = 'chegada' | 'colisao' | 'atolamento' | 'tombamento' | 'abandono' | 'saida_pista' | 'area_escape';
 export interface EpisodioCircuito {

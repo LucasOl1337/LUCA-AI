@@ -29,8 +29,10 @@ export type EventoPista = { tipo: 'falha-freio' } | { tipo: 'animal' } | { tipo:
 /** Velocidade (km/h) acima da qual o freio sem resposta é risco; acima de `criticoKph`, crítico. */
 export const FREIO_RISCO = Object.freeze({ atencaoKph: 25, criticoKph: 55 });
 
-export function riscosDaPista(c: EstadoCaminhao, radar: RetratoPista['radar'], falhaFreio: boolean, curva: RetratoPista['curva']) {
+export function riscosDaPista(c: EstadoCaminhao, radar: RetratoPista['radar'], falhaFreio: boolean, curva: RetratoPista['curva'], sono = false) {
   const riscos = new Map<SensorPista, Gravidade>();
+  // Webcam de sonolência do totem (mesma leitura do trator): olhos fechados há 1 s é crítico.
+  if (sono) riscos.set('sonolencia', 'critico');
   if (radar && radar.ttcS < 4.5) riscos.set('animal', radar.ttcS < 2.2 ? 'critico' : 'atencao');
   const kph = c.velocidade * 3.6;
   if (falhaFreio && !c.noCascalho && kph > FREIO_RISCO.atencaoKph) riscos.set('freio', kph > FREIO_RISCO.criticoKph ? 'critico' : 'atencao');
@@ -53,19 +55,20 @@ export function criarCorridaPista(pista: PistaSerra = PISTA_SERRA) {
   let animal = criarAnimal(pista);
   let comandos: ComandoVolante = { ...COMANDO_PARADO };
   let fase: FasePista = 'pronto', tempoMs = 0, eficiencia = 1, inicioFalha: number | null = null;
-  let fim: MotivoCircuito | null = null;
+  let fim: MotivoCircuito | null = null, sono = false;
   let retrato: RetratoPista;
   const montar = (eventos: EventoPista[]): RetratoPista => {
     const radar = radarAnimal(animal, caminhao), curva = proximaCurva(pista, caminhao.s);
     return { fase, tempoMs, caminhao, animal, comandos, eficienciaFreio: eficiencia, falhaFreio: inicioFalha !== null, radar, curva,
-      riscos: fase === 'fim' ? new Map() : riscosDaPista(caminhao, radar, inicioFalha !== null, curva), fim, eventos };
+      riscos: fase === 'fim' ? new Map() : riscosDaPista(caminhao, radar, inicioFalha !== null, curva, sono), fim, eventos };
   };
   retrato = montar([]);
   return {
     ler: () => retrato,
-    /** Um quadro. `freioMotor` = botão segurado (○/B, R1/RB ou E). */
-    quadro(dt: number, desejado: ComandoVolante, freioMotor: boolean): RetratoPista {
+    /** Um quadro. `freioMotor` = botão segurado (○/B, R1/RB ou E); `sonolento` = alarme da webcam. */
+    quadro(dt: number, desejado: ComandoVolante, freioMotor: boolean, sonolento = false): RetratoPista {
       if (fase === 'fim') return retrato;
+      sono = sonolento;
       const eventos: EventoPista[] = [];
       comandos = passoVolante(comandos, desejado, dt);
       if (fase === 'pronto' && comandos.acelerador > 0) fase = 'dirigindo';

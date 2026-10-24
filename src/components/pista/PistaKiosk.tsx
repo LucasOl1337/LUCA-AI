@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { comandoDesejado, setaDaTecla, SETAS_SOLTAS, bordaReiniciar, type SetasVolante } from '../gameplay/volante';
 import { COMANDOS_CABINE } from '../gameplay/comandosCabine';
 import { RotuloCamera } from '../gameplay/AtalhoCabine';
@@ -11,6 +11,8 @@ import { registrarContextoCorrida } from '../gameplay/contextoCorrida';
 import { useSegurancaCabine } from '../gameplay/useSegurancaCabine';
 import type { RelatorioCircuito } from '../gameplay/sessaoCircuito';
 import SeloFps from '../gameplay/SeloFps';
+import { useWebcamCircuito } from '../gameplay/CircuitoHud';
+import { sonoCabine } from '../gameplay/sonoCabine';
 import { criarCorridaPista, type RetratoPista } from './corridaPista';
 import { PISTA_SERRA, pontoLateral } from './pistaSerra';
 import { criarSessaoPista } from './sessaoPista';
@@ -20,6 +22,7 @@ import { BOTAO_FREIO_MOTOR, PistaHud } from './PistaHud';
 import type { VistaPista } from './atoresSerra';
 import './pista.css';
 
+const Webcam = lazy(() => import('../gameplay/WebcamSonoCabine'));
 const ESPERA_RESULTADO_MS = 1200;
 const TECLAS_FREIO_MOTOR = new Set(['e', 'shift']);
 
@@ -30,6 +33,8 @@ const TECLAS_FREIO_MOTOR = new Set(['e', 'shift']);
  */
 export default function PistaKiosk({ seloFps = false, aoAnalisar, aoTrocar }: { seloFps?: boolean; aoAnalisar?(relatorio: RelatorioCircuito): void; aoTrocar?(): void }) {
   const [volta, setVolta] = useState(0);
+  // Webcam de sonolência do totem, como no trator (Lucas, 24/10): vive fora do `key` da corrida.
+  const [webcam] = useWebcamCircuito();
   const corrida = useMemo(() => criarCorridaPista(), [volta]);
   const sessao = useMemo(() => criarSessaoPista(), [volta]);
   const [retrato, setRetrato] = useState<RetratoPista>(() => corrida.ler());
@@ -100,7 +105,7 @@ export default function PistaKiosk({ seloFps = false, aoAnalisar, aoTrocar }: { 
         fmSeguro = freioMotor;
         look = stepLook(look, pad ? { yaw: -applyDeadZone(pad.axes[2] ?? 0), pitch: -applyDeadZone(pad.axes[3] ?? 0) } : { yaw: 0, pitch: 0 }, dt, { recenter: !!pad });
         const congelado = e.menu || document.hidden || !!fim;
-        const r = congelado ? c.ler() : c.quadro(dt, comandoDesejado(pad, setas.current), freioMotor);
+        const r = congelado ? c.ler() : c.quadro(dt, comandoDesejado(pad, setas.current), freioMotor, sonoCabine.ler()?.status === 'alarm');
         if (!congelado) {
           s.quadro(r, new Date().toISOString()); s.registrar(r);
           if (s.registro.resultado && r.fase !== 'fim') c.encerrar(s.registro.resultado.motivo);
@@ -160,6 +165,7 @@ export default function PistaKiosk({ seloFps = false, aoAnalisar, aoTrocar }: { 
     <div ref={palcoRef} className="pista-kiosk-palco" />
     {seloFps && <SeloFps palcoRef={raizRef} />}
     <PistaHud key={volta} r={retrato} sessao={sessao} menu={menu} aoMenu={alterarMenu} aoNovo={novaCorrida} aoAnalisar={(rel) => aoAnalisar?.(rel)} aoTrocar={() => aoTrocar?.()} touch={touch} />
+    {webcam && <Suspense fallback={null}><div className="circuito-webcam" data-config-aberta={menu || !!sessao.registro.resultado}><Webcam silenciosa /></div></Suspense>}
     {retrato.fase === 'dirigindo' && <p className="pista-vista">{vista === 'externa' ? 'Câmera externa' : 'Cabine'} · <RotuloCamera /> troca</p>}
   </div>;
 }

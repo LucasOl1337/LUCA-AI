@@ -112,7 +112,7 @@ export function criarSessaoPista(runId = crypto.randomUUID(), inicioIso = new Da
         }
         if (ep.fimMs !== null || r.riscos.has(ep.sensor as SensorPista)) continue;
         if (!saidas.has(ep)) saidas.set(ep, t);
-        if (t - (saidas.get(ep) ?? t) >= 1000) { ep.fimMs = t; ep.evitado = ep.resposta !== null; }
+        if (t - (saidas.get(ep) ?? t) >= 1000) { ep.fimMs = t; ep.evitado = ep.sensor !== 'sonolencia' && ep.resposta !== null; }
       }
       anterior = { freio: c.freio, esterco: c.esterco, freioMotor: fm };
       if (r.fim) terminar(r.fim, agoraIso);
