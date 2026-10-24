@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Download, FlaskConical, RefreshCw } from 'lucide-react';
+import { ArrowDown, ArrowUp, Download, FileDown, FlaskConical, RefreshCw } from 'lucide-react';
+import { urlLaudo } from '@/components/laudo/BaixarLaudo';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppLocation } from '@/hooks/useAppLocation';
 import { downloadFile } from '@/lib/lab-client';
@@ -140,7 +141,15 @@ export default function FilaBancadaPage() {
                       </>
                     ) : i.estado === 'falhou' ? <p className="fila-falha">{i.erro}</p> : <p className="fila-espera">{i.estado === 'processando' ? 'Os agentes estão analisando.' : 'Aguardando a vez.'}</p>}
                   </div></td>
-                  <td className="fila-acoes"><button type="button" className="fila-botao" onClick={() => abrirCaso(i)}><FlaskConical size={15} aria-hidden />Abrir caso</button></td>
+                  <td className="fila-acoes">
+                    {/* Casos do Laboratório são da conta que enviou: item de outra conta (visão admin) não abre nem gera laudo daqui. */}
+                    {i.proprio ? (
+                      <div className="fila-acoes-grupo">
+                        <button type="button" className="fila-botao" onClick={() => abrirCaso(i)}><FlaskConical size={15} aria-hidden />Abrir caso</button>
+                        {i.estado === 'pronto' && <a className="fila-botao" href={urlLaudo(i.caseId, i.analysisId)} download data-acao="baixar-laudo" aria-label={`Baixar laudo em PDF da corrida de ${quandoBrasilia(i.criadoEm)}`}><FileDown size={15} aria-hidden />PDF</a>}
+                      </div>
+                    ) : <small>Caso de outra conta</small>}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -76,9 +76,10 @@ export function textoCulpado(v: VeredictoFila | null | undefined) {
   if (!v || !Number.isFinite(v.confianca)) return null;
   return `Culpado provável: ${v.rotulo} (${Math.round(v.confianca * 100)}%)`;
 }
-/** "R$ 8.000 – R$ 32.000"; null quando a faixa não foi calculada. */
+/** "R$ 8.000 – R$ 32.000" (mesmo texto do textoFaixa do Veredicto); null quando a faixa não foi calculada. */
 export function textoFaixaFila(v: VeredictoFila | null | undefined) {
   if (!v || v.faixaMinBrl == null || v.faixaMaxBrl == null) return null;
+  if (v.faixaMaxBrl === 0) return 'sem dano material estimado';
   return v.faixaMinBrl === v.faixaMaxBrl ? brl(v.faixaMinBrl) : `${brl(v.faixaMinBrl)} – ${brl(v.faixaMaxBrl)}`;
 }
 export const quandoBrasilia = (iso: string) => new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });

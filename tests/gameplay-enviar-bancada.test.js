@@ -74,6 +74,7 @@ test('tabela: veredicto vira "Culpado provável" rotulado estimativa; caso antig
   assert.match(textoFaixaFila(v), /^R\$\s8\.000 – R\$\s32\.000$/);
   assert.equal(textoCulpado(undefined), null); assert.equal(textoCulpado(null), null);
   assert.equal(textoFaixaFila({ ...v, faixaMinBrl: null, faixaMaxBrl: null }), null);
+  assert.equal(textoFaixaFila({ ...v, faixaMinBrl: 0, faixaMaxBrl: 0 }), 'sem dano material estimado');
   const corrida = { veiculo: 'trator', cenario: 'circuito', desfecho: 'colisao', desfechoTitulo: null, tempoMs: 1000, nota: null, avisos: 0, semResposta: 0, sinistrosEvitados: 0, reacaoMediaMs: null, runId: 'r' };
   const item = { id: 'a', caseId: 'c', estado: 'pronto', posicao: 0, criadoEm: '2026-10-24T11:00:00Z', tentativas: 1, erro: null, corrida, parecer: { status: 'completo', eixos: '4/4', resumo: 'x', hipoteses: 0, principal: null, veredicto: v } };
   const [cab, linha] = csvDaFila([item]).replace('\uFEFF', '').split('\r\n');
@@ -82,4 +83,12 @@ test('tabela: veredicto vira "Culpado provável" rotulado estimativa; caso antig
   assert.equal(col('impacto_min_brl_estimativa'), '8000');
   const tela = fs.readFileSync(new URL('../src/pages/FilaBancadaPage.tsx', import.meta.url), 'utf8');
   assert.match(tela, /fila-rotulo-estimativa">estimativa</);
+});
+
+test('tabela: link PDF do laudo só em item pronto da própria conta, pela urlLaudo do Laudo', async () => {
+  const tela = fs.readFileSync(new URL('../src/pages/FilaBancadaPage.tsx', import.meta.url), 'utf8');
+  assert.match(tela, /i\.proprio \?/);
+  assert.match(tela, /i\.estado === 'pronto' && <a className="fila-botao" href=\{urlLaudo\(i\.caseId, i\.analysisId\)\} download/);
+  const { urlLaudo } = await loadFrontendModule('../../src/components/laudo/BaixarLaudo.tsx');
+  assert.equal(urlLaudo('lab_x', 'a/1'), '/api/lab/cases/lab_x/laudo.pdf?analise=a%2F1');
 });
