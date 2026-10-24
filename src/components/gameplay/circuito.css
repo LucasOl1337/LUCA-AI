@@ -16,7 +16,8 @@
 @media (pointer:coarse) { .circuito-touch { display:flex; } }
 /* Fora do HUD da corrida (vive entre corridas): mesmo lugar e camada de antes, sem pegar o arraste do olhar. */
 .circuito-webcam { pointer-events:none; }
-.circuito-webcam .gameplay-webcam { top:84px; left:18px; right:auto; width:140px; }
+/* No totem os 15% de cima da tela ficam tampados (moldura/menu): webcam e mapa começam abaixo disso (Lucas, 24/10). */
+.circuito-webcam .gameplay-webcam { top:calc(15vh + 20px); left:18px; right:auto; width:140px; }
 .circuito-webcam .gameplay-webcam[hidden] { display:none; }
 .circuito-webcam[data-config-aberta=true] { visibility:hidden; }
 .circuito-relatorio,.circuito-turno { background:#1b2922; border:1px solid #455545; border-radius:12px; padding:22px; margin:24px 0; }
@@ -30,14 +31,14 @@
 .circuito-sensores div small { grid-column:1/-1; font-size:12px; color:#c4d5be; }
 .circuito-sensores [data-nivel=atencao] { color:#ffe092; }
 .circuito-sensores [data-nivel=critico] { color:#ffad9b; border-left:3px solid #fb806c; padding-left:7px; }
-.circuito-hud .gameplay-mapa { right:18px; bottom:auto; top:65px; width:200px; color:#dce6d5; }
+.circuito-hud .gameplay-mapa { right:18px; bottom:auto; top:calc(15vh + 16px); width:200px; color:#dce6d5; }
 .circuito-hud .gameplay-mapa small { font-size:10px; line-height:1.5; }
 @media(max-width:600px) {
   .circuito-estado { left:10px; right:10px; top:10px; gap:12px; }
   .circuito-menu-botao { top:60px; left:10px; right:auto; }
-  .gameplay-com-cabine .circuito-hud .gameplay-mapa { top:60px; right:10px; width:110px; transform:none; margin:0; }
+  .gameplay-com-cabine .circuito-hud .gameplay-mapa { top:calc(15vh + 12px); right:10px; width:110px; transform:none; margin:0; }
   .circuito-avisos { top:230px; left:10px; max-width:240px; }
-  .circuito-webcam .gameplay-webcam { top:130px; left:10px; width:120px; }
+  .circuito-webcam .gameplay-webcam { top:calc(15vh + 70px); left:10px; width:120px; }
 }
 .gameplay-mapa-rota { fill:none; stroke:#e5f4ab; stroke-width:1.1; stroke-dasharray:2 2; }
 .gameplay-mapa-fardo { fill:#ff7967; stroke:#ffd2c1; stroke-width:.6; }

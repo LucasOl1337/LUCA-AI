@@ -24,7 +24,7 @@
   .pista-hud .circuito-sensores { width:auto; right:10px; left:10px; bottom:72px; display:grid; grid-template-columns:1fr 1fr; gap:0 10px; padding:8px; }
   .pista-hud .circuito-sensores>small { grid-column:1/-1; }
   .pista-hud .circuito-sensores div small { display:none; }
-  .pista-mapa { top:60px; right:10px; width:120px; }
+  .pista-mapa { top:calc(15vh + 12px); right:10px; width:120px; }
   .pista-vista { display:none; }
 }
 /* Seletor Trator | Caminhão (só antes de partir): canto superior, longe do HUD do circuito. */
