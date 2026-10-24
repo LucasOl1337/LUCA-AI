@@ -74,3 +74,16 @@ test('a corrida seguinte no motor vivo dá o mesmo resultado que a primeira com 
   const referencia = JSON.stringify({ resultado: r.resultado, episodios: r.episodios, marco: r.proximoMarco, fim: novo.ler() });
   for (const atual of resultados) assert.equal(atual, referencia);
 });
+
+test('palco vivo: a troca de sessão zera os amortecedores de câmera (externa e cabeça da cabine)', async () => {
+  const fs = await import('node:fs');
+  const fonte = fs.readFileSync(new URL('../src/components/gameplay/GameplayKiosk.tsx', import.meta.url), 'utf8');
+  const linha = fonte.split('\n').find((l) => l.includes('sessaoDoFim !== sessao'));
+  assert.ok(linha, 'laço do palco detecta corrida nova');
+  assert.match(linha, /externa\.reiniciar\(\)/); assert.match(linha, /cabeca\.reiniciar\(\)/);
+  const { criarCabecaCabine } = await loadFrontendModule('../../src/components/gameplay/vistaTrator.ts');
+  const cabeca = criarCabecaCabine();
+  for (let i = 0; i < 30; i++) cabeca.passo(0.8, 3, 1 / 30);
+  cabeca.reiniciar();
+  assert.deepEqual(cabeca.passo(0, 0, 0), { rolagemGraus: 0, olharGraus: 0 });
+});
