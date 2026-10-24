@@ -1,5 +1,6 @@
 import { createSompoFloodSheets } from './createSompoFloodSheet';
 import { createSompoFieldFence } from './createSompoFieldFence';
+import { createSompoTireTracks } from './createSompoTireTracks';
 import { TRATOR } from '../gameplay/fisicaTrator';
 import * as THREE from 'three';
 import { criarPropsRurais } from '../gameplay/criarPropsRurais';
@@ -233,6 +234,7 @@ export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, out
   const propsRurais = ruralProps ? criarPropsRurais(worldRoot, field.groundHeight) : null;
   // Limite físico do trator vira cerca de verdade: o bico (≈2,6 m à frente do centro) encosta no arame.
   const cercaTalhao = ruralProps ? createSompoFieldFence(worldRoot, TRATOR.cercaM + 2.6, field.groundHeight) : null;
+  const rastro = ruralProps ? createSompoTireTracks(worldRoot, field.groundHeight) : null;
   if (circuitRoute) criarSinalizacaoCircuito(worldRoot, circuitRoute, field.groundHeight);
   const atmosphere = createSompoAtmosphere(scene, renderer, field.sun);
   const post = createSompoPostProcessing(renderer, scene, camera);
@@ -562,6 +564,7 @@ export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, out
     const contactHeight = rig?.supportHeight(machine.rotation, x, z, field.groundHeight) ?? 0;
     machine.position.set(x, field.groundHeight(x, z) + contactHeight + THREE.MathUtils.clamp(frame.vertical, -0.6, 1) - frame.sink * .5, z);
     if (effort > 0.02) machine.position.y += effort * .014 * (0.5 + 0.5 * Math.sin(shakeT * 51));
+    rastro?.update(machine);
     const studio = studioRef?.current ?? SOMPO_STUDIO_DEFAULT;
     field.update(frame, machine.position, camera.position, reduceMotion.matches, studio.wind, elapsed);
     pasture.update(reduceMotion.matches ? 0 : elapsed / 1000);
@@ -655,7 +658,7 @@ export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, out
     dispose() {
       disposed = true;
       propsRurais?.dispose();
-      cercaTalhao?.dispose();
+      cercaTalhao?.dispose(); rastro?.dispose();
       soltarLutCompartilhada(renderer, scene);
       pasture.dispose();
       lookAtivo?.dispose();
