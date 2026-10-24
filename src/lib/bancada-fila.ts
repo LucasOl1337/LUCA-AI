@@ -6,7 +6,9 @@ export interface CorridaFila {
   tempoMs: number | null; nota: number | null; avisos: number | null; semResposta: number | null;
   sinistrosEvitados: number | null; reacaoMediaMs: number | null; runId: string | null;
 }
-export interface ParecerFila { status: 'completo' | 'parcial'; eixos: string; resumo: string; hipoteses: number; principal: string | null }
+/** Resumo do `analysis.verdict` (contrato veredicto v1): estimativa, não laudo. Ausente/null em caso antigo. */
+export interface VeredictoFila { culpado: string; rotulo: string; confianca: number; faixaMinBrl: number | null; faixaMaxBrl: number | null }
+export interface ParecerFila { status: 'completo' | 'parcial'; eixos: string; resumo: string; hipoteses: number; principal: string | null; veredicto?: VeredictoFila | null }
 export interface ItemFila {
   id: string; caseId: string; caseName: string; estado: EstadoFila; posicao: number;
   criadoEm: string; iniciadoEm: string | null; concluidoEm: string | null; tentativas: number; erro: string | null;
@@ -68,6 +70,17 @@ export function textoNota(c: CorridaFila) {
   if (c.avisos !== null) partes.push(`${c.avisos} ${c.avisos === 1 ? 'aviso' : 'avisos'}${c.semResposta ? `, ${c.semResposta} sem resposta` : ''}`);
   return partes.join(' · ') || '—';
 }
+const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+/** "Culpado provável: Operador humano (72%)"; null sem veredicto ou indeterminado sem confiança. */
+export function textoCulpado(v: VeredictoFila | null | undefined) {
+  if (!v || !Number.isFinite(v.confianca)) return null;
+  return `Culpado provável: ${v.rotulo} (${Math.round(v.confianca * 100)}%)`;
+}
+/** "R$ 8.000 – R$ 32.000"; null quando a faixa não foi calculada. */
+export function textoFaixaFila(v: VeredictoFila | null | undefined) {
+  if (!v || v.faixaMinBrl == null || v.faixaMaxBrl == null) return null;
+  return v.faixaMinBrl === v.faixaMaxBrl ? brl(v.faixaMinBrl) : `${brl(v.faixaMinBrl)} – ${brl(v.faixaMaxBrl)}`;
+}
 export const quandoBrasilia = (iso: string) => new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 export type ColunaFila = 'quando' | 'veiculo' | 'desfecho' | 'nota' | 'estado';
@@ -95,11 +108,12 @@ function celula(valor: unknown) {
 }
 /** CSV (separador `;`, BOM para o Excel em pt-BR) com o que a tabela mostra e os ids para cruzar com o Laboratório. */
 export function csvDaFila(itens: readonly ItemFila[]) {
-  const cabecalho = ['enviado_em', 'estado', 'veiculo', 'cenario', 'desfecho', 'nota', 'tempo_s', 'avisos', 'sem_resposta', 'riscos_evitados', 'reacao_media_ms', 'parecer', 'eixos', 'hipotese_principal', 'erro', 'caso', 'run_id', 'id'];
+  const cabecalho = ['enviado_em', 'estado', 'veiculo', 'cenario', 'desfecho', 'nota', 'tempo_s', 'avisos', 'sem_resposta', 'riscos_evitados', 'reacao_media_ms', 'parecer', 'eixos', 'hipotese_principal', 'culpado_provavel_estimativa', 'confianca_estimativa', 'impacto_min_brl_estimativa', 'impacto_max_brl_estimativa', 'erro', 'caso', 'run_id', 'id'];
   const linhas = itens.map((i) => [
     i.criadoEm, ROTULO_ESTADO[i.estado], i.corrida.veiculo, i.corrida.cenario, textoDesfecho(i.corrida), i.corrida.nota,
     i.corrida.tempoMs === null ? '' : (i.corrida.tempoMs / 1000).toFixed(1), i.corrida.avisos, i.corrida.semResposta, i.corrida.sinistrosEvitados,
-    i.corrida.reacaoMediaMs, i.parecer?.resumo, i.parecer?.eixos, i.parecer?.principal, i.erro, i.caseId, i.corrida.runId, i.id,
+    i.corrida.reacaoMediaMs, i.parecer?.resumo, i.parecer?.eixos, i.parecer?.principal,
+    i.parecer?.veredicto?.rotulo, i.parecer?.veredicto ? i.parecer.veredicto.confianca.toFixed(2) : '', i.parecer?.veredicto?.faixaMinBrl, i.parecer?.veredicto?.faixaMaxBrl, i.erro, i.caseId, i.corrida.runId, i.id,
   ].map(celula).join(';'));
   return `\uFEFF${[cabecalho.join(';'), ...linhas].join('\r\n')}\r\n`;
 }

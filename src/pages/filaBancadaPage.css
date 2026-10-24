@@ -42,6 +42,10 @@
 .fila-estado[data-estado='na_fila'] { background: var(--l-warning-bg); color: #ffd28a; }
 .fila-parecer { min-width: 260px; max-width: 520px; }
 .fila-parecer p { margin: 0; line-height: 1.45; color: var(--l-text-soft); }
+.fila-parecer p.fila-veredicto { margin-top: 6px; color: var(--l-text); font-size: 13px; }
+.fila-veredicto b { font-weight: 700; }
+.fila-veredicto[data-culpado='indeterminado'] b { color: var(--l-text-mute); }
+.fila-rotulo-estimativa { margin-left: 8px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--l-border); font-size: 11px; color: var(--l-text-mute); text-transform: uppercase; letter-spacing: .06em; }
 .fila-corte { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .fila-falha { color: #ffb4ae !important; }
 .fila-espera { color: var(--l-text-mute) !important; font-style: italic; }

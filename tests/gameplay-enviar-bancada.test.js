@@ -66,3 +66,20 @@ test('tabela /bancada/fila: rota, ordenação e CSV com fórmula neutralizada', 
   const app = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
   assert.match(app, /case 'fila':.*<FilaBancadaPage \/>/);
 });
+
+test('tabela: veredicto vira "Culpado provável" rotulado estimativa; caso antigo fica sem linha', async () => {
+  const { textoCulpado, textoFaixaFila, csvDaFila } = await loadFrontendModule('../../src/lib/bancada-fila.ts');
+  const v = { culpado: 'operador', rotulo: 'Operador humano', confianca: 0.72, faixaMinBrl: 8000, faixaMaxBrl: 32000 };
+  assert.equal(textoCulpado(v), 'Culpado provável: Operador humano (72%)');
+  assert.match(textoFaixaFila(v), /^R\$\s8\.000 – R\$\s32\.000$/);
+  assert.equal(textoCulpado(undefined), null); assert.equal(textoCulpado(null), null);
+  assert.equal(textoFaixaFila({ ...v, faixaMinBrl: null, faixaMaxBrl: null }), null);
+  const corrida = { veiculo: 'trator', cenario: 'circuito', desfecho: 'colisao', desfechoTitulo: null, tempoMs: 1000, nota: null, avisos: 0, semResposta: 0, sinistrosEvitados: 0, reacaoMediaMs: null, runId: 'r' };
+  const item = { id: 'a', caseId: 'c', estado: 'pronto', posicao: 0, criadoEm: '2026-10-24T11:00:00Z', tentativas: 1, erro: null, corrida, parecer: { status: 'completo', eixos: '4/4', resumo: 'x', hipoteses: 0, principal: null, veredicto: v } };
+  const [cab, linha] = csvDaFila([item]).replace('\uFEFF', '').split('\r\n');
+  const col = (nome) => linha.split(';')[cab.split(';').indexOf(nome)];
+  assert.equal(col('culpado_provavel_estimativa'), 'Operador humano'); assert.equal(col('confianca_estimativa'), '0.72');
+  assert.equal(col('impacto_min_brl_estimativa'), '8000');
+  const tela = fs.readFileSync(new URL('../src/pages/FilaBancadaPage.tsx', import.meta.url), 'utf8');
+  assert.match(tela, /fila-rotulo-estimativa">estimativa</);
+});

@@ -56,7 +56,10 @@ async function fixture(t, { chat, concorrencia = 1, tetoDia = 60, directory = fs
 
 test('envio entra na fila, a pessoa recebe a posição e o worker processa em ordem com concorrência 1', { timeout: 20000 }, async (t) => {
   const ordem = []; const ativos = new Map(); let pico = 0;
+  // O worker fica preso até os envios terminarem: sem isso run-a podia acabar antes do 3º envio e as posições mudavam.
+  let liberar; const portao = new Promise((r) => { liberar = r; });
   const chat = async (args) => {
+    await portao;
     const run = JSON.parse(args.user).telemetry.circuito?.runId; if (!ordem.includes(run)) ordem.push(run);
     ativos.set(run, (ativos.get(run) || 0) + 1); pico = Math.max(pico, ativos.size);
     await new Promise((r) => setTimeout(r, 15));
@@ -76,6 +79,7 @@ test('envio entra na fila, a pessoa recebe a posição e o worker processa em or
   // Toque duplo: o mesmo caso ainda na fila devolve o item existente, sem nova análise.
   const repetido = await request('/api/bancada/fila', { cookie, body: { caso: caso('run-c') } });
   assert.equal(repetido.status, 200); assert.equal(repetido.body.item.id, enviados[2].body.item.id);
+  liberar();
   await fila().ocioso();
   assert.deepEqual(ordem, ['run-a', 'run-b', 'run-c']); assert.equal(pico, 1, 'uma análise por vez (concorrência 1)');
   const lista = await request('/api/bancada/fila', { cookie });

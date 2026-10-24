@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAppLocation } from '@/hooks/useAppLocation';
 import { downloadFile } from '@/lib/lab-client';
 import {
-  csvDaFila, diaBrasilia, listarFila, ordenarFila, quandoBrasilia, ROTULO_ESTADO, textoDesfecho, textoNota, textoPosicao,
+  csvDaFila, diaBrasilia, listarFila, ordenarFila, quandoBrasilia, ROTULO_ESTADO, textoCulpado, textoDesfecho, textoFaixaFila, textoNota, textoPosicao,
   type ColunaFila, type EstadoFila, type ItemFila, type LimitesFila,
 } from '@/lib/bancada-fila';
 import './filaBancadaPage.css';
@@ -128,6 +128,13 @@ export default function FilaBancadaPage() {
                     {i.parecer ? (
                       <>
                         <p className={aberto === i.id ? '' : 'fila-corte'}>{i.parecer.status === 'parcial' && <b>Parcial ({i.parecer.eixos} eixos). </b>}{i.parecer.resumo || 'Sem resumo.'}</p>
+                        {textoCulpado(i.parecer.veredicto) && (
+                          <p className="fila-veredicto" data-culpado={i.parecer.veredicto?.culpado}>
+                            <b>{textoCulpado(i.parecer.veredicto)}</b>
+                            {textoFaixaFila(i.parecer.veredicto) && <> · impacto {textoFaixaFila(i.parecer.veredicto)}</>}
+                            <span className="fila-rotulo-estimativa">estimativa</span>
+                          </p>
+                        )}
                         {i.parecer.principal && <small>Hipótese principal: {i.parecer.principal}{i.parecer.hipoteses > 1 ? ` (+${i.parecer.hipoteses - 1})` : ''}</small>}
                         {i.parecer.resumo.length > LIMITE_RESUMO && <button type="button" className="fila-botao-texto" onClick={() => setAberto(aberto === i.id ? null : i.id)}>{aberto === i.id ? 'Menos' : 'Ler tudo'}</button>}
                       </>
