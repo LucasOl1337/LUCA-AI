@@ -20,6 +20,8 @@ const saida = path.resolve(args.saida || path.join(os.tmpdir(), 'vitrine-finance
 const BANCADA = args.bancada || 'luca-vitrine';
 const SO = (args.cenas || 'b1,b2,b3,b4,b5,b6').split(',');
 const W = 1920; const H = 1080;
+// --seco 1: ensaio headless sem gravar (valida seletores fora da fila; sem cena 3D).
+const SECO = Boolean(args.seco);
 const Y4M = args.y4m || '/home/lol/tmp/luca-webcam/rosto-1080.y4m';
 const estado = JSON.parse(execFileSync('agent-bench', ['status', BANCADA], {encoding: 'utf8'}));
 const ENV_X = {...process.env, DISPLAY: estado.display, XAUTHORITY: `/run/user/1000/agent-bench/${BANCADA}/Xauthority`};
@@ -41,6 +43,7 @@ async function esperar(url, ms = 30000) {
 let rec = null;
 const marcas = {};
 function gravar(cena) {
+  if (SECO) { rec = {cena, p: null, inicio: Date.now()}; marcas[cena] = {}; log('REC(seco)', cena); return; }
   const arq = path.join(saida, 'bruto', `${cena}.mkv`);
   const p = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'x11grab', '-draw_mouse', '0', '-framerate', '30',
     '-video_size', `${W}x${H}`, '-i', `${estado.display}+0,0`, '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '12', '-pix_fmt', 'yuv420p', arq],
@@ -51,12 +54,13 @@ function gravar(cena) {
 const marcar = (rotulo) => { if (rec) { marcas[rec.cena][rotulo] = (Date.now() - rec.inicio) / 1000; log('MARCA', rec.cena, rotulo); } };
 async function parar() {
   if (!rec) return; const {p, cena} = rec; rec = null;
+  if (!p) { log('STOP(seco)', cena); return; }
   p.stdin.write('q'); await new Promise((r) => p.on('exit', r)); log('STOP', cena);
 }
 
 async function main() {
   if (!existsSync(path.join(repoDir, 'dist', 'index.html'))) throw new Error('rode `npm run build` antes');
-  const tela = execFileSync('xrandr', [], {env: ENV_X, encoding: 'utf8'}).split('\n')[0];
+  const tela = SECO ? `current ${W} x ${H}` : execFileSync('xrandr', [], {env: ENV_X, encoding: 'utf8'}).split('\n')[0];
   if (!tela.includes(`current ${W} x ${H}`)) throw new Error(`bancada fora de ${W}x${H}: ${tela}`);
   await mkdir(path.join(saida, 'bruto'), {recursive: true});
   await mkdir(path.join(saida, 'prints'), {recursive: true});
@@ -77,9 +81,9 @@ async function main() {
   try {
     await esperar(`${base}/api/auth/session`);
     ctx = await chromium.launchPersistentContext(perfil, {
-      executablePath: '/usr/bin/chromium', headless: false, env: ENV_X, viewport: null, deviceScaleFactor: 1, locale: 'pt-BR', colorScheme: 'dark',
+      executablePath: '/usr/bin/chromium', headless: SECO, env: ENV_X, viewport: SECO ? {width: W, height: H} : null, deviceScaleFactor: 1, locale: 'pt-BR', colorScheme: 'dark',
       ignoreDefaultArgs: ['--enable-automation'],
-      args: ['--ozone-platform=x11', '--kiosk', `--window-size=${W},${H}`, '--window-position=0,0', '--force-device-scale-factor=1', '--hide-scrollbars',
+      args: [...(SECO ? [] : ['--ozone-platform=x11', '--kiosk']), `--window-size=${W},${H}`, '--window-position=0,0', '--force-device-scale-factor=1', '--hide-scrollbars',
         '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', `--use-file-for-fake-video-capture=${Y4M}`, '--autoplay-policy=no-user-gesture-required',
         '--no-first-run', '--no-default-browser-check', '--password-store=basic', '--disable-features=Translate', '--lang=pt-BR'],
     });
