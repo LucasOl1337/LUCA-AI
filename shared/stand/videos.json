@@ -1,5 +1,25 @@
 [
   {
+    "id": "luca-em-reais",
+    "titulo": "O LUCA em reais: quem perde com o acidente e quem economiza",
+    "arquivo": "/stand/videos/luca-em-reais.mp4",
+    "duracao_s": null,
+    "perguntas_exemplo": [
+      "o que o luca faz em poucas palavras",
+      "pra que serve isso no dia a dia do produtor",
+      "qual o prejuízo quando um trator bate",
+      "qual o tamanho do prejuízo quando acontece um acidente na lavoura",
+      "como isso ajuda a economizar",
+      "quem ganha dinheiro com isso",
+      "o luca serve pra evitar acidente com sono também",
+      "isso evita prejuízo no campo",
+      "o que acontece se o tratorista dormir no volante",
+      "a câmera percebe quando o motorista está com sono",
+      "explica de um jeito simples o que é a solução de vocês"
+    ],
+    "resumo_falado": "Em pouco mais de um minuto: um trator vale cerca de quatrocentos mil reais e o acidente custa caro para todo mundo. O sensor e a câmera de sono avisam antes, cada susto vira um registro, e acidente evitado é conta que ninguém paga. É um protótipo com dados de demonstração; preço e desconto no seguro ainda não estão definidos."
+  },
+  {
     "id": "painel-sompo",
     "titulo": "O que a seguradora vê no painel",
     "arquivo": "/stand/videos/painel-sompo.mp4",

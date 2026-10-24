@@ -32,14 +32,14 @@ function cacheEmMemoria() {
   return { get: (k) => dados[k], set: (k, v) => { dados[k] = v; }, salvar() {} };
 }
 
-test('manifesto do stand é válido; pipeline-completo saiu da Vitrine em 24/10 (ordem do Lucas)', () => {
+test('manifesto do stand é válido: vitrine financeira abre a volta; pipeline-completo saiu em 24/10 (ordem do Lucas)', () => {
   const manifesto = carregarManifesto();
-  assert.deepEqual(manifesto.map((i) => i.id), ['painel-sompo', 'painel-segurado']);
+  assert.deepEqual(manifesto.map((i) => i.id), ['luca-em-reais', 'painel-sompo', 'painel-segurado']);
   assert.ok(manifesto.every((i) => i.arquivo === `/stand/videos/${i.id}.mp4`));
 });
 
 test('validarManifesto aponta o id e o campo com problema', () => {
-  const base = carregarManifesto()[0];
+  const base = carregarManifesto().find((i) => i.id === 'painel-sompo');
   assert.throws(() => validarManifesto([{ ...base, id: 'Com Espaço' }]), /id inválido/);
   assert.throws(() => validarManifesto([base, { ...base }]), /id repetido/);
   assert.throws(() => validarManifesto([{ ...base, resumo_falado: ' ' }]), /painel-sompo.*resumo_falado vazio/);

@@ -34,6 +34,10 @@
     { "pergunta": "qual o nome da empresa de vocês e como eu entro em contato?", "esperado": null },
     { "pergunta": "esse trator é de verdade ou é de brinquedo?", "esperado": null },
     { "pergunta": "quanto vocês estão captando de investimento?", "esperado": null },
-    { "pergunta": "me conta uma piada", "esperado": null }
+    { "pergunta": "me conta uma piada", "esperado": null },
+    { "pergunta": "quanto prejuízo dá um trator capotado", "esperado": "luca-em-reais" },
+    { "pergunta": "de que jeito isso faz o produtor economizar", "esperado": "luca-em-reais" },
+    { "pergunta": "e se o motorista do trator ficar com sono", "esperado": "luca-em-reais" },
+    { "pergunta": "resume pra mim o que é o luca", "esperado": "luca-em-reais" }
   ]
 }
