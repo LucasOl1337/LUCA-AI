@@ -27,13 +27,13 @@ export function cacheDoArquivo(relativo) {
   return null;
 }
 
-/** Serve o build em `root`: GLB com .br, estáticos com cache por classe e fallback SPA. */
+/** Serve o build em `root`: GLB e HDR com .br, estáticos com cache por classe e fallback SPA. */
 export function servirDist(app, root) {
   const base = path.resolve(root);
-  // O .br do GLB sai pelo sendFile do precompressedModels, antes do static: o cache
+  // O .br do GLB/HDR sai pelo sendFile do precompressedModels, antes do static: o cache
   // do nome com hash vai aqui, só se o arquivo existe (o fallback nunca fica imutável).
   app.use((req, res, next) => {
-    if (req.path.startsWith('/assets/') && req.path.endsWith('.glb')) {
+    if (req.path.startsWith('/assets/') && /\.(?:glb|hdr)$/.test(req.path)) {
       const relativo = req.path.slice(1);
       if (cacheDoArquivo(relativo) === CACHE_IMUTAVEL && fs.existsSync(path.join(base, relativo))) res.setHeader('Cache-Control', CACHE_IMUTAVEL);
     }

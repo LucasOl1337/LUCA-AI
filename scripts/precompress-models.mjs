@@ -1,5 +1,6 @@
-// Writes Brotli siblings (model.glb.br) for every built GLB (models/ and the
-// stand avatar); served by server/precompressed-models.js.
+// Writes Brotli siblings (model.glb.br, ceu.hdr.br) for every built GLB (models/
+// and the stand avatar) and HDR (ambiente do palco: 5,3 MB de float RGBE que nem
+// o Express nem a borda comprimem); served by server/precompressed-models.js.
 // Skips files that shrink less than 10% (GLBs with embedded JPEG/PNG textures).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,7 +15,7 @@ function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const file = path.join(dir, entry.name);
     if (entry.isDirectory()) { walk(file); continue; }
-    if (!entry.name.endsWith('.glb')) continue;
+    if (!/\.(?:glb|hdr)$/.test(entry.name)) continue;
     const { ino, dev } = fs.statSync(file);
     const irmao = porInode.get(`${dev}:${ino}`);
     if (irmao !== undefined) {

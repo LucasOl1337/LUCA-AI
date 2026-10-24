@@ -104,3 +104,26 @@ test('precompress-models comprime o GLB do avatar do stand, fora de models/ (cor
     assert.equal(fs.existsSync(path.join(root, 'stand/avatar/textura.glb.br')), false, 'quem encolhe menos de 10% fica sem .br');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+// Largada (24/10): o céu HDR do palco (5,3 MB de RGBE) saía cru; br tira ~42 % sem perda.
+test('HDR com .br sai em Brotli com o tipo do HDR; sem br no Accept-Encoding, o original', async () => {
+  const { root, get, close } = await serve();
+  try {
+    const hdr = Buffer.from('#?RADIANCE\n'.repeat(2048));
+    fs.writeFileSync(path.join(root, 'models', 'ceu.hdr'), hdr);
+    fs.writeFileSync(path.join(root, 'models', 'ceu.hdr.br'), zlib.brotliCompressSync(hdr));
+    const br = await get('/models/ceu.hdr', 'gzip, br');
+    assert.equal(br.res.statusCode, 200);
+    assert.equal(br.res.headers['content-encoding'], 'br');
+    assert.equal(br.res.headers['content-type'], 'image/vnd.radiance');
+    assert.match(br.res.headers.vary, /Accept-Encoding/);
+    assert.deepEqual(zlib.brotliDecompressSync(br.body), hdr);
+    const cru = await get('/models/ceu.hdr', 'gzip');
+    assert.equal(cru.res.headers['content-encoding'], undefined);
+    assert.deepEqual(cru.body, hdr);
+    // Outras extensões nunca passam pelo middleware.
+    fs.writeFileSync(path.join(root, 'models', 'x.jpg.br'), zlib.brotliCompressSync(Buffer.from('x')));
+    fs.writeFileSync(path.join(root, 'models', 'x.jpg'), 'x');
+    assert.equal((await get('/models/x.jpg', 'br')).res.headers['content-encoding'], undefined);
+  } finally { close(); }
+});

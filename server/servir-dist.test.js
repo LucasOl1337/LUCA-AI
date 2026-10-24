@@ -131,6 +131,7 @@ test('palco 3D com hash em assets/ (GLB, JPG, HDR, manifesto) é imutável, incl
     'assets/max-tractor-cabine-XpBAIuWb.glb.br': zlib.brotliCompressSync(glb),
     'assets/cabine-banco-basecolor-c2XTo2iX.jpg': 'jpg',
     'assets/kloofendal_48d_partly_cloudy_puresky_2k-AbCdEf12.hdr': 'hdr',
+    'assets/kloofendal_48d_partly_cloudy_puresky_2k-AbCdEf12.hdr.br': zlib.brotliCompressSync(Buffer.from('hdr')),
     'assets/cabine-banco.textures-W3_T4qpd.json': '{"images":[]}',
     'models/gameplay/max-tractor-cabine.glb': glb,
     'models/gameplay/cabine-banco.textures.json': '{"images":[]}',
@@ -139,6 +140,9 @@ test('palco 3D com hash em assets/ (GLB, JPG, HDR, manifesto) é imutável, incl
   const br = await get('/assets/max-tractor-cabine-XpBAIuWb.glb', { 'accept-encoding': 'br' });
   assert.equal(br.headers.get('content-encoding'), 'br');
   assert.equal(br.headers.get('cache-control'), CACHE_IMUTAVEL);
+  const ceu = await get('/assets/kloofendal_48d_partly_cloudy_puresky_2k-AbCdEf12.hdr', { 'accept-encoding': 'br' });
+  assert.equal(ceu.headers.get('content-encoding'), 'br');
+  assert.equal(ceu.headers.get('cache-control'), CACHE_IMUTAVEL, 'o .br do HDR com hash também é imutável');
   for (const caminho of ['/assets/cabine-banco-basecolor-c2XTo2iX.jpg', '/assets/kloofendal_48d_partly_cloudy_puresky_2k-AbCdEf12.hdr', '/assets/cabine-banco.textures-W3_T4qpd.json']) {
     const r = await get(caminho);
     assert.equal(r.status, 200, caminho);
