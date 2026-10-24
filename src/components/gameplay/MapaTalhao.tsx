@@ -30,8 +30,8 @@ export function MapaTalhao({ estado, geofence, circuito = false }: { estado: Est
           <path d="M0,-4.5L3.2,3.5L0,1.8L-3.2,3.5Z" />
         </g>
       </svg>
-      <figcaption>{geofence.zona ? geofence.zona.rotulo : 'Talhão · geofence'}</figcaption>
-      {circuito && <small>↑ +X · 100 × 100 m<br />Vermelho: água / fardos · âmbar: encosta<br />Tracejado: rota · ▲ trator{(x < x0 || x > x1 || z < z0 || z > z1) && <b> · Fora do mapa</b>}</small>}
+      <figcaption>{geofence.zona ? geofence.zona.rotulo : 'Mapa do talhão'}</figcaption>
+      {circuito && <small>Vermelho: água e obstáculos · âmbar: encosta<br />Tracejado: rota · ▲ você{(x < x0 || x > x1 || z < z0 || z > z1) && <b> · Fora do mapa</b>}</small>}
     </figure>
   );
 }

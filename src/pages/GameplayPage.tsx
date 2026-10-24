@@ -92,7 +92,7 @@ export default function GameplayPage() {
             {telaInteira && (
               <button type="button" className="experience-secondary" onClick={() => void quadroRef.current?.requestFullscreen?.().catch(() => undefined)}>Tela inteira</button>
             )}
-            <button type="button" className="experience-secondary" onClick={() => { setPlaying(false); setAjuda(false); }}>Encerrar teste</button>
+            <button type="button" className="experience-secondary" onClick={() => { setPlaying(false); setAjuda(false); }}>Sair do jogo</button>
           </div>
         )}
       </header>
@@ -104,10 +104,10 @@ export default function GameplayPage() {
         )}
         {mostrarAjuda && (
           <div id="gameplay-como-testar" className="experience-card gameplay-como-testar">
-            <h2>Como testar</h2>
-            <p>Teclado: ↑ acelera, ↓ freia e engata a ré em baixa velocidade, ← e → giram o volante. Arraste a imagem para olhar ao redor.</p>
-            <p>Controle padrão/DualSense: R2 acelera, L2 freia, analógico esquerdo dirige e direito olha ao redor. Options reinicia o desafio.</p>
-            <p>O sensor, o alerta e a distância aparecem no painel da cabine. O teste não grava telemetria no servidor.</p>
+            <h2>Como jogar</h2>
+            <p>Teclado: ↑ ou W acelera, ↓, S ou espaço freia e engata a ré em baixa velocidade, ← e → giram o volante, C troca a câmera. Arraste a imagem para olhar ao redor.</p>
+            <p>Controle PlayStation ou Xbox: R2/RT acelera, L2/LT freia, analógico esquerdo dirige e direito olha ao redor, ✕/A troca a câmera, Options/Menu recomeça o desafio.</p>
+            <p>O sensor, o alerta e a distância aparecem no painel da cabine. Nada do jogo é gravado no servidor.</p>
             {!playing && <button type="button" className="experience-primary" onClick={() => setPlaying(true)}>Iniciar Gameplay</button>}
             <p className="experience-note">No totem da feira, abra <code>/gameplay?quiosque=1</code>: a cabine abre direto em tela inteira e volta sozinha depois de F5. Shift+Q sai.</p>
             <p className="experience-note" data-webcam={webcam || undefined}>

@@ -28,7 +28,7 @@ test('landing do /gameplay mostra instruções e Iniciar; o quadro só monta dep
   globalThis.window = { location: { pathname: '/gameplay', search: '', hash: '' }, history: { replaceState() {}, pushState() {} }, addEventListener() {}, removeEventListener() {} };
   let h;
   try { h = renderToStaticMarkup(createElement(AppLocationProvider, null, createElement(GameplayPage))); } finally { globalThis.window = antes; }
-  assert.match(h, /Como testar/);
+  assert.match(h, /Como jogar/);
   assert.match(h, /Iniciar Gameplay/);
-  assert.doesNotMatch(h, /experience-game-viewport|Encerrar teste/);
+  assert.doesNotMatch(h, /experience-game-viewport|Sair do jogo/);
 });

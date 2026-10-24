@@ -58,3 +58,6 @@
   .circuito-dialogo h2 { font-size:22px; }
   .circuito-hud:has(.circuito-dialogo) :is(.circuito-sensores,.gameplay-mapa,.circuito-menu-botao,.circuito-avisos) { visibility:hidden; }
 }
+.circuito-dialogo button kbd { margin-left:6px; padding:1px 6px; border:1px solid #5d7a5b; border-radius:4px; font:inherit; font-size:.9em; }
+.circuito-dialogo label { display:block; margin:10px 0; }
+.circuito-dialogo details p { font-size:13px; color:#cfdcc8; }

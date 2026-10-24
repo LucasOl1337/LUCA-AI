@@ -186,3 +186,4 @@
 .gameplay-comandos-linha, .gameplay-comandos-itens { flex-wrap: wrap; white-space: normal; }
 .gameplay-comandos { font-size: clamp(14px, 1.6cqh, 20px); }
 .gameplay-painel-cabine > .gameplay-comandos { width: min(550px, 70cqw); box-sizing: border-box; }
+@container (max-width: 600px) { .gameplay-comandos-itens > i { display: none; } .gameplay-comandos-itens { column-gap: 10px; } }

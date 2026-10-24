@@ -19,7 +19,7 @@ for(const [width,height] of [[1920,1080],[1366,768]]){
  await checkbox.check();await p.locator('.gameplay-webcam[data-fase=erro]').waitFor({timeout:30000});
  const denied=await p.evaluate(()=>window.__cameraCalls);
  await p.screenshot({path:`${dir}/stand-sono-negada-${width}.png`});
- await p.getByRole('button',{name:'Continuar',exact:true}).click();
+ await p.getByRole('button',{name:/^Continuar/}).click();
  await p.keyboard.down('ArrowUp');await new Promise(r=>setTimeout(r,700));await p.keyboard.up('ArrowUp');
  await p.keyboard.down('Space');await new Promise(r=>setTimeout(r,500));await p.keyboard.up('Space');
  if(await p.locator('.gameplay-webcam').isVisible())throw Error('webcam negada encobre pista');

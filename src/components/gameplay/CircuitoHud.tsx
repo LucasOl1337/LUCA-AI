@@ -71,13 +71,15 @@ export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, t
     {!menu && !fim && <div className="circuito-touch" aria-label="Controles de toque">{[['ArrowLeft', '←'], ['ArrowDown', 'Freio'], ['ArrowUp', 'Acelerar'], ['ArrowRight', '→']].map(([key, label]) => <button key={key} aria-label={label} onPointerDown={(ev) => { ev.currentTarget.setPointerCapture(ev.pointerId); touch(key, true); }} onPointerUp={() => touch(key, false)} onPointerCancel={() => touch(key, false)} onLostPointerCapture={() => touch(key, false)}>{label}</button>)}</div>}
     {webcam && !fim && <Suspense fallback={null}><div className="circuito-webcam" data-config-aberta={menu}><Webcam silenciosa /></div></Suspense>}
     {menu && !fim && <section className="circuito-dialogo" role="dialog" aria-modal="true" aria-label="Opções do circuito">
-      <h2>Corrida pausada</h2><p>Siga as estacas até a chegada. Desvie dos obstáculos e da água; reduza na encosta. Parar para decidir não encerra a corrida.</p>
-      <p>↑/W acelera · ↓/S/espaço freia · ←/→ dirigem. R2/L2 e analógicos no controle. Options pausa; ✕/A continua na pausa. Durante a corrida, ✕/A ou C alterna a vista. Arraste para olhar.</p>
-      <label><input type="checkbox" checked={som} onChange={(ev) => { setSom(ev.target.checked); if (ev.target.checked) void audio.liberar(); }} /> Sons de risco {som ? 'ligados' : 'desligados'} · tons curtos, sem voz</label>
-      <p>Áudio liberado por toque, tecla ou Continuar. Sem som, os sensores e o mapa continuam ativos.</p>
-      <label><input type="checkbox" checked={webcam} onChange={(ev) => setWebcam(ev.target.checked)} /> Webcam e detector de sonolência (imagem só neste navegador)</label>
-      <p>Liga automaticamente quando há câmera. Você pode desligar aqui. Detector experimental, não sistema de segurança; sem câmera ou permissão a corrida segue normalmente.</p>
-      <button onClick={() => { void audio.liberar(); aoMenu(false); }} autoFocus>Continuar</button>
+      <h2>Corrida pausada</h2>
+      <p>Siga as estacas até a chegada, desviando dos obstáculos e da água; reduza na encosta. O tempo parado não conta.</p>
+      <label><input type="checkbox" checked={som} onChange={(ev) => { setSom(ev.target.checked); if (ev.target.checked) void audio.liberar(); }} /> Sons de risco {som ? 'ligados' : 'desligados'}</label>
+      <label><input type="checkbox" checked={webcam} onChange={(ev) => setWebcam(ev.target.checked)} /> Webcam e alerta de sonolência</label>
+      <details><summary>Comandos e privacidade</summary>
+        <p>Controle: R2 acelera · L2 freia e dá ré · analógico esquerdo vira · ✕ troca a câmera · Options pausa · PS volta à Coruja. Teclado: W/↑ acelera · S/↓/espaço freia · A D/← → viram · C troca a câmera · Esc pausa.</p>
+        <p>Sons de risco são tons curtos, sem voz. A imagem da webcam fica só neste navegador; o alerta de sonolência é experimental, não é sistema de segurança.</p>
+      </details>
+      <button onClick={() => { void audio.liberar(); aoMenu(false); }} autoFocus>Continuar <kbd>{confirmar}</kbd></button>
       <button onClick={() => { sessao.terminar('abandono', new Date().toISOString()); motor.encerrar('abandono'); aoMenu(false); }}>Abandonar esta corrida</button>
       <button onClick={() => { if (window.confirm('Abandonar a corrida e sair da simulação?')) window.dispatchEvent(new Event('luca:circuito-sair')); }}>Sair da simulação</button>
     </section>}

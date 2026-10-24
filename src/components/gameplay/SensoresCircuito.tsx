@@ -20,8 +20,8 @@ export function SensoresCircuito({ estado: e }: { estado: EstadoGameplay }) {
       <small>Máx. {e.tetoKph} km/h · encosta &lt; 7 km/h</small>
     </div>
     <div data-sensor="agua" data-nivel={agua.nivel === 'dentro' ? 'critico' : agua.nivel === 'rumo' ? 'atencao' : 'livre'}>
-      <span>≈ Água / Geofence</span><strong>{agua.nivel === 'dentro' ? 'DENTRO' : agua.nivel === 'rumo' ? 'APROXIMANDO' : 'FORA DA ÁGUA'}</strong>
-      <small>{agua.nivel === 'fora' ? 'Projeção de movimento: 3 s' : agua.nivel === 'dentro' ? 'Saia · 2 s dentro encerra a corrida' : 'Entrada prevista em até 3 s · desvie'}</small>
+      <span>≈ Área alagada</span><strong>{agua.nivel === 'dentro' ? 'Dentro' : agua.nivel === 'rumo' ? 'Chegando' : 'Longe'}</strong>
+      <small>{agua.nivel === 'fora' ? 'Avisa 3 s antes de entrar' : agua.nivel === 'dentro' ? 'Saia · 2 s dentro encerra a corrida' : 'Entrada prevista em até 3 s · desvie'}</small>
     </div>
   </section>;
 }

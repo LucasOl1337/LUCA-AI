@@ -28,5 +28,5 @@ test('quiosque desenha só a cabine, sem landing nem botão Iniciar', async () =
   const h = renderToStaticMarkup(createElement(GameplayQuiosque, { aoSair() {} }));
   assert.match(h, /data-quiosque="true"/);
   assert.match(h, /Carregando a cabine do Trator MAX/);
-  assert.doesNotMatch(h, /Iniciar Gameplay|Como testar/);
+  assert.doesNotMatch(h, /Iniciar Gameplay|Como jogar/);
 });

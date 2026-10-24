@@ -8,7 +8,9 @@ import './painelCabine.css';
  * cartão do sensor frontal (fora do para-brisa, da barra central, do
  * minimapa e do PIP da câmera).
  */
-export function ComandosSimulacao() {
+/** `totem`: Simulação clássica do /stand (Esc e PS levam à Coruja). `pagina`: cabine do /gameplay, sem Coruja. */
+export function ComandosSimulacao({ contexto = 'totem' }: { contexto?: 'totem' | 'pagina' } = {}) {
+  const totem = contexto === 'totem';
   const [controle, setControle] = useState(false);
   useEffect(() => {
     const conferir = () => setControle(Array.from(navigator.getGamepads?.() ?? []).some((pad) => pad?.mapping === 'standard'));
@@ -22,6 +24,7 @@ export function ComandosSimulacao() {
     <aside
       className="gameplay-comandos"
       data-comandos-simulacao=""
+      data-contexto={contexto}
       data-entrada={controle ? 'controle' : 'teclado'}
       aria-label="Comandos no controle PS5 e no teclado e mouse"
     >
@@ -62,7 +65,7 @@ export function ComandosSimulacao() {
           <i aria-hidden="true">·</i>
           <span><kbd>Analógico esquerdo</kbd> Virar</span>
           <i aria-hidden="true">·</i>
-          <span><kbd>PS / Home</kbd> Coruja</span>
+          {totem ? <span><kbd>PS / Home</kbd> Coruja</span> : <span><kbd>✕ / A</kbd> Câmera · <kbd>Options</kbd> Recomeçar</span>}
         </span>
       </div>
       <div className="gameplay-comandos-linha" data-dispositivo="teclado-mouse">
@@ -112,7 +115,7 @@ export function ComandosSimulacao() {
           <i aria-hidden="true">·</i>
           <span><kbd>Espaço</kbd> Freio</span>
           <i aria-hidden="true">·</i>
-          <span><kbd>Esc</kbd> Voltar à Coruja no Totem</span>
+          {totem ? <span><kbd>Esc</kbd> Voltar à Coruja no Totem</span> : <span><kbd>C</kbd> Câmera</span>}
         </span>
       </div>
     </aside>

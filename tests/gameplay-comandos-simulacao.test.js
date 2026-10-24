@@ -38,6 +38,13 @@ test('ComandosSimulacao renderiza ícones SVG nítidos de PS5 DualSense e Teclad
   assert.match(html, /<kbd>Espaço<\/kbd> Freio/);
   assert.match(html, /<kbd>Esc<\/kbd> Voltar à Coruja no Totem/);
 });
+test('ComandosSimulacao na página /gameplay não promete Coruja: mostra câmera e recomeço', () => {
+  const html = renderToStaticMarkup(createElement(ComandosSimulacao, { contexto: 'pagina' }));
+  assert.match(html, /data-contexto="pagina"/);
+  assert.doesNotMatch(html, /Coruja/);
+  assert.match(html, /<kbd>✕ \/ A<\/kbd> Câmera · <kbd>Options<\/kbd> Recomeçar/);
+  assert.match(html, /<kbd>C<\/kbd> Câmera/);
+});
 
 test('PainelCabine e DesafioCabine (usados na Simulação do /stand e em /gameplay) incluem o guia discreto de comandos', () => {
   const e = estadoBase();
