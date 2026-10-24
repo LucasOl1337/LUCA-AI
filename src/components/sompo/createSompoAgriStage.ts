@@ -403,7 +403,7 @@ export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, out
     });
   };
   // Área alagada: lâmina com margem rasa irregular, no mesmo retângulo do geofence.
-  const flood = createSompoFloodSheets(worldRoot, waterZones ?? [], field.groundHeight);
+  const flood = createSompoFloodSheets(worldRoot, waterZones ?? [], field.groundHeight, nightSky ? 0x162436 : 0xb5cdd0);
   beacon.position.set(beaconX, beaconTop, beaconZ);
   machine.add(beacon);
   // Giroflex de verdade varre o campo: um feixe estreito girando no topo.
@@ -600,6 +600,7 @@ export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, out
       orbit.update();
     }
     atmosphere.update(studio, camera, machine.position, elapsed, scenario.environmentId === 'muddy-field', night);
+    flood.update(reduceMotion.matches ? 0 : time / 1000);
     if (operation && focusTarget === 'truck' && scene.fog instanceof THREE.Fog) { scene.fog.near = 500; scene.fog.far = 800; }
     if (night && scene.fog instanceof THREE.Fog) {
       // Noite de lavoura: a partir de ~25 m o campo afunda num azul de luar e
