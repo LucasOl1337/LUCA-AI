@@ -48,7 +48,7 @@ export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, t
     return () => { cancelar(); document.removeEventListener('visibilitychange', atualizar); audio.parar(); };
   }, [audio, motor, menu, sono]);
   const painel = alertaCabine(e, sono);
-  const tocando = som && !menu && !document.hidden && !sessao.registro.resultado;
+  const tocando = som && !menu && !(typeof document !== 'undefined' && document.hidden) && !sessao.registro.resultado;
   useBipeCabine(tocando && (e.sensor.eco || e.contato) ? painel.bipe : null);
   useSegurancaCabine(tocando && e.fase === 'dirigindo' && (e.sensor.alerta || e.contato));
   const r = sessao.registro, m = metricasCircuito(r);

@@ -17,5 +17,5 @@ test('Vitrine narrada não pode ser silenciada pela escuta e oferece controle de
 test('circuito mantém mapa vivo à direita e leituras nomeadas com unidades, não só velocidade',()=>{
  const motor=criarMotorGameplay();motor.reiniciar(INICIO_CIRCUITO);const sessao=criarSessaoCircuito();
  const html=renderToStaticMarkup(React.createElement(CircuitoHud,{motor,sessao,menu:false,aoMenu(){},aoAnalisar(){},aoNovo(){},touch(){}}));
- assert.match(html,/Mapa do talhão/);assert.match(html,/Sensor frontal/);assert.match(html,/Inclinação/);assert.match(html,/20°/);assert.match(html,/Sem obstáculo/);assert.match(html,/Geofence/);
+ assert.match(html,/Mapa do talhão/);assert.match(html,/Sensor frontal/);assert.match(html,/Inclinação/);assert.match(html,/20°/);assert.match(html,/Sem obstáculo/);assert.match(html,/Área alagada/);assert.doesNotMatch(html,/Geofence/);
 });
