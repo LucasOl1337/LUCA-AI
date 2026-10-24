@@ -18,6 +18,8 @@ export const TRATOR = Object.freeze({
   /** Resposta da guinada: alcança 95% do alvo em ~0,54 s, sem salto ao inverter o volante. */
   guinadaTauS: 0.18,
   bitolaM: 2.087, // eixo traseiro: 2 × z 1.0435 do mesmo layout
+  /** L2 segurado depois de parar só engata a ré após este tempo parado (ou numa nova pressão). */
+  esperaReS: 0.5,
   /** Emissor do HC-SR04 à frente da origem da máquina. */
   sensorFrenteM: 2.2461,
   cercaM: 90,
@@ -34,12 +36,16 @@ export interface EstadoTrator {
   /** rad/s */
   guinada: number;
   contato: boolean;
+  /** s parado com L2 segurado depois de frear; ao chegar em `esperaReS` engata a ré. */
+  freioParadoS?: number;
+  /** L2 solto com o trator parado: a próxima pressão engata a ré na hora. */
+  reArmada?: boolean;
 }
 
 export interface MundoTrator { obstaculos: readonly ObstaculoGameplay[]; tetoKph: number }
 
 export function criarTrator(x: number, z = 0, rumo = 0): EstadoTrator {
-  return { x, z, rumo, velocidade: 0, percurso: 0, guinada: 0, contato: false };
+  return { x, z, rumo, velocidade: 0, percurso: 0, guinada: 0, contato: false, freioParadoS: 0, reArmada: true };
 }
 
 const limitar = (valor: number, min: number, max: number) => Math.max(min, Math.min(max, valor));
@@ -70,7 +76,8 @@ export function distanciaSensorM(estado: Pick<EstadoTrator, 'x' | 'z' | 'rumo'>,
 }
 
 /**
- * Um passo de `dt` s. L2 freia; parado e com L2 segurado, engata ré lenta.
+ * Um passo de `dt` s. L2 freia; parado, a ré lenta só engata com o L2 segurado
+ * por `esperaReS` ou numa nova pressão (sem isso, frear até parar recuava sozinho).
  * Ao encostar no obstáculo pela frente, para ali (sem atravessar).
  */
 export function passoTrator(estado: EstadoTrator, comando: ComandoVolante, dt: number, mundo: MundoTrator): EstadoTrator {
@@ -79,12 +86,20 @@ export function passoTrator(estado: EstadoTrator, comando: ComandoVolante, dt: n
   const vMax = limitar(Number.isFinite(mundo.tetoKph) ? mundo.tetoKph : GAMEPLAY_TETO_LIVRE_KPH, 0, GAMEPLAY_TETO_LIVRE_KPH) / 3.6;
   const vRe = -TRATOR.reKph / 3.6;
   let v = estado.velocidade;
+  const parado = Math.abs(v) <= 0.05;
+  const freando = freio > 0.2 && acelerador === 0;
+  // Nova pressão: L2 solto com o trator parado arma a ré; andar para a frente desarma.
+  const reArmada = v > 0.05 ? false : parado && !freando ? true : (estado.reArmada ?? true);
+  const freioParadoS = parado && freando ? (estado.freioParadoS ?? 0) + segundos : 0;
+  const reLiberada = v < -0.05 || reArmada || freioParadoS >= TRATOR.esperaReS;
   if (v > 0.05 || (acelerador > 0 && v >= -0.05)) {
     // Arrasto só rolando sem pedal (TRATOR.arrasto): com ele junto do acelerador, meio R2 não tirava o trator do lugar.
     v += (acelerador * TRATOR.aceleracao - freio * TRATOR.frenagem - (acelerador > 0 ? 0 : TRATOR.arrasto)) * segundos;
     // Acima do teto (o desafio baixou para 6 km/h): desacelera no ritmo do freio, sem teleporte.
     v = limitar(v, 0, Math.max(vMax, estado.velocidade - TRATOR.frenagem * segundos));
-  } else if (freio > 0.2 && acelerador === 0) {
+  } else if (freando && !reLiberada) {
+    v = 0;
+  } else if (freando) {
     v = Math.max(vRe, v - freio * TRATOR.aceleracao * 0.6 * segundos);
   } else {
     v = Math.min(0, v + (TRATOR.arrasto + acelerador * TRATOR.frenagem) * segundos);
@@ -117,7 +132,7 @@ export function passoTrator(estado: EstadoTrator, comando: ComandoVolante, dt: n
   const x = limitar(livreX, -TRATOR.cercaM, TRATOR.cercaM), z = limitar(livreZ, -TRATOR.cercaM, TRATOR.cercaM);
   if (x !== livreX || z !== livreZ) v = 0;
   return {
-    x, z, rumo, velocidade: v, percurso: estado.percurso + passo, guinada: v === 0 ? 0 : guinada,
+    x, z, rumo, velocidade: v, percurso: estado.percurso + passo, guinada: v === 0 ? 0 : guinada, freioParadoS, reArmada,
     // Continua encostado enquanto empurra o fardo parado.
     contato: contato || (estado.contato && v === 0 && acelerador > 0),
   };

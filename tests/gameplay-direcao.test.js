@@ -21,14 +21,34 @@ const pad = ({ x = 0, r2 = 0, l2 = 0, options = false } = {}) => {
   return { connected: true, mapping: 'standard', axes: [x, 0, 0, 0], buttons };
 };
 
-test('volante: zona morta 0,12, curva |x|^1,8 e batente', () => {
+test('volante: zona morta 0,12, curva |x|^1,35 e batente', () => {
   assert.equal(volante.curvaEsterco(0.12), 0);
   assert.equal(volante.curvaEsterco(-0.05), 0);
   assert.equal(Object.is(volante.curvaEsterco(-0.05), -0), false);
-  assert.equal(volante.curvaEsterco(0.5).toFixed(6), '0.220568');
-  assert.equal(volante.curvaEsterco(-0.5).toFixed(6), '-0.220568');
+  assert.equal(volante.curvaEsterco(0.5).toFixed(6), '0.321852');
+  assert.equal(volante.curvaEsterco(-0.5).toFixed(6), '-0.321852');
   assert.equal(volante.curvaEsterco(1), 1);
   assert.equal(volante.curvaEsterco(-1), -1);
+});
+
+/** Raio da curva em regime a 12 km/h com o analógico em `x`, pela física real (volante + guinada). */
+function raioA12(x) {
+  const mundo = { obstaculos: [], tetoKph: 12 };
+  let estado = { ...fisica.criarTrator(0), velocidade: 12 / 3.6 };
+  let comando = volante.COMANDO_PARADO;
+  for (let i = 0; i < 180; i += 1) {
+    comando = volante.passoVolante(comando, volante.comandoDesejado(pad({ x, r2: 1 })), 1 / 60);
+    estado = fisica.passoTrator(estado, comando, 1 / 60, mundo);
+  }
+  return estado.velocidade / Math.abs(estado.guinada);
+}
+
+test('analógico (Lupa D1): 30% e 50% do curso já viram; batente igual', () => {
+  // Antes (curva 1,8): 30% → 99,9 m, 50% → 26,1 m, 100% → 5,1 m. Agora: 49,0 / 17,9 / 5,1 m.
+  const r30 = raioA12(0.3), r50 = raioA12(0.5), r100 = raioA12(1);
+  assert.ok(r30 > 44 && r30 < 50, `30%: ${r30}`);
+  assert.ok(r50 > 16 && r50 < 18, `50%: ${r50}`);
+  assert.ok(Math.abs(r100 - fisica.TRATOR.entreEixosM / Math.tan(fisica.TRATOR.estercoMaxRad)) < 0.01, `100%: ${r100}`);
 });
 
 test('gatilho: corte de ruído e curva x^1,5', () => {
@@ -108,6 +128,35 @@ test('referencial: rumo 0 anda em +X; esterço à direita (+) gira o rumo para n
   assert.ok(estado.x > 0);
   assert.ok(estado.rumo < 0);
   assert.ok(estado.z > 0);
+});
+
+test('ré (Lupa D2): L2 cheio de 12 km/h mantido 2 s recua ≤ 0,7 m e não recua nos primeiros 0,5 s parado', () => {
+  const mundo = { obstaculos: [], tetoKph: 12 };
+  const freio = { esterco: 0, acelerador: 0, freio: 1 };
+  let estado = { ...fisica.criarTrator(0), velocidade: 12 / 3.6 };
+  let t = 0, xParou = null, paradoEm = null, maiorX = 0;
+  while (t < 2 - 1e-9) {
+    estado = fisica.passoTrator(estado, freio, 1 / 60, mundo); t += 1 / 60;
+    maiorX = Math.max(maiorX, estado.x);
+    if (xParou === null && estado.velocidade === 0) { xParou = estado.x; paradoEm = t; }
+    if (paradoEm !== null && t - paradoEm < 0.5 - 1e-9) assert.equal(estado.velocidade, 0, `ré aos ${(t - paradoEm).toFixed(3)} s parado`);
+  }
+  // Antes: ré 0,02 s depois de parar; mantido 2 s desde 12 km/h recuava 0,50 m. Agora: ré aos 0,52 s, recuo 0,16 m.
+  const recuo = maiorX - estado.x;
+  assert.ok(recuo > 0 && recuo <= 0.7, `recuo ${recuo}`);
+});
+
+test('ré (Lupa D2): parado, soltar e apertar o L2 de novo engata na hora', () => {
+  const mundo = { obstaculos: [], tetoKph: 12 };
+  let estado = { ...fisica.criarTrator(0), velocidade: 1 };
+  for (let i = 0; i < 30; i += 1) estado = fisica.passoTrator(estado, { esterco: 0, acelerador: 0, freio: 1 }, 1 / 60, mundo);
+  assert.equal(estado.velocidade, 0);
+  estado = fisica.passoTrator(estado, volante.COMANDO_PARADO, 1 / 60, mundo);
+  estado = fisica.passoTrator(estado, { esterco: 0, acelerador: 0, freio: 1 }, 1 / 60, mundo);
+  assert.ok(estado.velocidade < 0, 'nova pressão engata a ré');
+  // Estado sem os campos novos (pose antiga ou montada à mão) segue como antes: L2 parado engata.
+  const cru = fisica.passoTrator({ x: 0, z: 0, rumo: 0, velocidade: 0, percurso: 0, guinada: 0, contato: false }, { esterco: 0, acelerador: 0, freio: 1 }, 1 / 60, mundo);
+  assert.ok(cru.velocidade < 0);
 });
 
 test('L2 parado engata ré até 4 km/h; cerca de ±90 m segura o trator', () => {

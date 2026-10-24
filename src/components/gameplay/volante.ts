@@ -1,7 +1,8 @@
 /**
  * Controle como volante (grill r1, Direcao Q8 e Q9). Puro: entra o retrato do
  * pad (Gamepad API, mapping standard) e as setas; sai o comando que a física usa.
- * Esterço: zona morta 0,12, curva sinal·|x|^1,8 e volante com taxa limitada
+ * Esterço: zona morta 0,12, curva sinal·|x|^1,35 (Lupa 24/10: 1,8 dava raio de 25 m
+ * com meio curso) e volante com taxa limitada
  * (2,5/s: do centro ao batente em 0,4 s). R2/L2: curva x^1,5.
  */
 import { applyDeadZone, type GamepadLike } from '../sompo/gamepadMapping';
@@ -9,7 +10,7 @@ import { COMANDOS_CABINE, setaDoComando } from './comandosCabine';
 
 export const VOLANTE = Object.freeze({
   zonaMorta: 0.12,
-  expoenteEsterco: 1.8,
+  expoenteEsterco: 1.35,
   expoenteGatilho: 1.5,
   /** Unidades de esterço (-1..1) por segundo. */
   taxaEsterco: 2.5,
