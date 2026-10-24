@@ -380,6 +380,12 @@
 .stand-palco { position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; animation: stand-palco-entra 1.2s ease-out both; }
 .stand-avatar-palco { width: auto; height: min(96vh, 140vw); max-width: 100%; aspect-ratio: 1204 / 1104; animation: stand-flutua 6s ease-in-out infinite; }
 @keyframes stand-palco-entra { from { opacity: 0; transform: scale(0.96); } }
+/* Coruja 3D: o canvas ocupa de 7,5% a 92,5% da caixa (CAIXA_A, x -90..1114); asa ou ombro que passam
+   da borda saíam cortados em linha reta. Grande no palco, o corte aparece: esmaece as laterais do canvas. */
+.stand-avatar-palco[data-variante='coruja-3d'] {
+  -webkit-mask-image: linear-gradient(90deg, transparent 9%, #000 22%, #000 78%, transparent 91%);
+  mask-image: linear-gradient(90deg, transparent 9%, #000 22%, #000 78%, transparent 91%);
+}
 /* Botão "Tela cheia" da barra: discreto, mais apagado que os modos. */
 .stand-barra button[data-atalho='palco'] { opacity: 0.6; }
 @media (prefers-reduced-motion: reduce) { .stand-palco, .stand-avatar-palco { animation: none !important; } }
