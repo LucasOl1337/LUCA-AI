@@ -137,3 +137,32 @@ test('alarme de ré (Lupa fila vazia 2): andando de ré apita lento e agudo; ant
   assert.notDeepEqual(alertaCabine(estado({ re: true, kph: 1.5, cm: 120 })).bipe, BIPE_RE, 'alerta de obstáculo vence');
   assert.notDeepEqual(alertaCabine(estado({ re: true, kph: 1.5, cm: 300 })).bipe, BIPE_RE, 'eco do sensor vence');
 });
+
+test('cerca do talhão (Lupa, obs. da Lixa 05:39): preso de frente na cerca, a faixa diz "dê ré"; antes "Sem obstáculo"; sem bipe nem vinheta', async () => {
+  const { ROTULO_CERCA_CABINE } = await loadFrontendModule('../../src/components/gameplay/alertaCabine.ts');
+  const { cercaAFrente, TRATOR } = await loadFrontendModule('../../src/components/gameplay/fisicaTrator.ts');
+  const { criarMotorGameplay } = await loadFrontendModule('../../src/components/gameplay/motorGameplay.ts');
+  // Caso exato da Lixa: dirigir até a cerca e ficar parado encostado.
+  const motor = criarMotorGameplay(() => 0);
+  motor.reiniciar({ x: TRATOR.cercaM - 15, z: 0, rumoGraus: 0, tetoKph: 12, obstaculos: [] });
+  let e;
+  for (let i = 0; i < 60 * 10; i += 1) e = motor.quadro(1 / 60, { esterco: 0, acelerador: 1, freio: 0 });
+  for (let i = 0; i < 30; i += 1) e = motor.quadro(1 / 60, { esterco: 0, acelerador: 0, freio: 0 });
+  assert.equal(e.maquina.x, TRATOR.cercaM); assert.equal(e.sensor.eco, false, 'o sensor continua sem ver a cerca');
+  const a = alertaCabine(e);
+  assert.equal(a.cerca, true);
+  assert.equal(a.rotuloAlerta, ROTULO_CERCA_CABINE);
+  assert.equal(a.rotulo, 'Cerca do talhão à frente');
+  assert.equal(a.alerta, false, 'não vira FREIE nem alerta');
+  assert.equal(a.bipe.intervaloMs, null); assert.equal(a.vinheta, 'nenhuma');
+  // De ré afastando, de lado ou longe: sem aviso.
+  assert.equal(alertaCabine({ ...e, maquina: { ...e.maquina, re: true, velocidadeKph: 1 } }).cerca, false);
+  assert.equal(cercaAFrente({ x: TRATOR.cercaM, z: 0, rumoGraus: 90 }), false, 'paralelo à cerca');
+  assert.equal(cercaAFrente({ x: TRATOR.cercaM, z: 0, rumoGraus: 180 }), false, 'de costas');
+  assert.equal(cercaAFrente({ x: TRATOR.cercaM - 2, z: 0, rumoGraus: 0 }), false, 'a 2 m');
+  assert.equal(cercaAFrente({ x: 0, z: -TRATOR.cercaM + 0.3, rumoGraus: 60 }), true, 'cerca de z, nariz a 60°');
+  assert.equal(cercaAFrente({ x: Number.NaN, z: 0, rumoGraus: 0 }), false);
+  // Obstáculo real vence a cerca.
+  assert.equal(alertaCabine({ ...e, sensor: { distanciaCm: 120, eco: true, alerta: true } }).rotuloAlerta, ROTULO_ALERTA_CABINE);
+  assert.equal(alertaCabine({ ...e, fase: 'fim' }).cerca, false);
+});

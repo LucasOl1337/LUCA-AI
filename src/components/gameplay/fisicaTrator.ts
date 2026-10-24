@@ -162,3 +162,21 @@ export function leituraSensor(estado: EstadoTrator, obstaculos: readonly Obstacu
   const distanciaCm = folga === null ? GAMEPLAY_ECO_MAXIMO_CM : Math.max(2, Math.round(folga * 100));
   return { distanciaCm, eco: folga !== null, alerta: distanciaCm <= GAMEPLAY_ALERTA_CM };
 }
+
+/** Folga (m) até a cerca, na frente do trator, abaixo da qual o painel avisa "dê ré" (Lupa, a pedido da Lixa 24/10). */
+export const CERCA_AVISO_M = 0.6;
+
+/**
+ * O trator está de frente para a cerca do talhão, encostado ou quase (a cerca segura o centro em ±`cercaM`).
+ * Puro, só da pose: o sensor ultrassônico não vê a cerca (é do Verniz e fica como está),
+ * então sem isto o painel dizia "sem obstáculo" com o trator preso nela.
+ */
+export function cercaAFrente(maquina: { x: number; z: number; rumoGraus: number }, folgaM = CERCA_AVISO_M) {
+  const rumo = maquina.rumoGraus * Math.PI / 180;
+  const fx = Math.cos(rumo), fz = -Math.sin(rumo);
+  if (![maquina.x, maquina.z, fx, fz].every(Number.isFinite)) return false;
+  // Só conta o eixo para onde o nariz aponta de verdade (≥ ~25° de frente para a cerca).
+  const MIN = 0.42;
+  const folga = (pos: number, dir: number) => (dir > MIN ? (TRATOR.cercaM - pos) / dir : dir < -MIN ? (TRATOR.cercaM + pos) / -dir : Infinity);
+  return Math.min(folga(maquina.x, fx), folga(maquina.z, fz)) <= folgaM;
+}

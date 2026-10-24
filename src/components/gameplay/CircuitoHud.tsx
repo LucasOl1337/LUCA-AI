@@ -11,7 +11,7 @@ import { SensoresCircuito } from './SensoresCircuito';
 import { geofenceTalhao } from './geofenceTalhao';
 import { criarAudioCircuito } from './audioCircuito';
 import { somCompartilhado } from './somCompartilhado';
-import { alertaCabine } from './alertaCabine';
+import { alertaCabine, ROTULO_CERCA_CABINE } from './alertaCabine';
 import { useBipeCabine } from './bipeCabine';
 import { useSegurancaCabine } from './useSegurancaCabine';
 const Webcam = lazy(() => import('./WebcamSonoCabine'));
@@ -88,7 +88,9 @@ export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, t
     {!fim && <button className="circuito-menu-botao" onClick={() => aoMenu(!menu)}>Pausa / opções · Esc</button>}
     {!fim && !menu && e.fase === 'pronto' && <p className="circuito-partida" role="status">
       <kbd>{entrada === 'teclado' ? 'W / ↑' : COMANDOS_CABINE.acelerar[entrada]}</kbd> para partir · siga as estacas até a chegada</p>}
-    {!fim && <div className="circuito-avisos" aria-live="polite">{[...riscosCircuito(e, sono?.status === 'alarm')].map(([s, gravidade]) => <p key={s} data-gravidade={gravidade}>{ROTULOS[s]}</p>)}</div>}
+    {!fim && <div className="circuito-avisos" aria-live="polite">{[...riscosCircuito(e, sono?.status === 'alarm')].map(([s, gravidade]) => <p key={s} data-gravidade={gravidade}>{ROTULOS[s]}</p>)}
+      {/* Preso na cerca (Lupa, observação da Lixa): só texto; não é risco, não entra nas métricas nem toca. */}
+      {painel.cerca && <p data-gravidade="atencao" data-cerca="">{ROTULO_CERCA_CABINE}</p>}</div>}
     {!menu && !fim && <div className="circuito-touch" aria-label="Controles de toque">{[['ArrowLeft', '←'], ['ArrowDown', 'Freio'], ['ArrowUp', 'Acelerar'], ['ArrowRight', '→']].map(([key, label]) => <button key={key} aria-label={label} onPointerDown={(ev) => { ev.currentTarget.setPointerCapture(ev.pointerId); touch(key, true); }} onPointerUp={() => touch(key, false)} onPointerCancel={() => touch(key, false)} onLostPointerCapture={() => touch(key, false)}>{label}</button>)}</div>}
     {menu && !fim && <section className="circuito-dialogo" role="dialog" aria-modal="true" aria-label="Opções do circuito">
       <h2>Corrida pausada</h2>

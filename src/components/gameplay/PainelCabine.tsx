@@ -33,7 +33,8 @@ export function PainelCabineVista({ painel, estado }: { painel: AlertaCabine; es
   return (
     <div className="gameplay-painel" data-faixa={painel.faixa} data-alerta={painel.alerta} data-fase={estado.fase} data-sono={painel.sono || undefined}>
       <div className="gameplay-painel-vinheta" data-nivel={painel.vinheta} aria-hidden="true" />
-      <div className="gameplay-painel-alerta" role="alert" hidden={!painel.alerta}>
+      {/* Preso na cerca (Lupa): mesma faixa, em âmbar e sem piscar; não liga `alerta` (nem FREIE na tela, nem bipe). */}
+      <div className="gameplay-painel-alerta" role="alert" hidden={!painel.alerta && !painel.cerca} data-cerca={!painel.alerta && painel.cerca ? '' : undefined}>
         {painel.rotuloAlerta}
       </div>
       <section className="gameplay-painel-cabine" aria-label="Painel da cabine" aria-live="polite">

@@ -16,6 +16,7 @@
   animation: gameplay-pisca .4s steps(2, jump-none) infinite alternate;
 }
 .gameplay-painel-alerta[hidden] { display: none; }
+.gameplay-painel-alerta[data-cerca] { background: #b7791ff0; box-shadow: 0 0 0 3px #ffffff3a, 0 10px 40px #8a5a1488; animation: none; }
 @keyframes gameplay-pisca { from { opacity: 1; } to { opacity: .72; } }
 
 .gameplay-painel-cabine {

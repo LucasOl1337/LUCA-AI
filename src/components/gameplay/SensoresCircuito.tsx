@@ -1,4 +1,5 @@
 import { geofenceTalhao } from './geofenceTalhao';
+import { cercaAFrente } from './fisicaTrator';
 import { decimalCircuito as d } from './circuito';
 import type { EstadoGameplay } from './estadoGameplay';
 
@@ -9,7 +10,7 @@ export function SensoresCircuito({ estado: e }: { estado: EstadoGameplay }) {
     <small>LEITURAS SIMULADAS</small>
     <div data-sensor="colisao" data-nivel={e.sensor.alerta ? 'critico' : e.sensor.eco ? 'atencao' : 'livre'}>
       <span>◉ Sensor frontal</span><strong>{e.sensor.eco ? `${d(e.sensor.distanciaCm / 100)} m` : '> 4 m'}</strong>
-      <small>{e.sensor.eco ? 'Colisão · alerta ≤ 1,5 m' : 'Sem obstáculo no alcance de 4 m'}</small>
+      <small>{e.sensor.eco ? 'Colisão · alerta ≤ 1,5 m' : e.fase === 'dirigindo' && !e.maquina.re && cercaAFrente(e.maquina) ? 'Cerca do talhão à frente · dê ré' : 'Sem obstáculo no alcance de 4 m'}</small>
     </div>
     <div data-sensor="inclinacao" data-nivel={roll >= 20 ? 'critico' : roll >= 12 ? 'atencao' : 'livre'}>
       <span>◴ Inclinação lateral</span><strong>{d(e.atitude.rolagemGraus)}°</strong>

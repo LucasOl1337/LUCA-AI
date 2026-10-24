@@ -10,6 +10,7 @@
  */
 import { physicalRiskBands } from '../../../shared/sompo-physical-interactions.js';
 import type { EstadoGameplay } from './estadoGameplay';
+import { cercaAFrente } from './fisicaTrator';
 import { geofenceTalhao, type GeofenceTalhao } from './geofenceTalhao';
 import { ROTULO_ALERTA_SONO, type SonoCabine } from './sonoCabine';
 
@@ -44,9 +45,13 @@ export interface AlertaCabine {
   geofence: GeofenceTalhao;
   /** Webcam de sonolência (`/gameplay?webcam=1`): olhos fechados há 1 s ou mais. Sempre false sem webcam. */
   sono: boolean;
+  /** De frente para a cerca do talhão, encostado: o sensor não a vê; a faixa diz para dar ré (sem bipe nem vinheta). */
+  cerca: boolean;
 }
 
 export const ROTULO_ALERTA_CABINE = 'Obstáculo a 1,5 m · freie';
+/** Trator preso de frente na cerca do talhão (Lupa, observação da Lixa 24/10). */
+export const ROTULO_CERCA_CABINE = 'Cerca do talhão · dê ré com L2';
 /** Faixa vermelha do risco de tombamento: rolagem ou arfagem a partir de 20°. */
 export const rotuloInclinacaoCabine = (graus: number) => `Inclinação de ${graus}° · freie`;
 /** Faixa da zona de risco do talhão (geofence). */
@@ -110,19 +115,20 @@ export function alertaCabine(estado: EstadoGameplay, sono: SonoCabine | null = n
     : contato || perto || geofence.nivel === 'dentro' ? 'critica'
       : sensor.alerta || zona || faixas.inclination ? 'alerta' : 'nenhuma';
 
+  const cerca = fase === 'dirigindo' && !maquina.re && cercaAFrente(maquina);
   const rotulo = contato ? 'Contato com o obstáculo'
     : sensor.alerta ? 'Alerta de colisão'
       : zona ? `Zona de risco: ${geofence.zona!.rotulo}`
       : faixas.inclination ? 'Risco de tombamento'
       : faixa === 'atencao' ? 'Obstáculo à frente'
-        : sensor.eco ? 'Caminho livre' : 'Sem obstáculo no alcance';
+        : sensor.eco ? 'Caminho livre' : cerca ? 'Cerca do talhão à frente' : 'Sem obstáculo no alcance';
 
   return {
     faixa,
     distanciaTexto: sensor.eco ? metros(sensor.distanciaCm) : '+4 m',
     alerta: sensor.alerta || dormindo || zona || faixas.inclination,
     // Os dois juntos: o obstáculo vem primeiro, é o que pede freio mais rápido.
-    rotuloAlerta: sensor.alerta ? ROTULO_ALERTA_CABINE : dormindo ? ROTULO_ALERTA_SONO : zona ? rotuloGeofenceCabine(geofence) : faixas.inclination ? rotuloInclinacaoCabine(graus) : '',
+    rotuloAlerta: sensor.alerta ? ROTULO_ALERTA_CABINE : dormindo ? ROTULO_ALERTA_SONO : zona ? rotuloGeofenceCabine(geofence) : faixas.inclination ? rotuloInclinacaoCabine(graus) : cerca ? ROTULO_CERCA_CABINE : '',
     rotulo,
     velocidadeTexto: `${Math.round(maquina.velocidadeKph)} km/h${maquina.re ? ' · ré' : ''}`,
     inclinacao: { ligada: faixas.inclination, graus },
@@ -130,5 +136,6 @@ export function alertaCabine(estado: EstadoGameplay, sono: SonoCabine | null = n
     vinheta,
     geofence,
     sono: dormindo,
+    cerca,
   };
 }
