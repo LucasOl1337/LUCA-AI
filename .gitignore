@@ -54,3 +54,4 @@ public/datasets/frying-pan-farm/terrain-2022-5m.json
 public/datasets/frying-pan-farm/dtm-2022-5m.tif
 public/datasets/frying-pan-farm/elevation-validation.json
 docs/audit/farm/
+.tmp-release/

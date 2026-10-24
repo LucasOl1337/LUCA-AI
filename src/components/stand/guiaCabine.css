@@ -57,3 +57,9 @@
   .stand-guia-simulacao footer { align-items: stretch; flex-direction: column; gap: 14px; }
   .stand-guia-simulacao footer button { justify-content: center; }
 }
+/* Contagem do autoinício (24/10): o número pulsa a cada segundo. */
+.stand-guia-simulacao .cabine-contagem { display: block; color: #e9fffc; }
+.stand-guia-simulacao .cabine-contagem b { display: inline-block; min-width: 1ch; color: #a4e9cf; font-size: 1.5em; font-variant-numeric: tabular-nums; animation: cabine-contagem-pulso 1s ease-out infinite; }
+@keyframes cabine-contagem-pulso { from { transform: scale(1.25); } to { transform: scale(1); } }
+@media (max-width: 650px) { .stand-guia-simulacao footer strong.cabine-contagem { display: block; } }
+@media (prefers-reduced-motion: reduce) { .stand-guia-simulacao .cabine-contagem b { animation: none; } }
