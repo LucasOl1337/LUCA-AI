@@ -11,6 +11,15 @@
  * Só existe com página aberta (pela voz, `abrir_pagina`); a barra só o mostra
  * nesse caso. PS, `voltar_coruja` ou 90 s sem ninguém fecham a página.
  * Troca de modo: barra (toque/mouse) e voz; L1/R1 não trocam mais (21/10).
+ *
+ * Palco (Lucas, 24/10: "como se ele fosse alguém dentro do monitor. Sem texto
+ * em volta. Principalmente se ele tiver AFK"): sub-estado da Coruja com só a
+ * coruja em tela inteira. Entra sozinho após `palcoAfkMs` sem ninguém (padrão
+ * `PALCO_AFK_MS`) ou de propósito (botão "Tela cheia", tecla F). Sai com
+ * qualquer atividade: toque, tecla, controle, voz ou rosto chegando. Com o
+ * palco ligado ele é o repouso: a Coruja não cai mais sozinha na Vitrine
+ * (Vitrine segue pelo botão e pela voz). `palcoAfkMs: null` mantém o repouso
+ * antigo (Coruja → Vitrine em 60 s), usado no Stand sem login.
  */
 import type { PaginaSite } from '../../../shared/stand/acoes-site.ts';
 
@@ -28,6 +37,17 @@ export const REPOUSO_MS = 60_000;
 export const SIMULACAO_PARADA_MS = 90_000;
 export const AVISO_SIMULACAO_MS = 10_000;
 export const BARRA_MS = 5_000;
+/** Sem ninguém por este tempo, a Coruja entra no palco (configurável por `?palco=N` segundos). */
+export const PALCO_AFK_MS = 45_000;
+
+/** `?palco=N` (segundos) troca o tempo; `?palco=0` desliga o palco por tempo (volta o repouso na Vitrine). */
+export function palcoAfkDaUrl(search: string): number | null {
+  const bruto = new URLSearchParams(search).get('palco');
+  if (bruto === null || bruto.trim() === '') return PALCO_AFK_MS;
+  const segundos = Number(bruto);
+  if (!Number.isFinite(segundos) || segundos < 0) return PALCO_AFK_MS;
+  return segundos === 0 ? null : Math.round(segundos * 1000);
+}
 
 export interface EstadoModo {
   modo: Modo;
@@ -40,6 +60,10 @@ export interface EstadoModo {
   barraAte: number;
   /** Página do site aberta no modo Site (fica guardada se a barra passar pra outro modo). */
   pagina: PaginaSite | null;
+  /** Coruja sozinha em tela inteira (só com `modo === 'coruja'`). */
+  palco: boolean;
+  /** Tempo sem ninguém até o palco; `null` = repouso antigo na Vitrine. */
+  palcoAfkMs: number | null;
 }
 
 export type EntradaModo =
@@ -52,15 +76,17 @@ export type EntradaModo =
   | { tipo: 'abrir_pagina'; pagina: PaginaSite }
   /** Ação da voz: fecha a página e volta pra Coruja. */
   | { tipo: 'voltar_coruja' }
+  /** Botão ou tecla F: liga/desliga o palco (sem `ligado`, alterna). De outro modo, volta pra Coruja já no palco. */
+  | { tipo: 'palco'; ligado?: boolean }
   /**
    * `corujaOcupada`: a Coruja está em conversa ou vídeo, não em repouso.
    * `falando`: a IA está pensando ou falando (segura o modo Site).
    */
   | { tipo: 'relogio'; corujaOcupada?: boolean; falando?: boolean };
 
-export function modoInicial(agora: number): EstadoModo {
+export function modoInicial(agora: number, { palcoAfkMs = null }: { palcoAfkMs?: number | null } = {}): EstadoModo {
   // A barra só acende com toque: na abertura a Atração fica limpa.
-  return { modo: 'coruja', marco: agora, video: 0, pausado: false, barraAte: agora, pagina: null };
+  return { modo: 'coruja', marco: agora, video: 0, pausado: false, barraAte: agora, pagina: null, palco: false, palcoAfkMs };
 }
 
 const girar = (indice: number, passo: number, total: number) => (total > 0 ? (indice + passo + total) % total : 0);
@@ -89,20 +115,31 @@ const mascara = (itens: number | readonly boolean[]): readonly boolean[] => (typ
  * Com zero itens a Vitrine fica parada.
  */
 export function reduzirModo(atual: EstadoModo, entrada: EntradaModo, agora: number, itens: number | readonly boolean[]): EstadoModo {
-  const disponivel = mascara(itens);
+  const novo = passoModo(atual, entrada, agora, mascara(itens));
+  // Palco só existe na Coruja: qualquer troca de modo o desliga.
+  return novo.palco && novo.modo !== 'coruja' ? { ...novo, palco: false } : novo;
+}
+
+function passoModo(atual: EstadoModo, entrada: EntradaModo, agora: number, disponivel: readonly boolean[]): EstadoModo {
   switch (entrada.tipo) {
     case 'ir':
       // PS e a Coruja da barra fecham a página (solta a webcam da sonolência).
-      if (entrada.modo === 'coruja') return { ...atual, modo: 'coruja', marco: agora, pausado: false, pagina: null };
+      if (entrada.modo === 'coruja') return { ...atual, modo: 'coruja', marco: agora, pausado: false, pagina: null, palco: false };
       if (entrada.modo === 'site' && !atual.pagina) return { ...atual, marco: agora };
       if (entrada.modo === atual.modo) return { ...atual, marco: agora };
       return { ...atual, modo: entrada.modo, marco: agora, pausado: false };
     case 'abrir_pagina':
       return { ...atual, modo: 'site', pagina: entrada.pagina, marco: agora, pausado: false };
     case 'voltar_coruja':
-      return { ...atual, modo: 'coruja', pagina: null, marco: agora, pausado: false };
+      return { ...atual, modo: 'coruja', pagina: null, marco: agora, pausado: false, palco: false };
+    case 'palco': {
+      const ligado = entrada.ligado ?? !(atual.modo === 'coruja' && atual.palco);
+      if (!ligado) return { ...atual, palco: false, marco: agora };
+      return { ...atual, modo: 'coruja', pagina: null, pausado: false, palco: true, marco: agora };
+    }
     case 'atividade':
-      return { ...atual, marco: agora, barraAte: entrada.toque ? agora + BARRA_MS : atual.barraAte };
+      // Gente na frente (toque, tecla, controle, voz, rosto): o palco sai e a Coruja volta com tudo.
+      return { ...atual, palco: false, marco: agora, barraAte: entrada.toque ? agora + BARRA_MS : atual.barraAte };
     case 'trocar_video':
       if (atual.modo !== 'vitrine') return { ...atual, marco: agora };
       return { ...atual, video: proximoItem(atual.video, entrada.direcao, disponivel).indice, pausado: false, marco: agora };
@@ -119,6 +156,11 @@ export function reduzirModo(atual: EstadoModo, entrada: EntradaModo, agora: numb
     case 'relogio': {
       const parado = agora - atual.marco;
       if (atual.modo === 'coruja') {
+        if (atual.palcoAfkMs !== null) {
+          // Palco é o repouso: fica até alguém chegar; não cai na Vitrine.
+          if (atual.palco || entrada.corujaOcupada || parado < atual.palcoAfkMs) return atual;
+          return { ...atual, palco: true, marco: agora };
+        }
         if (entrada.corujaOcupada || parado < REPOUSO_MS) return atual;
         return { ...atual, modo: 'vitrine', video: 0, pausado: false, marco: agora, pagina: null };
       }

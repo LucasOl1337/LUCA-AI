@@ -22,6 +22,20 @@ export function Atracao({ variante, nivel, chamada, titulo }: BaseTela & { chama
   );
 }
 
+/**
+ * Palco (24/10): a coruja sozinha, em tela inteira, como alguém dentro do
+ * monitor. Sem texto em volta: nem chamada, marca, painel, selo ou webcam.
+ * Viva no repouso (respira, pisca e olha de lado pelo próprio rig; flutua de leve).
+ * Fala tira do palco (atividade), então legenda aqui nunca é necessária.
+ */
+export function Palco({ variante, nivel, voz }: BaseTela & { voz: EstadoVoz }) {
+  return (
+    <section className="stand-palco" aria-label="LUCA, assistente de IA">
+      <AvatarLuca variante={variante} voz={voz} nivel={nivel} className="stand-avatar stand-avatar-palco" />
+    </section>
+  );
+}
+
 const ROTULO_VOZ: Record<EstadoVoz, string> = {
   ocioso: 'Pode perguntar', ouvindo: 'Ouvindo…', pensando: 'Pensando…', falando: 'Falando',
 };

@@ -9,7 +9,7 @@ import { canalReal, type CanalStand } from '@/components/stand/canal';
 import { ligarUmSomPorVez } from '@/components/stand/umSomPorVez';
 import { criarCanalStub } from '@/components/stand/canalStub';
 import { reduzirTela, telaInicial, type EntradaTela, type EstadoTela } from '@/components/stand/telaStand';
-import { Atracao, Conversa, PlayerVideo } from '@/components/stand/Telas';
+import { Atracao, Conversa, Palco, PlayerVideo } from '@/components/stand/Telas';
 import { tratarTecla, type AtalhosStand } from '@/components/stand/atalhos';
 import { avisoDeControle, avisoParaEquipe, chamadaDeInicio, chamadaSemVoz, escutaNoStand, linhaDaEscuta, motivoSemVoz, vozDoStand, type StatusStand } from '@/components/stand/avisos';
 import { VIDEOS_VITRINE, videoDoStand } from '@/components/stand/videosStand';
@@ -19,7 +19,7 @@ import { enviarAcaoSite } from '@/components/stand/executor/ponte';
 import { aguardarExecutor } from '@/components/stand/executor/prontidao';
 import { caminhoDaPagina as planejarCaminho, executarPlano, linhaDaTela, planejarAcao } from '@/components/stand/site/acaoDoStand';
 import { SiteStand } from '@/components/stand/site/SiteStand';
-import { avisoDeSaida, barraVisivel, modoInicial, modosDisponiveis, reduzirModo, type EntradaModo, type EstadoModo } from '@/components/stand/modoStand';
+import { avisoDeSaida, barraVisivel, modoInicial, modosDisponiveis, palcoAfkDaUrl, reduzirModo, type EntradaModo, type EstadoModo } from '@/components/stand/modoStand';
 import type { AcaoNavegacao } from '@/components/stand/navegacaoPad';
 import { usePadStand } from '@/components/stand/usePadStand';
 import { AvisoSaida, BarraModos, preCarregarSimulador, SimulacaoStand, VitrineStand } from '@/components/stand/Modos';
@@ -39,9 +39,10 @@ import '@/stand.css';
 /** Margem segura padrão (% de cada lado): a moldura de MDF come as bordas. */
 const MARGEM_PADRAO = 6;
 
-function alternarTelaCheia() {
-  if (document.fullscreenElement) void document.exitFullscreen();
-  else void document.documentElement.requestFullscreen?.().catch(() => undefined);
+/** Fullscreen API só com gesto (botão, tecla); sem gesto o palco fica limpo do mesmo jeito. */
+function pedirTelaCheia(sim: boolean) {
+  if (sim && !document.fullscreenElement) void document.documentElement.requestFullscreen?.().catch(() => undefined);
+  else if (!sim && document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
 }
 
 const reduzirAgora = (atual: EstadoTela, entrada: EntradaTela) => reduzirTela(atual, entrada, Date.now());
@@ -92,7 +93,10 @@ export default function StandPage() {
   // Tela do app fora do ar sai da volta: o reducer lê quais itens estão prontos agora.
   const prontos = useRef<boolean[]>(disponiveis(ITENS_VITRINE, {}));
   const reduzirModoAgora = useCallback((atual: EstadoModo, entrada: EntradaModo) => reduzirModo(atual, entrada, Date.now(), prontos.current), []);
-  const [modo, despacharModo] = useReducer(reduzirModoAgora, undefined, () => modoInicial(Date.now()));
+  // Palco (24/10): `?palco=N` muda o tempo sem ninguém (segundos); `?palco=0` volta o repouso na Vitrine.
+  const [modo, despacharModo] = useReducer(reduzirModoAgora, undefined, () => modoInicial(Date.now(), { palcoAfkMs: palcoAfkDaUrl(window.location.search) }));
+  const palcoAtual = useRef(modo.palco);
+  palcoAtual.current = modo.palco;
   const telas = useTelasDoApp(modo.modo === 'vitrine');
   // Webcam sempre ligada no Totem: um stream para todas as abas (presença para a coruja, sono na Simulação).
   const webcam = useCameraTotem(modo.modo);
@@ -124,7 +128,8 @@ export default function StandPage() {
   const videoRef = useRef(estado.videoId);
   videoRef.current = estado.videoId;
   const corujaOcupada = useRef(false);
-  corujaOcupada.current = estado.tela !== 'atracao' || voz.ativa;
+  // Rosto na frente também segura a Coruja: o palco por tempo é pra quando não há ninguém.
+  corujaOcupada.current = estado.tela !== 'atracao' || voz.ativa || webcam.presenca === 'rosto';
   const modoAtual = useRef(modo.modo);
   modoAtual.current = modo.modo;
   const paginaAtual = useRef(modo.pagina);
@@ -350,6 +355,8 @@ export default function StandPage() {
   /** Toque na tela: acende a barra; na Atração, conversa (com voz) ou mostra a Vitrine (sem voz). */
   const tocar = useCallback(() => {
     despacharModo({ tipo: 'atividade', toque: true });
+    // No palco o primeiro toque só acorda a Coruja (a tela volta com tudo); o seguinte conversa.
+    if (palcoAtual.current) return;
     if (modo.modo !== 'coruja' || estado.tela !== 'atracao') return;
     if (vozStand === 'ligada') iniciar();
     else if (vozStand === 'desligada') despacharModo({ tipo: 'ir', modo: 'vitrine' });
@@ -376,7 +383,12 @@ export default function StandPage() {
       pularVideo: terminarVideo,
       demonstrar: iniciar,
       alternarGrade: () => setGrade((g) => !g),
-      alternarTelaCheia,
+      // F: liga/desliga o palco (coruja sozinha) junto com a tela cheia do navegador.
+      alternarTelaCheia: () => {
+        const ligar = !palcoAtual.current;
+        despacharModo({ tipo: 'palco', ligado: ligar });
+        pedirTelaCheia(ligar);
+      },
       sair,
     };
     const aoTeclar = (evento: KeyboardEvent) => {
@@ -395,7 +407,14 @@ export default function StandPage() {
     return () => window.removeEventListener('keydown', aoTeclar);
   }, [sair, terminarVideo, iniciar, encerrarVoz]);
 
+  // Rosto chegando na frente do totem tira a Coruja do palco (só na chegada, não a cada leitura).
+  useEffect(() => { if (webcam.presenca === 'rosto') despacharModo({ tipo: 'atividade' }); }, [webcam.presenca]);
+  // Entrou no palco: menu aberto fecha (ninguém está usando).
+  useEffect(() => { if (modo.palco) setMenu({ aberto: false, grupo: null }); }, [modo.palco]);
+
   const video = estado.tela === 'video' ? videoDoStand(estado.videoId, modoStub) : undefined;
+  // Palco: só a coruja na tela. Vídeo pedido continua por cima (o palco volta quando ele acaba).
+  const palco = modo.palco && modo.modo === 'coruja' && estado.tela !== 'video';
   // Painel do catálogo ao lado da coruja: sempre tocável; com voz mostra também o pedido falado.
   const painelComandos = estado.tela !== 'video';
   const comVoz = modoStub || vozStand === 'ligada';
@@ -433,6 +452,7 @@ export default function StandPage() {
       data-grade={grade || undefined}
       data-margem={`${margem}%`}
       data-modo={modo.modo}
+      data-palco={modo.palco || undefined}
       data-tela={estado.tela}
       data-sessao={voz.ativa ? 'ativa' : voz.fim?.motivo ?? 'parada'}
       data-voz-stand={vozStand}
@@ -443,10 +463,11 @@ export default function StandPage() {
       data-presenca={webcam.presenca}
       onPointerDown={tocar}
     >
+      {palco && <Palco variante={variante} nivel={nivel} voz={estado.voz} />}
       {modo.modo === 'coruja' && video && (
         <PlayerVideo variante={variante} nivel={nivel} voz={estado.voz} arquivo={video.arquivo} titulo={video.titulo} aoTerminar={terminarVideo} />
       )}
-      {modo.modo === 'coruja' && (
+      {modo.modo === 'coruja' && !palco && (
         <div className="stand-seguro" data-painel={painelComandos || undefined}>
           {estado.tela === 'atracao' && (
             <Atracao
@@ -472,7 +493,7 @@ export default function StandPage() {
       {modo.modo === 'site' && modo.pagina && (
         <SiteStand pagina={modo.pagina} variante={variante} nivel={nivel} voz={estado.voz} legenda={estado.legenda} aoMexer={mexeuNoPad} />
       )}
-      {modo.modo !== 'simulacao' && <div className="stand-seguro stand-camada">
+      {modo.modo !== 'simulacao' && !palco && <div className="stand-seguro stand-camada">
         <SeloCamera estado={webcam.camera} />
         {segundosParaSair !== null && <AvisoSaida segundos={segundosParaSair} />}
         {avisoControle && <p className="stand-aviso-equipe stand-aviso-controle">{avisoControle}</p>}
@@ -504,6 +525,11 @@ export default function StandPage() {
             rotulo: 'Menu',
             ativo: menu.aberto,
             aoEscolher: () => (menu.aberto ? fecharMenu() : abrirMenu(null)),
+          }, {
+            id: 'palco',
+            rotulo: 'Tela cheia',
+            ativo: modo.palco,
+            aoEscolher: () => { fecharMenu(); despacharModo({ tipo: 'palco', ligado: true }); pedirTelaCheia(true); },
           }]}
         />
       </div>}

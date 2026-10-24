@@ -374,3 +374,12 @@
 .stand-vitrine-som:focus-visible { outline:3px solid #fff; outline-offset:3px; }
 
 .stand-vitrine-controle { position:absolute; bottom:24px; left:24px; z-index:12; padding:12px 18px; border:1px solid #b7d7e9; border-radius:10px; color:#fff; background:#102a3deb; font:600 15px system-ui; cursor:pointer; }
+
+/* Palco (24/10): só a coruja, em tela inteira, sem moldura de texto. Entra por AFK, botão ou F. */
+.stand[data-palco] { background: radial-gradient(ellipse 60% 70% at 50% 46%, rgba(10, 132, 255, 0.13), transparent 72%), var(--l-void, #090c11); }
+.stand-palco { position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; animation: stand-palco-entra 1.2s ease-out both; }
+.stand-avatar-palco { width: auto; height: min(96vh, 140vw); max-width: 100%; aspect-ratio: 1204 / 1104; animation: stand-flutua 6s ease-in-out infinite; }
+@keyframes stand-palco-entra { from { opacity: 0; transform: scale(0.96); } }
+/* Botão "Tela cheia" da barra: discreto, mais apagado que os modos. */
+.stand-barra button[data-atalho='palco'] { opacity: 0.6; }
+@media (prefers-reduced-motion: reduce) { .stand-palco, .stand-avatar-palco { animation: none !important; } }
