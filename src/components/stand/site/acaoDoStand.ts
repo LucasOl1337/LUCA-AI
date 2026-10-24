@@ -33,6 +33,7 @@ export function planejarAcao(acao: unknown, args: unknown, atual: { modo: Modo; 
   if (validado.acao === 'abrir_simulacao') return { ok: true, passos: [{ tipo: 'modo', entrada: { tipo: 'ir', modo: 'simulacao' } }] };
   if (validado.acao === 'abrir_vitrine') return { ok: true, passos: [{ tipo: 'modo', entrada: { tipo: 'ir', modo: 'vitrine' } }] };
   // O tour é do cérebro: ele manda as ações do roteiro uma a uma.
+  if (validado.acao === 'sono_iniciar') return { ok: false, motivo: 'O teste de sono é conduzido pela voz do stand, passo a passo.' };
   if (validado.acao === 'tour_iniciar') return { ok: false, motivo: 'O tour é conduzido pela voz do stand, passo a passo.' };
   const pagina = paginaDaAcao(validado.acao);
   if (!pagina) return { ok: false, motivo: `A ação ${validado.acao} não tem página.` };

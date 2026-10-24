@@ -324,7 +324,7 @@ test('turno_id: dois pedidos concorrentes e retry concluído nunca repetem açã
     })();
   } });
   const { conversa_id } = await (await pedir('/api/stand/sessao', {})).json();
-  const corpo = { conversa_id, texto: 'Mostre o vídeo', turno_id: 'mesmo:1' };
+  const corpo = { conversa_id, texto: 'Qual vídeo explica o pipeline?', turno_id: 'mesmo:1' };
   const primeiro = pedir('/api/stand/turno', corpo);
   await iniciado;
   assert.equal((await pedir('/api/stand/turno', corpo)).status, 409);

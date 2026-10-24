@@ -46,6 +46,15 @@ export const FERRAMENTAS_STAND = Object.freeze([
   ...ferramentasAcaoSite('realtime'),
 ]);
 
+/**
+ * O que a voz oferece ao modelo (24/10, as cinco experiências): as três do
+ * cérebro mais as ações que abrem uma experiência e a volta. Os controles de
+ * página (`abrir_pagina`, `sensor_*`, `laboratorio_*`, `sompo_*`,
+ * `sonolencia_*`) seguem em `FERRAMENTAS_STAND` para o toque e os roteiros.
+ */
+export const NOMES_FERRAMENTAS_VOZ = Object.freeze(['buscar_no_repo', 'pesquisar_web', 'tocar_video', 'abrir_simulacao', 'sono_iniciar', 'tour_iniciar', 'abrir_vitrine', 'voltar_coruja']);
+export const FERRAMENTAS_VOZ = Object.freeze(NOMES_FERRAMENTAS_VOZ.map((nome) => FERRAMENTAS_STAND.find((f) => f.name === nome)));
+
 const NOMES = new Set(FERRAMENTAS_STAND.map((f) => f.name));
 const ACOES = new Set(ferramentasAcaoSite('realtime').map((f) => f.name));
 
@@ -117,6 +126,7 @@ export async function executarFerramentaStand(nome, args = {}, deps = {}) {
 
   // Ação do site (M3): valida aqui e a página/executor valida de novo.
   // O tour roda no cérebro em turnos (falas prontas); o Realtime não tem.
+  if (ferramenta === 'sono_iniciar') return { ...erro(ferramenta, 'sono_indisponivel'), mensagem: 'O teste de sono guiado só roda na voz em turnos; peça para a pessoa abrir o Teste de sono no menu.' };
   if (ferramenta === 'tour_iniciar') return { ...erro(ferramenta, 'tour_indisponivel'), mensagem: 'O tour guiado só roda na voz em turnos; mostre as páginas uma a uma.' };
   if (ACOES.has(ferramenta)) {
     const validacao = validarAcaoSite(ferramenta, entrada);

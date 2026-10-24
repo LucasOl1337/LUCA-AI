@@ -288,6 +288,7 @@ export function criarPassos(els: CursorElementos) {
       case 'abrir_simulacao':
       case 'abrir_vitrine':
       case 'tour_iniciar':
+      case 'sono_iniciar':
         throw new FalhaAcao('Essa ação é da tela do stand, não da página.');
     }
   };

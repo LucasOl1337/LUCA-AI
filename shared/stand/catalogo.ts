@@ -62,17 +62,14 @@ const videos = manifesto as Array<{ id: string; titulo: string }>;
 export const PERGUNTAS_PRONTAS: readonly string[] = Object.freeze([
   'O que é o LUCA-AI?',
   'O que a seguradora ganha com isso?',
+  'Quanto custa?',
   'Como o sensor mede o risco de tombar?',
   'Como funciona o alerta de sonolência?',
 ]);
 
 export const CATALOGO: readonly GrupoCatalogo[] = Object.freeze(([
   {
-    id: 'vitrine', titulo: 'Ver a vitrine', faz: 'Abre a mesma Vitrine do botão',
-    itens: [acao('abrir_vitrine', 'Abrir a Vitrine', 'abrir_vitrine')],
-  },
-  {
-    id: 'simulacao', titulo: 'Dirigir o trator', faz: 'Simulação: você dirige o Trator MAX',
+    id: 'simulacao', titulo: 'Dirigir o trator', faz: 'Você leva o trator até a chegada',
     itens: [
       acao('simulacao', 'Abrir a Simulação no totem', 'abrir_simulacao', {}, { detalhe: 'Percurso guiado (fardo, encosta, área alagada) ou condução livre; pegue o controle' }),
       acao('gameplay', 'Página do Gameplay', 'abrir_pagina', { pagina: 'gameplay' }, { detalhe: 'Instruções e cabine jogável' }),
@@ -80,11 +77,7 @@ export const CATALOGO: readonly GrupoCatalogo[] = Object.freeze(([
     ],
   },
   {
-    id: 'tour', titulo: 'Ver tudo', faz: 'Tour guiado de 1 minuto',
-    itens: [{ id: 'tour', rotulo: 'Começar o tour', detalhe: 'Sonolência, sensor na curva e volta', alvo: { tipo: 'tour' } }],
-  },
-  {
-    id: 'sonolencia', titulo: 'Teste de sono', faz: 'Webcam vê olho fechado e o alerta toca',
+    id: 'sonolencia', titulo: 'Teste de sono', faz: 'Feche os olhos 1 s e o alarme toca',
     itens: [
       acao('sono-abrir', 'Abrir o monitor', 'abrir_pagina', { pagina: 'sonolencia' }),
       acao('sono-camera', 'Ligar a webcam', 'sonolencia_ligar_camera', {}, { requer: ['webcam'], detalhe: 'Feche os olhos 1 s e o alerta toca' }),
@@ -93,6 +86,22 @@ export const CATALOGO: readonly GrupoCatalogo[] = Object.freeze(([
       ...['baixa', 'normal', 'alta'].map((n) => acao(`sono-sens-${n}`, `Sensibilidade ${n}`, 'sonolencia_sensibilidade', { nivel: n })),
     ],
   },
+  {
+    id: 'tour', titulo: 'Ver tudo', faz: 'Tour guiado de 1 minuto',
+    itens: [{ id: 'tour', rotulo: 'Começar o tour', detalhe: 'Sensor na curva, o que a seguradora vê e volta', alvo: { tipo: 'tour' } }],
+  },
+  {
+    id: 'vitrine', titulo: 'Ver como funciona', faz: 'Vídeo que explica o LUCA',
+    itens: [
+      ...videos.slice(0, 1).map((v) => ({ id: `vitrine-${v.id}`, rotulo: `Vídeo: ${v.titulo}`, alvo: { tipo: 'video', id: v.id } as AlvoItem })),
+      acao('abrir_vitrine', 'Abrir a Vitrine', 'abrir_vitrine', {}, { detalhe: 'Todos os vídeos em sequência' }),
+    ],
+  },
+  {
+    id: 'perguntar', titulo: 'Tirar dúvidas', faz: 'Responde sobre o projeto e pesquisa na web',
+    itens: PERGUNTAS_PRONTAS.map((texto, i) => ({ id: `pergunta-${i + 1}`, rotulo: texto, alvo: { tipo: 'pergunta', texto }, requer: ['voz'] })),
+  },
+  // Daqui pra baixo: só toque e equipe (fora do painel e da voz desde 24/10).
   {
     id: 'sensor', titulo: 'Sensor em ação', faz: 'Trator em curva, encosta, frenada, buraco',
     itens: [
@@ -133,10 +142,6 @@ export const CATALOGO: readonly GrupoCatalogo[] = Object.freeze(([
     itens: videos.map((v) => ({ id: `video-${v.id}`, rotulo: v.titulo, alvo: { tipo: 'video', id: v.id } })),
   },
   {
-    id: 'perguntar', titulo: 'Tirar dúvidas', faz: 'Responde sobre o projeto e pesquisa na web',
-    itens: PERGUNTAS_PRONTAS.map((texto, i) => ({ id: `pergunta-${i + 1}`, rotulo: texto, alvo: { tipo: 'pergunta', texto }, requer: ['voz'] })),
-  },
-  {
     id: 'voltar', titulo: 'Voltar', faz: 'Fecha a página e volta pra coruja',
     itens: [acao('voltar', 'Voltar pra coruja', 'voltar_coruja')],
   },
@@ -145,7 +150,11 @@ export const CATALOGO: readonly GrupoCatalogo[] = Object.freeze(([
 /** Ações que ficam fora do menu, com motivo (o teste exige motivo para cada uma). */
 export const FORA_DO_MENU: Readonly<Record<string, string>> = Object.freeze({
   tour_iniciar: 'o menu roda o roteiro TOUR_STAND direto (item tour), com ou sem voz',
+  sono_iniciar: 'roteiro de voz do cérebro (SONO_STAND); no toque, os itens do grupo sonolencia fazem os mesmos passos',
 });
+
+/** Grupos do menu fora das cinco experiências: só toque e equipe, sem cartão no painel nem rota de voz. */
+export const GRUPOS_SO_TOQUE: readonly string[] = Object.freeze(['sensor', 'fazenda', 'sompo', 'site', 'video', 'voltar']);
 
 export function grupoDoCatalogo(id: string): GrupoCatalogo | undefined {
   return CATALOGO.find((g) => g.id === id);
@@ -164,9 +173,10 @@ export function conferirCatalogo(catalogo: readonly GrupoCatalogo[] = CATALOGO):
   const problemas: string[] = [];
   const ids = new Set<string>();
   const usadas = new Set<string>();
-  const grupos = new Set(COMANDOS_VOZ.map((c) => c.id));
+  const grupos = new Set([...COMANDOS_VOZ.map((c) => c.id), ...GRUPOS_SO_TOQUE]);
+  for (const id of COMANDOS_VOZ.map((c) => c.id)) if (!catalogo.some((g) => g.id === id)) problemas.push(`experiência ${id} sem grupo no menu`);
   for (const g of catalogo) {
-    if (!grupos.has(g.id)) problemas.push(`grupo ${g.id} não existe em COMANDOS_VOZ`);
+    if (!grupos.has(g.id)) problemas.push(`grupo ${g.id} não é experiência nem grupo só de toque`);
     if (!g.itens.length) problemas.push(`grupo ${g.id} vazio`);
     for (const item of g.itens) {
       if (ids.has(item.id)) problemas.push(`item repetido ${item.id}`);

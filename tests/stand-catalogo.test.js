@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
-import { CATALOGO, FORA_DO_MENU, conferirCatalogo, itemDoCatalogo } from '../shared/stand/catalogo.ts';
+import { CATALOGO, FORA_DO_MENU, GRUPOS_SO_TOQUE, conferirCatalogo, itemDoCatalogo } from '../shared/stand/catalogo.ts';
 import { ACOES_SITE, IDS_PAGINAS, validarAcaoSite } from '../shared/stand/acoes-site.ts';
 import { COMANDOS_VOZ } from '../shared/stand/comandos-voz.ts';
 import { ehEventoPagina } from '../shared/stand/eventos.ts';
@@ -33,7 +33,7 @@ test('não esconde opções: cada valor de cada argumento das ações tem item p
 });
 
 test('grupos do menu são os mesmos ids dos comandos de voz (painel e prompt não divergem)', () => {
-  assert.deepEqual(CATALOGO.map((g) => g.id), COMANDOS_VOZ.map((c) => c.id));
+  assert.deepEqual(CATALOGO.map((g) => g.id), [...COMANDOS_VOZ.map((c) => c.id), ...GRUPOS_SO_TOQUE]);
   const vitrine = itemDoCatalogo('abrir_vitrine');
   assert.deepEqual(vitrine.alvo, { tipo: 'acao', acao: 'abrir_vitrine', args: {} });
   assert.equal(vitrine.requer, undefined, 'o toque abre a vitrine também sem voz');
@@ -68,8 +68,9 @@ test('pergunta do menu é evento da página válido, com limite de 500 caractere
 
 test('painel ao lado da coruja: grupos são botões (não texto morto), com ou sem voz', () => {
   const html = renderToStaticMarkup(createElement(PainelComandos, { voz: false, aoEscolher() {} }));
-  assert.equal((html.match(/<button/g) ?? []).length, CATALOGO.filter((g) => g.id !== 'sonolencia').length);
-  assert.doesNotMatch(html, /data-comando="sonolencia"/);
+  assert.equal((html.match(/<button/g) ?? []).length, 5, 'exatamente as cinco experiências');
+  assert.match(html, /data-comando="sonolencia"/);
+  for (const id of GRUPOS_SO_TOQUE) assert.doesNotMatch(html, new RegExp(`data-comando="${id}"`));
   assert.match(html, /Toque para ver/);
   assert.match(renderToStaticMarkup(createElement(PainelComandos, { voz: true, aoEscolher() {} })), /Toque ou peça/);
 });
@@ -77,8 +78,8 @@ test('painel ao lado da coruja: grupos são botões (não texto morto), com ou s
 test('menu: nível 1 lista grupos; nível 2 mostra todas as opções, motivo de indisponível e o retorno', () => {
   const base = { aberto: true, status: null, indisponivel: () => null, motivoSemTexto: null, aoAbrirGrupo() {}, aoFechar() {}, aoExecutar() {}, aoPerguntar() {} };
   const n1 = renderToStaticMarkup(createElement(MenuTotem, { ...base, grupo: null }));
-  assert.equal((n1.match(/data-grupo="/g) ?? []).length, CATALOGO.filter((g) => g.id !== 'sonolencia').length);
-  assert.doesNotMatch(n1, /data-grupo="sonolencia"/);
+  assert.equal((n1.match(/data-grupo="/g) ?? []).length, CATALOGO.length);
+  assert.match(n1, /data-grupo="sonolencia"/);
   const sompo = CATALOGO.find((g) => g.id === 'sompo');
   const n2 = renderToStaticMarkup(createElement(MenuTotem, {
     ...base,

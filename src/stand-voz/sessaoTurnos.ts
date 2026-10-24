@@ -492,6 +492,14 @@ export class SessaoTurnos implements SessaoDeVoz {
             await this.fila?.terminou();
             if (controle.signal.aborted) return '';
           }
+          // Roteiro (teste de sono): pausa em silêncio antes da ação, para a pessoa agir na tela.
+          if (typeof evento.espera_ms === 'number' && evento.espera_ms > 0) {
+            await new Promise<void>((ok) => {
+              const relogio = window.setTimeout(ok, Math.min(evento.espera_ms ?? 0, 30_000));
+              controle.signal.addEventListener('abort', () => { window.clearTimeout(relogio); ok(); }, { once: true });
+            });
+            if (controle.signal.aborted) return '';
+          }
           emitirEventoStand({ tipo: 'acao_site', acao: evento.acao, args: evento.args ?? {} });
         }
         break;

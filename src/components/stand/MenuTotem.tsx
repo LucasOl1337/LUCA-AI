@@ -29,7 +29,7 @@ const parar = (evento: PointerEvent) => evento.stopPropagation();
 export function MenuTotem({ aberto, grupo, status, indisponivel, motivoSemTexto, aoAbrirGrupo, aoFechar, aoExecutar, aoPerguntar, catalogo = CATALOGO }: Props) {
   const [texto, setTexto] = useState('');
   if (!aberto) return null;
-  const visiveis = catalogo.filter((g) => g.id !== 'sonolencia');
+  const visiveis = catalogo;
   const atual = grupo ? visiveis.find((g) => g.id === grupo) : undefined;
   const ocupado = status?.fase === 'executando';
   const enviar = (evento: FormEvent) => {

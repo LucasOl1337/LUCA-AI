@@ -5,9 +5,10 @@
 // assim que ela fecha. Tudo sai por `emitir`, linha a linha (NDJSON na rota).
 import { randomUUID } from 'node:crypto';
 import { cadeiaCerebroStand, ROUTER_API_KEY, ROUTER_BASE_URL } from '../config.js';
-import { FERRAMENTAS_STAND } from './ferramentas.js';
-import { TOUR_STAND, validarAcaoSite } from '../../shared/stand/acoes-site.ts';
-import { aceitaAlternativa, pedidoDireto } from '../../shared/stand/comandos-voz.ts';
+import { FERRAMENTAS_VOZ } from './ferramentas.js';
+import { SONO_STAND, TOUR_STAND, validarAcaoSite } from '../../shared/stand/acoes-site.ts';
+import { aceitaAlternativa, convite, pedidoDireto } from '../../shared/stand/comandos-voz.ts';
+import { carregarManifesto } from './roteador-video.js';
 import { RESERVA_TTS_TURNO } from './continuidade.js';
 import { contextoExperiencias, registrarExperiencias } from './experiencias.js';
 
@@ -23,13 +24,15 @@ export const FALAS = Object.freeze({
   falha: 'Tive um problema pra pensar agora. Pode perguntar de novo?',
   teto_respostas: 'Preciso renovar o limite desta conversa. Diga continuar para retomar sua pergunta.',
   acao_falhou: 'Não consegui fazer isso na tela agora.',
-  simulacao: 'Bora! Vou abrir a Simulação: pega o controle e dirige o Trator MAX.',
-  vitrine: 'Vou abrir a Vitrine, a mesma opção do botão na tela.',
+  simulacao: 'Bora! Vou abrir a Simulação: pega o controle e leva o Trator MAX até a chegada, desviando do feno, da água e da encosta.',
+  vitrine: 'Vou passar o vídeo que explica o LUCA em pouco mais de um minuto.',
+  vitrine_sem_video: 'Vou abrir a Vitrine, a mesma opção do botão na tela.',
+  video_fim: `Esse foi o vídeo. ${convite('vitrine')}`,
   animal: 'O cenário com animal na pista existe no simulador clássico, mas ainda não está disponível pelos controles deste Totem. Posso mostrar o cenário simulado do Trator MAX com um fardo como obstáculo. Quer ver?',
   obstaculo: 'Vou mostrar o cenário simulado do Trator MAX freando diante de um fardo, sem animal na pista.',
   voltar: 'Vou voltar pra coruja. Pode continuar falando comigo.',
   ajuda: 'No controle, R dois acelera, L dois freia e o analógico esquerdo vira. No teclado, W ou seta para cima acelera; S, seta para baixo ou espaço freia; A e D viram. Para sair, diga volta pra coruja.',
-  ...Object.fromEntries(TOUR_STAND.filter((passo) => 'fala' in passo).map((passo) => [passo.fala, passo.texto])),
+  ...Object.fromEntries([...TOUR_STAND, ...SONO_STAND].filter((passo) => 'fala' in passo).map((passo) => [passo.fala, passo.texto])),
 });
 
 /**
@@ -70,7 +73,7 @@ export function documentacaoDaPergunta(texto, buscar) {
 }
 
 /** Ferramentas do stand no formato de chat completions (o Realtime usa outro). */
-export function ferramentasDeChat(ferramentas = FERRAMENTAS_STAND) {
+export function ferramentasDeChat(ferramentas = FERRAMENTAS_VOZ) {
   return ferramentas.map((f) => ({ type: 'function', function: { name: f.name, description: f.description, parameters: f.parameters } }));
 }
 
@@ -277,6 +280,24 @@ function criarFilaDeFala({ conversa, sintetizar, emitir, aoCobrarTts, sinal, mar
   };
 }
 
+/** Roteiro de falas prontas fora da fila do modelo (pedido direto): mesma regra de `tocarRoteiro`. */
+async function tocarRoteiroDireto(passos, { tocarPronta, emitir, sinal }) {
+  const ditas = [];
+  let espera = 0;
+  for (const passo of passos) {
+    if (abortado(sinal)) break;
+    if ('espera_ms' in passo) { espera += passo.espera_ms; continue; }
+    if ('fala' in passo) {
+      await tocarPronta(passo.fala).catch(() => {});
+      if (!abortado(sinal)) ditas.push(passo.texto);
+    } else {
+      emitir({ t: 'evento', evento: { tipo: 'acao_site', acao: passo.acao, args: passo.args, apos_fala: true, ...(espera ? { espera_ms: espera } : {}) } });
+      espera = 0;
+    }
+  }
+  return { completo: !abortado(sinal), ditas };
+}
+
 /**
  * Executa um turno. `entrada`: `{texto}` (pergunta), `{evento:'saudacao'}` ou
  * `{evento:'video_terminou', id}`. Nunca lança: falha vira a fala pronta.
@@ -294,6 +315,7 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
     modelos = cadeiaCerebroStand(),
     aoCobrarTts = () => {},
     agora = () => Date.now(),
+    videoVitrine = () => carregarManifesto()[0]?.id ?? null,
   } = deps;
   const inicio = agora();
   const metricas = { modelo: null, tentativas: [] };
@@ -323,6 +345,12 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
     await tocarPronta('acao_falhou').catch(() => {});
     return encerrarTurno('acao_falhou');
   }
+  // Fim de vídeo: fechamento pronto com convite às outras experiências, sem modelo.
+  if (entrada.evento === 'video_terminou') {
+    conversa.historico.push({ role: 'assistant', content: FALAS.video_fim });
+    await tocarPronta('video_fim').catch(() => {});
+    return encerrarTurno('video_fim', { fala: FALAS.video_fim });
+  }
   if (conversa.respostas >= LIMITES_TURNO.respostas) {
     await tocarPronta('teto_respostas').catch(() => {});
     return encerrarTurno('teto_respostas');
@@ -333,20 +361,46 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
   let pedido = !entrada.evento ? pedidoDireto(entrada.texto) : null;
   if (!entrada.evento && conversa.alternativaAnimal && aceitaAlternativa(entrada.texto)) pedido = 'obstaculo';
   if (!entrada.evento) conversa.alternativaAnimal = pedido === 'animal';
+  if (pedido === 'tour' || pedido === 'sonolencia') {
+    // Experiência por roteiro, sem modelo: o mesmo caminho do tour pela ferramenta.
+    conversa.respostas += 1;
+    metricas.comando_direto = pedido;
+    metricas.ferramentas = [pedido === 'tour' ? 'tour_iniciar' : 'sono_iniciar'];
+    const roteiro = await tocarRoteiroDireto(pedido === 'tour' ? TOUR_STAND : SONO_STAND, { tocarPronta, emitir, sinal });
+    conversa.historico.push({ role: 'user', content: String(entrada.texto).trim() }, { role: 'assistant', content: roteiro.ditas.join(' ') || '…' });
+    if (abortado(sinal)) return { motivo: 'interrompido', metricas };
+    return encerrarTurno(pedido === 'tour' ? 'tour' : 'sono', { fala: roteiro.ditas.join(' ') });
+  }
   if (pedido) {
     const acoes = {
       simulacao: ['abrir_simulacao', {}], vitrine: ['abrir_vitrine', {}],
       voltar: ['voltar_coruja', {}], obstaculo: ['sompo_rodar_cenario', { id: 'stand-obstaculo-a-tempo' }],
     };
-    const acao = acoes[pedido];
+    let acao = acoes[pedido];
+    let chave = pedido;
+    let video = null;
+    if (pedido === 'vitrine') {
+      // ④ "Ver como funciona": o primeiro vídeo publicado, na Coruja; sem mp4, o modo Vitrine.
+      let id = null;
+      try { id = videoVitrine(); } catch { id = null; }
+      const saida = id ? await executarFerramenta('tocar_video', { id }).catch(() => null) : null;
+      if (saida?.ok && saida.evento) video = saida.evento;
+      else chave = 'vitrine_sem_video';
+      if (video) acao = null;
+    }
     conversa.respostas += 1;
-    conversa.historico.push({ role: 'user', content: String(entrada.texto).trim() }, { role: 'assistant', content: FALAS[pedido] });
+    conversa.historico.push({ role: 'user', content: String(entrada.texto).trim() }, { role: 'assistant', content: FALAS[chave] });
     metricas.comando_direto = pedido;
-    metricas.ferramentas = acao ? [acao[0]] : [];
-    await tocarPronta(pedido).catch(() => {});
+    metricas.ferramentas = video ? ['tocar_video'] : acao ? [acao[0]] : [];
+    await tocarPronta(chave).catch(() => {});
     if (abortado(sinal)) return { motivo: 'interrompido', metricas };
+    if (video) {
+      conversa.videosTocados.add(video.id);
+      emitir({ t: 'evento', evento: video });
+      return encerrarTurno('video', { fala: FALAS[chave] });
+    }
     if (acao) emitir({ t: 'evento', evento: { tipo: 'acao_site', acao: acao[0], args: acao[1], apos_fala: true } });
-    return encerrarTurno(pedido, { fala: FALAS[pedido] });
+    return encerrarTurno(pedido, { fala: FALAS[chave] });
   }
 
   let conteudo;
@@ -398,25 +452,18 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
   let tourDito = '';
 
   /**
-   * Tour (`tour_iniciar`): roteiro fixo com falas prontas, sem modelo. Cada ação
-   * vai com `apos_fala` (o navegador espera a fala anterior soar); barge-in
-   * aborta o turno e o tour para no passo em que estava.
+   * Roteiro (`tour_iniciar`, `sono_iniciar`): falas prontas, sem modelo. Cada
+   * ação vai com `apos_fala` (o navegador espera a fala anterior soar); pausa
+   * vira `espera_ms` na ação seguinte. Barge-in aborta o turno e o roteiro para
+   * no passo em que estava.
    */
-  const tocarTour = async () => {
+  const tocarRoteiro = async (passos) => {
     await fala.terminou();
-    const ditas = [];
-    for (const passo of TOUR_STAND) {
-      if (abortado(sinal)) break;
-      if ('fala' in passo) {
-        if (passo.fala === 'tour_1' && fala.faladas.length) continue;
-        await tocarPronta(passo.fala).catch(() => {});
-        if (!abortado(sinal)) ditas.push(passo.texto);
-      } else {
-        emitir({ t: 'evento', evento: { tipo: 'acao_site', acao: passo.acao, args: passo.args, apos_fala: true } });
-      }
-    }
-    return { completo: !abortado(sinal), ditas };
+    // O modelo já apresentou: o roteiro pula a fala de abertura.
+    const pular = fala.faladas.length ? passos.find((p) => 'fala' in p && /_1$/.test(p.fala)) : null;
+    return tocarRoteiroDireto(passos.filter((p) => p !== pular), { tocarPronta, emitir, sinal });
   };
+  const tocarTour = () => tocarRoteiro(TOUR_STAND);
 
   for (let rodada = 0; rodada < RODADAS_DE_FERRAMENTA && !videoComecou && !tourFeito; rodada++) {
     const mensagens = [{ role: 'system', content: `${instrucoes()}\n\n${INSTRUCAO_VOZ}\n\n${contextoExperiencias(conversa)}` }, ...comDocumentacao(conversa.historico)];
@@ -496,20 +543,21 @@ export async function executarTurno({ conversa, entrada, emitir, sinal, deps }) 
         conversa.historico.push({ role: 'tool', tool_call_id: chamada.id, content: JSON.stringify({ ok: false, erro: 'tour_em_andamento' }) });
         continue;
       }
-      if (chamada.function.name === 'tour_iniciar') {
+      if (chamada.function.name === 'tour_iniciar' || chamada.function.name === 'sono_iniciar') {
+        const nomeRoteiro = chamada.function.name;
         let args;
         try { args = JSON.parse(chamada.function.arguments || '{}'); } catch { args = null; }
-        const validado = validarAcaoSite('tour_iniciar', args);
+        const validado = validarAcaoSite(nomeRoteiro, args);
         if (!validado.ok) {
           conversa.historico.push({ role: 'tool', tool_call_id: chamada.id, content: JSON.stringify({ ok: false, erro: validado.motivo }) });
           continue;
         }
         tourFeito = true;
-        const tour = await tocarTour();
-        conversa.historico.push({ role: 'tool', tool_call_id: chamada.id, content: JSON.stringify({ ok: true, tour: tour.completo ? 'concluído' : 'interrompido' }) });
+        const tour = await (nomeRoteiro === 'sono_iniciar' ? tocarRoteiro(SONO_STAND) : tocarTour());
+        conversa.historico.push({ role: 'tool', tool_call_id: chamada.id, content: JSON.stringify({ ok: true, [nomeRoteiro === 'sono_iniciar' ? 'sono' : 'tour']: tour.completo ? 'concluído' : 'interrompido' }) });
         // O que o visitante ouviu entra depois de todos os resultados de ferramenta.
         tourDito = tour.ditas.join(' ');
-        metricas.ferramentas = [...(metricas.ferramentas || []), 'tour_iniciar'];
+        metricas.ferramentas = [...(metricas.ferramentas || []), nomeRoteiro];
         continue;
       }
       let args = {};

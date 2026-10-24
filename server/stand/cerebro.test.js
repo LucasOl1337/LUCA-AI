@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TOUR_STAND } from '../../shared/stand/acoes-site.ts';
+import { SONO_STAND, TOUR_STAND } from '../../shared/stand/acoes-site.ts';
 import { CortadorDeFrases, executarTurno, FALAS, ferramentasDeChat, INSTRUCAO_VOZ, LIMITES_TURNO, lerSseDeChat, limparTela, novaConversa, TELA_MAX, textoFalavel } from './cerebro.js';
 
 const MODELOS = ['cc/claude-sonnet-5', 'cc/claude-haiku-4-5-20251001', 'cx/gpt-6-astra-high'];
@@ -219,8 +219,11 @@ test('saudação e fim de vídeo', async () => {
   assert.equal(saudacao.resultado.motivo, 'saudacao');
   assert.equal(saudacao.conversa.historico[0].content, FALAS.saudacao);
   assert.equal(saudacao.conversa.respostas, 0);
-  const fimVideo = await rodar({ entrada: { evento: 'video_terminou', id: 'pipeline-completo' }, roteiros: [[{ texto: 'Ficou alguma dúvida?' }, { fim: true, ferramentas: [] }]] });
-  assert.match(fimVideo.chamadas[0].mensagens.at(-1).content, /vídeo pipeline-completo terminou/);
+  // Fim de vídeo (24/10): fechamento pronto, convidando as outras experiências, sem modelo.
+  const fimVideo = await rodar({ entrada: { evento: 'video_terminou', id: 'pipeline-completo' }, roteiros: [] });
+  assert.equal(fimVideo.chamadas.length, 0);
+  assert.equal(fimVideo.resultado.motivo, 'video_fim');
+  assert.match(fimVideo.linhas.find((l) => l.t === 'frase').texto, /dirigir o trator.*alerta de sono.*tour.*perguntar/);
 });
 
 test('acao_falhou: fala pronta na hora, sem modelo, sem contar resposta nem entrar no histórico', async () => {
@@ -261,7 +264,7 @@ const chamadaTour = (extra = []) => [{ fim: true, ferramentas: [{ id: 't1', type
 
 test('tour_iniciar: roteiro com falas prontas e ações depois da fala, sem segunda rodada de modelo', async () => {
   const conversa = novaConversa({ conta: 'demo' });
-  const { linhas, chamadas, resultado, sintetizadas } = await rodar({ conversa, entrada: { texto: 'me mostra tudo' }, roteiros: [chamadaTour()] });
+  const { linhas, chamadas, resultado, sintetizadas } = await rodar({ conversa, entrada: { texto: 'o que dá pra ver nesse stand?' }, roteiros: [chamadaTour()] });
   assert.equal(chamadas.length, 1, 'o modelo só escolhe o tour');
   assert.equal(resultado.motivo, 'tour');
   assert.equal(sintetizadas.length, 0, 'falas do tour são prontas (cache), não TTS por turno');
@@ -283,9 +286,9 @@ test('tour_iniciar: barge-in para o roteiro no passo em que estava e o históric
     if (chave.startsWith('tour_') && ++falas === 2) controle.abort();
     yield Buffer.from(chave);
   };
-  const { linhas, resultado } = await rodar({ conversa, sinal: controle.signal, entrada: { texto: 'o que tem aqui?' }, roteiros: [chamadaTour()], deps: { falaPronta } });
+  const { linhas, resultado } = await rodar({ conversa, sinal: controle.signal, entrada: { texto: 'o que dá pra ver nesse stand?' }, roteiros: [chamadaTour()], deps: { falaPronta } });
   assert.equal(resultado.motivo, 'interrompido');
-  assert.deepEqual(linhas.filter((l) => l.t === 'evento').map((l) => l.evento.acao), ['abrir_pagina'], 'nenhuma ação depois da interrupção');
+  assert.deepEqual(linhas.filter((l) => l.t === 'evento').map((l) => l.evento.acao), ['sensor_escolher_veiculo', 'sensor_rodar_ensaio'], 'nenhuma ação depois da interrupção');
   assert.ok(!linhas.some((l) => l.t === 'frase' && l.texto === TOUR_STAND.at(-1).texto));
   assert.match(conversa.historico.find((m) => m.role === 'tool').content, /interrompido/);
   assert.equal(conversa.historico.at(-1).role, 'assistant');
@@ -307,11 +310,14 @@ test('FALAS traz as falas do tour (cacheadas como as outras falas prontas)', () 
   for (const passo of TOUR_STAND.filter((p) => 'fala' in p)) assert.equal(FALAS[passo.fala], passo.texto);
 });
 
-test('ID05: vitrine explícita emite abrir_vitrine, sem modelo ou tour; pergunta vizinha não navega', async () => {
-  const pedido = await rodar({ entrada: { texto: 'Quero ver a vitrine' }, roteiros: [] });
+test('ID05/④: vitrine explícita toca o vídeo de como funciona, sem modelo; sem vídeo publicado abre a Vitrine; pergunta vizinha não navega', async () => {
+  const pedido = await rodar({ entrada: { texto: 'Quero ver a vitrine' }, roteiros: [], deps: { videoVitrine: () => 'pipeline-completo' } });
   assert.equal(pedido.chamadas.length, 0);
-  assert.equal(pedido.resultado.motivo, 'vitrine');
-  assert.deepEqual(pedido.linhas.filter((l) => l.t === 'evento').map((l) => l.evento), [
+  assert.equal(pedido.resultado.motivo, 'video');
+  assert.deepEqual(pedido.linhas.filter((l) => l.t === 'evento').map((l) => l.evento), [{ tipo: 'tocar_video', id: 'pipeline-completo' }]);
+  assert.equal(pedido.linhas.find((l) => l.t === 'frase').texto, FALAS.vitrine);
+  const semVideo = await rodar({ entrada: { texto: 'Me mostra o vídeo' }, roteiros: [], deps: { videoVitrine: () => null } });
+  assert.deepEqual(semVideo.linhas.filter((l) => l.t === 'evento').map((l) => l.evento), [
     { tipo: 'acao_site', acao: 'abrir_vitrine', args: {}, apos_fala: true },
   ]);
   const pergunta = await rodar({ entrada: { texto: 'Como funciona a vitrine?' }, roteiros: [[{ texto: 'Ela mostra as experiências.' }, { fim: true }]] });
@@ -343,7 +349,7 @@ test('ajuda e volta funcionam na Simulação sem modelo; barge-in não dispara a
 
 test('ID05: modelo já apresentou tour, roteiro não repete introdução', async () => {
   const roteiro = [{ texto: 'Vou mostrar tudo em um tour rápido. ' }, ...chamadaTour()];
-  const r = await rodar({ entrada: { texto: 'Me mostra tudo' }, roteiros: [roteiro] });
+  const r = await rodar({ entrada: { texto: 'o que dá pra ver nesse stand?' }, roteiros: [roteiro] });
   const frases = r.linhas.filter((l) => l.t === 'frase').map((l) => l.texto);
   assert.equal(frases[0], 'Vou mostrar tudo em um tour rápido.');
   assert.ok(!frases.includes(FALAS.tour_1));
@@ -370,7 +376,30 @@ test('tour_iniciar: argumentos extras são recusados sem executar roteiro', asyn
   const conversa = novaConversa({ conta: 'demo' });
   const chamada = chamadaTour();
   chamada[0].ferramentas[0].function.arguments = '{"pagina":"admin"}';
-  const { linhas } = await rodar({ conversa, entrada: { texto: 'me mostra tudo' }, roteiros: [chamada, [{ texto: 'Não posso abrir essa página.' }]] });
+  const { linhas } = await rodar({ conversa, entrada: { texto: 'o que dá pra ver nesse stand?' }, roteiros: [chamada, [{ texto: 'Não posso abrir essa página.' }]] });
   assert.ok(!linhas.some((l) => l.t === 'evento'));
   assert.match(conversa.historico.find((m) => m.role === 'tool').content, /não aceita/);
+});
+
+test('③ e ② por pedido direto: roteiro de falas prontas, sem modelo, terminando na coruja com convite', async () => {
+  const falasDe = (r) => r.linhas.filter((l) => l.t === 'frase' || l.t === 'evento')
+    .map((l) => (l.t === 'frase' ? l.texto : `${l.evento.acao}:${JSON.stringify(l.evento.args)}`));
+  for (const [texto, passos, motivo] of [['Me mostra tudo', TOUR_STAND, 'tour'], ['Testa o alerta de sono', SONO_STAND, 'sono']]) {
+    const conversa = novaConversa({ conta: 'demo' });
+    const r = await rodar({ conversa, entrada: { texto }, roteiros: [] });
+    assert.equal(r.chamadas.length, 0, texto);
+    assert.equal(r.resultado.motivo, motivo);
+    assert.deepEqual(falasDe(r), passos.filter((p) => !('espera_ms' in p)).map((p) => ('fala' in p ? p.texto : `${p.acao}:${JSON.stringify(p.args)}`)));
+    const acoes = r.linhas.filter((l) => l.t === 'evento').map((l) => l.evento);
+    assert.equal(acoes.at(-1).acao, 'voltar_coruja');
+    assert.match(falasDe(r).at(-1), /Agora você pode/);
+    assert.equal(conversa.respostas, 1);
+  }
+  const sono = await rodar({ entrada: { texto: 'quero testar o sono' }, roteiros: [] });
+  assert.equal(sono.linhas.find((l) => l.t === 'evento' && l.evento.acao === 'sonolencia_desligar_camera').evento.espera_ms, 15000);
+});
+
+test('voz só oferece as cinco experiências: sem abrir_pagina nem controles de página', () => {
+  const nomes = ferramentasDeChat().map((f) => f.function.name);
+  assert.deepEqual(nomes, ['buscar_no_repo', 'pesquisar_web', 'tocar_video', 'abrir_simulacao', 'sono_iniciar', 'tour_iniciar', 'abrir_vitrine', 'voltar_coruja']);
 });

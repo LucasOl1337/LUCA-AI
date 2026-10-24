@@ -13,6 +13,7 @@
  */
 import { SOMPO_EXAMPLE_CASES } from '../../src/lib/sompo-cases.ts';
 import { STAND_SCENARIOS } from '../../src/components/sompo/standScenarios.ts';
+import { convite } from './comandos-voz.ts';
 
 export const CANAL_STAND = 'luca-stand';
 
@@ -64,7 +65,8 @@ export type NomeAcaoSite =
   | 'sompo_voltar_inicio'
   | 'sompo_abrir_caso'
   | 'sompo_rodar_cenario'
-  | 'tour_iniciar';
+  | 'tour_iniciar'
+  | 'sono_iniciar';
 
 export interface ArgAcaoSite {
   descricao: string;
@@ -208,7 +210,13 @@ export const ACOES_SITE: readonly AcaoSiteDef[] = Object.freeze(([
   {
     nome: 'tour_iniciar',
     pagina: null,
-    descricao: 'Tour guiado de menos de um minuto, com falas prontas: monitor de sonolência, laboratório do sensor com o Trator MAX na curva e volta pra coruja. Use quando a pessoa pedir pra ver tudo ("me mostra tudo", "o que tem aqui?") ou não souber o que perguntar. Não fale antes de chamar: o tour já se apresenta. A pessoa pode interromper falando.',
+    descricao: 'Tour guiado de menos de um minuto, com falas prontas: sensor com o Trator MAX na curva, o que a seguradora vê no painel SOMPO e volta pra coruja. Use quando a pessoa pedir pra ver tudo ("me mostra tudo", "o que tem aqui?") ou não souber o que perguntar. Não fale antes de chamar: o tour já se apresenta. A pessoa pode interromper falando.',
+    args: {},
+  },
+  {
+    nome: 'sono_iniciar',
+    pagina: null,
+    descricao: 'Teste de sono completo, com falas prontas: explica o alerta, liga a webcam no monitor de sonolência, a pessoa fecha os olhos por 1 segundo e ouve o alarme, depois desliga a câmera e volta pra coruja. A imagem fica só no computador do totem. Use quando a pessoa quiser testar o alerta de sono ou sonolência. Não fale antes de chamar.',
     args: {},
   },
 ] as AcaoSiteDef[]).map((item) => Object.freeze(item)));
@@ -219,29 +227,51 @@ export const ACOES_SITE: readonly AcaoSiteDef[] = Object.freeze(([
  * dentro do iframe. `tour_iniciar` roda no cérebro (falas prontas + ações do
  * `TOUR_STAND`); o `/stand` só recebe as ações do roteiro.
  */
-export const ACOES_DO_STAND: readonly NomeAcaoSite[] = ['abrir_pagina', 'voltar_coruja', 'abrir_simulacao', 'abrir_vitrine', 'tour_iniciar'];
+export const ACOES_DO_STAND: readonly NomeAcaoSite[] = ['abrir_pagina', 'voltar_coruja', 'abrir_simulacao', 'abrir_vitrine', 'tour_iniciar', 'sono_iniciar'];
+
+/** Roteiros do cérebro (falas prontas + ações): não vão ao Executor. */
+export const ROTEIROS_DO_CEREBRO = ['tour_iniciar', 'sono_iniciar'] as const;
 
 export type PassoTour =
-  | { fala: `tour_${number}`; texto: string }
-  | { acao: Exclude<NomeAcaoSite, 'tour_iniciar'>; args: Record<string, string> };
+  | { fala: string; texto: string }
+  | { acao: Exclude<NomeAcaoSite, 'tour_iniciar' | 'sono_iniciar'>; args: Record<string, string> };
+
+/** Passo de roteiro do cérebro: fala pronta, ação depois da fala ou pausa em silêncio. */
+export type PassoRoteiro = PassoTour | { espera_ms: number };
 
 /**
- * Roteiro fixo do tour (proposta Totem-Site item 2): coruja → sonolência →
- * sensor com o trator na curva → coruja. Cada ação entra quando a fala anterior
- * termina de soar; tudo só mostra (sem câmera ligada, gravação nem bancada).
- * ~600 caracteres de fala: menos de 60 s na voz do stand.
+ * Roteiro fixo do tour (experiência ③, 24/10): coruja → sensor com o trator na
+ * curva → o que a seguradora vê no SOMPO → coruja, convidando as outras quatro.
+ * Cada ação entra quando a fala anterior termina de soar; tudo só mostra.
  */
 export const TOUR_STAND: readonly PassoTour[] = Object.freeze(([
-  { fala: 'tour_1', texto: 'Bora lá, vou te mostrar o LUCA em menos de um minuto. Primeiro, o monitor de sonolência.' },
-  { acao: 'abrir_pagina', args: { pagina: 'sonolencia' } },
-  { fala: 'tour_2', texto: 'Este é o monitor de sonolência. A demonstração ainda não está ativa. Toque em Ativar webcam e autorize a câmera; só experimente fechar os olhos quando a tela confirmar Monitor pronto e som liberado.' },
+  { fala: 'tour_1', texto: 'Bora lá, vou te mostrar o LUCA em menos de um minuto. Primeiro, o sensor no trator.' },
   { acao: 'sensor_escolher_veiculo', args: { veiculo: 'trator' } },
-  { fala: 'tour_3', texto: 'Agora o laboratório do sensor, com o Trator MAX na bancada.' },
   { acao: 'sensor_rodar_ensaio', args: { ensaio: 'curva' } },
-  { fala: 'tour_4', texto: 'Olha a curva de talhão: o sensor mede a inclinação e a força lateral que podem tombar a máquina, e é isso que alimenta o risco da operação.' },
+  { fala: 'tour_2', texto: 'Olha a curva de talhão: o sensor mede a inclinação e a força lateral que podem tombar a máquina, e é isso que alimenta o risco da operação.' },
+  { acao: 'sompo_abrir_aba', args: { aba: 'casos' } },
+  { fala: 'tour_3', texto: 'E aqui é o que a seguradora vê: casos de exemplo do campo, com o risco de cada um explicado.' },
   { acao: 'voltar_coruja', args: {} },
-  { fala: 'tour_5', texto: 'Esse foi o tour. Pode me perguntar qualquer coisa sobre o que você viu.' },
+  { fala: 'tour_4', texto: `Esse foi o tour. ${convite('tour')}` },
 ] as PassoTour[]).map((passo) => Object.freeze(passo)));
+
+/** Pausa do teste de sono: tempo para a câmera ficar pronta e a pessoa fechar os olhos. */
+export const ESPERA_TESTE_SONO_MS = 15_000;
+
+/**
+ * Teste de sono (experiência ②, 24/10): explica, liga a webcam, deixa a pessoa
+ * fechar os olhos e ouvir o alarme, desliga a câmera e volta pra coruja.
+ */
+export const SONO_STAND: readonly PassoRoteiro[] = Object.freeze(([
+  { fala: 'sono_1', texto: 'O LUCA vigia os olhos do operador pela câmera. Se eles ficarem fechados por um segundo, toca um alarme. A imagem fica só neste computador.' },
+  { acao: 'abrir_pagina', args: { pagina: 'sonolencia' } },
+  { acao: 'sonolencia_ligar_camera', args: {} },
+  { fala: 'sono_2', texto: 'Quando a tela disser monitor pronto, feche os olhos por um segundo e ouça. Abriu os olhos, ele para.' },
+  { espera_ms: ESPERA_TESTE_SONO_MS },
+  { acao: 'sonolencia_desligar_camera', args: {} },
+  { acao: 'voltar_coruja', args: {} },
+  { fala: 'sono_3', texto: `No trator é assim: o alarme acorda o motorista antes do acidente. ${convite('sonolencia')}` },
+] as PassoRoteiro[]).map((passo) => Object.freeze(passo)));
 
 export function paginaDaAcao(acao: string): PaginaSite | null {
   return ACOES_SITE.find((item) => item.nome === acao)?.pagina ?? null;

@@ -57,5 +57,5 @@ test('eco do tour: "o que é o sensor?" após a narração é pergunta, não pal
   assert.equal(interrompeFala('o que é o sensor?', falado), false);
   assert.equal(interrompeFala('quanto custa o sensor?', falado), true);
   assert.equal(pareceEco('o sensor mede a inclinação', falado, { durante: true }), true);
-  assert.equal(pareceEco('Pode me perguntar qualquer coisa sobre o que você viu.', falado), true);
+  assert.equal(pareceEco('Esse foi o tour. Agora você pode dirigir o trator.', falado), true);
 });

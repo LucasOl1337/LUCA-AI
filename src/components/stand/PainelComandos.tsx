@@ -3,10 +3,11 @@ import { COMANDOS_VOZ } from '../../../shared/stand/comandos-voz.ts';
 import { CATALOGO, type GrupoCatalogo } from '../../../shared/stand/catalogo.ts';
 
 const EXEMPLO = Object.fromEntries(COMANDOS_VOZ.map((c) => [c.id, c.exemplo]));
+const EXPERIENCIAS = new Set(COMANDOS_VOZ.map((c) => c.id));
 
 /**
- * Painel ao lado da coruja: os grupos do catálogo comum, tocáveis (grill Totem
- * interativo r1, Q1). Os ids são os de `COMANDOS_VOZ` (mesma lista do prompt do
+ * Painel ao lado da coruja: as cinco experiências (24/10), tocáveis. Os grupos
+ * só de toque (sensor, fazenda, SOMPO, site, vídeos) ficam no menu. Os ids são os de `COMANDOS_VOZ` (mesma lista do prompt do
  * cérebro), então o que a pessoa toca é o que ela também pode pedir falando.
  * Um toque abre as opções do grupo no menu.
  */
@@ -16,7 +17,7 @@ export function PainelComandos({ grupos = CATALOGO, voz = true, aoEscolher }: { 
     <aside className="stand-comandos" aria-label="O que fazer no LUCA" onPointerDown={parar}>
       <p className="stand-comandos-titulo">{voz ? 'Toque ou peça' : 'Toque para ver'}</p>
       <ul className="stand-comandos-lista">
-        {grupos.filter((g) => g.id !== 'sonolencia').map((g) => (
+        {grupos.filter((g) => EXPERIENCIAS.has(g.id)).map((g) => (
           <li key={g.id}>
             <button type="button" className="stand-comando" data-comando={g.id} onClick={() => aoEscolher(g.id)}>
               <span className="stand-comando-exemplo">{g.titulo}</span>

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { COMANDOS_VOZ, comandoDireto, comandosParaPrompt } from '../shared/stand/comandos-voz.ts';
-import { FERRAMENTAS_STAND, executarFerramentaStand } from '../server/stand/ferramentas.js';
+import { COMANDOS_VOZ, CONTROLE_VOLTAR, comandoDireto, comandosParaPrompt, pedidoDireto } from '../shared/stand/comandos-voz.ts';
+import { FERRAMENTAS_STAND, FERRAMENTAS_VOZ, executarFerramentaStand } from '../server/stand/ferramentas.js';
 import { executarTurno, FALAS, novaConversa } from '../server/stand/cerebro.js';
 import { montarPromptBase } from '../server/stand/conhecimento.js';
 import { loadFrontendModule } from './support/load-frontend-module.js';
@@ -37,11 +37,15 @@ const PERGUNTAS_SOBRE_SIMULADOR = [
   'o que é o LUCA?',
 ];
 
-test('painel e cérebro vêm da mesma lista: toda ferramenta do stand tem comando e todo comando tem ferramenta', () => {
+test('exatamente cinco experiências (Lucas, 24/10); painel e voz vêm da mesma lista', () => {
+  assert.deepEqual(COMANDOS_VOZ.map((c) => c.id), ['simulacao', 'sonolencia', 'tour', 'vitrine', 'perguntar']);
   const ferramentas = new Set(FERRAMENTAS_STAND.map((f) => f.name));
-  const nosComandos = new Set(COMANDOS_VOZ.flatMap((c) => c.ferramentas));
-  for (const nome of nosComandos) assert.ok(ferramentas.has(nome), `comando aponta para ferramenta inexistente: ${nome}`);
-  for (const nome of ferramentas) assert.ok(nosComandos.has(nome), `ferramenta sem comando no painel: ${nome}`);
+  const daVoz = new Set(FERRAMENTAS_VOZ.map((f) => f.name));
+  const nosComandos = new Set([...COMANDOS_VOZ.flatMap((c) => c.ferramentas), ...CONTROLE_VOLTAR.ferramentas]);
+  for (const nome of nosComandos) assert.ok(ferramentas.has(nome) && daVoz.has(nome), `comando aponta para ferramenta fora da voz: ${nome}`);
+  // abrir_vitrine fica na voz só como reserva do ④ sem vídeo publicado.
+  for (const nome of daVoz) assert.ok(nosComandos.has(nome) || nome === 'abrir_vitrine', `ferramenta de voz sem experiência: ${nome}`);
+  for (const nome of ['abrir_pagina', 'sensor_rodar_ensaio', 'sompo_abrir_aba', 'laboratorio_camera', 'sonolencia_ligar_camera']) assert.ok(!daVoz.has(nome), `${nome} saiu da voz`);
   assert.equal(new Set(COMANDOS_VOZ.map((c) => c.id)).size, COMANDOS_VOZ.length, 'ids únicos');
   for (const c of COMANDOS_VOZ) {
     assert.ok(c.titulo.split(' ').length <= 4, `título curto: ${c.titulo}`);
@@ -58,6 +62,23 @@ test('prompt do cérebro traz cada comando do painel com a ferramenta que atende
     for (const f of c.ferramentas) assert.ok(prompt.includes(f) || prompt.includes(`${f.split('_')[0]}_*`), f);
   }
   assert.match(prompt, /use abrir_simulacao para jogar, dirigir ou testar o simulador/);
+  assert.doesNotMatch(prompt, /abrir_pagina|sensor_\*|sompo_\*|laboratorio_\*/);
+});
+
+// Exemplo do painel + duas variações faladas de cada experiência (24/10).
+const PEDIDOS_EXPERIENCIA = {
+  simulacao: ['Quero dirigir o trator', 'bora jogar', 'posso pilotar o trator?'],
+  sonolencia: ['Testa o alerta de sono', 'quero testar a sonolência', 'me mostra o alarme de sono'],
+  tour: ['Me mostra tudo', 'o que tem aqui?', 'faz o tour'],
+  vitrine: ['Me mostra o vídeo', 'quero ver como funciona', 'passa o vídeo'],
+};
+
+test('cada experiência abre por pedido direto (exemplo + 2 variações); dúvidas seguem pro modelo', () => {
+  for (const [id, frases] of Object.entries(PEDIDOS_EXPERIENCIA)) {
+    assert.equal(frases[0], COMANDOS_VOZ.find((c) => c.id === id).exemplo);
+    for (const frase of frases) assert.equal(pedidoDireto(frase), id, frase);
+  }
+  for (const frase of ['O que a seguradora ganha?', 'quanto custa?', 'como funciona o alerta de sono?', 'como funciona a vitrine?', 'o que é o LUCA?']) assert.equal(pedidoDireto(frase), null, frase);
 });
 
 test('o exemplo da Simulação no painel é pedido direto', () => {
@@ -72,6 +93,7 @@ test('comandoDireto: pedidos de jogar/testar o simulador abrem a Simulação', (
 test('comandoDireto: pergunta sobre o simulador ou outro pedido segue pro modelo', () => {
   for (const frase of PERGUNTAS_SOBRE_SIMULADOR) assert.equal(comandoDireto(frase), null, frase);
   for (const c of COMANDOS_VOZ.filter((item) => item.id !== 'simulacao')) assert.equal(comandoDireto(c.exemplo), null, c.exemplo);
+  assert.equal(pedidoDireto('tem um vídeo do simulador?'), 'vitrine', 'vídeo é o ④, não a Simulação');
 });
 
 test('cérebro: "testar o simulador" fala a frase pronta e manda abrir_simulacao depois dela, sem modelo', async () => {

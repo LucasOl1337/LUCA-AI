@@ -23,85 +23,61 @@ export interface ComandoVoz {
   ferramentas: readonly string[];
 }
 
+/**
+ * As cinco experiências do Totem (pedido do Lucas, 24/10: "no máximo cinco,
+ * bem feitas e completas"). Cada uma abre com fala pronta, anda sozinha e volta
+ * pra Coruja convidando as outras. "Volta pra coruja" é controle, não cartão.
+ */
 export const COMANDOS_VOZ: readonly ComandoVoz[] = Object.freeze(([
-  {
-    id: 'vitrine',
-    titulo: 'Ver a vitrine',
-    exemplo: 'Quero ver a vitrine',
-    faz: 'Abre a mesma Vitrine do botão',
-    ferramentas: ['abrir_vitrine'],
-  },
   {
     id: 'simulacao',
     titulo: 'Dirigir o trator',
-    exemplo: 'Quero testar o simulador',
-    faz: 'Abre a Simulação: você dirige o trator',
+    exemplo: 'Quero dirigir o trator',
+    faz: 'Você leva o trator até a chegada',
     ferramentas: ['abrir_simulacao'],
+  },
+  {
+    id: 'sonolencia',
+    titulo: 'Teste de sono',
+    exemplo: 'Testa o alerta de sono',
+    faz: 'Feche os olhos 1 s e o alarme toca',
+    ferramentas: ['sono_iniciar'],
   },
   {
     id: 'tour',
     titulo: 'Ver tudo',
     exemplo: 'Me mostra tudo',
-    faz: 'Tour guiado de 1 minuto pelo stand',
+    faz: 'Tour guiado de 1 minuto',
     ferramentas: ['tour_iniciar'],
   },
   {
-    id: 'sonolencia',
-    titulo: 'Teste de sono',
-    exemplo: 'Testa o alerta de sonolência',
-    faz: 'Webcam vê olho fechado e o alerta toca',
-    ferramentas: ['sonolencia_ligar_camera', 'sonolencia_desligar_camera', 'sonolencia_testar_som', 'sonolencia_sensibilidade'],
-  },
-  {
-    id: 'sensor',
-    titulo: 'Sensor em ação',
-    exemplo: 'Faz o trator numa curva',
-    faz: 'Trator em curva, encosta, frenada, buraco',
-    ferramentas: ['sensor_escolher_veiculo', 'sensor_rodar_ensaio', 'sensor_ajustar', 'sensor_pausar', 'sensor_continuar', 'sensor_mostrar_vista'],
-  },
-  {
-    id: 'fazenda',
-    titulo: 'Fazenda em 3D',
-    exemplo: 'Mostra o caminhão na fazenda',
-    faz: 'Caminhão rodando numa fazenda em 3D',
-    ferramentas: ['laboratorio_ver_demonstracao', 'laboratorio_pausar', 'laboratorio_continuar', 'laboratorio_camera'],
-  },
-  {
-    id: 'sompo',
-    titulo: 'Painel da Sompo',
-    exemplo: 'Roda um cenário de risco',
-    faz: 'O que a seguradora vê: casos e riscos',
-    ferramentas: ['sompo_abrir_aba', 'sompo_voltar_inicio', 'sompo_abrir_caso', 'sompo_rodar_cenario'],
-  },
-  {
-    id: 'site',
-    titulo: 'Abrir o site',
-    exemplo: 'Abre a bancada de agentes',
-    faz: 'Abre uma página do LUCA-AI na tela',
-    ferramentas: ['abrir_pagina'],
-  },
-  {
-    id: 'video',
-    titulo: 'Ver um vídeo',
-    exemplo: 'Tem um vídeo de como funciona?',
-    faz: 'Toca o vídeo que explica o assunto',
+    id: 'vitrine',
+    titulo: 'Ver como funciona',
+    exemplo: 'Me mostra o vídeo',
+    faz: 'Vídeo que explica o LUCA',
     ferramentas: ['tocar_video'],
   },
   {
     id: 'perguntar',
     titulo: 'Tirar dúvidas',
-    exemplo: 'O que a seguradora ganha com isso?',
-    faz: 'Responde sobre o projeto e pesquisa na web',
+    exemplo: 'O que a seguradora ganha?',
+    faz: 'Pergunte o que quiser sobre o LUCA',
     ferramentas: ['buscar_no_repo', 'pesquisar_web'],
   },
-  {
-    id: 'voltar',
-    titulo: 'Voltar',
-    exemplo: 'Volta pra coruja',
-    faz: 'Fecha a página e volta pra coruja',
-    ferramentas: ['voltar_coruja'],
-  },
 ] as ComandoVoz[]).map((item) => Object.freeze(item)));
+
+/** Controle (não é experiência): fecha o que estiver aberto. Fala pronta, sem modelo. */
+export const CONTROLE_VOLTAR = Object.freeze({ id: 'voltar', exemplo: 'Volta pra coruja', ferramentas: ['voltar_coruja'] as readonly string[] });
+
+/** Convite de fechamento: depois de uma experiência, as outras quatro. */
+export function convite(feita: string): string {
+  const nomes: Record<string, string> = {
+    simulacao: 'dirigir o trator', sonolencia: 'testar o alerta de sono', tour: 'ver o tour',
+    vitrine: 'ver o vídeo de como funciona', perguntar: 'me perguntar qualquer coisa',
+  };
+  const resto = COMANDOS_VOZ.filter((c) => c.id !== feita).map((c) => nomes[c.id]);
+  return `Agora você pode ${resto.slice(0, -1).join(', ')} ou ${resto[resto.length - 1]}.`;
+}
 
 /** `sensor_pausar, sensor_ajustar...` → `sensor_*` (as descrições completas já vão nas ferramentas). */
 function resumirFerramentas(nomes: readonly string[]): string {
@@ -112,8 +88,9 @@ function resumirFerramentas(nomes: readonly string[]): string {
 /** Seção do prompt do cérebro: o que o painel mostra e qual ferramenta atende cada pedido. */
 export function comandosParaPrompt(comandos: readonly ComandoVoz[] = COMANDOS_VOZ): string {
   return [
-    'Painel ao lado da coruja: a pessoa vê estes pedidos de exemplo, e todos precisam funcionar com a ferramenta indicada. Quem não sabe o que pedir, convide com um deles.',
+    'As cinco experiências do Totem (o painel ao lado da coruja mostra só estas). Ofereça só estas cinco, cada uma com a ferramenta indicada; quem não sabe o que pedir, convide com uma delas.',
     ...comandos.map((c) => `- ${c.titulo} ("${c.exemplo}"): ${resumirFerramentas(c.ferramentas)}`),
+    `- Controle, a qualquer momento ("${CONTROLE_VOLTAR.exemplo}"): voltar_coruja`,
   ].join('\n');
 }
 
@@ -152,7 +129,16 @@ export function comandoDireto(texto: string): 'simulacao' | null {
   return null;
 }
 
-export type PedidoDireto = 'simulacao' | 'vitrine' | 'animal' | 'obstaculo' | 'voltar' | 'ajuda';
+export type PedidoDireto = 'simulacao' | 'sonolencia' | 'tour' | 'vitrine' | 'animal' | 'obstaculo' | 'voltar' | 'ajuda';
+
+/** ③ "Me mostra tudo", "o que tem aqui?", "faz o tour". */
+const TOUR_DIRETO = /^(?:(?:me )?mostra(?:r)?|quero ver|ver|bora ver) tudo$|\b(?:faz|fazer|faca|comeca|comecar|quero|quero ver|bora|mostra|me mostra)(?: o| um)? tour\b|^(?:o que|que) (?:tem|da pra fazer|eu posso fazer) aqui$|^tour(?: guiado)?$/;
+/** ② pedido de testar o alerta de sono (sem ser pergunta "como funciona"). */
+const SONO_ALVO = /\b(sono|sonolencia|sonolento|dormir|dormindo|cochilo|olho fechado|olhos fechados|fadiga)\b/;
+const SONO_VERBO = /\b(testa|testar|teste|quero|queria|mostra|mostrar|me mostra|faz|fazer|faca|bora|vamos|liga|ligar|ativa|ativar|experimentar|experimenta|posso|abre|abrir)\b/;
+/** ④ o vídeo de como funciona / a vitrine. */
+const VITRINE_DIRETO = /\b(video|videos|filme|vitrine)\b/;
+const VITRINE_VERBO = /\b(quero|queria|abre|abrir|abra|mostra|mostrar|mostre|ver|veja|passa|passar|coloca|bota|toca|tocar|assistir|tem)\b/;
 
 /** Nomes da navegação têm prioridade sobre a escolha probabilística do modelo. */
 export function pedidoDireto(texto: string): PedidoDireto | null {
@@ -161,9 +147,12 @@ export function pedidoDireto(texto: string): PedidoDireto | null {
   if (/^(?:por favor )?(?:volta|voltar|volte|sair|sai)(?: pra| para| a| pro| para a| para o)?(?: coruja| inicio)?(?: por favor)?$/.test(frase)) return 'voltar';
   if (/^(como (?:eu )?(?:dirijo|dirige|acelero|freio)|como funciona o controle|(?:me )?ajuda(?: aqui| no simulador)?)$/.test(frase)) return 'ajuda';
   // "Como funciona..." e "o que é..." continuam sendo perguntas, sem navegação.
-  if (/\b(como|explica|saber|entender|o que|qual)\b/.test(frase)) return null;
+  if (TOUR_DIRETO.test(frase)) return 'tour';
+  // "Tem um vídeo de como funciona?" e "quero ver como funciona" são o vídeo ④, não pergunta.
+  if (VITRINE_VERBO.test(frase) && (VITRINE_DIRETO.test(frase) || /\b(ver|veja|mostra|me mostra) como (funciona|e)\b/.test(frase))) return 'vitrine';
+  if (/\b(como|explica|saber|entender|o que|qual|por que|porque)\b/.test(frase)) return null;
+  if (SONO_ALVO.test(frase) && SONO_VERBO.test(frase)) return 'sonolencia';
   const pede = /\b(quero|queria|abre|abrir|abra|mostra|mostrar|mostre|ver|veja|testa|testar)\b/.test(frase);
-  if (pede && /\bvitrine\b/.test(frase)) return 'vitrine';
   if (pede && /\b(animal|animais|vaca|boi)\b/.test(frase) && /\b(pista|estrada)\b/.test(frase)) return 'animal';
   if (pede && /\b(fardo|obstaculo)\b/.test(frase)) return 'obstaculo';
   return comandoDireto(texto);

@@ -10,7 +10,7 @@
 // - `xai`: Grok Voice Realtime, conversa inteira no navegador (reserva).
 import { executarTurno, FALAS, LIMITES_TURNO, criarChamadaDeModelo, limparTela, novaConversa } from './cerebro.js';
 import { idTurno, lembrarTurno, prepararJanela, TEXTOS_PAUSA } from './continuidade.js';
-import { FERRAMENTAS_STAND, executarFerramentaStand, videoPublicado } from './ferramentas.js';
+import { FERRAMENTAS_VOZ, executarFerramentaStand, videoPublicado } from './ferramentas.js';
 import { buscarNoRepo, montarPromptBase } from './conhecimento.js';
 import { provedorXai } from './provedor-xai.js';
 import {
@@ -266,7 +266,7 @@ export function registerStandRoutes(app, {
         token: token.token,
         expira_em: token.expira_em,
         conexao: config.provedor.conexao(token.token),
-        sessao: config.provedor.sessao({ instrucoes: instrucoes(), ferramentas: FERRAMENTAS_STAND, voz: config.voz }),
+        sessao: config.provedor.sessao({ instrucoes: instrucoes(), ferramentas: FERRAMENTAS_VOZ, voz: config.voz }),
         limites: LIMITES_STAND,
       };
       if (config.provedor.turnos) {
