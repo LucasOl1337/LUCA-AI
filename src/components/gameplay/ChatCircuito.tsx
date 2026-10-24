@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { labRequest, type SavedCase } from '@/lib/lab-client';
-import { metricasCircuito } from './circuito';
+import { decimalCircuito, metricasCircuito, textoResultadoCircuito } from './circuito';
 import type { RelatorioCircuito } from './sessaoCircuito';
 import './circuito.css';
 export const CHAVE_CHAT_CIRCUITO = 'luca.circuito.chat.v1';
@@ -78,11 +78,11 @@ export default function ChatCircuito({ inicial, aoNovo }: { inicial: ConversaCir
   const analises = caso?.analyses ?? [];
   return <section className="circuito-chat" data-chat-circuito data-run-id={r.runId} aria-label="Chat dos agentes do Laboratório">
     <header><small>LUCA · Laboratório / SIMULAÇÃO</small><h1>Converse sobre sua corrida</h1><p>O simulador foi encerrado. O registro e a conversa ficam nesta aba; os pareceres são salvos na sua conta.</p><button onClick={aoNovo}>Voltar · nova corrida</button><a href="#circuito-pergunta">Perguntar aos agentes ↓</a></header>
-    <article className="circuito-relatorio"><h2>Relatório do circuito</h2><p>Run: {r.runId} · {r.resultado?.motivo ?? 'sem desfecho'}</p>
-      <dl><dt>Tempo ativo</dt><dd>{(m.elapsedMs / 1000).toFixed(1)} s</dd><dt>Sinistros evitados (heurística)</dt><dd>{m.sinistrosEvitados}</dd><dt>Reação média após aviso</dt><dd>{m.reacaoMediaMs === null ? 'N/A' : `${m.reacaoMediaMs} ms`}</dd><dt>Episódios sem resposta</dt><dd>{m.semResposta}</dd></dl>
+    <article className="circuito-relatorio"><h2>Relatório da corrida</h2><p>{textoResultadoCircuito(r).titulo}</p>
+      <dl><dt>Tempo dirigindo</dt><dd>{decimalCircuito(m.elapsedMs / 1000)} s</dd><dt>Riscos evitados (estimativa)</dt><dd>{m.sinistrosEvitados}</dd><dt>Reação média após aviso</dt><dd>{m.reacaoMediaMs === null ? 'sem reação medida' : `${decimalCircuito(m.reacaoMediaMs / 1000, 2)} s`}</dd><dt>Avisos sem resposta</dt><dd>{m.semResposta}</dd></dl>
       <p>Reação: nova frenagem ou esterço após o aviso. Evitado: exposição, resposta e saída segura por 1 s — estimativa do jogo, não acidente real.</p>
-      <details><summary>Regras, limites e trace temporal</summary><p>{r.regras}</p><pre>{JSON.stringify(r, null, 2)}</pre></details>
-      <button onClick={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(conversa.relatorio, null, 2)], { type: 'application/json' })); a.download = `${r.runId}.json`; a.click(); URL.revokeObjectURL(a.href); }}>Baixar registro da run</button>
+      <details><summary>Regras, limites e registro completo</summary><p>{r.regras}</p><pre>{JSON.stringify(r, null, 2)}</pre></details>
+      <button onClick={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(conversa.relatorio, null, 2)], { type: 'application/json' })); a.download = `${r.runId}.json`; a.click(); URL.revokeObjectURL(a.href); }}>Baixar registro da corrida</button>
     </article>
     <div role="log" aria-live="polite" aria-label="Diálogo com os agentes">{analises.map((a) => <article key={a.id} className="circuito-turno"><p><b>Você:</b> {conversa.turnos.find((t) => t.analiseId === a.id)?.pergunta ?? a.focus?.split('Pergunta do visitante: ')[1] ?? 'Avaliar corrida'}</p>
       {a.axes.map((eixo) => <section key={eixo.id}><h3>{eixo.title}</h3><p>{eixo.summary || (eixo.status === 'completed' ? 'Sem hipótese sustentada.' : 'Resposta indisponível.')}</p>{eixo.hypotheses.map((h) => <div key={h.id}><b>{h.title}</b><p>{h.explanation}</p>{h.evidence.map((e, i) => <p key={i}>{(e.elapsedMs / 1000).toFixed(1)} s — {e.description}</p>)}</div>)}{eixo.limitations.map((l, i) => <p key={i}>Limite: {l}</p>)}</section>)}
