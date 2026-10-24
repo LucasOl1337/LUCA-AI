@@ -68,3 +68,7 @@
 @media(max-width:650px) { .circuito-partida { top:auto; bottom:44%; font-size:14px; white-space:normal; width:min(320px,86%); text-align:center; } }
 /* Coruja compacta fica no canto inferior direito: o fim do chat rola para fora dela. */
 .circuito-chat { padding-bottom: 180px; }
+/* Batida (Lupa D4): o resultado da colisão espera o tranco da máquina (0,45 s) para não cobrir o baque. */
+.circuito-resultado[data-motivo='colisao'] { animation:circuito-resultado-apos-baque .25s ease-out .45s both; }
+@keyframes circuito-resultado-apos-baque { from { opacity:0; } to { opacity:1; } }
+@media (prefers-reduced-motion: reduce) { .circuito-resultado[data-motivo='colisao'] { animation:none; } }

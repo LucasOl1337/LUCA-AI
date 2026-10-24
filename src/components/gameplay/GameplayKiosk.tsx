@@ -23,6 +23,7 @@ import { PainelCabine } from './PainelCabine';
 import SeloFps from './SeloFps';
 import { criarMotorGameplay, vibracaoDoEvento, type MotorGameplay } from './motorGameplay';
 import { relevoRampaLateral } from './rampaLateral';
+import { arfagemDoTranco, criarBaque, type Tranco } from './impactoTrator';
 import { ZONAS_TALHAO } from './geofenceTalhao';
 import { anguloAroRad, bordaReiniciar, comandoDesejado, setaDaTecla, SETAS_SOLTAS, type SetasVolante } from './volante';
 import type { CabineGameplay, CriarCabineGameplay } from './cabineGameplay';
@@ -65,6 +66,8 @@ function obstaculosDoPalco(motor: MotorGameplay) {
     },
   };
 }
+
+const movimentoReduzido = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 function zumbidoMotor(acelerador: number, velocidadeKph: number) {
   const pad = firstStandardPad() as (Gamepad & { vibrationActuator?: GamepadHapticActuator | null }) | null;
@@ -122,12 +125,19 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
 
   // Rumble pelas bordas do motor (mesmo quadro da física); o zumbido espera o efeito acabar.
   const zumbidoPausaAteRef = useRef(0);
+  // Batida com corpo (Lupa D4): tranco curto de arfagem na pose e baque grave, pela velocidade de entrada.
+  const trancoRef = useRef<Tranco | null>(null);
+  const baque = useMemo(() => criarBaque(), []);
   useEffect(() => motor.aoEvento((evento) => {
+    if (evento.tipo === 'contato') {
+      trancoRef.current = { velocidadeKph: evento.velocidadeKph, inicioMs: performance.now() };
+      baque.tocar(evento.velocidadeKph);
+    }
     const pedido = vibracaoDoEvento(evento);
     if (!pedido) return;
     zumbidoPausaAteRef.current = performance.now() + (pedido === 'alerta' ? 260 : 460);
     rumble(pedido === 'alerta' ? 'alert' : 'contact');
-  }), [motor]);
+  }), [motor, baque]);
 
   // Retrato no DOM para a bancada e o teste ler sem React: ~15 Hz, sem re-render.
   useEffect(() => motor.assinar(() => {
@@ -238,7 +248,8 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
           speedKph: estado.maquina.velocidadeKph, direction: estado.maquina.re ? -1 : 1,
           yawRateDeg: trator.guinada * 180 / Math.PI,
           distanceCm: estado.sensor.distanciaCm, collision: estado.sensor.alerta, braking: estado.comandos.freio > 0.05,
-          rollDeg: estado.atitude.rolagemGraus, pitchDeg: estado.atitude.arfagemGraus,
+          rollDeg: estado.atitude.rolagemGraus,
+          pitchDeg: estado.atitude.arfagemGraus + arfagemDoTranco(trancoRef.current, agora, movimentoReduzido()),
           beacon: estado.sensor.alerta || estado.contato ? 1 : 0,
         };
       },

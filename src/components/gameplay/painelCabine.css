@@ -84,6 +84,10 @@
 }
 .gameplay-resultado[data-desfecho='encostou'] { border-color: #e5483bb3; }
 .gameplay-resultado[data-desfecho='tempo'] { border-color: #f2c14e99; }
+/* Batida (Lupa D4): o cartão espera o tranco da máquina (0,45 s) para não cobrir o para-brisa no instante do baque. */
+.gameplay-resultado[data-desfecho='encostou'] { animation: gameplay-cartao-apos-baque .25s ease-out .45s both; }
+@keyframes gameplay-cartao-apos-baque { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .gameplay-resultado[data-desfecho='encostou'] { animation: none; } }
 .gameplay-resultado .gameplay-painel-selo, .gameplay-abertura .gameplay-painel-selo { left: 50%; transform: translateX(-50%); }
 .gameplay-resultado h2 { margin: 0 0 2cqh; font-size: clamp(30px, 5.4cqh, 64px); font-weight: 800; }
 .gameplay-resultado[data-desfecho='parou'] h2 { color: #4fbf7a; }
