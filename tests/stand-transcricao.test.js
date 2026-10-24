@@ -100,3 +100,41 @@ test('ElevenLabs inicia sem timer absoluto240s; mantém prazo de fala/inatividad
   assert.ok(prazos.every((p) => p.ms !== 240000));
   sessao.encerrar();
 });
+
+// Ouvido 24/10 (`ouvido/MEDICAO.md`): o VAD de 0,6 s fecha a frase na hesitação
+// e o LUCA respondia só ao último pedaço.
+test('frase partida pelo VAD vira uma pergunta só: a resposta ao pedaço não sai', async () => {
+  const { sessao, pedidos, eventos } = preparar((corpo, opcoes) => corpo.texto === 'Tem como a seguradora.'
+    ? new Promise((_, falha) => opcoes.signal.addEventListener('abort', () => falha(new Error('abortado'))))
+    : fim());
+  sessao.aoScribe({ message_type: 'committed_transcript', text: 'Tem como a seguradora.' });
+  await drenar();
+  assert.equal(sessao.estado, 'pensando');
+  sessao.aoScribe({ message_type: 'partial_transcript', text: 'Baixar o preço' });
+  assert.equal(sessao.estado, 'ouvindo', 'continuação aborta a resposta ao pedaço');
+  assert.ok(eventos.some((e) => e.tipo === 'legenda' && e.texto === 'Tem como a seguradora baixar o preço'));
+  sessao.aoScribe({ message_type: 'committed_transcript', text: 'Baixar o preço do seguro com esses dados?' });
+  await drenar();
+  assert.deepEqual(pedidos.map((p) => p.texto), ['Tem como a seguradora.', 'Tem como a seguradora baixar o preço do seguro com esses dados?']);
+});
+
+test('pergunta nova depois da resposta tocada não é juntada com a anterior', async () => {
+  const { sessao, pedidos } = preparar(fim);
+  sessao.aoScribe({ message_type: 'committed_transcript', text: 'Como funciona o sensor?' });
+  await drenar();
+  await drenar();
+  sessao.aoScribe({ message_type: 'committed_transcript', text: 'E o simulador?' });
+  await drenar();
+  assert.deepEqual(pedidos.map((p) => p.texto), ['Como funciona o sensor?', 'E o simulador?']);
+});
+
+test('parcial parada fecha a frase (commit) uma vez, sem esperar o VAD do ruído', () => {
+  const { sessao } = preparar(fim);
+  sessao.aoScribe({ message_type: 'partial_transcript', text: 'Quero testar o simulador' });
+  assert.equal(sessao.parcialParada(), false, 'parcial recém-chegada não fecha');
+  sessao.parcialMudouEm = performance.now() - 1600;
+  assert.equal(sessao.parcialParada(), true);
+  assert.equal(sessao.parcialParada(), false, 'um commit por parcial');
+  sessao.aoScribe({ message_type: 'partial_transcript', text: 'Quero testar o simulador do trator' });
+  assert.equal(sessao.parcialParada(), false, 'texto novo zera o relógio');
+});

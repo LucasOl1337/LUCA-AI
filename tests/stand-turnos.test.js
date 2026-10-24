@@ -16,3 +16,13 @@ test('turno em curso: 2+ palavras novas do visitante ainda refazem a pergunta', 
   assert.equal(valeEnquantoPensa('Não, volta pra coruja.', falado), true);
   assert.equal(valeEnquantoPensa('o laboratório do sensor', falado), false, 'eco da própria fala não conta');
 });
+
+test('juntarPergunta: emenda o pedaço sem ponto e não duplica reenvio do começo', async () => {
+  const { juntarPergunta, mensagemAudioScribe } = await loadFrontendModule('../../src/stand-voz/turnos.ts');
+  assert.equal(juntarPergunta('Eu queria saber.', 'Quanto custa pra instalar?'), 'Eu queria saber quanto custa pra instalar?');
+  assert.equal(juntarPergunta('Se o trator tombar...', 'Quem fica sabendo?'), 'Se o trator tombar quem fica sabendo?');
+  assert.equal(juntarPergunta('Eu queria', 'Eu queria saber o preço'), 'Eu queria saber o preço');
+  assert.equal(juntarPergunta('', 'Oi'), 'Oi');
+  assert.equal(JSON.parse(mensagemAudioScribe('AA==', 24000, true)).commit, true);
+  assert.equal(JSON.parse(mensagemAudioScribe('AA==', 24000)).commit, false);
+});

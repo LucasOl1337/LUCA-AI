@@ -17,7 +17,10 @@ import { SEM_FALA_MS } from './escuta';
 import { visaoTotem } from './visao';
 import { base64DePcm16, criarDetectorFala } from './protocolo';
 import type { EtapaSessao, FimSessao, SessaoDeVoz, SessaoServidor } from './sessaoVoz';
-import { eventoScribe, interrompeFala, lerNdjson, mensagemAudioScribe, pareceEco, vaiAoCerebro, valeEnquantoPensa, type LinhaTurno } from './turnos';
+import {
+  JUNTAR_CONTINUACAO_MS, PARCIAL_ESTAVEL_MS, eventoScribe, interrompeFala, juntarPergunta, lerNdjson, mensagemAudioScribe,
+  mesmaParcial, pareceEco, vaiAoCerebro, valeEnquantoPensa, type LinhaTurno,
+} from './turnos';
 
 export interface SessaoServidorTurnos extends Omit<SessaoServidor, 'conexao'> {
   conexao: { transporte: 'scribe'; url: string };
@@ -79,6 +82,12 @@ export class SessaoTurnos implements SessaoDeVoz {
   private tela = '';
   /** Falha chegou com o LUCA falando: a fala pronta entra quando a fila esvaziar. */
   private falhaPendente = false;
+  /** Última pergunta enviada, enquanto a resposta não terminou: a continuação junta com ela. */
+  private perguntaAberta: { texto: string; em: number } | null = null;
+  /** Parcial ainda sem commit e quando o texto dela mudou pela última vez. */
+  private parcial = '';
+  private parcialMudouEm = 0;
+  private parcialFechada = false;
 
   constructor(private aoTerminar: (motivo: FimSessao, detalhe?: string) => void = () => {}) {}
 
@@ -242,8 +251,30 @@ export class SessaoTurnos implements SessaoDeVoz {
     if (this.detectorIndependente.alimentar(independente ? nivel : 0, 50)) {
       this.falaIndependenteAte = performance.now() + 2000;
     }
+    // Parcial parada: fecha a frase sem esperar o VAD, que no ruído não acha o silêncio.
+    const fechar = this.parcialParada();
+    if (fechar) registrarVoz('commit_forcado', { texto: this.parcial });
     // Mantém o relógio/VAD do Scribe vivo sem reenviar a própria voz como entrada.
-    this.ws.send(mensagemAudioScribe(eco.eco ? SILENCIO_50MS : base64DePcm16(pcm), HZ_STAND));
+    this.ws.send(mensagemAudioScribe(eco.eco ? SILENCIO_50MS : base64DePcm16(pcm), HZ_STAND, fechar));
+  }
+
+  private parcialParada(): boolean {
+    if (!this.parcial || this.parcialFechada || performance.now() - this.parcialMudouEm < PARCIAL_ESTAVEL_MS) return false;
+    this.parcialFechada = true;
+    return true;
+  }
+
+  private anotarParcial(texto: string): void {
+    if (mesmaParcial(texto, this.parcial)) return;
+    this.parcial = texto;
+    this.parcialMudouEm = performance.now();
+    this.parcialFechada = false;
+  }
+
+  /** Pergunta aberta há pouco e ainda sem resposta completa: o commit novo é continuação dela. */
+  private continuacao(): string {
+    const aberta = this.perguntaAberta;
+    return aberta && performance.now() - aberta.em < JUNTAR_CONTINUACAO_MS ? aberta.texto : '';
   }
 
   private textoFalado(): string {
@@ -276,6 +307,19 @@ export class SessaoTurnos implements SessaoDeVoz {
     // curto por cima do fim da pergunta do LUCA é resposta e continua valendo.
     if (this.estado === 'pensando' && !independente && !valeEnquantoPensa(evento.texto, this.textoFalado())) return;
     if (evento.tipo === 'parcial') {
+      // A pessoa continuou a mesma frase depois da hesitação: a resposta ao
+      // pedaço não sai; espera o resto e manda a frase inteira.
+      const aberta = this.continuacao();
+      if (aberta && this.estado === 'pensando' && vaiAoCerebro(evento.texto)) {
+        registrarVoz('continuacao', { aberta, parcial: evento.texto });
+        this.turno?.abort();
+        this.turno = null;
+        this.mudarEstado('ouvindo');
+        this.armarSilencio();
+        this.anotarParcial(evento.texto);
+        emitirEventoStand({ tipo: 'legenda', texto: juntarPergunta(aberta, evento.texto) });
+        return;
+      }
       if (this.estado === 'falando' || this.fila?.tocando) {
         // Barge-in: palavras claras e diferentes do que ele está dizendo.
         if (interrompeFala(evento.texto, this.textoFalado())) this.interromper();
@@ -284,14 +328,17 @@ export class SessaoTurnos implements SessaoDeVoz {
       if (!vaiAoCerebro(evento.texto)) return;
       this.mudarEstado('ouvindo');
       this.armarSilencio();
-      emitirEventoStand({ tipo: 'legenda', texto: evento.texto });
+      this.anotarParcial(evento.texto);
+      emitirEventoStand({ tipo: 'legenda', texto: aberta ? juntarPergunta(aberta, evento.texto) : evento.texto });
       return;
     }
+    this.parcial = '';
     // O final não pode contornar a mesma confirmação exigida da parcial.
     if ((this.estado === 'falando' || this.fila?.tocando) && !interrompeFala(evento.texto, this.textoFalado())) return;
     if (!vaiAoCerebro(evento.texto)) return;
-    emitirEventoStand({ tipo: 'legenda', texto: evento.texto });
-    void this.perguntar({ texto: evento.texto });
+    const pergunta = juntarPergunta(this.continuacao(), evento.texto);
+    emitirEventoStand({ tipo: 'legenda', texto: pergunta });
+    void this.perguntar({ texto: pergunta });
   }
 
   /** Alarme de sono tem prioridade: para a fala (não abaixa) e o turno; o alarme toca sozinho. */
@@ -331,6 +378,8 @@ export class SessaoTurnos implements SessaoDeVoz {
 
   private aoFilaVazia(): void {
     this.fimDaFala = performance.now();
+    // A resposta tocou inteira: a próxima fala é pergunta nova, não continuação.
+    if (!this.turno) this.perguntaAberta = null;
     if (this.turno || this.videoTocando || this.terminada) return;
     if (this.falhaPendente) {
       this.falhaPendente = false;
@@ -353,6 +402,7 @@ export class SessaoTurnos implements SessaoDeVoz {
     registrarVoz('envio', { turno: idTurno, ...entrada });
     window.clearTimeout(this.relogioSilencio);
     if ('texto' in entrada) this.mudarEstado('pensando');
+    this.perguntaAberta = 'texto' in entrada ? { texto: entrada.texto, em: performance.now() } : null;
     if (this.falado) this.faladoAnterior = this.falado;
     this.falado = '';
     let fraseAudio = '';

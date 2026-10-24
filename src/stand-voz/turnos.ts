@@ -49,8 +49,39 @@ async function* iterarStream(stream: ReadableStream<Uint8Array>): AsyncGenerator
 }
 
 /** Pedaço de microfone no formato do Scribe Realtime (`input_audio_chunk`). */
-export function mensagemAudioScribe(base64: string, hz: number): string {
-  return JSON.stringify({ message_type: 'input_audio_chunk', audio_base_64: base64, commit: false, sample_rate: hz });
+export function mensagemAudioScribe(base64: string, hz: number, commit = false): string {
+  return JSON.stringify({ message_type: 'input_audio_chunk', audio_base_64: base64, commit, sample_rate: hz });
+}
+
+/**
+ * Continuação da mesma pergunta: o VAD de 0,6 s do Scribe fecha a frase na
+ * hesitação ("Tem como a seguradora." ‖ "Baixar o preço do seguro?", 12 de 20
+ * frases na medição de 24/10, `ouvido/MEDICAO.md`). O commit novo que chega
+ * com a resposta ao pedaço ainda em andamento vira uma pergunta só.
+ */
+export const JUNTAR_CONTINUACAO_MS = 5000;
+
+export function juntarPergunta(anterior: string, novo: string): string {
+  const a = anterior.trim();
+  const n = novo.trim();
+  if (!a) return n;
+  if (!n) return a;
+  // O Scribe às vezes reenvia o começo: não repete o que já está lá.
+  if (palavras(n).join(' ').startsWith(palavras(a).join(' '))) return n;
+  return `${a.replace(/[.…]+$/u, '')} ${n.charAt(0).toLowerCase()}${n.slice(1)}`;
+}
+
+/**
+ * Fechamento forçado: com motor e multidão o VAD do Scribe não acha o
+ * silêncio e a frase nunca fecha (7 de 20 sem commit com 0,6 s; 16 de 20 com
+ * 1,2 s). Parcial que não muda por este tempo manda `commit:true`; com o
+ * commit no fim da fala a transcrição ficou igual à do lote (WER 2,8%).
+ */
+export const PARCIAL_ESTAVEL_MS = 1500;
+
+/** Mesmo conteúdo de parcial (ignora caixa, acento e pontuação). */
+export function mesmaParcial(a: string, b: string): boolean {
+  return palavras(a).join(' ') === palavras(b).join(' ');
 }
 
 export type EventoScribe =
