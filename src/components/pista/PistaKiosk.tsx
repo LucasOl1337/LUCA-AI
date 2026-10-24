@@ -10,6 +10,7 @@ import { useSegurancaCabine } from '../gameplay/useSegurancaCabine';
 import type { RelatorioCircuito } from '../gameplay/sessaoCircuito';
 import SeloFps from '../gameplay/SeloFps';
 import { criarCorridaPista, type RetratoPista } from './corridaPista';
+import { PISTA_SERRA, pontoLateral } from './pistaSerra';
 import { criarSessaoPista } from './sessaoPista';
 import { montarPalcoSerra } from './palcoSerra';
 import { criarAudioPista } from './audioPista';
@@ -107,7 +108,16 @@ export default function PistaKiosk({ seloFps = false, aoAnalisar, aoTrocar }: { 
         }
         audio.atualizar(c.ler(), congelado);
         const raiz = raizRef.current;
-        if (raiz) { raiz.dataset.fase = c.ler().fase; raiz.dataset.vista = e.vista; }
+        if (raiz) {
+          const atual = c.ler(), k = atual.caminhao;
+          // Leitura para provas (só leitura): posição na pista e erro de rumo até um ponto à frente na faixa `data-alvo-lateral` (padrão 1,8 m).
+          const alvo = pontoLateral(PISTA_SERRA, k.s + 6 + k.velocidade * 0.6, Number(raiz.dataset.alvoLateral ?? 1.8) || 0);
+          raiz.dataset.fase = atual.fase; raiz.dataset.vista = e.vista;
+          raiz.dataset.s = k.s.toFixed(1); raiz.dataset.lateral = k.lateral.toFixed(2); raiz.dataset.kph = (k.velocidade * 3.6).toFixed(1);
+          const erro = Math.atan2(-(alvo.z - k.z), alvo.x - k.x) - k.rumo;
+          raiz.dataset.erroRumo = Math.atan2(Math.sin(erro), Math.cos(erro)).toFixed(3);
+          raiz.dataset.riscos = [...atual.riscos.keys()].join(' ');
+        }
         const agora = performance.now();
         if (agora - ultimoHud > 66 || r.eventos.length) { ultimoHud = agora; setRetrato(c.ler()); }
         return { retrato: c.ler(), vista: e.vista, olhar: look };

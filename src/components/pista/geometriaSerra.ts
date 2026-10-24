@@ -22,7 +22,7 @@ export function fitaDaPista(pista: PistaSerra, perfil: Perfil, s0 = 0, s1 = pist
   }
   for (let i = 0; i < linhas - 1; i += 1) for (let j = 0; j < colunas - 1; j += 1) {
     const a = i * colunas + j, b = a + 1, c = a + colunas, d = c + 1;
-    idx.push(a, c, b, b, c, d);
+    idx.push(a, b, c, b, d, c);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
