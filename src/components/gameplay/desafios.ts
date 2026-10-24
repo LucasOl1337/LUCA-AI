@@ -273,6 +273,8 @@ const graus = (valor: number) => `${Math.round(valor)}°`;
 function linhaReacao(reacaoS: number | null) {
   return reacaoS === null ? 'Você não freou depois do aviso'
     : reacaoS === 0 ? 'Você já estava freando no aviso'
+      // Abaixo de 0,05 s o arredondamento escreveria "0,0 s", que soa como reação instantânea.
+      : reacaoS < 0.05 ? 'Você freou menos de 0,1 s depois do aviso'
       : `Você freou ${segundos(reacaoS)} depois do aviso`;
 }
 

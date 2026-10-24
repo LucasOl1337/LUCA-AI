@@ -216,3 +216,9 @@ test('resultado do pendente não carrega nome nem dado pessoal', () => {
   const r = rodarPendente([{ t: 1000, x: 2 }, { t: DESAFIO_PENDENTE.limiteMs }]);
   assert.deepEqual(Object.keys(r.resultado).sort(), ['alertaGraus', 'desafio', 'desfecho', 'grauMaximo', 'reacaoS']);
 });
+
+test('reação abaixo de 0,05 s não aparece como "0,0 s"', () => {
+  const base = { desafio: 'fardo-a-frente', desfecho: 'parou', alertaCm: 149, paradaCm: 117, contatoKph: null };
+  assert.equal(textoResultado({ ...base, reacaoS: 0.02 }).linhas[1], 'Você freou menos de 0,1 s depois do aviso');
+  assert.equal(textoResultado({ ...base, reacaoS: 0.05 }).linhas[1], 'Você freou 0,1 s depois do aviso');
+});
