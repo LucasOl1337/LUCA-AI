@@ -8,7 +8,8 @@ import { ENCOSTA_TALHAO, TALHAO, ZONAS_TALHAO } from './geofenceTalhao';
 import { PainelCabine } from './PainelCabine';
 import { REGRAS_NOTA, TRANSICAO_MS, TRECHOS_PERCURSO, resumoPercurso } from './percurso';
 import { AberturaDesafio } from './ResultadoDesafio';
-import { analisarPercurso, type EstadoAnalise } from './analisePercurso';
+import { analisarPercurso, FOCO_ANALISE, type CasoPercurso, type EstadoAnalise } from './analisePercurso';
+import { EnviarBancada } from './EnviarBancada';
 import { EVENTO_EM_USO } from './eventoEmUso';
 
 type Etapa =
@@ -93,21 +94,27 @@ export function PercursoCabine({ canal, som = true, aoSair }: { canal: CanalGame
     return () => window.clearTimeout(seguir);
   }, [etapa]);
 
-  const analisar = useCallback(() => {
-    if (analise.tipo === 'enviando' || analise.tipo === 'analisando') return;
+  /** Caso do Laboratório com o registro do percurso inteiro; null sem amostras suficientes. */
+  const casoDoPercurso = useCallback((): CasoPercurso | null => {
     const lista = amostras.current;
-    if (lista.length < 2) { setAnalise({ tipo: 'falha', mensagem: 'O percurso não gravou amostras suficientes para analisar.' }); return; }
+    if (lista.length < 2) return null;
     const registro = registroDoPercurso(lista, inicioIso.current);
     const alagado = ZONAS_TALHAO[0].poligono.rings[0];
-    const caso = {
+    return {
       rawCsv: registro.csv,
       sourceName: 'percurso-totem.csv',
       name: `Percurso do totem · ${new Date(inicioIso.current).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
       metadata: manifestoDoPercurso({ amostras: registro.amostras, duracaoMs: registro.duracaoMs }),
       map: mapaDoPercurso({ talhao: TALHAO, alagado, encosta: ENCOSTA_TALHAO.rings[0] }),
     };
+  }, []);
+
+  const analisar = useCallback(() => {
+    if (analise.tipo === 'enviando' || analise.tipo === 'analisando') return;
+    const caso = casoDoPercurso();
+    if (!caso) { setAnalise({ tipo: 'falha', mensagem: 'O percurso não gravou amostras suficientes para analisar.' }); return; }
     cancelarAnalise.current = analisarPercurso(caso, setAnalise);
-  }, [analise.tipo]);
+  }, [analise.tipo, casoDoPercurso]);
 
   const resumo = etapa.tipo === 'resumo' ? resumoPercurso(resultados) : null;
   const transicao = etapa.tipo === 'transicao' ? resumoPercurso(resultados).trechos[etapa.trecho] : null;
@@ -165,6 +172,11 @@ export function PercursoCabine({ canal, som = true, aoSair }: { canal: CanalGame
               <kbd>✕</kbd> {analise.tipo === 'pronta' || analise.tipo === 'falha' ? 'Analisar de novo' : 'Analisar com os agentes'}
             </button>
             <button type="button" data-acao="repetir" onClick={recomecar}><kbd>Options</kbd> Repetir percurso</button>
+            {/* key: percurso novo começa com o botão limpo. */}
+            <EnviarBancada key={inicioIso.current} montar={() => {
+              const caso = casoDoPercurso();
+              return caso && { caso, foco: FOCO_ANALISE, corrida: { veiculo: 'trator', cenario: 'percurso', nota: resumo?.nota ?? null, desfechoTitulo: resumo ? (resumo.nota === null ? 'Percurso sem nota' : `Nota de condução: ${resumo.nota}`) : null } };
+            }} />
             <button type="button" data-acao="livre" onClick={aoSair}>Dirigir livre</button>
           </div>
         </section>

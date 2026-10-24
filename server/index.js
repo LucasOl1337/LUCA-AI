@@ -218,6 +218,7 @@ import {
 } from './sompo-telemetry-history.js';
 import { registerSompoRiskRoutes } from './sompo-risk.js';
 import { registerLabCaseRoutes } from './lab-cases.js';
+import { registerBancadaFilaRoutes } from './bancada-fila.js';
 import { registerSompoVehicleRoutes } from './sompo-vehicles.js';
 import { lerMaxPorConta, recusarAcimaDoLimite } from './ws-limites.js';
 import { ligarPulso, lerPulsoMs, marcarVivo } from './ws-pulso.js';
@@ -277,6 +278,8 @@ app.use((req, res, next) => {
   next();
 });
 app.use('/api/lab', express.json({ limit: '8mb' }));
+// O envio à fila da bancada leva o caso inteiro da corrida (CSV + mapa), como o Laboratório.
+app.use('/api/bancada', express.json({ limit: '8mb' }));
 app.use(express.json({ limit: '1mb' }));
 
 const rateBuckets = new Map();
@@ -385,7 +388,8 @@ app.use('/api', (req, res, next) => {
   ensureWorkspace(userId);
   runWithWorkspaceUser(userId, () => next(), req.auth?.user?.role);
 });
-registerLabCaseRoutes(app);
+// Fila da bancada: corridas enviadas do resultado vão para a investigação do Laboratório em segundo plano.
+registerBancadaFilaRoutes(app, { lab: registerLabCaseRoutes(app) });
 registerSompoVehicleRoutes(app);
 registerStandRoutes(app, { requireAdmin: authService.requireAdmin });
 authService.registerAdminRoutes(app, {

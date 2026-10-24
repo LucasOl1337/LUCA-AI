@@ -74,3 +74,10 @@
 .circuito-resultado[data-motivo='colisao'] { animation:circuito-resultado-apos-baque .25s ease-out .45s both; }
 @keyframes circuito-resultado-apos-baque { from { opacity:0; } to { opacity:1; } }
 @media (prefers-reduced-motion: reduce) { .circuito-resultado[data-motivo='colisao'] { animation:none; } }
+/* Fila da bancada (EnviarBancada): botão e posição no resultado do circuito e do percurso. */
+.gameplay-enviar-bancada { display:inline-flex; flex-direction:column; align-items:flex-start; gap:4px; }
+.gameplay-enviar-bancada p { margin:4px 0 0; font-size:14px; line-height:1.35; color:#dfeadb; max-width:34em; }
+.gameplay-enviar-bancada p[role='alert'] { color:#ffb4a4; }
+.gameplay-enviar-bancada button[data-acao='enviar-bancada'] { background:#1d3b2c; color:#edf3ed; border-color:#7fc795; }
+.gameplay-enviar-bancada button:disabled { opacity:.7; cursor:default; }
+.gameplay-percurso-acoes .gameplay-enviar-bancada { align-items:center; text-align:center; }

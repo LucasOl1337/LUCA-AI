@@ -114,6 +114,9 @@ export const commands = [
   cmd('lab cases import', 'POST', '/api/lab/cases', 'Importar diretamente de arquivo CSV', [...labFiles, s('name')], { csvImport: true }),
   cmd('lab cases get', 'GET', '/api/lab/cases/:id', 'Ler caso, versões de análises e conclusões'),
   cmd('lab cases analyze', 'POST', '/api/lab/cases/:id/analyses', 'Investigar caso com IA (síncrono; timeout ajustável)', [s('focus')], { timeout: 600000 }),
+  cmd('bancada fila list', 'GET', '/api/bancada/fila', 'Corridas enviadas à fila da bancada, com estado, posição e parecer; limites do dia', [s('estado', 'na_fila, processando, pronto ou falhou'), s('dia', 'YYYY-MM-DD (Brasília)')]),
+  cmd('bancada fila send', 'POST', '/api/bancada/fila', 'Enfileirar o caso de uma corrida para a investigação do Laboratório (assíncrono; teto diário)', [j('caso', 'Caso do Laboratório: rawCsv, sourceName, name, metadata, map', true), j('corrida', 'Rótulos da corrida: veiculo, cenario, nota, desfechoTitulo'), s('foco', 'Orientação aos agentes')]),
+  cmd('bancada fila get', 'GET', '/api/bancada/fila/:id', 'Ler um item da fila: estado, posição, resumo da corrida e parecer'),
   cmd('lab cases conclude', 'POST', '/api/lab/cases/:id/conclusions', 'Registrar conclusão e revisão de hipóteses', [s('observations', '', true), s('category', 'operational, mechanical, environmental, combined ou inconclusive', true), s('action', '', true), j('hypothesis-reviews')]),
 
   cmd('admin overview', 'GET', '/api/admin/overview', 'Visão geral administrativa', [], { auth: 'admin' }),

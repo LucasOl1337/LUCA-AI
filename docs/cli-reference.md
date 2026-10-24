@@ -2,7 +2,7 @@
 
 Gerada por `npm run cli:docs` a partir de `cli/catalog.js`. Não editar à mão.
 
-126 comandos; 104 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
+129 comandos; 107 rotas HTTP distintas. [Instalação, receitas e contrato](cli.md). Todos aceitam `--help`; descoberta estruturada em `luca commands [prefixo]`.
 
 IDs são argumentos posicionais. Campos comuns podem ser flags; corpos completos usam `--data @arquivo.json`. Flags prevalecem sobre o corpo; objetos aninhados não são mesclados. Campos string são literais; apenas campos JSON e `--data` interpretam `@arquivo`/`-`.
 
@@ -829,6 +829,30 @@ Investigar caso com IA (síncrono; timeout ajustável).
 `POST /api/lab/cases/:id/analyses`; autenticação: **session**.
 
 `--focus` (string)
+
+### `bancada fila list`
+
+Corridas enviadas à fila da bancada, com estado, posição e parecer; limites do dia.
+
+`GET /api/bancada/fila`; autenticação: **session**.
+
+`--estado` (string): na_fila, processando, pronto ou falhou<br>`--dia` (string): YYYY-MM-DD (Brasília)
+
+### `bancada fila send`
+
+Enfileirar o caso de uma corrida para a investigação do Laboratório (assíncrono; teto diário).
+
+`POST /api/bancada/fila`; autenticação: **session**.
+
+`--caso` (json, obrigatório): Caso do Laboratório: rawCsv, sourceName, name, metadata, map<br>`--corrida` (json): Rótulos da corrida: veiculo, cenario, nota, desfechoTitulo<br>`--foco` (string): Orientação aos agentes
+
+### `bancada fila get <id>`
+
+Ler um item da fila: estado, posição, resumo da corrida e parecer.
+
+`GET /api/bancada/fila/:id`; autenticação: **session**.
+
+Nenhum; consulte a descrição para entradas por `--data`.
 
 ### `lab cases conclude <id>`
 

@@ -257,8 +257,8 @@ export function registerLabCaseRoutes(app, { dataDir = process.env.LUCA_DATA_DIR
     res.json({ ok: true, cases });
   }));
 
-  app.post('/api/lab/cases', route((req, res) => {
-    const body = req.body || {};
+  /** Salva o caso (dedupe pelo conteúdo). Devolve { created, case }. Precisa do contexto da conta. */
+  const createCase = (body = {}) => {
     const rawCsv = body.rawCsv;
     if (typeof rawCsv !== 'string' || !rawCsv.trim() || Buffer.byteLength(rawCsv) > 5 * 1024 * 1024) throw new LabError('Envie um CSV de até 5 MB.');
     const sourceName = text(body.sourceName, 'Nome do arquivo', 240);
@@ -268,10 +268,7 @@ export function registerLabCaseRoutes(app, { dataDir = process.env.LUCA_DATA_DIR
     const schema = object(body.schema, 'Schema', 128 * 1024);
     const source = { rawCsv, metadata, map, schema };
     const id = `lab_${digest(JSON.stringify(canonical(source))).slice(0, 32)}`;
-    if (fs.existsSync(file(id))) {
-      res.json({ ok: true, case: read(id) });
-      return;
-    }
+    if (fs.existsSync(file(id))) return { created: false, case: read(id) };
     if (fs.existsSync(directory()) && fs.readdirSync(directory()).filter((name) => name.endsWith('.json')).length >= 100) throw new LabError('Limite de 100 casos por conta atingido.', 409, 'lab_case_limit');
     const parsed = parseCase({ ...source, sourceName });
     const now = new Date().toISOString();
@@ -281,14 +278,20 @@ export function registerLabCaseRoutes(app, { dataDir = process.env.LUCA_DATA_DIR
       synthetic: parsed.synthetic, events: parsed.events, warnings: parsed.warnings,
       analyses: [], conclusions: [],
     });
-    res.status(201).json({ ok: true, case: record });
+    return { created: true, case: record };
+  };
+
+  app.post('/api/lab/cases', route((req, res) => {
+    const result = createCase(req.body || {});
+    res.status(result.created ? 201 : 200).json({ ok: true, case: result.case });
   }));
 
   app.get('/api/lab/cases/:id', route((req, res) => res.json({ ok: true, case: read(req.params.id) })));
 
-  app.post('/api/lab/cases/:id/analyses', route(async (req, res) => {
-    const focus = text(req.body?.focus, 'Orientação da investigação', 4000, { optional: true });
-    const record = read(req.params.id);
+  /** Investigação de 3 eixos + revisão. Devolve { analysis, case }. Precisa do contexto da conta. */
+  const investigateCase = async (caseId, rawFocus) => {
+    const focus = text(rawFocus, 'Orientação da investigação', 4000, { optional: true });
+    const record = read(caseId);
     const key = operationKey(record.id);
     if (inFlight.has(key)) throw new LabError('Já existe uma investigação em andamento neste caso.', 409, 'lab_analysis_running');
     if (record.analyses.length >= 100) throw new LabError('Limite de 100 versões de investigação atingido.', 409, 'lab_analysis_limit');
@@ -338,8 +341,13 @@ Retorne apenas JSON neste formato: {"summary":"...","limitations":["..."],"addit
       latest.analyses[latest.analyses.findIndex((item) => item.id === analysis.id)] = analysis;
       latest.updatedAt = analysis.completedAt;
       save(latest);
-      res.status(analysis.status === 'completed' ? 201 : 503).json({ ok: analysis.status === 'completed', ...(analysis.error ? { error: 'lab_ai_unavailable', message: analysis.error } : {}), analysis, case: latest });
+      return { analysis, case: latest };
     } finally { inFlight.delete(key); }
+  };
+
+  app.post('/api/lab/cases/:id/analyses', route(async (req, res) => {
+    const { analysis, case: latest } = await investigateCase(req.params.id, req.body?.focus);
+    res.status(analysis.status === 'completed' ? 201 : 503).json({ ok: analysis.status === 'completed', ...(analysis.error ? { error: 'lab_ai_unavailable', message: analysis.error } : {}), analysis, case: latest });
   }));
 
   app.post('/api/lab/cases/:id/conclusions', route((req, res) => {
@@ -365,4 +373,13 @@ Retorne apenas JSON neste formato: {"summary":"...","limitations":["..."],"addit
     save(record);
     res.status(201).json({ ok: true, conclusion, case: record });
   }));
+
+  // Uso interno (fila da bancada): mesmas funções das rotas, no contexto da conta dona do caso.
+  const asUser = (userId, fn) => runWithWorkspaceUser(userId, fn);
+  return {
+    createCase: (userId, body) => asUser(userId, () => createCase(body)),
+    readCase: (userId, caseId) => asUser(userId, () => read(caseId)),
+    investigate: (userId, caseId, focus) => asUser(userId, () => investigateCase(caseId, focus)),
+    isLabError: (error) => error instanceof LabError,
+  };
 }

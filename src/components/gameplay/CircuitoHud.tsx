@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { EnviarBancada, envioDoCircuito } from './EnviarBancada';
 import type { CanalGameplay } from './estadoGameplay';
 import { decimalCircuito, metricasCircuito, REGRAS_CIRCUITO_TELA, riscosCircuito, textoResultadoCircuito } from './circuito';
 import { COMANDOS_CABINE } from './comandosCabine';
@@ -111,6 +112,7 @@ export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, t
       <details><summary>Como a corrida é avaliada</summary><ul>{REGRAS_CIRCUITO_TELA.map((t) => <li key={t}>{t}</li>)}</ul>{r.pausas.length > 0 && <p>Pausas nesta corrida: {r.pausas.length}.</p>}</details>
       <button data-acao="nova-corrida" onClick={aoNovo} autoFocus>Nova corrida <kbd>{confirmar}</kbd></button>
       <button data-acao="analisar-circuito" onClick={() => { aoWebcam(false); aoAnalisar(sessao.relatorio()); }}>Analisar relatório · abrir chat dos agentes</button>
+      <EnviarBancada montar={() => envioDoCircuito(sessao.relatorio())} />
     </section>}
   </div>;
 }
