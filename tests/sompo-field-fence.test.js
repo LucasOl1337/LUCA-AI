@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 import * as THREE from 'three';
 
-const result = await build({entryPoints:[new URL('../src/components/sompo/createSompoFieldFence.ts',import.meta.url).pathname],bundle:true,write:false,format:'esm',platform:'node',plugins:[{name:'three-singleton',setup(b){b.onResolve({filter:/^three$/},a=>({path:import.meta.resolve(a.path),external:true}));}}]});
-const {createSompoFieldFence, mouroesDaCerca, CERCA_FIOS_M}=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].contents).toString('base64')}`);
+const result = await build({entryPoints:[new URL('../src/components/sompo/createSompoFieldFence.ts',import.meta.url).pathname],bundle:true,write:false,format:'esm',platform:'node',plugins:[{name:'three-singleton',setup(b){b.onResolve({filter:/^three(\/.*)?$/},a=>({path:import.meta.resolve(a.path),external:true}));}}]});
+const {createSompoFieldFence, mouroesDaCerca, porteirasDaCerca, CERCA_FIOS_M, CERCA_VAO_M, PORTEIRA_VAO_M, CARREADOR_GRADE_M, CARREADOR_FASE}=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].contents).toString('base64')}`);
 
 test('mourões fecham o quadrado, um por vão, sem repetir canto', () => {
   const pontos = mouroesDaCerca(92.6);
@@ -55,4 +55,44 @@ test('mourões e fios seguem o relevo, 2 draw calls, dispose solta tudo', () => 
   cerca.dispose();
   assert.equal(parent.children.length, 0);
   assert.equal(soltos, 4);
+});
+
+test('porteiras onde os carreadores do shader cruzam a cerca: sem mourão nem fio no vão', () => {
+  const meio = 92.6;
+  const portas = porteirasDaCerca(meio);
+  assert.equal(portas.length, 16);
+  for (const p of portas) {
+    // Centro numa linha de carreador da grade 46×38 do shader e sobre a cerca.
+    const v = p.lado === 'z' ? p.x : p.z, [grade, fase] = p.lado === 'z' ? [CARREADOR_GRADE_M[0], CARREADOR_FASE[0]] : [CARREADOR_GRADE_M[1], CARREADOR_FASE[1]];
+    assert.ok(Math.abs(((v / grade + fase) % 1 + 1) % 1) < 1e-9 || Math.abs(((v / grade + fase) % 1 + 1) % 1 - 1) < 1e-9);
+    assert.equal(Math.abs(p.lado === 'z' ? p.z : p.x), meio);
+    assert.ok(Math.abs(v) < meio - 3, 'longe do canto');
+  }
+  const parent = new THREE.Group();
+  const cerca = createSompoFieldFence(parent, meio, () => 0);
+  const [mouroes, fios, porteiras] = cerca.root.children;
+  assert.equal(porteiras.name, 'cerca-porteiras');
+  assert.equal(porteiras.count, 16);
+  const m = new THREE.Matrix4(), a = new THREE.Vector3();
+  for (let i = 0; i < mouroes.count; i++) {
+    mouroes.getMatrixAt(i, m); a.setFromMatrixPosition(m);
+    for (const p of portas) {
+      const ao = p.lado === 'z' ? Math.abs(a.x - p.x) : Math.abs(a.z - p.z), fora = p.lado === 'z' ? Math.abs(a.z - p.z) : Math.abs(a.x - p.x);
+      assert.ok(!(fora < 0.01 && ao < PORTEIRA_VAO_M / 2), `mourão no vão ${a.x},${a.z}`);
+    }
+  }
+  // Nenhum fio maior que um vão comum: o arame não atravessa a porteira.
+  for (let i = 0; i < fios.count; i++) {
+    fios.getMatrixAt(i, m); const s = new THREE.Vector3(); m.decompose(new THREE.Vector3(), new THREE.Quaternion(), s);
+    assert.ok(s.x <= CERCA_VAO_M * 1.5, `fio de ${s.x} m`);
+  }
+  assert.equal(fios.count % CERCA_FIOS_M.length, 0);
+  // Porteira fica alinhada ao lado da cerca.
+  porteiras.getMatrixAt(portas.findIndex((p) => p.lado === 'x'), m);
+  const eixo = new THREE.Vector3(1, 0, 0).transformDirection(m);
+  assert.ok(Math.abs(Math.abs(eixo.z) - 1) < 1e-6);
+  let soltos = 0;
+  porteiras.geometry.addEventListener('dispose', () => soltos++);
+  cerca.dispose();
+  assert.equal(soltos, 1);
 });
