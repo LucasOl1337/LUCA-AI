@@ -21,6 +21,7 @@ const StandPage = lazy(() => import('@/pages/StandPage'));
 const TotemPage = lazy(() => import('@/pages/TotemPage'));
 const GameplayPage = lazy(() => import('@/pages/GameplayPage'));
 const OperadorPage = lazy(() => import('@/pages/OperadorPage'));
+const FilaBancadaPage = lazy(() => import('@/pages/FilaBancadaPage'));
 
 export default function App() {
   const { user } = useAuth();
@@ -57,6 +58,7 @@ export default function App() {
       case 'totem':       return <Suspense fallback={<p role="status" className="p-8">Abrindo Totem…</p>}><TotemPage /></Suspense>;
       case 'gameplay':    return <Suspense fallback={<p role="status" className="p-8">Abrindo Gameplay…</p>}><GameplayPage /></Suspense>;
       case 'operador':    return <Suspense fallback={<p role="status" className="p-8">Abrindo o painel do operador…</p>}><OperadorPage /></Suspense>;
+      case 'fila':        return <Suspense fallback={<p role="status" className="p-8">Abrindo a fila da bancada…</p>}><FilaBancadaPage /></Suspense>;
       case 'stand':       return null;
     }
   };

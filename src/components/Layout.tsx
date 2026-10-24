@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Cpu,
   FlaskConical,
+  ListChecks,
   Gamepad2,
   Monitor,
   Eye,
@@ -23,7 +24,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useDeferredFlag } from '@/hooks/useDeferredFlag';
 import SidebarSessionsRail from '@/components/SidebarSessionsRail';
 
-export type PageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'laboratorio' | 'sensor' | 'sonolencia' | 'admin' | 'stand' | 'totem' | 'gameplay' | 'operador';
+export type PageId = 'inicio' | 'luca-ai' | 'personas' | 'configuracao' | 'sompo' | 'laboratorio' | 'sensor' | 'sonolencia' | 'admin' | 'stand' | 'totem' | 'gameplay' | 'operador' | 'fila';
 
 interface LayoutProps {
   activePage: PageId;
@@ -46,6 +47,7 @@ const navItems: NavItem[] = [
   { id: 'operador', label: 'Operador', icon: Tablet, hint: 'painel do operador: o gameplay ao vivo no tablet' },
   { id: 'sompo', label: 'SOMPO', icon: Wheat, hint: 'casos de exemplo agrícolas e rurais' },
   { id: 'laboratorio', label: 'Laboratório', icon: FlaskConical, hint: 'replay de incidentes a partir de arquivos' },
+  { id: 'fila', label: 'Fila da bancada', icon: ListChecks, hint: 'corridas enviadas aos agentes e os pareceres' },
   { id: 'sensor', label: 'Sensor', icon: Cpu, hint: 'o chip do ESP32 por dentro, em 3D' },
   { id: 'sonolencia', label: 'Sonolência', icon: Eye, hint: 'alerta de olhos fechados pela webcam' },
   { id: 'admin', label: 'Admin', icon: ShieldCheck, hint: 'usuários, personas e configuração' },

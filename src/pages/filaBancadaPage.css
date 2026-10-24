@@ -1,0 +1,71 @@
+/* Fila da bancada: tabela larga no desktop, cartões empilhados no celular. Tokens do painel (--l-*). */
+.fila-bancada { padding: clamp(16px, 2.6vw, 36px); color: var(--l-text); display: flex; flex-direction: column; gap: 16px; font-variant-numeric: tabular-nums; }
+.fila-topo { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px; }
+.fila-olho { margin: 0 0 4px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--l-gold-bright); }
+.fila-bancada h1 { margin: 0; font-size: clamp(24px, 3vw, 34px); font-weight: 700; }
+.fila-sub { margin: 6px 0 0; max-width: 60ch; color: var(--l-text-soft); line-height: 1.45; }
+.fila-limites { display: flex; gap: 10px; margin: 0; }
+.fila-limites div { padding: 8px 14px; border: 1px solid var(--l-border); border-radius: 12px; background: var(--l-surface); min-width: 92px; }
+.fila-limites dt { font-size: 12px; color: var(--l-text-mute); }
+.fila-limites dd { margin: 2px 0 0; font-size: 18px; font-weight: 700; }
+
+.fila-filtros { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.fila-filtros label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--l-text-mute); }
+.fila-filtros input, .fila-filtros select { min-height: 40px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--l-border); background: var(--l-input); color: var(--l-text); font: inherit; font-size: 14px; color-scheme: dark; }
+.fila-filtros select option { background: var(--l-panel); }
+.fila-espaco { flex: 1; }
+.fila-botao { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--l-border); background: var(--l-surface-hi); color: var(--l-text); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.fila-botao:hover:not(:disabled) { border-color: var(--l-border-hover); }
+.fila-botao:disabled { opacity: .5; cursor: default; }
+.fila-botao-texto { border: 0; background: none; padding: 4px 0; color: var(--l-gold-bright); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.fila-bancada button:focus-visible, .fila-filtros input:focus-visible, .fila-filtros select:focus-visible { outline: none; box-shadow: var(--l-focus); }
+
+.fila-erro { margin: 0; padding: 10px 14px; border-radius: 10px; background: var(--l-error-bg); color: #ffb4ae; }
+.fila-vazio { margin: 24px auto; max-width: 560px; text-align: center; padding: 28px; border: 1px dashed var(--l-border); border-radius: 16px; color: var(--l-text-soft); }
+.fila-vazio h2 { margin: 0 0 8px; font-size: 20px; color: var(--l-text); }
+.fila-resumo { margin: 0; font-size: 13px; color: var(--l-text-mute); }
+
+.fila-painel { border: 1px solid var(--l-border); border-radius: 14px; background: rgba(9, 12, 17, .86); padding: 6px 4px 2px; }
+.fila-tabela { width: 100%; border-collapse: collapse; font-size: 14px; }
+.fila-tabela time { white-space: nowrap; }
+.fila-tabela th { text-align: left; font-size: 12px; font-weight: 600; color: var(--l-text-mute); border-bottom: 1px solid var(--l-border); padding: 8px 10px; white-space: nowrap; }
+.fila-tabela th button { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; padding: 0; color: inherit; font: inherit; cursor: pointer; }
+.fila-tabela th[aria-sort='ascending'] button, .fila-tabela th[aria-sort='descending'] button { color: var(--l-text); }
+.fila-tabela tbody tr:last-child td { border-bottom: 0; }
+.fila-tabela td { padding: 12px 10px; border-bottom: 1px solid var(--l-border); vertical-align: top; }
+.fila-tabela td small { display: block; margin-top: 2px; font-size: 12px; color: var(--l-text-mute); }
+.fila-tabela tr[data-estado='processando'] td { background: var(--l-gold-haze); }
+.fila-estado { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; background: var(--l-input); }
+.fila-estado[data-estado='pronto'] { background: var(--l-ok-bg); color: #8ff0a8; }
+.fila-estado[data-estado='processando'] { background: var(--l-gold-soft); color: var(--l-gold-bright); }
+.fila-estado[data-estado='falhou'] { background: var(--l-error-bg); color: #ffb4ae; }
+.fila-estado[data-estado='na_fila'] { background: var(--l-warning-bg); color: #ffd28a; }
+.fila-parecer { min-width: 260px; max-width: 520px; }
+.fila-parecer p { margin: 0; line-height: 1.45; color: var(--l-text-soft); }
+.fila-corte { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.fila-falha { color: #ffb4ae !important; }
+.fila-espera { color: var(--l-text-mute) !important; font-style: italic; }
+.fila-acoes { text-align: right; }
+.fila-oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* 1366: tabela segue, parecer um pouco mais estreito. */
+@media (max-width: 1440px) { .fila-parecer { min-width: 220px; max-width: 380px; } }
+
+/* Celular: cada corrida vira um cartão com rótulo por campo. */
+@media (max-width: 760px) {
+  .fila-limites { width: 100%; }
+  .fila-limites div { flex: 1; min-width: 0; }
+  .fila-espaco { display: none; }
+  .fila-painel { border: 0; background: none; padding: 0; }
+  .fila-tabela thead { display: none; }
+  .fila-tabela, .fila-tabela tbody, .fila-tabela tr, .fila-tabela td { display: block; width: 100%; }
+  .fila-tabela tr { margin-bottom: 12px; padding: 12px 14px; border: 1px solid var(--l-border); border-radius: 14px; background: rgba(9, 12, 17, .9); }
+  .fila-tabela tbody tr:last-child td { border-bottom: 0; }
+  .fila-tabela tr[data-estado='processando'] td { background: none; }
+  .fila-tabela td { display: grid; grid-template-columns: 84px 1fr; gap: 8px; padding: 6px 0; border: 0; }
+  .fila-tabela td::before { content: attr(data-rotulo); font-size: 12px; color: var(--l-text-mute); padding-top: 2px; }
+  .fila-tabela td.fila-acoes { display: block; text-align: left; padding-top: 10px; }
+  .fila-tabela td.fila-acoes::before { content: none; }
+  .fila-acoes .fila-botao { width: 100%; justify-content: center; }
+  .fila-parecer { min-width: 0; max-width: none; }
+}

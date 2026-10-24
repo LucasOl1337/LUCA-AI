@@ -18,6 +18,7 @@ export const APP_PAGES = Object.freeze([
   'totem',
   'gameplay',
   'operador',
+  'fila',
 ]);
 
 export const PAGE_PATHS = Object.freeze({
@@ -34,6 +35,8 @@ export const PAGE_PATHS = Object.freeze({
   totem: '/totem',
   gameplay: '/gameplay',
   operador: '/operador',
+  // Tabela da fila da bancada (corridas enviadas do resultado do simulador).
+  fila: '/bancada/fila',
 });
 
 // 'principais' e 'ativadas' ficam só por compatibilidade com links antigos.

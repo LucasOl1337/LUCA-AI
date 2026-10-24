@@ -42,3 +42,27 @@ test('posição e dia de Brasília no cliente', () => {
   assert.equal(textoPosicao({ estado: 'pronto', posicao: 0 }), 'Pronto');
   assert.equal(diaBrasilia('2026-10-25T02:59:00Z'), '2026-10-24');
 });
+
+test('tabela /bancada/fila: rota, ordenação e CSV com fórmula neutralizada', async () => {
+  const { parseAppLocation, formatAppUrl } = await import('../shared/app-location.js');
+  assert.equal(parseAppLocation('/bancada/fila').page, 'fila');
+  assert.equal(formatAppUrl({ page: 'fila' }), '/bancada/fila');
+  const { ordenarFila, csvDaFila, textoDesfecho, textoNota } = await loadFrontendModule('../../src/lib/bancada-fila.ts');
+  const corrida = (o) => ({ veiculo: 'trator', cenario: 'circuito', desfecho: null, desfechoTitulo: null, tempoMs: 12345, nota: null, avisos: 2, semResposta: 1, sinistrosEvitados: 1, reacaoMediaMs: 700, runId: 'r', ...o });
+  const itens = [
+    { id: 'a', caseId: 'lab_a', estado: 'pronto', posicao: 0, criadoEm: '2026-10-24T11:00:00Z', tentativas: 1, erro: null, corrida: corrida({ desfecho: 'colisao', nota: 40 }), parecer: { status: 'completo', eixos: '4/4', resumo: '=HYPERLINK("x")', hipoteses: 1, principal: 'Velocidade; alta' } },
+    { id: 'b', caseId: 'lab_b', estado: 'na_fila', posicao: 1, criadoEm: '2026-10-24T11:05:00Z', tentativas: 0, erro: null, corrida: corrida({ desfecho: 'chegada', nota: 90 }), parecer: null },
+    { id: 'c', caseId: 'lab_c', estado: 'processando', posicao: 0, criadoEm: '2026-10-24T10:00:00Z', tentativas: 1, erro: null, corrida: corrida({ desfechoTitulo: 'Atolou na área alagada' }), parecer: null },
+  ];
+  assert.deepEqual(ordenarFila(itens, 'quando', false).map((i) => i.id), ['b', 'a', 'c']);
+  assert.deepEqual(ordenarFila(itens, 'nota', false).map((i) => i.id), ['b', 'a', 'c']);
+  assert.deepEqual(ordenarFila(itens, 'estado', true).map((i) => i.id), ['c', 'b', 'a']);
+  assert.equal(textoDesfecho(itens[0].corrida), 'Colisão'); assert.equal(textoDesfecho(itens[2].corrida), 'Atolou na área alagada');
+  assert.equal(textoNota(itens[0].corrida), 'Nota 40 · 2 avisos, 1 sem resposta');
+  const csv = csvDaFila(itens);
+  assert.ok(csv.startsWith('\uFEFFenviado_em;estado;veiculo'));
+  assert.match(csv, /"'=HYPERLINK\(""x""\)"/); assert.match(csv, /"Velocidade; alta"/);
+  assert.equal(csv.trim().split('\r\n').length, 4);
+  const app = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  assert.match(app, /case 'fila':.*<FilaBancadaPage \/>/);
+});
