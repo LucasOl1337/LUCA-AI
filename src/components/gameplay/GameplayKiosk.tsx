@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { criarSomMotor } from './somMotor';
 import { COMANDOS_CABINE } from './comandosCabine';
-import { alternarVistaTrator, criarVistaExterna, lerVistaTrator } from './vistaTrator';
+import { alternarVistaTrator, criarCabecaCabine, criarVistaExterna, lerVistaTrator } from './vistaTrator';
 import { registrarContextoCorrida } from './contextoCorrida';
 import { CircuitoHud, useWebcamCircuito, WebcamCircuito } from './CircuitoHud';
 import { contextoDoCircuito, criarSessaoCircuito, largarCircuito, type RelatorioCircuito, type SessaoCircuito } from './sessaoCircuito';
@@ -208,6 +208,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
     let sessaoDoFim: SessaoCircuito | null = null;
     const externa = criarVistaExterna();
     const tremorEuler = new Euler(), tremorQuat = new Quaternion();
+    const cabeca = criarCabecaCabine(), cabecaEuler = new Euler(), cabecaQuat = new Quaternion();
     let pulsoMotor = 0;
     let ultimoDt = 0;
     ultimoMonotono.current = performance.now();
@@ -220,6 +221,14 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
         if (vistaRef.current === 'externa') externa(camera, maquina, ultimoDt);
         else {
           externa.reiniciar();
+          // Cabeça na curva (Lupa D7): inclina para fora e adianta o olhar para dentro, amortecido.
+          const trator = motor.trator();
+          const parado = pausado.current || motor.ler().fase === 'fim';
+          const cab = cabeca.passo(parado ? 0 : trator.guinada, parado ? 0 : trator.velocidade, ultimoDt, movimentoReduzido());
+          if (cab.rolagemGraus || cab.olharGraus) {
+            cabecaEuler.set(0, cab.olharGraus * Math.PI / 180, cab.rolagemGraus * Math.PI / 180, 'YXZ');
+            camera.quaternion.multiply(cabecaQuat.setFromEuler(cabecaEuler));
+          }
           // Sensação de velocidade (Lupa D6): o olho treme pouco e rápido, na proporção da velocidade.
           const t = trepidacaoCabine(pausado.current ? 0 : motor.ler().maquina.velocidadeKph, performance.now() / 1000, movimentoReduzido());
           if (t.arfagemGraus || t.rolagemGraus || t.alturaM) {

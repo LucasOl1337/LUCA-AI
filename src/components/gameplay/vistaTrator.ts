@@ -55,3 +55,46 @@ export function criarVistaExterna() {
   /** Fora da vista externa: a próxima entrada nasce atrás do trator, sem varrer o rumo antigo. */
   return Object.assign(seguir, { reiniciar() { rumo = null; } });
 }
+
+/**
+ * Cabeça do operador na curva (Lupa D7, 24/10). Antes o olho girava exatamente com a máquina:
+ * no batente a 12 km/h (0,22 g de lateral) a cabine não dava sinal nenhum da curva e as colunas
+ * escondiam para onde o trator ia. Agora a cabeça inclina um pouco para fora da curva
+ * (proporcional à aceleração lateral v·ω) e o olhar adianta alguns graus para dentro dela
+ * (proporcional à guinada, só de frente). Os dois são amortecidos e independem do FPS.
+ */
+export const CABECA_CABINE = Object.freeze({
+  /** graus de rolagem por m/s² de aceleração lateral, com teto. */
+  rolagemPorMs2: 0.6,
+  rolagemMaxGraus: 1.5,
+  /** olhar adiantado = guinada × isto (s), com teto. */
+  antecipacaoS: 0.2,
+  olharMaxGraus: 6,
+  tauS: 0.25,
+});
+
+/** Alvo instantâneo da cabeça. `guinada` em rad/s (positivo = esquerda), `velocidade` em m/s (negativo = ré). */
+export function alvoCabecaCabine(guinada: number, velocidade: number) {
+  if (!Number.isFinite(guinada) || !Number.isFinite(velocidade)) return { rolagemGraus: 0, olharGraus: 0 };
+  const lateral = velocidade * guinada;
+  const rolagemGraus = -Math.max(-CABECA_CABINE.rolagemMaxGraus, Math.min(CABECA_CABINE.rolagemMaxGraus, lateral * CABECA_CABINE.rolagemPorMs2));
+  const olhar = velocidade > 0 ? guinada * CABECA_CABINE.antecipacaoS * 180 / Math.PI : 0;
+  const olharGraus = Math.max(-CABECA_CABINE.olharMaxGraus, Math.min(CABECA_CABINE.olharMaxGraus, olhar));
+  return { rolagemGraus: rolagemGraus || 0, olharGraus: olharGraus || 0 };
+}
+
+/** Estado amortecido da cabeça; `passo` devolve rolagem (eixo da visão; negativo = cabeça para a direita) e olhar (guinada; positivo = esquerda). */
+export function criarCabecaCabine() {
+  let rolagem = 0, olhar = 0;
+  return {
+    passo(guinada: number, velocidade: number, dt: number, reduzirMovimento = false) {
+      const alvo = reduzirMovimento ? { rolagemGraus: 0, olharGraus: 0 } : alvoCabecaCabine(guinada, velocidade);
+      const k = dt > 0 && Number.isFinite(dt) ? 1 - Math.exp(-Math.min(dt, 0.25) / CABECA_CABINE.tauS) : 0;
+      rolagem += (alvo.rolagemGraus - rolagem) * k;
+      olhar += (alvo.olharGraus - olhar) * k;
+      if (reduzirMovimento) rolagem = olhar = 0;
+      return { rolagemGraus: rolagem, olharGraus: olhar };
+    },
+    reiniciar() { rolagem = olhar = 0; },
+  };
+}
