@@ -126,3 +126,14 @@ test('painel desenha a vinheta com o nível do alerta', () => {
   const html = renderToStaticMarkup(createElement(PainelCabine, { canal }));
   assert.match(html, /class="gameplay-painel-vinheta" data-nivel="critica" aria-hidden="true"/);
 });
+
+test('alarme de ré (Lupa fila vazia 2): andando de ré apita lento e agudo; antes mudo; nunca cobre alerta nem toca parado ou fora da corrida', async () => {
+  const { BIPE_RE } = await loadFrontendModule('../../src/components/gameplay/alertaCabine.ts');
+  assert.deepEqual(alertaCabine(estado({ re: true, kph: 1.5 })).bipe, BIPE_RE);
+  assert.deepEqual(BIPE_RE, { intervaloMs: 600, frequenciaHz: 1040 });
+  assert.equal(alertaCabine(estado({ re: false, kph: 1.5 })).bipe.intervaloMs, null, 'de frente sem nada: mudo');
+  assert.equal(alertaCabine(estado({ re: true, kph: 0.1 })).bipe.intervaloMs, null, 'parado: mudo');
+  assert.equal(alertaCabine(estado({ re: true, kph: 1.5, fase: 'fim' })).bipe.intervaloMs, null);
+  assert.notDeepEqual(alertaCabine(estado({ re: true, kph: 1.5, cm: 120 })).bipe, BIPE_RE, 'alerta de obstáculo vence');
+  assert.notDeepEqual(alertaCabine(estado({ re: true, kph: 1.5, cm: 300 })).bipe, BIPE_RE, 'eco do sensor vence');
+});

@@ -55,6 +55,10 @@ export const BIPE_LENTO_MS = 600;
 export const BIPE_RAPIDO_MS = 200;
 /** Bipe da sonolência: grave e insistente, diferente dos tons do sensor e da zona. */
 export const BIPE_SONO: BipeCabine = { intervaloMs: 300, frequenciaHz: 520 };
+/** Alarme de ré de máquina: lento e agudo, diferente de todos os alertas (Lupa, 24/10). */
+export const BIPE_RE: BipeCabine = { intervaloMs: 600, frequenciaHz: 1040 };
+/** Abaixo disso (trator parado com a ré engatada) não apita. */
+export const RE_BIPE_MIN_KPH = 0.3;
 
 const MUDO: BipeCabine = { intervaloMs: null, frequenciaHz: 0 };
 
@@ -97,6 +101,8 @@ export function alertaCabine(estado: EstadoGameplay, sono: SonoCabine | null = n
     // Mesmo ritmo do alerta, tom mais grave: dá para saber qual dos dois sem olhar.
     else if (faixas.inclination) bipe = { intervaloMs: BIPE_RAPIDO_MS, frequenciaHz: 660 };
     else if (sensor.eco) bipe = bipeProximidade(sensor.distanciaCm);
+    // Alarme de ré (Lupa, fila vazia 2): antes a ré engatava muda; prioridade mais baixa, nunca cobre um alerta.
+    else if (maquina.re && maquina.velocidadeKph >= RE_BIPE_MIN_KPH) bipe = BIPE_RE;
   } else if (dormindo) bipe = BIPE_SONO;
 
   const vinheta: VinhetaCabine = dormindo ? 'critica'
