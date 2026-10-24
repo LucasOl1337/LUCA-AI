@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { contextoCircuito } from '../shared/circuito-context.js';
+import { resumoVeredicto } from '../shared/veredicto.js';
 
 /**
  * Fila da bancada (pedido do Lucas, 24/10): a corrida vai para a investigação do
@@ -65,6 +66,8 @@ export function parecerDaAnalise(analysis) {
     resumo: (revisao?.summary || analysis.error || '').slice(0, 600),
     hipoteses: (analysis.hypotheses || []).length,
     principal: analysis.hypotheses?.[0]?.title?.slice(0, 200) ?? null,
+    // Contrato veredicto v1: resumo curto do analysis.verdict (estimativa); null em caso antigo.
+    veredicto: resumoVeredicto(analysis.verdict),
   };
 }
 

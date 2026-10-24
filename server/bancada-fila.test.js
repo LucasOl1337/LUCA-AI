@@ -6,7 +6,7 @@ import test from 'node:test';
 import express from 'express';
 import { createAuthService } from './auth.js';
 import { registerLabCaseRoutes } from './lab-cases.js';
-import { registerBancadaFilaRoutes, diaBrasilia, lerConcorrencia, lerTetoDia, resumoDaCorrida } from './bancada-fila.js';
+import { registerBancadaFilaRoutes, diaBrasilia, lerConcorrencia, lerTetoDia, resumoDaCorrida, parecerDaAnalise } from './bancada-fila.js';
 
 // Runtime isolado com análise falsa: nenhum teste chama o 9Router.
 const fixtureDir = path.resolve('datasets/laboratorio-virtual-v1');
@@ -87,6 +87,8 @@ test('envio entra na fila, a pessoa recebe a posição e o worker processa em or
   const item = (await request(`/api/bancada/fila/${enviados[0].body.item.id}`, { cookie })).body.item;
   assert.equal(item.parecer.status, 'completo'); assert.match(item.parecer.resumo, /Revisão/); assert.equal(item.parecer.principal, 'Reação ao fardo');
   assert.equal(item.foco, undefined); assert.equal(item.ownerId, undefined);
+  // O chat falso não devolve veredicto válido: o 5º passo vira 'indeterminado' (contrato v1), resumido na fila.
+  assert.equal(item.parecer.veredicto?.culpado, 'indeterminado'); assert.equal(item.parecer.veredicto.confianca, 0);
   const labCase = await request(`/api/lab/cases/${item.caseId}`, { cookie });
   assert.equal(labCase.body.case.analyses[0].id, item.analysisId);
 });
@@ -147,4 +149,11 @@ test('limites lidos do ambiente e resumo confiam no registro validado, não no r
   assert.equal(r.desfecho, 'tombamento'); assert.equal(r.avisos, 1); assert.equal(r.veiculo, 'caminhao'); assert.equal(r.cenario, 'serra-sem-freio');
   assert.equal(resumoDaCorrida({ metadata: {} }, { nota: 72, desfecho: 'percurso' }).cenario, 'percurso');
   assert.equal(diaBrasilia('2026-10-25T02:30:00Z'), '2026-10-24');
+});
+
+test('parecer resume o veredicto (estimativa) e deixa null em caso antigo', () => {
+  const base = { status: 'completed', axes: [{ id: 'review', status: 'completed', summary: 'ok' }], hypotheses: [] };
+  assert.equal(parecerDaAnalise(base).veredicto, null);
+  const verdict = { versao: 1, status: 'concluido', culpado: 'operador', culpadoRotulo: 'Operador humano', confianca: 0.72, impacto_financeiro: { faixa_min_brl: 8000, faixa_max_brl: 32000 } };
+  assert.deepEqual(parecerDaAnalise({ ...base, verdict }).veredicto, { culpado: 'operador', rotulo: 'Operador humano', confianca: 0.72, faixaMinBrl: 8000, faixaMaxBrl: 32000 });
 });
