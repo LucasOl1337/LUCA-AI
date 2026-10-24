@@ -29,6 +29,7 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
       setPixelRatio(_ratio: number) {},
       setEnabled(_enabled: boolean) {},
       setGrade(_enabled: boolean) {},
+      alvoDaCena(): THREE.WebGLRenderTarget | null { return null; },
       render(_delta: number) { renderer.render(scene, camera); },
       dispose() {},
     };
@@ -91,6 +92,8 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
     setEnabled(value: boolean) { enabled = value; },
     /** Quem já gradua no tone mapping (look do gameplay) desliga este passe para não graduar duas vezes. */
     setGrade(value: boolean) { grade.enabled = value; },
+    /** Onde a cena é desenhada neste quadro: o tone mapping e o espaço de cor do programa dependem dele. */
+    alvoDaCena(): THREE.WebGLRenderTarget | null { return enabled ? sceneTarget : null; },
     render(_delta: number) { if (enabled) composer.render(); else renderer.render(scene, camera); },
     dispose() {
       if (disposed) return;

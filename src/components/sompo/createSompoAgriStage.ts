@@ -27,6 +27,7 @@ import { createSompoRenderer, sompoRenderBudget, disposeSompoObject, type SompoS
 import { createSompoEnvironmentAssets } from './createSompoEnvironmentAssets';
 import { createSompoAtmosphere } from './createSompoAtmosphere';
 import { createSompoPostProcessing } from './createSompoPostProcessing';
+import { criarAquecedorDePalco } from './aquecerPalco';
 import { createSompoRenderMeter } from './sompoStage';
 import { soltarLutCompartilhada } from './soltarLutCompartilhada';
 import { soltarOrbit } from './soltarOrbit';
@@ -146,6 +147,9 @@ function createUltrasonicBeam(origin: readonly [number, number, number]) {
   };
 }
 
+/** Lado do cubo do ambiente provisório: o mesmo do PMREM do HDR 2k do céu (2048/4). */
+export const AMBIENTE_PROVISORIO_PX = 512;
+
 /**
  * Palco agrícola autocontido: renderer, campo, equipamento gerado e movimento
  * real em forma fechada: separado do loop do caminhão para não arriscar o
@@ -206,7 +210,10 @@ export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, out
 
   const environmentScene = new RoomEnvironment();
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const environment = pmrem.fromScene(environmentScene, 0.04);
+  // 512 = o tamanho do PMREM que o three gera do HDR de 2k (largura/4): o define
+  // CUBEUV_MAX_MIP fica igual, e a chegada do céu ~1 s depois não recompila todo material
+  // da cena (com 256, eram ~10 programas e um quadro de 230 ms no meio da largada).
+  const environment = pmrem.fromScene(environmentScene, 0.04, 0.1, 100, { size: AMBIENTE_PROVISORIO_PX });
   scene.environment = environment.texture;
   scene.environmentIntensity = scenario.environmentId === 'row-crop-field-night' ? 0.12 : 0.5;
   environmentScene.dispose();
@@ -239,6 +246,8 @@ export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, out
   const atmosphere = createSompoAtmosphere(scene, renderer, field.sun);
   const post = createSompoPostProcessing(renderer, scene, camera);
   const lookAtivo = look?.({ mount, scene, renderer, sun: field.sun, setPostGrade: (on) => post.setGrade(on), night }) ?? null;
+  // Compila shader e sobe textura fora do quadro: o que é novo espera fora da tela até ficar pronto.
+  const aquecedor = criarAquecedorDePalco(renderer, scene, camera, { alvoDaCena: () => post.alvoDaCena(), aoMudar: (n) => { mount.dataset.aquecendo = String(n); } });
   // Qualidade automática (só no totem): o medidor de 1 s alimenta o regulador.
   const degraus = qualityProfile.degraus;
   let qualidade = qualidadeInicial(qualityProfile.degrauInicial ?? Math.max(0, degraus.findIndex(d => d.pixelRatio <= renderer.getPixelRatio())), qualityProfile);
@@ -617,6 +626,7 @@ export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, out
       field.sun.intensity = 0.32;
     }
     lookAtivo?.quadro(camera, machine.position);
+    aquecedor.quadro();
     post.render(elapsed);
     meter.end();
     onAfterRender?.(renderer.domElement);
@@ -660,6 +670,7 @@ export function mountSompoAgriStage({ mount, ruralProps = false, scenarioId, out
     recenterHeading() { /* sem rumo integrado no palco agrícola */ },
     dispose() {
       disposed = true;
+      aquecedor.dispose();
       propsRurais?.dispose();
       cercaTalhao?.dispose(); rastro?.dispose();
       soltarLutCompartilhada(renderer, scene);

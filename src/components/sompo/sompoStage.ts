@@ -49,6 +49,10 @@ export function createSompoRenderer(mount: HTMLElement) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.info.autoReset = false;
+  // Em produção o three não pede ao driver o log de cada shader no primeiro uso (416 ms
+  // de getProgramInfoLog na largada do gameplay, porque obriga a esperar o link). Dev e
+  // testes seguem com a checagem; o aquecedor do palco avisa link que falhar.
+  renderer.debug.checkShaderErrors = !import.meta.env?.PROD;
   renderer.domElement.setAttribute('aria-hidden', 'true');
   mount.appendChild(renderer.domElement);
   return { renderer, budget };
