@@ -21,7 +21,16 @@ test('post owns every pass resource, including disabled grade and bloom high-pas
   assert.match(aoComposite, /color\.rgb \*= mix/);
   assert.match(aoComposite, /isnan\(color\.r\).*isinf\(color\.r\).*65520/);
   assert.match(aoComposite, /gl_FragColor = vec4\(color\.rgb, 1\.\)/);
+  const [composer] = composers;
+  assert.equal(composer.renderTarget1.samples, 0, 'quad passes write plain buffers: MSAA there only cost clear+resolve');
+  assert.equal(composer.renderTarget2.samples, 0);
+  assert.equal(composer.renderTarget1.depthBuffer, false);
+  const sceneTarget = passes[0].sceneTarget;
+  assert.equal(sceneTarget.samples, 4, 'scene keeps its MSAA');
+  assert.ok(sceneTarget.depthTexture, 'AO reads resolved scene depth');
+  assert.equal(passes[1].source, sceneTarget, 'AO samples the scene target, not the composer buffer');
   post.resize(1920, 1080);
+  assert.equal(sceneTarget.width, 1920);
   post.setGrade(false);
   post.setEnabled(false);
   const resources = new Set();

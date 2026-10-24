@@ -76,9 +76,13 @@ export class SompoDepthAOPass extends Pass {
   private readonly aoQuad = new FullScreenQuad(this.aoMaterial);
   private readonly compositeQuad = new FullScreenQuad(this.compositeMaterial);
 
-  constructor(camera: THREE.PerspectiveCamera) {
+  /** `source`: alvo da cena (cor HDR + profundidade); sem ele, lê o readBuffer do composer. */
+  private readonly source: THREE.WebGLRenderTarget | null;
+
+  constructor(camera: THREE.PerspectiveCamera, source: THREE.WebGLRenderTarget | null = null) {
     super();
     this.camera = camera;
+    this.source = source;
   }
 
   setSize(width: number, height: number) {
@@ -90,7 +94,8 @@ export class SompoDepthAOPass extends Pass {
   }
 
   render(renderer: THREE.WebGLRenderer, writeBuffer: THREE.WebGLRenderTarget, readBuffer: THREE.WebGLRenderTarget) {
-    const depth = readBuffer.depthTexture;
+    const input = this.source ?? readBuffer;
+    const depth = input.depthTexture;
     this.compositeMaterial.uniforms.strength.value = depth ? .75 : 0;
     for (const material of [this.aoMaterial, this.compositeMaterial]) {
       material.uniforms.tDepth.value = depth;
@@ -99,7 +104,7 @@ export class SompoDepthAOPass extends Pass {
     this.aoMaterial.uniforms.proj.value.copy(this.camera.projectionMatrix);
     renderer.setRenderTarget(this.aoTarget);
     this.aoQuad.render(renderer);
-    this.compositeMaterial.uniforms.tDiffuse.value = readBuffer.texture;
+    this.compositeMaterial.uniforms.tDiffuse.value = input.texture;
     this.compositeMaterial.uniforms.tAO.value = this.aoTarget.texture;
     renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
     this.compositeQuad.render(renderer);

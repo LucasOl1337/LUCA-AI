@@ -6,6 +6,15 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { sompoRenderBudget } from './sompoStage';
 import { SompoDepthAOPass } from './createSompoDepthAO';
+import { Pass } from 'three/addons/postprocessing/Pass.js';
+
+/** Desenha a cena no alvo MSAA dela, fora do vaivém de buffers do composer. */
+class SompoScenePass extends Pass {
+  constructor(private readonly inner: RenderPass, private readonly sceneTarget: THREE.WebGLRenderTarget) { super(); this.needsSwap = false; }
+  setSize(width: number, height: number) { this.sceneTarget.setSize(width, height); }
+  render(renderer: THREE.WebGLRenderer, _write: THREE.WebGLRenderTarget, _read: THREE.WebGLRenderTarget, delta: number, maskActive: boolean) { this.inner.render(renderer, this.sceneTarget, this.sceneTarget, delta, maskActive); }
+  dispose() { this.inner.dispose(); this.sceneTarget.dispose(); }
+}
 
 /**
  * Cadeia real de pós: render HDR (alvo HalfFloat com MSAA) → bloom só do que
@@ -24,12 +33,16 @@ export function createSompoPostProcessing(renderer: THREE.WebGLRenderer, scene: 
       dispose() {},
     };
   }
-  // Depth resolved from the MSAA buffer feeds the ambient-occlusion pass; the
-  // composer's second buffer clones it.
-  const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4, depthTexture: new THREE.DepthTexture(1, 1, THREE.UnsignedIntType) });
+  // Só a cena tem geometria a suavizar: ela vai para um alvo próprio com MSAA e
+  // profundidade resolvida (o AO lê). Os buffers do composer são simples: num
+  // quad de tela cheia o MSAA repete o mesmo valor nas 4 amostras e só custava
+  // limpar e resolver cor e profundidade a cada passada.
+  const sceneTarget = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4, depthTexture: new THREE.DepthTexture(1, 1, THREE.UnsignedIntType) });
+  sceneTarget.texture.name = 'SompoPost.scene';
+  const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
   const composer = new EffectComposer(renderer, target);
-  composer.addPass(new RenderPass(scene, camera));
-  const ambientOcclusion = new SompoDepthAOPass(camera);
+  composer.addPass(new SompoScenePass(new RenderPass(scene, camera), sceneTarget));
+  const ambientOcclusion = new SompoDepthAOPass(camera, sceneTarget);
   composer.addPass(ambientOcclusion);
   // The AO composite sanitizes its HDR output before bloom in the same draw.
   // Limiar acima do teto branco do baú ao sol: em 1.1 ele florescia num halo
