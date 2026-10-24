@@ -1,8 +1,9 @@
 import { amostraDoPercurso, manifestoDoPercurso, mapaDoPercurso, registroDoPercurso } from '../../../shared/percurso-lab.js';
 import { ENCOSTA_TALHAO, TALHAO, ZONAS_TALHAO } from './geofenceTalhao';
-import { criarCircuito, metricasCircuito, type RegistroCircuito } from './circuito';
-import type { EstadoGameplay } from './estadoGameplay';
+import { criarCircuito, INICIO_CIRCUITO, metricasCircuito, type RegistroCircuito } from './circuito';
+import type { CanalGameplay, EstadoGameplay } from './estadoGameplay';
 import type { CasoPercurso } from './analisePercurso';
+import type { ContextoCorrida } from './contextoCorrida';
 
 export interface RelatorioCircuito { registro: RegistroCircuito; caso: CasoPercurso }
 export function criarSessaoCircuito(runId = crypto.randomUUID(), inicioIso = new Date().toISOString()) {
@@ -30,3 +31,20 @@ export function criarSessaoCircuito(runId = crypto.randomUUID(), inicioIso = new
   };
 }
 export type SessaoCircuito = ReturnType<typeof criarSessaoCircuito>;
+
+/**
+ * Largada de uma corrida no motor que segue vivo entre corridas: trator na
+ * largada, parado, sem contato nem aviso, e a primeira amostra da sessão nova
+ * já nessa pose (nada da corrida anterior entra no registro).
+ */
+export function largarCircuito(motor: Pick<CanalGameplay, 'reiniciar' | 'ler'>, sessao: SessaoCircuito) {
+  motor.reiniciar(INICIO_CIRCUITO);
+  sessao.registrar(motor.ler());
+}
+
+/** O que a Coruja lê da corrida: só o motor e a sessão desta corrida. */
+export function contextoDoCircuito(motor: Pick<CanalGameplay, 'ler'>, sessao: SessaoCircuito, pausada: boolean): ContextoCorrida {
+  const e = motor.ler();
+  return { velocidadeKph: e.maquina.velocidadeKph, distanciaCm: e.sensor.distanciaCm,
+    fase: sessao.registro.resultado ? 'fim' : pausada ? 'pausa' : 'dirigindo' };
+}

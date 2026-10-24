@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { criarSomMotor } from './somMotor';
 import { COMANDOS_CABINE } from './comandosCabine';
 import { alternarVistaTrator, criarVistaExterna, lerVistaTrator } from './vistaTrator';
 import { registrarContextoCorrida } from './contextoCorrida';
 import { CircuitoHud, useWebcamCircuito, WebcamCircuito } from './CircuitoHud';
-import { criarSessaoCircuito, type RelatorioCircuito } from './sessaoCircuito';
+import { contextoDoCircuito, criarSessaoCircuito, largarCircuito, type RelatorioCircuito, type SessaoCircuito } from './sessaoCircuito';
 import { INICIO_CIRCUITO, ROTA_CIRCUITO } from './circuito';
 import { sonoCabine } from './sonoCabine';
 import type * as THREE from 'three';
@@ -99,24 +99,41 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
   const pausado = useRef(false);
   const pausaInicio = useRef<number | null>(null);
   const ultimoMonotono = useRef(performance.now());
+  // Um motor e um palco 3D para a Simulação inteira: "Nova corrida" só troca a sessão
+  // e reinicia o motor (Maratona, 24/10). Antes cada corrida remontava renderer,
+  // shaders, GLB, som e webcam, e o totem fazia isso o dia inteiro.
+  const motor = useMemo(() => criarMotorGameplay(), []);
   const sessao = useMemo(() => criarSessaoCircuito(), [volta]);
+  // O laço do palco lê a sessão por aqui. Ela só troca junto com o reinício do motor
+  // (layout effect, antes de qualquer rAF): nenhum quadro grava a pose da corrida
+  // anterior na nova.
+  const sessaoRef = useRef<SessaoCircuito>(sessao);
+  const setasRef = useRef<SetasVolante>({ ...SETAS_SOLTAS });
+  const lookRef = useRef<LookState>({ yaw: 0, pitch: 0 });
+  // Relógio do palco (roteiro de luz/poeira, vento): zera na largada como fazia a remontagem.
+  const inicioPalco = useRef(performance.now());
+  useLayoutEffect(() => {
+    if (circuito) largarCircuito(motor, sessao);
+    sessaoRef.current = sessao;
+    inicioPalco.current = performance.now();
+    lookRef.current = { yaw: 0, pitch: 0 };
+    setasRef.current = { ...SETAS_SOLTAS };
+    trancoRef.current = null;
+  }, [motor, circuito, sessao]);
   const alterarMenu = useCallback((aberto: boolean) => {
     pausado.current = aberto; setMenu(aberto);
     ultimoMonotono.current = performance.now();
     if (aberto) pausaInicio.current = performance.now();
     else if (pausaInicio.current !== null) {
-      sessao.pausa(sessao.registro.elapsedMs, performance.now() - pausaInicio.current, 'menu'); pausaInicio.current = null;
+      const atual = sessaoRef.current;
+      atual.pausa(atual.registro.elapsedMs, performance.now() - pausaInicio.current, 'menu'); pausaInicio.current = null;
     }
-  }, [sessao]);
-  const motor = useMemo(() => criarMotorGameplay(), [volta]);
+  }, []);
   const novaCorrida = useCallback(() => { alterarMenu(false); setVolta((n) => n + 1); }, [alterarMenu]);
   const novaCorridaRef = useRef(novaCorrida);
   novaCorridaRef.current = novaCorrida;
-  useEffect(() => { if (circuito) { motor.reiniciar(INICIO_CIRCUITO); sessao.registrar(motor.ler()); } }, [motor, circuito, sessao]);
   const raizRef = useRef<HTMLDivElement>(null);
   const palcoRef = useRef<HTMLDivElement>(null);
-  const setasRef = useRef<SetasVolante>({ ...SETAS_SOLTAS });
-  const lookRef = useRef<LookState>({ yaw: 0, pitch: 0 });
   const [rodada, setRodada] = useState(0);
   // No percurso, Options (ou o botão) recomeça o percurso; "Dirigir livre" tira o roteiro sem sair da cabine.
   const [livre, setLivre] = useState(false);
@@ -160,11 +177,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
 
   useEffect(() => {
     if (!circuito) return;
-    return registrarContextoCorrida(() => {
-      const e = motor.ler();
-      return { velocidadeKph: e.maquina.velocidadeKph, distanciaCm: e.sensor.distanciaCm,
-        fase: sessao.registro.resultado ? 'fim' : pausado.current || document.hidden ? 'pausa' : 'dirigindo' };
-    });
+    return registrarContextoCorrida(() => contextoDoCircuito(motor, sessao, pausado.current || document.hidden));
   }, [circuito, motor, sessao]);
 
   // Aba oculta (ensaio da feira, C3): o rAF para; o tablet troca "ao vivo" congelado por "jogo pausado".
@@ -191,6 +204,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
     let reiniciarSegurado = false;
     let cameraSegurada = false;
     let fimAte: number | null = null;
+    let sessaoDoFim: SessaoCircuito | null = null;
     const externa = criarVistaExterna();
     let pulsoMotor = 0;
     let ultimoDt = 0;
@@ -217,6 +231,9 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
         const pad = firstStandardPad() as GamepadLike | null;
         const borda = bordaReiniciar(pad, reiniciarSegurado);
         reiniciarSegurado = borda.segurado;
+        const sessao = sessaoRef.current;
+        // O respiro do resultado é de cada corrida: corrida nova começa sem o fim da anterior.
+        if (sessaoDoFim !== sessao) { sessaoDoFim = sessao; fimAte = null; }
         const fimCorrida = circuito ? sessao.registro.resultado : null;
         if (fimCorrida && fimAte === null) fimAte = performance.now() + ESPERA_RESULTADO_MS;
         if (borda.reiniciar) {
@@ -256,7 +273,8 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
         };
       },
     };
-    const inicio = { current: performance.now() };
+    inicioPalco.current = performance.now();
+    const inicio = inicioPalco;
     const stage = mountSompoAgriStage({
       mount,
       ruralProps: true,
@@ -286,7 +304,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
       cabine?.desmontar();
       stage?.dispose();
     };
-  }, [motor, modeloUrl, criarCamera, mundo, circuito, sessao, alterarMenu, trocarVista]);
+  }, [motor, modeloUrl, criarCamera, mundo, circuito, alterarMenu, trocarVista]);
 
   // Setas dirigem (Q9). Só as setas: as letras do stand (r, n, d, g, f) seguem com a equipe.
   useEffect(() => {
