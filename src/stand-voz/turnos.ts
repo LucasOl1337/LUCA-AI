@@ -72,6 +72,16 @@ export function juntarPergunta(anterior: string, novo: string): string {
 }
 
 /**
+ * O trecho novo continua a pergunta aberta? 2+ palavras, ou qualquer letra ou
+ * número quando a pergunta ficou sem ponto de interrogação ("Eu quero fazer
+ * em" ‖ "3D", caso do Lucas, 24/10). "Oi?" solto depois de "...sensor?" não continua.
+ */
+export function continuaPergunta(aberta: string, novo: string): boolean {
+  if (!aberta.trim() || !/[\p{L}\p{N}]/u.test(novo)) return false;
+  return palavras(novo).length >= 2 || !/[?!]\s*$/.test(aberta);
+}
+
+/**
  * Fechamento forçado: com motor e multidão o VAD do Scribe não acha o
  * silêncio e a frase nunca fecha (7 de 20 sem commit com 0,6 s; 16 de 20 com
  * 1,2 s). Parcial que não muda por este tempo manda `commit:true`; com o

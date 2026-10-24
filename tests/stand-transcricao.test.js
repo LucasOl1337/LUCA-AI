@@ -138,3 +138,33 @@ test('parcial parada fecha a frase (commit) uma vez, sem esperar o VAD do ruído
   sessao.aoScribe({ message_type: 'partial_transcript', text: 'Quero testar o simulador do trator' });
   assert.equal(sessao.parcialParada(), false, 'texto novo zera o relógio');
 });
+
+// Caso real do Lucas no site, 24/10 08:03: "eu quero a fazenda em 3D" saiu "eu quero fazer em".
+for (const [pedaco1, pedaco2, esperado] of [
+  ['Eu quero a fazenda.', 'Em 3D.', 'Eu quero a fazenda em 3D.'],
+  ['Eu quero fazer em', '3D', 'Eu quero fazer em 3D'],
+]) {
+  test(`caso Lucas: "${pedaco1}" ‖ "${pedaco2}" vai ao cérebro como uma pergunta só`, async () => {
+    const { sessao, pedidos } = preparar((corpo, opcoes) => corpo.texto === pedaco1
+      ? new Promise((_, falha) => opcoes.signal.addEventListener('abort', () => falha(new Error('abortado'))))
+      : fim());
+    sessao.aoScribe({ message_type: 'committed_transcript', text: pedaco1 });
+    await drenar();
+    sessao.aoScribe({ message_type: 'partial_transcript', text: pedaco2 });
+    assert.equal(sessao.estado, 'ouvindo');
+    sessao.aoScribe({ message_type: 'committed_transcript', text: pedaco2 });
+    await drenar();
+    assert.equal(pedidos.at(-1).texto, esperado);
+    assert.equal(pedidos.length, 2);
+  });
+}
+
+test('"Oi?" solto depois de pergunta fechada com ? não vira continuação nem atropela', async () => {
+  const { sessao, pedidos } = preparar((_, opcoes) => new Promise((_, falha) => opcoes.signal.addEventListener('abort', () => falha(new Error('abortado')))));
+  sessao.aoScribe({ message_type: 'committed_transcript', text: 'Como funciona o sensor?' });
+  await drenar();
+  sessao.aoScribe({ message_type: 'committed_transcript', text: 'Oi?' });
+  await drenar();
+  assert.deepEqual(pedidos.map((p) => p.texto), ['Como funciona o sensor?']);
+  assert.equal(sessao.estado, 'pensando');
+});

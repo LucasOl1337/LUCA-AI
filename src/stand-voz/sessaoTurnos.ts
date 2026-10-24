@@ -19,7 +19,7 @@ import { base64DePcm16, criarDetectorFala } from './protocolo';
 import type { EtapaSessao, FimSessao, SessaoDeVoz, SessaoServidor } from './sessaoVoz';
 import {
   JUNTAR_CONTINUACAO_MS, PARCIAL_ESTAVEL_MS, eventoScribe, interrompeFala, juntarPergunta, lerNdjson, mensagemAudioScribe,
-  mesmaParcial, pareceEco, vaiAoCerebro, valeEnquantoPensa, type LinhaTurno,
+  continuaPergunta, mesmaParcial, pareceEco, vaiAoCerebro, valeEnquantoPensa, type LinhaTurno,
 } from './turnos';
 
 export interface SessaoServidorTurnos extends Omit<SessaoServidor, 'conexao'> {
@@ -305,12 +305,15 @@ export class SessaoTurnos implements SessaoDeVoz {
     }
     // Resposta a caminho: 1 palavra solta não atropela o turno. Na fala, "sim"
     // curto por cima do fim da pergunta do LUCA é resposta e continua valendo.
-    if (this.estado === 'pensando' && !independente && !valeEnquantoPensa(evento.texto, this.textoFalado())) return;
+    // Continuação da pergunta que ainda não teve resposta tocada: vem antes do
+    // filtro do "Oi?" solto, porque "Em 3D" (1 palavra de conteúdo) é o resto da frase.
+    const aberta = this.continuacao();
+    const continua = Boolean(aberta) && this.estado !== 'falando' && !this.fila?.tocando && continuaPergunta(aberta, evento.texto);
+    if (!continua && this.estado === 'pensando' && !independente && !valeEnquantoPensa(evento.texto, this.textoFalado())) return;
     if (evento.tipo === 'parcial') {
       // A pessoa continuou a mesma frase depois da hesitação: a resposta ao
       // pedaço não sai; espera o resto e manda a frase inteira.
-      const aberta = this.continuacao();
-      if (aberta && this.estado === 'pensando' && vaiAoCerebro(evento.texto)) {
+      if (continua && this.estado === 'pensando') {
         registrarVoz('continuacao', { aberta, parcial: evento.texto });
         this.turno?.abort();
         this.turno = null;
@@ -325,18 +328,18 @@ export class SessaoTurnos implements SessaoDeVoz {
         if (interrompeFala(evento.texto, this.textoFalado())) this.interromper();
         return;
       }
-      if (!vaiAoCerebro(evento.texto)) return;
+      if (!continua && !vaiAoCerebro(evento.texto)) return;
       this.mudarEstado('ouvindo');
       this.armarSilencio();
       this.anotarParcial(evento.texto);
-      emitirEventoStand({ tipo: 'legenda', texto: aberta ? juntarPergunta(aberta, evento.texto) : evento.texto });
+      emitirEventoStand({ tipo: 'legenda', texto: continua ? juntarPergunta(aberta, evento.texto) : evento.texto });
       return;
     }
     this.parcial = '';
     // O final não pode contornar a mesma confirmação exigida da parcial.
     if ((this.estado === 'falando' || this.fila?.tocando) && !interrompeFala(evento.texto, this.textoFalado())) return;
-    if (!vaiAoCerebro(evento.texto)) return;
-    const pergunta = juntarPergunta(this.continuacao(), evento.texto);
+    if (!continua && !vaiAoCerebro(evento.texto)) return;
+    const pergunta = continua ? juntarPergunta(aberta, evento.texto) : evento.texto;
     emitirEventoStand({ tipo: 'legenda', texto: pergunta });
     void this.perguntar({ texto: pergunta });
   }
@@ -462,6 +465,7 @@ export class SessaoTurnos implements SessaoDeVoz {
         const inicio = this.fila?.tocar(linha.pcm);
         if (inicio == null || !this.fila) return legendaPendente;
         this.mudarEstado('falando');
+        this.perguntaAberta = null;
         if (legendaPendente) {
           const texto = legendaPendente;
           this.legendas.push(window.setTimeout(() => {
