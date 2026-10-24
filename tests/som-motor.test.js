@@ -49,3 +49,31 @@ test('fontes só durante corrida; pausa/fim/saída param, não mudam ganho da vo
  assert.ok(volume.length>0);
  } finally {globalThis.fetch=anterior;}
 });
+
+test('corridas seguidas no mesmo contexto decodificam os loops do motor uma vez só', async () => {
+ let decodes = 0, baixados = 0;
+ const buffer = {numberOfChannels:1,length:24000,sampleRate:24000,getChannelData:()=>new Float32Array(24000)};
+ const ctx = {state:'running',currentTime:0,destination:{},createBuffer:()=>buffer,decodeAudioData:async()=>{decodes++; return buffer;}};
+ const anterior = globalThis.fetch;
+ globalThis.fetch = async()=>{baixados++; return {ok:true,arrayBuffer:async()=>new ArrayBuffer(2)};};
+ try {
+  const som = {obter:()=>ctx,destravar:async()=>true};
+  for (let corrida = 0; corrida < 5; corrida++) { const motor = criarSomMotor(som); await motor.carregar(); motor.desmontar(); }
+  assert.equal(decodes, 2); assert.equal(baixados, 2);
+ } finally {globalThis.fetch=anterior;}
+});
+
+test('falha ao baixar os loops não fica presa: a próxima corrida tenta de novo', async () => {
+ let tentativas = 0;
+ const buffer = {numberOfChannels:1,length:24000,sampleRate:24000,getChannelData:()=>new Float32Array(24000)};
+ const ctx = {state:'running',currentTime:0,destination:{},createBuffer:()=>buffer,decodeAudioData:async()=>buffer};
+ const anterior = globalThis.fetch;
+ globalThis.fetch = async()=>{tentativas++; return tentativas <= 2 ? {ok:false} : {ok:true,arrayBuffer:async()=>new ArrayBuffer(2)};};
+ try {
+  const som = {obter:()=>ctx,destravar:async()=>true};
+  await criarSomMotor(som).carregar();
+  await new Promise((r) => setTimeout(r, 0));
+  await criarSomMotor(som).carregar();
+  assert.ok(tentativas >= 3);
+ } finally {globalThis.fetch=anterior;}
+});

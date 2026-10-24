@@ -3,7 +3,7 @@ import { criarSomMotor } from './somMotor';
 import { COMANDOS_CABINE } from './comandosCabine';
 import { alternarVistaTrator, criarVistaExterna, lerVistaTrator } from './vistaTrator';
 import { registrarContextoCorrida } from './contextoCorrida';
-import { CircuitoHud } from './CircuitoHud';
+import { CircuitoHud, useWebcamCircuito, WebcamCircuito } from './CircuitoHud';
 import { criarSessaoCircuito, type RelatorioCircuito } from './sessaoCircuito';
 import { INICIO_CIRCUITO, ROTA_CIRCUITO } from './circuito';
 import { sonoCabine } from './sonoCabine';
@@ -121,6 +121,7 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
   // No percurso, Options (ou o botão) recomeça o percurso; "Dirigir livre" tira o roteiro sem sair da cabine.
   const [livre, setLivre] = useState(false);
   const [falhaWebgl, setFalhaWebgl] = useState(false);
+  const [webcam, setWebcam] = useWebcamCircuito();
   const criarCabineRef = useRef(criarCabine);
 
   // Rumble pelas bordas do motor (mesmo quadro da física); o zumbido espera o efeito acabar.
@@ -330,7 +331,9 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
       {experiencia === 'percurso' && livre && <ConducaoLivre canal={motor} aoPercurso={() => { setLivre(false); setRodada((n) => n + 1); }} />}
       {circuito && <CircuitoHud key={volta} motor={motor} sessao={sessao} menu={menu} aoMenu={alterarMenu}
         aoAnalisar={(relatorio) => aoAnalisarCircuito?.(relatorio)} aoNovo={novaCorrida}
-        touch={(key, ligada) => { const seta = setaDaTecla(key); if (seta) setasRef.current = { ...setasRef.current, [seta]: ligada }; }} />}
+        touch={(key, ligada) => { const seta = setaDaTecla(key); if (seta) setasRef.current = { ...setasRef.current, [seta]: ligada }; }}
+        webcam={webcam} aoWebcam={setWebcam} />}
+      {circuito && <WebcamCircuito motor={motor} sessao={sessao} menu={menu} ligada={webcam} />}
       {seloFps && <SeloFps palcoRef={palcoRef} />}
       <a className="gameplay-creditos-rurais" href="/models/scenario/CREDITOS.html" target="_blank" rel="noreferrer">Créditos 3D · Scenario</a>
     </div>

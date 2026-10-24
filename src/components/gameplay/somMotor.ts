@@ -27,6 +27,27 @@ export function fecharLoop(ctx: BaseAudioContext, original: AudioBuffer): AudioB
 }
 
 type Camada = { fonte: AudioBufferSourceNode; ganho: GainNode };
+/**
+ * Loops do motor decodificados uma vez por contexto (o da página é único): o
+ * totem troca de corrida o dia inteiro e cada corrida nova criava um som do
+ * motor que baixava e decodificava os dois MP3 de novo (Maratona, 24/10).
+ */
+const loopsPorContexto = new WeakMap<BaseAudioContext, Promise<AudioBuffer[]>>();
+export function loopsDoMotor(ctx: BaseAudioContext): Promise<AudioBuffer[]> {
+  let pedido = loopsPorContexto.get(ctx);
+  if (!pedido) {
+    pedido = Promise.all(['lenta', 'carga'].map(async (nome) => {
+      const r = await fetch(`/audio/trator/${nome}.mp3`);
+      if (!r.ok) throw new Error('motor_asset_indisponivel');
+      return fecharLoop(ctx, await ctx.decodeAudioData(await r.arrayBuffer()));
+    }));
+    loopsPorContexto.set(ctx, pedido);
+    // Falhou (rede, asset): a próxima tentativa baixa de novo.
+    pedido.catch(() => { if (loopsPorContexto.get(ctx) === pedido) loopsPorContexto.delete(ctx); });
+  }
+  return pedido;
+}
+
 export function criarSomMotor(som: SomCompartilhado = somCompartilhado) {
   let buffers: AudioBuffer[] | null = null;
   let carregando: Promise<void> | null = null;
@@ -34,11 +55,7 @@ export function criarSomMotor(som: SomCompartilhado = somCompartilhado) {
   let encerrado = false;
   let geracao = 0;
   const carregar = (ctx: AudioContext) => {
-    carregando ??= Promise.all(['lenta', 'carga'].map(async (nome) => {
-      const r = await fetch(`/audio/trator/${nome}.mp3`);
-      if (!r.ok) throw new Error('motor_asset_indisponivel');
-      return fecharLoop(ctx, await ctx.decodeAudioData(await r.arrayBuffer()));
-    })).then((b) => { buffers = b; }).catch(() => { carregando = null; });
+    carregando ??= loopsDoMotor(ctx).then((b) => { buffers = b; }).catch(() => { carregando = null; });
     return carregando;
   };
   const parar = () => {

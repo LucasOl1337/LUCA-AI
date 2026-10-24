@@ -16,15 +16,13 @@ import { useBipeCabine } from './bipeCabine';
 import { useSegurancaCabine } from './useSegurancaCabine';
 const Webcam = lazy(() => import('./WebcamSonoCabine'));
 const ROTULOS = { feno: 'Obstáculo à frente · reduza e desvie', agua: 'Área alagada · contorne', encosta: 'Encosta · reduza a velocidade', sonolencia: 'Olhos fechados · pare em segurança' };
-export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, touch }: {
-  motor: CanalGameplay; sessao: SessaoCircuito; menu: boolean; aoMenu(aberto: boolean): void;
-  aoAnalisar(relatorio: RelatorioCircuito): void; aoNovo(): void;
-  touch(tecla: string, ligada: boolean): void;
-}) {
-  const e = useSyncExternalStore(motor.assinar, motor.ler, motor.ler);
-  const sono = useSonoCabine();
+/**
+ * Webcam de sonolência da Simulação: liga sozinha quando há câmera e vive
+ * acima da corrida (quem monta é o GameplayKiosk, fora do `key` de cada
+ * corrida). Assim "Nova corrida" não fecha e reabre câmera e detector.
+ */
+export function useWebcamCircuito() {
   const [webcam, setWebcam] = useState(false);
-  const [som, setSom] = useState(true);
   useEffect(() => {
     let viva = true;
     void navigator.mediaDevices?.enumerateDevices().then((dispositivos) => {
@@ -32,6 +30,27 @@ export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, t
     }).catch(() => { /* Sem câmera/permissão: a corrida segue sem aviso. */ });
     return () => { viva = false; };
   }, []);
+  return [webcam, setWebcam] as const;
+}
+
+/** Cartão da webcam: some (visibility, o vídeo segue tocando pro detector) no resultado e na pausa, sem fechar a câmera. */
+export function WebcamCircuito({ motor, sessao, menu, ligada }: { motor: CanalGameplay; sessao: SessaoCircuito; menu: boolean; ligada: boolean }) {
+  useSyncExternalStore(motor.assinar, motor.ler, motor.ler);
+  if (!ligada) return null;
+  const fim = !!sessao.registro.resultado;
+  return <Suspense fallback={null}><div className="circuito-webcam" data-config-aberta={menu || fim}><Webcam silenciosa /></div></Suspense>;
+}
+
+export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, touch, webcam = false, aoWebcam = () => undefined }: {
+  motor: CanalGameplay; sessao: SessaoCircuito; menu: boolean; aoMenu(aberto: boolean): void;
+  aoAnalisar(relatorio: RelatorioCircuito): void; aoNovo(): void;
+  touch(tecla: string, ligada: boolean): void;
+  /** Estado da webcam (de quem monta o cartão, `useWebcamCircuito`): a pausa liga e desliga. */
+  webcam?: boolean; aoWebcam?(ligada: boolean): void;
+}) {
+  const e = useSyncExternalStore(motor.assinar, motor.ler, motor.ler);
+  const sono = useSonoCabine();
+  const [som, setSom] = useState(true);
   const audio = useMemo(() => criarAudioCircuito(), [motor]);
   useEffect(() => somCompartilhado.ligarDestravas(window, document), []);
   useEffect(() => () => audio.parar(), [audio]);
@@ -71,12 +90,11 @@ export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, t
       <kbd>{entrada === 'teclado' ? 'W / ↑' : COMANDOS_CABINE.acelerar[entrada]}</kbd> para partir · siga as estacas até a chegada</p>}
     {!fim && <div className="circuito-avisos" aria-live="polite">{[...riscosCircuito(e, sono?.status === 'alarm')].map(([s, gravidade]) => <p key={s} data-gravidade={gravidade}>{ROTULOS[s]}</p>)}</div>}
     {!menu && !fim && <div className="circuito-touch" aria-label="Controles de toque">{[['ArrowLeft', '←'], ['ArrowDown', 'Freio'], ['ArrowUp', 'Acelerar'], ['ArrowRight', '→']].map(([key, label]) => <button key={key} aria-label={label} onPointerDown={(ev) => { ev.currentTarget.setPointerCapture(ev.pointerId); touch(key, true); }} onPointerUp={() => touch(key, false)} onPointerCancel={() => touch(key, false)} onLostPointerCapture={() => touch(key, false)}>{label}</button>)}</div>}
-    {webcam && !fim && <Suspense fallback={null}><div className="circuito-webcam" data-config-aberta={menu}><Webcam silenciosa /></div></Suspense>}
     {menu && !fim && <section className="circuito-dialogo" role="dialog" aria-modal="true" aria-label="Opções do circuito">
       <h2>Corrida pausada</h2>
       <p>Siga as estacas até a chegada, desviando dos obstáculos e da água; reduza na encosta. O tempo parado não conta.</p>
       <label><input type="checkbox" checked={som} onChange={(ev) => { setSom(ev.target.checked); if (ev.target.checked) void audio.liberar(); }} /> Sons de risco {som ? 'ligados' : 'desligados'}</label>
-      <label><input type="checkbox" checked={webcam} onChange={(ev) => setWebcam(ev.target.checked)} /> Webcam e alerta de sonolência</label>
+      <label><input type="checkbox" checked={webcam} onChange={(ev) => aoWebcam(ev.target.checked)} /> Webcam e alerta de sonolência</label>
       <details><summary>Comandos e privacidade</summary>
         <p>Controle: R2 acelera · L2 freia e dá ré · analógico esquerdo vira · ✕ troca a câmera · Options pausa · PS volta à Coruja. Teclado: W/↑ acelera · S/↓/espaço freia · A D/← → viram · C troca a câmera · Esc pausa.</p>
         <p>Sons de risco são tons curtos, sem voz. A imagem da webcam fica só neste navegador; o alerta de sonolência é experimental, não é sistema de segurança.</p>
@@ -90,7 +108,7 @@ export function CircuitoHud({ motor, sessao, menu, aoMenu, aoAnalisar, aoNovo, t
       <p>{textoResultadoCircuito(r).resumo}</p>
       <details><summary>Como a corrida é avaliada</summary><ul>{REGRAS_CIRCUITO_TELA.map((t) => <li key={t}>{t}</li>)}</ul>{r.pausas.length > 0 && <p>Pausas nesta corrida: {r.pausas.length}.</p>}</details>
       <button data-acao="nova-corrida" onClick={aoNovo} autoFocus>Nova corrida <kbd>{confirmar}</kbd></button>
-      <button data-acao="analisar-circuito" onClick={() => { setWebcam(false); aoAnalisar(sessao.relatorio()); }}>Analisar relatório · abrir chat dos agentes</button>
+      <button data-acao="analisar-circuito" onClick={() => { aoWebcam(false); aoAnalisar(sessao.relatorio()); }}>Analisar relatório · abrir chat dos agentes</button>
     </section>}
   </div>;
 }
