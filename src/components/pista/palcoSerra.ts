@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { createSompoRenderer, createSompoRenderMeter, disposeSompoObject } from '../sompo/sompoStage';
 import { createSompoPostProcessing } from '../sompo/createSompoPostProcessing';
+import { soltarLutCompartilhada } from '../sompo/soltarLutCompartilhada';
 import { criarPortaoDeAquecimento, pixelRatioDoDegrau, PERFIL_GAMEPLAY, qualidadeInicial, regularQualidade } from '../sompo/qualidadeAdaptativa';
 import type { SompoRenderStats } from '../sompo/sompoStudioConfig';
 import { montarCenarioSerra } from './cenarioSerra';
@@ -77,7 +78,7 @@ export function montarPalcoSerra({ mount, passo, aoStats, aoModelo, aoErroWebgl 
     reiniciar() { atores.reiniciar(); },
     dispose() {
       vivo = false; cancelAnimationFrame(quadro); observador.disconnect();
-      atores.dispose(); cenario.dispose(); post.dispose(); disposeSompoObject(scene);
+      atores.dispose(); cenario.dispose(); post.dispose(); soltarLutCompartilhada(renderer, scene); disposeSompoObject(scene);
       renderer.dispose(); renderer.domElement.remove();
     },
   };

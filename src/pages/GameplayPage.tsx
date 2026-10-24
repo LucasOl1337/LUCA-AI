@@ -24,8 +24,7 @@ class GameplayBoundary extends Component<{ children: ReactNode }, { failed: bool
   }
 }
 
-function Cabine({ seloFps = false, webcam = false }: { seloFps?: boolean; webcam?: boolean }) {
-  const { location } = useAppLocation();
+function Cabine({ seloFps = false, webcam = false, caminhao = false }: { seloFps?: boolean; webcam?: boolean; caminhao?: boolean }) {
   const [cameraDisponivel, setCameraDisponivel] = useState(false);
   const [cameraDesligada, setCameraDesligada] = useState(false);
   useEffect(() => {
@@ -38,7 +37,7 @@ function Cabine({ seloFps = false, webcam = false }: { seloFps?: boolean; webcam
   return (
     <GameplayBoundary>
       <Suspense fallback={<p className="experience-game-status" role="status">Carregando a cabine do Trator MAX…</p>}>
-        {location.veiculo === 'caminhao' ? <PistaKiosk seloFps={seloFps} /> : <GameplayComCabine seloFps={seloFps} />}
+        {caminhao ? <PistaKiosk seloFps={seloFps} /> : <GameplayComCabine seloFps={seloFps} />}
       </Suspense>
       {/* Fora do Suspense da cabine: detector não bloqueia o GLB; falha automática é silenciosa. */}
       {!cameraDesligada && (webcam || cameraDisponivel) && <Suspense fallback={null}><WebcamSonoCabine silenciosa={!webcam} aoDesligar={() => setCameraDesligada(true)} /></Suspense>}
@@ -50,7 +49,7 @@ function Cabine({ seloFps = false, webcam = false }: { seloFps?: boolean; webcam
  * /gameplay?quiosque=1 (ensaio da feira, item 7): tela inteira, sem landing nem
  * menu, para F5 no totem voltar jogando sem ninguém tocar. Shift+Q volta à landing.
  */
-export function GameplayQuiosque({ aoSair, seloFps = false, webcam = false }: { aoSair: () => void; seloFps?: boolean; webcam?: boolean }) {
+export function GameplayQuiosque({ aoSair, seloFps = false, webcam = false, caminhao = false }: { aoSair: () => void; seloFps?: boolean; webcam?: boolean; caminhao?: boolean }) {
   useEffect(() => {
     const tecla = (evento: KeyboardEvent) => {
       if (evento.shiftKey && evento.key.toLowerCase() === 'q' && !evento.ctrlKey && !evento.metaKey && !evento.altKey) aoSair();
@@ -60,7 +59,7 @@ export function GameplayQuiosque({ aoSair, seloFps = false, webcam = false }: { 
   }, [aoSair]);
   return (
     <div className="experience-game-quiosque" data-quiosque="true" aria-label="Cabine jogável do Trator MAX">
-      <Cabine seloFps={seloFps} webcam={webcam} />
+      <Cabine seloFps={seloFps} webcam={webcam} caminhao={caminhao} />
     </div>
   );
 }
@@ -76,7 +75,9 @@ export default function GameplayPage() {
   const seloFps = location.fps === '1';
   // /gameplay?webcam=1 (opção do CP3, 19/10): detector de sonolência da /sonolencia na cabine.
   const webcam = location.webcam === '1';
-  if (location.quiosque === '1') return <GameplayQuiosque aoSair={sairDoQuiosque} seloFps={seloFps} webcam={webcam} />;
+  // /gameplay?veiculo=caminhao (Pista, 24/10): caminhão na serra sem freio no lugar do trator.
+  const caminhao = location.veiculo === 'caminhao';
+  if (location.quiosque === '1') return <GameplayQuiosque aoSair={sairDoQuiosque} seloFps={seloFps} webcam={webcam} caminhao={caminhao} />;
   const telaInteira = typeof document !== 'undefined' && document.fullscreenEnabled;
   const mostrarAjuda = !playing || ajuda;
   return (
@@ -102,7 +103,7 @@ export default function GameplayPage() {
       <div className="gameplay-page-corpo">
         {playing && (
           <div ref={quadroRef} className="experience-game-viewport" aria-label="Cabine jogável do Trator MAX">
-            <Cabine seloFps={seloFps} webcam={webcam} />
+            <Cabine seloFps={seloFps} webcam={webcam} caminhao={caminhao} />
           </div>
         )}
         {mostrarAjuda && (
