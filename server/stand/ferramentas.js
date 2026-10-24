@@ -39,7 +39,7 @@ export const FERRAMENTAS_STAND = Object.freeze([
     description: 'Toca no monitor um vídeo pré-gravado do stand. Só use ids da lista de vídeos disponíveis. Fale o resumo antes.',
     parameters: {
       type: 'object',
-      properties: { id: { type: 'string', description: 'Id do vídeo, por exemplo pipeline-completo' } },
+      properties: { id: { type: 'string', description: 'Id do vídeo, por exemplo painel-sompo' } },
       required: ['id'],
     },
   },

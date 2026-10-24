@@ -56,9 +56,10 @@ test('videoPublicado: só vale com id no manifesto e mp4 no disco', (t) => {
   assert.equal(videoPublicado('pipeline-completo', { lerManifesto: () => { throw new Error('ENOENT'); }, raiz }), false);
 });
 
-test('tocar_video com o manifesto real da M7 conhece pipeline-completo', async () => {
-  const r = await executarFerramentaStand('tocar_video', { id: 'pipeline-completo' });
+test('tocar_video com o manifesto real: painel-sompo existe e pipeline-completo saiu (24/10)', async () => {
+  const r = await executarFerramentaStand('tocar_video', { id: 'painel-sompo' });
   assert.ok(r.ok || r.erro === 'video_sem_arquivo', JSON.stringify(r));
+  assert.equal((await executarFerramentaStand('tocar_video', { id: 'pipeline-completo' })).erro, 'video_desconhecido');
 });
 
 test('ações do site passam pelo validador da M3 e viram evento acao_site', async () => {

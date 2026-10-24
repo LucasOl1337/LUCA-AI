@@ -32,9 +32,9 @@ function cacheEmMemoria() {
   return { get: (k) => dados[k], set: (k, v) => { dados[k] = v; }, salvar() {} };
 }
 
-test('manifesto do stand é válido e tem os três vídeos do primeiro corte', () => {
+test('manifesto do stand é válido; pipeline-completo saiu da Vitrine em 24/10 (ordem do Lucas)', () => {
   const manifesto = carregarManifesto();
-  assert.deepEqual(manifesto.map((i) => i.id), ['pipeline-completo', 'painel-sompo', 'painel-segurado']);
+  assert.deepEqual(manifesto.map((i) => i.id), ['painel-sompo', 'painel-segurado']);
   assert.ok(manifesto.every((i) => i.arquivo === `/stand/videos/${i.id}.mp4`));
 });
 
@@ -42,7 +42,7 @@ test('validarManifesto aponta o id e o campo com problema', () => {
   const base = carregarManifesto()[0];
   assert.throws(() => validarManifesto([{ ...base, id: 'Com Espaço' }]), /id inválido/);
   assert.throws(() => validarManifesto([base, { ...base }]), /id repetido/);
-  assert.throws(() => validarManifesto([{ ...base, resumo_falado: ' ' }]), /pipeline-completo.*resumo_falado vazio/);
+  assert.throws(() => validarManifesto([{ ...base, resumo_falado: ' ' }]), /painel-sompo.*resumo_falado vazio/);
   assert.throws(() => validarManifesto([{ ...base, duracao_s: 0 }]), /duracao_s/);
   assert.throws(() => validarManifesto([{ ...base, perguntas_exemplo: base.perguntas_exemplo.slice(0, 7) }]), /8 a 15/);
   const outro = { ...base, id: 'outro', perguntas_exemplo: [...base.perguntas_exemplo] };
@@ -132,7 +132,7 @@ test('tabela de avaliação com vetores reais congelados: ≥90% de acerto e 0 f
   const foraDeEscopo = carregarForaDeEscopo();
   assert.ok(casos.length >= 30);
   assert.ok(casos.some((c) => c.pergunta.startsWith('como que funciona o fluxo do dado até a entrega para os agentes')
-    && c.esperado === 'pipeline-completo'));
+    && c.esperado === null));
 
   const vetorDe = (texto) => {
     const v = vetores[hashTexto(texto)];

@@ -1,5 +1,5 @@
 {
-  "nota": "Âncoras fora de escopo (M7), escritas à mão. Se a pergunta fica mais perto destas frases que de qualquer vídeo, o roteador devolve null e a IA responde ao vivo. Não copiar frases da tabela de avaliação.",
+  "nota": "Âncoras fora de escopo (M7), escritas à mão. Se a pergunta fica mais perto destas frases que de qualquer vídeo, o roteador devolve null e a IA responde ao vivo. Não copiar frases da tabela de avaliação. 24/10: o vídeo pipeline-completo saiu da Vitrine por ordem do Lucas ('está horrível'); as perguntas-exemplo dele ficaram aqui como âncoras, então essas perguntas são respondidas ao vivo, sem vídeo, até o vídeo novo entrar.",
   "perguntas": [
     "vocês trabalham pra qual empresa",
     "vocês são funcionários da seguradora",
@@ -19,6 +19,19 @@
     "dá pra dirigir o trator no videogame",
     "vocês têm cartão de visita",
     "onde eu compro isso",
-    "qual a previsão do tempo pra amanhã"
+    "qual a previsão do tempo pra amanhã",
+    "como que funciona o fluxo do dado até a entrega para os agentes",
+    "como funciona o sistema de vocês do começo ao fim",
+    "o que esse trator faz",
+    "me explica como funciona isso aqui",
+    "de onde vem o dado e pra onde ele vai",
+    "o sensor manda a informação pra onde",
+    "como a inteligência artificial analisa o que acontece no campo",
+    "como vocês descobrem o risco de acidente na lavoura",
+    "o que acontece quando o trator quase bate em alguma coisa",
+    "como funciona o look ai",
+    "mostra o processo inteiro da luca ai",
+    "como a informação sai da máquina e chega na seguradora",
+    "o que é essa bancada de agentes"
   ]
 }

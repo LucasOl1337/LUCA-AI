@@ -320,7 +320,7 @@ test('turno_id: dois pedidos concorrentes e retry concluído nunca repetem açã
     return (async function* () {
       entrou();
       await continuar;
-      yield { fim: true, ferramentas: [{ id: 'f1', type: 'function', function: { name: 'tocar_video', arguments: '{"id":"pipeline-completo"}' } }] };
+      yield { fim: true, ferramentas: [{ id: 'f1', type: 'function', function: { name: 'tocar_video', arguments: '{"id":"painel-sompo"}' } }] };
     })();
   } });
   const { conversa_id } = await (await pedir('/api/stand/sessao', {})).json();

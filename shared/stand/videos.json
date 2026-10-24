@@ -1,27 +1,5 @@
 [
   {
-    "id": "pipeline-completo",
-    "titulo": "O caminho do dado, do campo até a bancada de agentes",
-    "arquivo": "/stand/videos/pipeline-completo.mp4",
-    "duracao_s": 93.2,
-    "perguntas_exemplo": [
-      "como que funciona o fluxo do dado até a entrega para os agentes",
-      "como funciona o sistema de vocês do começo ao fim",
-      "o que esse trator faz",
-      "me explica como funciona isso aqui",
-      "de onde vem o dado e pra onde ele vai",
-      "o sensor manda a informação pra onde",
-      "como a inteligência artificial analisa o que acontece no campo",
-      "como vocês descobrem o risco de acidente na lavoura",
-      "o que acontece quando o trator quase bate em alguma coisa",
-      "como funciona o look ai",
-      "mostra o processo inteiro da luca ai",
-      "como a informação sai da máquina e chega na seguradora",
-      "o que é essa bancada de agentes"
-    ],
-    "resumo_falado": "Vou te mostrar o caminho inteiro: o sensor no trator percebe o risco, o dado chega no painel, vira um episódio gravado e uma bancada de agentes de IA devolve um veredito sobre o que aconteceu. As cenas de risco são simuladas; o veredito foi gerado de verdade."
-  },
-  {
     "id": "painel-sompo",
     "titulo": "O que a seguradora vê no painel",
     "arquivo": "/stand/videos/painel-sompo.mp4",

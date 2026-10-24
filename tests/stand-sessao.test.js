@@ -24,7 +24,7 @@ test('aviso da equipe só aparece em desligado e erro', () => {
 
 test('vídeos saem do manifesto da M7; o de teste só no modo stub', () => {
   assert.equal(videoDoStand('painel-sompo', false).arquivo, '/stand/videos/painel-sompo.mp4');
-  assert.equal(videoDoStand('pipeline-completo', false).arquivo, '/stand/videos/pipeline-completo.mp4');
+  assert.equal(videoDoStand('pipeline-completo', false), undefined); // saiu da Vitrine em 24/10
   assert.equal(videoDoStand('pipeline-completo', true).arquivo, '/icons/heartbeat.mp4');
   assert.equal(videoDoStand('nao-existe', false), undefined);
   assert.equal(videoDoStand('', true), undefined);

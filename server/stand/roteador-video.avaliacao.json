@@ -1,13 +1,13 @@
 {
   "nota": "Tabela fixa escrita à mão (M7). Não gerar em lote. esperado = id do vídeo ou null (resposta ao vivo).",
   "casos": [
-    { "pergunta": "como que funciona o fluxo do dado até a entrega para os agentes?", "esperado": "pipeline-completo" },
-    { "pergunta": "o que é isso aqui, como funciona?", "esperado": "pipeline-completo" },
-    { "pergunta": "explica pra mim o caminho da informação desde o trator", "esperado": "pipeline-completo" },
-    { "pergunta": "esse sensor aí manda os dados pra quem?", "esperado": "pipeline-completo" },
-    { "pergunta": "como a ia percebe que teve um acidente no campo", "esperado": "pipeline-completo" },
-    { "pergunta": "qual é o passo a passo do look ai", "esperado": "pipeline-completo" },
-    { "pergunta": "e esses agentes, o que eles fazem com o dado do trator", "esperado": "pipeline-completo" },
+    { "pergunta": "como que funciona o fluxo do dado até a entrega para os agentes?", "esperado": null },
+    { "pergunta": "o que é isso aqui, como funciona?", "esperado": null },
+    { "pergunta": "explica pra mim o caminho da informação desde o trator", "esperado": null },
+    { "pergunta": "esse sensor aí manda os dados pra quem?", "esperado": null },
+    { "pergunta": "como a ia percebe que teve um acidente no campo", "esperado": null },
+    { "pergunta": "qual é o passo a passo do look ai", "esperado": null },
+    { "pergunta": "e esses agentes, o que eles fazem com o dado do trator", "esperado": null },
 
     { "pergunta": "e a sompo, o que ela consegue ver?", "esperado": "painel-sompo" },
     { "pergunta": "o que a seguradora enxerga no painel dela", "esperado": "painel-sompo" },
