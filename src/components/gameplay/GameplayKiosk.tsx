@@ -244,7 +244,8 @@ export default function GameplayKiosk({ criarCabine, modeloUrl, criarCamera = cr
         reiniciarSegurado = borda.segurado;
         const sessao = sessaoRef.current;
         // O respiro do resultado é de cada corrida: corrida nova começa sem o fim da anterior.
-        if (sessaoDoFim !== sessao) { sessaoDoFim = sessao; fimAte = null; }
+        // A câmera externa também larga atrás do trator, sem o rumo amortecido da corrida anterior.
+        if (sessaoDoFim !== sessao) { sessaoDoFim = sessao; fimAte = null; externa.reiniciar(); }
         const fimCorrida = circuito ? sessao.registro.resultado : null;
         if (fimCorrida && fimAte === null) fimAte = performance.now() + ESPERA_RESULTADO_MS;
         if (borda.reiniciar) {
