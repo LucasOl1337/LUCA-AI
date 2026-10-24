@@ -243,9 +243,13 @@ export default function StandPage() {
     else void iniciarVoz(tocouNaEscuta() ?? undefined);
   }, [modoStub, iniciarVoz, tocouNaEscuta]);
 
-  // Vitrine encerra a conversa anterior. Site e Simulação preservam a mesma sessão.
+  // Vitrine e palco (o repouso) encerram a conversa anterior. Site e Simulação preservam a mesma sessão.
+  // Palco ligado de propósito (F, botão) no meio de uma conversa não a corta: só sem conversa é fim de visita.
+  const vozAtiva = useRef(voz.ativa);
+  vozAtiva.current = voz.ativa;
+  const repouso = modo.modo === 'vitrine' || modo.palco;
   useEffect(() => {
-    if (modo.modo === 'coruja' || modo.modo === 'site' || modo.modo === 'simulacao') return;
+    if (!repouso || (modo.modo !== 'vitrine' && vozAtiva.current)) return;
     nivel.current = 0;
     despachar({ tipo: 'encerrar' });
     canal.current.enviar({ tipo: 'encerrar' });
@@ -253,7 +257,7 @@ export default function StandPage() {
     // Fim de visita: a próxima pessoa não herda experiências, chat da corrida nem vista do trator.
     experienciasAbertas.current.clear();
     encerrarVisita();
-  }, [modo.modo, encerrarVoz]);
+  }, [repouso, encerrarVoz]);
 
   const agirNoPad = useCallback((acao: AcaoNavegacao) => {
     if (acao.tipo === 'conversar') {

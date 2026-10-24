@@ -21,7 +21,7 @@ Sons ligados por padrão, liberados por gesto. Quatro tons distintos curtos usam
 
 ## Análise fora do WebGL
 
-“Analisar relatório” desmonta o componente de gameplay e abre uma página de conversa com os agentes do Laboratório, sem canvas, rAF, controle do jogo ou webcam. A run fica em memória e `sessionStorage` da aba (sobrevive a recarregar); o totem voltar ao repouso (Vitrine, fim de visita) apaga essa conversa, para o próximo visitante não cair nela. No repouso a Coruja também esquece as experiências abertas e a vista do trator volta à cabine (`src/components/stand/fimDeVisita.ts`). Nenhuma análise paga acontece nessa transição: o visitante confirma “Enviar para análise”.
+“Analisar relatório” desmonta o componente de gameplay e abre uma página de conversa com os agentes do Laboratório, sem canvas, rAF, controle do jogo ou webcam. A run fica em memória e `sessionStorage` da aba (sobrevive a recarregar); o totem voltar ao repouso (palco após 45 s sem ninguém, ou Vitrine; fim de visita) apaga essa conversa, para o próximo visitante não cair nela. No repouso a Coruja também esquece as experiências abertas e a vista do trator volta à cabine (`src/components/stand/fimDeVisita.ts`). Nenhuma análise paga acontece nessa transição: o visitante confirma “Enviar para análise”.
 
 A página reutiliza `POST /api/lab/cases`, `POST /api/lab/cases/:id/analyses` e `GET /api/lab/cases/:id`; sem novo endpoint ou tabela. IDs de análise/caso são preservados, respostas persistidas são recuperadas, e análises em andamento não são reenviadas automaticamente. A conta é obrigatória. Nenhum parecer é simulado no produto quando a API falha. O botão de nova run limpa o estado da conversa ativa sem apagar casos da conta. A conversa da Coruja permanece no estado do stand.
 

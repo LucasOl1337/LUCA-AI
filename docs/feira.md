@@ -28,6 +28,10 @@ A página `https://luca-ai.com.br/totem` tem os dois botões: **Abrir Totem** (c
 
 Atalho de equipe: **Shift+Q** sai do jogo em tela cheia e, na coruja sem login, abre a tela de entrar.
 
+**Coruja sozinha na tela (palco).** Depois de 45 s sem ninguém, a coruja fica sozinha na tela, sem texto em volta, e a conversa anterior é encerrada. Ela volta com tudo quando alguém toca na tela, fala ou aparece na frente da câmera. Para deixar a coruja sozinha de propósito, aperte **F**, que também põe o navegador em tela cheia, ou toque em **Tela cheia** na barra de baixo. **F** de novo desfaz. Para mudar o tempo, abra `https://luca-ai.com.br/stand/?palco=90` (90 s). `?palco=0` volta o comportamento antigo, em que a coruja cai na Vitrine depois de um tempo parada. A Vitrine continua pelo botão ou pedindo por voz.
+
+**Simulação.** Ao tocar em Simulação, a tela dos controles mostra "Começando em 5…" e a corrida começa sozinha. **Começar já**, Enter ou ✕/A no controle começam antes.
+
 ### Medir se o jogo está liso (antes de abrir, uma vez)
 
 1. No totem, abra `https://luca-ai.com.br/gameplay?quiosque=1&fps=1`. É o mesmo jogo, só que com um selo pequeno no canto de cima, à esquerda.
